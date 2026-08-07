@@ -333,10 +333,19 @@ def test_definitions_resolve(env: Path) -> None:
     }
     assert "h3_grid_weights" in ecmwf_parents
 
-    # The power-data freshness check and the NWP data-quality check are both registered.
+    # Every production asset's check is registered.
     check_keys = {key.name for key in asset_graph.asset_check_keys}
     assert "power_data_is_fresh" in check_keys
     assert "nwp_has_no_unexpected_nulls" in check_keys
+    assert "live_forecasts_are_healthy" in check_keys
+
+    # ...and the 6-hourly scheduled job actually runs the live check: an AssetSelection includes
+    # its assets' checks, so this is what makes the check evaluate on every production tick.
+    live_job_checks = {
+        key.name
+        for key in repo.get_job("live_forecasts_job").asset_layer.asset_graph.asset_check_keys
+    }
+    assert live_job_checks == {"live_forecasts_are_healthy"}
 
     # A job whose AssetSelection names a missing asset resolves to an empty/wrong key set.
     for job_name, expected_asset in [

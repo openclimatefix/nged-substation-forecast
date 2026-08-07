@@ -36,9 +36,10 @@ because this pull failed, or ran long — ``live_forecasts`` still runs on time 
 telemetry is already on disk. Making the ordering a precondition would convert one failed
 ingest into a missing forecast, which is the failure mode the whole design exists to avoid.
 
-(The NWP run used is stamped on every forecast row as ``nwp_init_time``; telemetry staleness is
-not yet recorded on the forecast — see issue #424.) Rule: "never make one production job's run
-status a precondition for another's" —
+(The NWP run used is stamped on every forecast row as ``nwp_init_time``, and
+``live_forecasts_are_healthy`` reports how many daily NWP runs were missing at forecast time;
+telemetry staleness is not yet recorded on the forecast row itself.) Rule: "never make one
+production job's run status a precondition for another's" —
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>."""
 
 ecmwf_ens_job = define_asset_job(

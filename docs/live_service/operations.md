@@ -173,12 +173,39 @@ nulls in the three de-accumulated variables is *expected* and is not a fault —
 nulls is rejected at ingest by `Nwp.validate`, which means the day's run simply does not land: the
 symptom you will actually see is a **missed run**, not corrupt data.
 
+**Reading the live-forecast check.** `live_forecasts_are_healthy` runs against `live_forecasts`
+after each 6-hourly materialisation, is likewise non-blocking WARN, and reads the forecasts back
+*off disk* — so it answers "did this slot really land usable rows?", which the run's own green tick
+does not. It goes yellow when the slot wrote no rows at all, when any row carries a null, NaN or
+infinite `power_fcst`, when a row targets a `valid_time` at or before its own init time, when the
+slot forecast fewer time series than the promoted model was trained on, or when daily NWP runs were
+missing. Its metadata carries each of those counts plus `nwp_init_time_on_disk` and
+`nwp_init_time_expected`, so the description usually tells you which of the two halves — the write
+or the weather — is at fault. Note that the check only reports on slots where the asset
+*succeeded*; a slot that raised fails the run instead, and Sentry reports that — see *When
+`live_forecasts` fails outright* below.
+
 **When a daily NWP run is missing.** We ingest one ECMWF run per day (the 00Z run, downloaded at
 08:30 UTC), so healthy NWP is between 12 and 30 hours old depending on which 6-hourly slot is
-forecasting. Raw age is not a fault signal; a missed *run* is. If one or two runs are missed,
-`live_forecasts` continues normally against the freshest run on disk — it selects "the freshest run
-present as of the forecast init time", so no intervention is needed beyond fixing the download.
-Materialise the missed `ecmwf_ens` partitions once the feed recovers.
+forecasting. Raw age is not a fault signal; a missed *run* is, and
+`live_forecasts_are_healthy`'s `n_missed_nwp_runs` is that count: **zero in every healthy slot**,
+whichever slot it is. Read it as follows.
+
+- **0** — healthy, whatever the NWP age happens to be. Do not act on the age.
+- **1** — one daily run absent. `live_forecasts` continues normally against the freshest run on
+  disk, so this needs no intervention beyond fixing the download; materialise the missed
+  `ecmwf_ens` partition once the feed recovers, and the count clears at the next slot.
+- **2 or more** — the download has been failing for more than a day. Still not an emergency, but
+  chase it the same business day: forecast quality decays as the run ages, and past roughly 15 days
+  of staleness the run stops covering the forecast horizon altogether — see *When
+  `live_forecasts` fails outright* below.
+- **`unknown — no NWP run at or before this slot`** — the NWP table holds nothing usable at all.
+  Expect `live_forecasts` itself to be failing too.
+
+One count deserves a caveat: the check demands the day's run by 14:00 UTC, late enough to clear the
+08:30 download plus its retry window, so a download that fails today first shows up at the 18:00
+slot rather than the 12:00 one. That six-hour lag is deliberate — the alternative is a false alarm
+on every morning the download merely ran slowly.
 
 **When `live_forecasts` fails outright.** Today, if no NWP run on disk is recent enough to cover
 the forecast horizon (roughly 15 days of staleness), the asset raises rather than producing a

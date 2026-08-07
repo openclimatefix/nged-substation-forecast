@@ -15,11 +15,12 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.ml_schemas import AllFeatures
-from dagster import DagsterInstance, RunConfig, materialize
+from dagster import AssetCheckSeverity, DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
+from nged_substation_forecast.defs.checks import live_forecasts_are_healthy
 from nged_substation_forecast.defs.production_assets import LiveForecastsConfig, live_forecasts
 
 pytestmark = pytest.mark.integration
@@ -225,6 +226,32 @@ def test_accumulation_across_partitions(env: dict[str, str]) -> None:
         _EARLIER_TICK_POWER_FCST_INIT_TIME,
         _POWER_FCST_INIT_TIME,
     }
+
+
+def test_check_passes_after_a_real_live_materialisation(env: dict[str, str]) -> None:
+    """``live_forecasts_are_healthy`` passes against a genuinely produced forecast.
+
+    This is the only test that exercises the check *partitioned*: ``build_asset_check_context``
+    (used by ``tests/test_checks.py``) cannot carry a partition key, so only a real materialisation
+    proves the check reports on its partition's ``power_fcst_init_time`` — the window's end — and
+    not on whatever slot the wall clock happens to be in.
+    """
+    result = materialize(
+        [live_forecasts, live_forecasts_are_healthy],
+        partition_key=_PARTITION_KEY,
+        run_config=RunConfig(ops={"live_forecasts": LiveForecastsConfig(availability_mode="live")}),
+        instance=DagsterInstance.ephemeral(),
+    )
+    assert result.success
+
+    (evaluation,) = result.get_asset_check_evaluations()
+    assert evaluation.check_name == "live_forecasts_are_healthy"
+    assert evaluation.passed, evaluation.description
+    assert evaluation.severity == AssetCheckSeverity.WARN
+    assert evaluation.metadata["power_fcst_init_time"].value == _POWER_FCST_INIT_TIME.isoformat()
+    assert evaluation.metadata["n_missed_nwp_runs"].value == 0
+    assert evaluation.metadata["n_invalid_rows"].value == 0
+    assert evaluation.metadata["n_time_series"].value == 1
 
 
 def _capture_checkins(monkeypatch: pytest.MonkeyPatch) -> list[dict]:

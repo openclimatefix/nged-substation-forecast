@@ -135,8 +135,9 @@ code as it stands; "intended" describes where this principle takes it.
 
 | Failure | Today | Intended | Human alerted? |
 |---|---|---|---|
-| One or two daily NWP runs missed | `live_forecasts` selects the freshest run present as of the forecast time, so an older run is used through the normal path | Unchanged, plus a check reporting the count of missed runs 🚧 | No |
-| NWP stale but still covering the horizon | Forecast produced from an increasingly ancient run; `nwp_init_time` is on every row, but nothing warns | Bands widen with the regime; `STALE NWP` warning row 🚧 | No |
+| One or two daily NWP runs missed | `live_forecasts` selects the freshest run present as of the forecast time, so an older run is used through the normal path; `live_forecasts_are_healthy` warns with the count of missed runs | Unchanged | No |
+| NWP stale but still covering the horizon | Forecast produced from an increasingly ancient run; `nwp_init_time` is on every row and `live_forecasts_are_healthy` warns with the missed-run count, but the forecast itself looks as confident as a fresh one | Bands widen with the regime; `STALE NWP` warning row 🚧 | No |
+| A slot produces no rows, or unusable ones, while the asset still succeeds | `live_forecasts_are_healthy` warns, naming the row count, the invalid rows and any trained series that went missing | Unchanged | No |
 | NWP absent, or too old to cover the horizon | **Hard failure** — the asset raises and NGED gets nothing (tracked to change in [#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) | Weather-blind forecast, wide bands, warning row 🚧 | No |
 | Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns and names the late series | Unchanged, plus regime-appropriate band widening 🚧 | No |
 | A meter reporting detectably wrong values | Partly detected at ingest; see [Missing versus wrong](#missing-versus-wrong) | Treated as missing, which routes it into the always-output path 🚧 | No |
@@ -306,7 +307,7 @@ here: nothing else says clear-sky is what we fall back *to*.
 | Audience | Question | Channel |
 |---|---|---|
 | **Forecast users** (NGED) | "How much should I trust *this row*?" | In-band: quantile spread, plus `nwp_init_time`, already on the row |
-| **Data providers** | "Is *your* feed broken, and since when?" | Aggregated and **attributable**: `power_forecast_warnings`, the freshness check's late-series table |
+| **Data providers** | "Is *your* feed broken, and since when?" | Aggregated and **attributable**: `power_forecast_warnings`, the freshness check's late-series table, the live check's missed-NWP-run count |
 | **Us, the developers** | "Is *our* system at fault?" | Out-of-band: Sentry, plus the missed-check-in alarm |
 
 Inherent stability creates a specific hazard for the third channel: **a system that always succeeds
@@ -330,6 +331,17 @@ ingest schedule or the slot times change, and that still cannot say *how many* r
 The signal is **missed runs** — how many
 daily runs are absent between the freshest run on disk and the freshest that ought to exist by now.
 That is zero in every healthy slot, whichever slot it is.
+
+`live_forecasts_are_healthy` implements exactly that count, and the "freshest that ought to exist"
+half is where the care goes. It is derived from a deadline — how long after a run's `init_time` a
+healthy ingest should have landed it — rather than from the publication time, because what matters
+is when the run reaches *our* disk. The deadline therefore has to clear `ecmwf_ens_schedule`'s
+08:30 UTC start plus that asset's four-hour retry window, so it sits at 14 hours. The consequence
+is a one-run leniency at the 12:00 slot, where today's run has landed but is not yet *demanded*: a
+download that fails today is reported from the 18:00 slot onwards rather than six hours earlier.
+That is the right way round to be wrong. A tighter deadline would buy those six hours at the price
+of a false alarm on every morning the download merely ran slowly, which is precisely the failure
+mode this whole section exists to avoid.
 
 ### Missingness in learned models
 

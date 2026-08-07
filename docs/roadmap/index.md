@@ -85,8 +85,9 @@ AWS — see [Live service](live-service.md).
   `ml_core._repro`; every MLflow run carries the stamp)
 - Drop Hydra in favour of plain YAML + importlib + pydantic
 - Asset check on `live_forecasts` reporting **missed NWP runs** at forecast time
-  ([#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424)) — every
-  production asset has a check except the one NGED consume
+  ([#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424)) ✅
+  (`live_forecasts_are_healthy`: it also reads the slot's rows back off disk, so every production
+  asset now has a check — including the one NGED consume)
 - Start the [intervention log](../live_service/intervention-log.md) ✅ (started with the v0.1 AWS
   period; its measurement window opens at v1.0, but it cannot be reconstructed retrospectively,
   which is why it exists now)
