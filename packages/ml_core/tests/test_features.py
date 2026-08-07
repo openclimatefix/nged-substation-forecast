@@ -16,6 +16,7 @@ from ml_core.features.tabular_feature_engineer import (
     _apply_local_time_features,
     _apply_rolling_mean_feature,
     _engineer_features,
+    _whole_hour_utc_offset,
 )
 
 
@@ -313,6 +314,46 @@ def test_apply_local_time_features_dst_transitions():
     # clock (01:30), the repeated hour, so their time-of-day features are identical.
     assert result["local_time_of_day_sin"][2] == pytest.approx(result["local_time_of_day_sin"][4])
     assert result["local_time_of_day_cos"][2] == pytest.approx(result["local_time_of_day_cos"][4])
+
+
+def test_whole_hour_utc_offset_gb():
+    """The GB path: both British offsets are whole hours, so the guard passes silently."""
+    lf = pl.LazyFrame(
+        {
+            "valid_time": [
+                datetime(2023, 1, 10, 12, 0, tzinfo=timezone.utc),  # GMT, UTC+0
+                datetime(2023, 7, 10, 12, 0, tzinfo=timezone.utc),  # BST, UTC+1
+            ]
+        }
+    ).with_columns(local_time=pl.col("valid_time").dt.convert_time_zone("Europe/London"))
+
+    result = lf.select(local_utc_offset=_whole_hour_utc_offset(pl.col("local_time"))).collect()
+
+    assert result["local_utc_offset"].to_list() == [0, 1]
+    assert result["local_utc_offset"].dtype == pl.Int8
+
+
+@pytest.mark.parametrize(
+    ("time_zone", "month"),
+    [
+        ("Asia/Kolkata", 1),  # UTC+5:30 — would collide with Nepal's +5:45 if we rounded.
+        ("Asia/Kathmandu", 1),  # UTC+5:45.
+        ("Australia/Adelaide", 6),  # UTC+9:30 — would collide with UTC+9:00.
+        ("America/St_Johns", 1),  # UTC-3:30 — the negative case a floored division moved to -4.
+    ],
+)
+def test_whole_hour_utc_offset_rejects_sub_hour_zone(time_zone: str, month: int):
+    """A sub-hour offset is a contract violation, so it raises instead of being rounded away.
+
+    Only a code change to the hard-coded time zone can reach this state, which is why raising is
+    the right response rather than degrading. See ``_whole_hour_utc_offset``.
+    """
+    lf = pl.LazyFrame(
+        {"valid_time": [datetime(2023, month, 10, 12, 0, tzinfo=timezone.utc)]}
+    ).with_columns(local_time=pl.col("valid_time").dt.convert_time_zone(time_zone))
+
+    with pytest.raises(pl.exceptions.InvalidOperationError):
+        lf.select(local_utc_offset=_whole_hour_utc_offset(pl.col("local_time"))).collect()
 
 
 def test_parsed_features_from_selected_features():

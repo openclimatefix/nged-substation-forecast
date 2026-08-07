@@ -97,7 +97,17 @@ class AllFeatures(pt.Model):
 
     # Temporal features. `local` means "in the local timezone", e.g. "Europe/London". We use `local`
     # as the main input feature, because it's the local time that mostly drives demand.
-    local_utc_offset: int | None = pt.Field(dtype=pl.Int8, allow_missing=True)
+    local_utc_offset: int | None = pt.Field(
+        dtype=pl.Int8,
+        allow_missing=True,
+        description=(
+            "Offset of the local time zone from UTC, in whole hours (0 or 1 for GB). Whole hours "
+            "are sufficient because we deploy in a single time zone, where the feature is "
+            "constant; they would collide in a mixed-offset deployment (India's +5:30 and Nepal's "
+            "+5:45 both become 5). The feature engineer raises rather than rounding if the offset "
+            "is not a whole hour, so this dtype cannot silently lose a sub-hour component."
+        ),
+    )
     local_time_of_day_sin: float | None = _FEATURE_DTYPE
     local_time_of_day_cos: float | None = _FEATURE_DTYPE
     local_time_of_year_sin: float | None = _FEATURE_DTYPE
