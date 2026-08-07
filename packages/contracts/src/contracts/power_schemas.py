@@ -13,6 +13,7 @@ from .common import (
     UTC_DATETIME_DTYPE,
     _get_time_series_id_dtype,
     check_datetime_bounds,
+    split_by_datetime_plausibility,
 )
 
 
@@ -79,6 +80,35 @@ class PowerTimeSeries(pt.Model):
             raise ValueError("the `time` column is not sorted!")
 
         return validated_df
+
+    @classmethod
+    def drop_implausible_rows(cls, dataframe: pl.DataFrame) -> tuple[pl.DataFrame, int]:
+        """Drop rows with a malformed ``time``, returning ``(survivors, n_dropped)``.
+
+        A row is dropped when its ``time`` lies outside the plausible datetime range, or when it
+        does not fall on the top or bottom of the hour (minute 00 or 30). Both indicate a
+        malformed upstream reading — not a bug in our own pipeline — so under [inherent
+        stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
+        an ingestion boundary should degrade the batch rather than abort it entirely.
+
+        This exists alongside ``validate``, which stays strict and raises on the same two rules:
+        ``validate`` is also used as a hard assertion in tests and R&D code, where a
+        raise-on-violation contract must not silently change. Call this method BEFORE
+        ``validate``, and only at a boundary that receives data from outside our system (e.g.
+        NGED's raw JSON feed) — the uniqueness and sortedness checks in ``validate`` are NOT
+        relaxed here, because those indicate a bug in OUR pipeline, not malformed external data,
+        and should keep raising.
+
+        Args:
+            dataframe: An already-cast frame with a ``time`` column; need not yet be validated.
+
+        Returns:
+            ``(survivors, n_dropped)``. ``survivors`` keeps ``dataframe``'s row order.
+        """
+        survivors, out_of_range = split_by_datetime_plausibility(dataframe, "time")
+        is_aligned = pl.col("time").dt.minute().is_in([0, 30])
+        survivors, misaligned = survivors.filter(is_aligned), survivors.filter(~is_aligned)
+        return survivors, out_of_range.height + misaligned.height
 
     # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
     columns_to_sort_by: ClassVar[tuple[str, str]] = ("time_series_id", "time")

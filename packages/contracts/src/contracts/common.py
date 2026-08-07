@@ -69,6 +69,32 @@ def check_datetime_bounds(dataframe: pl.DataFrame, column: str, *more_columns: s
         _raise_if_outside_plausible_range(name, extremes[f"min_{name}"], extremes[f"max_{name}"])
 
 
+def split_by_datetime_plausibility(
+    dataframe: pl.DataFrame, column: str
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Partition ``dataframe`` into ``(plausible, implausible)`` rows by ``column``.
+
+    A row is implausible when its ``column`` value is before :data:`MIN_PLAUSIBLE_DATETIME` or
+    after :data:`MAX_PLAUSIBLE_DATETIME` — the same bounds :func:`check_datetime_bounds` enforces.
+    Nulls are always plausible (absence is not malformedness).
+
+    Use this at an ingestion boundary to drop-and-report malformed external rows instead of
+    aborting the whole batch; use :func:`check_datetime_bounds` where a hard assertion is
+    appropriate instead (e.g. inside a Patito model's ``validate``).
+
+    Args:
+        dataframe: Any frame; ``column`` must be a datetime column.
+        column: Name of the datetime column to test.
+
+    Returns:
+        ``(plausible, implausible)``, each keeping ``dataframe``'s row order and schema.
+    """
+    is_implausible = pl.col(column).is_not_null() & (
+        (pl.col(column) < MIN_PLAUSIBLE_DATETIME) | (pl.col(column) > MAX_PLAUSIBLE_DATETIME)
+    )
+    return dataframe.filter(~is_implausible), dataframe.filter(is_implausible)
+
+
 def _raise_if_outside_plausible_range(
     column: str, earliest: datetime | None, latest: datetime | None
 ) -> None:
