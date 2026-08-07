@@ -21,6 +21,7 @@ Nullify Leaky Lags Rationale:
 """
 
 import math
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Final
 
@@ -42,9 +43,9 @@ from ml_core.features.feature_engineer import FeatureEngineer
 from weather_utils import select_analysis_proxy
 
 _SECONDS_PER_HOUR: Final[int] = 60 * 60
-"""Seconds in an hour, used to convert a UTC offset from seconds to hours."""
+"""Seconds in an hour, used to express a whole-hour UTC offset in seconds."""
 
-_WHOLE_HOUR_UTC_OFFSETS: Final[dict[int, int]] = {
+_WHOLE_HOUR_UTC_OFFSETS: Final[Mapping[int, int]] = {
     hours * _SECONDS_PER_HOUR: hours for hours in range(-12, 15)
 }
 """Every whole-hour UTC offset any IANA time zone uses, in seconds, mapped to that offset in hours.
@@ -358,18 +359,27 @@ def _whole_hour_utc_offset(local_time: pl.Expr) -> pl.Expr:
     collide — India (+5:30) and Nepal (+5:45) would both land on ``5``, silently merging two
     distinct zones, as would Australia's +9:30 and +9:00. That is the case this guard catches.
 
-    Why it raises rather than degrading. The time zone is a constant in our own source, so no
-    external input can produce a sub-hour offset here: only a code change can, which makes this a
-    contract violation (our own bug) rather than the outside world misbehaving. That is the one
-    category the inherent-stability rules reserve raising for. On GB data the guard can never fire,
-    so it cannot destabilise the live service.
+    Why it raises rather than degrading. The time zone is a constant in our own source, so the way
+    to reach a sub-hour offset is to change that constant — a code change, which makes this a
+    contract violation (our own bug) rather than the outside world misbehaving, the one category
+    the inherent-stability rules reserve raising for. There is one way a *timestamp* can reach it:
+    ``Europe/London`` ran on local mean time, UTC−0:01:15, until 1847, so a ``valid_time`` before
+    1848 raises here. Nothing bounds ``PowerTimeSeries.time`` at the Patito boundary, so a corrupt
+    feed could in principle deliver one — but such a row is already silently poisoning every other
+    local-time feature, and no timestamp in the era we forecast can fire the guard.
 
     ``replace_strict`` is passed no ``default``, so any offset outside the mapping — sub-hour, or
     an implausible whole-hour value — raises ``InvalidOperationError`` when the frame is collected.
+    Note that this makes the guard conditional on the column surviving projection pushdown: if a
+    feature set does not request ``local_utc_offset``, Polars prunes the whole expression and the
+    check does not run. That is harmless, because a column nobody asked for cannot be silently
+    wrong, but it does mean the guard protects the feature rather than the pipeline.
+
     Keeping the check inside the Polars expression means it forces no extra ``.collect()`` and no
-    Python round-trip over the data: it is one hash lookup per row, about 7 ns, measured against
-    the ``// 3600`` it replaces over a 47M-row frame. Looking the offset up rather than dividing
-    it also makes the floor-versus-truncate question moot, because we never divide.
+    Python round-trip over the data: it is one hash lookup per row. Over a 47M-row frame the
+    lookup measured a few nanoseconds per row more than the ``// 3600`` it replaces, against the
+    ~36 ns per row the surrounding time-zone conversion already costs. Looking the offset up
+    rather than dividing it also makes the floor-versus-truncate question moot: we never divide.
 
     Args:
         local_time: An expression yielding a time-zone-aware datetime in the local time zone.

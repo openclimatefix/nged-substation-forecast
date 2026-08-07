@@ -352,8 +352,27 @@ def test_whole_hour_utc_offset_rejects_sub_hour_zone(time_zone: str, month: int)
         {"valid_time": [datetime(2023, month, 10, 12, 0, tzinfo=timezone.utc)]}
     ).with_columns(local_time=pl.col("valid_time").dt.convert_time_zone(time_zone))
 
-    with pytest.raises(pl.exceptions.InvalidOperationError):
+    # Match on the message: `InvalidOperationError` is also what a *different* failure earlier in
+    # the same expression raises (e.g. `base_utc_offset` on a tz-naive column), so without this
+    # the test could pass for the wrong reason.
+    with pytest.raises(pl.exceptions.InvalidOperationError, match="incomplete mapping"):
         lf.select(local_utc_offset=_whole_hour_utc_offset(pl.col("local_time"))).collect()
+
+
+def test_apply_local_time_features_raises_on_sub_hour_offset():
+    """The guard is wired into the production entry point, not just available beside it.
+
+    ``_apply_local_time_features`` hard-codes ``Europe/London``, which reaches a sub-hour offset
+    for one input: London ran on local mean time, UTC-0:01:15, until 1847. That makes this the
+    only way to exercise the guard through the function that production actually calls — and it
+    pins the wiring, which a test of ``_whole_hour_utc_offset`` alone would not.
+    """
+    lf = pl.LazyFrame(
+        {"valid_time": [datetime(1840, 6, 1, 12, 0, tzinfo=timezone.utc)]}
+    ).with_columns(pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
+
+    with pytest.raises(pl.exceptions.InvalidOperationError, match="incomplete mapping"):
+        _apply_local_time_features(lf).collect()
 
 
 def test_parsed_features_from_selected_features():
