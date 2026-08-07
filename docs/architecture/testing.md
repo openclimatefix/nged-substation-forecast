@@ -63,14 +63,20 @@ row counts wrapping past 2³² rows.
   (the artifact storage an ephemeral instance builds when given no `tempdir`) also defers its
   `tempfile.TemporaryDirectory()` cleanup to `dispose()`, so an undisposed instance's temp
   directory is left to the garbage collector too — via a `weakref.finalize` callback that can run
-  at any later point in the process, not just at shutdown. On the CI runner's CPython 3.14.7, that
-  GC-triggered path occasionally hit an upstream pathlib/weakref timing bug and turned into a hard
-  pytest failure *attributed to whatever unrelated test's setup happened to be running* when the
-  collector fired (`pytest.PytestUnraisableExceptionWarning`, since `filterwarnings` starts with
-  `error` — see below). One extra bare `DagsterInstance.ephemeral()` call added anywhere in the
-  suite was enough to tip a previously-clean run into failing 2/2 times in CI while never
-  reproducing locally, which is what surfaced this. The fixture's deterministic disposal removes
-  the trigger for both failure modes at once.
+  at any later point in the process, not just at shutdown. That callback is
+  `TemporaryDirectory._cleanup`, which removes the directory and then emits `ResourceWarning:
+  Implicitly cleaning up <TemporaryDirectory ...>`; because `filterwarnings` starts with `error`
+  (see below), the warning is *raised*, and an exception raised inside a weakref callback is
+  unraisable — CPython can only hand it to `sys.unraisablehook`, and pytest's hook turns it into a
+  hard `pytest.PytestUnraisableExceptionWarning` failure *attributed to whatever unrelated test
+  happened to be running* when the collector fired. Nothing about this is rare or environmental: it
+  is what always happens when a used ephemeral instance is collected instead of disposed, and the
+  only nondeterminism is *which* test is running at the time. One extra bare
+  `DagsterInstance.ephemeral()` call added anywhere in the suite was enough to tip a
+  previously-clean run into failing 2/2 times in CI while never reproducing locally, which is what
+  surfaced this. The fixture's deterministic disposal removes the trigger for both failure modes at
+  once.
+
 - **In a script, use the context manager directly** — `with DagsterInstance.ephemeral() as
   instance:` — rather than a bare call. Letting the local go out of scope is *not* enough: once the
   instance has actually run a job, Dagster's own caches retain it (a `RunDomain`, and the

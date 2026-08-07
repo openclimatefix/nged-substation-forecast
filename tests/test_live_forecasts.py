@@ -239,7 +239,9 @@ def test_accumulation_across_partitions(
     }
 
 
-def test_check_passes_after_a_real_live_materialisation(env: dict[str, str]) -> None:
+def test_check_passes_after_a_real_live_materialisation(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
     """``live_forecasts_are_healthy`` passes against a genuinely produced forecast.
 
     This is the only test that exercises the check *partitioned*: ``build_asset_check_context``
@@ -251,7 +253,7 @@ def test_check_passes_after_a_real_live_materialisation(env: dict[str, str]) -> 
         [live_forecasts, live_forecasts_are_healthy],
         partition_key=_PARTITION_KEY,
         run_config=RunConfig(ops={"live_forecasts": LiveForecastsConfig(availability_mode="live")}),
-        instance=DagsterInstance.ephemeral(),
+        instance=dagster_instance,
     )
     assert result.success
 
