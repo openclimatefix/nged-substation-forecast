@@ -61,10 +61,10 @@ is fixed or the partition is re-run.
 
 The checks above ask whether the rows we received are usable. A separate question is whether we
 received *all* the rows: a complete ECMWF ENS run is the full cartesian product of **51 ensemble
-members × 85 native forecast steps × every H3 cell in the
-[H3 grid weights](overview.md)**. A run missing an ensemble member, or stopping short of the 15-day
-horizon, is short in a way `Nwp.validate` cannot see — every row it *does* contain is perfectly
-well-formed — and would otherwise only surface much later as strange training data.
+members × 85 native forecast steps × every H3 cell in the H3 grid weights**. A run missing an
+ensemble member, or stopping short of the 15-day horizon, is short in a way `Nwp.validate` cannot
+see — every row it *does* contain is perfectly well-formed — and would otherwise only surface much
+later as strange training data.
 
 `assess_nwp_run_completeness` therefore compares the ingested run against that expected shape and
 returns an `NwpRunCompletenessReport`. The `ecmwf_ens` asset publishes the report as the
@@ -116,7 +116,7 @@ partition would discard the 50 members we did get; the live forecast would then 
 run today. So the run lands, the check WARNs, and the missing pieces are named.
 
 So an upstream outage is fatal or tolerated according to how it reaches us, not according to how
-serious it is. When the 2026-07-14 outage below lost a forecast step for 50 of 51 members, the rows
+serious it is. When the 2026-07-14 outage above lost a forecast step for 50 of 51 members, the rows
 still existed carrying null temperatures — *malformed*, so `Nwp.validate` rejected them and the day
 became a missed run. This check covers the other shape: a whole `ensemble_member` or `lead_time`
 coordinate short on the source dataset, where the rows are simply *absent*, and the rest of the run
