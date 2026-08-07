@@ -76,11 +76,13 @@ then point the task definition at the new tag — see
 
 Once a model is promoted, `live_forecasts` produces a new forecast automatically every 6 hours —
 at 00:00, 06:00, 12:00, and 18:00 UTC — via `live_forecasts_schedule`. `power_time_series_and_metadata`
-(a separate, hourly-scheduled job `live_forecasts` depends on but isn't ordered against) is
-itself scheduled 5 minutes *before* each hour so that hour's pull has landed by the time
-`live_forecasts` ticks — a cheap mitigation, not a guarantee; see
-`power_time_series_and_metadata_schedule`'s docstring (`defs/schedules.py`) for the more rigorous
-fix still to explore. This needs the Dagster daemon running (see
+(a separate, hourly-scheduled job `live_forecasts` depends on but is deliberately not ordered
+against) is itself scheduled 5 minutes *before* each hour so that hour's pull has landed by the
+time `live_forecasts` ticks. That offset is an optimisation for freshness, not a precondition: if
+the pull fails or runs long, the forecast still goes out on time against whatever is already on
+disk, and records how stale that input was — see
+[Inherent Stability, rule 11](../design-philosophy/inherent-stability.md#the-rules). This needs the
+Dagster daemon running (see
 [Prerequisites](#prerequisites-a-running-dagster-instance) above) to fire on time.
 
 To materialise one 6-hourly slot yourself — e.g. right after promoting a model, so you don't have

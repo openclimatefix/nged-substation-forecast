@@ -151,8 +151,8 @@ Nothing here is a 2am page. The uptime posture that makes that acceptable is arg
 ## The rules
 
 These are the imperative form of everything above: the checklist to follow when in doubt while
-changing production code. It is deliberately self-contained, so three of the ten restate a
-[design principle](design-principles.md) rather than adding anything new. Those three are marked
+changing production code. It is deliberately self-contained, so four of the eleven restate a
+[design principle](design-principles.md) rather than adding anything new. Those four are marked
 below — if you change one, change its matching principle too. The remaining seven are specific to
 degradation and appear nowhere else.
 
@@ -185,6 +185,12 @@ degradation and appear nowhere else.
 10. **Damp the corrections.** Bounded retries with backoff, rate limits on retraining and hysteresis
     on model promotion (the latter two designed but not built 🚧) are as much a part of this
     principle as the degradation ladder is.
+11. **Never make one production job's run status a precondition for another's.** Couple them through
+    data at rest: read whatever is on disk, record how stale it was, and carry on. A dependency in
+    the *lineage* graph is fine and useful — it is what builds a developer's inputs on a laptop — but
+    it must never become a runtime gate, because a gate turns one failed upstream run into a missing
+    forecast, which is rung 0 of the ladder reached by the one route the ladder cannot catch. *(The
+    coupling-through-data-at-rest principle, in imperative form.)*
 
 ## Where complexity should live
 
