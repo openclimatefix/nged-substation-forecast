@@ -200,10 +200,9 @@ class XGBoostForecaster(BaseForecaster):
         """Save all Boosters as .ubj files plus a meta.json with the full config.
 
         Clears ``path`` first, so re-saving a smaller model over a directory that already holds a
-        bigger one's ``.ubj`` files can never leave the dropped series' boosters behind on disk —
-        this is the "merge instead of replace" defect class that made MLflow's artifact store
-        accumulate stale boosters, issue #197. (MLflow's own artifact upload merges independently
-        of this — see ``load``'s docstring for that remaining hazard, which this does not reach.)
+        bigger one's ``.ubj`` files can never leave the dropped series' boosters behind on disk
+        (issue #197). The same replace-don't-merge property holds through MLflow, because
+        ``BaseForecaster.save_to_mlflow`` uploads this directory as a single archive artifact.
         """
         shutil.rmtree(path, ignore_errors=True)
         path.mkdir(parents=True, exist_ok=True)
@@ -224,11 +223,12 @@ class XGBoostForecaster(BaseForecaster):
         """Reconstruct an XGBoostForecaster from a saved directory.
 
         ``meta.json``'s ``trained_time_series_ids`` — not whatever ``.ubj`` files happen to be in
-        the directory — decides the population. The two can disagree: an MLflow run's artifact
-        directory is written with ``log_artifacts``, which *merges* rather than replaces, so
-        re-training a reused CV fold run on a **smaller** population leaves the dropped series'
-        boosters behind. Globbing would resurrect them, silently scoring those series with a
-        superseded model and breaking the train==predict invariant (see
+        the directory — decides the population, because a model's population is the model's own
+        frozen record and not a directory listing (issue #197). A directory can hold files this
+        model did not write: ``ml_core._production_helpers.fetch_model_artifacts`` adds a
+        ``promotion.json``, and a hand-assembled directory can hold anything. Globbing would let
+        such a file enlarge the population, silently scoring a series with a model that was never
+        trained for it and breaking the train==predict invariant (see
         ``BaseForecaster.trained_time_series_ids``).
         """
         meta = json.loads((path / "meta.json").read_text())

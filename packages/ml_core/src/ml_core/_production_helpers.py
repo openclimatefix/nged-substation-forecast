@@ -17,13 +17,12 @@ from pathlib import Path
 from typing import Literal, Sequence, cast
 
 import hydra
-import mlflow
 import patito as pt
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries
 
-from ml_core.base_forecaster import _MLFLOW_ARTIFACT_PATH, BaseForecaster
+from ml_core.base_forecaster import BaseForecaster, _download_and_unpack_model
 from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
 
 AvailabilityModeType = Literal["live", "replay"]
@@ -166,14 +165,18 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
 
 
 def fetch_model_artifacts(run_id: str, dest: Path) -> None:
-    """Download an MLflow run's saved model artifacts to ``dest``, replacing it atomically.
+    """Download and unpack an MLflow run's saved model into ``dest``, replacing it atomically.
 
-    Downloads into a temporary directory first, so a failed or interrupted download never
-    touches ``dest`` — only a fully-downloaded model is moved into place (via ``rmtree`` +
-    ``move``). Also writes a ``promotion.json`` (``{"mlflow_run_id", "promoted_at"}``) into
-    ``dest`` for provenance; a ``BaseForecaster.load`` implementation reads its own population
-    from its saved record (e.g. ``XGBoostForecaster`` from ``meta.json``'s
-    ``trained_time_series_ids``), never from a directory listing, so this extra file is harmless.
+    Downloads and unpacks into a temporary directory first, so a failed or interrupted download
+    never touches ``dest`` — only a fully-downloaded model is moved into place (via ``rmtree`` +
+    ``move``). The run holds the model as a single archive artifact
+    (``BaseForecaster._MLFLOW_MODEL_ARTIFACT``), so ``dest`` gets exactly the files the last
+    ``save_to_mlflow`` wrote and can never inherit a stale file from an earlier, larger model.
+
+    Also writes a ``promotion.json`` (``{"mlflow_run_id", "promoted_at"}``) into ``dest`` for
+    provenance; a ``BaseForecaster.load`` implementation reads its own population from its saved
+    record (e.g. ``XGBoostForecaster`` from ``meta.json``'s ``trained_time_series_ids``), never
+    from a directory listing, so this extra file is harmless.
 
     The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
     beforehand.
@@ -183,10 +186,7 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
         dest: Directory to populate — typically ``Settings.production_model_path``.
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
-        mlflow.artifacts.download_artifacts(
-            run_id=run_id, artifact_path=_MLFLOW_ARTIFACT_PATH, dst_path=tmp_dir
-        )
-        downloaded_dir = Path(tmp_dir) / _MLFLOW_ARTIFACT_PATH
+        downloaded_dir = _download_and_unpack_model(run_id, Path(tmp_dir))
         promotion = {
             "mlflow_run_id": run_id,
             "promoted_at": datetime.now(timezone.utc).isoformat(),

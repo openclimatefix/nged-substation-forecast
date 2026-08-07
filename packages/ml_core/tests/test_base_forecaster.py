@@ -1,45 +1,68 @@
-"""Tests for ``BaseForecaster``'s MLflow persistence, against file-based MLflow.
+"""Tests for the MLflow model-artifact plumbing, against file-based MLflow.
 
-Uses a tiny fake ``BaseForecaster`` (rather than a concrete model) so the tests stay focused on
-the shared behaviour — artifact upload/download — and free of any model-library dependency.
+Covers ``BaseForecaster.save_to_mlflow``/``load_from_mlflow`` and the third consumer of the same
+archive layout, ``ml_core._production_helpers.fetch_model_artifacts`` — they are tested together
+here because they share one on-the-wire format and one fake forecaster.
+
+That fake (rather than a concrete model) keeps the tests focused on the shared behaviour —
+archive upload/download — and free of any model-library dependency. It writes one file per
+``time_series_id``, mirroring ``XGBoostForecaster``'s one-``.ubj``-per-series layout, which is
+what makes a *shrinking* population observable as files that must vanish from the run.
 """
 
+import json
 from pathlib import Path
-from typing import Self
+from typing import Self, Sequence
 
 import mlflow
 import patito as pt
 import pytest
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
+from mlflow.tracking import MlflowClient
+from ml_core._production_helpers import fetch_model_artifacts
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 
 pytestmark = pytest.mark.integration
 
 
 class _FakeForecaster(BaseForecaster):
-    """Minimal forecaster whose entire trained state is a single string payload on disk."""
+    """Minimal forecaster: a string payload plus one file per trained ``time_series_id``."""
 
     MODEL_NAME = "fake"
     MODEL_VERSION = 1
 
-    def __init__(self, model_params: BaseForecasterConfig, payload: str = "") -> None:
+    def __init__(
+        self,
+        model_params: BaseForecasterConfig,
+        payload: str = "",
+        series: Sequence[int] = (),
+    ) -> None:
         super().__init__(model_params)
         self.payload = payload
+        self._series = sorted(series)
 
     @property
     def trained_time_series_ids(self) -> list[int]:
-        return []
+        return self._series
 
     def save(self, path: Path) -> None:
         path.mkdir(parents=True, exist_ok=True)
         (path / "payload.txt").write_text(self.payload)
+        (path / "meta.json").write_text(
+            json.dumps({"trained_time_series_ids": self._series, "model_class": "fake"})
+        )
+        for ts_id in self._series:
+            (path / f"{ts_id}.part").write_text(f"model for {ts_id}")
 
     @classmethod
     def load(cls, path: Path) -> Self:
-        instance = cls(BaseForecasterConfig(selected_features=set()))
-        instance.payload = (path / "payload.txt").read_text()
-        return instance
+        meta = json.loads((path / "meta.json").read_text())
+        return cls(
+            BaseForecasterConfig(selected_features=set()),
+            payload=(path / "payload.txt").read_text(),
+            series=meta["trained_time_series_ids"],
+        )
 
     def train(
         self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]
@@ -76,10 +99,26 @@ def test_trained_time_series_ids_is_abstract() -> None:
         _MissingPopulation(BaseForecasterConfig(selected_features=set()))
 
 
-def _save(run_id: str, payload: str) -> None:
-    """Save a ``_FakeForecaster`` carrying ``payload`` into an existing MLflow run."""
-    forecaster = _FakeForecaster(BaseForecasterConfig(selected_features=set()), payload=payload)
+def _save(run_id: str, payload: str, series: Sequence[int] = ()) -> None:
+    """Save a ``_FakeForecaster`` carrying ``payload`` and ``series`` into an existing run."""
+    forecaster = _FakeForecaster(
+        BaseForecasterConfig(selected_features=set()), payload=payload, series=series
+    )
     forecaster.save_to_mlflow(run_id)
+
+
+def _artifact_file_paths(run_id: str) -> list[str]:
+    """Every artifact *file* reachable in the run, recursively, as artifact-root-relative paths."""
+    client = MlflowClient()
+    paths: list[str] = []
+    dirs_to_walk = [""]
+    while dirs_to_walk:
+        for info in client.list_artifacts(run_id, dirs_to_walk.pop()):
+            if info.is_dir:
+                dirs_to_walk.append(info.path)
+            else:
+                paths.append(info.path)
+    return sorted(paths)
 
 
 @pytest.fixture
@@ -90,13 +129,23 @@ def saved_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     experiment_id = mlflow.create_experiment("base_forecaster_test")
     with mlflow.start_run(experiment_id=experiment_id) as run:
         run_id = run.info.run_id
-    _save(run_id, "hello-model")
+    _save(run_id, "hello-model", series=[10, 20, 30])
     return run_id
 
 
 def test_save_load_round_trip(saved_run: str) -> None:
     loaded = _FakeForecaster.load_from_mlflow(saved_run)
     assert loaded.payload == "hello-model"
+    assert loaded.trained_time_series_ids == [10, 20, 30]
+
+
+def test_the_model_is_stored_as_a_single_archive_artifact(saved_run: str) -> None:
+    """The run holds exactly one model file — the archive — not a directory of model files.
+
+    This is the property that makes a re-upload replace rather than merge (issue #470): MLflow
+    overwrites a same-name single artifact but merges a directory upload.
+    """
+    assert _artifact_file_paths(saved_run) == ["model.tar.gz"]
 
 
 def test_re_saving_to_the_same_run_is_reflected_on_the_next_load(saved_run: str) -> None:
@@ -111,6 +160,48 @@ def test_re_saving_to_the_same_run_is_reflected_on_the_next_load(saved_run: str)
     assert _FakeForecaster.load_from_mlflow(saved_run).payload == "hello-model"
 
     # Re-train into the *same* run, exactly as a re-materialised fold does.
-    _save(saved_run, "retrained-model")
+    _save(saved_run, "retrained-model", series=[10, 20, 30])
 
     assert _FakeForecaster.load_from_mlflow(saved_run).payload == "retrained-model"
+
+
+def test_re_saving_a_smaller_model_leaves_no_trace_of_the_dropped_series(
+    saved_run: str, tmp_path: Path
+) -> None:
+    """Re-training a reused run on a smaller population must not leave the dropped series behind.
+
+    The regression this issue exists to prevent (issue #470). A directory upload
+    (``log_artifacts``) *merges*, and MLflow has no public artifact-delete API, so series 30's
+    file would survive in the run forever — downloaded on every subsequent load and baked into
+    the production container image. Uploading one same-name archive replaces it instead.
+    """
+    _save(saved_run, "smaller-model", series=[10, 20])
+
+    # Nothing in the run's artifact store mentions the dropped series...
+    assert _artifact_file_paths(saved_run) == ["model.tar.gz"]
+
+    # ...and nothing the download path materialises does either, on either consumer.
+    assert _FakeForecaster.load_from_mlflow(saved_run).trained_time_series_ids == [10, 20]
+
+    dest = tmp_path / "production_model"
+    fetch_model_artifacts(saved_run, dest)
+    assert not (dest / "30.part").exists()
+    assert sorted(p.name for p in dest.iterdir()) == [
+        "10.part",
+        "20.part",
+        "meta.json",
+        "payload.txt",
+        "promotion.json",
+    ]
+
+
+def test_fetch_model_artifacts_unpacks_the_archive_into_dest(
+    saved_run: str, tmp_path: Path
+) -> None:
+    """The production download path lands a plain model directory, not an archive file."""
+    dest = tmp_path / "production_model"
+    fetch_model_artifacts(saved_run, dest)
+
+    assert not (dest / "model.tar.gz").exists()
+    assert _FakeForecaster.load(dest).payload == "hello-model"
+    assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run
