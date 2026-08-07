@@ -146,11 +146,15 @@ pythonpath = ["tests"]
 # named and dated the same way, rather than widening an existing one.
 filterwarnings = [
     "error",
-    "ignore:codecs.open\\(\\) is deprecated:DeprecationWarning:mlflow.*",
+    # mlflow 3.15.1: `utils/file_utils.py` and `utils/yaml_utils.py` (the only two call sites, and
+    # both read and write) still use the `codecs.open()` that Python 3.14 deprecated. Triggered by
+    # every file-store access, so most of the MLflow-backed tests hit it. Delete once MLflow
+    # switches to the builtin `open()`.
+    "ignore:codecs\\.open\\(\\) is deprecated:DeprecationWarning:mlflow\\.utils\\.(file_utils|yaml_utils)$",
     # dagster 1.13.16: `_core/storage/event_log/sql_event_log.py` still calls the
     # `datetime.utcfromtimestamp()` that Python 3.12 deprecated. Triggered whenever an asset check
     # evaluation is written to the event log. Delete once Dagster moves to timezone-aware datetimes.
-    "ignore:datetime\\.datetime\\.utcfromtimestamp\\(\\) is deprecated:DeprecationWarning:dagster\\._core\\.storage\\.event_log\\.sql_event_log",
+    "ignore:datetime\\.datetime\\.utcfromtimestamp\\(\\) is deprecated:DeprecationWarning:dagster\\._core\\.storage\\.event_log\\.sql_event_log$",
 ]
 # `.claude` holds git worktrees (`.claude/worktrees/*`), each a full checkout carrying its own
 # copy of this `conftest.py`; recursing into them re-registers the `--run-network` option and

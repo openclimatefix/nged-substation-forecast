@@ -175,7 +175,6 @@ def _read_forecasts(env: dict[str, str]) -> pl.DataFrame:
 def test_live_and_replay_select_different_nwp_runs(
     env: dict[str, str], dagster_instance: DagsterInstance
 ) -> None:
-
     assert _materialize(dagster_instance, "live").success
     live_forecasts_df = _read_forecasts(env)
     assert (live_forecasts_df["nwp_init_time"] == _SAME_DAY_RUN).all()

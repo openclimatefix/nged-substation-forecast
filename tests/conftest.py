@@ -15,7 +15,9 @@ from dagster import DagsterInstance
 def dagster_instance() -> Iterator[DagsterInstance]:
     """A fresh ephemeral ``DagsterInstance``, disposed when the test finishes.
 
-    Always prefer this over calling ``DagsterInstance.ephemeral()`` directly. An ephemeral
+    Every test here should take this fixture rather than calling ``DagsterInstance.ephemeral()``
+    itself; outside the test suite the equivalent is to use the instance as a context manager. An
+    ephemeral
     instance's in-memory run storage and event-log storage each open one SQLAlchemy connection
     against an in-memory SQLite database and hold it for the life of the instance. Nothing closes
     those two connections unless ``dispose()`` is called, and ``DagsterInstance`` has no

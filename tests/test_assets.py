@@ -342,6 +342,7 @@ def test_definitions_resolve(env: Path) -> None:
     for job_name, expected_asset in [
         ("power_time_series_and_metadata_job", "power_time_series_and_metadata"),
         ("ecmwf_ens_job", "ecmwf_ens"),
+        ("live_forecasts_job", "live_forecasts"),
     ]:
         selected = {
             key.to_user_string() for key in repo.get_job(job_name).asset_layer.executable_asset_keys
@@ -349,11 +350,19 @@ def test_definitions_resolve(env: Path) -> None:
         assert selected == {expected_asset}
 
     # Neither partitioned job passes `partitions_def` to `define_asset_job` — Dagster infers it from
-    # the selected asset at resolution time. Assert the inferred definition is the *same object* the
-    # asset declares, so a future regression (a job silently resolving to `None`, or to a different
-    # cadence/start) fails here rather than at the next schedule tick.
-    assert repo.get_job("ecmwf_ens_job").partitions_def is ecmwf_ens_partitions
-    assert repo.get_job("live_forecasts_job").partitions_def is live_forecast_partitions
+    # the selected asset at resolution time. Assert the inferred definition equals the one the asset
+    # declares, so a job silently resolving to `None`, or to a different cadence or start, fails here
+    # rather than at the next schedule tick. (Equality, not identity: what matters is that the job
+    # targets the same partitions, and Dagster is free to hand back an equal copy.)
+    assert repo.get_job("ecmwf_ens_job").partitions_def == ecmwf_ens_partitions
+    assert repo.get_job("live_forecasts_job").partitions_def == live_forecast_partitions
+
+    # `live_forecasts_schedule` is built by `build_schedule_from_partitioned_job`, so its cron is
+    # *derived* from that inferred partitions_def — the one thing dropping the explicit argument
+    # could plausibly have broken. Pin the resolved schedule, not just the job.
+    live_schedule = repo.get_schedule_def("live_forecasts_job_schedule")
+    assert live_schedule.cron_schedule == live_forecast_partitions.cron_schedule
+    assert live_schedule.execution_timezone == "UTC"
 
 
 # --- summary classes (pure, no Dagster) ----------------------------------------------------------

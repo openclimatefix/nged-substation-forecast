@@ -50,6 +50,30 @@ row counts wrapping past 2³² rows.
   (`monkeypatch.setattr(some_module, "open", fake_open)`) through the built-in fixture. For S3,
   drive the in-process `moto` server instead of mocking — `tests/test_s3_data_paths.py` is the
   canonical pattern.
+- **Take the `dagster_instance` fixture; never call `DagsterInstance.ephemeral()` in a test.** The
+  fixture lives in `tests/conftest.py`. An ephemeral instance's in-memory run storage and event-log
+  storage each hold one SQLAlchemy connection to an in-memory SQLite database open for the life of
+  the instance, and `DagsterInstance` has no finaliser — so an instance that is never `dispose()`d
+  survives to interpreter shutdown, where SQLAlchemy's connection-pool finaliser can run after
+  SQLite has closed the database and print a bare `Exception during reset or similar` traceback
+  *after* pytest's summary line, owned by no test. The fixture enters the instance as a context
+  manager, so `dispose()` runs when the test ends. Outside the test suite the equivalent is
+  `with DagsterInstance.ephemeral() as instance:`.
+
+## Warnings are errors
+
+`[tool.pytest.ini_options] filterwarnings` in `pyproject.toml` starts with `error`, so **any**
+warning fails the test that raised it. A deprecation introduced by our own code is therefore caught
+by the PR that introduces it, instead of accumulating in the warnings summary.
+
+The exceptions listed after `error` are third-party deprecations we cannot fix from this repo. Each
+one is pinned to the exact warning message *and* the exact upstream module that raises it — the
+module anchor is what stops an entry from ever masking the same deprecation appearing in our own
+code — and carries a comment naming the package, the version, and the condition for deleting it.
+
+When a dependency upgrade introduces a new upstream warning, the suite fails loudly. Add a new
+entry in that same form rather than widening an existing one; if the warning comes from our code,
+fix the code. Later entries take precedence, so `error` stays first.
 
 ## Network-gated tests
 
