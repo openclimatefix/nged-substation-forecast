@@ -32,21 +32,15 @@ def test_data_quality_settings_defaults():
 
 
 def test_settings_validation_invalid_url():
+    """Liberal about a missing source-bucket URL, strict about a malformed one."""
     with pytest.raises(ValidationError, match="Input should be a valid URL"):
-        Settings(
-            nged_s3_bucket_url="not-a-url",
-            nged_s3_bucket_access_key="key",
-            nged_s3_bucket_secret="secret",
-        )
+        Settings(nged_s3_bucket_url="not-a-url")
 
 
 def test_paths_derive_from_data_root():
     """Unset data-table paths derive from data_path_internal; nested tables sit under nged_data_path."""
     settings = Settings(
         data_path_internal="/srv/data",
-        nged_s3_bucket_url="https://example.com",
-        nged_s3_bucket_access_key="key",
-        nged_s3_bucket_secret="secret",
     )
     assert settings.nwp_data_path == "/srv/data/NWP"
     assert settings.nged_data_path == "/srv/data/NGED"
@@ -60,9 +54,6 @@ def test_delivery_paths_derive_from_delivery_root():
     settings = Settings(
         data_path_internal="s3://internal-bucket/data",
         data_path_delivery="s3://delivery-bucket/data",
-        nged_s3_bucket_url="https://example.com",
-        nged_s3_bucket_access_key="key",
-        nged_s3_bucket_secret="secret",
     )
     assert settings.power_forecasts_data_path == "s3://delivery-bucket/data/power_forecasts"
     assert settings.effective_capacity_data_path == "s3://delivery-bucket/data/effective_capacity"
@@ -84,9 +75,6 @@ def test_delivery_fields_are_exactly_the_known_delivery_tables():
     settings = Settings(
         data_path_internal="/internal",
         data_path_delivery="/delivery",
-        nged_s3_bucket_url="https://example.com",
-        nged_s3_bucket_access_key="key",
-        nged_s3_bucket_secret="secret",
     )
     managed_data_table_fields = {
         name
@@ -108,9 +96,6 @@ def test_remote_data_path_keeps_artifacts_local():
         data_path_internal="s3://bucket/data",
         data_path_delivery="s3://bucket/data",
         local_artifacts_path="/local/artifacts",
-        nged_s3_bucket_url="https://example.com",
-        nged_s3_bucket_access_key="key",
-        nged_s3_bucket_secret="secret",
     )
     assert settings.power_forecasts_data_path == "s3://bucket/data/power_forecasts"
     assert settings.power_time_series_data_path == "s3://bucket/data/NGED/power_time_series.delta"
@@ -124,9 +109,6 @@ def test_explicit_path_overrides_derivation():
         data_path_delivery="s3://bucket/data",
         production_model_path="/mnt/models/prod",
         nwp_data_path="/mnt/fast/NWP",
-        nged_s3_bucket_url="https://example.com",
-        nged_s3_bucket_access_key="key",
-        nged_s3_bucket_secret="secret",
     )
     assert settings.production_model_path == "/mnt/models/prod"
     assert settings.nwp_data_path == "/mnt/fast/NWP"
@@ -138,9 +120,6 @@ def test_storage_options_empty_without_dev_credentials():
     """With no ``data_store_*`` credentials set, ``storage_options`` is empty (the AWS default)."""
     settings = Settings(
         data_path_internal="s3://bucket/data",
-        nged_s3_bucket_url="https://example.com",
-        nged_s3_bucket_access_key="key",
-        nged_s3_bucket_secret="secret",
     )
     assert settings.storage_options == {}
 
@@ -153,9 +132,6 @@ def test_storage_options_populated_from_dev_credentials():
         data_store_access_key_id="minio",
         data_store_secret_access_key="minio123",
         data_store_region="us-east-1",
-        nged_s3_bucket_url="https://example.com",
-        nged_s3_bucket_access_key="key",
-        nged_s3_bucket_secret="secret",
     )
     assert settings.storage_options == {
         "aws_endpoint_url": "http://localhost:9000",
@@ -166,11 +142,8 @@ def test_storage_options_populated_from_dev_credentials():
     }
 
 
-def test_get_settings_is_cached(monkeypatch: pytest.MonkeyPatch):
+def test_get_settings_is_cached():
     """get_settings returns a single shared instance; cache_clear forces a rebuild."""
-    monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
-    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "key")
-    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "secret")
     get_settings.cache_clear()
     try:
         assert get_settings() is get_settings()
@@ -185,10 +158,10 @@ def test_get_settings_is_cached(monkeypatch: pytest.MonkeyPatch):
 def test_importing_contracts_constructs_no_settings():
     """Importing the schema modules must not construct Settings (no import-time .env read).
 
-    Settings has required credential fields with no defaults, so any import-time construction would
-    make the whole contracts package unimportable without a populated .env — breaking type-checkers,
-    doc builders, and credential-free unit tests. Run in a fresh interpreter because this process
-    has already imported (and used) these modules. See contracts.settings.get_settings.
+    Constructing Settings reads .env and the environment, so an import-time construction would
+    freeze whatever configuration happened to be present when the module first loaded, before a
+    test (or an entry point) could set it. Run in a fresh interpreter because this process has
+    already imported (and used) these modules. See contracts.settings.get_settings.
 
     The guard patches ``Settings.__init__`` to raise, so it catches *any* import-time construction —
     a direct module-level ``Settings()`` as well as one routed through ``get_settings()`` — not just
@@ -210,3 +183,50 @@ def test_importing_contracts_constructs_no_settings():
         [sys.executable, "-c", probe], capture_output=True, text=True, check=False
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_settings_builds_without_nged_source_credentials():
+    """A clone with no `.env` must still get a usable `Settings`.
+
+    `.env` is gitignored and holds third-party credentials for NGED's *source* bucket, so
+    requiring them would mean a fresh checkout could not run the test suite, train a model, or
+    open a dashboard — none of which read NGED's bucket. That is the laptop-exercisable principle
+    applied to configuration.
+    """
+    settings = Settings()
+
+    assert settings.nged_s3_bucket_url == ""
+    assert settings.nged_s3_bucket_access_key == ""
+    assert settings.nged_s3_bucket_secret == ""
+
+
+@pytest.mark.parametrize(
+    "url, access_key, secret, expected_missing",
+    [
+        ("", "", "", "NGED_S3_BUCKET_URL, NGED_S3_BUCKET_ACCESS_KEY, NGED_S3_BUCKET_SECRET"),
+        ("https://example.com", "", "", "NGED_S3_BUCKET_ACCESS_KEY, NGED_S3_BUCKET_SECRET"),
+        ("https://example.com", "key", "", "NGED_S3_BUCKET_SECRET"),
+        ("", "key", "secret", "NGED_S3_BUCKET_URL"),
+    ],
+)
+def test_require_nged_source_credentials_names_what_is_missing(
+    url: str, access_key: str, secret: str, expected_missing: str
+):
+    """The error has to name the unset variables — that is the whole point of moving the check
+    from construction (where pydantic named them) to the point of use."""
+    settings = Settings(
+        nged_s3_bucket_url=url,
+        nged_s3_bucket_access_key=access_key,
+        nged_s3_bucket_secret=secret,
+    )
+
+    with pytest.raises(ValueError, match=expected_missing):
+        settings.require_nged_source_credentials()
+
+
+def test_require_nged_source_credentials_passes_when_all_three_are_set():
+    Settings(
+        nged_s3_bucket_url="https://example.com",
+        nged_s3_bucket_access_key="key",
+        nged_s3_bucket_secret="secret",
+    ).require_nged_source_credentials()

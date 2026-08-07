@@ -315,10 +315,16 @@ No static AWS keys anywhere in either role — the same IAM-role auto-discovery
 
 ## Step 8 — Store secrets in Parameter Store
 
-The container can't start without `NGED_S3_BUCKET_URL`, `NGED_S3_BUCKET_ACCESS_KEY`, and
-`NGED_S3_BUCKET_SECRET` (`Settings` requires them at import — see the smoke test in
-[Step 4](#step-4-build-and-verify-the-image)), and the deployed service genuinely uses them: the
-hourly `power_time_series_and_metadata` schedule pulls fresh telemetry from NGED's bucket.
+The deployed service genuinely needs `NGED_S3_BUCKET_URL`, `NGED_S3_BUCKET_ACCESS_KEY` and
+`NGED_S3_BUCKET_SECRET`: the hourly `power_time_series_and_metadata` schedule pulls fresh
+telemetry from NGED's bucket. Without them that schedule fails every hour — loudly, since
+`Settings.get_nged_s3_store` raises an error naming the unset variables and the job's
+`sentry_capture_failure` hook reports it — while everything that does not read NGED's own bucket
+carries on. `Settings` deliberately does *not* require them at construction, so that a laptop, a
+test run or a training job needs no third-party credentials
+([why](../architecture/../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)).
+To turn a mis-wired secret into an immediate start-up failure instead of an hourly one, call
+`Settings().require_nged_source_credentials()` from the container's entry point.
 
 They are also the one credential in this deployment that can't come from an IAM role: NGED's
 bucket lives in NGED's AWS account, so these are unavoidably static third-party keys. Don't

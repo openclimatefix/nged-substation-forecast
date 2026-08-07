@@ -144,9 +144,6 @@ def test_result_threshold_hours_reflects_threshold() -> None:
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point ``Settings`` at a temp data root (mirrors ``tests/test_assets.py``)."""
-    monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
-    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "dummy")
-    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "dummy")
     monkeypatch.setenv("DATA_PATH_INTERNAL", str(tmp_path))
     monkeypatch.setenv("DATA_PATH_DELIVERY", str(tmp_path))
     monkeypatch.setenv("LOCAL_ARTIFACTS_PATH", str(tmp_path))
