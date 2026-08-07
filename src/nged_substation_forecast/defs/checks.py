@@ -46,6 +46,7 @@ from typing import Any, Final
 
 import polars as pl
 from contracts._uri import ObjectStoreOptions, delta_table_exists, object_exists
+from contracts.common import UTC_DATETIME_DTYPE
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
 from dagster import (
@@ -573,9 +574,9 @@ def _read_live_forecast_rows(
     ``write_power_forecasts`` replaces one ``(experiment_name, fold_id)`` partition at a time, so
     promoting a champion from a *different* experiment leaves the outgoing experiment's rows for
     the same slot in place: without this filter the check would aggregate live rows from two
-    experiments and report faults sourced entirely from dead ones. ``None`` (an unreadable
-    ``meta.json``) falls back to every live experiment, which is the same reading as before the
-    filter existed.
+    experiments and report faults sourced entirely from dead ones. ``None`` — the promoted model's
+    ``meta.json`` is absent or unreadable, so there is no name to scope to — falls back to reading
+    every live experiment, which over-reports rather than under-reports.
 
     The scan is pruned to the matching ``(experiment_name, fold_id="live")`` Delta partitions and
     then to the one ``power_fcst_init_time``, and every column is reduced to a scalar inside
@@ -599,6 +600,15 @@ def _read_live_forecast_rows(
     # once and `is_finite()`'s own null on that row never leaks into the sum.
     nonfinite_power = pl.col("power_fcst").is_null() | ~pl.col("power_fcst").is_finite()
     hindcast = pl.col("valid_time") <= pl.lit(power_fcst_init_time)
+    # `nwp_init_time` is `allow_missing=True` on `PowerForecast` — a model that uses no NWP (a
+    # persistence baseline) never writes the column at all. Selecting it unconditionally would
+    # raise `ColumnNotFoundError` into the check's catch-all, costing the whole report — every
+    # other field, all of them computable — for one cosmetic one.
+    nwp_init_time = (
+        pl.max("nwp_init_time")
+        if "nwp_init_time" in slot.collect_schema().names()
+        else pl.lit(None, dtype=UTC_DATETIME_DTYPE)
+    )
     summary = slot.select(
         n_rows=pl.len(),
         # The union, not the sum: a row that is both must not be counted twice.
@@ -608,7 +618,7 @@ def _read_live_forecast_rows(
         n_ensemble_members=pl.col("ensemble_member").n_unique(),
         time_series_ids=pl.col("time_series_id").unique().implode(),
         latest_valid_time=pl.max("valid_time"),
-        nwp_init_time=pl.max("nwp_init_time"),
+        nwp_init_time=nwp_init_time,
     ).collect(engine="streaming")
 
     row = summary.row(0, named=True)
@@ -656,8 +666,16 @@ def _read_promoted_model_facts(production_model_path: str) -> PromotedModelFacts
             raise TypeError(
                 f"trained_time_series_ids must be a list, got {type(ids).__name__}: {ids!r}"
             )
+        experiment_name = meta.get("model_params", {}).get("experiment_name")
+        if experiment_name is None:
+            # `BaseForecaster.save` always writes `model_params.experiment_name`, so its absence
+            # means this file is not one we wrote. Degrade both facts together rather than half of
+            # them: keeping the trained population while losing the name to scope the read to would
+            # let an unfiltered union of two experiments' rows pass for one complete population,
+            # and would blame this slot for an outgoing champion's rows.
+            return _UNKNOWN_PROMOTED_MODEL
         return PromotedModelFacts(
-            experiment_name=meta.get("model_params", {}).get("experiment_name"),
+            experiment_name=experiment_name,
             trained_time_series_ids=None if ids is None else tuple(int(i) for i in ids),
         )
     except OSError, ValueError, TypeError, AttributeError:

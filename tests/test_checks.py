@@ -470,7 +470,12 @@ def test_zero_rows_is_not_healthy() -> None:
 
 @pytest.mark.parametrize("n_bad", [1, 500])
 def test_non_finite_power_forecasts_are_invalid(n_bad: int) -> None:
-    """Null, NaN and infinite ``power_fcst`` values all reach the evaluator as this one count."""
+    """Whatever made the rows unusable, the evaluator sees only this one count and reddens.
+
+    Which values the count covers is the Polars expression's job, pinned end-to-end by
+    ``test_live_forecasts_check_warns_on_non_finite_forecasts`` and
+    ``test_live_forecasts_check_warns_on_null_forecasts``.
+    """
     result = _evaluate(replace(_HEALTHY_ROWS, n_invalid=n_bad, n_nonfinite_power=n_bad))
     assert not result.is_healthy
     assert result.rows.n_invalid == n_bad
@@ -563,10 +568,11 @@ def _write_live_forecasts(
     power_fcst_init_time: datetime,
     *,
     time_series_ids: tuple[int, ...] = (1, 2),
-    power_fcst: float = 12.5,
+    power_fcst: float | None = 12.5,
     valid_time_offset: timedelta = _FULL_HORIZON,
     fold_id: str = "live",
     experiment_name: str = _EXPERIMENT,
+    with_nwp_init_time: bool = True,
     mode: Literal["error", "append"] = "error",
 ) -> None:
     """Write a minimal ``power_forecasts`` Delta table partitioned the way production writes it.
@@ -574,7 +580,8 @@ def _write_live_forecasts(
     Only the columns the check reads are written: the genuine ``write_power_forecasts`` path is
     exercised by ``tests/test_live_forecasts.py`` instead, and a full ``PowerForecast`` frame here
     would obscure what each case is actually varying. ``mode="append"`` adds a second experiment's
-    rows to an existing table.
+    rows to an existing table. ``with_nwp_init_time=False`` omits the column entirely, which is
+    what a model using no NWP writes — ``PowerForecast`` marks it ``allow_missing=True``.
     """
     rows = [
         {
@@ -585,24 +592,27 @@ def _write_live_forecasts(
             "time_series_id": ts_id,
             "ensemble_member": member,
             "power_fcst": power_fcst,
-            "nwp_init_time": power_fcst_init_time - timedelta(hours=12),
         }
+        | (
+            {"nwp_init_time": power_fcst_init_time - timedelta(hours=12)}
+            if with_nwp_init_time
+            else {}
+        )
         for ts_id in time_series_ids
         for member in (0, 1)
     ]
-    frame = pl.DataFrame(
-        rows,
-        schema={
-            "experiment_name": pl.String,
-            "fold_id": pl.String,
-            "power_fcst_init_time": UTC_DATETIME_DTYPE,
-            "valid_time": UTC_DATETIME_DTYPE,
-            "time_series_id": pl.Int32,
-            "ensemble_member": pl.Int8,
-            "power_fcst": pl.Float32,
-            "nwp_init_time": UTC_DATETIME_DTYPE,
-        },
-    )
+    schema = {
+        "experiment_name": pl.String,
+        "fold_id": pl.String,
+        "power_fcst_init_time": UTC_DATETIME_DTYPE,
+        "valid_time": UTC_DATETIME_DTYPE,
+        "time_series_id": pl.Int32,
+        "ensemble_member": pl.Int8,
+        "power_fcst": pl.Float32,
+    }
+    if with_nwp_init_time:
+        schema["nwp_init_time"] = UTC_DATETIME_DTYPE
+    frame = pl.DataFrame(rows, schema=schema)
     write_deltalake(
         table_or_uri=path,
         data=frame.to_arrow(),
@@ -759,6 +769,99 @@ def test_live_forecasts_check_warns_on_non_finite_forecasts(env: Path, bad_power
     assert result.passed is False
     assert result.metadata["n_nonfinite_power"].value == 4
     assert result.metadata["n_invalid_rows"].value == 4
+
+
+def test_live_forecasts_check_warns_on_null_forecasts(env: Path) -> None:
+    """A null ``power_fcst`` counts as non-finite, which Kleene logic makes easy to get wrong.
+
+    ``~is_finite()`` is *null* — not true — for a null input, and ``sum()`` skips nulls, so the
+    explicit ``is_null()`` arm is the only thing that catches the single likeliest way for the
+    asset to succeed while writing garbage. Without it this slot would read as perfectly healthy.
+    """
+    from contracts.settings import Settings
+
+    settings = Settings()
+    slot = _current_slot()
+    _write_live_forecasts(settings.power_forecasts_data_path, slot, power_fcst=None)
+    _write_nwp_runs(settings.nwp_data_path, _healthy_runs_at(slot))
+    _write_promoted_model_meta(settings.production_model_path, [1, 2])
+
+    result = _run_live_check()
+    assert result.passed is False
+    assert result.metadata["n_nonfinite_power"].value == 4
+    assert result.metadata["n_invalid_rows"].value == 4
+
+
+def test_a_row_that_is_both_non_finite_and_a_hindcast_is_counted_once(env: Path) -> None:
+    """``n_invalid`` is the union of the two faults, not their sum.
+
+    Every row here is null *and* valid in the past, so both counts are 4 while ``n_invalid`` must
+    stay 4: summing would report 8 invalid rows out of 4, breaking ``n_invalid <= n_rows``.
+    """
+    from contracts.settings import Settings
+
+    settings = Settings()
+    slot = _current_slot()
+    _write_live_forecasts(
+        settings.power_forecasts_data_path,
+        slot,
+        power_fcst=None,
+        valid_time_offset=-timedelta(hours=1),
+    )
+    _write_nwp_runs(settings.nwp_data_path, _healthy_runs_at(slot))
+    _write_promoted_model_meta(settings.production_model_path, [1, 2])
+
+    result = _run_live_check()
+    assert result.passed is False
+    assert result.metadata["n_rows"].value == 4
+    assert result.metadata["n_nonfinite_power"].value == 4
+    assert result.metadata["n_hindcast_rows"].value == 4
+    assert result.metadata["n_invalid_rows"].value == 4
+
+
+def test_live_forecasts_check_reports_on_a_model_that_writes_no_nwp_init_time(env: Path) -> None:
+    """An absent optional column costs that one field, not the whole report.
+
+    ``PowerForecast.nwp_init_time`` is ``allow_missing=True`` — a persistence baseline writes no
+    such column — so the check must still judge the rows it *can* see rather than failing to
+    evaluate anything.
+    """
+    from contracts.settings import Settings
+
+    settings = Settings()
+    slot = _current_slot()
+    _write_live_forecasts(settings.power_forecasts_data_path, slot, with_nwp_init_time=False)
+    _write_nwp_runs(settings.nwp_data_path, _healthy_runs_at(slot))
+    _write_promoted_model_meta(settings.production_model_path, [1, 2])
+
+    result = _run_live_check()
+    assert result.passed is True
+    assert result.metadata["n_rows"].value == 4
+    assert result.metadata["n_time_series"].value == 2
+    assert result.metadata["n_invalid_rows"].value == 0
+    assert result.metadata["nwp_init_time_on_rows"].value == "None"
+
+
+def test_live_forecasts_check_degrades_when_meta_json_names_no_experiment(env: Path) -> None:
+    """Both promoted-model facts degrade together, never one without the other.
+
+    Keeping ``trained_time_series_ids`` while losing ``experiment_name`` would gate the population
+    check on a count drawn from an *unfiltered* read of every live experiment's rows.
+    """
+    from contracts.settings import Settings
+
+    settings = Settings()
+    slot = _current_slot()
+    _write_live_forecasts(settings.power_forecasts_data_path, slot, time_series_ids=(1,))
+    _write_nwp_runs(settings.nwp_data_path, _healthy_runs_at(slot))
+    directory = Path(settings.production_model_path)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "meta.json").write_text(json.dumps({"trained_time_series_ids": [1, 2]}))
+
+    result = _run_live_check()
+    assert result.passed is True
+    assert "n_time_series_expected" not in result.metadata
+    assert "n_time_series_missing" not in result.metadata
 
 
 def test_live_forecasts_check_warns_on_hindcast_rows(env: Path) -> None:
