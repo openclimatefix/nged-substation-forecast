@@ -580,6 +580,15 @@ regime in which the two diverge sharply: a single 25 °C afternoon tells the mod
 whether the preceding quarter contained
 [the driest July England and Wales have recorded since their series began in 1836](../design-philosophy/design-principles.md#industry-best-practices-we-have-not-yet-absorbed).
 
+This is also the corner of the feature space where the GB brief and the
+[India assessment](../architecture/adapting-to-another-geography.md#the-two-pilot-discoms-delhi-and-jaipur)
+converge, which is worth knowing before deciding how much to invest here. Everything below is a
+mild refinement in a rainy maritime climate and a first-order effect in an arid one — Rajasthan
+sits on the margin of the Thar desert, where soiling between monsoons is severe *and* unusually
+observable, because a sharp washing signal is what identifies a reversible cleanliness factor at
+all. Building these features for Great Britain is therefore cheaper than it looks on the GB
+business case alone.
+
 **Where the signal plausibly is**, in roughly descending order of confidence:
 
 - **PV soiling** — the mechanism this project has already worked out in most detail, which is why
@@ -596,8 +605,13 @@ whether the preceding quarter contained
   (though reconstructing a dry spell longer than one 15-day run still means stitching across
   archived runs, and so inherits the availability-cut caveat below) — and it is the one member of
   this family that needs no climatological normalisation at all, because "37 days since washing
-  rain" is already interpretable in absolute terms. Note the division of labour with capacity
-  estimation, which absorbs the long-run
+  rain" is already interpretable in absolute terms. The
+  [assessment of running this codebase over India](../architecture/adapting-to-another-geography.md#the-short-answer)
+  reaches the same conclusion from the opposite direction, and is worth reading alongside this
+  bullet: it argues that a reversible cleanliness factor is something "we should probably add for
+  Britain anyway", precisely because Britain's rainy *average* hides real dry-spell episodes, and
+  concludes that work done here would pay off in both countries. Note the division of labour with
+  capacity estimation, which absorbs the long-run
   *average* soiling bias into the effective-capacity estimate
   ([honest caveats of the convex route](capacity-estimation.md#honest-caveats-of-the-convex-route)):
   that leaves precisely the time-varying part for a feature to explain, and this is the cheap
@@ -611,30 +625,37 @@ whether the preceding quarter contained
 - **Agricultural irrigation pumping.** Drought raises it, and the trial area sits in the EMids
   licence area, which includes arable Lincolnshire. Treat that second clause as an assumption
   rather than a finding: nothing in the metadata carries a land-use or customer-mix field, so it
-  needs confirming against NGED's own customer mix before anyone leans on it.
-- **Hydro** — physically the cleanest mechanism of the four and the one where a 90-day rainfall
-  total approaches being a *primary* driver rather than a correction, but listed last because
-  there is so little of it on NGED's network. It has **no v1 exposure at all**: `Hydro` is a valid
+  needs confirming against NGED's own customer mix before anyone leans on it. Note how much easier
+  the same load is to model elsewhere: the
+  [India assessment](../architecture/adapting-to-another-geography.md#the-short-answer) calls
+  agricultural pumping "the happier case" there, because Indian agricultural feeders are largely
+  segregated and run to a published supply schedule, so a large unmetered load is partly known in
+  advance. GB offers no such segregation, which is exactly why this stays an inference from
+  weather rather than a measured quantity.
+- **Hydro** — physically the cleanest mechanism of the four, and the only one where a 90-day
+  rainfall total approaches being a *primary* driver rather than a correction. It is listed last
+  anyway, because NGED's network barely has any. It has **no v1 exposure**: `Hydro` is a valid
   `time_series_type` in the contract, but the [32-series trial area](../index.md#scope) contains no
-  hydro series. It does not gain much at v2 either. Wales has 170 MW of hydro across 380 sites
-  ([Energy Generation in Wales 2023](https://www.gov.wales/sites/default/files/publications/2025-02/energy-generation-in-wales-2023.pdf)),
-  but three-quarters of that sits in six large schemes in North and Mid Wales — SP Manweb
-  territory, not NGED's. In particular the 56 MW Rheidol scheme, the largest in England and Wales,
-  connects in the SP Energy Networks area. NGED's Welsh share is roughly 10–15 MW spread over
-  ~100–170 sites (South East and South West Wales, plus part of Powys), the largest being the
-  1.8 MW Ystradffn scheme in Carmarthenshire; the South West adds Mary Tavy (2.6 MW) and a handful
-  of other Dartmoor and Exmoor schemes, and the two Midlands areas add almost nothing.
+  hydro series. Nor does v2 rescue it. NGED's own
+  [Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register)
+  (May 2026) lists **41 connected hydro sites totalling 25.7 MW** across all four licence areas —
+  South Wales 13.7 MW over 10 sites, South West 6.2 MW over 18, East Midlands 5.3 MW over 8, West
+  Midlands 0.5 MW over 5. For scale, the same register shows **5,669 MW of connected solar** and
+  1,416 MW of wind on that network, so hydro is under half a percent of the embedded solar
+  capacity.
 
-    The nuance runs in the feature's favour, though. What NGED has is overwhelmingly *sub-MW
-    run-of-river with no storage*, which is the **most** rainfall-sensitive kind — output tracks
-    catchment flow almost directly — whereas the large schemes inflating the Welsh totals are
-    reservoir and pumped storage, and far less weather-coupled. So the hydro NGED does have is
-    exactly the hydro this feature suits; there is simply not much of it, and most of it will
-    arrive embedded in primary-substation net demand rather than as its own time series. Settle
-    this against NGED's
-    [Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register)
-    — every resource ≥50 kW with its generation type, updated monthly — rather than against the
-    figures quoted here, which are national statistics apportioned to licence areas by hand.
+    Two details from the register matter more than the headline total. First, it confirms the
+    physics is the *right* physics: 39 of the 44 hydro entries are `Hydro - Run of river` and 29
+    of the 41 connected sites join at 0.4 kV, so this is overwhelmingly small run-of-river with no
+    storage — the most rainfall-sensitive kind there is, output tracking catchment flow almost
+    directly. Second, it kills the feature's usefulness for hydro *specifically*: those 41 sites
+    are spread across **32 distinct primary substations**, so no primary is hydro-dominated and
+    every one of these schemes arrives diluted into a much larger net-demand signal rather than as
+    its own series. The largest connected schemes are Llyn Brianne (5.45 MW, Dyfed), Elan Valley
+    (4.0 MW, Powys), Chatsworth (3.7 MW, Derbyshire), Mary Tavy (2.6 MW, Devon) and Ystradffin
+    (1.99 MW, Dyfed). One entry is much larger — a 58.5 MW Cwm Rheidol scheme accepted to connect
+    in the South Wales area — but its target energisation date is 2037, well beyond any horizon
+    this roadmap plans for.
 
 **Why this sits behind the instantaneous z-scores, and what the leaderboard will actually tell
 you.** The obstacle is not the feature, it is the effective sample size *on the training side*. A
