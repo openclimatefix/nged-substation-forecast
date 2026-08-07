@@ -157,7 +157,7 @@ Experiment "xgboost_smoke_test"
 **What the asset does:**
 
 1. Loads the fold's model back from MLflow (a fresh download each time — no local cache, see
-   [ML orchestration: model artifacts](../architecture/ml-orchestration.md#model-artifacts-mlflow-artifact-store-no-local-cache))
+   [ML orchestration: model artifacts](../architecture/ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-cache))
    and reads its `trained_time_series_ids` — the population it scores (the train==predict
    invariant). Raises if the loaded model has no trained series.
 2. Forecasts the **inclusive validation window** across **all ~51 NWP ensemble members** (the

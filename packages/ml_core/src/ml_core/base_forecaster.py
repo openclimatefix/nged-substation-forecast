@@ -1,3 +1,4 @@
+import tarfile
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -7,12 +8,97 @@ import mlflow
 import patito as pt
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
+from mlflow.exceptions import MlflowException
 from pydantic import BaseModel, field_serializer
 
 from ml_core.features import FeatureEngineer, TabularFeatureEngineer
 
-_MLFLOW_ARTIFACT_PATH: Final[str] = "model"
-"""Sub-path under an MLflow run's artifact root where the model directory is stored."""
+_MLFLOW_MODEL_ARTIFACT: Final[str] = "model.tar.gz"
+"""Name of the single artifact, at an MLflow run's artifact root, holding the saved model.
+
+The whole model directory is uploaded as **one archive file** rather than as a directory of
+files, because MLflow's directory upload (``log_artifacts``) *merges* into a run's artifact
+store instead of replacing it, while re-logging a single artifact of the same name overwrites
+it (both verified empirically against MLflow 3.15.1). CV fold runs are reused across
+re-materialisations, so a directory upload lets a re-training on a **smaller** population leave
+the dropped series' files behind in the run forever — MLflow exposes no public artifact-delete
+API to clean them up. One replaceable archive makes that accumulation impossible. See
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#one-archive-file-not-a-directory-of-files>.
+
+A run holding exactly *one* model file is what the fix rests on: logging a second per-model
+artifact alongside this archive would reopen the merge problem for that artifact.
+"""
+
+_ARCHIVE_COMPRESSLEVEL: Final[int] = 1
+"""gzip level used for the model archive — the fastest, not ``tarfile``'s default of 9.
+
+Measured on 40 real XGBoost boosters (500 estimators, depth 6, 24 features; 77 MB of ``.ubj``):
+level 1 takes 0.7 s for a 2.7x reduction, level 9 takes 14.9 s for 3.5x. Level 9 would put ~15
+minutes of pure CPU on every ``trained_cv_model`` materialisation at V2 scale (~2,500 series)
+to save a fifth of the bytes. Boosters are already dense, and the archive is transient — it
+exists to be one replaceable object, not to be small — so the fastest level is the right trade.
+"""
+
+
+def _archive_model_dir(model_dir: Path, archive_path: Path) -> None:
+    """Write everything in ``model_dir`` into a gzipped tar at ``archive_path``.
+
+    Members are stored by bare filename (no leading directory component), so unpacking the
+    archive reproduces ``model_dir``'s contents directly in the destination directory.
+
+    Args:
+        model_dir: The directory a subclass's ``save`` just wrote.
+        archive_path: Where to write the ``.tar.gz`` (must not be inside ``model_dir``).
+    """
+    with tarfile.open(archive_path, "w:gz", compresslevel=_ARCHIVE_COMPRESSLEVEL) as tar:
+        for item in sorted(model_dir.iterdir()):
+            tar.add(item, arcname=item.name)
+
+
+def _download_and_unpack_model(run_id: str, work_dir: Path) -> Path:
+    """Download an MLflow run's model archive into ``work_dir`` and unpack it.
+
+    Shared by ``BaseForecaster.load_from_mlflow`` and
+    ``ml_core._production_helpers.fetch_model_artifacts``, the two readers of a run's saved
+    model, so the archive layout is defined in exactly one place.
+
+    The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
+    beforehand.
+
+    Args:
+        run_id: The MLflow run the model was saved under.
+        work_dir: A scratch directory (typically a ``TemporaryDirectory``) to download and
+            extract into. Needs room for the archive *and* its unpacked contents.
+
+    Returns:
+        The directory holding the unpacked model, ready to hand to a subclass's ``load``. It
+        contains only what the archive held, so a stale file from an earlier, larger model
+        cannot appear in it.
+
+    Raises:
+        MlflowException: The run holds no model archive — either nothing was ever saved to it,
+            or it was written before the model became a single archive artifact, in which case
+            the fold must be re-trained.
+    """
+    try:
+        archive_path = Path(
+            mlflow.artifacts.download_artifacts(
+                run_id=run_id, artifact_path=_MLFLOW_MODEL_ARTIFACT, dst_path=str(work_dir)
+            )
+        )
+    except MlflowException as error:
+        raise MlflowException(
+            f"MLflow run {run_id} has no {_MLFLOW_MODEL_ARTIFACT} artifact. Either no model was "
+            "ever saved to this run, or it was saved before the model became a single archive "
+            "artifact — re-materialise `trained_cv_model` for this fold to rewrite it."
+        ) from error
+    # Unpack beside the archive rather than over it: download_artifacts has already claimed the
+    # archive's own name inside work_dir.
+    model_dir = work_dir / "unpacked_model"
+    model_dir.mkdir()
+    with tarfile.open(archive_path, "r:gz") as tar:
+        tar.extractall(model_dir, filter="data")
+    return model_dir
 
 
 class BaseForecasterConfig(BaseModel):
@@ -143,23 +229,30 @@ class BaseForecaster(ABC):
         pass
 
     def save_to_mlflow(self, run_id: str) -> None:
-        """Upload this trained model's artifacts to the given MLflow run.
+        """Upload this trained model to the given MLflow run, as one replaceable archive.
 
-        Writes the model to a temporary directory via ``save`` (the subclass's own format), then
-        uploads that directory to the run's artifact store under ``model/``. The caller is
-        responsible for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
+        Writes the model to a temporary directory via ``save`` (the subclass's own format),
+        packs that directory into a single ``model.tar.gz`` and logs *that one file* to the
+        run's artifact root. Logging one archive rather than a directory of files is what makes
+        a re-upload **replace** the previous model instead of merging with it — see
+        ``_MLFLOW_MODEL_ARTIFACT``. The caller is responsible for setting the tracking URI
+        (``mlflow.set_tracking_uri``) beforehand.
 
         Args:
-            run_id: The MLflow run to attach the artifacts to.
+            run_id: The MLflow run to attach the artifact to.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
-            self.save(Path(tmp_dir))
+            model_dir = Path(tmp_dir) / "model"
+            model_dir.mkdir()
+            self.save(model_dir)
+            archive_path = Path(tmp_dir) / _MLFLOW_MODEL_ARTIFACT
+            _archive_model_dir(model_dir, archive_path)
             with mlflow.start_run(run_id=run_id):
-                mlflow.log_artifacts(tmp_dir, artifact_path=_MLFLOW_ARTIFACT_PATH)
+                mlflow.log_artifact(str(archive_path))
 
     @classmethod
     def load_from_mlflow(cls, run_id: str) -> Self:
-        """Download a trained model's artifacts from an MLflow run and load it.
+        """Download a trained model's archive from an MLflow run, unpack it and load it.
 
         Downloads into a temporary directory and loads from there — there is no local-disk cache.
         An earlier version of this method cached downloads on disk keyed by run ID, but a CV fold
@@ -169,7 +262,7 @@ class BaseForecaster(ABC):
         contents, which required write-side invalidation just to keep the cache honest — machinery
         that existed purely to compensate for the cache, not to serve any consumer: production
         inference never used this cache (issue #469). See
-        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#model-artifacts-mlflow-artifact-store-no-local-cache>
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#model-artifacts-one-replaceable-archive-no-local-cache>
         for the full rationale. Re-adding a cache, if a future consumer needs to serve through an
         MLflow outage, is tracked in issue #472 and should be scoped to that consumer's actual
         invalidation needs rather than resurrecting this one.
@@ -184,12 +277,7 @@ class BaseForecaster(ABC):
             The reconstructed, trained forecaster.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
-            mlflow.artifacts.download_artifacts(
-                run_id=run_id,
-                artifact_path=_MLFLOW_ARTIFACT_PATH,
-                dst_path=tmp_dir,
-            )
-            return cls.load(Path(tmp_dir) / _MLFLOW_ARTIFACT_PATH)
+            return cls.load(_download_and_unpack_model(run_id, Path(tmp_dir)))
 
     @abstractmethod
     def train(self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]) -> None:
