@@ -432,13 +432,15 @@ from silently changing which rules the repo enforces.
 
 ### numpy Gotcha: `ty` mis-types `.view(np.uint32)` — pass `np.dtype(np.uint32)` instead
 
-`ndarray.view` is overloaded, and one overload takes `DTypeT | _HasDType[DTypeT]` with `DTypeT`
-bound to `np.dtype`. Since ty 0.0.69, ty matches a bare scalar type against that overload and
-solves `DTypeT` as `type[np.uint32]`, in violation of the bound, so `arr.view(np.uint32)` infers
-as `ndarray[_AnyShape, type[unsignedinteger[_32Bit]]]` instead of
-`ndarray[_AnyShape, dtype[unsignedinteger[_32Bit]]]`. Every subsequent operation on that array
-then fails — a bit-mask check reports `unsupported-operator: Unsupported & operation`. The code
-is correct at runtime; only the inferred type is wrong.
+Since ty 0.0.67, `arr.view(np.uint32)` infers as
+`ndarray[_AnyShape, type[unsignedinteger[_32Bit]]]` instead of
+`ndarray[_AnyShape, dtype[unsignedinteger[_32Bit]]]`, so every subsequent operation on that array
+fails — a bit-mask check reports `unsupported-operator: Unsupported & operation`. `ndarray.view`
+is overloaded, and the inferred type looks like the overload taking
+`DTypeT | _HasDType[DTypeT]` (with `DTypeT` bound to `np.dtype`) matched with `DTypeT` solved as
+`type[np.uint32]`, in violation of that bound. The code is correct at runtime — pyright infers
+`dtype[unsignedinteger[_32Bit]]` — and this is upstream ty bug
+[astral-sh/ty#4208](https://github.com/astral-sh/ty/issues/4208).
 
 **How to apply:** pass a real dtype object — `arr.view(np.dtype(np.uint32))` — which is the same
 call at runtime and which ty resolves to the correct `ndarray[..., dtype[uint32]]`. Prefer this
@@ -446,7 +448,9 @@ over a `# ty: ignore` comment: the suppression would have to sit on the line tha
 array, which can be several lines away from the `.view()` call that actually causes it.
 Annotating the intermediate as `npt.NDArray[np.uint32]` does not work — it raises
 `invalid-assignment` instead. The significand-rounding tests in `packages/delta_store/tests/`
-are the worked examples.
+are the worked examples. Nothing warns when the upstream bug is fixed, so the signal to delete
+this section is astral-sh/ty#4208 closing; the `np.dtype(...)` calls themselves can stay, because
+they are correct either way.
 
 ### Marimo Notebooks
 
