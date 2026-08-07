@@ -152,14 +152,19 @@ class BaseForecaster(ABC):
         Args:
             run_id: The MLflow run to attach the artifacts to.
             cache_base_path: Root of the local model cache that ``load_from_mlflow`` reads from.
-                The run's cache entry is deleted, both before and after the upload. This is
-                required, not optional, because a CV fold run is **reused** across
+                This is required, not optional, because a CV fold run is **reused** across
                 re-materialisations: the same ``run_id`` can hold a different model after
                 re-training, so a surviving cache entry would keep serving the previous model.
-                Deleting on *both* sides leaves no window in which a crash (or a partial
-                ``log_artifacts``, which is not atomic) can strand a cache entry that no longer
-                matches the run — the next load re-downloads and fails loudly on a partial
-                upload rather than quietly serving the superseded model.
+                The entry is deleted on *both* sides of the upload, and each side does different
+                work: the delete *before* the upload is what actually closes the crash window —
+                if the process dies mid-``log_artifacts`` (which is not atomic), the cache entry
+                is already gone, so the next load finds no cache, re-downloads, and either gets
+                the new model or fails loudly on a partial upload, never silently serves the
+                superseded one. The delete *after* the upload instead guards against a
+                **concurrent reader**: another process's ``load_from_mlflow`` racing this method
+                could repopulate the cache from the pre-upload (or partially-uploaded) artifacts
+                while this upload is still in flight; deleting again afterwards clears that
+                repopulated entry too, so the *next* reader downloads the finished upload.
         """
         _delete_cache_entry(cache_base_path, run_id)
         with tempfile.TemporaryDirectory() as tmp_dir:

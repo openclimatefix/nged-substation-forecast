@@ -171,8 +171,9 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
     Downloads into a temporary directory first, so a failed or interrupted download never
     touches ``dest`` — only a fully-downloaded model is moved into place (via ``rmtree`` +
     ``move``). Also writes a ``promotion.json`` (``{"mlflow_run_id", "promoted_at"}``) into
-    ``dest`` for provenance; ``BaseForecaster.load`` implementations glob for their own model
-    files (e.g. ``*.ubj``), so this extra file is harmless.
+    ``dest`` for provenance; a ``BaseForecaster.load`` implementation reads its own population
+    from its saved record (e.g. ``XGBoostForecaster`` from ``meta.json``'s
+    ``trained_time_series_ids``), never from a directory listing, so this extra file is harmless.
 
     The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
     beforehand.

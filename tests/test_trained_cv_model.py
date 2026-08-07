@@ -228,14 +228,15 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(env: dict[str, str]) -> Non
 
     assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
 
-    # The fold's child run records the run's identity as a param, and the mutable training window
-    # and counters as tags/metrics (which a re-materialisation is allowed to change — issue #197).
+    # The fold's identity (fold_id) is already a tag from run creation; the training window and
+    # counters are logged as tags too, since a re-materialisation is allowed to change them and
+    # tags (unlike MLflow params) overwrite cleanly — issue #197.
     fold_run = _fold_run(MlflowClient())
-    assert fold_run.data.params["fold_id"] == FOLD_ID
+    assert fold_run.data.tags["fold_id"] == FOLD_ID
     assert fold_run.data.tags["train_start"] == "2024-04-01T00:00:00+00:00"
     assert fold_run.data.tags["train_end"] == "2025-06-30T23:59:59+00:00"
-    assert fold_run.data.metrics["n_eligible_time_series"] == 2.0
-    assert fold_run.data.metrics["n_trained_time_series"] == 1.0
+    assert fold_run.data.tags["n_eligible_time_series"] == "2"
+    assert fold_run.data.tags["n_trained_time_series"] == "1"
 
     # The model round-trips from MLflow, and only the in-window ts1 was trained (ts2's data is all
     # past train_end, so the inclusive-window filter excludes it).
@@ -250,8 +251,9 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
 
     Regression test for issue #197: ``get_or_create_fold_run`` reuses the fold run by tag, and
     MLflow params are write-once, so logging a changed ``n_eligible_time_series`` as a *param*
-    made the second materialisation fail with "Changing param values is not allowed" — after the
-    model had already been uploaded, leaving the fold half-written and the Dagster run failed.
+    (as this code used to) made the second materialisation fail with "Changing param values is
+    not allowed" — after the model had already been uploaded, leaving the fold half-written and
+    the Dagster run failed.
     """
     eligible_path = str(Settings().eligible_time_series_data_path)
     # First pass: only ts1 is eligible.
@@ -276,7 +278,7 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
     # and it now carries the updated counter.
     fold_run = _fold_run(client)
     assert fold_run.info.run_id == first_run_id
-    assert fold_run.data.metrics["n_eligible_time_series"] == 2.0
+    assert fold_run.data.tags["n_eligible_time_series"] == "2"
 
     # Re-training invalidated the run's stale local model cache, so the next load re-downloads
     # the freshly trained artifacts rather than serving the previous model.

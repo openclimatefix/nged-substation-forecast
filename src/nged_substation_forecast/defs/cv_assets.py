@@ -357,10 +357,10 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
 
     The fold run is resolved **by tag**, never by a handle passed between assets, so this is safe
     across processes and idempotent under Dagster retries. Because that run is *reused* on every
-    re-materialisation, only genuinely immutable values may be logged as MLflow params (which are
-    write-once); the mutable training window goes in tags and the mutable counters in metrics, and
-    ``save_to_mlflow`` invalidates the run's local model cache so the newly trained model is the
-    one ``cv_power_forecasts`` picks up.
+    re-materialisation, the training window and population go in tags rather than MLflow params
+    (which are write-once and would reject a changed value), and ``save_to_mlflow`` invalidates
+    the run's local model cache so the newly trained model is the one ``cv_power_forecasts`` picks
+    up.
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -421,21 +421,24 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     forecaster.save_to_mlflow(fold_run_id, cache_base_path=Path(settings.model_cache_base_path))
     with mlflow.start_run(run_id=fold_run_id):
         # MLflow params are immutable and the fold run is reused on every re-materialisation, so
-        # only a value that cannot change for this run may be a param. `fold_id` is the only one:
-        # the run is resolved *by* that value, so it is the run's identity.
-        mlflow.log_param("fold_id", fold_id)
+        # nothing here that can legitimately change between materialisations may be a param.
+        # `fold_id` is already set as a tag at run creation (get_or_create_fold_run, which is also
+        # what resolves the run) — no need to duplicate it here as a param too.
+        #
         # The training window comes from the CV config, which is edited between materialisations
-        # as the archive grows (a fold's train_end is extended). Tags overwrite cleanly; params
-        # would raise "Changing param values is not allowed" on the re-run.
-        mlflow.set_tag("train_start", train_start.isoformat())
-        mlflow.set_tag("train_end", train_end.isoformat())
-        # These counters are outputs of *this* materialisation, not identifying inputs — the
-        # eligible population grows as power coverage extends — so they are metrics, which record
-        # the latest value rather than rejecting it.
-        mlflow.log_metrics(
+        # as the archive grows (a fold's train_end is extended). The eligible/trained counters are
+        # outputs of *this* materialisation, not identifying inputs — the eligible population
+        # grows as power coverage extends, and can also shrink. All four are tags rather than
+        # metrics: MLflow resolves a metric's "latest" value as the max over
+        # (step, timestamp, value), not the newest write, so a metric would under-report a
+        # genuinely *shrunk* count if two materialisations ever landed the same timestamp/step.
+        # Tags are last-write-wins, which is the semantic actually wanted here.
+        mlflow.set_tags(
             {
-                "n_eligible_time_series": float(len(eligible_ids)),
-                "n_trained_time_series": float(n_trained),
+                "train_start": train_start.isoformat(),
+                "train_end": train_end.isoformat(),
+                "n_eligible_time_series": str(len(eligible_ids)),
+                "n_trained_time_series": str(n_trained),
             }
         )
         # Provenance: the code + data versions that produced this fold's model — the load-bearing
