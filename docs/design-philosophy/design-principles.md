@@ -477,17 +477,25 @@ the weather distributions, and the grid beneath the power data is changing fast 
 pumps).
 
 Great Britain's summer of 2026 is the concrete case, and it arrived while this page was being
-written. On the Met Office's provisional figures, July 2026 was the driest July in the England and
-Wales series that begins in 1836: England recorded 6.5 mm of rain, 10% of its long-term average,
-and southern England recorded 1.9 mm — 3% of average, and the driest month it has ever observed.
-The same month was the sunniest calendar month England and Wales have on record (a series starting
-in 1910) and the second-warmest July for the UK as a whole. At the season's halfway point the UK
-was running 1.8 °C above the seasonal norm on 42% of its average rainfall — warmer and drier than
-2025 at the same stage, and 2025 went on to be the UK's warmest summer on record. Every one of
-those is a real shift in the distribution of an input we feed the model, and not one of them is a
-fault. A naive "distribution changed" alarm would have fired continuously from May 2026 onwards
-while telling an operator nothing they could act on, which is exactly how such an alarm gets tuned
-into silence.
+written. All the figures here are the Met Office's provisional ones, current as of early August
+2026. July 2026 was the driest July in the England and Wales series that begins in 1836: England
+recorded 6.5 mm of rain, 10% of its long-term average, and southern England recorded 1.9 mm — 3% of
+average, and the driest month it has ever observed. The same month was the UK's sunniest July in a
+series running from 1910, and for England and Wales the sunniest *calendar month* ever observed; it
+was also the second-warmest July for the UK as a whole. Nor was this confined to one month: spring
+2026 was already the warmest on record for England and Wales, and at the summer's halfway point the
+UK was running 1.8 °C above the seasonal norm — warmer than 2025 at the same stage, and 2025 went
+on to be the UK's warmest summer on record. Every one of those is a real shift in the distribution
+of an input we feed the model, and not one of them is a fault. A naive "distribution changed" alarm
+would have fired continuously from spring 2026 onwards while telling an operator nothing they could
+act on, which is exactly how such an alarm gets tuned into silence.
+
+Note also how much the *choice of statistic* does here, which is part of why the design question is
+open. Summer rainfall to mid-July stood at 42% of the full season's long-term average against the
+roughly 50% normal for that date, which the Met Office fairly describes as just below average —
+even as the same season was producing individual months that broke 190-year records. A detector
+watching seasonal aggregates and one watching monthly or daily distributions would have told an
+operator entirely different stories about the same summer.
 
 The question to answer before adopting the practice is therefore whether the useful event is "the
 distribution changed" or "the model is extrapolating — being asked about conditions unlike anything

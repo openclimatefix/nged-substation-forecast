@@ -577,62 +577,89 @@ moment. A second family of features asks a different question: how abnormal has 
 climatological norm for that window, and the equivalent accumulated-temperature (or degree-day)
 anomaly, carry state that no instantaneous feature can hold. Great Britain's summer of 2026 is the
 regime in which the two diverge sharply: a single 25 °C afternoon tells the model nothing about
-whether the preceding quarter was
-[the driest on record since 1836](../design-philosophy/design-principles.md#industry-best-practices-we-have-not-yet-absorbed).
+whether the preceding quarter contained
+[the driest July England and Wales have recorded since their series began in 1836](../design-philosophy/design-principles.md#industry-best-practices-we-have-not-yet-absorbed).
 
 **Where the signal plausibly is**, in roughly descending order of confidence:
 
-- **Hydro.** `Hydro` is a real `time_series_type`, and run-of-river output is set by catchment
-  wetness — an accumulation over weeks to months — far more than by the rain falling during the
-  forecast window. This is the clearest physical case on the list, and the one where a 90-day
-  rainfall total is close to being the *primary* driver rather than a correction.
-- **Sustained-heat demand.** The Tier-2
+- **Sustained-heat demand** — the leading case for the v1 population, because most of that
+  population is demand. The Tier-2
   [effective temperature](#effective-smoothed-temperature-and-degree-day-features) smooths over
   roughly 1–3 days, which is building thermal inertia. A multi-week heat regime is a different
   thing: acclimatisation, cooling equipment bought partway through a hot summer and then kept, and
   ground and building-fabric temperatures that a three-day EWM cannot represent.
-- **Agricultural irrigation pumping.** Drought raises it, and the licence area carries arable load.
-  Real, but concentrated in a minority of series.
+- **Agricultural irrigation pumping.** Drought raises it, and the trial area sits in the EMids
+  licence area, which includes arable Lincolnshire. Treat that second clause as an assumption
+  rather than a finding: nothing in the metadata carries a land-use or customer-mix field, so it
+  needs confirming against NGED's own customer mix before anyone leans on it.
 - **PV soiling.** A long dry spell lets dust and pollen build up on panels and rain washes them
-  clean, so a "days since meaningful rain" feature has a genuine mechanism behind it. Expect it to
-  sit under the noise floor.
+  clean. Note that this partly overlaps work already assigned elsewhere: the capacity model absorbs
+  *average* soiling bias into the effective-capacity estimate
+  ([honest caveats of the convex route](capacity-estimation.md#honest-caveats-of-the-convex-route)),
+  so only the time-*varying* part is left for a feature to explain. That residue is small enough
+  that it will most likely sit under the noise floor, and a "days since meaningful rain" feature is
+  in any case a different construct from the accumulate-and-normalise family described here.
+- **Hydro.** Run-of-river output is set by catchment wetness — an accumulation over weeks to
+  months — far more than by the rain falling during the forecast window, so this is physically the
+  cleanest case of the four, and the one where a 90-day rainfall total approaches being a *primary*
+  driver rather than a correction. It is listed last because it has **no v1 exposure at all**:
+  `Hydro` is a valid `time_series_type` in the contract, but the
+  [32-series trial area](../index.md#scope) contains no hydro series, so the mechanism is
+  untestable until v2 widens the population.
 
-**Why this sits behind the instantaneous z-scores, and what it will and will not measure.** The
-obstacle is not the feature, it is the effective sample size. A 90-day accumulator moves slowly, so
-a training history of roughly 15 months of power data — against an ENS archive that only starts
-2024-04-01 — contains on the order of a *handful* of independent observations of it per series: one
-summer and one winter, not a distribution. A per-series booster will still happily split on it, and
-what it fits will largely be that particular year's idiosyncrasies, aliased with `day_of_year` and
-with any level drift over the same months. The instantaneous z-scores do not have this problem,
-because a heatwave anomaly recurs many times within a single year.
+**Why this sits behind the instantaneous z-scores, and what the leaderboard will actually tell
+you.** The obstacle is not the feature, it is the effective sample size *on the training side*. A
+90-day accumulator moves slowly, so the
+[leaderboard fold](../ml_experimentation/cross-validation-folds.md#current-state-a-single-fold)'s
+training window — 2024-04-01 to 2025-06-30, bounded below by the start of the ENS archive —
+contains a *handful* of independent observations of it per series: one summer and one winter, not a
+distribution. A per-series booster will still happily split on it, and what it fits will largely be
+that particular year's idiosyncrasies, aliased with the seasonal `local_time_of_year_sin`/`_cos`
+features and with any level drift over the same months. The instantaneous z-scores do not have this
+problem, because a heatwave anomaly recurs many times within a single year.
 
-The consequence is a *measurement* problem rather than a modelling one, and it is worth stating
-plainly before anyone registers the experiment: the value of a drought feature is out-of-sample
-robustness in a regime the training data barely contains, and a leaderboard scored on folds drawn
-from that same short history structurally cannot see it. This is the same argument the
-[monotone constraints](#monotone-constraints-for-the-generation-models) item makes — the win is
-"sane extrapolation in weather regimes the training year never saw" — and it should be judged the
-same way: expect roughly no leaderboard movement, and assess it on whether the model behaves
-sensibly when the accumulator is pushed to values the training set never held. It becomes a
-genuinely *measurable* feature only once
-[ERA5 pre-training](#explicitly-deferred-not-quick-or-not-skill) extends the effective history from
-one summer to several.
+The *validation* side is the opposite, and it is what makes this worth running rather than merely
+worth describing. The same fold validates on 2025-07-01 to 2026-06-30, which contains summer 2025
+(the UK's warmest on record) and spring 2026 (the warmest on record for England and Wales). This is
+a forward-chained split holding out genuinely extreme regimes, so the leaderboard *can* register a
+result here. What it cannot do is separate "the idea is wrong" from "one summer of training data
+was not enough to fit it" — so a loss is weak evidence rather than a verdict, and should be
+recorded as such in MLflow rather than closing the question.
 
-**Anchor it to init time, and source it from ERA5.** The accumulator is a property of the forecast
-*moment*, not of the target time — a 14-day window shifts a 90-day total only marginally — so it is
-the same number for every horizon in a run and should be computed once at `power_fcst_init_time`
-and broadcast, exactly like the
-[init-time-anchored features](#init-time-anchored-features-current-level-anchor-prerequisite-for-the-global-model).
-That anchoring also settles where the data comes from: a window reaching 90 days into the past
-cannot come from the forecast NWP trajectory at all, and stitching it together from archived ENS
-runs would ride the same uncut freshest-run join the residual-lag features flag. The clean source
-is the **ERA5 ingest** this item already depends on, which supplies the accumulation and its
-climatological norm from one table and one publication-time availability cut. Nothing here needs
-live data at forecast time beyond the ~5-day ERA5T latency, which is immaterial to a 90-day total.
+Two things follow for how to judge it. Expect a small or negative NMAE move, and pair the
+leaderboard number with an out-of-band check of whether the model still behaves sensibly when the
+accumulator is pushed past the values the training window held — the same "sane extrapolation in
+weather regimes the training year never saw" criterion the
+[monotone constraints](#monotone-constraints-for-the-generation-models) item is judged on. Note
+that this does not trade away principle 8 ("*every experiment is scored identically*"): the
+leaderboard measurement is unchanged and stays comparable, and the extrapolation check is an
+*additional* acceptance criterion rather than a substitute score. The feature becomes cleanly
+measurable only once [ERA5 pre-training](#explicitly-deferred-not-quick-or-not-skill) extends the
+training history from one summer to several.
 
-**Scope the first long-window experiment to precipitation**, since accumulated-heat effects are
-partly reachable by lengthening the effective-temperature EWM, which is a config change rather than
-a new data dependency and should be tried first as the cheap control.
+**Anchor it to init time, and source it from ERA5.** Compute the accumulator once at
+`power_fcst_init_time` and broadcast it across every horizon in the run, exactly like the
+[init-time-anchored features](#init-time-anchored-features-current-level-anchor-prerequisite-for-the-global-model)
+and for the same reason: an init-time anchor is never leaky and never null at any horizon. (A
+target-time-anchored variant, whose window slides with `valid_time`, is a genuinely different
+feature — over a 14-day horizon it moves a 30-day window by nearly half its length — and can be
+tried separately if the init-time version earns it.) The anchoring also settles where the data
+comes from: a window reaching 90 days into the past cannot come from the forecast NWP trajectory at
+all, and stitching it together from archived ENS runs would ride the same uncut freshest-run join
+the residual-lag features flag. The clean source is the **ERA5 ingest** this item already depends
+on, which supplies the accumulation and its climatological norm from one table and one
+publication-time availability cut. Nothing here needs live data at forecast time beyond the ~5-day
+ERA5T latency, which is immaterial to a 90-day total.
+
+**Scope the first long-window experiment to precipitation.** The accumulated-*heat* variant is
+tempting to reach for first as a cheap control, on the grounds that it is just a longer
+effective-temperature EWM — but that is wrong, and for the reason this section has already given.
+The Tier-2 effective temperature is computed from the NWP trajectory itself, and
+`_apply_rolling_mean_feature` groups by `nwp_init_time` precisely so that a window cannot span
+runs, so with a 15-day ENS run there is no multi-week EWM to configure: the heat accumulator
+carries the same ERA5 dependency as the precipitation one. The genuinely cheap control is to
+lengthen the EWM only as far as the trajectory allows (~7–10 days), which is a weaker experiment
+and should be labelled as one.
 
 ## Tier 4 — structural model changes (weeks)
 
