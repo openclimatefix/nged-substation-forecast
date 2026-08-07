@@ -126,21 +126,11 @@ class Settings(BaseSettings):
             " shared leaderboard evaluation protocol; read them from here, never hard-coded."
         ),
     )
-    nwp_metadata_csv_path: Path = Field(
-        default=PROJECT_ROOT / "metadata" / "nwp_metadata.csv",
-        description=(
-            "Static CSV of per-NWP-model metadata (H3 resolution, provider, ensemble flag),"
-            " checked into the repo and read by NwpMetaData.load. A code-relative resource"
-            " (like cv_config_path), so it stays a local Path even when the data tables are a"
-            " remote URI."
-        ),
-    )
-
     # --- Storage roots -------------------------------------------------------------------
     #
     # data_path_internal and data_path_delivery hold the (S3-capable) data tables; local_
-    # artifacts_path holds the always-local model cache and production model. Why they
-    # are split, and what belongs in each:
+    # artifacts_path holds the always-local production model. Why they are split, and
+    # what belongs in each:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     data_path_internal: str = Field(
@@ -165,9 +155,9 @@ class Settings(BaseSettings):
     local_artifacts_path: str = Field(
         default=str(PROJECT_ROOT / "data"),
         description=(
-            "Root of the always-local artifacts (model cache, production model). Kept"
-            " separate from the data-table roots because these back local-filesystem-only"
-            " libraries and must stay local even when the data tables live on S3."
+            "Root of the always-local artifacts (the production model). Kept separate from"
+            " the data-table roots because these back local-filesystem-only libraries and"
+            " must stay local even when the data tables live on S3."
         ),
     )
 
@@ -264,16 +254,6 @@ class Settings(BaseSettings):
 
     # --- Always-local artifacts (derive from local_artifacts_path unless explicitly set) --
 
-    model_cache_base_path: str = Field(
-        default="",
-        description=(
-            "Root of the local-disk model cache, keyed by MLflow run ID, used by"
-            " BaseForecaster.load_from_mlflow. Currently only the CV pipeline"
-            " (cv_power_forecasts) reads a model back through this cache; production"
-            " inference does not use it for v0.1 (the model is baked directly into the"
-            " container image instead)."
-        ),
-    )
     production_model_path: str = Field(
         default="",
         description=(
@@ -353,9 +333,6 @@ class Settings(BaseSettings):
         )
         self.metadata_path = self.metadata_path or uri_join(self.nged_data_path, "metadata.parquet")
         # Always-local artifacts.
-        self.model_cache_base_path = self.model_cache_base_path or uri_join(
-            self.local_artifacts_path, "model_cache"
-        )
         self.production_model_path = self.production_model_path or uri_join(
             self.local_artifacts_path, "production_model"
         )

@@ -9,10 +9,10 @@ leaderboard. **Inference** (step 3) is automatic — once a model is promoted, t
 keeps producing forecasts from it with no further action, as long as Dagster's daemon is running.
 
 Production inference has **zero dependency on MLflow at runtime**: the promoted model is a plain
-directory on disk, loaded with a plain `save`/`load` round trip — no run id, tracking-server call,
-or cache lookup on the hot path. See
+directory on disk, loaded with a plain `save`/`load` round trip — no run id or tracking-server call
+on the hot path. See
 [roadmap: Production model artifacts](../roadmap/live-service.md#production-model-artifacts) for
-why this was chosen over reusing the CV pipeline's MLflow-cache mechanism.
+why this was chosen over fetching the champion model from MLflow dynamically at runtime.
 
 ---
 
@@ -172,6 +172,26 @@ nulls in the three de-accumulated variables is *expected* and is not a fault —
 [Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md). A whole slice of
 nulls is rejected at ingest by `Nwp.validate`, which means the day's run simply does not land: the
 symptom you will actually see is a **missed run**, not corrupt data.
+
+**Reading the NWP completeness check.** `nwp_run_is_complete` also runs inside `ecmwf_ens`, also
+non-blocking WARN, and asks the other question: did the whole run arrive? Its description names
+the missing ensemble members and the missing lead times in hours, and its metadata carries the
+observed-versus-expected member, step, cell and row counts. **The run has already landed when this
+warns** — a short run is kept, because partial NWP forecasts better than falling back on
+yesterday's run. The action is to chase Dynamical.org, not to touch the table.
+
+**Do not re-materialise a partition that has already landed.** `write_nwp` is append-only, so
+re-running the partition after Dynamical republishes the run would append a *second* copy of it
+alongside the short one. `Nwp.validate` checks uniqueness only within the in-memory frame, so the
+duplicate primary keys would land silently and every later `Nwp.scan_delta` read would fan out. If
+a short run genuinely needs replacing, that needs a partition-replace path in `delta_store.nwp`,
+which does not exist today — tracked in
+[issue #476](https://github.com/openclimatefix/nged-substation-forecast/issues/476). (Materialising
+a *missed* partition, below, is a different case and is safe: nothing landed for it.)
+
+Every materialisation also publishes `n_ensemble_members`, `n_valid_times`, `n_h3_cells` and the
+`valid_time` range as metadata, so the Dagster UI timeline shows slow drift in the upstream dataset
+before it becomes a warning.
 
 **Reading the live-forecast check.** `live_forecasts_are_healthy` runs against `live_forecasts`
 after each 6-hourly materialisation, is likewise non-blocking WARN, and reads the forecasts back

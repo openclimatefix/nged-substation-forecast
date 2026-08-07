@@ -13,7 +13,6 @@ Tests at two tiers:
 """
 
 import os
-import shutil
 import socket
 import subprocess
 import time
@@ -179,14 +178,12 @@ def _base_env(
     nged_path.mkdir()
     forecasts_path = tmp_path / "power_forecasts"
     metrics_path = tmp_path / "forecast_metrics"
-    cache_path = tmp_path / "cache"
     effective_capacity_path = tmp_path / "effective_capacity"
 
     monkeypatch.setenv("MLFLOW_TRACKING_URI", tracking_uri)
     monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
     monkeypatch.setenv("NWP_DATA_PATH", str(tmp_path / "NWP"))
     monkeypatch.setenv("ELIGIBLE_TIME_SERIES_DATA_PATH", str(tmp_path / "eligible"))
-    monkeypatch.setenv("MODEL_CACHE_BASE_PATH", str(cache_path))
     monkeypatch.setenv("POWER_FORECASTS_DATA_PATH", str(forecasts_path))
     monkeypatch.setenv("FORECAST_METRICS_DATA_PATH", str(metrics_path))
     # Point at a temp path so metrics never reads the repo's real effective_capacity table; the
@@ -202,7 +199,6 @@ def _base_env(
     return {
         "forecasts": forecasts_path,
         "metrics": metrics_path,
-        "cache": cache_path,
         "effective_capacity": effective_capacity_path,
     }
 
@@ -266,11 +262,11 @@ def _run_cv_pipeline(instance: DagsterInstance, materialise_capacity: bool = Tru
 
 def test_metrics_leaderboard_writes_forecast_metrics_delta(
     file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
 ) -> None:
-    instance = DagsterInstance.ephemeral()
-    _run_cv_pipeline(instance)
+    _run_cv_pipeline(dagster_instance)
     assert materialize(
-        [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
+        [metrics], run_config=_metrics_run_config("leaderboard"), instance=dagster_instance
     ).success
 
     fm = pl.read_delta(str(file_mlflow_env["metrics"]))
@@ -296,11 +292,11 @@ def test_metrics_leaderboard_writes_forecast_metrics_delta(
 
 def test_metrics_leaderboard_logs_to_mlflow(
     file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
 ) -> None:
-    instance = DagsterInstance.ephemeral()
-    _run_cv_pipeline(instance)
+    _run_cv_pipeline(dagster_instance)
     assert materialize(
-        [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
+        [metrics], run_config=_metrics_run_config("leaderboard"), instance=dagster_instance
     ).success
 
     experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
@@ -327,18 +323,19 @@ def test_metrics_leaderboard_logs_to_mlflow(
     assert "rmse__all" in parent_metrics
 
 
-def test_metrics_is_idempotent(file_mlflow_env: dict[str, Path]) -> None:
-    instance = DagsterInstance.ephemeral()
-    _run_cv_pipeline(instance)
+def test_metrics_is_idempotent(
+    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+) -> None:
+    _run_cv_pipeline(dagster_instance)
 
     assert materialize(
-        [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
+        [metrics], run_config=_metrics_run_config("leaderboard"), instance=dagster_instance
     ).success
     first_height = pl.read_delta(str(file_mlflow_env["metrics"])).height
 
     # Re-materialising overwrites the partition rather than appending.
     assert materialize(
-        [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
+        [metrics], run_config=_metrics_run_config("leaderboard"), instance=dagster_instance
     ).success
     assert pl.read_delta(str(file_mlflow_env["metrics"])).height == first_height
 
@@ -352,15 +349,16 @@ def _read_metric(metrics_path: Path, metric_name: str) -> float:
     return float(fm["metric_value"][0])
 
 
-def test_metrics_raises_without_effective_capacity(file_mlflow_env: dict[str, Path]) -> None:
+def test_metrics_raises_without_effective_capacity(
+    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+) -> None:
     """The metrics asset requires the effective_capacity table and fails cleanly when it is absent."""
-    instance = DagsterInstance.ephemeral()
-    _run_cv_pipeline(instance, materialise_capacity=False)
+    _run_cv_pipeline(dagster_instance, materialise_capacity=False)
 
     result = materialize(
         [metrics],
         run_config=_metrics_run_config("leaderboard"),
-        instance=instance,
+        instance=dagster_instance,
         raise_on_error=False,
     )
     assert not result.success
@@ -368,6 +366,7 @@ def test_metrics_raises_without_effective_capacity(file_mlflow_env: dict[str, Pa
 
 def test_metrics_nmae_denominator_is_effective_capacity(
     file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
 ) -> None:
     """NMAE is MAE divided by the series' full-history effective_capacity_mw.
 
@@ -375,10 +374,9 @@ def test_metrics_nmae_denominator_is_effective_capacity(
     frame directly), this proves the *asset* reads the materialised effective_capacity Delta table
     and uses that table's value as the denominator.
     """
-    instance = DagsterInstance.ephemeral()
-    _run_cv_pipeline(instance)
+    _run_cv_pipeline(dagster_instance)
     assert materialize(
-        [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
+        [metrics], run_config=_metrics_run_config("leaderboard"), instance=dagster_instance
     ).success
 
     mae = _read_metric(file_mlflow_env["metrics"], "mae")
@@ -559,11 +557,12 @@ def test_score_forecast_group_per_series_batches(
     assert written.select(compare_cols).sort(sort_keys).equals(expected_str.sort(sort_keys))
 
 
-def test_metrics_ad_hoc_no_mlflow_logging(file_mlflow_env: dict[str, Path]) -> None:
-    instance = DagsterInstance.ephemeral()
-    _run_cv_pipeline(instance)
+def test_metrics_ad_hoc_no_mlflow_logging(
+    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+) -> None:
+    _run_cv_pipeline(dagster_instance)
     assert materialize(
-        [metrics], run_config=_metrics_run_config("ad_hoc"), instance=instance
+        [metrics], run_config=_metrics_run_config("ad_hoc"), instance=dagster_instance
     ).success
 
     # Delta rows written.
@@ -616,15 +615,16 @@ def test_population_filter_prunes_partitions(tmp_path: Path) -> None:
     assert "experiment_name=expB" not in plan
 
 
-def test_metrics_no_filter_scores_every_group(file_mlflow_env: dict[str, Path]) -> None:
+def test_metrics_no_filter_scores_every_group(
+    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+) -> None:
     """A default (no-filter) ``metrics`` run scores every ``(experiment_name, fold_id)`` group.
 
     The pipeline produces forecasts for one experiment; we duplicate them under a second
     experiment so two groups exist on disk, then run ``metrics`` with the default
     ``PopulationFilter()`` (no filter) and assert both groups land in ``forecast_metrics``.
     """
-    instance = DagsterInstance.ephemeral()
-    _run_cv_pipeline(instance)
+    _run_cv_pipeline(dagster_instance)
 
     # Duplicate the produced forecasts under a second experiment so two groups exist on disk.
     forecasts_path = str(file_mlflow_env["forecasts"])
@@ -643,7 +643,7 @@ def test_metrics_no_filter_scores_every_group(file_mlflow_env: dict[str, Path]) 
     assert materialize(
         [metrics],
         run_config=RunConfig(ops={"metrics": MetricsConfig(evaluation_scope="ad_hoc")}),
-        instance=instance,
+        instance=dagster_instance,
     ).success
 
     fm = pl.read_delta(str(file_mlflow_env["metrics"]))
@@ -688,14 +688,17 @@ def _wait_for_mlflow_server(
     )
 
 
-def test_full_stack_real_mlflow_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_full_stack_real_mlflow_server(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
     """Full-stack test: real HTTP MLflow server + artifact round-trip + tag resolution.
 
     Proves §4.1.1 (cross-call tag resolution) and §4.5 (artifact upload/download).
     Each ``materialize()`` call starts with a fresh ``mlflow.set_tracking_uri`` inside
     the asset body — simulating what happens when assets run in separate Dagster processes.
-    The artifact round-trip is proved by deleting the local model cache between
-    ``trained_cv_model`` and ``cv_power_forecasts``.
+    The artifact round-trip is proved by ``cv_power_forecasts`` downloading the model
+    ``trained_cv_model`` uploaded to the real server — ``load_from_mlflow`` has no local
+    cache (issue #469), so every load is a genuine download.
     """
     # The real MLflow HTTP server needs the server runtime stack (full ``mlflow``, in the dev
     # group); a ``mlflow-skinny``-only environment cannot start it, so skip rather than fail.
@@ -737,31 +740,27 @@ def test_full_stack_real_mlflow_server(tmp_path: Path, monkeypatch: pytest.Monke
         mlflow.set_tracking_uri(tracking_uri)
 
         paths = _base_env(tmp_path, monkeypatch, tracking_uri)
-        instance = DagsterInstance.ephemeral()
-        _register(instance)
+        _register(dagster_instance)
 
         # Train — uploads model artifacts to the real server.
         assert materialize(
-            [trained_cv_model], partition_key=PARTITION_KEY, instance=instance
+            [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
         ).success
 
-        # Delete local cache to force artifact re-download on the next step (§4.5 cache miss).
-        shutil.rmtree(paths["cache"], ignore_errors=True)
-
-        # Predict — downloads artifacts from the real server on cache miss.
+        # Predict — downloads artifacts from the real server (load_from_mlflow has no local cache).
         assert materialize(
-            [cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance
+            [cv_power_forecasts], partition_key=PARTITION_KEY, instance=dagster_instance
         ).success
 
         # The NMAE denominator table that metrics requires.
-        assert materialize([effective_capacity], instance=instance).success
+        assert materialize([effective_capacity], instance=dagster_instance).success
 
         # Score — proves tag-based run resolution: the asset calls get_or_create_fold_run()
         # with a fresh MlflowClient connection and finds the same run that trained_cv_model used.
         assert materialize(
             [metrics],
             run_config=_metrics_run_config("leaderboard"),
-            instance=instance,
+            instance=dagster_instance,
         ).success
 
         # Assert leaderboard metrics landed on the real server.

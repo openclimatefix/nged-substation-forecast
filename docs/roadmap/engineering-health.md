@@ -4,49 +4,13 @@
 > codebase review that don't change forecast behaviour. Each section is an independent,
 > roughly one-PR piece of work; sections are deleted as they ship. Mostly the v0.2 epic
 > [#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138):
-> NWP ingestion checks [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) ·
 > Hydra removal [#228](https://github.com/openclimatefix/nged-substation-forecast/issues/228) ·
 > rigor tests [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229).
+> NWP ingestion checks
+> [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) have shipped —
+> as-built in
+> [Known ECMWF ENS data-quality issues](../architecture/ecmwf-ens-known-issues.md#an-incomplete-run-tolerated-and-reported).
 > Task ordering lives in the GitHub Project board.
-
-## NWP ingestion: completeness checks and Dagster metrics
-
-Issue: [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161)
-
-`ecmwf_ens` currently records only `n_rows` in the Dagster UI, and nothing validates that a
-downloaded run is *complete* — `Nwp.validate` checks row-level invariants (dtypes, bounds,
-uniqueness, null patterns) but not run-level shape. A partial download (a missing ensemble
-member, a truncated forecast horizon, a dropped H3 cell) would land silently and only surface
-later as weird training data.
-
-(This issue's design originally also covered counting values clipped by the Int16
-quantisation ranges — the highest-value check at the time. That failure mode was eliminated by
-[#271](https://github.com/openclimatefix/nged-substation-forecast/pull/271): Float32
-significand rounding has no ranges, so nothing clips.)
-
-### Implementation details — ingestion checks (deleted when this ships)
-
-**1. Run-level completeness check in contracts.** New `@classmethod` on `Nwp` — called from
-the asset, **not** from `Nwp.validate`: validation runs on arbitrary frames (filtered test
-fixtures, pruned scans), while completeness is a property of one whole ingested run.
-`check_run_completeness(df, expected_n_cells, expected_members)` asserts, per the issue:
-
-- `valid_time` spans `init_time` → `init_time + 15 days` with the expected 85 native steps
-  (3-hourly to 144 h, then 6-hourly to 360 h);
-- the expected number of unique `h3_index` values (from the H3 grid weights);
-- the expected `ensemble_member` set.
-
-Raise with a message naming exactly what's missing (which members, which lead times).
-
-**2. Call it in `ecmwf_ens`** after `convert_nwp_xarray_dataset_to_polars_dataframe`, before
-`write_nwp`, and attach the counts to the materialisation metadata (`n_members`, `n_cells`,
-`n_valid_times`, `valid_time_min`/`valid_time_max` alongside the existing `n_rows`) so drift
-is visible in the Dagster UI timeline even when the check passes.
-
-**Verification.** (1) Unit test in `packages/contracts/tests/`: a synthetic complete run
-passes; dropping one member / one cell / one lead time raises naming the gap. (2) Materialise
-one `ecmwf_ens` partition locally and confirm the new metadata entries appear in the Dagster
-UI.
 
 ## Drop Hydra (and OmegaConf): plain YAML + importlib + pydantic
 

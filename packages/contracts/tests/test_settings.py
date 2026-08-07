@@ -80,7 +80,7 @@ def test_delivery_fields_are_exactly_the_known_delivery_tables():
     # Always-local artifacts derive from local_artifacts_path, not either data-table root, so
     # they're excluded from this internal-vs-delivery check even though their names also end in
     # "_data_path".
-    local_artifact_fields = {"model_cache_base_path", "production_model_path"}
+    local_artifact_fields = {"production_model_path"}
     settings = Settings(
         data_path_internal="/internal",
         data_path_delivery="/delivery",
@@ -114,7 +114,6 @@ def test_remote_data_path_keeps_artifacts_local():
     )
     assert settings.power_forecasts_data_path == "s3://bucket/data/power_forecasts"
     assert settings.power_time_series_data_path == "s3://bucket/data/NGED/power_time_series.delta"
-    assert settings.model_cache_base_path == "/local/artifacts/model_cache"
     assert settings.production_model_path == "/local/artifacts/production_model"
 
 

@@ -1241,24 +1241,24 @@ All of it sits in a thin layer, and most of it sits in `contracts`.
 | `LIST_OF_TIME_SERIES_TYPES` — 22 NGED categories, re-exported as the `AllFeatures` enum | `contracts/power_schemas.py` | Propagates into the ML schema. |
 | Power bounded to ±1000 MW; `max_mw_threshold` / `min_mw_threshold` sized to GB primaries | `contracts/power_schemas.py`, `contracts/settings.py` | Secondary substations are far smaller; thresholds are meaningless as set. |
 | The GB outline | `geo/great_britain/load.py` | Add a sibling region loader; swap one import in `defs/assets.py`. |
-| `"Europe/London"` as a bare string literal in the feature engineer | `ml_core/features/tabular_feature_engineer.py:350` | Drives every local-time feature in the champion feature set. |
+| `"Europe/London"` as a bare string literal in the feature engineer | `ml_core/features/tabular_feature_engineer.py`, in `_apply_local_time_features` | Drives every local-time feature in the champion feature set. |
 | `DISPLAY_TIME_ZONE = "Europe/London"`, asserted in the dashboard's axis titles | `dashboard/forecast_chart.py:40` | Display only, but it is a second hard-coded timezone. |
 | H3 resolution 5 (~253 km² per cell) chosen for GB, and reached for via a **private** import from the ingest package | `defs/assets.py:40,141` | The NWP grid resolution currently lives inside `nged_data`; see the `PowerIngest` note [below](#how-we-would-structure-it). |
 | `nged_s3_bucket_url` / `_access_key` / `_secret` are **required** settings with no defaults | `contracts/settings.py` | `Settings()` raises for any deployment with no NGED bucket. |
 
-The exercise also surfaced a **latent correctness wart**, though a milder one than it first looks.
-`local_utc_offset` is computed as
-`(base_utc_offset + dst_offset).dt.total_seconds() // 3600` cast to `Int8`
-([`tabular_feature_engineer.py:358`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/packages/ml_core/src/ml_core/features/tabular_feature_engineer.py)),
-so it can only ever represent whole-hour offsets. Note that `//` floors rather than truncates, so a
-negative fractional offset moves *away* from zero.
+The UTC-offset feature is **not** one of these British assumptions.
+`local_utc_offset_minutes` holds the local offset from UTC in minutes, in an `Int16`, so every
+offset in scope is represented exactly and sub-hour zones stay distinct: India's +5:30 is `330` and
+Nepal's +5:45 is `345`, and Australia's +9:30 (`570`) does not collide with +9:00 (`540`). A
+mixed-offset deployment is representable, and the column name states its own units.
 
-In any single-timezone deployment this costs nothing: the feature is constant across the dataset,
-so mapping UTC+5:30 to `5` discards no information a model could have used. The genuine failure
-mode is **collision** in a mixed-offset deployment — India (+5:30) and Nepal (+5:45) both land on
-`5`, silently merging two distinct zones — and, more immediately, legibility: neither the `// 3600`
-nor the `Int8` states the whole-hour assumption it depends on. Tracked as
-[issue #431](https://github.com/openclimatefix/nged-substation-forecast/issues/431).
+The one thing an adapted deployment would need to revisit is the era bound that
+[issue #466](https://github.com/openclimatefix/nged-substation-forecast/issues/466) puts on
+`PowerTimeSeries.time`, which is what keeps the offset a whole number of minutes. A handful of IANA
+offsets are not. Each zone leaves mean solar time at its own date, so the era that needs excluding
+differs by geography: `Europe/London` runs on UTC−0:01:15 until 1847, whereas `Asia/Kolkata` runs
+on mean-time offsets of +5:53:20 and +5:21:10 until 1906. Nor is it only the deep past — Liberia
+kept UTC−0:44:30 as legal time until 1972.
 
 ### What is hard-wired to half-hourly
 
@@ -1716,10 +1716,9 @@ not win. The correct move is to leave the British assumptions hard-coded and *le
 is a large part of what makes them legible — and to pay the refactoring cost only once there is a
 second consumer to amortise it against.
 
-The two exceptions are the `local_utc_offset` whole-hour assumption and the private
-`_H3_RESOLUTION` import, both described above. Neither is really a portability concern — they are
-ordinary code-quality items that happened to surface here — so both can be fixed on their own
-merits whenever convenient, independently of anything on this page.
+The one exception is the private `_H3_RESOLUTION` import, described above. It is not really a
+portability concern — it is an ordinary code-quality item that happened to surface here — so it can
+be fixed on its own merits whenever convenient, independently of anything on this page.
 
 **What would change our mind:**
 

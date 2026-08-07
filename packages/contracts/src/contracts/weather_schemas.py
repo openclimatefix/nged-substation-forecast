@@ -1,9 +1,9 @@
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum, auto
 from pathlib import Path
-from typing import ClassVar, Literal, Self
+from typing import ClassVar, Final, Literal, Self
 
 import patito as pt
 import polars as pl
@@ -12,7 +12,7 @@ from contracts._uri import ObjectStoreOptions
 from contracts.settings import get_settings
 from contracts.typing_utils import typeddict_to_dict
 
-from .common import UTC_DATETIME_DTYPE
+from .common import UTC_DATETIME_DTYPE, check_datetime_bounds
 
 WeatherFeature = Literal[
     "temperature_2m",
@@ -37,41 +37,36 @@ class NwpModelId(StrEnum):
 
 NWP_MODEL_ID_DTYPE = pl.Enum([model.name for model in NwpModelId])
 
+ECMWF_ENS_ENSEMBLE_MEMBERS: Final[frozenset[int]] = frozenset(range(51))
+"""The ensemble members every ECMWF IFS ENS run carries: the control member plus 50 perturbed
+members, indexed 0-50 by Dynamical.org (matching `Nwp.ensemble_member`, which is 0-based).
 
-class NwpMetaData(pt.Model):
-    """Metadata about numerical weather prediction models."""
+The count is a fixed property of the ECMWF IFS ENS configuration, corroborated by our own data: the
+2026-07-14 incident described in
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>
+lost a forecast step for "50 of 51 ensemble members", and the per-partition row arithmetic in
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/> is
+1671 H3 cells x 51 ensemble members x 85 native steps.
+"""
 
-    nwp_model_id: str = pt.Field(
-        dtype=NWP_MODEL_ID_DTYPE,
-        description="Primary key for joining with NWP data (e.g. 'ECMWF_ENS_0_25_degree').",
-        unique=True,
-    )
+ECMWF_ENS_LEAD_TIME_HOURS: Final[tuple[int, ...]] = tuple(range(0, 145, 3)) + tuple(
+    range(150, 361, 6)
+)
+"""The 85 native forecast steps of the ECMWF IFS ENS 15-day 0.25-degree dataset, in hours after
+`init_time`: 3-hourly out to 144 h (49 steps, lead-0 inclusive), then 6-hourly out to 360 h
+(36 steps) — i.e. `init_time` to `init_time + 15 days` inclusive.
 
-    provider: str = pt.Field(
-        dtype=pl.Enum(["ECMWF"]),
-        description="NWP data provider (currently always 'ECMWF').",
-    )
+Lead-0 is included: it is a real step, distinguished only by the de-accumulated variables being
+legitimately null there (see `Nwp.deaccumulated_var_names`).
+"""
 
-    h3_resolution: int = pt.Field(
-        dtype=pl.Int8,
-        description="H3 spatial resolution used for this NWP model's grid.",
-    )
-
-    is_ensemble: bool = pt.Field(description="Whether this NWP model produces ensemble forecasts.")
-
-    @classmethod
-    def load(cls, csv_path: str | Path | None = None) -> pt.DataFrame[Self]:
-        """Load NWP metadata from a static CSV file.
-
-        Args:
-            csv_path: Path to the metadata CSV; defaults to ``get_settings().nwp_metadata_csv_path``
-                (resolved lazily so importing this module needs no ``.env``).
-        """
-        if csv_path is None:
-            csv_path = get_settings().nwp_metadata_csv_path
-        df = pl.read_csv(csv_path)
-        # Patito's .cast() will handle the conversion to the Enum type defined in the model
-        return pt.DataFrame(df).set_model(cls).cast().validate()
+ECMWF_ENS_H3_RESOLUTION: Final[int] = 5
+"""The H3 spatial resolution the `ecmwf_ens` ingest pipeline grids ECMWF ENS data to, and the
+resolution `power_time_series_and_metadata` computes for every time series so the two line up on
+one grid. Every NWP model shares this one resolution today; per-model resolution (so a future NWP
+source can use a different one) is tracked in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/114>.
+"""
 
 
 class Nwp(pt.Model):
@@ -83,14 +78,16 @@ class Nwp(pt.Model):
     and measured numbers.
 
     `validate` is the fatal ingest gate; `assess_nwp_quality` reports the tolerated scattered nulls
-    (the known upstream ECMWF ENS corruption) as a non-fatal check. Which null patterns are fatal
-    versus tolerated, and why, is documented at
+    (the known upstream ECMWF ENS corruption) and `assess_nwp_run_completeness` reports a run that
+    is missing whole members, steps or cells — both as non-fatal checks, because both are the
+    upstream provider misbehaving rather than a contract violation. Which patterns are fatal versus
+    tolerated, and why, is documented at
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
     """
 
     nwp_model_id: str = pt.Field(
         dtype=NWP_MODEL_ID_DTYPE,
-        description="The primary key for joining with NwpMetaData (e.g. 'ECMWF_ENS_0_25_degree').",
+        description="Which NWP model produced this row (e.g. 'ECMWF_ENS_0_25_degree').",
     )
 
     init_time: datetime = pt.Field(
@@ -118,7 +115,7 @@ class Nwp(pt.Model):
 
     h3_index: int = pt.Field(
         dtype=pl.UInt64,
-        description="H3 cell index. The H3 resolution for the nwp_model_id is stored in NwpMetaData.",
+        description="H3 cell index, at `ECMWF_ENS_H3_RESOLUTION` (every NWP model shares it today).",
     )
 
     temperature_2m: float = pt.Field(
@@ -267,8 +264,9 @@ class Nwp(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame[Self]:  # ty:ignore[invalid-method-override]
-        """Validate the frame: rejecting whole-slice nulls in de-accumulated variables (scattered
-        nulls are tolerated), enforcing uniqueness, and the ptype-introduction invariant."""
+        """Validate the frame: bounding `init_time`/`valid_time` to the plausible datetime range,
+        rejecting whole-slice nulls in de-accumulated variables (scattered nulls are tolerated),
+        enforcing uniqueness, and the ptype-introduction invariant."""
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -277,6 +275,8 @@ class Nwp(pt.Model):
             drop_superfluous_columns=drop_superfluous_columns,
         )
 
+        # Patito ignores `ge`/`le` on datetime fields, so the range check lives here.
+        check_datetime_bounds(validated_df, "init_time", "valid_time")
         cls._check_no_whole_null_deaccumulated_slices(validated_df)
         cls._check_unique(validated_df)
         cls._check_variables_that_were_introduced_after_start_of_dataset(validated_df)
@@ -464,3 +464,217 @@ def assess_nwp_quality(dataframe: pt.DataFrame[Nwp]) -> NwpQualityReport:
         pl.col("n_null") < pl.col("n_total")
     )
     return NwpQualityReport(scattered=scattered)
+
+
+@dataclass(frozen=True)
+class NwpRunCompletenessReport:
+    """Run-level shape summary for one ingested NWP run: is the whole (member x step x cell) grid
+    there?
+
+    Deliberately a *report* rather than an exception. A short run is the upstream provider
+    misbehaving, not a contract violation, and the
+    [never-raise-on-absent-input rule](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
+    says we land what arrived and warn, rather than throwing away an otherwise-good run. The
+    `ecmwf_ens` asset wraps this into a WARN, non-blocking `AssetCheckResult` and publishes the
+    counts as materialisation metadata.
+    """
+
+    init_times: tuple[datetime, ...]
+    """Distinct `init_time` values in the frame. A whole run has exactly one."""
+
+    n_rows: int
+    """Rows in the frame."""
+
+    expected_n_rows: int
+    """`len(expected_ensemble_members) * len(expected_lead_time_hours) * expected_n_h3_cells` —
+    the size of the complete grid."""
+
+    n_ensemble_members: int
+    """Distinct `ensemble_member` values observed."""
+
+    n_valid_times: int
+    """Distinct `valid_time` values observed."""
+
+    n_h3_cells: int
+    """Distinct `h3_index` values observed."""
+
+    expected_n_h3_cells: int
+    """Distinct `h3_index` values the H3 grid weights say this run should cover."""
+
+    valid_time_min: datetime | None
+    """Earliest `valid_time`, or `None` for an empty frame."""
+
+    valid_time_max: datetime | None
+    """Latest `valid_time`, or `None` for an empty frame."""
+
+    missing_ensemble_members: tuple[int, ...]
+    """Expected members with no rows at all, sorted."""
+
+    unexpected_ensemble_members: tuple[int, ...]
+    """Observed members outside the expected set, sorted — the upstream ensemble changed shape."""
+
+    missing_lead_time_hours: tuple[int, ...]
+    """Expected forecast steps (hours after `init_time`) with no rows at all, sorted."""
+
+    unexpected_valid_times: tuple[datetime, ...]
+    """Observed `valid_time`s that are not on any expected forecast step, sorted."""
+
+    @property
+    def is_complete(self) -> bool:
+        """True when the frame is one run whose member set, forecast-step set, H3 cell *count* and
+        row count all match the expectation.
+
+        Cells are compared by count, not by set: the report never receives the expected `h3_index`
+        values, only how many there should be. Substituting one cell for another would therefore
+        pass. That is not a live gap, because the asset derives the expected count from the very H3
+        grid weights the converter joins against — see
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
+        """
+        return (
+            len(self.init_times) == 1
+            and not self.missing_ensemble_members
+            and not self.unexpected_ensemble_members
+            and not self.missing_lead_time_hours
+            and not self.unexpected_valid_times
+            and self.n_h3_cells == self.expected_n_h3_cells
+            and self.n_rows == self.expected_n_rows
+        )
+
+    @property
+    def h3_cell_shortfall(self) -> int:
+        """Expected H3 cells minus observed — *net*, so it is negative if the run carries extra
+        cells and zero if one cell was swapped for another."""
+        return self.expected_n_h3_cells - self.n_h3_cells
+
+    def describe(self) -> str:
+        """One human-readable sentence naming every gap, for the asset check's description."""
+        gaps = list(self._describe_gaps())
+        if not gaps:
+            return (
+                f"Complete run: {self.n_ensemble_members} ensemble members x "
+                f"{self.n_valid_times} forecast steps x {self.n_h3_cells} H3 cells "
+                f"= {self.n_rows} rows."
+            )
+        return "Incomplete NWP run — " + "; ".join(gaps) + "."
+
+    def _describe_gaps(self) -> Iterator[str]:
+        """Yield one clause per detected gap, in decreasing order of diagnostic value."""
+        if len(self.init_times) != 1:
+            yield f"expected exactly one init_time, found {len(self.init_times)}"
+        if self.missing_ensemble_members:
+            yield f"missing ensemble member(s) {_abbreviate(self.missing_ensemble_members)}"
+        if self.unexpected_ensemble_members:
+            yield f"unexpected ensemble member(s) {_abbreviate(self.unexpected_ensemble_members)}"
+        if self.missing_lead_time_hours:
+            yield f"missing lead time(s) in hours {_abbreviate(self.missing_lead_time_hours)}"
+        if self.unexpected_valid_times:
+            yield f"unexpected valid_time(s) {_abbreviate(self.unexpected_valid_times)}"
+        if self.n_h3_cells != self.expected_n_h3_cells:
+            yield f"{self.n_h3_cells} H3 cells, expected {self.expected_n_h3_cells}"
+        if self.n_rows != self.expected_n_rows:
+            yield f"{self.n_rows} rows, expected {self.expected_n_rows}"
+
+
+_MAX_GAP_ITEMS_IN_DESCRIPTION: Final[int] = 10
+"""Cap on how many missing members/steps `NwpRunCompletenessReport.describe` spells out.
+
+A wholesale upstream outage can miss hundreds of steps; the exact counts stay in the report's
+fields and the Dagster metadata, so the sentence only needs enough to start debugging.
+"""
+
+
+def _abbreviate(items: Sequence[object]) -> str:
+    """Render a gap list, truncating past `_MAX_GAP_ITEMS_IN_DESCRIPTION` with a `+N more` tail."""
+    shown = ", ".join(str(item) for item in items[:_MAX_GAP_ITEMS_IN_DESCRIPTION])
+    overflow = len(items) - _MAX_GAP_ITEMS_IN_DESCRIPTION
+    return f"[{shown}, +{overflow} more]" if overflow > 0 else f"[{shown}]"
+
+
+def assess_nwp_run_completeness(
+    dataframe: pt.DataFrame[Nwp],
+    expected_n_h3_cells: int,
+    expected_ensemble_members: frozenset[int] = ECMWF_ENS_ENSEMBLE_MEMBERS,
+    expected_lead_time_hours: tuple[int, ...] = ECMWF_ENS_LEAD_TIME_HOURS,
+) -> NwpRunCompletenessReport:
+    """Summarise whether one ingested NWP run covers its full (member x step x cell) grid.
+
+    Called from the `ecmwf_ens` asset, deliberately **not** from `Nwp.validate`: validation runs on
+    arbitrary frames (filtered test fixtures, pruned scans, single-member training reads), whereas
+    completeness is a property of one whole ingested run and would be false on every one of those.
+    Pure and Dagster-free, so it is unit-testable in isolation.
+
+    Never raises on a validated `Nwp` frame — not on an empty one, not on a multi-`init_time` one,
+    not on one whose `valid_time`s are off-grid — so it cannot turn the warning path into a failure
+    path (rule 7 of
+    [Inherent Stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+    The qualifier matters: the key columns being non-null and present is exactly what `Nwp.validate`
+    guarantees, and the sole production caller validates before calling.
+
+    Row counting is safe here despite Polars' 32-bit row index: this runs on a single in-memory run
+    (at V1 scale 1671 cells x 51 members x 85 steps ~ 7.24M rows), four orders of magnitude below
+    the 2**32 ceiling that the whole ~5.9B-row NWP Delta table would hit.
+
+    Args:
+        dataframe: One whole ingested NWP run, already through `Nwp.validate`.
+        expected_n_h3_cells: Distinct H3 cells the run should cover — pass
+            `h3_grid["h3_index"].n_unique()` so the expectation tracks the H3 grid weights rather
+            than a hard-coded number.
+        expected_ensemble_members: Members the run should carry. Defaults to the ECMWF ENS
+            ensemble, the only `NwpModelId` we ingest today.
+        expected_lead_time_hours: Forecast steps, in hours after `init_time`, the run should carry.
+            Defaults to the ECMWF ENS native step structure.
+    """
+    init_times = tuple(sorted(dataframe["init_time"].unique().to_list()))
+    observed_members = set(dataframe["ensemble_member"].unique().to_list())
+    observed_valid_times = set(dataframe["valid_time"].unique().to_list())
+    missing_lead_times, unexpected_valid_times = _lead_time_gaps(
+        init_times, observed_valid_times, expected_lead_time_hours
+    )
+    return NwpRunCompletenessReport(
+        init_times=init_times,
+        n_rows=dataframe.height,
+        expected_n_rows=(
+            len(expected_ensemble_members) * len(expected_lead_time_hours) * expected_n_h3_cells
+        ),
+        n_ensemble_members=len(observed_members),
+        n_valid_times=len(observed_valid_times),
+        n_h3_cells=dataframe["h3_index"].n_unique(),
+        expected_n_h3_cells=expected_n_h3_cells,
+        valid_time_min=min(observed_valid_times, default=None),
+        valid_time_max=max(observed_valid_times, default=None),
+        missing_ensemble_members=tuple(sorted(expected_ensemble_members - observed_members)),
+        unexpected_ensemble_members=tuple(sorted(observed_members - expected_ensemble_members)),
+        missing_lead_time_hours=missing_lead_times,
+        unexpected_valid_times=unexpected_valid_times,
+    )
+
+
+def _lead_time_gaps(
+    init_times: tuple[datetime, ...],
+    observed_valid_times: set[datetime],
+    expected_lead_time_hours: tuple[int, ...],
+) -> tuple[tuple[int, ...], tuple[datetime, ...]]:
+    """Compare observed `valid_time`s against the expected forecast steps of a single run.
+
+    Returns `(missing_lead_time_hours, unexpected_valid_times)`. Both are empty when the frame does
+    not hold exactly one `init_time`, because there is then no single origin to measure lead times
+    from; `NwpRunCompletenessReport.is_complete` reports that case through `init_times` instead.
+
+    Compares whole `datetime`s rather than integer lead times, so a `valid_time` that is off-grid by
+    minutes is reported rather than silently rounded onto a step.
+    """
+    if len(init_times) != 1:
+        return (), ()
+    init_time = init_times[0]
+    expected_valid_times = {
+        init_time + timedelta(hours=hours): hours for hours in expected_lead_time_hours
+    }
+    missing = tuple(
+        sorted(
+            hours
+            for valid_time, hours in expected_valid_times.items()
+            if valid_time not in observed_valid_times
+        )
+    )
+    unexpected = tuple(sorted(observed_valid_times - set(expected_valid_times)))
+    return missing, unexpected

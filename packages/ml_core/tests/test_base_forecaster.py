@@ -1,8 +1,7 @@
 """Tests for ``BaseForecaster``'s MLflow persistence, against file-based MLflow.
 
 Uses a tiny fake ``BaseForecaster`` (rather than a concrete model) so the tests stay focused on
-the shared behaviour — artifact upload/download and the local cache — and free of any
-model-library dependency.
+the shared behaviour — artifact upload/download — and free of any model-library dependency.
 """
 
 from pathlib import Path
@@ -77,6 +76,12 @@ def test_trained_time_series_ids_is_abstract() -> None:
         _MissingPopulation(BaseForecasterConfig(selected_features=set()))
 
 
+def _save(run_id: str, payload: str) -> None:
+    """Save a ``_FakeForecaster`` carrying ``payload`` into an existing MLflow run."""
+    forecaster = _FakeForecaster(BaseForecasterConfig(selected_features=set()), payload=payload)
+    forecaster.save_to_mlflow(run_id)
+
+
 @pytest.fixture
 def saved_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     """A file-based MLflow run id with a saved _FakeForecaster (payload 'hello-model')."""
@@ -85,33 +90,27 @@ def saved_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     experiment_id = mlflow.create_experiment("base_forecaster_test")
     with mlflow.start_run(experiment_id=experiment_id) as run:
         run_id = run.info.run_id
-    forecaster = _FakeForecaster(
-        BaseForecasterConfig(selected_features=set()), payload="hello-model"
-    )
-    forecaster.save_to_mlflow(run_id)
+    _save(run_id, "hello-model")
     return run_id
 
 
-def test_save_load_round_trip(saved_run: str, tmp_path: Path) -> None:
-    loaded = _FakeForecaster.load_from_mlflow(saved_run, cache_base_path=tmp_path / "cache")
+def test_save_load_round_trip(saved_run: str) -> None:
+    loaded = _FakeForecaster.load_from_mlflow(saved_run)
     assert loaded.payload == "hello-model"
 
 
-def test_cache_hit_does_not_contact_mlflow(
-    saved_run: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    cache = tmp_path / "cache"
+def test_re_saving_to_the_same_run_is_reflected_on_the_next_load(saved_run: str) -> None:
+    """Re-saving into a reused run must be what the next load returns (issue #197).
 
-    # First load is a cache miss → downloads from MLflow into the cache.
-    first = _FakeForecaster.load_from_mlflow(saved_run, cache_base_path=cache)
-    assert first.payload == "hello-model"
-    assert (cache / saved_run / "model" / "payload.txt").exists()
+    CV fold runs are reused across re-materialisations, so the same ``run_id`` can hold a
+    different model after re-training. ``load_from_mlflow`` has no local cache (issue #469 removed
+    it — see ``load_from_mlflow``'s docstring), so this is really a round-trip test, but it is
+    worth keeping explicit: a future re-introduction of caching must not silently reintroduce the
+    staleness bug this guards against.
+    """
+    assert _FakeForecaster.load_from_mlflow(saved_run).payload == "hello-model"
 
-    # Simulate an MLflow outage: any download attempt now blows up. A cache hit must not call it.
-    def _boom(*args: object, **kwargs: object) -> None:
-        raise RuntimeError("MLflow is unreachable")
+    # Re-train into the *same* run, exactly as a re-materialised fold does.
+    _save(saved_run, "retrained-model")
 
-    monkeypatch.setattr(mlflow.artifacts, "download_artifacts", _boom)
-
-    second = _FakeForecaster.load_from_mlflow(saved_run, cache_base_path=cache)
-    assert second.payload == "hello-model"
+    assert _FakeForecaster.load_from_mlflow(saved_run).payload == "retrained-model"
