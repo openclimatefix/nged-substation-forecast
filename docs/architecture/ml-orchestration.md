@@ -41,13 +41,19 @@ The complementary decision — the resolved config is stamped onto the MLflow ex
 registration and read back by the assets, never re-read from YAML — is explained in
 [Running an experiment end-to-end](../ml_experimentation/dagster-workflow.md).
 
-## Model artifacts: MLflow artifact store + immutable local cache
+## Model artifacts: MLflow artifact store + write-invalidated local cache
 
 Trained models live in MLflow's artifact store, wrapped by two concrete `BaseForecaster`
 methods (`save_to_mlflow` / `load_from_mlflow`) that delegate to each subclass's own disk
 `save`/`load` — subclasses stay MLflow-free. `load_from_mlflow` serves from a local cache at
-`{model_cache_base_path}/{run_id}/model`; the cache key is the **immutable run ID**, so a
-cached model never goes stale and never needs invalidation.
+`{model_cache_base_path}/{run_id}/model`.
+
+The cache is keyed by run ID, but a run's *artifacts* are not immutable: a CV fold run is reused
+across re-materialisations of its partition, so re-training a fold writes a different model under
+the same run ID. `save_to_mlflow` therefore takes the cache root as a required argument and
+deletes the run's cache entry after a successful upload. That write-side invalidation is what
+keeps the read-side cache honest — without it, `cv_power_forecasts` would score a re-trained fold
+using the model it replaced.
 
 Today this pair is used by the CV/experiment pipeline: `cv_power_forecasts` loads a fold's
 freshly trained model back from MLflow (a separate Dagster process) via this cache. Production

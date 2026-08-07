@@ -105,9 +105,17 @@ MLflow experiment and partition keys rather than creating duplicates.
 7. Calls `forecaster.train(features, eligible_ids)` (the population is passed explicitly). The asset
    then **raises** if zero boosters were trained (e.g. no series had usable power in the window).
 8. Resolves the MLflow fold run by tag and uploads the trained model artifacts via
-   `forecaster.save_to_mlflow(fold_run_id)`.
-9. Logs training params (`fold_id`, `train_start`, `train_end`, `n_eligible_time_series`,
-   `n_trained_time_series`) to the fold run.
+   `forecaster.save_to_mlflow(fold_run_id, cache_base_path=…)`, which also clears that run's entry
+   in the local model cache so the freshly trained model is the one step 7 loads back.
+9. Records the training run on the fold run: `fold_id` as a **param**, the training window
+   (`train_start`, `train_end`) as **tags**, and the populations (`n_eligible_time_series`,
+   `n_trained_time_series`) as **metrics**.
+
+A fold run is reused on every re-materialisation of its partition and MLflow params are
+write-once, so only genuinely immutable values may be params. The training window comes from the
+CV config (which is edited as the archive grows) and the counters are outputs of the
+materialisation (the eligible population grows with power coverage), so both would make a
+re-materialisation fail with "Changing param values is not allowed".
 
 The MLflow run structure after training looks like this:
 
@@ -115,8 +123,9 @@ The MLflow run structure after training looks like this:
 Experiment "xgboost_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
     │   params: n_estimators=100, learning_rate=0.05, …
-    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test}
-            params: train_start, train_end, n_eligible_time_series, n_trained_time_series
+    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test, train_start, train_end}
+            params: fold_id
+            metrics: n_eligible_time_series, n_trained_time_series
             artifacts: model/   ← trained model binary files
 ```
 
@@ -229,8 +238,8 @@ Experiment "xgboost_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
     │   params: n_estimators=100, learning_rate=0.05, …
     │   metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← mean across folds
-    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test}
-            params: train_start, train_end, …
+    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test, train_start, train_end, …}
+            params: fold_id
             metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← per-fold aggregate
             artifacts: model/
 ```

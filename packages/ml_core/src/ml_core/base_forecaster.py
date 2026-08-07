@@ -1,3 +1,4 @@
+import shutil
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -128,8 +129,8 @@ class BaseForecaster(ABC):
         """Reconstruct a trained instance from a previously saved directory."""
         pass
 
-    def save_to_mlflow(self, run_id: str) -> None:
-        """Upload this trained model's artifacts to the given MLflow run.
+    def save_to_mlflow(self, run_id: str, *, cache_base_path: Path) -> None:
+        """Upload this trained model's artifacts to an MLflow run, invalidating its local cache.
 
         Writes the model to a temporary directory via ``save`` (the subclass's own format), then
         uploads that directory to the run's artifact store under ``model/``. The caller is
@@ -137,11 +138,18 @@ class BaseForecaster(ABC):
 
         Args:
             run_id: The MLflow run to attach the artifacts to.
+            cache_base_path: Root of the local model cache that ``load_from_mlflow`` reads from.
+                The run's cache entry is deleted once the upload has succeeded. This is required,
+                not optional, because a CV fold run is **reused** across re-materialisations: the
+                same ``run_id`` can hold a different model after re-training, so a surviving cache
+                entry would keep serving the previous model. Deleting only after a successful
+                upload means a failed upload leaves the cache still agreeing with MLflow.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
             self.save(Path(tmp_dir))
             with mlflow.start_run(run_id=run_id):
                 mlflow.log_artifacts(tmp_dir, artifact_path=_MLFLOW_ARTIFACT_PATH)
+        shutil.rmtree(cache_base_path / run_id, ignore_errors=True)
 
     @classmethod
     def load_from_mlflow(cls, run_id: str, cache_base_path: Path) -> Self:
@@ -150,8 +158,13 @@ class BaseForecaster(ABC):
         On a cache hit (``{cache_base_path}/{run_id}/model`` already exists) the model is loaded
         straight from disk and MLflow is never contacted — this is what lets the live service keep
         serving during an MLflow outage. On a cache miss the artifacts are downloaded from the run
-        into the cache, then loaded. The cache key is the immutable run ID, so a cached model never
-        goes stale. The caller sets the tracking URI (``mlflow.set_tracking_uri``) beforehand.
+        into the cache, then loaded. The caller sets the tracking URI
+        (``mlflow.set_tracking_uri``) beforehand.
+
+        The cache is keyed by run ID, but a run's artifacts are *not* immutable — a CV fold run is
+        reused across re-materialisations — so ``save_to_mlflow`` deletes the run's cache entry
+        whenever it writes new artifacts. That write-side invalidation is what keeps this
+        read-side cache honest; without it a re-trained fold would silently serve its old model.
 
         Args:
             run_id: The MLflow run the model was saved under.

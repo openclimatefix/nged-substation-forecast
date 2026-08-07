@@ -77,6 +77,12 @@ def test_trained_time_series_ids_is_abstract() -> None:
         _MissingPopulation(BaseForecasterConfig(selected_features=set()))
 
 
+def _save(run_id: str, payload: str, cache_base_path: Path) -> None:
+    """Save a ``_FakeForecaster`` carrying ``payload`` into an existing MLflow run."""
+    forecaster = _FakeForecaster(BaseForecasterConfig(selected_features=set()), payload=payload)
+    forecaster.save_to_mlflow(run_id, cache_base_path=cache_base_path)
+
+
 @pytest.fixture
 def saved_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     """A file-based MLflow run id with a saved _FakeForecaster (payload 'hello-model')."""
@@ -85,10 +91,7 @@ def saved_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     experiment_id = mlflow.create_experiment("base_forecaster_test")
     with mlflow.start_run(experiment_id=experiment_id) as run:
         run_id = run.info.run_id
-    forecaster = _FakeForecaster(
-        BaseForecasterConfig(selected_features=set()), payload="hello-model"
-    )
-    forecaster.save_to_mlflow(run_id)
+    _save(run_id, "hello-model", tmp_path / "cache")
     return run_id
 
 
@@ -115,3 +118,27 @@ def test_cache_hit_does_not_contact_mlflow(
 
     second = _FakeForecaster.load_from_mlflow(saved_run, cache_base_path=cache)
     assert second.payload == "hello-model"
+
+
+def test_re_saving_to_the_same_run_invalidates_the_cache(saved_run: str, tmp_path: Path) -> None:
+    """Re-saving into a reused run must not leave the previous model cached (issue #197).
+
+    CV fold runs are reused across re-materialisations, so the same ``run_id`` can hold a
+    different model after re-training. Without write-side invalidation the run's cache entry
+    would still hold the old artifacts and ``cv_power_forecasts`` would silently score the
+    stale model.
+    """
+    cache = tmp_path / "cache"
+
+    # Populate the cache from the first save.
+    assert _FakeForecaster.load_from_mlflow(saved_run, cache_base_path=cache).payload == (
+        "hello-model"
+    )
+    assert (cache / saved_run / "model" / "payload.txt").exists()
+
+    # Re-train into the *same* run, exactly as a re-materialised fold does.
+    _save(saved_run, "retrained-model", cache)
+
+    assert not (cache / saved_run).exists()
+    reloaded = _FakeForecaster.load_from_mlflow(saved_run, cache_base_path=cache)
+    assert reloaded.payload == "retrained-model"
