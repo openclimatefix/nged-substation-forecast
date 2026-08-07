@@ -92,7 +92,8 @@ def test_continuous_vars_rounded_to_significand_bits(tmp_path: Path) -> None:
         expected = np.sort(np.array([base * (1 + 0.003 * i) for i in range(n)], dtype=np.float32))
         rel_err = np.abs(stored - expected) / np.abs(expected)
         assert (rel_err <= 2.0**-NWP_SIGNIFICAND_BITS).all(), var
-        assert (stored.view(np.uint32) & discarded == 0).all(), var
+        # np.dtype(np.uint32), not a bare np.uint32 — see CLAUDE.md ("numpy Gotcha").
+        assert (stored.view(np.dtype(np.uint32)) & discarded == 0).all(), var
 
 
 def test_successive_appends_create_separate_partitions(tmp_path: Path) -> None:

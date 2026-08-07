@@ -234,7 +234,8 @@ def test_cv_power_forecasts_storage_format(env: dict[str, str]) -> None:
     # ballpark.)
     stored = _read_forecasts(env)["power_fcst"].to_numpy()
     assert np.isfinite(stored).all()
-    assert (stored.view(np.uint32) & np.uint32((1 << 11) - 1) == 0).all()
+    # np.dtype(np.uint32), not a bare np.uint32 — see CLAUDE.md ("numpy Gotcha").
+    assert (stored.view(np.dtype(np.uint32)) & np.uint32((1 << 11) - 1) == 0).all()
     assert (np.abs(stored) > 50).all()
 
 

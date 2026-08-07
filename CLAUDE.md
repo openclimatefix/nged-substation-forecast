@@ -430,6 +430,24 @@ Ruff's lint rule *selection* is pinned in `pyproject.toml` (`[tool.ruff.lint] se
 same class of reason: ruff 0.16 widened its default rule set, and pinning keeps a ruff upgrade
 from silently changing which rules the repo enforces.
 
+### numpy Gotcha: `ty` mis-types `.view(np.uint32)` — pass `np.dtype(np.uint32)` instead
+
+`ndarray.view` is overloaded, and one overload takes `DTypeT | _HasDType[DTypeT]` with `DTypeT`
+bound to `np.dtype`. Since ty 0.0.69, ty matches a bare scalar type against that overload and
+solves `DTypeT` as `type[np.uint32]`, in violation of the bound, so `arr.view(np.uint32)` infers
+as `ndarray[_AnyShape, type[unsignedinteger[_32Bit]]]` instead of
+`ndarray[_AnyShape, dtype[unsignedinteger[_32Bit]]]`. Every subsequent operation on that array
+then fails — a bit-mask check reports `unsupported-operator: Unsupported & operation`. The code
+is correct at runtime; only the inferred type is wrong.
+
+**How to apply:** pass a real dtype object — `arr.view(np.dtype(np.uint32))` — which is the same
+call at runtime and which ty resolves to the correct `ndarray[..., dtype[uint32]]`. Prefer this
+over a `# ty: ignore` comment: the suppression would have to sit on the line that *uses* the
+array, which can be several lines away from the `.view()` call that actually causes it.
+Annotating the intermediate as `npt.NDArray[np.uint32]` does not work — it raises
+`invalid-assignment` instead. The significand-rounding tests in `packages/delta_store/tests/`
+are the worked examples.
+
 ### Marimo Notebooks
 
 Marimo notebooks (`packages/dashboard/*.py`, `packages/notebooks/*.py`) are reactive: each

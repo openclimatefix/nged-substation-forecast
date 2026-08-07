@@ -30,7 +30,9 @@ def test_relative_error_bounded_by_unit_roundoff(keep_bits: int) -> None:
 @pytest.mark.parametrize("keep_bits", [10, 13, 16])
 def test_low_fraction_bits_are_zero(keep_bits: int) -> None:
     values = [math.pi, -math.e, 0.123456789, 3.0000002, 65503.9]
-    bits = _round(values, keep_bits).to_numpy().view(np.uint32)
+    # We pass np.dtype(np.uint32) rather than the bare np.uint32 because ty mis-solves
+    # ndarray.view's overloads for a bare scalar type. See CLAUDE.md ("numpy Gotcha").
+    bits = _round(values, keep_bits).to_numpy().view(np.dtype(np.uint32))
     # keep_bits significand bits = (keep_bits - 1) explicit fraction bits kept of 23.
     discarded = np.uint32((1 << (23 - (keep_bits - 1))) - 1)
     assert (bits & discarded == 0).all()
