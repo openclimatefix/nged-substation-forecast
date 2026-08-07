@@ -56,9 +56,10 @@ def _parent_run(experiment_id: str):
     return runs[0]
 
 
-def test_smoke_test_registers_experiment_and_dev_fold(mlflow_env: None) -> None:
-    instance = DagsterInstance.ephemeral()
-    _run(instance, "exp_smoke", run_mode="smoke_test")
+def test_smoke_test_registers_experiment_and_dev_fold(
+    mlflow_env: None, dagster_instance: DagsterInstance
+) -> None:
+    _run(dagster_instance, "exp_smoke", run_mode="smoke_test")
 
     experiment = mlflow.get_experiment_by_name("exp_smoke")
     assert experiment is not None
@@ -79,25 +80,25 @@ def test_smoke_test_registers_experiment_and_dev_fold(mlflow_env: None) -> None:
     assert "n_estimators" in parent.data.params
 
     # smoke_test selects the non-leaderboard dev folds; conf/cv/default.yaml holds one (smoke_test).
-    assert _partition_keys(instance) == ["exp_smoke__smoke_test"]
+    assert _partition_keys(dagster_instance) == ["exp_smoke__smoke_test"]
 
 
-def test_full_cv_registers_the_leaderboard_folds(mlflow_env: None) -> None:
-    instance = DagsterInstance.ephemeral()
-    _run(instance, "exp_full", run_mode="full_cv")
+def test_full_cv_registers_the_leaderboard_folds(
+    mlflow_env: None, dagster_instance: DagsterInstance
+) -> None:
+    _run(dagster_instance, "exp_full", run_mode="full_cv")
 
     # full_cv selects the leaderboard folds; conf/cv/default.yaml currently holds a single one. The
     # flag-based smoke-test-vs-full-CV distinction is unit-tested in tests/test_jobs.py.
-    assert _partition_keys(instance) == ["exp_full__mid_2025_to_mid_2026"]
+    assert _partition_keys(dagster_instance) == ["exp_full__mid_2025_to_mid_2026"]
 
 
-def test_re_registration_is_idempotent(mlflow_env: None) -> None:
-    instance = DagsterInstance.ephemeral()
-    _run(instance, "exp_idem", run_mode="full_cv")
-    _run(instance, "exp_idem", run_mode="full_cv")
+def test_re_registration_is_idempotent(mlflow_env: None, dagster_instance: DagsterInstance) -> None:
+    _run(dagster_instance, "exp_idem", run_mode="full_cv")
+    _run(dagster_instance, "exp_idem", run_mode="full_cv")
 
     # One experiment, one parent run, no duplicate partition keys.
     experiment = mlflow.get_experiment_by_name("exp_idem")
     assert experiment is not None
     _parent_run(experiment.experiment_id)  # asserts exactly one parent run
-    assert _partition_keys(instance) == ["exp_idem__mid_2025_to_mid_2026"]
+    assert _partition_keys(dagster_instance) == ["exp_idem__mid_2025_to_mid_2026"]

@@ -160,11 +160,16 @@ def _read_forecasts(env: dict[str, str]) -> pl.DataFrame:
     return pl.read_delta(env["forecasts"])
 
 
-def test_cv_power_forecasts_predicts_validation_fold(env: dict[str, str]) -> None:
-    instance = DagsterInstance.ephemeral()
-    _register(instance)
-    assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
-    assert materialize([cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance).success
+def test_cv_power_forecasts_predicts_validation_fold(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
+    _register(dagster_instance)
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+    assert materialize(
+        [cv_power_forecasts], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
 
     forecasts = _read_forecasts(env)
     assert forecasts.height > 0
@@ -190,7 +195,9 @@ def test_cv_power_forecasts_predicts_validation_fold(env: dict[str, str]) -> Non
     assert fold_runs[0].data.metrics["n_forecast_rows"] == float(forecasts.height)
 
 
-def test_cv_power_forecasts_storage_format(env: dict[str, str]) -> None:
+def test_cv_power_forecasts_storage_format(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
     """The written parquet files carry the compression-oriented storage format end-to-end.
 
     Guards that ``cv_power_forecasts`` writes through ``delta_store.power_forecasts``: ZSTD
@@ -198,10 +205,13 @@ def test_cv_power_forecasts_storage_format(env: dict[str, str]) -> None:
     rounded to ``POWER_FCST_SIGNIFICAND_BITS``. The format itself is unit-tested in
     ``packages/delta_store/tests/``; this asserts the real asset actually uses it.
     """
-    instance = DagsterInstance.ephemeral()
-    _register(instance)
-    assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
-    assert materialize([cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance).success
+    _register(dagster_instance)
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+    assert materialize(
+        [cv_power_forecasts], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
 
     parquet_files = sorted(Path(env["forecasts"]).rglob("*.parquet"))
     assert parquet_files
@@ -239,14 +249,21 @@ def test_cv_power_forecasts_storage_format(env: dict[str, str]) -> None:
     assert (np.abs(stored) > 50).all()
 
 
-def test_cv_power_forecasts_is_idempotent(env: dict[str, str]) -> None:
-    instance = DagsterInstance.ephemeral()
-    _register(instance)
-    assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
+def test_cv_power_forecasts_is_idempotent(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
+    _register(dagster_instance)
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
 
-    assert materialize([cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance).success
+    assert materialize(
+        [cv_power_forecasts], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
     first_height = _read_forecasts(env).height
 
     # Re-materialising the same fold overwrites its partition rather than appending.
-    assert materialize([cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance).success
+    assert materialize(
+        [cv_power_forecasts], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
     assert _read_forecasts(env).height == first_height

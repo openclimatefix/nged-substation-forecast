@@ -199,11 +199,14 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     assert nwp_both.collect()["h3_index"].unique().to_list() == [_TS1_CELL]
 
 
-def test_trained_cv_model_trains_and_saves_to_mlflow(env: dict[str, str]) -> None:
-    instance = DagsterInstance.ephemeral()
-    _register(instance)
+def test_trained_cv_model_trains_and_saves_to_mlflow(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
+    _register(dagster_instance)
 
-    assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
 
     # The fold's child run exists with the logged training params.
     experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
@@ -222,7 +225,9 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(env: dict[str, str]) -> Non
     assert loaded.trained_time_series_ids == [1]
 
 
-def test_trained_cv_model_fails_loudly_when_no_eligible_series(env: dict[str, str]) -> None:
+def test_trained_cv_model_fails_loudly_when_no_eligible_series(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
     """With no eligible series for the fold, the asset must fail loudly, not silently succeed."""
     # Replace the eligible table so this fold has no rows (only an unrelated fold), mirroring an
     # un-materialised / coverage-excluded fold in production.
@@ -241,10 +246,12 @@ def test_trained_cv_model_fails_loudly_when_no_eligible_series(env: dict[str, st
         partition_by=["fold_id"],
     )
 
-    instance = DagsterInstance.ephemeral()
-    _register(instance)
+    _register(dagster_instance)
     result = materialize(
-        [trained_cv_model], partition_key=PARTITION_KEY, instance=instance, raise_on_error=False
+        [trained_cv_model],
+        partition_key=PARTITION_KEY,
+        instance=dagster_instance,
+        raise_on_error=False,
     )
 
     assert not result.success

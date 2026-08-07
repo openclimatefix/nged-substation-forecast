@@ -11,8 +11,6 @@ from dagster import (
 )
 
 from nged_substation_forecast._sentry import sentry_capture_failure
-from nged_substation_forecast.defs.assets import ecmwf_ens_partitions
-from nged_substation_forecast.defs.production_assets import live_forecast_partitions
 
 # Define a job that targets the power_time_series_and_metadata asset
 power_time_series_and_metadata_job = define_asset_job(
@@ -44,7 +42,6 @@ status a precondition for another's" —
 ecmwf_ens_job = define_asset_job(
     "ecmwf_ens_job",
     selection=AssetSelection.assets("ecmwf_ens"),
-    partitions_def=ecmwf_ens_partitions,
     hooks={sentry_capture_failure},
 )
 
@@ -67,7 +64,6 @@ def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
 live_forecasts_job = define_asset_job(
     "live_forecasts_job",
     selection=AssetSelection.assets("live_forecasts"),
-    partitions_def=live_forecast_partitions,
     hooks={sentry_capture_failure},
 )
 
