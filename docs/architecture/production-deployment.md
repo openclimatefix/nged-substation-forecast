@@ -91,6 +91,49 @@ evaluation is a pure function, so the Sentry warning reuses the same `PowerFresh
 check already computed rather than recomputing it; the same result will later also feed the
 forecast-warnings delivery table.
 
+## Read the live forecast back off disk with a second asset check
+
+`live_forecasts` has the same shape of blind spot, and it matters more, because it is the one
+asset NGED consumes. The asset can raise nothing, report a green tick, and still have written no
+rows — or rows carrying a NaN forecast, or rows for only half the promoted model's population.
+`live_forecasts_are_healthy` closes that gap by reading the slot back out of the
+`power_forecasts` Delta table after the write and reporting what is actually there: the row count,
+the count of null/NaN/infinite `power_fcst` values, the count of rows targeting a `valid_time` at
+or before their own init time (which `PowerForecast` forbids), how far ahead the furthest row
+reaches, and any `time_series_id` the promoted model was trained on that the slot did not forecast.
+None of that is a measure of forecast *skill*, which is production monitoring's job, not a
+data-health check's.
+
+Two of those deserve a note. The **horizon** is checked because `live_forecasts` drops rows outside
+the selected NWP run's coverage, so a partly-ingested run delivers a much shorter forecast than
+NGED expect while every individual row stays perfectly well-formed — a fault nothing else would
+see. The floor is half the horizon we ask for, which is loose enough that a healthy slot (about
+13.75 of the 14 days, since the run it used is already 12–30 hours old) never trips it. And the
+read is scoped to the promoted model's own `experiment_name`, because `write_power_forecasts`
+replaces one `(experiment_name, fold_id)` partition at a time: promoting a champion from a
+different experiment leaves the outgoing experiment's rows for the same slot on disk, and without
+that filter the check would report faults sourced entirely from dead rows.
+
+The same check carries the **missed daily NWP run count**, because the second way a live slot goes
+quietly wrong is to be built from an increasingly ancient weather run. It is deliberately a count
+of *runs*, never an age in hours: we ingest one ECMWF run a day and forecast four times a day, so
+healthy NWP is anywhere between 12 and 30 hours old and any absolute age threshold tight enough to
+catch an outage would fire on two slots in four every day. The reasoning, and why the "expected
+freshest run" deadline is 14 hours rather than the publication time, is in
+[Inherent Stability → Three audiences, three channels](../design-philosophy/inherent-stability.md#three-audiences-three-channels).
+
+Two design points follow the `power_data_is_fresh` pattern deliberately. The check is **WARN** and
+**non-blocking**, like every other check in the repo — a degraded slot is still the best forecast
+we have, and blocking would contradict the principle that a partition fails only when there is
+genuinely no useful data. And it **cannot raise**: every read is guarded, and the whole body sits
+under a catch-all that logs the traceback and returns an unhealthy result, because a raise inside a
+warning path would trip `live_forecasts_job`'s failure hook and turn fail-open into fail-closed at
+exactly the wrong moment.
+
+The check covers the slots where the asset *succeeded*. A slot whose asset raised never reaches it —
+Dagster does not run a check whose asset op failed — and that case is already loud, so nothing is
+lost. What the check adds is exactly the quiet half.
+
 ## Send telemetry to Sentry, and alarm on absence
 
 Three independent Sentry mechanisms live in `nged_substation_forecast._sentry`, all active
