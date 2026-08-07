@@ -98,8 +98,9 @@ within the day, so the as-of instant is part of the measurement rather than a fo
 ### v0.1 on AWS, from 2026-07-15
 
 The first `live_forecasts` run on AWS was the 18:00 UTC slot on 15 July 2026. That is 22 days and
-12 hours — 91 consecutive 6-hourly forecast slots, and 22 daily `ecmwf_ens` runs — with **zero
-interventions and zero observed failures**. Every expected forecast exists.
+12 hours at the time of writing (7th August 2026) — 91 consecutive 6-hourly forecast slots, and 22
+daily `ecmwf_ens` runs — with **zero interventions and zero observed failures**. Every expected
+forecast exists.
 
 The VM was deployed once, on 15 July, and has not been touched since: no code has been pushed to
 AWS during the period, and the next deployment will be v0.2. So the period is genuinely unattended
