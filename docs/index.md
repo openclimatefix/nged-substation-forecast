@@ -85,7 +85,7 @@ questioned repeatedly tends to end up better evidenced than one written in a sin
 
 The division of labour matters most for the evidential claims. The performance, size and cost
 figures were measured on real data through the real code path rather than estimated — the
-[measure; do not assume](design-philosophy/design-principles.md) principle applies to the
+[measure; do not assume](design-philosophy/design-principles.md#12-measure-do-not-assume) principle applies to the
 documentation as much as to the pipeline. Claims about what the code does are checked against the
 code, but we will not pretend that every sentence across this many pages has had a human's eye on
 it next to the source. Where the docs and the code disagree, the code is right, and we would rather

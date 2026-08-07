@@ -158,11 +158,14 @@ appear nowhere else.
 
 1. **In production, never raise because an input is absent or stale.** Degrade, widen the bands, and
    record the degradation on the row. Reserve raising for states that are our own bug — an empty
-   promoted model, a contract violation — not for the outside world misbehaving. *(The never-stop
-   principle, in imperative form.)*
+   promoted model, a contract violation — not for the outside world misbehaving. *(The
+   [never-stop principle](design-principles.md#1-the-power-forecast-never-stops), in imperative
+   form.)*
 2. **Be liberal about missing inputs and strict about malformed ones.** Absent data routes into the
    always-output path; malformed data is rejected at the contract boundary. These are opposite
-   postures and both are deliberate. *(The strict-contracts principle, in imperative form.)*
+   postures and both are deliberate. *(The
+   [strict-contracts principle](design-principles.md#7-strict-contracts-at-every-boundary), in
+   imperative form.)*
 3. **Treat detectably-wrong input as missing, not as data** — see
    [Missing versus wrong](#missing-versus-wrong).
 4. **Signal degradation in-band first.** The uncertainty band is the only number the consumer is
@@ -179,7 +182,9 @@ appear nowhere else.
    is why `report_power_freshness` never raises.
 8. **When a capability could live in the training loop or in the production service, put it in the
    training loop.** See [Where complexity should live](#where-complexity-should-live). *(The
-   complexity-offline principle, in imperative form.)*
+   [complexity-offline
+   principle](design-principles.md#2-complexity-belongs-offline-not-in-the-serving-path), in
+   imperative form.)*
 9. **Fail in the direction where being wrong is cheapest to recover from.** In production that is
    forward; in model R&D it is backward. See [R&D fails the other way](#rd-fails-the-other-way).
 10. **Damp the corrections.** Bounded retries with backoff, rate limits on retraining and hysteresis
@@ -191,7 +196,9 @@ appear nowhere else.
     upstreams together on a laptop — but it must never become a runtime gate. A gate turns one
     failed upstream run into a missing forecast, and a missing forecast is not on the ladder at all:
     not even rung 4, where the service still emits a very wide but true forecast. *(The
-    coupling-through-data-at-rest principle, in imperative form.)*
+    [coupling-through-data-at-rest
+    principle](design-principles.md#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status),
+    in imperative form.)*
 
 ## Where complexity should live
 
