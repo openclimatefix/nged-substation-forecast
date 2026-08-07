@@ -62,14 +62,32 @@ is fixed or the partition is re-run.
 The checks above ask whether the rows we received are usable. A separate question is whether we
 received *all* the rows: a complete ECMWF ENS run is the full cartesian product of **51 ensemble
 members × 85 native forecast steps × every H3 cell in the
-[H3 grid weights](overview.md)**. A run missing an ensemble member, stopping short of the 15-day
-horizon, or dropping a grid cell is short in a way `Nwp.validate` cannot see — every row it *does*
-contain is perfectly well-formed — and would otherwise only surface much later as strange training
-data.
+[H3 grid weights](overview.md)**. A run missing an ensemble member, or stopping short of the 15-day
+horizon, is short in a way `Nwp.validate` cannot see — every row it *does* contain is perfectly
+well-formed — and would otherwise only surface much later as strange training data.
 
 `assess_nwp_run_completeness` therefore compares the ingested run against that expected shape and
 returns an `NwpRunCompletenessReport`. The `ecmwf_ens` asset publishes the report as the
 `nwp_run_is_complete` asset check, naming exactly which members and which lead times are absent.
+
+### What it can and cannot detect
+
+The two detections that bite are a **missing ensemble member** and a **missing forecast step**,
+because both arrive as a short coordinate on the source dataset:
+`convert_nwp_xarray_dataset_to_polars_dataframe` loops over `ds.ensemble_member` and `ds.lead_time`,
+so a short coordinate becomes absent rows and the check names it. An off-grid `valid_time` — the
+upstream step structure changing under us — is caught the same way.
+
+The **cell count and the total row count cannot fire through today's converter**, and are there as
+defence-in-depth rather than as live detections. That converter left-joins the NWP values onto the
+H3 grid and then groups by `h3_index`, so its output always carries exactly the cells the grid
+weights name, and always as a dense cross-product. They would start to matter if that converter
+were ever replaced by one that can emit a ragged frame.
+
+A dropped *grid point* is not covered by this check at all, and is worth knowing about: because the
+left join misses and the weighted `sum` over an all-null group returns `0.0`, a dropped point lands
+as a plausible-looking all-zero cell (0 °C, 0 Pa, 0 m s⁻¹) rather than as an absent one. That is
+inside physical bounds, so `Nwp.validate` accepts it and neither non-fatal check sees it.
 
 ### Where the expected shape comes from
 
@@ -83,9 +101,9 @@ returns an `NwpRunCompletenessReport`. The `ecmwf_ens` asset publishes the repor
   actually running on. (For the V1 trial area that is 1671 cells, which is why a complete V1
   partition is ~7.24M rows — see [Performance and Scale](performance.md).)
 
-The report also compares the total row count against the full grid, which catches a *ragged* run
-that the three marginal counts miss: every member, step and cell present, but some
-(member, step, cell) combinations absent.
+The report also compares the total row count against the full grid, which is what would catch a
+*ragged* run that the three marginal counts miss — every member, step and cell present, but some
+(member, step, cell) combinations absent. As noted above, today's converter cannot produce one.
 
 ### Why it warns instead of failing the run
 
@@ -97,11 +115,14 @@ partition would discard the 50 members we did get; the live forecast would then 
 *yesterday's* NWP run, which is a strictly worse degradation than forecasting from a slightly short
 run today. So the run lands, the check WARNs, and the missing pieces are named.
 
-That is why the same real-world upstream failure can be fatal or tolerated depending on how it
-manifests. When the 2026-07-14 outage below dropped a forecast step, the rows still existed with
-null temperatures — malformed, so `Nwp.validate` rejected them. Had the rows simply been *absent*,
-this check would have landed the rest of the run and warned. The difference is deliberate, and it
-is the missing/malformed split, not an inconsistency.
+So an upstream outage is fatal or tolerated according to how it reaches us, not according to how
+serious it is. When the 2026-07-14 outage below lost a forecast step for 50 of 51 members, the rows
+still existed carrying null temperatures — *malformed*, so `Nwp.validate` rejected them and the day
+became a missed run. This check covers the other shape: a whole `ensemble_member` or `lead_time`
+coordinate short on the source dataset, where the rows are simply *absent*, and the rest of the run
+is kept. The two postures are deliberate, and the fatal one is already recorded as such on the
+[degradation ladder](../design-philosophy/inherent-stability.md) ("a whole ECMWF slice corrupt …
+manifests downstream as a missed run").
 
 ### Completeness is not part of `Nwp.validate`
 

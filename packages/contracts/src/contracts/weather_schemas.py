@@ -546,7 +546,15 @@ class NwpRunCompletenessReport:
 
     @property
     def is_complete(self) -> bool:
-        """True when the frame is exactly one run covering the full (member x step x cell) grid."""
+        """True when the frame is one run whose member set, forecast-step set, H3 cell *count* and
+        row count all match the expectation.
+
+        Cells are compared by count, not by set: the report never receives the expected `h3_index`
+        values, only how many there should be. Substituting one cell for another would therefore
+        pass. That is not a live gap, because the asset derives the expected count from the very H3
+        grid weights the converter joins against — see
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
+        """
         return (
             len(self.init_times) == 1
             and not self.missing_ensemble_members
@@ -558,8 +566,9 @@ class NwpRunCompletenessReport:
         )
 
     @property
-    def missing_h3_cell_count(self) -> int:
-        """How many expected H3 cells are absent (negative if the run carries extra cells)."""
+    def h3_cell_shortfall(self) -> int:
+        """Expected H3 cells minus observed — *net*, so it is negative if the run carries extra
+        cells and zero if one cell was swapped for another."""
         return self.expected_n_h3_cells - self.n_h3_cells
 
     def describe(self) -> str:
@@ -619,8 +628,12 @@ def assess_nwp_run_completeness(
     completeness is a property of one whole ingested run and would be false on every one of those.
     Pure and Dagster-free, so it is unit-testable in isolation.
 
-    Never raises, so it cannot turn the warning path into a failure path — see rule 7 of
-    [Inherent Stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules).
+    Never raises on a validated `Nwp` frame — not on an empty one, not on a multi-`init_time` one,
+    not on one whose `valid_time`s are off-grid — so it cannot turn the warning path into a failure
+    path (rule 7 of
+    [Inherent Stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+    The qualifier matters: the key columns being non-null and present is exactly what `Nwp.validate`
+    guarantees, and the sole production caller validates before calling.
 
     Row counting is safe here despite Polars' 32-bit row index: this runs on a single in-memory run
     (at V1 scale 1671 cells x 51 members x 85 steps ~ 7.24M rows), four orders of magnitude below

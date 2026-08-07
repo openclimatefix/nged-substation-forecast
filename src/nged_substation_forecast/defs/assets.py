@@ -288,9 +288,16 @@ def _nwp_run_shape_metadata(report: NwpRunCompletenessReport) -> dict[str, Metad
         "n_ensemble_members": MetadataValue.int(report.n_ensemble_members),
         "n_valid_times": MetadataValue.int(report.n_valid_times),
         "n_h3_cells": MetadataValue.int(report.n_h3_cells),
-        "valid_time_min": MetadataValue.text(str(report.valid_time_min)),
-        "valid_time_max": MetadataValue.text(str(report.valid_time_max)),
+        # Text, not MetadataValue.timestamp: an empty run has no valid_time at all, and a key whose
+        # metadata *type* changed between runs would break the Dagster UI's timeline plot.
+        "valid_time_min": MetadataValue.text(_or_na(report.valid_time_min)),
+        "valid_time_max": MetadataValue.text(_or_na(report.valid_time_max)),
     }
+
+
+def _or_na(value: datetime | None) -> str:
+    """Render an optional datetime for Dagster metadata, matching ``_BaseSummary``'s ``"N/A"``."""
+    return "N/A" if value is None else str(value)
 
 
 def _nwp_completeness_check_result(report: NwpRunCompletenessReport) -> AssetCheckResult:
@@ -312,7 +319,7 @@ def _nwp_completeness_check_result(report: NwpRunCompletenessReport) -> AssetChe
             "expected_n_rows": report.expected_n_rows,
             "missing_ensemble_members": list(report.missing_ensemble_members),
             "missing_lead_time_hours": list(report.missing_lead_time_hours),
-            "n_missing_h3_cells": report.missing_h3_cell_count,
+            "h3_cell_shortfall": report.h3_cell_shortfall,
         },
     )
 

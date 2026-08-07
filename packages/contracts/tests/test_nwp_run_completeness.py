@@ -94,7 +94,7 @@ def test_complete_run_passes() -> None:
     assert report.n_valid_times == 85
     assert report.n_h3_cells == 2
     assert report.n_rows == report.expected_n_rows == 51 * 85 * 2
-    assert report.missing_h3_cell_count == 0
+    assert report.h3_cell_shortfall == 0
     assert report.valid_time_min == _INIT_TIME
     assert report.valid_time_max == _INIT_TIME + timedelta(days=15)
 
@@ -129,7 +129,7 @@ def test_dropping_one_h3_cell_is_caught_and_named() -> None:
 
     assert not report.is_complete
     assert report.n_h3_cells == 1
-    assert report.missing_h3_cell_count == 1
+    assert report.h3_cell_shortfall == 1
     assert report.missing_ensemble_members == ()
     assert report.missing_lead_time_hours == ()
     assert "1 H3 cells, expected 2" in report.describe()

@@ -258,8 +258,10 @@ def test_ecmwf_ens_materialises_and_appends_nwp(env: Path, monkeypatch: pytest.M
     assert written.height == 4
     # The clean run emits a passing data-quality check.
     assert _check_evaluations(result)["nwp_has_no_unexpected_nulls"].passed
-    # The run's observed shape is published on every materialisation, so drift stays visible in the
-    # Dagster UI timeline even when both checks pass.
+    # The run's observed shape is published on the materialisation itself, not only on the
+    # completeness check, so drift stays visible in the Dagster UI timeline on a passing run too.
+    # (The tiny stub frame is not a full ECMWF ENS run, so nwp_run_is_complete does WARN here —
+    # that path is asserted in test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises.)
     (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
     assert {
         "n_rows",
@@ -310,9 +312,12 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
 def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
     env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A short run (the stub frame carries 4 members x 4 steps x 4 cells, not the full ECMWF ENS
-    grid) is landed anyway and surfaced as a WARN — an incomplete upstream run is absent input, so
-    we keep the rows that arrived rather than discarding the whole partition."""
+    """A short run is landed anyway and surfaced as a WARN — an incomplete upstream run is absent
+    input, so we keep the rows that arrived rather than discarding the whole partition.
+
+    ``_make_nwp`` builds 4 rows carrying 4 distinct members, valid_times and cells (a diagonal, not
+    a cross-product), which is nothing like a complete 51 x 85 x 1 ECMWF ENS run.
+    """
     from contracts.settings import Settings
 
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
