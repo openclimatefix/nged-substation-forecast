@@ -246,7 +246,7 @@ feature, not a limitation.
 
 This is deliberately simpler than depending on `BaseForecaster.load_from_mlflow` at runtime (the
 mechanism the CV pipeline already uses — see
-[ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-mlflow-artifact-store-no-local-cache)):
+[ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-cache)):
 v0.1 has no MLflow tracking server to reach from the runtime container in the first place, so
 there is nothing to cache or fail over from.
 
@@ -547,7 +547,7 @@ runtime needs MLflow.)
 Rejecting this design says nothing against MLflow itself — MLflow remains the backbone of ML
 experimentation: training runs log their models, configs, and metrics to it, and the champion
 is *chosen* from an MLflow leaderboard (see
-[ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-mlflow-artifact-store-no-local-cache)
+[ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-cache)
 for the design, and [ML experimentation](../ml_experimentation/index.md) for the day-to-day
 workflow). The boundary this rejection draws is between ML R&D and production: research uses
 MLflow constantly, while production's hot path never touches it. MLflow's job ends at the

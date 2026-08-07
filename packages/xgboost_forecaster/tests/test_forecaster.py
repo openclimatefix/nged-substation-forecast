@@ -196,20 +196,16 @@ def test_save_clears_stale_ubj_files_from_a_prior_save(tmp_path: Path) -> None:
 def test_load_ignores_ubj_files_not_in_meta_json(tmp_path: Path) -> None:
     """``meta.json`` decides the population, not whatever ``.ubj`` files are lying around.
 
-    ``save`` clearing ``path`` first (see
-    ``test_save_clears_stale_ubj_files_from_a_prior_save``) closes the local-directory route to a
-    stale ``.ubj`` file, but an MLflow run's *remote* artifact directory is written with
-    ``log_artifacts``, which *merges* rather than replaces — a hazard ``save`` cannot reach.
-    Re-training a reused CV fold run on a smaller population therefore still leaves the dropped
-    series' boosters in the run's artifact store; loading them back would silently score those
-    series with a superseded model, breaking the train==predict invariant. This test simulates
-    that merge directly, since it does not go through ``save``.
+    A model's population is the model's own frozen record, not a directory listing, so a booster
+    that ``save`` did not write must not enlarge it — loading such a series would score it with a
+    model that was never trained for it, breaking the train==predict invariant. This test writes
+    the extra booster directly rather than through ``save``, since ``save`` clears its
+    destination (see ``test_save_clears_stale_ubj_files_from_a_prior_save``).
     """
     save_dir = tmp_path / "m"
     _trained(_make_df(ts_ids=[10, 20])).save(save_dir)
-    # Simulate a stale booster left behind by MLflow's artifact-merge (not save, which now clears
-    # its destination first — see above): a real trained booster, written directly rather than
-    # through save, for a series not in this directory's meta.json.
+    # A real trained booster for a series absent from this directory's meta.json, written
+    # directly rather than through save.
     stale_booster = _trained(_make_df(ts_ids=[30]))._models[30]
     stale_booster.save_model(str(save_dir / "30.ubj"))
 

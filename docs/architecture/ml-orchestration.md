@@ -41,15 +41,58 @@ The complementary decision — the resolved config is stamped onto the MLflow ex
 registration and read back by the assets, never re-read from YAML — is explained in
 [Running an experiment end-to-end](../ml_experimentation/dagster-workflow.md).
 
-## Model artifacts: MLflow artifact store, no local cache
+## Model artifacts: one replaceable archive, no local cache
 
 Trained models live in MLflow's artifact store, wrapped by two concrete `BaseForecaster`
 methods (`save_to_mlflow` / `load_from_mlflow`) that delegate to each subclass's own disk
 `save`/`load` — subclasses stay MLflow-free. `load_from_mlflow` downloads straight into a
 temporary directory and loads from there; there is no local-disk cache.
 
-An earlier version cached downloads on disk keyed by MLflow run ID. That was removed (issue
-#469) because it was actively harmful rather than merely unused: a CV fold run is **reused**
+### One archive file, not a directory of files
+
+`save_to_mlflow` packs the model directory into a single `model.tar.gz` and logs that one file
+to the run's artifact root. `load_from_mlflow` and the production download path
+(`ml_core._production_helpers.fetch_model_artifacts`) each unpack it into a temporary directory.
+Subclass `save`/`load` never see the archive: they stay directory-based and MLflow-free, so the
+Docker bake path (`load_forecaster_from_dir`) is unaffected.
+
+The archive exists because **MLflow's directory upload merges rather than replaces**, and MLflow
+exposes no public artifact-delete API. Verified empirically against MLflow 3.15.1: re-uploading
+`{a.ubj, meta.json}` with `log_artifacts` over an existing `{a.ubj, b.ubj, meta.json}` leaves
+`b.ubj` in place, while re-logging a same-name single artifact overwrites it outright. A fold run
+is **reused** across re-materialisations of its partition (see "Cross-process run resolution"
+above), so with a directory upload, re-training a fold on a *smaller* population would strand the
+dropped series' model files in the run permanently — downloaded on every subsequent load and
+baked into the container image. One replaceable file makes that accumulation impossible at the
+source (issue #470).
+
+Two properties are worth keeping in mind when reading the code:
+
+- The run holding exactly one model file is the load-bearing invariant, not an implementation
+  detail. Logging any *second* per-model file alongside the archive would reopen the merge
+  problem for that file.
+
+- A model's population is still read from its own `meta.json`, never from a directory listing —
+  the archive removes the accumulation, but the population contract stands on its own (the
+  train==predict invariant; see `BaseForecaster.trained_time_series_ids`).
+
+Two costs come with this. The first is losing per-file browsing of model artifacts in the MLflow
+UI, which is negligible for a directory of opaque model blobs. The second is that both sides now
+hold the model twice at once in their temporary directory — the model directory plus the archive
+when saving, the archive plus its unpacked contents when loading — so a machine running these
+assets needs roughly twice the model's size in free temp space. At V2 scale (~2,500 series) that
+is a few GB, which matters mainly if `TMPDIR` is a memory-backed filesystem inside a container.
+
+The archive is written at gzip level 1 rather than `tarfile`'s default of 9. Measured on 40 real
+boosters (77 MB of `.ubj`), level 1 takes 0.7 s for a 2.7x reduction and level 9 takes 14.9 s for
+3.5x, so the default would spend about fifteen minutes of CPU per fold at V2 scale to save a
+fifth of the bytes. Boosters are already dense and the archive is transient — it exists to be one
+replaceable object, not to be small.
+
+### Why there is no local cache
+
+An earlier version cached downloads on disk keyed by MLflow run ID. That was removed
+(issue #469) because it was actively harmful rather than merely unused: a CV fold run is **reused**
 across re-materialisations of its partition (see "Cross-process run resolution" above), so the
 same run ID can legitimately hold a different model after re-training, which made the cache key
 non-unique for its contents. Keeping the cache honest under that reuse required write-side
