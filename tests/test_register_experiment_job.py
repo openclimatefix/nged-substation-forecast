@@ -9,7 +9,7 @@ from pathlib import Path
 
 import mlflow
 import pytest
-from dagster import DagsterInstance, RunConfig
+from dagster import DagsterInstance, ExecuteInProcessResult, RunConfig
 from mlflow.tracking import MlflowClient
 
 from nged_substation_forecast.defs.cv_assets import CV_EXPERIMENT_FOLDS_NAME
@@ -27,20 +27,39 @@ def mlflow_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     mlflow.set_tracking_uri(tracking_uri)
 
 
-def _run(instance: DagsterInstance, experiment_name: str, run_mode: str) -> None:
-    result = register_experiment_job.execute_in_process(
+def _execute(
+    instance: DagsterInstance,
+    experiment_name: str,
+    run_mode: str,
+    config_overrides: dict[str, object] | None = None,
+    description: str = "a test experiment",
+    raise_on_error: bool = True,
+) -> ExecuteInProcessResult:
+    return register_experiment_job.execute_in_process(
         run_config=RunConfig(
             ops={
                 "register_experiment": RegisterExperimentConfig(
                     experiment_name=experiment_name,
                     base_model_config="conf/model/xgboost.yaml",
+                    config_overrides=config_overrides or {},
                     run_mode=run_mode,
-                    description="a test experiment",
+                    description=description,
                 )
             }
         ),
         instance=instance,
+        raise_on_error=raise_on_error,
     )
+
+
+def _run(
+    instance: DagsterInstance,
+    experiment_name: str,
+    run_mode: str,
+    config_overrides: dict[str, object] | None = None,
+    description: str = "a test experiment",
+) -> None:
+    result = _execute(instance, experiment_name, run_mode, config_overrides, description)
     assert result.success
 
 
@@ -102,3 +121,56 @@ def test_re_registration_is_idempotent(mlflow_env: None, dagster_instance: Dagst
     assert experiment is not None
     _parent_run(experiment.experiment_id)  # asserts exactly one parent run
     assert _partition_keys(dagster_instance) == ["exp_idem__mid_2025_to_mid_2026"]
+
+
+def test_re_registration_may_update_the_description(
+    mlflow_env: None, dagster_instance: DagsterInstance
+) -> None:
+    """The description is prose about the experiment, not part of what makes it that experiment."""
+    _run(dagster_instance, "exp_desc", run_mode="full_cv", description="first")
+    _run(dagster_instance, "exp_desc", run_mode="full_cv", description="second")
+
+    experiment = mlflow.get_experiment_by_name("exp_desc")
+    assert experiment is not None
+    assert experiment.tags["description"] == "second"
+
+
+def test_re_registration_with_a_changed_config_leaves_no_half_written_state(
+    mlflow_env: None, dagster_instance: DagsterInstance
+) -> None:
+    """A changed config is rejected, and the rejection writes nothing.
+
+    The experiment's ``config`` tag is what ``load_experiment_forecaster`` reconstructs the
+    forecaster from, so a failed registration that had already rewritten it would leave the
+    experiment describing a config its parent run's params contradict — and every later fold would
+    train on the config of a registration that *failed*.
+    """
+    _run(dagster_instance, "exp_changed", run_mode="full_cv", config_overrides={"n_estimators": 7})
+
+    experiment = mlflow.get_experiment_by_name("exp_changed")
+    assert experiment is not None
+    tags_before = dict(experiment.tags)
+    params_before = dict(_parent_run(experiment.experiment_id).data.params)
+    assert params_before["n_estimators"] == "7"
+
+    result = _execute(
+        dagster_instance,
+        "exp_changed",
+        run_mode="full_cv",
+        config_overrides={"n_estimators": 300},
+        raise_on_error=False,
+    )
+    assert not result.success
+    # Assert *why* it failed, so the test cannot pass on an unrelated error. Dagster wraps the op's
+    # exception in a DagsterExecutionStepExecutionError, so the original is the `cause`.
+    failure = result.failure_data_for_node("register_experiment")
+    assert failure is not None and failure.error is not None
+    cause = failure.error.cause
+    assert cause is not None
+    assert cause.cls_name == "ExperimentIdentityChangedError"
+    assert "config.n_estimators: 7 -> 300" in cause.message
+
+    experiment_after = mlflow.get_experiment_by_name("exp_changed")
+    assert experiment_after is not None
+    assert dict(experiment_after.tags) == tags_before
+    assert dict(_parent_run(experiment_after.experiment_id).data.params) == params_before

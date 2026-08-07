@@ -6,7 +6,8 @@ dynamic partition set rather than producing a data artifact. Their ops use ``OpE
 which needs the Dagster instance.
 """
 
-from typing import Any, Literal, cast
+import json
+from typing import Any, Final, Literal, cast
 
 import hydra
 import mlflow
@@ -94,6 +95,151 @@ def _class_target(obj: type | object) -> str:
     return f"{cls.__module__}.{cls.__qualname__}"
 
 
+IdentityTagType = Literal["config", "forecaster_target", "config_target"]
+"""Type annotation for the experiment tags that together define an experiment's identity."""
+
+IDENTITY_TAGS: Final[tuple[IdentityTagType, ...]] = ("config", "forecaster_target", "config_target")
+"""Runtime tuple — iterated when comparing a re-registration against the stored identity.
+
+The ``description`` tag is deliberately absent: prose about an experiment is not part of what
+makes it that experiment, so it stays freely editable by re-registering.
+"""
+
+IdentityTagsType = dict[IdentityTagType, str]
+"""An experiment's identity, as the tag values that carry it."""
+
+
+class ExperimentIdentityChangedError(ValueError):
+    """Raised when re-registering an existing experiment under a changed config.
+
+    A distinct subclass so a caller (or a test) can tell "this experiment name is already taken by
+    a different config" apart from the ordinary ``ValueError``s raised while resolving the config
+    itself.
+    """
+
+
+def _identity_tags(
+    forecaster_cls: type[BaseForecaster], forecaster_config: BaseForecasterConfig
+) -> IdentityTagsType:
+    """Return the experiment tags that define this experiment's identity.
+
+    Args:
+        forecaster_cls: The resolved forecaster class.
+        forecaster_config: The resolved config, with ``experiment_name`` already stamped.
+
+    Returns:
+        The ``config``/``forecaster_target``/``config_target`` tag values. ``config`` is the
+        canonical JSON dump — see ``BaseForecasterConfig`` on why serialisation must be
+        order-stable for this comparison to mean anything.
+    """
+    return {
+        "config": forecaster_config.model_dump_json(),
+        "forecaster_target": _class_target(forecaster_cls),
+        "config_target": _class_target(forecaster_config),
+    }
+
+
+_ABSENT: Final[object] = object()
+"""Sentinel for a config field present on only one side of an identity comparison.
+
+A sentinel rather than ``None``, so a field that is genuinely ``null`` on one side and missing on
+the other is reported as the difference it is.
+"""
+
+
+def _render_value(value: object) -> str:
+    """Render one config value for the rejection message."""
+    return "<absent>" if value is _ABSENT else repr(value)
+
+
+def _describe_value_change(stored: object, requested: object) -> str:
+    """Describe how one config field's value differs.
+
+    A list of strings that differs only in order gets its own phrasing rather than two near-identical
+    dumps: that is what a ``set``-valued field looks like when the stored tag was written by a
+    registration that did not yet serialise it canonically, and printing both orderings in full
+    would read as a change to the values themselves.
+    """
+    if (
+        isinstance(stored, list)
+        and isinstance(requested, list)
+        and all(isinstance(item, str) for item in (*stored, *requested))
+        and sorted(stored) == sorted(requested)
+    ):
+        return f"the same {len(stored)} values, in a different order"
+    return f"{_render_value(stored)} -> {_render_value(requested)}"
+
+
+def _config_differences(stored_json: str, requested_json: str) -> list[str]:
+    """Return one line per differing config field, or nothing if the two configs agree.
+
+    Compares the *parsed* JSON, not the raw strings, so a difference in key order or JSON
+    formatting is not mistaken for a config change.
+    """
+    stored: dict[str, Any] = json.loads(stored_json)
+    requested: dict[str, Any] = json.loads(requested_json)
+    return [
+        f"  config.{field}: "
+        f"{_describe_value_change(stored.get(field, _ABSENT), requested.get(field, _ABSENT))}"
+        for field in sorted(stored.keys() | requested.keys())
+        if stored.get(field, _ABSENT) != requested.get(field, _ABSENT)
+    ]
+
+
+def _target_difference(tag: IdentityTagType, stored: str, requested: str) -> list[str]:
+    """Return the difference line for a class-target tag, or nothing if it is unchanged."""
+    return [] if stored == requested else [f"  {tag}: {stored!r} -> {requested!r}"]
+
+
+def _reject_changed_identity(
+    experiment_name: str, stored_tags: dict[str, str], requested_tags: IdentityTagsType
+) -> None:
+    """Raise if re-registering ``experiment_name`` would change its identity.
+
+    An experiment's identity **is** its config: every fold of an experiment must be trained and
+    scored under one config, or its leaderboard row silently mixes two different models. Folds
+    already materialised under the old config cannot be un-trained, and the assets read the config
+    back from the experiment tag (``load_experiment_forecaster``), so re-pointing that tag mid-flight
+    would poison every comparison built on the experiment. A changed config is therefore a *new*
+    experiment, and the only correct answer is to reject it — before anything has been written.
+
+    Called with the experiment's stored tags before any write, so a rejection leaves MLflow exactly
+    as it found it. A tag absent from ``stored_tags`` is not a change: that is the untagged
+    experiment ``get_or_create_experiment`` creates as its self-healing fallback, which this
+    registration is entitled to complete.
+
+    The decision to reject *is* the list of differences to report, so the error can never claim a
+    change it cannot then name.
+
+    Args:
+        experiment_name: The MLflow experiment name, for the error message.
+        stored_tags: The existing experiment's tags (empty for a brand-new experiment).
+        requested_tags: The identity this registration is asking for, from ``_identity_tags``.
+
+    Raises:
+        ExperimentIdentityChangedError: If any identity tag is already set to a different value.
+    """
+    differences = [
+        line
+        for tag in IDENTITY_TAGS
+        if tag in stored_tags
+        for line in (
+            _config_differences(stored_tags[tag], requested_tags[tag])
+            if tag == "config"
+            else _target_difference(tag, stored_tags[tag], requested_tags[tag])
+        )
+    ]
+    if not differences:
+        return
+    raise ExperimentIdentityChangedError(
+        f"MLflow experiment {experiment_name!r} is already registered with a different"
+        " configuration. An experiment's identity is its configuration — every fold must be"
+        " trained and scored under the same one — so a changed configuration is a new experiment."
+        " Register it under a new experiment_name.\nDifferences (registered -> requested):\n"
+        + "\n".join(differences)
+    )
+
+
 def _fold_ids_for_run_mode(run_mode: str, cv_config: CvConfig) -> list[str]:
     """Return the fold ids a run mode expands to (read from the CV config, never hard-coded).
 
@@ -109,10 +255,17 @@ def _fold_ids_for_run_mode(run_mode: str, cv_config: CvConfig) -> list[str]:
 def register_experiment(context: OpExecutionContext, config: RegisterExperimentConfig) -> None:
     """Create the MLflow experiment + parent run and add the experiment's CV partition keys.
 
-    Idempotent: re-running with the same ``experiment_name`` resolves the existing experiment,
-    parent run, and partition keys rather than duplicating them. Materialises no assets — the
-    user materialises ``trained_cv_model`` / ``cv_power_forecasts`` for the new partitions
-    afterwards.
+    Idempotent for the *same* config: re-running with the same ``experiment_name`` resolves the
+    existing experiment, parent run, and partition keys rather than duplicating them, and may
+    freely update the ``description`` and add the other run mode's folds. Re-running with a
+    **changed** config is rejected outright — see ``_reject_changed_identity``. Materialises no
+    assets — the user materialises ``trained_cv_model`` / ``cv_power_forecasts`` for the new
+    partitions afterwards.
+
+    Raises:
+        ExperimentIdentityChangedError: If ``experiment_name`` is already registered under a
+            different config. Raised before any MLflow write, so the experiment is left exactly
+            as it was.
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -120,17 +273,26 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     forecaster_cls, forecaster_config = _resolve_forecaster_config(
         config.base_model_config, config.config_overrides, config.experiment_name
     )
+    identity_tags = _identity_tags(forecaster_cls, forecaster_config)
 
+    # get_or_create_experiment writes nothing when the name already exists, so the check below
+    # still runs before this registration's first write. On a brand-new name it creates the
+    # (untagged) experiment, which has no stored identity to conflict with.
     experiment_id = get_or_create_experiment(config.experiment_name)
     client = MlflowClient()
-    client.set_experiment_tag(experiment_id, "config", forecaster_config.model_dump_json())
-    client.set_experiment_tag(experiment_id, "description", config.description)
-    # Stamp class identity so assets can reconstruct the exact forecaster + config subclass from
-    # MLflow alone (the config JSON above carries no class identifier). See
-    # load_experiment_forecaster.
-    client.set_experiment_tag(experiment_id, "forecaster_target", _class_target(forecaster_cls))
-    client.set_experiment_tag(experiment_id, "config_target", _class_target(forecaster_config))
+    _reject_changed_identity(
+        config.experiment_name, mlflow.get_experiment(experiment_id).tags, identity_tags
+    )
 
+    # Log the params before the experiment tags. MLflow params are write-once, so this is the one
+    # write the tracking store can reject; doing it first means a rejection can never leave the
+    # experiment tagged with a config that its params contradict. The check above should make such
+    # a rejection unreachable, but an experiment registered before that check existed may already
+    # carry params that disagree with its tag, and the ordering keeps even that case one-sided.
+    # log_params is not itself atomic — a batch containing one conflicting key still writes the
+    # batch's other keys before raising — so this bounds the damage to the params rather than
+    # eliminating it. Reaching that requires an experiment whose tags failed to write on an earlier
+    # registration, which is why the tags are the last thing written.
     parent_run_id = get_or_create_parent_run(experiment_id)
     with mlflow.start_run(run_id=parent_run_id):
         mlflow.log_params(flatten_config(forecaster_config))
@@ -143,6 +305,13 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
                 **provenance_tags("register"),
             }
         )
+
+    # The identity tags carry the resolved config as JSON plus the class identity the JSON itself
+    # lacks, so assets can reconstruct the exact forecaster + config subclass from MLflow alone.
+    # See load_experiment_forecaster.
+    for tag_name, tag_value in identity_tags.items():
+        client.set_experiment_tag(experiment_id, tag_name, tag_value)
+    client.set_experiment_tag(experiment_id, "description", config.description)
 
     cv_config = load_cv_config(settings.cv_config_path)
     fold_ids = _fold_ids_for_run_mode(config.run_mode, cv_config)
