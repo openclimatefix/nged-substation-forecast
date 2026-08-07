@@ -135,8 +135,22 @@ addopts = "--import-mode=importlib"
 # test data (e.g. `_nwp_test_data`) by bare name — importlib mode does not add each test file's
 # own directory to sys.path the way prepend mode does.
 pythonpath = ["tests"]
+# `error` first: any warning not explicitly excepted below fails the test that raised it, so a
+# deprecation in our own code is caught by the PR that introduces it instead of accumulating in the
+# summary. Later entries win, so every exception below is applied on top of `error`.
+#
+# Each exception silences one *third-party* deprecation we cannot fix from this repo, and is pinned
+# to the exact message and the exact upstream module that raises it, so it can never match a warning
+# from our own code. Delete an entry when the upstream release named in its comment ships a fix.
+# When a dependency upgrade adds a new upstream warning, the suite fails loudly: add an entry here,
+# named and dated the same way, rather than widening an existing one.
 filterwarnings = [
+    "error",
     "ignore:codecs.open\\(\\) is deprecated:DeprecationWarning:mlflow.*",
+    # dagster 1.13.16: `_core/storage/event_log/sql_event_log.py` still calls the
+    # `datetime.utcfromtimestamp()` that Python 3.12 deprecated. Triggered whenever an asset check
+    # evaluation is written to the event log. Delete once Dagster moves to timezone-aware datetimes.
+    "ignore:datetime\\.datetime\\.utcfromtimestamp\\(\\) is deprecated:DeprecationWarning:dagster\\._core\\.storage\\.event_log\\.sql_event_log",
 ]
 # `.claude` holds git worktrees (`.claude/worktrees/*`), each a full checkout carrying its own
 # copy of this `conftest.py`; recursing into them re-registers the `--run-network` option and

@@ -75,14 +75,15 @@ def _save_trained_model_to_mlflow(experiment_name: str, n_estimators: int) -> st
     return run_id
 
 
-def test_promoted_model_promotes_and_populates_directory(env: dict[str, str]) -> None:
+def test_promoted_model_promotes_and_populates_directory(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
     run_id = _save_trained_model_to_mlflow("promo_test", n_estimators=5)
 
-    instance = DagsterInstance.ephemeral()
     result = materialize(
         [promoted_model],
         run_config=RunConfig(ops={"promoted_model": PromotedModelConfig(mlflow_run_id=run_id)}),
-        instance=instance,
+        instance=dagster_instance,
     )
     assert result.success
 
@@ -103,19 +104,20 @@ def test_promoted_model_promotes_and_populates_directory(env: dict[str, str]) ->
     assert metadata["n_trained_time_series"].value == 1
 
 
-def test_re_promotion_replaces_the_model(env: dict[str, str]) -> None:
+def test_re_promotion_replaces_the_model(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
     first_run_id = _save_trained_model_to_mlflow("promo_test_v1", n_estimators=5)
     second_run_id = _save_trained_model_to_mlflow("promo_test_v2", n_estimators=7)
 
     model_dir = Path(env["production_model_path"])
 
-    instance = DagsterInstance.ephemeral()
     assert materialize(
         [promoted_model],
         run_config=RunConfig(
             ops={"promoted_model": PromotedModelConfig(mlflow_run_id=first_run_id)}
         ),
-        instance=instance,
+        instance=dagster_instance,
     ).success
     first_meta = json.loads((model_dir / "meta.json").read_text())
     assert first_meta["model_params"]["experiment_name"] == "promo_test_v1"
@@ -125,7 +127,7 @@ def test_re_promotion_replaces_the_model(env: dict[str, str]) -> None:
         run_config=RunConfig(
             ops={"promoted_model": PromotedModelConfig(mlflow_run_id=second_run_id)}
         ),
-        instance=instance,
+        instance=dagster_instance,
     ).success
     second_meta = json.loads((model_dir / "meta.json").read_text())
     assert second_meta["model_params"]["experiment_name"] == "promo_test_v2"
@@ -134,10 +136,12 @@ def test_re_promotion_replaces_the_model(env: dict[str, str]) -> None:
     assert promotion["mlflow_run_id"] == second_run_id
 
 
-def test_promotable_model_runs_lists_fold_run_candidates(env: dict[str, str]) -> None:
+def test_promotable_model_runs_lists_fold_run_candidates(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
     run_id = _save_trained_model_to_mlflow("candidates_test", n_estimators=5)
 
-    result = materialize([promotable_model_runs], instance=DagsterInstance.ephemeral())
+    result = materialize([promotable_model_runs], instance=dagster_instance)
     assert result.success
 
     [materialization] = result.asset_materializations_for_node("promotable_model_runs")
