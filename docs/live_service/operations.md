@@ -191,9 +191,9 @@ series is *not* a data outage — it is a promotion bug, and it is meant to fail
 ([above](#rolling-back-to-the-previous-champion)).
 
 **Log the intervention.** Every entry above that needed a human is a data point for
-[T1.1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself): record the date, the
-trigger, the cause, the minutes spent, and whether this runbook covered it. A gap in this page is
-itself the finding.
+[T1.1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself): append
+a row to the [intervention log](intervention-log.md) with the date, the trigger, the cause, the
+minutes spent, and whether this runbook covered it. A gap in this page is itself the finding.
 
 ## Inspecting a live forecast
 

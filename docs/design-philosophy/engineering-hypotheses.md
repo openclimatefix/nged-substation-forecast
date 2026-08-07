@@ -36,6 +36,10 @@ that at ≥90% so a single fluke cannot falsify the claim on its own. "Zero out-
 intervention is ever needed outside normal working hours — the posture that makes
 next-business-day recovery honest.
 
+Pre-v1.0 periods are recorded in the
+[intervention log](../live_service/intervention-log.md#periods-covered), with their caveats, and do
+not score.
+
 **T1.2 — Graceful degradation.** Run the failure-scenario suite across every time series and check
 two things: that a forecast is emitted at all, and that it still beats `nged_incumbent` at rungs 0–2
 of the [degradation ladder](inherent-stability.md#the-degradation-ladder). Blocked on
@@ -231,7 +235,8 @@ nobody. A number that resolves itself is a better outcome, and pre-registering o
 confidence in a way that prose cannot.
 
 **It forces the measurement artefacts to exist in advance.** Most of these tests need something
-built before they can be scored: a baseline forecaster, a scenario suite, an intervention log.
+built before they can be scored: a baseline forecaster and a scenario suite, plus the
+[intervention log](../live_service/intervention-log.md), which is the one already in place.
 Writing the hypothesis first is what puts those on the roadmap early enough to be useful.
 
 The commitment this entails is real: a hypothesis without a number is an aim wearing a lab coat.
@@ -250,7 +255,10 @@ Three rules keep that measurement honest.
 
 The artefact is deliberately cheap — an append-only log with the date, the trigger, a cause
 category, the human-minutes spent, and whether a runbook already existed — so there is no excuse for
-not keeping it.
+not keeping it. It lives at
+[Live Service → Intervention log](../live_service/intervention-log.md), and the
+[operations runbook](../live_service/operations.md#degraded-input-data-nwp-feed-down-or-telemetry-stalled)
+tells the operator to append to it.
 
 But its **measurement window opens at v1.0**. Interventions during v0.2–v0.9, while the system is
 being actively rebuilt, are development churn, and counting them would spuriously falsify the
