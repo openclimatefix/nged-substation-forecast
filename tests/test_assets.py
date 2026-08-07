@@ -8,6 +8,7 @@ the wiring, branching, and metadata each asset owns — stubbing the S3/network 
 ~30-second GB-boundary buffer so the tests stay fast and offline.
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -142,7 +143,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_power_time_series_and_metadata_ingests_and_writes(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """Happy path: a fake S3 store serving two real NGED JSON files → metadata parquet + power
     Delta table both written, and the asset materialises successfully."""
@@ -150,7 +151,7 @@ def test_power_time_series_and_metadata_ingests_and_writes(
         assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
     )
 
-    result = materialize([power_time_series_and_metadata], instance=DagsterInstance.ephemeral())
+    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
     assert result.success
 
     metadata = pl.read_parquet(env / "NGED" / "metadata.parquet")
@@ -172,8 +173,46 @@ def test_power_time_series_and_metadata_ingests_and_writes(
     assert {"nged_s3_paths", "PowerTimeSeries"} <= metadata_keys
 
 
+def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """A row with a malformed `time` is dropped and counted, not allowed to abort ingestion of
+    every other well-formed row in the batch."""
+    fixture = json.loads((_NGED_JSON_DIR / "TimeSeries_10.json").read_text())
+    fixture["data"] = [
+        {
+            "value": 1.0,
+            "startTime": "2026-03-05 12:00:00+0000",
+            "endTime": "2026-03-05 12:30:00+0000",
+        },
+        # Malformed: outside the plausible datetime range.
+        {
+            "value": 2.0,
+            "startTime": "1840-06-01 00:00:00+0000",
+            "endTime": "1840-06-01 00:30:00+0000",
+        },
+    ]
+    files = {
+        "timeseries/1774512000000_1774533600000/TimeSeries_10_20260326T080000Z_20260326T140000Z.json": (
+            json.dumps(fixture).encode()
+        ),
+    }
+    monkeypatch.setattr(assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(files))
+
+    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
+    assert result.success
+
+    power = pl.read_delta(str(env / "NGED" / "power_time_series.delta"))
+    assert power.height == 1
+    assert power["time"][0] == datetime(2026, 3, 5, 12, 30, tzinfo=timezone.utc)
+
+    materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
+    metadata = {k: v for mat in materialisations for k, v in mat.metadata.items()}
+    assert metadata["n_implausible_power_rows_dropped"].value == 1
+
+
 def test_power_time_series_and_metadata_handles_no_new_data(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """``NoNewData`` from ``download_and_parse_files`` → the asset returns early, writing nothing."""
     monkeypatch.setattr(
@@ -185,7 +224,7 @@ def test_power_time_series_and_metadata_handles_no_new_data(
 
     monkeypatch.setattr(assets, "download_and_parse_files", _raise_no_new_data)
 
-    result = materialize([power_time_series_and_metadata], instance=DagsterInstance.ephemeral())
+    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
     assert result.success
     assert not (env / "NGED" / "metadata.parquet").exists()
     assert not (env / "NGED" / "power_time_series.delta").exists()
@@ -195,14 +234,14 @@ def test_power_time_series_and_metadata_handles_no_new_data(
 
 
 def test_h3_grid_weights_materialises_and_writes_parquet(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """Materialise ``h3_grid_weights`` against a small stand-in boundary (the real GB boundary
     buffers for ~30 s and is exercised in ``packages/geo``); assert a valid parquet lands on disk."""
     # A 1×1-degree box over central GB — enough to yield several H3 cells, milliseconds to compute.
     monkeypatch.setattr(assets, "load_gb_boundary", lambda: shapely.box(-2.0, 52.0, -1.0, 53.0))
 
-    result = materialize([h3_grid_weights], instance=DagsterInstance.ephemeral())
+    result = materialize([h3_grid_weights], instance=dagster_instance)
     assert result.success
 
     weights = pl.read_parquet(env / "h3_grid_weights.parquet")
@@ -224,7 +263,9 @@ def _check_evaluations(result: ExecuteInProcessResult) -> dict[str, AssetCheckEv
     }
 
 
-def test_ecmwf_ens_materialises_and_appends_nwp(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ecmwf_ens_materialises_and_appends_nwp(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
     """Happy path with the download/convert pipeline stubbed: the partition key parses into
     ``nwp_init_time`` (passed to ``open_ecmwf_ens_run``) and the converted frame is written to the
     NWP Delta table via ``write_nwp``."""
@@ -247,9 +288,7 @@ def test_ecmwf_ens_materialises_and_appends_nwp(env: Path, monkeypatch: pytest.M
         lambda ds, h3_grid: _make_nwp(init_time),
     )
 
-    result = materialize(
-        [ecmwf_ens], partition_key="2024-12-01", instance=DagsterInstance.ephemeral()
-    )
+    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success
     # The partition key is parsed into nwp_init_time and handed to open_ecmwf_ens_run...
     assert captured["nwp_init_time"] == init_time
@@ -277,7 +316,7 @@ def test_ecmwf_ens_materialises_and_appends_nwp(env: Path, monkeypatch: pytest.M
 
 
 def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """Scattered per-pixel nulls in a de-accumulated variable (the known upstream ECMWF ENS
     corruption) are tolerated: the run still materialises, and the data-quality check WARNs."""
@@ -299,9 +338,7 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
         assets, "convert_nwp_xarray_dataset_to_polars_dataframe", lambda ds, h3_grid: scattered
     )
 
-    result = materialize(
-        [ecmwf_ens], partition_key="2024-12-01", instance=DagsterInstance.ephemeral()
-    )
+    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success  # tolerated — the run is NOT failed
     assert pl.read_delta(Settings().nwp_data_path).height == 3  # data was persisted
     evaluation = _check_evaluations(result)["nwp_has_no_unexpected_nulls"]
@@ -310,7 +347,7 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
 
 
 def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """A short run is landed anyway and surfaced as a WARN — an incomplete upstream run is absent
     input, so we keep the rows that arrived rather than discarding the whole partition.
@@ -330,9 +367,7 @@ def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
         lambda ds, h3_grid: _make_nwp(init_time),
     )
 
-    result = materialize(
-        [ecmwf_ens], partition_key="2024-12-01", instance=DagsterInstance.ephemeral()
-    )
+    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success  # WARN, not a failure: the partial run is NOT thrown away
     assert pl.read_delta(Settings().nwp_data_path).height == 4  # data was persisted
 
@@ -361,8 +396,16 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
 
     monkeypatch.setattr(assets, "open_ecmwf_ens_run", _raise_not_available)
 
-    with pytest.raises(RetryRequested) as exc_info:
-        ecmwf_ens(build_asset_context(partition_key="2024-05-01"))
+    # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()` (see
+    # `docs/architecture/testing.md`) and is used as a context manager here for the same reason
+    # `dagster_instance` is a fixture: entering it makes disposal happen deterministically at
+    # `__exit__`, rather than depending on `__del__` running via garbage collection, which the
+    # traceback captured by `pytest.raises` delays past this test — see the fixture's docstring.
+    with (
+        build_asset_context(partition_key="2024-05-01") as context,
+        pytest.raises(RetryRequested) as exc_info,
+    ):
+        ecmwf_ens(context)
 
     assert exc_info.value.max_retries == _ECMWF_ENS_MAX_RETRIES
     assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS
@@ -387,6 +430,8 @@ def test_definitions_resolve(env: Path) -> None:
     """
     from dagster import AssetKey
 
+    from nged_substation_forecast.defs.assets import ecmwf_ens_partitions
+    from nged_substation_forecast.defs.production_assets import live_forecast_partitions
     from nged_substation_forecast.definitions import defs
 
     repo = defs.get_repository_def()
@@ -411,11 +456,27 @@ def test_definitions_resolve(env: Path) -> None:
     for job_name, expected_asset in [
         ("power_time_series_and_metadata_job", "power_time_series_and_metadata"),
         ("ecmwf_ens_job", "ecmwf_ens"),
+        ("live_forecasts_job", "live_forecasts"),
     ]:
         selected = {
             key.to_user_string() for key in repo.get_job(job_name).asset_layer.executable_asset_keys
         }
         assert selected == {expected_asset}
+
+    # Neither partitioned job passes `partitions_def` to `define_asset_job` — Dagster infers it from
+    # the selected asset at resolution time. Assert the inferred definition equals the one the asset
+    # declares, so a job silently resolving to `None`, or to a different cadence or start, fails here
+    # rather than at the next schedule tick. (Equality, not identity: what matters is that the job
+    # targets the same partitions, and Dagster is free to hand back an equal copy.)
+    assert repo.get_job("ecmwf_ens_job").partitions_def == ecmwf_ens_partitions
+    assert repo.get_job("live_forecasts_job").partitions_def == live_forecast_partitions
+
+    # `live_forecasts_schedule` is built by `build_schedule_from_partitioned_job`, so its cron is
+    # *derived* from that inferred partitions_def — the one thing dropping the explicit argument
+    # could plausibly have broken. Pin the resolved schedule, not just the job.
+    live_schedule = repo.get_schedule_def("live_forecasts_job_schedule")
+    assert live_schedule.cron_schedule == live_forecast_partitions.cron_schedule
+    assert live_schedule.execution_timezone == "UTC"
 
 
 # --- summary classes (pure, no Dagster) ----------------------------------------------------------

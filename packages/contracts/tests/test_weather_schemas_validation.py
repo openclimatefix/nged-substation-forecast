@@ -180,3 +180,21 @@ def test_categorical_precipitation_type_surface_validation() -> None:
     )
     with pytest.raises(ValueError, match="must not be null for init_time > 2024-11-12"):
         Nwp.validate(pt.DataFrame(df_invalid_after).set_model(Nwp).cast())
+
+
+@pytest.mark.parametrize(
+    "column, time, expected_error",
+    [
+        ("init_time", datetime(1840, 6, 1, tzinfo=timezone.utc), "before MIN_PLAUSIBLE_DATETIME"),
+        ("init_time", datetime(3000, 6, 1, tzinfo=timezone.utc), "after MAX_PLAUSIBLE_DATETIME"),
+        ("valid_time", datetime(1840, 6, 1, tzinfo=timezone.utc), "before MIN_PLAUSIBLE_DATETIME"),
+        ("valid_time", datetime(3000, 6, 1, tzinfo=timezone.utc), "after MAX_PLAUSIBLE_DATETIME"),
+    ],
+)
+def test_out_of_range_nwp_time_is_fatal(column: str, time: datetime, expected_error: str) -> None:
+    """`init_time` and `valid_time` are bounded to the plausible range, same as PowerTimeSeries."""
+    df = _nwp_slice(overrides={column: [time] * 3})
+    with pytest.raises(ValueError, match=expected_error) as exc_info:
+        _validate(df)
+
+    assert f"`{column}` is outside the plausible datetime range" in str(exc_info.value)

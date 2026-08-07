@@ -1,5 +1,5 @@
 import logging
-from typing import Final, Sequence, TypedDict, overload
+from typing import Final, NamedTuple, Sequence, TypedDict, overload
 
 import obstore
 import patito as pt
@@ -127,9 +127,22 @@ class NoNewData(Exception):
     pass
 
 
+class DownloadAndParseResult(NamedTuple):
+    """Result of ``download_and_parse_files``.
+
+    ``n_implausible_power_rows_dropped`` sums ``ExtractedPowerTimeSeries.n_dropped`` across every
+    file in the batch — see ``PowerTimeSeries.drop_implausible_rows`` for what gets dropped and
+    why.
+    """
+
+    metadata: pt.DataFrame[TimeSeriesMetadata]
+    power_time_series: pt.DataFrame[PowerTimeSeries]
+    n_implausible_power_rows_dropped: int
+
+
 def download_and_parse_files(
     store: obstore.store.S3Store, paths_df: pt.DataFrame[_ProcessedFileListing]
-) -> tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
+) -> DownloadAndParseResult:
     """Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
     there are any duplicates.
 
@@ -137,6 +150,7 @@ def download_and_parse_files(
     """
     metadata_dfs = []
     power_time_series_dfs = []
+    n_implausible_power_rows_dropped = 0
     for _end_time, df_for_end_time in paths_df.group_by("end_time", maintain_order=True):
         for path in df_for_end_time["path"]:
             # TODO: Use `store.get_async` to get all files for this group concurrently.
@@ -151,9 +165,7 @@ def download_and_parse_files(
 
             # Extract PowerTimeSeries from df:
             try:
-                new_time_series_df = _extract_power_time_series(
-                    df=df, time_series_id=time_series_id
-                )
+                extracted = _extract_power_time_series(df=df, time_series_id=time_series_id)
             except pl.exceptions.InvalidOperationError as e:
                 if "invalid dtype: expected 'Struct', got 'Null' for 'data'" in str(e):
                     log.warning(
@@ -166,7 +178,8 @@ def download_and_parse_files(
                 else:
                     raise
             else:
-                power_time_series_dfs.append(new_time_series_df)
+                power_time_series_dfs.append(extracted.dataframe)
+                n_implausible_power_rows_dropped += extracted.n_dropped
 
     log.info(
         f"{len(metadata_dfs)} new TimeSeriesMetadata DataFrames and {len(power_time_series_dfs)}"
@@ -188,7 +201,11 @@ def download_and_parse_files(
         .sort(by=PowerTimeSeries.columns_to_sort_by)
     )
 
-    return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)
+    return DownloadAndParseResult(
+        metadata=TimeSeriesMetadata.validate(metadata_df),
+        power_time_series=PowerTimeSeries.validate(time_series_df),
+        n_implausible_power_rows_dropped=n_implausible_power_rows_dropped,
+    )
 
 
 class TimeSeriesCoverage(pt.Model):

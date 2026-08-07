@@ -108,9 +108,12 @@ def get_or_create_parent_run(experiment_id: str) -> str:
 def get_or_create_fold_run(experiment_id: str, parent_run_id: str, fold_id: str) -> str:
     """Return the fold's child run id (tags ``cv_role=fold, fold_id=...``), creating it if absent.
 
-    The fold run holds that fold's per-fold params and metrics. It is created **nested** under
-    the experiment's parent run, so the MLflow UI groups folds beneath ``cv_summary``. Resolved
-    by ``(cv_role, fold_id)`` so any process — and any Dagster retry of the fold — finds the same
+    The fold run holds that fold's per-fold tags and metrics (never MLflow params — a fold run is
+    reused across every re-materialisation of its partition, and params are write-once, so
+    nothing that can legitimately change between materialisations may be logged as one; see
+    ``trained_cv_model`` in ``defs/cv_assets.py``). It is created **nested** under the
+    experiment's parent run, so the MLflow UI groups folds beneath ``cv_summary``. Resolved by
+    ``(cv_role, fold_id)`` so any process — and any Dagster retry of the fold — finds the same
     run.
 
     Args:

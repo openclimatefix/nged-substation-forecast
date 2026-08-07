@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 
 import patito as pt
+import polars as pl
 import pytest
+from contracts.common import MAX_PLAUSIBLE_DATETIME, MIN_PLAUSIBLE_DATETIME
 from contracts.power_schemas import PowerTimeSeries
 
 
@@ -83,3 +85,208 @@ def test_power_time_series_invalid_data(data, expected_error):
     # We expect validation to fail
     with pytest.raises(Exception, match=expected_error):
         df.cast().validate()
+
+
+def _one_row(time: datetime) -> pt.DataFrame[PowerTimeSeries]:
+    """A single PowerTimeSeries row at the given time, valid in every respect except `time`.
+
+    Every `time` passed in below is on :00 or :30, so the only rule an out-of-range case can break
+    is the range rule — the assertion cannot be satisfied by the alignment check firing instead.
+    """
+    return pt.DataFrame({"time_series_id": [123], "time": [time], "power": [10.0]}).set_model(
+        PowerTimeSeries
+    )
+
+
+@pytest.mark.parametrize(
+    "time, expected_error",
+    [
+        # Pre-modern: `Europe/London` ran on local mean time (UTC-0:01:15) until 1847, so a
+        # timestamp like this makes every local-time feature nonsensical.
+        (
+            datetime(1840, 6, 1, 0, 30, tzinfo=timezone.utc),
+            "before MIN_PLAUSIBLE_DATETIME",
+        ),
+        # The last half-hour before the lower bound: the bound itself is inclusive, this is not.
+        (
+            datetime(1999, 12, 31, 23, 30, tzinfo=timezone.utc),
+            "before MIN_PLAUSIBLE_DATETIME",
+        ),
+        # Far future — how a Unix-epoch value in milliseconds read as seconds shows up.
+        (
+            datetime(3000, 6, 1, 0, 30, tzinfo=timezone.utc),
+            "after MAX_PLAUSIBLE_DATETIME",
+        ),
+        (
+            datetime(2100, 1, 1, 0, 30, tzinfo=timezone.utc),
+            "after MAX_PLAUSIBLE_DATETIME",
+        ),
+    ],
+)
+def test_power_time_series_rejects_out_of_range_time(time: datetime, expected_error: str) -> None:
+    """An out-of-range timestamp must be rejected, naming the column and the bound it broke."""
+    with pytest.raises(ValueError, match=expected_error) as exc_info:
+        _one_row(time).cast().validate()
+
+    assert "`time` is outside the plausible datetime range" in str(exc_info.value)
+
+
+@pytest.mark.parametrize(
+    "time",
+    [
+        MIN_PLAUSIBLE_DATETIME,  # The bounds are inclusive at both ends.
+        MAX_PLAUSIBLE_DATETIME,
+        datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),  # An ordinary reading.
+    ],
+)
+def test_power_time_series_accepts_in_range_time(time: datetime) -> None:
+    _one_row(time).cast().validate()
+
+
+def test_power_time_series_bounds_span_all_plausible_nged_data() -> None:
+    """The bounds must be wide enough never to reject real NGED telemetry.
+
+    NGED's trial-area feed starts in the 2020s and this project runs for a handful of years, so
+    the range has to comfortably contain that. It must also start well after 1847, when
+    ``Europe/London`` stopped running on local mean time at UTC-0:01:15.
+    """
+    assert MIN_PLAUSIBLE_DATETIME < datetime(2015, 1, 1, tzinfo=timezone.utc)
+    assert MIN_PLAUSIBLE_DATETIME > datetime(1900, 1, 1, tzinfo=timezone.utc)
+    assert MAX_PLAUSIBLE_DATETIME > datetime(2050, 1, 1, tzinfo=timezone.utc)
+
+
+def test_power_time_series_empty_frame_passes_bounds_check() -> None:
+    """An empty frame has no timestamps to reject, so the range check must not raise on it."""
+    PowerTimeSeries.DataFrame(schema=PowerTimeSeries.dtypes).validate()
+
+
+def test_drop_implausible_rows_keeps_well_formed_rows() -> None:
+    """Rows with a plausible, aligned `time` all survive, and none are counted as dropped."""
+    df = (
+        pt.DataFrame(
+            {
+                "time_series_id": [123, 123],
+                "time": [
+                    datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc),
+                    datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),
+                ],
+                "power": [10.0, 20.0],
+            }
+        )
+        .set_model(PowerTimeSeries)
+        .cast()
+    )
+
+    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
+
+    assert n_dropped == 0
+    assert survivors.height == 2
+    PowerTimeSeries.validate(survivors)
+
+
+def test_drop_implausible_rows_drops_out_of_range_time() -> None:
+    """A `time` outside the plausible datetime range is dropped, not raised on."""
+    df = (
+        pt.DataFrame(
+            {
+                "time_series_id": [123, 123],
+                "time": [
+                    datetime(1840, 6, 1, 0, 30, tzinfo=timezone.utc),  # out of range
+                    datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),  # fine
+                ],
+                "power": [10.0, 20.0],
+            }
+        )
+        .set_model(PowerTimeSeries)
+        .cast()
+    )
+
+    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
+
+    assert n_dropped == 1
+    assert survivors["time"].to_list() == [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)]
+    PowerTimeSeries.validate(survivors)
+
+
+def test_drop_implausible_rows_drops_misaligned_time() -> None:
+    """A `time` not on :00 or :30 is dropped, not raised on."""
+    df = (
+        pt.DataFrame(
+            {
+                "time_series_id": [123, 123],
+                "time": [
+                    datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc),  # misaligned
+                    datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),  # fine
+                ],
+                "power": [10.0, 20.0],
+            }
+        )
+        .set_model(PowerTimeSeries)
+        .cast()
+    )
+
+    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
+
+    assert n_dropped == 1
+    assert survivors["time"].to_list() == [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)]
+    PowerTimeSeries.validate(survivors)
+
+
+def test_drop_implausible_rows_drops_both_kinds_in_one_pass() -> None:
+    """Out-of-range and misaligned rows are both dropped in a single call, summed into n_dropped."""
+    df = (
+        pt.DataFrame(
+            {
+                "time_series_id": [123, 123, 123],
+                "time": [
+                    datetime(1840, 6, 1, 0, 30, tzinfo=timezone.utc),  # out of range
+                    datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc),  # misaligned
+                    datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),  # fine
+                ],
+                "power": [10.0, 20.0, 30.0],
+            }
+        )
+        .set_model(PowerTimeSeries)
+        .cast()
+    )
+
+    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
+
+    assert n_dropped == 2
+    assert survivors["time"].to_list() == [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)]
+
+
+def test_drop_implausible_rows_empty_frame() -> None:
+    """An empty frame has nothing to drop."""
+    df = PowerTimeSeries.DataFrame(schema=PowerTimeSeries.dtypes)
+
+    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
+
+    assert n_dropped == 0
+    assert survivors.is_empty()
+
+
+def test_drop_implausible_rows_drops_and_counts_null_time() -> None:
+    """A null `time` must be dropped and counted, not silently vanish from the row accounting.
+
+    Regression test: `dt.minute().is_in(...)` is null for a null `time`, and `.filter()` treats
+    both a null predicate and its negation as False — without an explicit `fill_null`, a null
+    `time` row was excluded from both the "aligned" and "misaligned" partitions and disappeared
+    without being counted in `n_dropped`.
+    """
+    df = pl.DataFrame(
+        {
+            "time_series_id": [123, 123],
+            "time": pl.Series(
+                [None, datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+                dtype=PowerTimeSeries.dtypes["time"],
+            ),
+            "power": [10.0, 20.0],
+        }
+    )
+
+    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
+
+    assert survivors.height + n_dropped == df.height
+    assert n_dropped == 1
+    assert survivors["time"].to_list() == [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)]

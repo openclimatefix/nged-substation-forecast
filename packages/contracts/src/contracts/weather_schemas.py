@@ -12,7 +12,7 @@ from contracts._uri import ObjectStoreOptions
 from contracts.settings import get_settings
 from contracts.typing_utils import typeddict_to_dict
 
-from .common import UTC_DATETIME_DTYPE
+from .common import UTC_DATETIME_DTYPE, check_datetime_bounds
 
 WeatherFeature = Literal[
     "temperature_2m",
@@ -292,8 +292,9 @@ class Nwp(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame[Self]:  # ty:ignore[invalid-method-override]
-        """Validate the frame: rejecting whole-slice nulls in de-accumulated variables (scattered
-        nulls are tolerated), enforcing uniqueness, and the ptype-introduction invariant."""
+        """Validate the frame: bounding `init_time`/`valid_time` to the plausible datetime range,
+        rejecting whole-slice nulls in de-accumulated variables (scattered nulls are tolerated),
+        enforcing uniqueness, and the ptype-introduction invariant."""
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -302,6 +303,8 @@ class Nwp(pt.Model):
             drop_superfluous_columns=drop_superfluous_columns,
         )
 
+        # Patito ignores `ge`/`le` on datetime fields, so the range check lives here.
+        check_datetime_bounds(validated_df, "init_time", "valid_time")
         cls._check_no_whole_null_deaccumulated_slices(validated_df)
         cls._check_unique(validated_df)
         cls._check_variables_that_were_introduced_after_start_of_dataset(validated_df)

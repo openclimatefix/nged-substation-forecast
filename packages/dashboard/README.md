@@ -35,6 +35,6 @@ To enable S3 mode, copy the committed example and fill in the real values:
 cp packages/dashboard/.env.s3.example packages/dashboard/.env.s3
 ```
 
-Only the data tables follow the toggle. Local artifact paths (model cache, production model) are
-never overridden by `.env.s3`, so they stay laptop-local in both modes. If `.env.s3` is missing,
-the `s3` selection falls back to local paths and the UI flags it.
+Only the data tables follow the toggle. The local artifact path (the production model) is never
+overridden by `.env.s3`, so it stays laptop-local in both modes. If `.env.s3` is missing, the
+`s3` selection falls back to local paths and the UI flags it.

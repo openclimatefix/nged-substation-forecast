@@ -25,7 +25,7 @@ TimeFeature = Literal[
     "local_day_of_week_sin",
     "local_day_of_week_cos",
     "local_day_of_week",
-    "local_utc_offset",
+    "local_utc_offset_minutes",
 ]
 
 SafeInputBaseColumn = Literal[
@@ -97,7 +97,15 @@ class AllFeatures(pt.Model):
 
     # Temporal features. `local` means "in the local timezone", e.g. "Europe/London". We use `local`
     # as the main input feature, because it's the local time that mostly drives demand.
-    local_utc_offset: int | None = pt.Field(dtype=pl.Int8, allow_missing=True)
+    local_utc_offset_minutes: int | None = pt.Field(
+        dtype=pl.Int16,
+        allow_missing=True,
+        description=(
+            "Offset of the local time zone from UTC, in minutes (0 or 60 for GB). Minutes keep "
+            "sub-hour zones distinct: India's +5:30 is 330 and Nepal's +5:45 is 345. Int16 spans "
+            "the real extremes, -720 (Etc/GMT+12) to +840 (Pacific/Kiritimati)."
+        ),
+    )
     local_time_of_day_sin: float | None = _FEATURE_DTYPE
     local_time_of_day_cos: float | None = _FEATURE_DTYPE
     local_time_of_year_sin: float | None = _FEATURE_DTYPE
