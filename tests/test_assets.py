@@ -8,6 +8,7 @@ the wiring, branching, and metadata each asset owns — stubbing the S3/network 
 ~30-second GB-boundary buffer so the tests stay fast and offline.
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -163,6 +164,48 @@ def test_power_time_series_and_metadata_ingests_and_writes(
     materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
     metadata_keys = set().union(*(mat.metadata.keys() for mat in materialisations))
     assert {"nged_s3_paths", "PowerTimeSeries"} <= metadata_keys
+
+
+def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A row with a malformed `time` is dropped and counted, not allowed to abort ingestion of
+    every other well-formed row in the batch."""
+    fixture = json.loads((_NGED_JSON_DIR / "TimeSeries_10.json").read_text())
+    fixture["data"] = [
+        {
+            "value": 1.0,
+            "startTime": "2026-03-05 12:00:00+0000",
+            "endTime": "2026-03-05 12:30:00+0000",
+        },
+        # Malformed: outside the plausible datetime range.
+        {
+            "value": 2.0,
+            "startTime": "1840-06-01 00:00:00+0000",
+            "endTime": "1840-06-01 00:30:00+0000",
+        },
+    ]
+    files = {
+        "timeseries/1774512000000_1774533600000/TimeSeries_10_20260326T080000Z_20260326T140000Z.json": (
+            json.dumps(fixture).encode()
+        ),
+    }
+    monkeypatch.setattr(assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(files))
+
+    # Context-manager form disposes the ephemeral instance's TemporaryDirectory-backed artifact
+    # storage on exit, rather than leaving it to the garbage collector — see the CI-flakiness
+    # gotcha in CLAUDE.md for why an undisposed instance matters here.
+    with DagsterInstance.ephemeral() as instance:
+        result = materialize([power_time_series_and_metadata], instance=instance)
+        assert result.success
+
+        power = pl.read_delta(str(env / "NGED" / "power_time_series.delta"))
+        assert power.height == 1
+        assert power["time"][0] == datetime(2026, 3, 5, 12, 30, tzinfo=timezone.utc)
+
+        materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
+        metadata = {k: v for mat in materialisations for k, v in mat.metadata.items()}
+        assert metadata["n_implausible_power_rows_dropped"].value == 1
 
 
 def test_power_time_series_and_metadata_handles_no_new_data(

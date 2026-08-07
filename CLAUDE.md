@@ -342,6 +342,22 @@ result = pl.DataFrame._from_pydf(patito_df._df).cast({"foo": pl.Categorical})
 Patito use and is correct. Expression/Series casts like `pl.col("foo").cast(pl.Int8)` are always
 plain Polars and unaffected.)
 
+### Patito Gotcha: `ge`/`le` are silently ignored on a datetime field
+
+`pt.Field(ge=..., le=...)` enforces nothing on a `datetime` column. Patito builds its bounds checks
+by reading the `minimum`/`maximum` keywords out of the Pydantic JSON schema, and JSON Schema
+defines those keywords for numbers only — so a datetime field's `Ge`/`Le` metadata never reaches
+the JSON schema, Patito finds no keyword to turn into a filter, and `validate()` accepts every
+year. There is no warning and no error; the constraint simply does not exist. (`ge`/`le` on a
+numeric field works exactly as documented, which is what makes this so easy to miss.)
+
+**How to apply:** bound a datetime column from the model's `validate` override, not from the field.
+`contracts.common.check_datetime_bounds` is the shared helper, and `MIN_PLAUSIBLE_DATETIME` /
+`MAX_PLAUSIBLE_DATETIME` are the shared bounds; `PowerTimeSeries.validate` and `Nwp.validate` are
+the worked examples. A `constraints=` Polars expression on the field also works, but its failure
+message is the generic "1 row does not match custom constraints", so prefer the explicit check when
+you want the error to say which bound was broken.
+
 ### Delta Lake dictionary-encoded columns: declare Delta filter/partition columns as `String`
 
 delta-rs stores all Arrow dictionary-encoded columns (`Categorical`, `Enum`) as plain `String` in
@@ -416,6 +432,39 @@ rows, and an `object_exists` precondition sees a leftover parquet. Keep the *ser
 for speed, but give each test a **function-scoped** fixture that `POST`s to `/moto-api/reset` and
 recreates the bucket before the test body runs, so every test starts pristine and independent of
 execution order. `tests/test_s3_data_paths.py` is the canonical pattern.
+
+### Testing Gotcha: an undisposed `DagsterInstance.ephemeral()` risks flaky CI on Python 3.14.x
+
+`DagsterInstance.ephemeral()` (with no `tempdir` argument, the form used everywhere in this repo)
+backs its artifact storage with `dagster._core.storage.root.TemporaryLocalArtifactStorage`, which
+lazily creates a `tempfile.TemporaryDirectory()` on first access and defers cleanup to an explicit
+`instance.dispose()` call. Nothing in this repo's test suite calls `dispose()`, so every ephemeral
+instance's temp directory is cleaned up implicitly by the garbage collector instead — via a
+`weakref.finalize` callback that runs at an unpredictable point during a later test's setup, not
+inside the test that created the instance.
+
+On the CI runner's CPython 3.14.7, that GC-triggered path occasionally hits an upstream
+pathlib/weakref timing bug: the finalizer's own `ResourceWarning: Implicitly cleaning up
+<TemporaryDirectory ...>` becomes "unraisable" (sometimes chained through an `AttributeError` in
+`pathlib.PosixPath.__str__`, itself missing an internal `_str`/`_drv` attribute — a symptom of
+another object's finalizer partially tearing down state in the same GC pass). Pytest's
+`unraisableexception` plugin turns that into a hard failure, attributed to whichever unrelated
+test's *setup* happened to be running when the collector fired —
+`test_h3_grid_weights_materialises_and_writes_parquet` failing this way in CI (while passing
+locally on other 3.14.x patches, and in isolation) is the concrete case that surfaced this. The
+failure is timing-sensitive, not deterministic per test: it depends on how many ephemeral
+instances (and other GC-eligible objects) have accumulated by that point in the run, so adding an
+unrelated `DagsterInstance.ephemeral()` call anywhere in the suite can tip a previously-clean run
+into failing.
+
+**How to apply:** use `DagsterInstance.ephemeral()` as a context manager (`with
+DagsterInstance.ephemeral() as instance:`) rather than passing the bare expression inline —
+`DagsterInstance.__exit__` calls `dispose()`, which cleans up the temp directory explicitly and
+deterministically instead of leaving it to the collector. `tests/test_assets.py`'s
+`test_power_time_series_and_metadata_drops_and_reports_malformed_rows` is the worked example. The
+~30 pre-existing call sites across the test suite that still pass `instance=DagsterInstance.
+ephemeral()` inline have not been swept to this pattern; each remains a latent contributor to this
+flake until it is.
 
 ### Altair Gotcha: `ty` loses the chart type after a `mark_*()` call
 
