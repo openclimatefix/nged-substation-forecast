@@ -24,9 +24,9 @@ answers two questions the asset's own success status cannot: did this 6-hourly s
 valid forecast rows on disk, and how many daily NWP runs were missing when the forecast was made?
 Both are read back from disk after the write, so a run that "succeeded" while writing nothing —
 or writing null/non-finite forecasts, hindcast rows, or a short population — still shows up.
-Missed NWP runs are *counted as runs*, never measured in hours of age: healthy NWP is 12–30 hours
-old depending on the slot, so any absolute age threshold would fire on two slots in four every
-day. See
+Missed NWP runs are *counted as runs*, never measured in hours of age — healthy NWP is 12–30 hours
+old depending on the slot, so any absolute age threshold would fire on two slots in four every day.
+The full argument is in
 [Inherent Stability → Three audiences, three channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
 
 Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and ``live_forecasts_are_healthy``
@@ -461,10 +461,8 @@ def count_missed_nwp_runs(
     """Count the daily NWP runs missing between the freshest run on disk and the freshest expected.
 
     Pure and deterministic — no Dagster, Delta or clock access. Counting *runs* rather than hours
-    of age is the whole point: we ingest one run a day and forecast four times a day, so healthy
-    NWP is anywhere between 12 and 30 hours old, and any absolute age threshold tight enough to
-    catch an outage fires on two slots in four every day. This count is zero in every healthy
-    slot, whichever slot it is.
+    of age (module docstring) is what makes this count zero in every healthy slot, whichever slot
+    it is.
 
     Args:
         available_init_times: The ``init_time``s genuinely present in the NWP Delta table. Runs

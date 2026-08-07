@@ -81,8 +81,10 @@ upstream step structure changing under us — is caught the same way.
 The **cell count and the total row count cannot fire through today's converter**, and are there as
 defence-in-depth rather than as live detections. That converter left-joins the NWP values onto the
 H3 grid and then groups by `h3_index`, so its output always carries exactly the cells the grid
-weights name, and always as a dense cross-product. They would start to matter if that converter
-were ever replaced by one that can emit a ragged frame.
+weights name, and always as a dense cross-product. The row count is what would catch a *ragged*
+run — every member, step and cell present, but some (member, step, cell) combinations absent —
+which the three marginal counts all miss. Both would start to matter if that converter were ever
+replaced by one that can emit such a frame.
 
 A dropped *grid point* is not covered by this check at all, and is worth knowing about: because the
 left join misses and the weighted `sum` over an all-null group returns `0.0`, a dropped point lands
@@ -100,10 +102,6 @@ inside physical bounds, so `Nwp.validate` accepts it and neither non-fatal check
   `h3_grid_weights` parquet it has already loaded, so the expectation tracks whatever grid we are
   actually running on. (For the V1 trial area that is 1671 cells, which is why a complete V1
   partition is ~7.24M rows — see [Performance and Scale](performance.md).)
-
-The report also compares the total row count against the full grid, which is what would catch a
-*ragged* run that the three marginal counts miss — every member, step and cell present, but some
-(member, step, cell) combinations absent. As noted above, today's converter cannot produce one.
 
 ### Why it warns instead of failing the run
 

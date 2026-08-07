@@ -152,24 +152,6 @@ def _render_value(value: object) -> str:
     return "<absent>" if value is _ABSENT else repr(value)
 
 
-def _describe_value_change(stored: object, requested: object) -> str:
-    """Describe how one config field's value differs.
-
-    A list of strings that differs only in order gets its own phrasing rather than two near-identical
-    dumps: that is what a ``set``-valued field looks like when the stored tag was written by a
-    registration that did not yet serialise it canonically, and printing both orderings in full
-    would read as a change to the values themselves.
-    """
-    if (
-        isinstance(stored, list)
-        and isinstance(requested, list)
-        and all(isinstance(item, str) for item in (*stored, *requested))
-        and sorted(stored) == sorted(requested)
-    ):
-        return f"the same {len(stored)} values, in a different order"
-    return f"{_render_value(stored)} -> {_render_value(requested)}"
-
-
 def _config_differences(stored_json: str, requested_json: str) -> list[str]:
     """Return one line per differing config field, or nothing if the two configs agree.
 
@@ -179,8 +161,8 @@ def _config_differences(stored_json: str, requested_json: str) -> list[str]:
     stored: dict[str, Any] = json.loads(stored_json)
     requested: dict[str, Any] = json.loads(requested_json)
     return [
-        f"  config.{field}: "
-        f"{_describe_value_change(stored.get(field, _ABSENT), requested.get(field, _ABSENT))}"
+        f"  config.{field}: {_render_value(stored.get(field, _ABSENT))}"
+        f" -> {_render_value(requested.get(field, _ABSENT))}"
         for field in sorted(stored.keys() | requested.keys())
         if stored.get(field, _ABSENT) != requested.get(field, _ABSENT)
     ]
