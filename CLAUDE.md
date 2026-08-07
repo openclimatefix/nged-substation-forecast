@@ -53,6 +53,18 @@ docstrings), link to that rendered site (e.g.
 `https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#anchor`),
 never to a `github.com/.../blob/main/docs/...` path.
 
+**Chart images — optimise an SVG before committing it.** A Vega/Altair chart exported straight to
+SVG carries one path point per reading, at more decimal places than the viewport can express, so
+the file is far larger than it needs to be. Run the export through
+
+```bash
+npx svgo@4 --multipass --precision=1
+```
+
+which took `docs/example_power_forecast.svg` from 571 KB to 296 KB with no visible change (verified
+by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised exports tend to trip
+`check-added-large-files`' 500 KB limit, which is the signal that this step was skipped.
+
 **Prose style — write full sentences, don't drop the subject.** Don't clip words for terseness
 if it leaves a sentence without a clear subject/verb. Prefer "We split storage across two
 buckets so that..." over "Two buckets, not one — split so that...". The full form is more
