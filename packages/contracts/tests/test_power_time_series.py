@@ -160,133 +160,64 @@ def test_power_time_series_empty_frame_passes_bounds_check() -> None:
     PowerTimeSeries.DataFrame(schema=PowerTimeSeries.dtypes).validate()
 
 
-def test_drop_implausible_rows_keeps_well_formed_rows() -> None:
-    """Rows with a plausible, aligned `time` all survive, and none are counted as dropped."""
-    df = (
-        pt.DataFrame(
-            {
-                "time_series_id": [123, 123],
-                "time": [
-                    datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc),
-                    datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),
-                ],
-                "power": [10.0, 20.0],
-            }
-        )
-        .set_model(PowerTimeSeries)
-        .cast()
-    )
+_OK = datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)
+"""A plausible, aligned `time` — the row that must survive every case below."""
 
-    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
+_OK2 = datetime(2026, 1, 1, 1, 0, tzinfo=timezone.utc)
+"""A second survivor, distinct from `_OK` so that assertions on survivor order can fail."""
 
-    assert n_dropped == 0
-    assert survivors.height == 2
-    PowerTimeSeries.validate(survivors)
+_OUT_OF_RANGE = datetime(1840, 6, 1, 0, 30, tzinfo=timezone.utc)
+_MISALIGNED = datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc)
 
 
-def test_drop_implausible_rows_drops_out_of_range_time() -> None:
-    """A `time` outside the plausible datetime range is dropped, not raised on."""
-    df = (
-        pt.DataFrame(
-            {
-                "time_series_id": [123, 123],
-                "time": [
-                    datetime(1840, 6, 1, 0, 30, tzinfo=timezone.utc),  # out of range
-                    datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),  # fine
-                ],
-                "power": [10.0, 20.0],
-            }
-        )
-        .set_model(PowerTimeSeries)
-        .cast()
-    )
-
-    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
-
-    assert n_dropped == 1
-    assert survivors["time"].to_list() == [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)]
-    PowerTimeSeries.validate(survivors)
-
-
-def test_drop_implausible_rows_drops_misaligned_time() -> None:
-    """A `time` not on :00 or :30 is dropped, not raised on."""
-    df = (
-        pt.DataFrame(
-            {
-                "time_series_id": [123, 123],
-                "time": [
-                    datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc),  # misaligned
-                    datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),  # fine
-                ],
-                "power": [10.0, 20.0],
-            }
-        )
-        .set_model(PowerTimeSeries)
-        .cast()
-    )
-
-    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
-
-    assert n_dropped == 1
-    assert survivors["time"].to_list() == [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)]
-    PowerTimeSeries.validate(survivors)
-
-
-def test_drop_implausible_rows_drops_both_kinds_in_one_pass() -> None:
-    """Out-of-range and misaligned rows are both dropped in a single call, summed into n_dropped."""
-    df = (
-        pt.DataFrame(
-            {
-                "time_series_id": [123, 123, 123],
-                "time": [
-                    datetime(1840, 6, 1, 0, 30, tzinfo=timezone.utc),  # out of range
-                    datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc),  # misaligned
-                    datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),  # fine
-                ],
-                "power": [10.0, 20.0, 30.0],
-            }
-        )
-        .set_model(PowerTimeSeries)
-        .cast()
-    )
-
-    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
-
-    assert n_dropped == 2
-    assert survivors["time"].to_list() == [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)]
-
-
-def test_drop_implausible_rows_empty_frame() -> None:
-    """An empty frame has nothing to drop."""
-    df = PowerTimeSeries.DataFrame(schema=PowerTimeSeries.dtypes)
-
-    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
-
-    assert n_dropped == 0
-    assert survivors.is_empty()
-
-
-def test_drop_implausible_rows_drops_and_counts_null_time() -> None:
-    """A null `time` must be dropped and counted, not silently vanish from the row accounting.
-
-    Regression test: `dt.minute().is_in(...)` is null for a null `time`, and `.filter()` treats
-    both a null predicate and its negation as False — without an explicit `fill_null`, a null
-    `time` row was excluded from both the "aligned" and "misaligned" partitions and disappeared
-    without being counted in `n_dropped`.
-    """
-    df = pl.DataFrame(
+def _frame(times: list[datetime | None]) -> pl.DataFrame:
+    """A `PowerTimeSeries`-shaped frame carrying `times`, cast but not yet validated."""
+    return pl.DataFrame(
         {
-            "time_series_id": [123, 123],
-            "time": pl.Series(
-                [None, datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
-                dtype=PowerTimeSeries.dtypes["time"],
+            "time_series_id": pl.Series(
+                [123] * len(times), dtype=PowerTimeSeries.dtypes["time_series_id"]
             ),
-            "power": [10.0, 20.0],
+            "time": pl.Series(times, dtype=PowerTimeSeries.dtypes["time"]),
+            "power": pl.Series([10.0] * len(times), dtype=PowerTimeSeries.dtypes["power"]),
         }
     )
 
+
+@pytest.mark.parametrize(
+    "times, expected_survivors",
+    [
+        pytest.param([_OK2, _OK], [_OK2, _OK], id="all_well_formed"),
+        pytest.param([_OUT_OF_RANGE, _OK], [_OK], id="out_of_range_time"),
+        pytest.param([_MISALIGNED, _OK], [_OK], id="misaligned_time"),
+        pytest.param([_OK2, _OUT_OF_RANGE, _MISALIGNED, _OK], [_OK2, _OK], id="both_kinds_in_one"),
+        # A null `time` is malformed this early (the schema declares it non-nullable) and must be
+        # dropped *and counted*, never silently vanish from the row accounting: `dt.minute()` is
+        # null for a null `time`, and `.filter()` drops a row on a null predicate.
+        pytest.param([None, _OK], [_OK], id="null_time"),
+        pytest.param([], [], id="empty_frame"),
+    ],
+)
+def test_drop_implausible_rows(
+    times: list[datetime | None], expected_survivors: list[datetime]
+) -> None:
+    """Malformed `time`s are dropped and counted; well-formed rows survive, in order.
+
+    `n_dropped` is asserted against the case's own arithmetic on every case, so a row cannot go
+    missing without being reported. (Asserting `survivors.height + n_dropped == df.height` instead
+    would be a tautology: that difference is how `n_dropped` is computed.)
+    """
+    df = _frame(times)
+
     survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
 
-    assert survivors.height + n_dropped == df.height
-    assert n_dropped == 1
-    assert survivors["time"].to_list() == [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)]
+    assert survivors["time"].to_list() == expected_survivors
+    assert n_dropped == len(times) - len(expected_survivors)
+
+
+def test_drop_implausible_rows_leaves_a_validatable_frame() -> None:
+    """The survivors are exactly what `validate` — still strict — then accepts."""
+    survivors, _ = PowerTimeSeries.drop_implausible_rows(
+        _frame([_OUT_OF_RANGE, _MISALIGNED, None, _OK])
+    )
+
+    PowerTimeSeries.validate(survivors)

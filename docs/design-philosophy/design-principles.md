@@ -15,6 +15,11 @@ be useful. Writing them all down is what makes them explicit and checkable: a de
 then be tested against the *whole* list, rather than against whichever two or three principles
 happen to be at the front of the reviewer's mind that day.
 
+That pays off twice over now that much of this repo is written with an AI coding agent, because an
+agent can check every new addition against the whole list on every change — precisely the job a
+human reviewer's attention is too scarce to do reliably. Principles that live only in an
+experienced engineer's head cannot be applied that way; written-down ones can.
+
 Two things are worth saying up front. These are **bets, not truths**: each one is scored by the
 [engineering hypotheses](engineering-hypotheses.md), and a principle that fails its test will be
 reported as a negative result, not rewritten out of the record. And the defence against merely

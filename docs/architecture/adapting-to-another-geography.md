@@ -1,9 +1,8 @@
 # Could this codebase forecast another country?
 
 > **Status: Thought experiment — not planned work.** This page records an assessment made on
-> 2026-08-05 (against `main` at `737fb86`) while OCF was preparing a pitch for an innovation
-> project in India, **updated on 2026-08-07** once we identified the programme as **ENTICE 3.0** and
-> learned more about the brief — see [The brief](#the-brief).
+> 2026-08-05 and revised on 2026-08-07 (against `main` at `737fb86`), while OCF was preparing a
+> pitch for **ENTICE 3.0**, an innovation programme in India — see [The brief](#the-brief).
 > There is no GitHub issue for any of it, no roadmap entry, and **no intention to
 > refactor this codebase for portability**. We would not start any of this work unless we won that
 > bid. Nothing here is a commitment, and no current design decision should be taken "so that India
@@ -1244,7 +1243,7 @@ All of it sits in a thin layer, and most of it sits in `contracts`.
 | `"Europe/London"` as a bare string literal in the feature engineer | `ml_core/features/tabular_feature_engineer.py`, in `_apply_local_time_features` | Drives every local-time feature in the champion feature set. |
 | `DISPLAY_TIME_ZONE = "Europe/London"`, asserted in the dashboard's axis titles | `dashboard/forecast_chart.py:40` | Display only, but it is a second hard-coded timezone. |
 | H3 resolution 5 (~253 km² per cell) chosen for GB, and reached for via a **private** import from the ingest package | `defs/assets.py:40,141` | The NWP grid resolution currently lives inside `nged_data`; see the `PowerIngest` note [below](#how-we-would-structure-it). |
-| `nged_s3_bucket_url` / `_access_key` / `_secret` are **required** settings with no defaults | `contracts/settings.py` | `Settings()` raises for any deployment with no NGED bucket. |
+| `nged_s3_bucket_url` / `_access_key` / `_secret` are named for one specific data provider | `contracts/settings.py` | Cosmetic: they default to empty and only the ingest asset reads them, so a deployment with no NGED bucket runs fine — but a second provider needs its own settings, not these renamed. |
 
 The UTC-offset feature is **not** one of these British assumptions.
 `local_utc_offset_minutes` holds the local offset from UTC in minutes, in an `Int16`, so every

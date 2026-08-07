@@ -99,18 +99,71 @@ class Settings(BaseSettings):
         description="Configurable thresholds for data quality checks.",
     )
 
+    # Credentials for NGED's *source* bucket, which lives in NGED's AWS account. Empty by default,
+    # not required: `get_nged_s3_store` is their only consumer, and its only caller is the
+    # `power_time_series_and_metadata` ingest asset. Making them required would mean every Delta
+    # read, training run and dashboard could not build a `Settings` without third-party credentials
+    # it never uses — and since `.env` is gitignored, a fresh clone could not run the test suite at
+    # all, which is exactly what "the whole system must be exercisable on one laptop" forbids:
+    # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#6-the-whole-system-must-be-exercisable-on-one-laptop
+    #
+    # Absence is therefore caught at the point of *use* (`get_nged_s3_store`), which also confines
+    # a mis-wired secret to the one schedule that needs it: inference reads our own Delta tables and
+    # a baked-in model, so failing it over an ingest credential would stop the forecast.
     nged_s3_bucket_url: str = Field(
-        ..., description="NGED S3 bucket URL. Typically stored in the .env file."
+        default="",
+        description=(
+            "NGED source S3 bucket URL. Typically stored in the .env file. Empty unless you need"
+            " to ingest from NGED's bucket; `get_nged_s3_store` raises if it is."
+        ),
     )
     nged_s3_bucket_access_key: str = Field(
-        ..., description="Access key for the NGED S3 bucket. Typically stored in the .env file."
+        default="",
+        description="Access key for the NGED source S3 bucket. Typically stored in the .env file.",
     )
     nged_s3_bucket_secret: str = Field(
-        ..., description="Secret key for the NGED S3 bucket. Typically stored in the .env file."
+        default="",
+        description="Secret key for the NGED source S3 bucket. Typically stored in the .env file.",
     )
 
+    def require_nged_source_credentials(self) -> None:
+        """Raise ``ValueError`` unless all three NGED source-bucket credentials are set.
+
+        Call this immediately before doing something that reads NGED's bucket, so the failure names
+        the missing configuration instead of surfacing as an opaque auth error from ``obstore``.
+
+        Do *not* call it from process start-up or module import to fail a deployment fast: inference
+        needs none of these credentials, so that would stop the forecast over a missing ingest
+        secret. See the [AWS runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-8-store-secrets-in-parameter-store).
+
+        Raises:
+            ValueError: Naming exactly which of the three environment variables are unset.
+        """
+        missing = [
+            name
+            for name, value in (
+                ("NGED_S3_BUCKET_URL", self.nged_s3_bucket_url),
+                ("NGED_S3_BUCKET_ACCESS_KEY", self.nged_s3_bucket_access_key),
+                ("NGED_S3_BUCKET_SECRET", self.nged_s3_bucket_secret),
+            )
+            if not value
+        ]
+        if missing:
+            raise ValueError(
+                f"NGED source-bucket credentials are not set: {', '.join(missing)}. Reading"
+                " NGED's telemetry needs all three. Set them in `.env` (locally) or inject them"
+                " from Parameter Store (on AWS). Everything that does not read NGED's own bucket"
+                " — training, cross-validation, the dashboards, every Delta read — works without"
+                " them."
+            )
+
     def get_nged_s3_store(self) -> obstore.store.S3Store:
-        """Returns an initialized obstore.store.S3Store instance for the NGED bucket."""
+        """Returns an initialized obstore.store.S3Store instance for the NGED bucket.
+
+        Raises:
+            ValueError: If any of the three source-bucket credentials is unset.
+        """
+        self.require_nged_source_credentials()
         return obstore.store.S3Store.from_url(
             url=self.nged_s3_bucket_url,
             config={
@@ -349,8 +402,14 @@ class Settings(BaseSettings):
     @field_validator("nged_s3_bucket_url")
     @classmethod
     def validate_url(cls, v: str) -> str:
-        """Validate that the S3 bucket URL is a valid URL."""
-        url_adapter.validate_python(v)
+        """Validate that the S3 bucket URL is a valid URL, if one was given at all.
+
+        Empty means "no NGED ingest configured", which is the default and not an error;
+        ``require_nged_source_credentials`` is what rejects it where it matters. A *non-empty*
+        value still has to be a real URL — strict about malformed, liberal about missing.
+        """
+        if v:
+            url_adapter.validate_python(v)
         return v
 
 
@@ -358,12 +417,10 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return the shared, lazily-constructed ``Settings`` singleton.
 
-    Prefer this over constructing ``Settings()`` at module import time. ``Settings`` has required
-    fields (the ``nged_s3_bucket_*`` credentials) with no defaults, so instantiation reads ``.env``
-    and raises ``ValidationError`` when those are absent. Deferring construction to first *use*
-    keeps library modules (e.g. the ``contracts`` schemas) importable without live credentials —
-    so type-checkers, doc builders, and tests that only touch in-memory frames don't need a
-    populated ``.env`` — while still failing fast the moment settings are actually needed.
+    Prefer this over constructing ``Settings()`` at module import time: instantiation reads
+    ``.env`` and the environment, so deferring it to first *use* keeps library modules (e.g. the
+    ``contracts`` schemas) importable whatever the environment holds, and lets a test change the
+    environment before the first read.
 
     Cached with ``lru_cache`` so every caller shares one instance (matching the previous
     module-level singletons). Call ``get_settings.cache_clear()`` in a test that needs to

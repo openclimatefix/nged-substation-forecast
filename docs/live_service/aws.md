@@ -315,10 +315,20 @@ No static AWS keys anywhere in either role — the same IAM-role auto-discovery
 
 ## Step 8 — Store secrets in Parameter Store
 
-The container can't start without `NGED_S3_BUCKET_URL`, `NGED_S3_BUCKET_ACCESS_KEY`, and
-`NGED_S3_BUCKET_SECRET` (`Settings` requires them at import — see the smoke test in
-[Step 4](#step-4-build-and-verify-the-image)), and the deployed service genuinely uses them: the
-hourly `power_time_series_and_metadata` schedule pulls fresh telemetry from NGED's bucket.
+The deployed service genuinely needs `NGED_S3_BUCKET_URL`, `NGED_S3_BUCKET_ACCESS_KEY` and
+`NGED_S3_BUCKET_SECRET`: the hourly `power_time_series_and_metadata` schedule pulls fresh
+telemetry from NGED's bucket. Without them that schedule fails every hour — loudly, since
+`Settings.get_nged_s3_store` raises an error naming the unset variables and the job's
+`sentry_capture_failure` hook reports it — while everything that does not read NGED's own bucket
+carries on. `Settings` deliberately does *not* require them at construction, for two reasons: a
+laptop, a test run or a training job then needs no third-party credentials
+([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)),
+and a mis-wired secret cannot take down inference. Requiring them would make the container refuse
+to start, which sounds like a useful fail-fast until you notice that `live_forecasts` reads our own
+Delta tables and a model baked into the image — it needs no NGED credential, so stopping it because
+one is missing would break [principle 1](../design-philosophy/design-principles.md#1-the-power-forecast-never-stops)
+to protect a schedule that already fails loudly on its own. Catch a mis-wired secret in the deploy
+pipeline instead, where the blast radius is the deploy rather than the forecast.
 
 They are also the one credential in this deployment that can't come from an IAM role: NGED's
 bucket lives in NGED's AWS account, so these are unavoidably static third-party keys. Don't

@@ -212,13 +212,23 @@ class BaseForecaster(ABC):
 
     @abstractmethod
     def save(self, path: Path) -> None:
-        """Save the trained model state to a directory.
+        """Save the trained model state to a directory, **replacing** anything already there.
 
-        The saved directory must contain a ``meta.json`` with a ``model_class`` field — the
-        fully-qualified ``{module}.{qualname}`` of the concrete subclass (e.g.
-        ``"xgboost_forecaster.forecaster.XGBoostForecaster"``) — so that production inference
-        (``ml_core._production_helpers.load_forecaster_from_dir``) can reconstruct the correct
-        class from a plain model directory with no other context (issue #221).
+        Two requirements on every implementation:
+
+        - The saved directory must contain a ``meta.json`` with a ``model_class`` field — the
+          fully-qualified ``{module}.{qualname}`` of the concrete subclass (e.g.
+          ``"xgboost_forecaster.forecaster.XGBoostForecaster"``) — so that production inference
+          (``ml_core._production_helpers.load_forecaster_from_dir``) can reconstruct the correct
+          class from a plain model directory with no other context (issue #221).
+        - ``path`` must be cleared first, so that saving over a directory holding a *larger*
+          model's files leaves none of them behind. Merging instead of replacing is how a dropped
+          time series' weights survive a re-train (issue #197); ``XGBoostForecaster.save`` clears
+          with ``shutil.rmtree(path, ignore_errors=True)``.
+
+        The clearing requirement makes ``path`` the model's to own while it saves, so anything a
+        caller left there is gone afterwards. (Depositing a file *after* a save is fine, and is how
+        ``_production_helpers.fetch_model_artifacts`` puts ``promotion.json`` beside the model.)
         """
         pass
 
@@ -254,18 +264,12 @@ class BaseForecaster(ABC):
     def load_from_mlflow(cls, run_id: str) -> Self:
         """Download a trained model's archive from an MLflow run, unpack it and load it.
 
-        Downloads into a temporary directory and loads from there — there is no local-disk cache.
-        An earlier version of this method cached downloads on disk keyed by run ID, but a CV fold
-        run is **reused** across re-materialisations (``get_or_create_fold_run`` resolves the
-        same run for every re-run of a fold's partition), so the same ``run_id`` can legitimately
-        hold a different model after re-training. That made the cache key non-unique for its
-        contents, which required write-side invalidation just to keep the cache honest — machinery
-        that existed purely to compensate for the cache, not to serve any consumer: production
-        inference never used this cache (issue #469). See
-        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#model-artifacts-one-replaceable-archive-no-local-cache>
-        for the full rationale. Re-adding a cache, if a future consumer needs to serve through an
-        MLflow outage, is tracked in issue #472 and should be scoped to that consumer's actual
-        invalidation needs rather than resurrecting this one.
+        Downloads into a temporary directory and loads from there. There is deliberately no
+        local-disk cache: a CV fold run is **reused** across re-materialisations
+        (``get_or_create_fold_run`` resolves the same run for every re-run of a fold's partition),
+        so a cache keyed by ``run_id`` would not be unique for its contents — and production
+        inference makes no MLflow call at all. Full rationale:
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#why-there-is-no-local-cache>.
 
         The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
         beforehand.

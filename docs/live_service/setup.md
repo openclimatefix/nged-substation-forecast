@@ -98,9 +98,9 @@ per-table overrides).
 ### The `.env` file and NGED source credentials
 
 Create a `.env` file in the repo root by copying the committed template — `cp .env.example .env` —
-and filling in the values. The three **NGED source-bucket** credentials are always required, in
-every environment — they authenticate reads of NGED's telemetry bucket, which is a *different*
-account and bucket from our own managed data tables:
+and filling in the values. The three **NGED source-bucket** credentials authenticate reads of
+NGED's telemetry bucket, which is a *different* account and bucket from our own managed data
+tables, so only telemetry ingest needs them:
 
 ```dotenv
 NGED_S3_BUCKET_URL=<nged source bucket url>
@@ -108,8 +108,15 @@ NGED_S3_BUCKET_ACCESS_KEY=<key>
 NGED_S3_BUCKET_SECRET=<secret>
 ```
 
-`.env` is git-ignored — never commit real credentials. Everything else on this page is optional and
-layers on top of these three.
+`.env` is git-ignored — never commit real credentials.
+
+Leave them unset and `Settings` still builds: the ingest asset raises an error naming the unset
+variables when it runs, while every other asset, the test suite, training and the dashboards carry
+on. That keeps a laptop, a CI runner and a training job free of third-party credentials they never
+use ([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)),
+and it confines a mis-wired secret to the one schedule that needs it —
+[Step 8 of the AWS runbook](aws.md#step-8-store-secrets-in-parameter-store) explains why a deployment
+should *not* promote that into a start-up failure.
 
 The optional `SENTRY_*` settings (`SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_MONITOR_FORECASTS`,
 `SENTRY_TRACES_SAMPLE_RATE`) enable error telemetry and the missed-check-in alarm; an empty

@@ -28,8 +28,8 @@ The essentials:
 1. Ensure [`uv`](https://docs.astral.sh/uv/) is installed following their [official documentation](https://docs.astral.sh/uv/getting-started/installation/).
 2. **Install dependencies**: `uv sync`
 3. **Install pre-commit hooks**: `uv run pre-commit install`
-4. **Create your `.env`**: `cp .env.example .env`, then fill in the three required
-   `NGED_S3_BUCKET_*` credentials (the only values you must set).
+4. **Create your `.env`**: `cp .env.example .env`. Every setting has a working default, so you can
+   leave it as-is; fill in the `NGED_S3_BUCKET_*` credentials only to ingest NGED telemetry.
 5. **Run Dagster**: `uv run dg dev`, then open `http://localhost:3000` in your browser.
 
 ### Linting & Formatting

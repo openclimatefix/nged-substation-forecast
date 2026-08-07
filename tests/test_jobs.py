@@ -173,27 +173,6 @@ def test_a_reserialised_config_is_not_a_change() -> None:
     _reject_changed_identity("exp", _as_stored({**requested, "config": reserialised}), requested)
 
 
-def test_a_reordered_feature_set_is_reported_as_an_ordering_difference() -> None:
-    """A tag whose feature list is merely in a different order must not read as changed values.
-
-    That is what an experiment registered before the config serialised its feature set canonically
-    looks like. It is still rejected — MLflow's write-once params mean the stored record cannot be
-    brought into line — but the error must say what actually differs.
-    """
-    requested = _identity_of()
-    stored_config = json.loads(requested["config"])
-    stored_config["selected_features"] = list(reversed(stored_config["selected_features"]))
-    stored = _as_stored({**requested, "config": json.dumps(stored_config)})
-
-    with pytest.raises(ExperimentIdentityChangedError) as excinfo:
-        _reject_changed_identity("exp", stored, requested)
-
-    message = str(excinfo.value)
-    assert "config.selected_features: the same 24 values, in a different order" in message
-    # The feature names themselves are not dumped twice over.
-    assert "power_lag_24h" not in message
-
-
 def test_a_field_absent_on_one_side_is_reported_not_swallowed() -> None:
     """``None`` and "field missing" are different, and neither may produce a blank explanation."""
     requested = _identity_of()

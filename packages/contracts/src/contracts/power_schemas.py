@@ -113,13 +113,13 @@ class PowerTimeSeries(pt.Model):
         Returns:
             ``(survivors, n_dropped)``. ``survivors`` keeps ``dataframe``'s row order.
         """
-        survivors, out_of_range = split_by_datetime_plausibility(dataframe, "time")
-        # fill_null(False): a null `time` must land in exactly one of {aligned, misaligned}, not
-        # silently vanish from both — `dt.minute().is_in(...)` is null for a null `time`, and
-        # `.filter()` drops a row on both a null predicate and its negation.
-        is_aligned = pl.col("time").dt.minute().is_in([0, 30]).fill_null(False)
-        survivors, misaligned = survivors.filter(is_aligned), survivors.filter(~is_aligned)
-        return DropImplausibleRowsResult(survivors, out_of_range.height + misaligned.height)
+        survivors, _ = split_by_datetime_plausibility(dataframe, "time")
+        # `dt.minute()` is null for a null `time` and `.filter()` drops a row on a null predicate,
+        # so this also drops the null `time`s the non-nullable schema forbids.
+        survivors = survivors.filter(pl.col("time").dt.minute().is_in([0, 30]))
+        # Counted as a height difference rather than by summing the rejected partitions: whatever
+        # a filter does with a null predicate, every row that left is counted exactly once.
+        return DropImplausibleRowsResult(survivors, dataframe.height - survivors.height)
 
     # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
     columns_to_sort_by: ClassVar[tuple[str, str]] = ("time_series_id", "time")

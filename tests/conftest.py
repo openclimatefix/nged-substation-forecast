@@ -33,18 +33,3 @@ def dagster_instance() -> Iterator[DagsterInstance]:
     """
     with DagsterInstance.ephemeral() as instance:
         yield instance
-
-
-@pytest.fixture(autouse=True)
-def _dummy_nged_s3_creds(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Placeholder NGED source-bucket credentials.
-
-    Every integration test here builds a ``Settings``-backed object store, which requires these
-    three variables to be present — but none of the tests actually reach the real NGED bucket
-    (they read from temp Delta tables). Setting dummy values once, for every test in this
-    directory, removes the per-fixture boilerplate. A test that needs real values (e.g. the moto
-    S3 test constructs ``Settings`` with explicit kwargs) overrides them regardless.
-    """
-    monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
-    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "dummy")
-    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "dummy")

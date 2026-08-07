@@ -12,8 +12,8 @@ identical to the AWS deployment.
 ## Step 1 — Repository and credentials
 
 Follow [Getting started on your laptop](../getting-started.md) for first-time setup (`uv`, `uv
-sync`, pre-commit hooks, and `cp .env.example .env`). At minimum, `.env` needs the three NGED
-source-bucket credentials — the only values that are always required (see
+sync`, pre-commit hooks, and `cp .env.example .env`). This rehearsal ingests real telemetry, so
+`.env` needs the three NGED source-bucket credentials (see
 [Configuration reference](setup.md#the-env-file-and-nged-source-credentials)):
 
 ```dotenv

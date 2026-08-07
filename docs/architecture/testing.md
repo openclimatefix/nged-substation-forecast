@@ -51,61 +51,53 @@ row counts wrapping past 2³² rows.
   drive the in-process `moto` server instead of mocking — `tests/test_s3_data_paths.py` is the
   canonical pattern.
 - **Take the `dagster_instance` fixture; never call `DagsterInstance.ephemeral()` in a test.** The
-  fixture lives in `tests/conftest.py`. An ephemeral instance's in-memory run storage and event-log
-  storage each hold one SQLAlchemy connection to an in-memory SQLite database open for the life of
-  the instance, and `DagsterInstance` has no finaliser — so an instance that is never `dispose()`d
-  survives to interpreter shutdown, where SQLAlchemy's connection-pool finaliser can run after
-  SQLite has closed the database and print a bare `Exception during reset or similar` traceback
-  *after* pytest's summary line, owned by no test. The fixture enters the instance as a context
-  manager, so `dispose()` runs when the test ends.
+  fixture (in `tests/conftest.py`) enters the instance as a context manager, so `dispose()` runs
+  when the test ends.
 
-  A second, independent failure mode from the same root cause: `TemporaryLocalArtifactStorage`
-  (the artifact storage an ephemeral instance builds when given no `tempdir`) also defers its
-  `tempfile.TemporaryDirectory()` cleanup to `dispose()`, so an undisposed instance's temp
-  directory is left to the garbage collector too — via a `weakref.finalize` callback that can run
-  at any later point in the process, not just at shutdown. That callback is
-  `TemporaryDirectory._cleanup`, which removes the directory and then emits `ResourceWarning:
-  Implicitly cleaning up <TemporaryDirectory ...>`; because `filterwarnings` starts with `error`
-  (see below), the warning is *raised*, and an exception raised inside a weakref callback is
-  unraisable — CPython can only hand it to `sys.unraisablehook`, and pytest's hook turns it into a
-  hard `pytest.PytestUnraisableExceptionWarning` failure *attributed to whatever unrelated test
-  happened to be running* when the collector fired. Nothing about this is rare or environmental: it
-  is what always happens when a used ephemeral instance is collected instead of disposed, and the
-  only nondeterminism is *which* test is running at the time. One extra bare
-  `DagsterInstance.ephemeral()` call added anywhere in the suite was enough to tip a
-  previously-clean run into failing 2/2 times in CI while never reproducing locally, which is what
-  surfaced this. The fixture's deterministic disposal removes the trigger for both failure modes at
-  once.
+    `DagsterInstance` has no finaliser, so an undisposed instance defers two cleanups to whenever
+    the garbage collector reaches it. Both then surface as failures owned by no test:
+
+    - Its run storage and event-log storage each hold one SQLAlchemy connection to an in-memory
+      SQLite database. At interpreter shutdown the connection-pool finaliser can run *after*
+      SQLite has closed the database, printing a bare `Exception during reset or similar`
+      traceback after pytest's summary line.
+    - `TemporaryLocalArtifactStorage` defers its `tempfile.TemporaryDirectory()` cleanup to
+      `dispose()` as well, leaving it to a `weakref.finalize` callback that can fire at any point,
+      not just at shutdown. The callback emits `ResourceWarning: Implicitly cleaning up
+      <TemporaryDirectory ...>`, which the [warnings-are-errors](#warnings-are-errors) policy
+      *raises* — and
+      an exception inside a weakref callback is unraisable, so pytest's `sys.unraisablehook` turns
+      it into a hard `PytestUnraisableExceptionWarning` attributed to *whatever unrelated test was
+      running* when the collector fired.
+
+    Neither is rare or environmental: both are what always happens when a used ephemeral instance
+    is collected rather than disposed. Only *which* test gets blamed varies.
 
 - **In a script, use the context manager directly** — `with DagsterInstance.ephemeral() as
-  instance:` — rather than a bare call. Letting the local go out of scope is *not* enough: once the
-  instance has actually run a job, Dagster's own caches retain it (a `RunDomain`, and the
-  partition-loading contexts that hold it as `dynamic_partitions_store`), so it survives to
-  interpreter shutdown with both connections open even on a completely successful run. The context
-  manager also covers the failure path, where an unhandled exception's traceback pins the raising
-  frame as well. `scripts/run_baseline_experiment.py` is the worked example. Measured with an
-  `atexit` probe counting storages whose held connection is still open at exit, after one real
-  `materialize`: 2 open with a bare call, 0 with the context manager, on both paths.
-- **`build_asset_context()` (and the other `build_*_context()` direct-invocation helpers) needs
-  the same treatment when called without an explicit `instance=`.** Its docstring says it
-  "Defaults to `DagsterInstance.ephemeral()`" — built internally and owned by an `ExitStack` that
-  only closes on `__exit__`, or otherwise on `__del__`. Called bare and passed straight into an
-  asset (`some_asset(build_asset_context(...))`), nothing ever calls `__exit__`, so disposal
-  depends on `__del__` running — and inside a `pytest.raises(...) as exc_info:` block, the
-  captured traceback keeps the asset's frame (and the context argument in it) referenced past the
-  end of that `with` block, so `__del__` doesn't fire until *something* triggers a GC pass, which
-  is exactly the non-deterministic timing this page keeps warning about. Enter it as a context
-  manager instead: `with build_asset_context(...) as context, pytest.raises(...) as exc_info:`.
-  `tests/test_assets.py::test_ecmwf_ens_retries_when_run_not_yet_available` is the worked example
-  — before the fix, probing immediately after that one test's teardown, with **no forced
-  `gc.collect()`**, found 2 open connections; after, 0, every time.
-- **`materialize()` and `JobDefinition.execute_in_process()` do *not* need this.** Called without
-  `instance=`, both build their default ephemeral instance behind their own internal `with
-  ephemeral_instance_if_missing(instance):`, entered and exited inside the call, before the
-  function returns — so disposal there is already deterministic regardless of how the caller uses
-  the return value. The distinguishing question for any Dagster helper that can default-construct
-  an instance is whether *the helper itself* opens and closes the `with` block, or hands you an
-  object that expects *you* to.
+  instance:`. Letting the local go out of scope is *not* enough: once the instance has run a job,
+  Dagster's own caches retain it (a `RunDomain`, and the partition-loading contexts holding it as
+  `dynamic_partitions_store`), so it reaches interpreter shutdown with both connections open even
+  on a completely successful run. The context manager also covers the failure path, where an
+  unhandled exception's traceback pins the raising frame. Worked example:
+  `scripts/run_baseline_experiment.py`. Measured with an `atexit` probe after one real
+  `materialize`: 2 connections still open with a bare call, 0 with the context manager, on both
+  paths.
+- **`build_asset_context()` (and the other `build_*_context()` helpers) needs the same treatment
+  when called without an explicit `instance=`.** It defaults to `DagsterInstance.ephemeral()`,
+  owned by an `ExitStack` that closes only on `__exit__` or `__del__`. Passed straight into an
+  asset (`some_asset(build_asset_context(...))`) nothing ever calls `__exit__`, and inside a
+  `pytest.raises(...) as exc_info:` block the captured traceback keeps the context referenced past
+  the end of that block, so `__del__` waits on a GC pass. Enter it as a context manager instead:
+  `with build_asset_context(...) as context, pytest.raises(...) as exc_info:`. Worked example:
+  `tests/test_assets.py::test_ecmwf_ens_retries_when_run_not_yet_available` — probing right after
+  that test's teardown with **no forced `gc.collect()`** found 2 open connections before the fix,
+  0 after, every time.
+- **`materialize()` and `JobDefinition.execute_in_process()` do *not* need this.** Both wrap their
+  default instance in their own internal `with ephemeral_instance_if_missing(instance):`, entered
+  and exited inside the call, so disposal is already deterministic however the caller uses the
+  return value. The distinguishing question for any Dagster helper that can default-construct an
+  instance is whether *the helper itself* closes the `with` block, or hands you an object that
+  expects *you* to.
 
 ## Warnings are errors
 

@@ -23,6 +23,7 @@ import polars as pl
 import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import TimeSeriesMetadata
+from contracts.settings import Settings
 from dagster import (
     AssetCheckResult,
     AssetCheckSeverity,
@@ -143,9 +144,6 @@ def test_result_threshold_hours_reflects_threshold() -> None:
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point ``Settings`` at a temp data root (mirrors ``tests/test_assets.py``)."""
-    monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
-    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "dummy")
-    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "dummy")
     monkeypatch.setenv("DATA_PATH_INTERNAL", str(tmp_path))
     monkeypatch.setenv("DATA_PATH_DELIVERY", str(tmp_path))
     monkeypatch.setenv("LOCAL_ARTIFACTS_PATH", str(tmp_path))
@@ -174,8 +172,6 @@ def _write_metadata_roster(path: str, ids: list[int]) -> None:
 
 def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """One fresh series, one stale series, one never-reported roster id → a WARN naming all late."""
-    from contracts.settings import Settings
-
     # Freeze "now" so the fresh/stale split is deterministic regardless of wall-clock.
     now = datetime.now(timezone.utc)
     fresh_time = now - timedelta(hours=1)
@@ -207,8 +203,6 @@ def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPat
 
 
 def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
-    from contracts.settings import Settings
-
     now = datetime.now(timezone.utc)
     settings = Settings()
     pl.DataFrame(
@@ -246,8 +240,6 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
     alone would not prove reuse, since the pure function is deterministic and a recompute would
     yield equal counts and pass a weaker test. The reporter self-gates on health (tested in
     ``test_sentry.py``), so the check calls it unconditionally."""
-    from contracts.settings import Settings
-
     sentinel = PowerFreshnessResult(
         n_series_total=8,
         n_stale=7,
@@ -659,8 +651,6 @@ def _run_live_check() -> AssetCheckResult:
 
 def test_live_forecasts_are_healthy_end_to_end(env: Path) -> None:
     """A slot with valid rows for the whole trained population and a complete NWP feed passes."""
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot)
@@ -678,8 +668,6 @@ def test_live_forecasts_are_healthy_end_to_end(env: Path) -> None:
 
 def test_live_forecasts_check_warns_when_the_slot_wrote_nothing(env: Path) -> None:
     """Rows exist for an *earlier* slot but not this one — the asset "succeeded" writing nothing."""
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot - timedelta(hours=6))
@@ -695,8 +683,6 @@ def test_live_forecasts_check_warns_when_the_slot_wrote_nothing(env: Path) -> No
 
 def test_live_forecasts_check_ignores_cv_fold_rows(env: Path) -> None:
     """Rows written for a CV fold at the same init time must not be mistaken for the live slot."""
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot, fold_id="mid_2025_to_mid_2026")
@@ -715,8 +701,6 @@ def test_live_forecasts_check_ignores_a_previous_experiments_rows(env: Path) -> 
     slot on disk indefinitely. Here those stale rows are all NaN: without the experiment filter
     they would be reported as this slot's fault.
     """
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(
@@ -737,8 +721,6 @@ def test_live_forecasts_check_ignores_a_previous_experiments_rows(env: Path) -> 
 
 def test_live_forecasts_check_warns_on_a_truncated_horizon(env: Path) -> None:
     """Well-formed rows that stop hours rather than days ahead are an undeliverable forecast."""
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(
@@ -757,8 +739,6 @@ def test_live_forecasts_check_warns_on_a_truncated_horizon(env: Path) -> None:
 @pytest.mark.parametrize("bad_power", [float("nan"), float("inf")])
 def test_live_forecasts_check_warns_on_non_finite_forecasts(env: Path, bad_power: float) -> None:
     """Rows exist, but every ``power_fcst`` is unusable."""
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot, power_fcst=bad_power)
@@ -778,8 +758,6 @@ def test_live_forecasts_check_warns_on_null_forecasts(env: Path) -> None:
     explicit ``is_null()`` arm is the only thing that catches the single likeliest way for the
     asset to succeed while writing garbage. Without it this slot would read as perfectly healthy.
     """
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot, power_fcst=None)
@@ -798,8 +776,6 @@ def test_a_row_that_is_both_non_finite_and_a_hindcast_is_counted_once(env: Path)
     Every row here is null *and* valid in the past, so both counts are 4 while ``n_invalid`` must
     stay 4: summing would report 8 invalid rows out of 4, breaking ``n_invalid <= n_rows``.
     """
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(
@@ -826,8 +802,6 @@ def test_live_forecasts_check_reports_on_a_model_that_writes_no_nwp_init_time(en
     such column — so the check must still judge the rows it *can* see rather than failing to
     evaluate anything.
     """
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot, with_nwp_init_time=False)
@@ -848,8 +822,6 @@ def test_live_forecasts_check_degrades_when_meta_json_names_no_experiment(env: P
     Keeping ``trained_time_series_ids`` while losing ``experiment_name`` would gate the population
     check on a count drawn from an *unfiltered* read of every live experiment's rows.
     """
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot, time_series_ids=(1,))
@@ -866,8 +838,6 @@ def test_live_forecasts_check_degrades_when_meta_json_names_no_experiment(env: P
 
 def test_live_forecasts_check_warns_on_hindcast_rows(env: Path) -> None:
     """A row valid at or before its own init time is undeliverable, whatever its value."""
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(
@@ -882,8 +852,6 @@ def test_live_forecasts_check_warns_on_hindcast_rows(env: Path) -> None:
 
 
 def test_live_forecasts_check_warns_on_a_missing_trained_series(env: Path) -> None:
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot, time_series_ids=(1,))
@@ -898,8 +866,6 @@ def test_live_forecasts_check_warns_on_a_missing_trained_series(env: Path) -> No
 
 def test_live_forecasts_check_reports_missed_nwp_runs_end_to_end(env: Path) -> None:
     """Valid rows, but the NWP feed has been down for days."""
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     stale_runs = _daily_runs(slot.replace(hour=0) - timedelta(days=5))
@@ -951,8 +917,6 @@ def test_live_forecasts_check_degrades_on_a_malformed_meta_json(env: Path) -> No
     rejects that shape and falls back to an unknown population, per CLAUDE.md's "strict about
     malformed inputs" rule.
     """
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot, time_series_ids=(1,))
@@ -971,8 +935,6 @@ def test_live_forecasts_check_degrades_on_a_malformed_meta_json(env: Path) -> No
 
 def test_live_forecasts_check_degrades_on_invalid_json(env: Path) -> None:
     """A ``meta.json`` that isn't valid JSON at all degrades the same way as one that's absent."""
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot, time_series_ids=(1,))
@@ -988,8 +950,6 @@ def test_live_forecasts_check_degrades_on_invalid_json(env: Path) -> None:
 
 def test_live_forecasts_check_does_not_raise_on_an_empty_table(env: Path) -> None:
     """An existing but row-less ``power_forecasts`` table is as harmless as no table at all."""
-    from contracts.settings import Settings
-
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot)
