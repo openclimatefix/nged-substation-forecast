@@ -169,8 +169,10 @@ imperfection — throws away otherwise-good data; ignoring the distinction the o
 genuinely broken data land silently.
 
 The `ecmwf_ens` asset is the worked example. Its `nwp_has_no_unexpected_nulls` check surfaces the
-scattered per-pixel nulls that ECMWF ENS is known to carry (a WARN), while `Nwp.validate` still
-hard-fails a wholesale structural gap. The reasoning behind exactly where that fatal/tolerated line
+scattered per-pixel nulls that ECMWF ENS is known to carry (a WARN), and its `nwp_run_is_complete`
+check surfaces a run that arrived short of its full ensemble-member, forecast-step and grid-cell
+grid (also a WARN — the rows that did arrive are kept), while `Nwp.validate` still hard-fails a
+wholesale structural gap. The reasoning behind exactly where that fatal/tolerated line
 sits is documented in
 [Known ECMWF ENS data-quality issues](ecmwf-ens-known-issues.md). The `power_data_is_fresh` check
 above is the same shape of tool pointed at a different question — staleness rather than
@@ -219,8 +221,8 @@ scoped to production's actual availability needs rather than resurrecting the ol
 ## Resolve repo-relative paths via a workspace marker, not directory depth
 
 `contracts.settings.PROJECT_ROOT` anchors every repo-relative default in `Settings` — the CV
-fold definitions (`conf/cv/default.yaml`), the NWP metadata CSV (`metadata/nwp_metadata.csv`),
-the local `data/` roots, and the `.env` location. It is resolved by walking up from the
+fold definitions (`conf/cv/default.yaml`), the local `data/` roots, and the `.env` location. It
+is resolved by walking up from the
 installed `settings.py` to the nearest ancestor directory holding `uv.lock` (the file that
 exists only at the uv workspace root), falling back to the current working directory when no
 ancestor qualifies.
