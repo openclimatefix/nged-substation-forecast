@@ -154,7 +154,7 @@ Experiment "xgboost_smoke_test"
 4. Writes to the `power_forecasts` Delta table keyed by `(experiment_name, fold_id)`: the **first**
    chunk overwrites the partition (clearing any prior run), the rest **append**, so a full
    re-materialisation replaces the fold's rows without ever holding all forecasts in memory.
-5. Logs `val_start`/`val_end` params and `n_forecast_rows`/`n_forecast_time_series`/
+5. Logs `val_start`/`val_end` tags and `n_forecast_rows`/`n_forecast_time_series`/
    `n_ensemble_members` metrics to the fold run.
 
 ---

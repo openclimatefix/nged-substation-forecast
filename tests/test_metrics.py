@@ -690,8 +690,9 @@ def test_full_stack_real_mlflow_server(tmp_path: Path, monkeypatch: pytest.Monke
     Proves §4.1.1 (cross-call tag resolution) and §4.5 (artifact upload/download).
     Each ``materialize()`` call starts with a fresh ``mlflow.set_tracking_uri`` inside
     the asset body — simulating what happens when assets run in separate Dagster processes.
-    The artifact round-trip is proved by deleting the local model cache between
-    ``trained_cv_model`` and ``cv_power_forecasts``.
+    The artifact round-trip is proved by ``cv_power_forecasts`` downloading the model
+    ``trained_cv_model`` uploaded to the real server — ``load_from_mlflow`` has no local
+    cache (issue #469), so every load is a genuine download.
     """
     # The real MLflow HTTP server needs the server runtime stack (full ``mlflow``, in the dev
     # group); a ``mlflow-skinny``-only environment cannot start it, so skip rather than fail.

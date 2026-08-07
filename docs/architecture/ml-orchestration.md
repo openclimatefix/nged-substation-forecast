@@ -14,7 +14,7 @@ reasoning stays auditable. The step-by-step *how-to* is
 | **Dagster partition key** | `"{experiment_name}__{fold_id}"` on a `DynamicPartitionsDefinition`. Encodes both dimensions; unique by construction because MLflow enforces unique experiment names. |
 | **MLflow experiment** | One per `experiment_name`; carries the resolved config as tags and holds all of the experiment's runs. |
 | **MLflow parent run** | One per experiment (`cv_summary`, tagged `cv_role=parent`). Holds the flattened config params and the mean-across-folds aggregate metrics — the row the leaderboard sorts on. |
-| **MLflow fold run** | One per fold, nested under the parent (tagged `cv_role=fold`, `fold_id=…`). Holds per-fold training params, per-fold metrics, and the trained model artifacts. |
+| **MLflow fold run** | One per fold, nested under the parent (tagged `cv_role=fold`, `fold_id=…`). Holds per-fold training tags (`train_start`, `train_end`, `n_eligible_time_series`, `n_trained_time_series` — tags, not params, because the run is reused on every re-materialisation), per-fold metrics, and the trained model artifacts. |
 
 ## Cross-process run resolution: discover by tag, never pass handles
 

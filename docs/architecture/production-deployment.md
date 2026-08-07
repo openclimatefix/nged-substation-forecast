@@ -530,7 +530,7 @@ reused from `load_from_mlflow`'s old, now-removed cache.
   and missed-check-in alarm designed above: get a DSN, test from a laptop, enable in production.
 - [Configuration reference](../live_service/setup.md) — where data tables and local
   artifacts live, and how to point `Settings` at S3.
-- [ML Orchestration Design](ml-orchestration.md) — why production inference doesn't reuse the
-  CV pipeline's MLflow-artifact cache.
+- [ML Orchestration Design](ml-orchestration.md) — why production inference has no MLflow
+  dependency at runtime at all, unlike the CV pipeline's artifact round-trip.
 - [Why Dagster, not Airflow?](why-dagster-not-airflow.md) — why Dagster was chosen at design
   time, whether a migration to Airflow would be possible today, and what a port would take.
