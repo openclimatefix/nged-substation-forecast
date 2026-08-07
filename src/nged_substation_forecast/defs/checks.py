@@ -649,6 +649,13 @@ def _read_promoted_model_facts(production_model_path: str) -> PromotedModelFacts
     try:
         meta = json.loads(meta_path.read_text())
         ids = meta.get("trained_time_series_ids")
+        if ids is not None and not isinstance(ids, list):
+            # A JSON string, int, etc. here is malformed, not merely a different shape: iterating
+            # a str with int() would silently mis-parse it (e.g. "12" -> (1, 2)) instead of
+            # degrading, which is the "strict about malformed input" rule from CLAUDE.md.
+            raise TypeError(
+                f"trained_time_series_ids must be a list, got {type(ids).__name__}: {ids!r}"
+            )
         return PromotedModelFacts(
             experiment_name=meta.get("model_params", {}).get("experiment_name"),
             trained_time_series_ids=None if ids is None else tuple(int(i) for i in ids),
@@ -716,16 +723,19 @@ def _live_forecast_check_metadata(result: LiveForecastHealthResult) -> dict[str,
         "n_nonfinite_power": rows.n_nonfinite_power,
         "n_hindcast_rows": rows.n_hindcast,
         "n_time_series": rows.n_time_series,
-        "n_time_series_missing": len(result.missing_time_series_ids),
-        "missing_time_series_ids": str(
-            list(result.missing_time_series_ids[:_MAX_MISSING_SERIES_LISTED])
-        ),
         "n_ensemble_members": rows.n_ensemble_members,
         "nwp_init_time_on_disk": str(result.nwp.latest_init_time),
         "nwp_init_time_expected": result.nwp.expected_latest_init_time.isoformat(),
         "nwp_init_time_on_rows": str(rows.nwp_init_time),
     }
     if result.n_expected_time_series is not None:
+        # Gated on the same condition as n_time_series_expected below: an unreadable meta.json
+        # makes "how many are missing" as unknown as "how many are expected", so 0 must not be
+        # reported here — it would be indistinguishable from a verified-complete population.
+        metadata["n_time_series_missing"] = len(result.missing_time_series_ids)
+        metadata["missing_time_series_ids"] = str(
+            list(result.missing_time_series_ids[:_MAX_MISSING_SERIES_LISTED])
+        )
         metadata["n_time_series_expected"] = result.n_expected_time_series
     if result.horizon_hours is not None:
         metadata["forecast_horizon_hours"] = round(result.horizon_hours, 1)

@@ -832,8 +832,55 @@ def test_live_forecasts_check_does_not_raise_with_no_tables_at_all(env: Path) ->
     # one type across runs and stays plottable; the description carries the explanation instead.
     assert "n_missed_nwp_runs" not in result.metadata
     assert "n_time_series_expected" not in result.metadata
+    # An unreadable meta.json makes "how many are missing" as unknown as "how many are expected" —
+    # 0 here would be indistinguishable from a verified-complete population.
+    assert "n_time_series_missing" not in result.metadata
+    assert "missing_time_series_ids" not in result.metadata
     assert "forecast_horizon_hours" not in result.metadata
     assert "no NWP run is available" in str(result.description)
+
+
+def test_live_forecasts_check_degrades_on_a_malformed_meta_json(env: Path) -> None:
+    """A ``trained_time_series_ids`` that isn't a list is malformed, not merely missing.
+
+    ``int(i) for i in ids`` would silently mis-parse a corrupted string (e.g. ``"12"`` iterates
+    character-by-character into ``(1, 2)``) instead of degrading — this pins that the check
+    rejects that shape and falls back to an unknown population, per CLAUDE.md's "strict about
+    malformed inputs" rule.
+    """
+    from contracts.settings import Settings
+
+    settings = Settings()
+    slot = _current_slot()
+    _write_live_forecasts(settings.power_forecasts_data_path, slot, time_series_ids=(1,))
+    _write_nwp_runs(settings.nwp_data_path, _healthy_runs_at(slot))
+    directory = Path(settings.production_model_path)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "meta.json").write_text(
+        json.dumps({"trained_time_series_ids": "12", "model_params": {"experiment_name": None}})
+    )
+
+    result = _run_live_check()
+    assert result.passed is True  # the single time series written is not flagged as missing
+    assert "n_time_series_expected" not in result.metadata
+    assert "n_time_series_missing" not in result.metadata
+
+
+def test_live_forecasts_check_degrades_on_invalid_json(env: Path) -> None:
+    """A ``meta.json`` that isn't valid JSON at all degrades the same way as one that's absent."""
+    from contracts.settings import Settings
+
+    settings = Settings()
+    slot = _current_slot()
+    _write_live_forecasts(settings.power_forecasts_data_path, slot, time_series_ids=(1,))
+    _write_nwp_runs(settings.nwp_data_path, _healthy_runs_at(slot))
+    directory = Path(settings.production_model_path)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "meta.json").write_text("{not valid json")
+
+    result = _run_live_check()
+    assert result.passed is True
+    assert "n_time_series_expected" not in result.metadata
 
 
 def test_live_forecasts_check_does_not_raise_on_an_empty_table(env: Path) -> None:
