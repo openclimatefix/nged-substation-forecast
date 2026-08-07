@@ -1,6 +1,7 @@
 """XGBoost-based power forecasting model."""
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any, Self, cast
 
@@ -198,13 +199,13 @@ class XGBoostForecaster(BaseForecaster):
     def save(self, path: Path) -> None:
         """Save all Boosters as .ubj files plus a meta.json with the full config.
 
-        Does not clear ``path`` first, so saving a smaller model over a directory that already
-        holds a bigger one's ``.ubj`` files leaves the extra files behind on disk (harmless today,
-        since every caller saves into a fresh temp directory or one it has just ``rmtree``'d, and
-        ``load`` reads its population from ``meta.json`` rather than the directory listing — see
-        ``load``'s docstring — but it is the same "merge instead of replace" defect class that
-        made MLflow's artifact store accumulate stale boosters, issue #197).
+        Clears ``path`` first, so re-saving a smaller model over a directory that already holds a
+        bigger one's ``.ubj`` files can never leave the dropped series' boosters behind on disk —
+        this is the "merge instead of replace" defect class that made MLflow's artifact store
+        accumulate stale boosters, issue #197. (MLflow's own artifact upload merges independently
+        of this — see ``load``'s docstring for that remaining hazard, which this does not reach.)
         """
+        shutil.rmtree(path, ignore_errors=True)
         path.mkdir(parents=True, exist_ok=True)
         for ts_id, booster in self._models.items():
             booster.save_model(str(path / f"{ts_id}.ubj"))

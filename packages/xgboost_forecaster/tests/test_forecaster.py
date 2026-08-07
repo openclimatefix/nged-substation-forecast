@@ -178,19 +178,40 @@ def test_save_records_trained_time_series_ids(tmp_path: Path) -> None:
     assert meta["trained_time_series_ids"] == [10, 20, 30]
 
 
+def test_save_clears_stale_ubj_files_from_a_prior_save(tmp_path: Path) -> None:
+    """Re-saving a smaller model over a directory drops the larger model's leftover boosters.
+
+    Regression test for the "merge instead of replace" defect class (issue #197): ``save`` used
+    to write into ``path`` without clearing it first, so a shrinking population left the dropped
+    series' ``.ubj`` files on disk.
+    """
+    save_dir = tmp_path / "m"
+    _trained(_make_df(ts_ids=[10, 20, 30])).save(save_dir)
+    _trained(_make_df(ts_ids=[10, 20])).save(save_dir)
+
+    assert not (save_dir / "30.ubj").exists()
+    assert XGBoostForecaster.load(save_dir).trained_time_series_ids == [10, 20]
+
+
 def test_load_ignores_ubj_files_not_in_meta_json(tmp_path: Path) -> None:
     """``meta.json`` decides the population, not whatever ``.ubj`` files are lying around.
 
-    An MLflow run's artifact directory is written with ``log_artifacts``, which *merges* rather
-    than replaces. Re-training a reused CV fold run on a smaller population therefore leaves the
-    dropped series' boosters in place; loading them back would silently score those series with a
-    superseded model, breaking the train==predict invariant.
+    ``save`` clearing ``path`` first (see
+    ``test_save_clears_stale_ubj_files_from_a_prior_save``) closes the local-directory route to a
+    stale ``.ubj`` file, but an MLflow run's *remote* artifact directory is written with
+    ``log_artifacts``, which *merges* rather than replaces — a hazard ``save`` cannot reach.
+    Re-training a reused CV fold run on a smaller population therefore still leaves the dropped
+    series' boosters in the run's artifact store; loading them back would silently score those
+    series with a superseded model, breaking the train==predict invariant. This test simulates
+    that merge directly, since it does not go through ``save``.
     """
     save_dir = tmp_path / "m"
-    # An earlier training run over {10, 20, 30}...
-    _trained(_make_df(ts_ids=[10, 20, 30])).save(save_dir)
-    # ...then a re-train over just {10, 20}, merged into the same directory.
     _trained(_make_df(ts_ids=[10, 20])).save(save_dir)
+    # Simulate a stale booster left behind by MLflow's artifact-merge (not save, which now clears
+    # its destination first — see above): a real trained booster, written directly rather than
+    # through save, for a series not in this directory's meta.json.
+    stale_booster = _trained(_make_df(ts_ids=[30]))._models[30]
+    stale_booster.save_model(str(save_dir / "30.ubj"))
 
     assert (save_dir / "30.ubj").exists()  # the stale booster is still on disk...
     assert XGBoostForecaster.load(save_dir).trained_time_series_ids == [10, 20]  # ...but unused.
