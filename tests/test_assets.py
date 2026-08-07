@@ -192,16 +192,20 @@ def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(
     }
     monkeypatch.setattr(assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(files))
 
-    result = materialize([power_time_series_and_metadata], instance=DagsterInstance.ephemeral())
-    assert result.success
+    # Context-manager form disposes the ephemeral instance's TemporaryDirectory-backed artifact
+    # storage on exit, rather than leaving it to the garbage collector — see the CI-flakiness
+    # gotcha in CLAUDE.md for why an undisposed instance matters here.
+    with DagsterInstance.ephemeral() as instance:
+        result = materialize([power_time_series_and_metadata], instance=instance)
+        assert result.success
 
-    power = pl.read_delta(str(env / "NGED" / "power_time_series.delta"))
-    assert power.height == 1
-    assert power["time"][0] == datetime(2026, 3, 5, 12, 30, tzinfo=timezone.utc)
+        power = pl.read_delta(str(env / "NGED" / "power_time_series.delta"))
+        assert power.height == 1
+        assert power["time"][0] == datetime(2026, 3, 5, 12, 30, tzinfo=timezone.utc)
 
-    materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
-    metadata = {k: v for mat in materialisations for k, v in mat.metadata.items()}
-    assert metadata["n_implausible_power_rows_dropped"].value == 1
+        materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
+        metadata = {k: v for mat in materialisations for k, v in mat.metadata.items()}
+        assert metadata["n_implausible_power_rows_dropped"].value == 1
 
 
 def test_power_time_series_and_metadata_handles_no_new_data(
