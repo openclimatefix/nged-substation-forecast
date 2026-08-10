@@ -7,12 +7,9 @@ pytest all pass, because the file they were handed is valid Python. `ruff check 
 check can and cannot catch:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#marimo-notebooks-bind-every-name-their-cells-reference>
 
-`Cell.refs` and `Cell.defs` are public marimo API; loading a notebook without running it is not, so
-this reads `marimo._ast`. Attaching line numbers costs a second private entry point
-(`get_notebook_status`) on top of `load_app` — worth it for a hook whose output should be
-clickable, but it is the first thing to drop if keeping up with marimo gets expensive. Nothing here
-may fail quietly: every way of not reaching an answer raises, and `tests/test_marimo_notebooks.py`
-keeps a positive control that fails if this stops detecting a real breakage.
+`Cell.refs` and `Cell.defs` are public marimo API; parsing a notebook without running it is not, so
+this reads `marimo._ast`. The serialized form carries the line numbers and the compiled form
+carries the names, so both are needed.
 """
 
 import builtins
@@ -22,8 +19,9 @@ from pathlib import Path
 from typing import Final
 
 from marimo._ast.app import InternalApp
-from marimo._ast.load import get_notebook_status, load_app
-from marimo._ast.parse import MarimoFileError, NonMarimoPythonScriptError
+from marimo._ast.cell import Cell
+from marimo._ast.load import get_notebook_status, load_notebook_ir
+from marimo._ast.parse import MarimoFileError
 
 ALWAYS_BOUND: Final[frozenset[str]] = frozenset(dir(builtins)) | {
     "__builtin__",
@@ -62,41 +60,32 @@ def unbound_cells(path: Path) -> list[UnboundCell]:
         path: Path to a marimo notebook.
 
     Raises:
-        MarimoFileError: if `path` is not a marimo notebook.
-        NonMarimoPythonScriptError: if `path` is an ordinary Python script.
-        ValueError: if the notebook cannot be checked in full — it holds no marimo app, it holds a
-            cell marimo cannot compile, or marimo's two views of it disagree about how many cells
-            it has (which would mean the private API this rides on has moved). Raised rather than
-            reported as "no findings", so that the check cannot degrade into passing everything.
+        MarimoFileError: if marimo cannot parse `path` at all.
+        ValueError: if the notebook cannot be checked in full — it parses into no cells, or it
+            holds a cell marimo cannot compile. Raised rather than reported as "no findings", so
+            that the check cannot degrade into passing everything.
     """
-    app = load_app(str(path))
-    load_result = get_notebook_status(str(path))
-    if app is None or load_result.notebook is None:
-        # marimo reports an unparsable file as `empty` too, so only trust that status for a file
-        # that really is empty; anything else with no app is a file we could not read as one.
-        if load_result.status == "empty" and not path.read_text().strip():
-            raise ValueError("file is empty")
+    notebook = get_notebook_status(str(path)).notebook
+    if notebook is None or not notebook.cells:
         raise ValueError(
-            f"could not be read as a marimo notebook (marimo status: {load_result.status})"
+            "did not parse into any marimo cells. Every `.py` file directly inside "
+            "`packages/notebooks/` or `packages/dashboard/` is taken to be a notebook — an "
+            "ordinary module put there silently stops being auto-fixed by the ruff pre-commit hook."
         )
-    compiled = list(InternalApp(app).cell_manager.cell_data())
-    serialized = load_result.notebook.cells
-    if not serialized:
-        raise ValueError("parsed into zero marimo cells")
-    if len(compiled) != len(serialized):
-        raise ValueError(
-            f"marimo reports {len(compiled)} compiled cells but {len(serialized)} serialized "
-            "ones, so cells can no longer be matched to line numbers"
-        )
-    cells = [(source.lineno, data.cell) for data, source in zip(compiled, serialized, strict=True)]
-    for lineno, cell in cells:
-        if cell is None:
-            raise ValueError(f"marimo cannot compile the cell at line {lineno}")
-    defined = ALWAYS_BOUND.union(*(cell.defs for _, cell in cells if cell is not None))
+    compiled = InternalApp(load_notebook_ir(notebook)).cell_manager.cell_data()
+    cells: list[tuple[int, Cell]] = []
+    # `load_notebook_ir` registers one compiled cell per serialized cell, so `strict` never fires
+    # unless that stops being true — in which case the line numbers below would be attached to the
+    # wrong cells, and a loud failure beats a misleading report.
+    for data, source in zip(compiled, notebook.cells, strict=True):
+        if data.cell is None:
+            raise ValueError(f"marimo cannot compile the cell at line {source.lineno}")
+        cells.append((source.lineno, data.cell))
+    defined = ALWAYS_BOUND.union(*(cell.defs for _, cell in cells))
     return [
         UnboundCell(lineno, tuple(sorted(cell.refs - defined)))
         for lineno, cell in cells
-        if cell is not None and cell.refs - defined
+        if cell.refs - defined
     ]
 
 
@@ -108,15 +97,7 @@ def _check_file(path: Path) -> list[str]:
     """
     try:
         unbound = unbound_cells(path)
-    except (MarimoFileError, NonMarimoPythonScriptError) as error:
-        return [
-            (
-                f"{path}: not a marimo notebook: {error} Every `.py` file directly inside "
-                "`packages/notebooks/` or `packages/dashboard/` is taken to be one — an ordinary "
-                "module put there silently stops being auto-fixed by the ruff pre-commit hook."
-            )
-        ]
-    except (OSError, SyntaxError, ValueError) as error:
+    except (MarimoFileError, OSError, SyntaxError, ValueError) as error:
         return [f"{path}: cannot be checked: {error}"]
     return [
         f"{path}:{cell.lineno}: cell references name(s) that no cell defines: "

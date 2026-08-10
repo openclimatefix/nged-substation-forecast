@@ -3,26 +3,25 @@
 The check itself lives in `scripts/check_marimo_notebooks.py`, which is also a pre-commit hook;
 its module docstring explains what the failure looks like and which tools produce it. These tests
 run it over every notebook in the repo, and — because it rides on private marimo API — keep hand-
-written notebooks either side of the line: two that it must flag, so a marimo release cannot
+written notebooks either side of the line: three that it must flag, so a marimo release cannot
 quietly turn it into a no-op, and one correct notebook that it must not.
+
+Every test drives the checker as a subprocess, which is how pre-commit drives it, so its exit code
+is covered as well as its findings.
 """
 
 import ast
-import importlib.util
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
-from types import ModuleType
 from typing import Final
-
-import pytest
 
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 """The repo root, one level above this `tests/` directory."""
 
 CHECKER_PATH: Final[Path] = REPO_ROOT / "scripts" / "check_marimo_notebooks.py"
-"""The checker, imported by path below because `scripts/` is not an importable package."""
+"""The checker, run as a subprocess below because `scripts/` is not an importable package."""
 
 NOTEBOOK_DIRS: Final[tuple[str, ...]] = ("packages/notebooks", "packages/dashboard")
 """Directories whose top-level `.py` files are marimo notebooks.
@@ -80,7 +79,7 @@ Its names cannot be analysed, so a checker that quietly skipped it would report 
 one as clean.
 """
 
-DUNDER_FILE_NOTEBOOK: Final[str] = """import marimo
+DUNDERS_NOTEBOOK: Final[str] = """import marimo
 
 __generated_with = "0.23.16"
 app = marimo.App()
@@ -92,24 +91,18 @@ with app.setup:
 @app.cell
 def _():
     print(pathlib.Path(__file__).name)
+    print(eval("1 + 1", {"__builtins__": __builtins__}))
     return
 
 
 if __name__ == "__main__":
     app.run()
 """
-"""A correct notebook that locates itself. `__file__` is not a builtin — marimo injects it into
-the cell globals — so it is the one name that would otherwise look unbound in working code."""
+"""A correct notebook that locates itself and sandboxes an `eval`.
 
-
-def _load_checker() -> ModuleType:
-    """Import `scripts/check_marimo_notebooks.py` by path."""
-    spec = importlib.util.spec_from_file_location("check_marimo_notebooks", CHECKER_PATH)
-    assert spec is not None, f"cannot import {CHECKER_PATH}"
-    assert spec.loader is not None, f"no loader for {CHECKER_PATH}"
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+Neither `__file__` nor `__builtins__` is a builtin — marimo injects both into the cell globals — so
+they are the names that would otherwise look unbound in working code.
+"""
 
 
 def _notebooks() -> list[Path]:
@@ -127,24 +120,22 @@ def _run_checker(*paths: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-CHECKER: Final[ModuleType] = _load_checker()
-"""The checker module, loaded once for every test in this file."""
-
-
 def test_every_directory_of_notebooks_holds_at_least_one():
-    # Guards the parametrised test below: a glob that silently matched nothing would collect zero
-    # cases and pass.
+    # Guards the test below: a glob that silently matched nothing would check nothing and pass.
     for directory in NOTEBOOK_DIRS:
         assert list((REPO_ROOT / directory).glob("*.py")), f"no notebooks found in {directory}"
 
 
-@pytest.mark.parametrize("notebook", _notebooks(), ids=lambda path: path.name)
-def test_notebook_binds_every_name_its_cells_reference(notebook: Path):
-    unbound = CHECKER.unbound_cells(notebook)
-    assert not unbound, (
-        f"{notebook.name} references names no cell defines: {unbound}. A name bound at module "
-        "level does not count — marimo never runs module-level statements."
+def test_every_notebook_binds_every_name_its_cells_reference():
+    # Also the only test of the exit-0 path: without it, a checker that rejected every notebook it
+    # was given would still pass this whole file.
+    result = _run_checker(*_notebooks())
+
+    assert result.returncode == 0, (
+        f"{result.stdout}A name bound at module level does not count — marimo never runs "
+        "module-level statements."
     )
+    assert not result.stdout
 
 
 def test_checker_flags_an_import_hoisted_to_module_level(tmp_path: Path):
@@ -168,7 +159,7 @@ def test_checker_rejects_a_file_that_is_not_a_notebook(tmp_path: Path):
     result = _run_checker(script)
 
     assert result.returncode == 1, result.stdout
-    assert "not a marimo notebook" in result.stdout
+    assert "did not parse into any marimo cells" in result.stdout
 
 
 def test_checker_flags_a_cell_marimo_cannot_compile(tmp_path: Path):
@@ -183,20 +174,13 @@ def test_checker_flags_a_cell_marimo_cannot_compile(tmp_path: Path):
     assert "cannot compile" in result.stdout
 
 
-def test_checker_allows_a_cell_to_reference_dunder_file(tmp_path: Path):
+def test_checker_allows_a_cell_to_reference_the_dunders_marimo_injects(tmp_path: Path):
     notebook = tmp_path / "locates_itself.py"
-    notebook.write_text(DUNDER_FILE_NOTEBOOK)
+    notebook.write_text(DUNDERS_NOTEBOOK)
 
-    assert not CHECKER.unbound_cells(notebook)
-
-
-def test_checker_passes_over_every_notebook_at_once():
-    # The only test of the exit-0 path: without it, a checker that rejected every notebook it was
-    # given would still pass this whole file.
-    result = _run_checker(*_notebooks())
+    result = _run_checker(notebook)
 
     assert result.returncode == 0, result.stdout
-    assert not result.stdout
 
 
 def test_every_notebook_named_in_python_files_exists_and_holds_tests():
