@@ -31,13 +31,14 @@ The full argument is in
 [Inherent Stability → Three audiences, three channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
 
 Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and nothing either one *does*
-can fail its own step: each body sits under a catch-all for ``Exception`` and for pyo3's
-``PanicException``, which logs the traceback, reports the exception to Sentry (the run no longer
-fails, so the failure hook no longer fires) and returns an unhealthy result. Only Dagster's own
-interrupt errors propagate, which is what we want — a cancelled run should cancel. What remains
-outside the guard is Dagster's own machinery: resource init, and serialising the returned
-``AssetCheckResult`` into an event. A warning path that could fail would turn fail-open into
-fail-closed at exactly the wrong moment (rule 7 of
+can fail its own step: each body sits under a catch-all which logs the traceback, reports the
+exception to Sentry (the run no longer fails, so the failure hook no longer fires) and returns an
+unhealthy result. Catching ``BaseException`` is what makes that absolute — a Rust panic in any of
+the pyo3 extensions these bodies read through arrives as a ``PanicException``, which does not
+derive from ``Exception``. Only cancellation is re-raised, which is what we want: a cancelled run
+should cancel. What remains outside the guard is Dagster's own machinery: resource init, and
+serialising the returned ``AssetCheckResult`` into an event. A warning path that could fail would
+turn fail-open into fail-closed at exactly the wrong moment (rule 7 of
 [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
 
 The two differ in how much they salvage short of that catch-all. In ``live_forecasts_are_healthy``
@@ -65,6 +66,7 @@ from dagster import (
     AssetCheckExecutionContext,
     AssetCheckResult,
     AssetCheckSeverity,
+    DagsterExecutionInterruptedError,
     MetadataValue,
     TableColumn,
     TableRecord,
@@ -72,7 +74,6 @@ from dagster import (
     asset_check,
 )
 from nged_data.storage import time_series_coverage
-from polars.exceptions import PanicException
 
 from nged_substation_forecast._sentry import report_check_degradation, report_power_freshness
 from nged_substation_forecast.defs.assets import power_time_series_and_metadata
@@ -273,9 +274,7 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
 def _check_power_data_freshness() -> AssetCheckResult:
     """Read the power table's recency off disk and judge it.
 
-    Split out from the check itself so the check's ``except`` wraps everything — the ``Settings``
-    load, both reads, the evaluation, the Sentry report and the metadata build — rather than only
-    part of it.
+    Split out from the check itself so the check's ``except`` wraps the whole body.
     """
     settings = Settings()
     storage_options = settings.storage_options
@@ -315,18 +314,16 @@ def power_data_is_fresh() -> AssetCheckResult:
     """
     try:
         return _check_power_data_freshness()
-    except (Exception, PanicException) as exc:
-        # Catch-all is deliberate. This check is non-blocking, but it runs as its own step inside
-        # `power_time_series_and_metadata_job`, whose `sentry_capture_failure` hook would turn a
-        # raise here into a failed production run — fail-open silently becoming fail-closed.
-        # `PanicException` is named explicitly because pyo3 derives it from `BaseException`, not
-        # `Exception`, so a Rust panic inside a Polars or delta-rs read would otherwise sail
-        # straight past this handler. Dagster's own interrupt errors are `BaseException` too and
-        # deliberately keep propagating: a cancelled run should cancel. Logged at ERROR with the
-        # traceback (never a silent swallow) and surfaced as an unhealthy check, so a fault in here
-        # stays visible. Reported to Sentry explicitly as well: not failing the run means the
-        # failure hook no longer fires, and this hourly job has no cron monitor watching it, so
-        # without this the fault would reach nobody outside Dagster's Checks view.
+    except BaseException as exc:
+        # `BaseException`, not `Exception`: a Rust panic surfaces as a pyo3 `PanicException`, which
+        # derives from `BaseException`, and each compiled extension this body reads through (polars,
+        # delta-rs, obstore) defines its own class — so there is no one name to catch. Naming what
+        # must propagate instead is the only version that stays true as dependencies come and go.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel. This also re-raises pytest's own control flow.
+        # Rule 7: a non-blocking check that *errors* still fails its run, and this job carries the
+        # `sentry_capture_failure` hook, so a raise here would turn fail-open into fail-closed.
+        # Sentry is told explicitly because not failing the run means that hook no longer fires.
         logger.exception("Could not evaluate power-data freshness")
         report_check_degradation("power_data_is_fresh", exc)
         return AssetCheckResult(
@@ -892,17 +889,11 @@ def live_forecasts_are_healthy(context: AssetCheckExecutionContext) -> AssetChec
     """
     try:
         return _evaluate_live_forecasts(context)
-    except (Exception, PanicException) as exc:
-        # Catch-all is deliberate. A warning path must never be able to fail the thing it warns
-        # about: this check is non-blocking, but it runs inside `live_forecasts_job`, whose
-        # `sentry_capture_failure` hook would turn a raise here into a failed production run —
-        # fail-open silently becoming fail-closed. `PanicException` is named explicitly because
-        # pyo3 derives it from `BaseException`, not `Exception`, so a Rust panic inside a Polars or
-        # delta-rs read would otherwise sail straight past this handler; Dagster's own interrupt
-        # errors are `BaseException` too and deliberately keep propagating, because a cancelled run
-        # should cancel. Logged at ERROR with the traceback (never a silent swallow), reported to
-        # Sentry explicitly (not failing the run means the failure hook no longer fires) and
-        # surfaced as an unhealthy check, so a bug in here stays visible.
+    except BaseException as exc:
+        # The same guard as `power_data_is_fresh`, for the same reason — see the comment there for
+        # why it catches `BaseException`, and rule 7 for why a warning path may never raise.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel. This also re-raises pytest's own control flow.
         logger.exception("Could not evaluate live-forecast health")
         report_check_degradation("live_forecasts_are_healthy", exc)
         return AssetCheckResult(

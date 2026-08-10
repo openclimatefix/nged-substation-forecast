@@ -1,8 +1,9 @@
 """Unit tests for the Sentry telemetry helpers (``nged_substation_forecast._sentry``).
 
-Every Sentry side effect is monkeypatched, so these tests never touch the network and assert the
-two invariants that matter: everything is a no-op unless explicitly enabled, and when enabled the
-right Sentry call is made with the right arguments.
+These tests never touch the network — every Sentry side effect is monkeypatched, bar the one test
+that needs a real client to build a real event, which drops it in ``before_send`` — and they assert
+the two invariants that matter: everything is a no-op unless explicitly enabled, and when enabled
+the right Sentry call is made with the right arguments.
 """
 
 import logging
@@ -11,9 +12,11 @@ from typing import Any
 
 import polars as pl
 import pytest
+import sentry_sdk
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.settings import Settings
 from dagster import build_hook_context
+from sentry_sdk.types import Event, Hint
 
 from nged_substation_forecast import _sentry
 from nged_substation_forecast.defs.checks import PowerFreshnessResult
@@ -170,23 +173,38 @@ def test_failure_hook_noop_without_exception(monkeypatch: pytest.MonkeyPatch) ->
     assert captured == []
 
 
-def test_report_check_degradation_captures_the_exception_and_tags_the_check(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_report_check_degradation_captures_the_exception_and_tags_the_check() -> None:
     """A degraded check sends the same exception the failure hook would have, tagged per check.
 
-    The tag is what makes the event filterable per check; without the capture, a check that caught
-    its own exception would reach nobody, because log-to-event capture is deliberately disabled.
+    The tag is what makes the event filterable per check (``operations.md`` documents
+    ``asset_check:power_data_is_fresh`` as the operator's Sentry filter); without the capture, a
+    check that caught its own exception would reach nobody, because log-to-event capture is
+    deliberately disabled.
+
+    The assertion is on the *built event*, not on the arguments to ``capture_exception``: a tag set
+    on the wrong scope, or not set at all, still reaches ``capture_exception`` intact and would slip
+    past an argument-level check. A real client is given a temporary isolation scope so nothing
+    leaks into other tests, and ``before_send`` returns ``None`` so the event is dropped rather than
+    transmitted.
     """
-    captured: list[BaseException] = []
-    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
-    boom = ValueError("boom")
+    events: list[Event] = []
 
-    _sentry.report_check_degradation("power_data_is_fresh", boom)
+    def collect(event: Event, _hint: Hint) -> Event | None:
+        """Record the built event and return ``None``, which tells the SDK to drop it."""
+        events.append(event)
+        return None
 
-    assert captured == [boom]
-    # The tag lived on an isolated scope, so it cannot leak into a later unrelated event.
-    assert _sentry.sentry_sdk.get_current_scope()._tags.get("asset_check") is None
+    with sentry_sdk.isolation_scope() as scope:
+        scope.set_client(sentry_sdk.Client(dsn=_DSN, before_send=collect))
+        _sentry.report_check_degradation("power_data_is_fresh", ValueError("boom"))
+
+    (event,) = events
+    assert event["tags"] == {"asset_check": "power_data_is_fresh"}
+    assert event["exception"]["values"][0]["type"] == "ValueError"
+    # The tag lived on a scope forked for the one event, so it cannot leak into a later unrelated
+    # one — including via the isolation scope this whole Dagster process shares.
+    assert sentry_sdk.get_current_scope()._tags == {}
+    assert sentry_sdk.get_isolation_scope()._tags == {}
 
 
 def test_report_check_degradation_swallows_and_logs_on_send_error(

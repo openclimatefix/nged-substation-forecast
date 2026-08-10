@@ -86,13 +86,14 @@ Nothing the check **does** can fail its own step. It runs as a step of the hooke
 non-blocking that check is — so a stalled object store, a half-written `metadata.parquet` or a bug
 in the check itself would otherwise fail the hourly production run and page, turning fail-open into
 fail-closed at exactly the wrong moment. The whole body therefore sits under a catch-all that logs
-the traceback and returns an unhealthy result naming the fault. (Dagster's own machinery — resource
-init, and serialising the returned result into an event — is still outside that guard.)
-
-Because the run then succeeds, the failure hook no longer fires, and this hourly job has no cron
-monitor watching it. So the handler also sends the exception to Sentry itself, tagged with the
-check's name: the signal the hook used to carry is kept, without the run failure it used to come
-with.
+the traceback and returns an unhealthy result naming the fault. It catches `BaseException` and
+re-raises only cancellation, because a Rust panic in any of the pyo3 extensions the check reads
+through (Polars, delta-rs, obstore) does not derive from `Exception`, and each of those extensions
+compiles a `PanicException` class of its own — so listing the classes to catch could never stay
+complete, while the list of classes that must propagate can. (Dagster's own machinery — resource
+init, and serialising the returned result into an event — is still outside the guard.) The
+degradation still reaches Sentry, via
+[`report_check_degradation`](#send-telemetry-to-sentry-and-alarm-on-absence).
 
 This in-Dagster check is complementary to — not a replacement for — the
 [missed-check-in alarm](#send-telemetry-to-sentry-and-alarm-on-absence). The alarm fires on total

@@ -33,6 +33,7 @@ from dagster import (
     AssetCheckResult,
     AssetCheckSeverity,
     AssetSelection,
+    DagsterExecutionInterruptedError,
     DagsterInstance,
     TableMetadataValue,
     build_asset_check_context,
@@ -307,29 +308,9 @@ def _raise_inside_the_check(**_kwargs: object) -> PowerFreshnessResult:
     raise RuntimeError("simulated bug inside the check")
 
 
-def test_power_data_is_fresh_contains_an_internal_error(
-    env: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Even a bug inside the check itself must surface as a warning, never as a raise.
-
-    No fixture data is needed: with no tables on disk ``time_series_coverage`` returns an empty
-    frame and ``_read_roster_ids`` returns ``None``, so the patched evaluator is still reached.
-    """
-    monkeypatch.setattr(checks, "evaluate_power_freshness", _raise_inside_the_check)
-    reported: list[tuple[str, BaseException]] = []
-    monkeypatch.setattr(
-        checks, "report_check_degradation", lambda name, exc: reported.append((name, exc))
-    )
-
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)
-    assert result.passed is False
-    assert result.severity == AssetCheckSeverity.WARN
-    assert "simulated bug inside the check" in str(result.description)
-    # Not failing the run means the Sentry failure hook no longer fires, so the handler must send
-    # the exception itself or the fault reaches nobody outside Dagster's Checks view.
-    assert [name for name, _ in reported] == ["power_data_is_fresh"]
-    assert isinstance(reported[0][1], RuntimeError)
+def _never_called(name: str, exc: BaseException) -> None:
+    """Stand in for ``report_check_degradation`` on a path that must not report to Sentry."""
+    raise AssertionError(f"report_check_degradation({name!r}, {exc!r}) should not have been called")
 
 
 def test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet(env: Path) -> None:
@@ -365,9 +346,15 @@ def test_power_data_is_fresh_never_fails_the_run(
     check is ``blocking=False``, which governs only whether a *failed* check blocks downstream
     assets, not whether an *erroring* one fails the run. Running the check through Dagster's
     executor is the only way to assert that; ``AssetSelection.checks`` runs the check step alone,
-    so no asset materialises and nothing touches S3.
+    so no asset materialises and nothing touches S3. No fixture data is needed either: with no
+    tables on disk ``time_series_coverage`` returns an empty frame and ``_read_roster_ids`` returns
+    ``None``, so the patched evaluator is still reached.
     """
     monkeypatch.setattr(checks, "evaluate_power_freshness", _raise_inside_the_check)
+    reported: list[tuple[str, BaseException]] = []
+    monkeypatch.setattr(
+        checks, "report_check_degradation", lambda name, exc: reported.append((name, exc))
+    )
 
     result = materialize(
         [checks.power_data_is_fresh],
@@ -380,6 +367,31 @@ def test_power_data_is_fresh_never_fails_the_run(
     (evaluation,) = result.get_asset_check_evaluations()
     assert evaluation.passed is False
     assert evaluation.severity == AssetCheckSeverity.WARN
+    assert "simulated bug inside the check" in str(evaluation.description)
+    # Not failing the run means the Sentry failure hook no longer fires, so the handler must send
+    # the exception itself or the fault reaches nobody outside Dagster's Checks view.
+    assert [name for name, _ in reported] == ["power_data_is_fresh"]
+    assert isinstance(reported[0][1], RuntimeError)
+
+
+def test_power_data_is_fresh_re_raises_a_cancelled_run(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The one thing the catch-all must *not* swallow.
+
+    It catches ``BaseException``, because a pyo3 panic derives from that rather than from
+    ``Exception``. Cancellation lands in the same net, so the handler re-raises it explicitly: a
+    run the operator cancelled has to stop, not report itself as merely unhealthy.
+    """
+
+    def _cancel(**_kwargs: object) -> PowerFreshnessResult:
+        raise DagsterExecutionInterruptedError
+
+    monkeypatch.setattr(checks, "evaluate_power_freshness", _cancel)
+    monkeypatch.setattr(checks, "report_check_degradation", _never_called)
+
+    with pytest.raises(DagsterExecutionInterruptedError):
+        checks.power_data_is_fresh()
 
 
 # ---------------------------------------------------------------------------
