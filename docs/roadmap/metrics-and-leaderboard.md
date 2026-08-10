@@ -812,6 +812,34 @@ preserves both
 and the standing
 [rejection of reanalysis-backed validation folds](../architecture/ml-orchestration.md#yearly-folds-backed-by-era5-rejected-for-validation).
 
+### The perfect-weather ceiling — what it gates
+
+Train *and* score on near-perfect weather, and the resulting skill is an **upper bound on
+everything we could buy by improving the weather input**: a second NWP source, more ensemble
+members, neighbouring-cell context, sharper interpolation. If that ceiling sits close to today's
+ENS-scored skill, no amount of NWP investment will move the number much and the effort belongs in
+the modelling instead. So run this **before** ingesting another NWP source, not after — it is the
+cheap test that decides whether the expensive one is worth doing.
+
+Two rungs, in increasing order of "cheating":
+
+- **ERA5.** A reanalysis, so it assimilates observations, but still a 31 km model field — good, not
+  perfect. Free once the [ingest](training-history.md) lands.
+
+- **Observations.** Closer to truth at the site, and worth the second rung precisely because ERA5's
+  remaining error is not small. The UK Met Office's MIDAS Open (via CEDA) supplies hourly
+  land-surface temperature, wind and pressure from GB stations — spatially sparse, so
+  nearest-station matched. [CM SAF](data-sources.md#weather-data) SARAH-3 is the equivalent rung for
+  solar, at 0.05°, and is already planned for v0.7.
+
+Two conditions on reading the result. It must be **trained** on the better weather, not merely
+scored on it: feeding reanalysis to an ENS-trained model measures a train/serve mismatch instead of
+a ceiling. And it is a ceiling **for the current model family and feature set** — a model that
+cannot exploit perfect weather shows a low ceiling for reasons that have nothing to do with weather
+availability. That does not weaken the decision it gates (a model that cannot use perfect weather
+will not be rescued by a better NWP either), but it does mean the ceiling is re-measured after any
+large modelling change rather than treated as a standing fact.
+
 ---
 
 ## Time-slices for performance evaluation

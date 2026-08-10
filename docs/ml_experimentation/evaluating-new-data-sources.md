@@ -6,6 +6,12 @@ the leaderboard folds. Such a source **cannot** enter the canonical folds (there
 overlapping history), so its evaluation lives entirely in the `metrics` asset's
 `evaluation_scope="ad_hoc"` and **never** feeds the leaderboard.
 
+**For a new *weather* source, check the ceiling first.** Before ingesting one at all, measure what
+near-perfect weather would buy — see
+[the perfect-weather ceiling](../roadmap/metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates).
+If a model trained and scored on reanalysis barely beats the ENS-scored champion, no NWP source
+will, and the patterns below are not yet worth running.
+
 Three patterns, answering three different questions.
 
 ## 1. Controlled ablation — "does the source add skill?"

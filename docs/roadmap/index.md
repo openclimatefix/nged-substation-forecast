@@ -292,7 +292,10 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   ([#363](https://github.com/openclimatefix/nged-substation-forecast/issues/363)): explore
   whether adding ICON-EU from Dynamical.org improves forecast skill over ECMWF ENS alone — the
   v1 nice-to-have version of the broader "further NWP sources" idea on the
-  [v2.0 research list](#v20-scale-up-future-research). Because ICON-EU's history starts early
+  [v2.0 research list](#v20-scale-up-future-research). **Gated on the v0.5
+  [perfect-weather ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates)**:
+  if training on reanalysis barely beats the ENS-scored champion, a second NWP cannot beat it
+  either, and this drops off the list. Because ICON-EU's history starts early
   2026 (shorter than the canonical CV folds) it is assessed via a controlled ad-hoc ablation,
   not the leaderboard, until it has ~1–2 complete years of history. See
   [Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).
@@ -341,7 +344,7 @@ delivery of the v2 live service)*
 - **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
 - **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the graph-structured disaggregation engine
 - **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (see [the graph-structured engine](disaggregation.md#the-graph-structured-engine) and [MVA metering](disaggregation.md#apparent-power-mva-metering))
-- **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history. The ICON-EU trial specifically is also pulled forward as a [v0.9 nice-to-have](#v09-nice-to-haves-if-we-have-time); this v2.0 item is the wider question of further sources beyond it
+- **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone, and only if the v0.5 [perfect-weather ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates) leaves enough headroom to be worth chasing. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history. The ICON-EU trial specifically is also pulled forward as a [v0.9 nice-to-have](#v09-nice-to-haves-if-we-have-time); this v2.0 item is the wider question of further sources beyond it
 
 **Stretch goals**:
 

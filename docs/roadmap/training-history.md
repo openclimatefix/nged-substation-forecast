@@ -139,8 +139,11 @@ carry the connection dates needed to check.
   error into the weather-to-power response — the part we can actually improve, since NWP error is
   exogenous to us — and the implicit hedging against forecast error. Expect the two rankings to
   disagree: under perfect weather the best model leans hard on weather features, so a large
-  divergence is information about how much hedging a model does, not a bug. It lands as a new
-  `evaluation_scope`, not as a new fold, so leaderboard folds stay ENS-only and both
+  divergence is information about how much hedging a model does, not a bug. The same scope carries
+  the [perfect-weather ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates),
+  which bounds what any weather-input improvement — a second NWP, more ensemble members,
+  neighbouring-cell context — could ever buy, and so gates whether we ingest another NWP at all. It
+  lands as a new `evaluation_scope`, not as a new fold, so leaderboard folds stay ENS-only and both
   [principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically)
   and the
   [rejection of reanalysis-backed validation folds](../architecture/ml-orchestration.md#yearly-folds-backed-by-era5-rejected-for-validation)
