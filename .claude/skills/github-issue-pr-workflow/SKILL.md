@@ -50,22 +50,29 @@ Never squash-merge. Jack wants the full commit history preserved in `main`, so u
 (`gh pr merge --merge`) or rebase (`gh pr merge --rebase`), not `gh pr merge --squash`. Under the
 `implement-issue` routine you stop and wait for Jack's review rather than merging at all.
 
-**Check what the merge will close, before you merge:**
+**Check what the merge will close, before you merge.** Issues are closed by two independent
+routes, and you have to check both — neither one shows you the other's:
 
 ```bash
 gh pr view <N> --json closingIssuesReferences --jq '.closingIssuesReferences[].number'
+git log origin/main..HEAD --format='%B' | grep -inE '(close[sd]?|fix(e[sd])?|resolve[sd]?) +#[0-9]+'
 ```
 
-Every number listed is closed the moment the PR merges. The list is *sticky*: a closing keyword
-in an early draft of the PR body, or in any commit message on the branch, registers the link
-permanently, and later editing that text away does not remove it. So a PR whose body now says
-"filed rather than fixed, see #512" can still be holding a closing link to #512 from a draft —
-reading the current body is not enough, and neither is grepping the commits.
+The first lists the links registered from the **PR body** (and the Development sidebar). That list
+is *sticky*: GitHub registers a link when the text containing the keyword is first saved and does
+not drop it when the text is edited away. A PR whose body now reads "filed rather than fixed, see
+\#512" can still hold a closing link to 512 from an early draft, so reading the current body proves
+nothing. A link you did not intend cannot be edited out either — close the PR and open it again
+from the same branch with a clean body.
 
-If the list contains an issue you did not mean to close, either sort it out before merging or
-watch for it afterwards: `gh issue reopen <N>`, then put its project Status back (the board
-automation moves a closed issue to Done, and reopening it lands on In Progress, not Todo — see
-the `github-graphql` skill for `gh project item-edit`).
+The second catches keywords in **commit messages**, which close their issue when the commit lands
+on `main` and are invisible to `closingIssuesReferences` beforehand — that field stays `[]` right
+up to the merge. Prose *about* a closure counts: "Merging #514 closed #512" in a commit message
+closes 512. Keep those words away from any issue reference when writing about one.
+
+When something is closed that should not have been: `gh issue reopen <N>`, then put its project
+Status back explicitly. The board automation moves a closed issue to Done, and reopening lands it
+on In Progress rather than Todo — see the `github-graphql` skill for `gh project item-edit`.
 
 ## GraphQL calls
 
