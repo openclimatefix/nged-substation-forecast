@@ -3,7 +3,8 @@
 The regular lat/lon grid is aggregated onto H3 cells on the way.
 """
 
-from typing import Literal
+from collections.abc import Sequence
+from typing import Final, Literal
 
 import numpy as np
 import patito as pt
@@ -13,6 +14,19 @@ import xarray as xr
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.geo_schemas import H3GridWeights
 from contracts.weather_schemas import NWP_MODEL_ID_DTYPE, Nwp, NwpModelId
+
+_CONTRIBUTING_WEIGHT_SUFFIX: Final[str] = "__contributing_weight"
+"""Suffix of the per-variable renormalisation denominator built by the H3 aggregation.
+
+These columns are intermediate: they are dropped before the aggregated frame is returned.
+"""
+
+_CATEGORY_WEIGHT_SUFFIX: Final[str] = "__category_weight"
+"""Suffix of the per-category area weight the H3 aggregation ranks a categorical variable by.
+
+These columns are intermediate: they exist only on the pre-`group_by` frame, so they never reach
+the aggregated output.
+"""
 
 
 def convert_nwp_xarray_dataset_to_polars_dataframe(
@@ -94,27 +108,121 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
 
     all_nwp_vars = [str(v) for v in ds.data_vars]
     categorical_vars = list(Nwp.categorical_var_names)
+    numeric_vars = [v for v in all_nwp_vars if v not in Nwp.categorical_var_names]
 
     # Add data variables
     for var_name in all_nwp_vars:
         data_dict[var_name] = ds[var_name].values.ravel()
 
-    # Create Polars DataFrame.
+    # Normalise NaN to null here, at the boundary, for *every* weather variable. This is what gives
+    # "missing" a single representation downstream: xarray delivers upstream corruption as NaN,
+    # while a grid point the H3 weights name but the dataset does not carry arrives as a null from
+    # the left join below. The aggregation must treat the two identically, and it can only do that
+    # if they look the same.
     nwp_df = pl.DataFrame(data_dict).with_columns(
-        pl.col(categorical_vars).fill_nan(None).cast(pl.UInt8)
+        pl.col(numeric_vars).fill_nan(None),
+        pl.col(categorical_vars).fill_nan(None).cast(pl.UInt8),
     )
 
     joined = h3_grid.join(
         nwp_df, left_on=["nwp_lon", "nwp_lat"], right_on=["longitude", "latitude"], how="left"
     )
 
-    # Aggregate NWP variables to H3 index.
-    numeric_vars = [v for v in all_nwp_vars if v not in Nwp.categorical_var_names]
+    return _aggregate_grid_points_to_h3_cells(joined, numeric_vars, categorical_vars)
+
+
+def _aggregate_grid_points_to_h3_cells(
+    joined: pl.DataFrame,
+    numeric_vars: Sequence[str],
+    categorical_vars: Sequence[str],
+) -> pl.DataFrame:
+    """Reduce one H3 cell's overlapping NWP grid points to a single row per cell.
+
+    An H3 cell's value is the area-weighted mean of the grid points that overlap it: `sum(v * p)`
+    over the cell, where the `proportion` weights `p` sum to 1 by construction (see
+    `geo.h3.compute_h3_grid_weights`). Each variable is renormalised over the points that actually
+    supplied a value — dividing by the *contributing* weight rather than by 1.0 — so a cell keeps a
+    usable value when only some of its points arrived, instead of losing every point because one
+    was corrupt. Without that division, a missing point is silently treated as contributing zero,
+    which biases the cell low; the production grid averages ~2.9 grid points per cell, so that is
+    not a corner case.
+
+    A cell where *no* point contributed has a contributing weight of zero and yields null, never
+    `0.0`. Getting that wrong is subtle and consequential: Polars sums an all-null group to `0.0`,
+    which for weather is a physically plausible, in-bounds lie (0 degC, 0 Pa, 0 m s-1) that passes
+    every downstream check. Nulling it is what makes the failure visible — see
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
+
+    A categorical variable cannot be averaged, so its cell takes the category covering the most of
+    the cell's area: the `proportion` weights are summed per category and the heaviest wins, with
+    the lowest category code breaking an exact tie. That tie-break is arbitrary but deterministic,
+    which matters because ties are reachable — two grid points in one cell can carry identical
+    `proportion` weights, which happens for 185 of the V1 grid's 1671 cells — and an
+    order-dependent answer would vary with Polars' internals. Note the direction of the bias it
+    introduces: **ties resolve to the lowest category code, and code 0 is "no precipitation", so an
+    evenly-split cell leans dry.** Points that supplied no category are excluded from the ranking
+    rather than competing in it, so the cell is null only when *no* point supplied one, matching
+    the numeric rule above.
+
+    Renormalising each variable over *its own* contributing weight is what makes a variable's
+    corruption cost only that variable, but it does mean two variables in one cell can end up
+    averaged over different sub-areas of the hexagon. That matters only for `wind_u_*`/`wind_v_*`,
+    where `_calc_wind_speed` and `_calc_wind_direction` later combine the pair: if `u` and `v` have
+    different null footprints, the derived vector mixes two sub-areas. Upstream corruption has
+    always been co-located across variables, so this is theoretical today, and a shared denominator
+    would be worse — it would let one variable's corruption null every other variable in the cell.
+
+    Args:
+        joined: The H3 grid weights left-joined onto one chunk's NWP grid values. NaN must already
+            have been normalised to null, since the contributing weight is computed from nullness.
+        numeric_vars: Weather variables aggregated as a renormalised weighted mean.
+        categorical_vars: Weather variables aggregated as an area-weighted mode.
+    """
+    contributing_weights = [
+        pl.col("proportion")
+        .filter(pl.col(var).is_not_null())
+        .sum()
+        .alias(var + _CONTRIBUTING_WEIGHT_SUFFIX)
+        for var in numeric_vars
+    ]
+    # Total area each category covers within the cell. Null where the category itself is null, so
+    # that `nulls_last` below drops missing points out of the running rather than letting them win.
+    category_weights = [
+        pl.when(pl.col(var).is_not_null())
+        .then(pl.col("proportion").sum().over(["h3_index", var]))
+        .otherwise(None)
+        .alias(var + _CATEGORY_WEIGHT_SUFFIX)
+        for var in categorical_vars
+    ]
+    # The category covering the most of the cell's area wins. An exact tie goes to the lowest
+    # category code, which leans dry: code 0 is "no precipitation", so a cell split exactly between
+    # "no precipitation" and "snow" is recorded as "no precipitation".
+    weighted_modes = [
+        pl.col(var)
+        .sort_by(
+            pl.col(var + _CATEGORY_WEIGHT_SUFFIX),
+            pl.col(var),
+            descending=[True, False],
+            nulls_last=True,
+        )
+        .first()
+        for var in categorical_vars
+    ]
     return (
-        joined.with_columns(pl.col(numeric_vars) * pl.col("proportion"))
+        joined.with_columns(pl.col(numeric_vars) * pl.col("proportion"), *category_weights)
         .group_by("h3_index")
-        .agg(pl.col(numeric_vars).sum(), pl.col(categorical_vars).mode().first(ignore_nulls=True))
-        # The ordering matters! It's essential to to `fill_nan(None)` *after* the aggregation,
-        # otherwise the None values get silently filled with zeros!
-        .with_columns(pl.col(numeric_vars).fill_nan(None))
+        .agg(
+            pl.col(numeric_vars).sum(),
+            *contributing_weights,
+            *weighted_modes,
+        )
+        .with_columns(
+            **{
+                var: pl.when(pl.col(var + _CONTRIBUTING_WEIGHT_SUFFIX) > 0)
+                .then(pl.col(var) / pl.col(var + _CONTRIBUTING_WEIGHT_SUFFIX))
+                .otherwise(None)
+                for var in numeric_vars
+            }
+        )
+        .drop(cs.ends_with(_CONTRIBUTING_WEIGHT_SUFFIX))
     )

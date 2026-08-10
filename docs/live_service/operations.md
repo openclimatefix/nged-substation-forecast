@@ -176,9 +176,14 @@ raising, so the hourly ingest keeps running; nothing is known about staleness wh
 treat it as "unknown", not "healthy".
 
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from
-the frame already in memory, and is likewise non-blocking WARN. A small scattered fraction of
-nulls in the three de-accumulated variables is *expected* and is not a fault — see
-[Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md). The check's
+the frame already in memory, and is likewise non-blocking WARN. Nulls in the three de-accumulated
+variables are *expected* and are not a fault — see
+[Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md). Read the counts
+as "how much did we lose", not as "how broken is Dynamical's feed": the H3 aggregation absorbs most
+of the upstream per-pixel corruption before it reaches a cell, so `n_null_cells` and
+`n_scattered_slices` stay small even when that corruption is heavy. Measuring the feed itself is
+tracked in
+[issue #505](https://github.com/openclimatefix/nged-substation-forecast/issues/505). The check's
 `n_whole_null_slices` metadata is the one worth a second look: those are
 `(variable, ensemble_member, valid_time)` slices where the field arrived wholesale empty. A handful
 is not a fault and the run is kept regardless, but a count that climbs run after run is worth

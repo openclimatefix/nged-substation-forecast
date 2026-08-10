@@ -91,12 +91,14 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     datetime_ranges + explode, then the original NWP values are left-joined back in, and
     interpolate/forward_fill are applied with over() to stay within group boundaries.
 
-    Leading-null propagation: Polars' interpolate() fills interior nulls but leaves leading
-    nulls (before the first non-null value in a group) as null. Some ECMWF ENS variables
-    (precipitation, radiation fluxes) are null at lead time 0 by convention. After upsampling
-    from native 3-hourly steps, all interpolated 30-min rows before the first non-null step
-    remain null — typically a 3-hour window per NWP run. Callers and downstream models should
-    treat these as genuinely missing values, not as a data quality issue.
+    End-null propagation: Polars' interpolate() fills interior nulls but leaves both leading
+    nulls (before the first non-null value in a group) and trailing nulls (after the last one)
+    as null. Some ECMWF ENS variables (precipitation, radiation fluxes) are null at lead time 0
+    by convention. After upsampling from native 3-hourly steps, all interpolated 30-min rows
+    before the first non-null step remain null — typically a 3-hour window per NWP run. The
+    trailing case is rarer but real: a wholly-null slice at the last native step of the horizon
+    is not bridged either, so it too reaches the caller as null. Callers and downstream models
+    should treat all of these as genuinely missing values, not as a data quality issue.
     """
     schema_names = nwp_lf.collect_schema().names()
     all_weather_vars = Nwp.all_weather_var_names()
