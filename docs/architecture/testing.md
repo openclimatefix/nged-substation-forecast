@@ -239,6 +239,42 @@ present):
 the only layer that can catch *future upstream drift* — a change in Dynamical.org's own conventions
 that the committed slice, frozen at capture time, cannot.
 
+## Marimo notebooks bind every name their cells reference
+
+Marimo rebuilds a notebook from its `with app.setup:` block plus its `@app.cell` functions, and
+never runs the module-level statements in between. A name bound at module level is therefore
+invisible to every cell: the notebook raises `NameError` the next time it is opened, while ruff, ty
+and pytest all pass, because the file they were handed is valid Python. Two tools produce exactly
+that shape from a working notebook — `ruff check --fix`, which writes an import an autofix needs
+into the top-level import block, and `marimo check --fix`, which deletes such an import and
+rewrites the cell that used the name as `def _(name)`, leaving a cell input nothing defines.
+
+`scripts/check_marimo_notebooks.py` reads each cell's `refs` and `defs` and reports any name a cell
+references that no cell binds. It runs as a pre-commit hook over changed notebooks, and
+`tests/test_marimo_notebooks.py` runs it over every notebook in `packages/notebooks/` and
+`packages/dashboard/`. Three properties are worth knowing:
+
+- **It is static.** Nothing executes, so the check needs none of the notebooks' runtime
+  dependencies — only marimo itself, which the root environment has via the `dashboard` dev
+  dependency. It cannot catch a notebook that binds every name and still fails inside a Polars or
+  Altair call; executing the notebooks is not an option, because they read real Delta tables and
+  S3.
+- **It rides on private marimo API.** `Cell.refs` and `Cell.defs` are documented, but loading a
+  notebook without running it is not. So the checker raises rather than reporting "no findings"
+  whenever a file does not parse into at least one cell, and the tests keep a positive control —
+  a deliberately broken notebook, held as a string so ruff never sees it — that fails if a marimo
+  release stops the check detecting a real breakage.
+- **Every `.py` file directly inside those two directories must be a notebook**, and a file that
+  is not one is a finding. The ruff pre-commit hooks share that assumption: they use it to decide
+  which files must never be auto-fixed.
+
+Testing what a notebook's cells actually *do* is a separate job, and
+`packages/notebooks/plot_missing_NWP_data.py` is the worked example. Its chart-building helper is
+an `@app.function` — marimo's form for a top-level reusable function — so an ordinary `test_*`
+function in the same notebook can exercise it on a synthetic frame. Naming the notebook in
+`python_files` is what makes a plain `uv run pytest` collect it. The authoring rules for writing
+one are in the `marimo-notebooks` skill.
+
 ## Assertion style for Patito frames
 
 Build a frame, attach the model, cast, and validate for the happy path:
