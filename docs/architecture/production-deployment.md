@@ -212,11 +212,11 @@ imperfection — throws away otherwise-good data; ignoring the distinction the o
 genuinely broken data land silently.
 
 The `ecmwf_ens` asset is the worked example. Its `nwp_has_no_unexpected_nulls` check surfaces the
-scattered per-pixel nulls that ECMWF ENS is known to carry (a WARN), and its `nwp_run_is_complete`
-check surfaces a run that arrived short of its full ensemble-member, forecast-step and grid-cell
-grid (also a WARN — the rows that did arrive are kept), while `Nwp.validate` still hard-fails a
-wholesale structural gap. The reasoning behind exactly where that fatal/tolerated line
-sits is documented in
+nulls that ECMWF ENS is known to carry (a WARN), and its `nwp_run_is_complete` check surfaces a
+run that arrived short of its full ensemble-member, forecast-step and grid-cell grid (also a WARN
+— the rows that did arrive are kept), while `Nwp.validate` still hard-fails a weather column that
+carries no data at all. The reasoning behind exactly where that fatal/tolerated line sits is
+documented in
 [Known ECMWF ENS data-quality issues](ecmwf-ens-known-issues.md). The `power_data_is_fresh` check
 above is the same shape of tool pointed at a different question — staleness rather than
 completeness — and is likewise a warning, never a failure.

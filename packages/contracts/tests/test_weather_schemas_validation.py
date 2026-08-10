@@ -3,15 +3,28 @@ from datetime import datetime, timedelta, timezone
 import patito as pt
 import polars as pl
 import pytest
-from contracts.weather_schemas import Nwp, assess_nwp_quality
+from contracts.weather_schemas import Nwp, NwpVariableWhollyMissing, assess_nwp_quality
 
 # A run initialised after 2024-11-12, when categorical_precipitation_type_surface became non-null.
 _INIT_TIME = datetime(2024, 12, 1, tzinfo=timezone.utc)
 _BEYOND_LEAD0 = _INIT_TIME + timedelta(hours=3)
+_LATER_BEYOND_LEAD0 = _INIT_TIME + timedelta(hours=6)
+
+_DEACCUMULATED_VARS = (
+    "precipitation_surface",
+    "downward_short_wave_radiation_flux_surface",
+    "downward_long_wave_radiation_flux_surface",
+)
+
+
+def _valid_value(deaccumulated_var: str) -> float:
+    """A physically-in-bounds value for one de-accumulated variable (precipitation's `le` is 0.01)."""
+    return 0.001 if deaccumulated_var == "precipitation_surface" else 100.0
 
 
 def _nwp_slice(
     *,
+    init_time: datetime = _INIT_TIME,
     valid_time: datetime = _BEYOND_LEAD0,
     h3_indices: tuple[int, ...] = (100, 101, 102),
     member: int = 0,
@@ -25,7 +38,7 @@ def _nwp_slice(
     n = len(h3_indices)
     columns: dict[str, object] = {
         "nwp_model_id": ["ECMWF_ENS_0_25_degree"] * n,
-        "init_time": [_INIT_TIME] * n,
+        "init_time": [init_time] * n,
         "valid_time": [valid_time] * n,
         "ensemble_member": [member] * n,
         "h3_index": list(h3_indices),
@@ -46,6 +59,16 @@ def _nwp_slice(
     if overrides:
         columns.update(overrides)
     return pl.DataFrame(columns)
+
+
+def _nwp_run(*slices: pl.DataFrame) -> pl.DataFrame:
+    """Stack several `_nwp_slice` frames into one multi-slice run.
+
+    ``vertical_relaxed`` because an all-null override column arrives as Polars' `Null` dtype, which
+    will not vstack onto the `Float64` of an intact slice; the relaxed supertype is the one
+    `_validate`'s model cast would land on anyway.
+    """
+    return pl.concat(slices, how="vertical_relaxed")
 
 
 def _validate(df: pl.DataFrame) -> pt.DataFrame[Nwp]:
@@ -77,18 +100,11 @@ def test_instantaneous_null_beyond_lead0_is_fatal(instantaneous_var: str) -> Non
         _validate(df)
 
 
-@pytest.mark.parametrize(
-    "deaccumulated_var",
-    [
-        "precipitation_surface",
-        "downward_short_wave_radiation_flux_surface",
-        "downward_long_wave_radiation_flux_surface",
-    ],
-)
+@pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
 def test_scattered_deaccumulated_null_beyond_lead0_is_tolerated(deaccumulated_var: str) -> None:
     """Scattered per-pixel nulls in a de-accumulated variable (the 2026-07-12 / #722 class) are
     tolerated at ingest and surfaced by the quality assessor, not failed."""
-    valid_value = 0.001 if deaccumulated_var == "precipitation_surface" else 100.0
+    valid_value = _valid_value(deaccumulated_var)
     df = _nwp_slice(
         overrides={deaccumulated_var: [valid_value, None, valid_value]}
     )  # 1 of 3 cells null
@@ -99,23 +115,115 @@ def test_scattered_deaccumulated_null_beyond_lead0_is_tolerated(deaccumulated_va
     assert not report.is_healthy
     assert report.n_null_cells == 1
     assert report.n_affected_slices == 1
+    assert report.n_scattered_slices == 1
+    assert report.n_whole_null_slices == 0
     assert report.affected_variables == (deaccumulated_var,)
 
 
-@pytest.mark.parametrize(
-    "deaccumulated_var",
-    [
-        "precipitation_surface",
-        "downward_short_wave_radiation_flux_surface",
-        "downward_long_wave_radiation_flux_surface",
-    ],
-)
-def test_whole_slice_deaccumulated_null_beyond_lead0_is_fatal(deaccumulated_var: str) -> None:
-    """A whole (member, valid_time) slice that is entirely null for a de-accumulated variable is a
-    wholesale missing field, not tolerable scatter — it must fail ingest."""
-    df = _nwp_slice(overrides={deaccumulated_var: [None, None, None]})  # all 3 cells null
-    with pytest.raises(ValueError, match="Whole-slice null"):
+@pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
+def test_whole_slice_deaccumulated_null_beyond_lead0_is_tolerated(deaccumulated_var: str) -> None:
+    """One wholly-null (member, valid_time) slice is tolerated while the variable still carries
+    weather elsewhere in the run — the 2026-08-09 class, where 2 of that variable's 4284
+    (member, step) slices arrived empty.
+
+    Failing here would discard an otherwise-good run for a fraction of one already-nullable
+    variable, so the slice is landed and reported by the quality assessor instead.
+    """
+    df = _nwp_run(
+        _nwp_slice(overrides={deaccumulated_var: [None, None, None]}),  # wholly null
+        _nwp_slice(valid_time=_LATER_BEYOND_LEAD0),  # intact
+    )
+
+    validated = _validate(df)  # does not raise
+
+    report = assess_nwp_quality(validated)
+    assert not report.is_healthy
+    assert report.n_whole_null_slices == 1
+    assert report.n_scattered_slices == 0
+    assert report.n_null_cells == 3
+    assert report.affected_variables == (deaccumulated_var,)
+
+
+@pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
+def test_wholly_missing_deaccumulated_variable_is_fatal(deaccumulated_var: str) -> None:
+    """A de-accumulated variable null in *every* slice beyond lead-0 carries no weather at all —
+    an absent column rather than a degraded one, which must fail ingest so the live forecast falls
+    back on the previous (complete) run."""
+    df = _nwp_run(
+        _nwp_slice(overrides={deaccumulated_var: [None, None, None]}),
+        _nwp_slice(valid_time=_LATER_BEYOND_LEAD0, overrides={deaccumulated_var: [None] * 3}),
+    )
+    with pytest.raises(NwpVariableWhollyMissing, match="wholesale absent"):
         _validate(df)
+
+
+@pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
+def test_wholly_missing_variable_is_judged_per_init_time(deaccumulated_var: str) -> None:
+    """A run with an empty column is fatal even inside a frame that also holds a healthy run.
+
+    Counting a variable's wholly-null slices against the *frame's* total slice count instead of
+    its run's would let the healthy run's slices outvote the broken one, and the empty column
+    would land.
+    """
+    other_init_time = _INIT_TIME + timedelta(days=1)
+    df = _nwp_run(
+        # The broken run: its only slice beyond lead-0 carries no weather for this variable.
+        _nwp_slice(overrides={deaccumulated_var: [None] * 3}),
+        # A healthy run alongside it.
+        _nwp_slice(init_time=other_init_time, valid_time=other_init_time + timedelta(hours=3)),
+    )
+    with pytest.raises(NwpVariableWhollyMissing, match="wholesale absent"):
+        _validate(df)
+
+
+def test_wholly_missing_variables_are_all_named() -> None:
+    """Two empty columns at once are both named, so the message is actionable rather than
+    reporting whichever happened to sort first."""
+    df = _nwp_run(
+        _nwp_slice(
+            overrides={
+                "precipitation_surface": [None] * 3,
+                "downward_short_wave_radiation_flux_surface": [None] * 3,
+            }
+        ),
+        _nwp_slice(
+            valid_time=_LATER_BEYOND_LEAD0,
+            overrides={
+                "precipitation_surface": [None] * 3,
+                "downward_short_wave_radiation_flux_surface": [None] * 3,
+            },
+        ),
+    )
+    with pytest.raises(NwpVariableWhollyMissing) as exc_info:
+        _validate(df)
+
+    message = str(exc_info.value)
+    assert "precipitation_surface" in message
+    assert "downward_short_wave_radiation_flux_surface" in message
+
+
+@pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
+def test_wholly_missing_variable_is_judged_beyond_lead0_only(deaccumulated_var: str) -> None:
+    """Lead-0 nulls never count towards "wholly missing": every de-accumulated variable is
+    legitimately null there, so a run whose only null slice is lead-0 must pass."""
+    df = _nwp_run(
+        _nwp_slice(
+            valid_time=_INIT_TIME,  # lead-0, legitimately null
+            overrides={deaccumulated_var: [None, None, None]},
+        ),
+        _nwp_slice(),  # intact, beyond lead-0
+    )
+    validated = _validate(df)  # does not raise
+    assert assess_nwp_quality(validated).is_healthy
+
+
+@pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
+def test_lead0_only_frame_is_not_wholly_missing(deaccumulated_var: str) -> None:
+    """A frame with no rows beyond lead-0 has no slice that *could* carry weather, so the fatal
+    check must abstain rather than treat "no surviving slices" as "the column is empty"."""
+    df = _nwp_slice(valid_time=_INIT_TIME, overrides={deaccumulated_var: [None, None, None]})
+    validated = _validate(df)  # does not raise
+    assert assess_nwp_quality(validated).is_healthy
 
 
 def test_lead0_deaccumulated_nulls_are_allowed() -> None:

@@ -9,38 +9,65 @@ and two non-fatal reporters sit behind the asset's two WARN checks — `assess_n
 
 ## The guiding principle
 
-We fail a run's ingest only when its data is *structurally* broken, and we tolerate *localised*
-corruption that a model can absorb — surfacing it as a warning rather than throwing away an
-otherwise-good run. The variable that is affected turns out to be a clean signal for which case we
-are in, so the fatal gate needs no magic thresholds.
+We reject data that is *structurally* wrong and tolerate gaps a model can absorb, surfacing those
+as a warning rather than throwing away an otherwise-good run. Which case we are in is decided by
+the *variable*, so the gate needs no magic thresholds:
 
-## Scattered per-pixel nulls in the de-accumulated variables (tolerated)
+- An **instantaneous** variable (temperature, winds, pressures) is never legitimately null, so any
+  null in one is anomalous, and any null is fatal.
+- A **de-accumulated** variable (precipitation, the two radiation fluxes) is null by design at
+  lead-0 and carries known upstream corruption beyond it, so its nulls are in-distribution. Every
+  null pattern in one of these is tolerated, with exactly one exception: it is fatal when that
+  variable is null in **every single** `(ensemble_member, valid_time)` slice beyond lead-0 of the
+  run being ingested — that is, when the column holds no weather anywhere in the run. The test is
+  literally "is anything left?", so a run with 4283 of one variable's 4284 slices empty still
+  lands (with a warning); only 4284 of 4284 fails.
+
+## Nulls in the de-accumulated variables (tolerated)
 
 The three de-accumulated variables — `precipitation_surface`,
 `downward_short_wave_radiation_flux_surface`, and `downward_long_wave_radiation_flux_surface` —
-sometimes carry scattered, per-pixel nulls beyond the first forecast step. Dynamical de-accumulates
-these from ECMWF's cumulative source fields to instantaneous rates, and the root cause is corrupt
-source accumulation: some `(ensemble_member, forecast_step)` fields report physically-impossible
-*negative* accumulation, which the de-accumulation step correctly leaves as null rather than
-silently clamping corrupt data to zero. This is documented and WONTFIX upstream in
+carry nulls beyond the first forecast step. Dynamical de-accumulates these from ECMWF's cumulative
+source fields to instantaneous rates, and the root cause is corrupt source accumulation: some
+`(ensemble_member, forecast_step)` fields report physically-impossible *negative* accumulation,
+which the de-accumulation step correctly leaves as null rather than silently clamping corrupt data
+to zero. This is documented and WONTFIX upstream in
 [dynamical-org/reformatters#722](https://github.com/dynamical-org/reformatters/issues/722); a
 looser clamp threshold would only convert visibly-null corrupt data into invisibly-zeroed corrupt
 data.
 
-We tolerate these at ingest for two reasons. First, all three variables are already legitimately
-null at lead-0 (the de-accumulation has no previous step to difference against), so every model
-must handle their nulls regardless. Second, the corruption is genuinely scattered — empirically a
-few percent of a slice at most, never a whole slice — so the run remains overwhelmingly usable.
+Usually the corruption is scattered per-pixel, a few percent of a slice. Occasionally a whole
+`(ensemble_member, valid_time)` slice arrives null across the grid: the 2026-08-09 00Z run had
+`downward_short_wave_radiation_flux_surface` null worldwide for ensemble member 34 at the 354-hour
+and 360-hour steps — 2 of that variable's 4284 `(member, step)` slices (51 ensemble members × the
+84 steps beyond lead-0).
 
-`Nwp.validate` therefore permits scattered nulls in these variables, and the
-`nwp_has_no_unexpected_nulls` asset check reports them (WARN, non-blocking) with the affected
-`(variable, ensemble_member, valid_time)` slices, so the quirk stays visible without failing the
-run.
+Both patterns are tolerated at ingest, for two reasons. First, a tolerated gap is a small,
+isolated part of one member's trajectory, and it is absorbed the same way the scattered corruption
+already is. Be careful with the tempting shorter version of that argument — "these variables are
+null at lead-0 anyway, so models handle their nulls" — because it does not quite transfer. Lead-0
+nulls reach the model *as nulls* only because they are *leading*, and `_upsample_nwp_to_half_hourly`
+leaves leading nulls alone; an *interior* wholly-null slice is interpolated from its neighbouring
+steps, so the model sees a fabricated value instead. Note the span that bridges: losing one native
+step means interpolating between the steps *either side* of it, so 6 hours in the 3-hourly part of
+the horizon and 12 in the 6-hourly part. That is acceptable, and it is what already happens to the
+scattered nulls — but it is a different claim from "the model sees a null and copes". Second, the
+run that failing would discard is overwhelmingly good. Take that 2026-08-09 run as the worked example: 0.05% of one
+already-nullable variable is not worth the other 4282 slices of that same variable, nor the twelve
+other variables that arrived complete, and rejecting it leaves the live forecast on a run 24 hours
+older. That is exactly the trade
+[principle 7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary)
+warns against, in its own words: throwing away an otherwise-good NWP run converts a tolerable
+problem into an outage.
 
-## Whole-slice and instantaneous nulls (fatal)
+`Nwp.validate` therefore permits both patterns, and the `nwp_has_no_unexpected_nulls` asset check
+reports them (WARN, non-blocking), naming the affected `(variable, ensemble_member, valid_time)`
+slices and counting the wholly-null ones separately from the scattered ones — the two warrant
+different responses even though neither fails the run.
 
-Two null patterns *do* fail ingest, because both mean the data is structurally missing rather than
-locally corrupt:
+## A wholly-missing variable, and instantaneous nulls (fatal)
+
+Two null patterns *do* fail ingest:
 
 - **A null in any instantaneous variable** (temperature, dew point, winds, pressures,
   geopotential height). These are never legitimately null, so any null is an anomalous structural
@@ -49,13 +76,40 @@ locally corrupt:
   ensemble members across every variable — reported upstream as
   [dynamical-org/reformatters#765](https://github.com/dynamical-org/reformatters/issues/765).
 
-- **A whole-slice null in a de-accumulated variable** — an entire `(ensemble_member, valid_time)`
-  slice null across the grid beyond lead-0. Unlike the scattered case above, a wholesale-missing
-  field is a structural outage, so `Nwp._check_no_whole_null_deaccumulated_slices` fails it.
+- **A de-accumulated variable null in *every* slice beyond lead-0 of a run** — the column is absent
+  rather than degraded, so `Nwp._check_no_wholly_missing_deaccumulated_variable` raises
+  `NwpVariableWhollyMissing`. This is the one place where landing the run is worse than not landing
+  it: an all-null weather column would train and serve silently for the full 15-day horizon,
+  whereas the previous run is stale but complete. The judgement is made per `init_time`, so a run
+  with an empty column is caught even in a frame that also holds healthy runs.
 
 A run that fails ingest writes nothing (validation runs before the Delta append), so there are no
-partial partitions to clean up; the partition simply stays unmaterialised until the upstream data
-is fixed or the partition is re-run.
+partial partitions to clean up.
+
+### A wholly-missing variable is retried, not failed outright
+
+`NwpVariableWhollyMissing` is its own exception type because the `ecmwf_ens` asset **retries** it,
+on the same ladder as a run that is not in the catalog yet: every 30 minutes, up to 8 times. (That
+is *at least* four hours of waiting — this failure is only detectable after downloading, so each
+of those attempts pays for a download too.)
+Both mean "the upstream run is not ready yet"; they just say it at different points.
+
+That is worth doing because Dynamical.org publishes each 00Z run as roughly 40 separate Icechunk
+commits between 08:05 and 08:20 UTC, one per worker. A run being written is therefore genuinely
+readable and genuinely incomplete: a variable whose worker has not committed yet reads as
+fill-value null across every member and step, which is precisely this fatal pattern. That covers
+less ground than it sounds, and the limit is worth stating: only 3 of the `Nwp` contract's 13
+weather variables reach this check at all. Nine are instantaneous and non-nullable, so a
+half-published run also missing one of *those* is rejected by base Patito validation first and
+fails immediately, with no retry; the thirteenth, `categorical_precipitation_type_surface`, is
+nullable but has its own historical invariant that rejects an all-null column just as fast. So the
+retry engages when the variables still unwritten are the de-accumulated ones. A *defective*
+run also gets republished — the 2026-08-09 00Z run was repaired by a second sweep at 11:45 UTC,
+3 hours 25 minutes after its first publication, and well inside the retry budget.
+
+The retry stays deliberately narrow: it covers these two exceptions and nothing else, so a genuine
+bug still fails immediately rather than retrying for four hours. The partition simply stays
+unmaterialised if every retry is exhausted, until the upstream data is fixed and it is re-run.
 
 ## An incomplete run (tolerated, and reported)
 
@@ -113,14 +167,16 @@ partition would discard the 50 members we did get; the live forecast would then 
 *yesterday's* NWP run, which is a strictly worse degradation than forecasting from a slightly short
 run today. So the run lands, the check WARNs, and the missing pieces are named.
 
-So an upstream outage is fatal or tolerated according to how it reaches us, not according to how
-serious it is. When the 2026-07-14 outage above lost a forecast step for 50 of 51 members, the rows
-still existed carrying null temperatures — *malformed*, so `Nwp.validate` rejected them and the day
-became a missed run. This check covers the other shape: a whole `ensemble_member` or `lead_time`
-coordinate short on the source dataset, where the rows are simply *absent*, and the rest of the run
-is kept. The two postures are deliberate, and the fatal one is already recorded as such on the
-[degradation ladder](../design-philosophy/inherent-stability.md) ("a whole ECMWF slice corrupt …
-manifests downstream as a missed run").
+One asymmetry is worth naming, because it means an *instantaneous* variable's nulls are judged by
+the shape they arrive in rather than by how much data is lost. The 2026-07-14 outage lost a
+forecast step for 50 of 51 members, but the rows still existed carrying null temperatures —
+*malformed*, so `Nwp.validate` rejects that and the day becomes a missed run. The same loss
+arriving as absent *rows* is this check's territory: a whole `ensemble_member` or `lead_time`
+coordinate short on the source dataset, where the rest of the run is kept and the gap is named.
+The de-accumulated variables do not work that way — their nulls are tolerated by volume, up to the
+point where the column is empty — so the asymmetry is confined to the variables that are never
+legitimately null at all. Both postures are on the
+[degradation ladder](../design-philosophy/inherent-stability.md#failure-modes).
 
 ### Completeness is not part of `Nwp.validate`
 

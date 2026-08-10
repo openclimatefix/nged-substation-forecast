@@ -304,9 +304,13 @@ rather than a loud rejection at the boundary.
 
 *Decided:* `AllFeatures`, `PowerForecast` and the rest are validated schemas rather than
 conventions, and every `PowerForecast` row is self-describing. `Nwp.validate` rejects a
-*whole-slice* null in a de-accumulated variable but tolerates scattered per-pixel nulls (the
-`nwp_has_no_unexpected_nulls` check reports them as a `WARN`) — usefully converting fine-grained
-catastrophe into a coarse-grained missed run, the form principle 1 already handles.
+de-accumulated variable that is null in *every* slice beyond lead-0 — a column carrying no weather
+at all — but tolerates every smaller null pattern, from scattered per-pixel corruption up to a
+whole `(ensemble_member, valid_time)` slice, which the `nwp_has_no_unexpected_nulls` check reports
+as a `WARN`. That line is this principle's granularity clause doing real work: a run can arrive
+with 2 of one variable's 4284 `(member, step)` slices empty, and rejecting it over 0.05% of a
+single already-nullable variable is exactly the tolerable-problem-into-an-outage trade the clause
+exists to forbid.
 
 *Serves:*
 [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
