@@ -5,13 +5,13 @@ from pathlib import Path
 
 
 def trim_json(input_path: Path, output_path: Path, num_entries: int = 1000) -> None:
-    with open(input_path, "r") as f:
+    with input_path.open() as f:
         data = json.load(f)
 
     if "data" in data:
         data["data"] = data["data"][-num_entries:]
 
-    with open(output_path, "w") as f:
+    with output_path.open("w") as f:
         json.dump(data, f, indent=2)
 
 

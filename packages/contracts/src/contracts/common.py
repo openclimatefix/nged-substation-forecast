@@ -1,5 +1,11 @@
+"""Shared building blocks for the Patito schemas.
+
+The canonical UTC dtype, the plausible-datetime bounds and the checks that enforce them, and the
+delivery quantile levels.
+"""
+
 from datetime import UTC, datetime
-from typing import Any, Final, Type
+from typing import Any, Final
 
 import patito as pt
 import polars as pl
@@ -151,7 +157,7 @@ def quantile_label(quantile: float) -> str:
     return f"p{round(quantile * 100)}"
 
 
-def _get_time_series_id_dtype(**kwargs) -> Any:
+def _get_time_series_id_dtype(**kwargs: Any) -> Any:
     return pt.Field(
         dtype=pl.Int32,
         description=(
@@ -164,16 +170,14 @@ def _get_time_series_id_dtype(**kwargs) -> Any:
     )
 
 
-def validate_schema(model: Type[pt.Model], df: pl.DataFrame | pl.LazyFrame) -> None:
-    """Validates that the schema of a Polars DataFrame or LazyFrame matches the schema defined in a
-    Patito model, raising DataFrameValidationError on failure. On LazyFrames, this function doesn't
-    materialize any data, it just calls `collect_schema()`.
+def validate_schema(model: type[pt.Model], df: pl.DataFrame | pl.LazyFrame) -> None:
+    """Validate a Polars DataFrame's or LazyFrame's schema against a Patito model.
+
+    Raises `DataFrameValidationError` on failure. On LazyFrames this materializes no data; it just
+    calls `collect_schema()`.
     """
     # Get actual schema
-    if isinstance(df, pl.LazyFrame):
-        actual_schema = dict(df.collect_schema())
-    else:
-        actual_schema = dict(df.schema)
+    actual_schema = dict(df.collect_schema()) if isinstance(df, pl.LazyFrame) else dict(df.schema)
 
     # Check for missing columns
     missing_cols = set(model.dtypes.keys()) - set(actual_schema.keys())

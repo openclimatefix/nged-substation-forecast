@@ -35,10 +35,18 @@ The essentials:
 ### Linting & Formatting
 
 - **Check linting**: `uv run ruff check .`
-- **Fix linting**: `uv run ruff check . --fix`
+- **Fix linting**: `uv run ruff check . --fix` — but see the warning below before running this
+  over a marimo notebook.
 - **Format code**: `uv run ruff format .`
 - **Type checking**: `uv run ty check`
 - **Markdown linting**: `uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md`
+
+> **Never run `ruff check --fix` over a marimo notebook** (`packages/notebooks/*.py`,
+> `packages/dashboard/{map_and_timeseries,view_forecasts}.py`). When a fix needs a name the file
+> does not import yet, ruff adds the import at module level — outside `with app.setup:`, where no
+> cell can see it — and the notebook then fails with a `NameError` while `ruff check` reports
+> success. The pre-commit hook is split so notebooks are checked but never auto-fixed; a `--fix`
+> you type yourself is not covered.
 
 Markdown (README.md files, docs/*.md, and Python docstrings) is linted automatically by the
 pre-commit hook, but when developing code or docs it's a good idea to run the markdown lint

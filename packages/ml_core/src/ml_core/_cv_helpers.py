@@ -5,7 +5,7 @@ can be unit-tested in isolation. The CV asset bodies stay thin by delegating the
 """
 
 import calendar
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from typing import Any, Final
 
 import polars as pl
@@ -32,7 +32,7 @@ def date_to_utc_datetime(d: date, *, end_of_day: bool = False) -> datetime:
             the training/validation windows and ``val_end``); otherwise ``00:00:00``.
     """
     clock = time(23, 59, 59) if end_of_day else time(0, 0, 0)
-    return datetime.combine(d, clock, tzinfo=timezone.utc)
+    return datetime.combine(d, clock, tzinfo=UTC)
 
 
 def _subtract_months(d: date, months: int) -> date:

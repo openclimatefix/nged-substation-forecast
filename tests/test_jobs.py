@@ -38,7 +38,7 @@ def test_resolve_applies_scalar_override() -> None:
 
 
 def test_resolve_replaces_list_override() -> None:
-    """A list override swaps the whole list (merge replaces, not extends) — then coerces to a set."""
+    """A list override swaps the whole list (merge replaces, not extends), then coerces to a set."""
     _, config = _resolve_forecaster_config(
         _BASE_CONFIG, {"selected_features": ["power_lag_24h"]}, "exp"
     )

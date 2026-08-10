@@ -8,7 +8,7 @@ second run id should replace the directory rather than merging into it.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import mlflow
@@ -45,7 +45,7 @@ def _save_trained_model_to_mlflow(experiment_name: str, n_estimators: int) -> st
     genuine trained booster + a real ``meta.json`` with ``model_class``, exercised through the
     same ``save_to_mlflow`` mechanism ``trained_cv_model`` uses.
     """
-    times = [datetime(2025, 1, 1, hour, tzinfo=timezone.utc) for hour in (0, 1, 2)]
+    times = [datetime(2025, 1, 1, hour, tzinfo=UTC) for hour in (0, 1, 2)]
     train_df = pl.DataFrame(
         {
             "time_series_id": [1, 1, 1],

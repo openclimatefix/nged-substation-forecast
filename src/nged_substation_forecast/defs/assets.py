@@ -1,7 +1,12 @@
+"""The ingestion Dagster assets.
+
+NGED telemetry and metadata, the H3 grid weights, and the daily-partitioned ECMWF ENS download.
+"""
+
 import ast
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
-from typing import Any, Final, Generic, Self, TypeVar
+from datetime import UTC, datetime
+from typing import Any, Final, Self
 
 import patito as pt
 import polars as pl
@@ -59,8 +64,7 @@ from pydantic import BaseModel, computed_field, field_validator
 
 @asset
 def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
-    """
-    Ingests raw telemetry and metadata from NGED S3 into our local storage.
+    """Ingests raw telemetry and metadata from NGED S3 into our local storage.
 
     This asset acts as the entry point for NGED data into our system. It fetches
     the latest available data from the external S3 bucket and appends it to our
@@ -146,8 +150,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 
 @asset
 def h3_grid_weights(context: AssetExecutionContext) -> None:
-    """
-    Computes H3 grid weights for the Great Britain boundary.
+    """Computes H3 grid weights for the Great Britain boundary.
 
     This asset calculates the fractional overlap of H3 cells with the GB boundary
     at various resolutions, which is used for spatial aggregation of weather data.
@@ -240,8 +243,7 @@ _NWP_NULL_SLICES_SCHEMA: Final[TableSchema] = TableSchema(
     pool="ECMWF",
 )
 def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
-    """
-    Downloads and processes ECMWF ensemble NWP data for a specific day.
+    """Downloads and processes ECMWF ensemble NWP data for a specific day.
 
     This asset fetches the 00Z NWP run for the partition date, converts it to a
     Polars DataFrame, and appends it to the Delta table through
@@ -250,7 +252,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     settings = Settings()
     storage_options = settings.storage_options
     partition_date_str = context.partition_key
-    nwp_init_time = datetime.strptime(partition_date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    nwp_init_time = datetime.strptime(partition_date_str, "%Y-%m-%d").replace(tzinfo=UTC)
 
     # Load dependencies
     h3_grid = pt.DataFrame(
@@ -309,8 +311,11 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
 
 
 def _nwp_run_shape_metadata(report: NwpRunCompletenessReport) -> dict[str, MetadataValue]:
-    """The run's observed shape, published on *every* materialisation so drift is visible in the
-    Dagster UI timeline even on the runs where the completeness check passes."""
+    """The run's observed shape.
+
+    Published on *every* materialisation so drift is visible in the Dagster UI timeline even on
+    the runs where the completeness check passes.
+    """
     return {
         "n_ensemble_members": MetadataValue.int(report.n_ensemble_members),
         "n_valid_times": MetadataValue.int(report.n_valid_times),
@@ -426,13 +431,11 @@ def _nwp_null_slices_metadata(affected: pl.DataFrame) -> TableMetadataValue:
 # TODO: Move the code below this line to a separate file.
 
 
-T = TypeVar("T", bound=pt.Model)
-
-
-class _BaseSummary(ABC, BaseModel, Generic[T]):
+class _BaseSummary[T: pt.Model](ABC, BaseModel):
     """Create a Dagster table of summary statistics.
 
-    The Generic[T] makes this superclass generic over pt.Models."""
+    The type parameter ``T`` makes this superclass generic over ``pt.Model`` subclasses.
+    """
 
     stage: str
     start_time: str = "N/A"
@@ -478,8 +481,9 @@ class _FileListingSummary(_BaseSummary[_ProcessedFileListing]):
 
     @classmethod
     def from_data_frame(cls, stage_name: str, df: pt.DataFrame[_ProcessedFileListing]) -> Self:
-        # The `ty: ignore` comments are because `ty` only looks at the types specified in the BaseModel.
-        # `ty` doesn't know that we're casting the types in the `field_validator` methods.
+        # The `ty: ignore` comments are because `ty` only looks at the types specified in the
+        # BaseModel. `ty` doesn't know that we're casting the types in the `field_validator`
+        # methods.
         if len(df) > 0:
             return cls(
                 stage=stage_name,
@@ -491,8 +495,7 @@ class _FileListingSummary(_BaseSummary[_ProcessedFileListing]):
                 min_file_size_bytes=df["filesize_bytes"].min(),  # ty: ignore[invalid-argument-type]
                 max_file_size_bytes=df["filesize_bytes"].max(),  # ty: ignore[invalid-argument-type]
             )
-        else:
-            return cls(stage=stage_name, n_files=0)
+        return cls(stage=stage_name, n_files=0)
 
 
 class _PowerTimeSeriesSummary(_BaseSummary[PowerTimeSeries]):
@@ -509,5 +512,4 @@ class _PowerTimeSeriesSummary(_BaseSummary[PowerTimeSeries]):
                 # TODO: We can't list *all* time_series_ids when we're handling 1,000s of IDs!
                 time_series_ids=df["time_series_id"],
             )
-        else:
-            return cls(stage=stage_name, n_rows=0)
+        return cls(stage=stage_name, n_rows=0)

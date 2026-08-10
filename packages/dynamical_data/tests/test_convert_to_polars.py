@@ -5,7 +5,7 @@ test drives the whole open -> download -> convert pipeline with the network call
 """
 
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import patito as pt
@@ -21,7 +21,7 @@ from dynamical_data.ecmwf_ens.convert_to_polars import (
 
 # After 2024-11-12 so the populated categorical_precipitation_type_surface column is valid; see
 # Nwp._check_variables_that_were_introduced_after_start_of_dataset.
-_INIT_TIME = datetime(2025, 1, 1, tzinfo=timezone.utc)
+_INIT_TIME = datetime(2025, 1, 1, tzinfo=UTC)
 
 
 def _single_cell_grid(
@@ -65,9 +65,9 @@ def test_convert_happy_path_shape_and_schema(
         assert col not in df.columns
     assert df["init_time"].unique().to_list() == [_INIT_TIME]
     assert set(df["valid_time"].unique().to_list()) == {
-        datetime(2025, 1, 1, 0, tzinfo=timezone.utc),
-        datetime(2025, 1, 1, 6, tzinfo=timezone.utc),
-        datetime(2025, 1, 1, 12, tzinfo=timezone.utc),
+        datetime(2025, 1, 1, 0, tzinfo=UTC),
+        datetime(2025, 1, 1, 6, tzinfo=UTC),
+        datetime(2025, 1, 1, 12, tzinfo=UTC),
     }
 
 
@@ -95,7 +95,7 @@ def test_convert_derives_wind_speed(
 
 
 @pytest.mark.parametrize(
-    "wind_u, wind_v, expected_direction",
+    ("wind_u", "wind_v", "expected_direction"),
     # Meteorological "direction from"; formula is (arctan2(u, v) * 180/pi + 180) % 360. All four
     # quadrants plus a non-axis-aligned bearing; values kept clear of the 0/360 wrap boundary so
     # float rounding can't flip 359.99 <-> 0.

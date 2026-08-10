@@ -33,7 +33,6 @@ def compute_h3_grid_weights_for_boundary(
     determining which regular grid cell each child falls into. The `grid_size` parameter is used to
     snap high-resolution H3 cells to the nearest regular NWP grid points.
     """
-
     _LOG.info(f"Generating H3 cells at resolution {h3_res}...")
 
     h3_index = h3.geo_to_cells(geo=boundary, res=h3_res)
@@ -67,8 +66,8 @@ def compute_h3_grid_weights(
             strictly greater than the resolution of the input 'h3_index' column.
     """
     _LOG.info(
-        f"Computing H3 grid weights for grid size {nwp_grid_size_degrees} with child_res {child_h3_res}"
-        f" for {len(h3_index)} H3 indicies..."
+        f"Computing H3 grid weights for grid size {nwp_grid_size_degrees}"
+        f" with child_res {child_h3_res} for {len(h3_index)} H3 indicies..."
     )
 
     if len(h3_index) == 0:
@@ -100,11 +99,13 @@ def compute_h3_grid_weights(
     half_grid_size = nwp_grid_size_degrees / 2
 
     def _snap_to_grid(lat_or_lon: pl.Expr) -> pl.Expr:
-        """Grid snapping formula: The half-grid offset binning `((lat + grid_size/2) /
-        grid_size).floor() * grid_size` ensures that points are snapped to the *closest* grid
-        center rather than the bottom-left corner of the grid cell. Adding `grid_size/2`
-        before flooring shifts the bin boundaries so that the grid points (0, 0.25, 0.5, etc.)
-        are at the center of each bin."""
+        """Snap a latitude or longitude to the closest NWP grid line.
+
+        The half-grid offset binning `((lat + grid_size/2) / grid_size).floor() * grid_size`
+        ensures that points are snapped to the *closest* grid center rather than the bottom-left
+        corner of the grid cell. Adding `grid_size/2` before flooring shifts the bin boundaries so
+        that the grid points (0, 0.25, 0.5, etc.) are at the center of each bin.
+        """
         return (
             (lat_or_lon + half_grid_size) / nwp_grid_size_degrees
         ).floor() * nwp_grid_size_degrees

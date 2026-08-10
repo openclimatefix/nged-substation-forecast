@@ -13,8 +13,9 @@ would miss exactly the failure this check exists to catch.
 
 ``evaluate_power_freshness`` is a pure function so it is unit-testable without Dagster or Delta,
 and it is the hand-off point for routing per-series staleness to Sentry: the same
-``PowerFreshnessResult`` is fed to ``report_power_freshness`` (in ``nged_substation_forecast._sentry``)
-rather than recomputed. The two mechanisms stay complementary — the
+``PowerFreshnessResult`` is fed to ``report_power_freshness`` (in
+``nged_substation_forecast._sentry``) rather than recomputed. The two mechanisms stay
+complementary — the
 [Sentry missed-check-in alarm](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
 fires on total silence from outside the deployment, while this check (and its Sentry warning) report
 per-series staleness from inside Dagster while the daemon is alive.
@@ -29,8 +30,9 @@ old depending on the slot, so any absolute age threshold would fire on two slots
 The full argument is in
 [Inherent Stability → Three audiences, three channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
 
-Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and ``live_forecasts_are_healthy``
-additionally cannot raise — every read it makes is guarded and its whole body sits under a
+Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and
+``live_forecasts_are_healthy`` additionally cannot raise — every read it makes is guarded and its
+whole body sits under a
 catch-all — because a warning path that fails would turn fail-open into fail-closed at exactly the
 wrong moment (rule 7 of
 [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
@@ -40,7 +42,7 @@ import json
 import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Final
 
@@ -279,7 +281,7 @@ def power_data_is_fresh() -> AssetCheckResult:
     result = evaluate_power_freshness(
         coverage=coverage,
         roster_ids=roster_ids,
-        now=datetime.now(timezone.utc),
+        now=datetime.now(UTC),
         threshold=_POWER_DATA_STALENESS_THRESHOLD,
     )
     # Forward per-series staleness to Sentry (a no-op unless a DSN is set and some series is late).
@@ -334,7 +336,7 @@ Keeps the one-line description readable at V2 scale (~2,500 series) when a whole
 missing; the true count is always carried by the ``n_time_series_missing`` metadata field, so a
 truncated list never makes a large gap look small."""
 
-_UNIX_EPOCH: Final[datetime] = datetime(1970, 1, 1, tzinfo=timezone.utc)
+_UNIX_EPOCH: Final[datetime] = datetime(1970, 1, 1, tzinfo=UTC)
 """Origin for ``_floor_to_interval``'s arithmetic. Both cadences we floor to (daily NWP runs at
 00Z, 6-hourly forecast slots at 00/06/12/18) are aligned to it."""
 
@@ -436,13 +438,17 @@ class LiveForecastHealthResult:
         ``live_forecasts`` drops rows outside the selected NWP run's coverage, so a run that was
         only partly ingested — or one so old that its remaining coverage is nearly used up —
         silently delivers a much shorter forecast than NGED expect, with every row still perfectly
-        well-formed. That is structural, not a matter of skill, so it belongs here."""
+        well-formed. That is structural, not a matter of skill, so it belongs here.
+        """
         return self.horizon_hours is not None and self.horizon_hours < _MIN_HORIZON_HOURS
 
     @property
     def is_healthy(self) -> bool:
-        """True when the slot wrote usable rows, over the expected horizon, for the whole trained
-        population, against a complete NWP feed."""
+        """True when the slot is fully healthy.
+
+        That is, when it wrote usable rows, over the expected horizon, for the whole trained
+        population, against a complete NWP feed.
+        """
         return (
             self.rows.n_rows > 0
             and self.rows.n_invalid == 0
@@ -668,7 +674,7 @@ def _read_promoted_model_facts(production_model_path: str) -> PromotedModelFacts
             # A JSON string, int, etc. here is malformed, not merely a different shape: iterating
             # a str with int() would silently mis-parse it (e.g. "12" -> (1, 2)) instead of
             # degrading, which is the "strict about malformed input" rule from CLAUDE.md.
-            raise TypeError(
+            raise TypeError(  # noqa: TRY301 — raised to reach this function's own degrade handler.
                 f"trained_time_series_ids must be a list, got {type(ids).__name__}: {ids!r}"
             )
         experiment_name = meta.get("model_params", {}).get("experiment_name")
@@ -800,7 +806,7 @@ def _evaluate_live_forecasts(context: AssetCheckExecutionContext) -> AssetCheckR
     load, all three reads, the evaluation and the metadata build — rather than only part of it.
     """
     settings = Settings()
-    power_fcst_init_time = _checked_power_fcst_init_time(context, datetime.now(timezone.utc))
+    power_fcst_init_time = _checked_power_fcst_init_time(context, datetime.now(UTC))
     promoted = _read_promoted_model_facts(settings.production_model_path)
     result = evaluate_live_forecast_health(
         _read_live_forecast_rows(

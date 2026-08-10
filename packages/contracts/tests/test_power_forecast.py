@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 import patito as pt
 import pytest
@@ -10,14 +11,14 @@ def test_power_forecast_validation():
     df = (
         pt.DataFrame(
             {
-                "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+                "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
                 "time_series_id": [123],
                 "ensemble_member": [1],
                 "ml_flow_experiment_id": [1],
-                "nwp_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
+                "nwp_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=UTC)],
                 "power_fcst_model_name": ["model_a"],
                 "power_fcst_model_version": [1],
-                "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
+                "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=UTC)],
                 "power_fcst": [10.0],
                 "experiment_name": ["baseline"],
                 "fold_id": ["live"],
@@ -32,19 +33,19 @@ def test_power_forecast_validation():
 
 
 @pytest.mark.parametrize(
-    "data, expected_error",
+    ("data", "expected_error"),
     [
         # Invalid ensemble_member (too high for Int8)
         (
             {
-                "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+                "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
                 "time_series_id": [123],
                 "ensemble_member": [200],
                 "ml_flow_experiment_id": [1],
-                "nwp_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
+                "nwp_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=UTC)],
                 "power_fcst_model_name": ["model_a"],
                 "power_fcst_model_version": [1],
-                "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
+                "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=UTC)],
                 "power_fcst": [10.0],
                 "experiment_name": ["baseline"],
                 "fold_id": ["live"],
@@ -53,7 +54,7 @@ def test_power_forecast_validation():
         ),
     ],
 )
-def test_power_forecast_invalid_data(data, expected_error):
+def test_power_forecast_invalid_data(data: dict[str, list[Any]], expected_error: str):
     # We need to cast to ensure the types are checked
     df = pt.DataFrame(data).set_model(PowerForecast)
 

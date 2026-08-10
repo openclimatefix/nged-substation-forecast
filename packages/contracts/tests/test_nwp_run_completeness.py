@@ -6,7 +6,8 @@ The synthetic "complete" run is built against the *real* ``ECMWF_ENS_ENSEMBLE_ME
 if either constant drifted away from the shape the asset actually expects.
 """
 
-from datetime import datetime, timedelta, timezone
+import itertools
+from datetime import UTC, datetime, timedelta
 
 import patito as pt
 import polars as pl
@@ -19,7 +20,7 @@ from contracts.weather_schemas import (
     assess_nwp_run_completeness,
 )
 
-_INIT_TIME = datetime(2024, 12, 1, tzinfo=timezone.utc)
+_INIT_TIME = datetime(2024, 12, 1, tzinfo=UTC)
 """A run initialised after 2024-11-12, when ``categorical_precipitation_type_surface`` became
 non-null (``Nwp.validate`` enforces that split)."""
 
@@ -106,8 +107,8 @@ def test_native_step_structure_is_3_hourly_then_6_hourly() -> None:
     assert ECMWF_ENS_LEAD_TIME_HOURS[-1] == 24 * 15
     three_hourly = [h for h in ECMWF_ENS_LEAD_TIME_HOURS if h <= 144]
     six_hourly = [h for h in ECMWF_ENS_LEAD_TIME_HOURS if h >= 144]
-    assert {b - a for a, b in zip(three_hourly, three_hourly[1:], strict=False)} == {3}
-    assert {b - a for a, b in zip(six_hourly, six_hourly[1:], strict=False)} == {6}
+    assert {b - a for a, b in itertools.pairwise(three_hourly)} == {3}
+    assert {b - a for a, b in itertools.pairwise(six_hourly)} == {6}
 
 
 def test_dropping_one_ensemble_member_is_caught_and_named() -> None:

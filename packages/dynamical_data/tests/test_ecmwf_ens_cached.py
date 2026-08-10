@@ -76,7 +76,8 @@ def test_cached_real_slice_conventions_and_orientation() -> None:
     assert lats[0] > lats[-1], (
         "the committed slice is stored descending-latitude, as convert expects"
     )
-    assert lons.min() >= -180.0 and lons.max() <= 180.0, "the committed slice is in [-180, 180]"
+    assert lons.min() >= -180.0, "the committed slice is in [-180, 180]"
+    assert lons.max() <= 180.0, "the committed slice is in [-180, 180]"
 
     grid, expected = _one_cell_per_grid_point(ds)
     df = convert(ds=ds, h3_grid=grid)

@@ -11,18 +11,19 @@ what makes a *shrinking* population observable as files that must vanish from th
 """
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Self, Sequence
+from typing import Self
 
 import mlflow
 import patito as pt
 import pytest
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
-from mlflow.exceptions import MlflowException
-from mlflow.tracking import MlflowClient
 from ml_core._production_helpers import fetch_model_artifacts
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
+from mlflow.exceptions import MlflowException
+from mlflow.tracking import MlflowClient
 
 pytestmark = pytest.mark.integration
 

@@ -6,7 +6,7 @@ right Sentry call is made with the right arguments.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import polars as pl
@@ -39,7 +39,7 @@ def _freshness_result(
         {
             "time_series_id": pl.Series(range(n_late), dtype=pl.Int32),
             "last_seen": pl.Series(
-                [datetime(2026, 7, 1, tzinfo=timezone.utc)] * n_stale + [None] * n_never
+                [datetime(2026, 7, 1, tzinfo=UTC)] * n_stale + [None] * n_never
             ).cast(UTC_DATETIME_DTYPE),
             "hours_late": pl.Series([30.0] * n_stale + [None] * n_never, dtype=pl.Float64),
             "status": pl.Series(["stale"] * n_stale + ["never"] * n_never),
@@ -151,7 +151,7 @@ def test_send_forecast_checkin_uses_given_slug(monkeypatch: pytest.MonkeyPatch) 
 def test_failure_hook_captures_the_real_exception(monkeypatch: pytest.MonkeyPatch) -> None:
     """The failure hook forwards ``context.op_exception`` to ``capture_exception``."""
     captured: list[BaseException] = []
-    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", lambda exc: captured.append(exc))
+    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
     hook_fn = _sentry.sentry_capture_failure.decorated_fn
     assert hook_fn is not None
     boom = ValueError("boom")
@@ -162,7 +162,7 @@ def test_failure_hook_captures_the_real_exception(monkeypatch: pytest.MonkeyPatc
 def test_failure_hook_noop_without_exception(monkeypatch: pytest.MonkeyPatch) -> None:
     """No exception on the context ⇒ nothing is captured."""
     captured: list[BaseException] = []
-    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", lambda exc: captured.append(exc))
+    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
     hook_fn = _sentry.sentry_capture_failure.decorated_fn
     assert hook_fn is not None
     hook_fn(build_hook_context(op_exception=None))
@@ -215,7 +215,9 @@ def test_report_power_freshness_noop_when_healthy(monkeypatch: pytest.MonkeyPatc
 def test_report_power_freshness_sends_warning_with_fingerprint_and_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """DSN + late series ⇒ one warning, fingerprinted per environment, with counts as tags/context."""
+    """DSN + late series ⇒ one warning, fingerprinted per environment, with counts as
+    tags/context.
+    """
     calls = _capture_message_recorder(monkeypatch)
     _sentry.report_power_freshness(
         _settings(sentry_dsn=_DSN, sentry_environment="jacks-laptop"),
@@ -282,8 +284,11 @@ def test_report_power_freshness_caps_series_listed_in_message(
 def test_report_power_freshness_swallows_and_logs_on_send_error(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """A Sentry send error must not propagate (it would fail the data-health check and trip the
-    failure hook), but it must be logged at ERROR with a traceback rather than silently swallowed."""
+    """A Sentry send error must not propagate, but must be logged at ERROR with a traceback.
+
+    Propagating would fail the data-health check and trip the failure hook; silently swallowing
+    would hide the problem entirely.
+    """
 
     def boom(*_: Any, **__: Any) -> None:
         raise RuntimeError("sentry down")

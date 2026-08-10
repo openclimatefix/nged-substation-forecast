@@ -1,9 +1,8 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import patito as pt
 import polars as pl
 import pytest
-from pydantic import ValidationError
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from ml_core.features._lags import _apply_power_lag, _nullify_leaky_lags
@@ -19,6 +18,7 @@ from ml_core.features.tabular_feature_engineer import (
     _engineer_features,
     _local_utc_offset_minutes,
 )
+from pydantic import ValidationError
 
 
 def test_apply_power_lag_with_source():
@@ -223,7 +223,8 @@ def test_windchill_feature():
     # Formula: 13.12 + 0.6215 * T - 11.37 * (V ** 0.16) + 0.3965 * T * (V ** 0.16)
     # V is in km/h, so V = wind_speed_10m * 3.6
     # For T=0, V=18: 13.12 + 0 - 11.37 * (18 ** 0.16) + 0 = 13.12 - 11.37 * 1.583 = -4.88
-    # For T=-10, V=36: 13.12 - 6.215 - 11.37 * (36 ** 0.16) - 3.965 * (36 ** 0.16) = 6.905 - 15.335 * 1.768 = -20.2
+    # For T=-10, V=36: 13.12 - 6.215 - 11.37 * (36 ** 0.16) - 3.965 * (36 ** 0.16)
+    #                = 6.905 - 15.335 * 1.768 = -20.2
     assert result["windchill"][0] == pytest.approx(-4.88, abs=0.1)
     assert result["windchill"][1] == pytest.approx(-20.3, abs=0.1)
 
@@ -293,12 +294,12 @@ def test_apply_local_time_features_dst_transitions():
         {
             "valid_time": [
                 # Spring forward: 01:00 UTC, clocks jump 01:00 GMT -> 02:00 BST.
-                datetime(2023, 3, 26, 0, 30, tzinfo=timezone.utc),  # 00:30 GMT, offset 0
-                datetime(2023, 3, 26, 1, 0, tzinfo=timezone.utc),  # 02:00 BST, offset 60
+                datetime(2023, 3, 26, 0, 30, tzinfo=UTC),  # 00:30 GMT, offset 0
+                datetime(2023, 3, 26, 1, 0, tzinfo=UTC),  # 02:00 BST, offset 60
                 # Fall back: 01:00 UTC, clocks drop 02:00 BST -> 01:00 GMT (the 01:00 hour repeats).
-                datetime(2023, 10, 29, 0, 30, tzinfo=timezone.utc),  # 01:30 BST, offset 60
-                datetime(2023, 10, 29, 1, 0, tzinfo=timezone.utc),  # 01:00 GMT, offset 0
-                datetime(2023, 10, 29, 1, 30, tzinfo=timezone.utc),  # 01:30 GMT, offset 0
+                datetime(2023, 10, 29, 0, 30, tzinfo=UTC),  # 01:30 BST, offset 60
+                datetime(2023, 10, 29, 1, 0, tzinfo=UTC),  # 01:00 GMT, offset 0
+                datetime(2023, 10, 29, 1, 30, tzinfo=UTC),  # 01:30 GMT, offset 0
             ]
         }
     ).with_columns(pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
@@ -330,9 +331,9 @@ def test_apply_local_time_features_dst_transitions():
 )
 def test_local_utc_offset_minutes_is_faithful(time_zone: str, month: int, expected_minutes: int):
     """Every offset in scope is represented exactly, sub-hour and negative zones included."""
-    lf = pl.LazyFrame(
-        {"valid_time": [datetime(2023, month, 10, 12, 0, tzinfo=timezone.utc)]}
-    ).with_columns(local_time=pl.col("valid_time").dt.convert_time_zone(time_zone))
+    lf = pl.LazyFrame({"valid_time": [datetime(2023, month, 10, 12, 0, tzinfo=UTC)]}).with_columns(
+        local_time=pl.col("valid_time").dt.convert_time_zone(time_zone)
+    )
 
     result = lf.select(offset=_local_utc_offset_minutes(pl.col("local_time"))).collect()
 
@@ -388,7 +389,8 @@ def test_parsed_features_from_selected_features():
         ("invalid_col_rolling_mean_6h", ValidationError, None),
         # A rolling mean of the target `power` is forbidden (leakage).
         ("power_rolling_mean_6h", ValidationError, None),
-        # Malformed hours (negative / non-integer / non-numeric) miss the regex and raise ValueError.
+        # Malformed hours (negative / non-integer / non-numeric) miss the regex and raise
+        # ValueError.
         ("power_lag_-5h", ValueError, "Invalid lag feature name format"),
         ("power_rolling_mean_-2h", ValueError, "Invalid rolling_mean feature name format"),
         ("power_lag_12.5h", ValueError, "Invalid lag feature name format"),
@@ -460,7 +462,8 @@ def test_apply_rolling_mean_feature_partitions_by_group(
         pl.DataFrame(columns).lazy(), "temperature_2m", 2
     ).collect()
     sorted_result = result.sort([partition_col, "valid_time"])
-    # Group A: mean([10]) = 10, mean([10, 20]) = 15. Group B: mean([100]) = 100, mean([100, 200]) = 150.
+    # Group A: mean([10]) = 10, mean([10, 20]) = 15.
+    # Group B: mean([100]) = 100, mean([100, 200]) = 150.
     assert sorted_result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 100.0, 150.0]
 
 
@@ -850,7 +853,7 @@ def test_engineer_features_bulk_mode_weather_lag_uses_correct_nwp_run():
     valid_time = 2023-01-02 12:00, lag = 12h → target_time = 2023-01-02 00:00
 
     Run A: target_time (Jan-02 00:00) > power_fcst_init_time (Jan-01 06:00) → same-run join → 10.0
-    Run B: target_time (Jan-02 00:00) < power_fcst_init_time (Jan-02 06:00) → freshest-run join → 20.0
+    Run B: target_time (Jan-02 00:00) < power_fcst_init_time (Jan-02 06:00) → freshest join → 20.0
     """
     nwp_df = pl.DataFrame(
         {

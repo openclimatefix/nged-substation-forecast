@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import patito as pt
@@ -7,9 +7,9 @@ import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from nged_data.storage import (
+    _process_file_listing,
     _ProcessedFileListing,
     _RawFileListItem,
-    _process_file_listing,
     select_new_rows,
     time_series_coverage,
     upsert_metadata,
@@ -244,10 +244,16 @@ def test_upsert_metadata_returns_diff(tmp_path: Path):
     )
 
 
+_EXAMPLE_OBJECT_KEY = (
+    "timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json"
+)
+"""One real NGED object key, whose embedded epoch-millisecond window and id the parser extracts."""
+
+
 def test_parse_file_listing_valid():
     raw_file_listing: list[_RawFileListItem] = [
         {
-            "path": "timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json",
+            "path": _EXAMPLE_OBJECT_KEY,
             "filesize_bytes": 1024,
         }
     ]
@@ -256,18 +262,14 @@ def test_parse_file_listing_valid():
 
     assert result.height == 1
     assert result["time_series_id"][0] == 23
-    assert (
-        result["path"][0]
-        == "timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json"
-    )
+    assert result["path"][0] == _EXAMPLE_OBJECT_KEY
     assert result["filesize_bytes"][0] == 1024
-    assert result["start_time"][0] == datetime(2026, 3, 26, 8, 0, 0, tzinfo=timezone.utc)
-    assert result["end_time"][0] == datetime(2026, 3, 26, 14, 0, 0, tzinfo=timezone.utc)
+    assert result["start_time"][0] == datetime(2026, 3, 26, 8, 0, 0, tzinfo=UTC)
+    assert result["end_time"][0] == datetime(2026, 3, 26, 14, 0, 0, tzinfo=UTC)
 
 
 def test_select_new_rows_file_listing(tmp_path: Path):
     """Regression: trailing comma made filtered_df a tuple, causing superfluous column_0 error."""
-    UTC = timezone.utc
     delta_path = tmp_path / "power.delta"
 
     pl.DataFrame(
@@ -312,7 +314,6 @@ def test_select_new_rows_file_listing(tmp_path: Path):
 
 def test_select_new_rows_power_time_series(tmp_path: Path):
     """select_new_rows must filter PowerTimeSeries rows newer than the Delta table max."""
-    UTC = timezone.utc
     delta_path = tmp_path / "power.delta"
     T = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
 
@@ -345,7 +346,6 @@ def test_select_new_rows_power_time_series(tmp_path: Path):
 
 def test_time_series_coverage(tmp_path: Path):
     """Returns the earliest and latest ``time`` per ``time_series_id`` from the Delta table."""
-    UTC = timezone.utc
     delta_path = tmp_path / "power.delta"
     pl.DataFrame(
         {

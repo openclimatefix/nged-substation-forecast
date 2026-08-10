@@ -7,7 +7,7 @@ that reads it). Both stay thin shells over the pure/IO-light helpers in
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -161,8 +161,7 @@ def _available_nwp_init_times(settings: Settings) -> list[datetime]:
     )
     raw_values = {partition["init_time"] for partition in delta_table.partitions()}
     return [
-        datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc)
-        for value in raw_values
+        datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=UTC) for value in raw_values
     ]
 
 

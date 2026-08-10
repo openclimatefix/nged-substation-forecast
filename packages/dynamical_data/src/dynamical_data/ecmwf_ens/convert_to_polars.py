@@ -1,3 +1,8 @@
+"""Converting a downloaded ECMWF ENS xarray dataset into the `Nwp` Polars contract.
+
+The regular lat/lon grid is aggregated onto H3 cells on the way.
+"""
+
 from typing import Literal
 
 import numpy as np

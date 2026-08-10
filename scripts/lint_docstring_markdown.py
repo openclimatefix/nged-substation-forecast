@@ -72,12 +72,15 @@ def _scan_docstring(text: str) -> tuple[str, str, int]:
         input=text,
         capture_output=True,
         text=True,
+        # A non-zero return code means pymarkdown found violations, which is the whole point of
+        # this call: the caller inspects `returncode` itself, so raising here would be wrong.
+        check=False,
     )
     return result.stdout, result.stderr, result.returncode
 
 
 def _remap_violation(line: str, path: Path, start_line: int) -> str:
-    """Rewrite a `pymarkdown scan-stdin` violation's pseudo `stdin:line:col:...` to `path:line:col:...`."""
+    """Rewrite a `pymarkdown scan-stdin` violation's `stdin:line:col:...` to `path:line:col:...`."""
     _pseudo_file, _, rest = line.partition(":")
     docstring_line_str, _, remainder = rest.partition(":")
     source_line = start_line + int(docstring_line_str) - 1

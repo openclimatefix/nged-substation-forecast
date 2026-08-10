@@ -6,7 +6,7 @@ network access).
 """
 
 from collections.abc import Callable, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Final
 
 import numpy as np
@@ -42,7 +42,7 @@ assert set(_VAR_DEFAULTS) == set(_ECMWF_ENS_VARS_TO_DOWNLOAD), (
 
 # After 2024-11-12, so a populated categorical_precipitation_type_surface passes Nwp validation
 # (that column must be all-null on/before 2024-11-12 and never-null afterwards).
-_DEFAULT_INIT_TIME: Final[datetime] = datetime(2025, 1, 1, tzinfo=timezone.utc)
+_DEFAULT_INIT_TIME: Final[datetime] = datetime(2025, 1, 1, tzinfo=UTC)
 
 
 def _build_ens_dataset(
@@ -77,7 +77,7 @@ def _build_ens_dataset(
     lons = np.asarray(longitudes, dtype=np.float32)
     lead = np.asarray(lead_time_hours, dtype="timedelta64[h]").astype("timedelta64[ns]")
     members = np.asarray(ensemble_members, dtype=np.int64)
-    init = np.datetime64(init_time.astimezone(timezone.utc).replace(tzinfo=None), "ns")
+    init = np.datetime64(init_time.astimezone(UTC).replace(tzinfo=None), "ns")
     valid = init + lead  # datetime64[ns], one per lead time
 
     shape = (len(lead), len(members), len(lats), len(lons))

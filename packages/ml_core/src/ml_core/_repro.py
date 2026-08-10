@@ -109,7 +109,9 @@ def get_git_info(cwd: Path | None = None) -> MlflowTags:
 def get_delta_versions(
     paths: dict[TableNameType, str], storage_options: ObjectStoreOptions | None = None
 ) -> MlflowTags:
-    """Return ``{f"delta_version__{name}": str(version)}`` for each named Delta table, never raising.
+    """Return ``{f"delta_version__{name}": str(version)}`` for each named Delta table.
+
+    Never raises.
 
     Args:
         paths: ``{logical_name: table_uri}``. The URI may be local or a remote object-store URI.
@@ -129,7 +131,7 @@ def get_delta_versions(
                 versions[key] = ABSENT
                 continue
             versions[key] = str(DeltaTable(path, storage_options=options).version())
-        except Exception:  # noqa: BLE001 — provenance must never fail the surrounding run.
+        except Exception:  # Provenance must never fail the surrounding run.
             logger.warning("Could not read Delta version for %r at %s", name, path, exc_info=True)
             versions[key] = ABSENT
     return versions
@@ -140,7 +142,7 @@ def provenance_tags(
     delta_paths: dict[TableNameType, str] | None = None,
     storage_options: ObjectStoreOptions | None = None,
 ) -> MlflowTags:
-    """Build stage-prefixed MLflow tags stamping the code (git) and data (Delta versions) provenance.
+    """Build stage-prefixed MLflow tags stamping code (git) and data (Delta version) provenance.
 
     Args:
         stage: Prefix identifying the writing asset. Keeps the tags of assets that share one MLflow

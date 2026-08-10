@@ -4,7 +4,7 @@ Contains the three functions that implement power lags, weather lags (dual-strat
 and post-hoc nullification of leaky lag values.
 """
 
-from typing import Sequence
+from collections.abc import Sequence
 
 import polars as pl
 

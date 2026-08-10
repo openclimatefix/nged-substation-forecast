@@ -60,9 +60,11 @@ class BaseLookbackFeature(BaseModel):
 
     @abstractmethod
     def is_leaky(self) -> bool:
-        """Returns True if this feature leaks information that wouldn't be available at inference
-        time into the ML model's inputs, and hence must be nullified."""
-        pass
+        """Whether this feature must be nullified to avoid lookahead bias.
+
+        True if the feature leaks information into the ML model's inputs that would not be
+        available at inference time.
+        """
 
     def is_weather_feature(self) -> bool:
         return self.base_col in get_args(WeatherFeature)
@@ -75,9 +77,11 @@ class LagFeature(BaseLookbackFeature):
     base_col: WeatherFeature | Literal["power"]
 
     def is_leaky(self) -> bool:
-        """Power lags are always leaky: observed power may not exist at forecast-issue time
-        if the lagged observation post-dates power_fcst_init_time. Per-row nullification is
-        handled downstream by _nullify_leaky_lags."""
+        """Power lags are always leaky.
+
+        Observed power may not exist at forecast-issue time if the lagged observation post-dates
+        power_fcst_init_time. Per-row nullification is handled downstream by _nullify_leaky_lags.
+        """
         return self.base_col == "power"
 
 
@@ -85,7 +89,8 @@ class RollingFeature(BaseLookbackFeature):
     """Represents a parsed rolling mean feature.
 
     Note that computing the rolling mean of 'power' is currently forbidden to prevent lookahead
-    bias."""
+    bias.
+    """
 
     # TODO: Generalise to support more weather summary stats over the rolling window, i.e.
     # rolling_{mean,min,max,std,median,sum} (add an `agg` field here + dispatch in
@@ -99,9 +104,12 @@ class RollingFeature(BaseLookbackFeature):
     SUFFIX: ClassVar[str] = "rolling_mean"
 
     def is_leaky(self) -> bool:
-        """Weather rolling means are never leaky: NWP forecasts are available for future valid_times,
-        so a weather rolling mean (e.g., mean temperature over the 6h window ending at valid_time)
-        is always known at inference time."""
+        """Weather rolling means are never leaky.
+
+        NWP forecasts are available for future valid_times, so a weather rolling mean (e.g. the
+        mean temperature over the 6h window ending at valid_time) is always known at inference
+        time.
+        """
         return False
 
 
@@ -142,17 +150,18 @@ class ParsedFeatures:
         """Parse a list of selected features into a ParsedFeatures object.
 
         Rationale:
-            Parsing upfront allows us to fail fast on invalid requests and cleanly separates the parsing
-            logic from the execution logic. It specifically identifies lags on the target variable
-            (`power`) and flags them in the `get_leaky_features` method, ensuring the execution phase knows
-            exactly which features require lags to be nullified.
+            Parsing upfront allows us to fail fast on invalid requests and cleanly separates the
+            parsing logic from the execution logic. It specifically identifies lags on the target
+            variable (`power`) and flags them in the `get_leaky_features` method, ensuring the
+            execution phase knows exactly which features require lags to be nullified.
 
-            Furthermore, this parser enforces strict architectural guardrails to prevent target leakage
-            and index column misuse. For example, requesting the raw target variable 'power' as an input
-            feature is forbidden because it would allow downstream models to learn a trivial identity function,
-            rendering them useless at inference time when the actual power is unknown. Similarly, 'valid_time'
-            is an index column and should not be used directly as a feature; instead, local time features
-            should be used to capture behavioral patterns.
+            Furthermore, this parser enforces strict architectural guardrails to prevent target
+            leakage and index column misuse. For example, requesting the raw target variable 'power'
+            as an input feature is forbidden because it would allow downstream models to learn a
+            trivial identity function, rendering them useless at inference time when the actual
+            power is unknown. Similarly, 'valid_time' is an index column and should not be used
+            directly as a feature; instead, local time features should be used to capture behavioral
+            patterns.
 
         Args:
             selected_features: A set of raw feature name strings requested for engineering. Valid
@@ -173,7 +182,7 @@ class ParsedFeatures:
             if LagFeature.SUFFIX in feature_name and RollingFeature.SUFFIX in feature_name:
                 raise ValueError(f"Feature stacking is not supported: {feature_name}")
 
-            elif LagFeature.SUFFIX in feature_name:
+            if LagFeature.SUFFIX in feature_name:
                 lags.append(LagFeature.from_str(feature_name))
 
             elif RollingFeature.SUFFIX in feature_name:
@@ -222,8 +231,10 @@ class ParsedFeatures:
         return self.lags + self.rolling_means
 
     def get_leaky_features(self) -> list[LagFeature | RollingFeature]:
-        """List features (like lagged power) that could cause lookahead bias, allowing the pipeline
-        to selectively nullify them based on the forecast lead time."""
+        """List the features that could cause lookahead bias, such as lagged power.
+
+        The pipeline uses this list to selectively nullify them based on the forecast lead time.
+        """
         return [feature for feature in self._get_all_lookback_features() if feature.is_leaky()]
 
     def requires_weather_data(self) -> bool:
@@ -239,7 +250,7 @@ class ParsedFeatures:
             feature.is_weather_feature() for feature in self._get_all_lookback_features()
         )
         static_features_require_weather = any(
-            feature in ["windchill"] for feature in self.static_features
+            feature == "windchill" for feature in self.static_features
         )
         return (
             lookback_features_require_weather

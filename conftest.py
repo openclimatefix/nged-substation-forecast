@@ -5,10 +5,10 @@ Gates the ``network``-marked tests behind an explicit ``--run-network`` flag so 
 
 Why a collection hook rather than ``-m "not network"`` in ``addopts``: pytest keeps only the *last*
 ``-m`` it sees, so any developer-supplied marker expression (e.g. ``-m "not integration"``) silently
-replaces an ``addopts`` ``-m "not network"`` and re-includes the network tests. A skip applied during
-collection cannot be defeated that way — the gate holds regardless of what ``-m`` the caller passes.
-Run the network tests with ``uv run pytest --run-network`` (add ``-m network`` to run *only* them).
-See docs/architecture/testing.md.
+replaces an ``addopts`` ``-m "not network"`` and re-includes the network tests. A skip applied
+during collection cannot be defeated that way — the gate holds regardless of what ``-m`` the caller
+passes. Run the network tests with ``uv run pytest --run-network`` (add ``-m network`` to run *only*
+them). See docs/architecture/testing.md.
 """
 
 import os

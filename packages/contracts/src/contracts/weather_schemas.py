@@ -1,6 +1,12 @@
+"""Contracts for numerical weather prediction data.
+
+The `Nwp` frame as stored and read, plus the run-completeness and data-quality reports that assess
+an ingested ECMWF ENS run.
+"""
+
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum, auto
 from pathlib import Path
 from typing import ClassVar, Final, Literal, Self
@@ -32,6 +38,8 @@ WeatherFeature = Literal[
 
 
 class NwpModelId(StrEnum):
+    """The NWP models we ingest, used as the `nwp_model_id` column's vocabulary."""
+
     ECMWF_ENS_0_25_degree = auto()
 
 
@@ -89,7 +97,9 @@ class NwpVariableWhollyMissing(ValueError):
 
 
 class Nwp(pt.Model):
-    """Weather data schema for NWP forecasts: gridded ECMWF ENS ensemble weather, one row per
+    """Weather data schema for NWP forecasts.
+
+    Gridded ECMWF ENS ensemble weather, one row per
     (nwp_model_id, init_time, valid_time, ensemble_member, h3_index).
 
     Stored on disk as plain Float32, rounded to a significand-bit budget by
@@ -134,7 +144,9 @@ class Nwp(pt.Model):
 
     h3_index: int = pt.Field(
         dtype=pl.UInt64,
-        description="H3 cell index, at `ECMWF_ENS_H3_RESOLUTION` (every NWP model shares it today).",
+        description=(
+            "H3 cell index, at `ECMWF_ENS_H3_RESOLUTION` (every NWP model shares it today)."
+        ),
     )
 
     temperature_2m: float = pt.Field(
@@ -160,7 +172,10 @@ class Nwp(pt.Model):
 
     wind_direction_10m: float = pt.Field(
         dtype=pl.Float32,
-        description="Wind direction at 10 m. The angle where the wind is coming from. Degrees. 0° is North; 90° is East.",
+        description=(
+            "Wind direction at 10 m. The angle where the wind is coming from. Degrees."
+            " 0° is North; 90° is East."
+        ),
         ge=0,
         le=360,
     )
@@ -174,7 +189,10 @@ class Nwp(pt.Model):
 
     wind_direction_100m: float = pt.Field(
         dtype=pl.Float32,
-        description="Wind direction at 100 m. The angle where the wind is coming from. Degrees. 0° is North; 90° is East.",
+        description=(
+            "Wind direction at 100 m. The angle where the wind is coming from. Degrees. 0° is "
+            "North; 90° is East."
+        ),
         ge=0,
         le=360,
     )
@@ -206,21 +224,30 @@ class Nwp(pt.Model):
     # values before we receive them. So these are true _rates_.
     downward_long_wave_radiation_flux_surface: float | None = pt.Field(
         dtype=pl.Float32,
-        description="Downward long-wave radiation flux at surface. Note that this variable is all-null for lead time 0. Unit: W m-2.",
+        description=(
+            "Downward long-wave radiation flux at surface. Note that this variable is all-null for "
+            "lead time 0. Unit: W m-2."
+        ),
         ge=0,
         le=1500,  # Max in 2 years of ECMWF ENS = 445
     )
 
     downward_short_wave_radiation_flux_surface: float | None = pt.Field(
         dtype=pl.Float32,
-        description="Downward short-wave (solar) radiation flux at surface. Note that this variable is all-null for lead time 0. Unit: W m-2.",
+        description=(
+            "Downward short-wave (solar) radiation flux at surface. Note that this variable is"
+            " all-null for lead time 0. Unit: W m-2."
+        ),
         ge=0,
         le=1500,  # Max in 2 years of ECMWF ENS = 892
     )
 
     precipitation_surface: float | None = pt.Field(
         dtype=pl.Float32,
-        description="Total precipitation rate at surface, de-accumulated by Dynamical. Note that this variable is all-null for lead time 0. Unit: kg m-2 s-1.",
+        description=(
+            "Total precipitation rate at surface, de-accumulated by Dynamical. Note that this "
+            "variable is all-null for lead time 0. Unit: kg m-2 s-1."
+        ),
         ge=0,
         le=0.01,  # Max in 2 years of ECMWF ENS = 0.006
     )
@@ -285,9 +312,12 @@ class Nwp(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame[Self]:  # ty:ignore[invalid-method-override]
-        """Validate the frame: bounding `init_time`/`valid_time` to the plausible datetime range,
-        rejecting a de-accumulated variable that is wholly missing (smaller null patterns are
-        tolerated), enforcing uniqueness, and the ptype-introduction invariant."""
+        """Validate the frame.
+
+        Bounds `init_time`/`valid_time` to the plausible datetime range, rejects a de-accumulated
+        variable that is wholly missing (smaller null patterns are tolerated), and enforces both
+        uniqueness and the ptype-introduction invariant.
+        """
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -305,8 +335,10 @@ class Nwp(pt.Model):
 
     @classmethod
     def _check_no_wholly_missing_deaccumulated_variable(cls, dataframe: pt.DataFrame[Self]) -> None:
-        """Reject a de-accumulated variable that is null in *every* (ensemble_member, valid_time)
-        slice beyond lead-0 of a run — the column carries no weather at all.
+        """Reject a de-accumulated variable that carries no weather at all.
+
+        That is, one that is null in *every* (ensemble_member, valid_time) slice beyond lead-0 of
+        a run.
 
         An all-null weather column is an absent input rather than a degraded one: it would train
         and serve silently for the whole 15-day horizon, so a run 24 hours old but *complete* is
@@ -385,14 +417,15 @@ class Nwp(pt.Model):
     def _check_variables_that_were_introduced_after_start_of_dataset(
         cls, dataframe: pt.DataFrame[Self]
     ) -> None:
-        """Check that `categorical_precipitation_type_surface` is all-null when
-        init_time <= 2024-11-12, and is never null afterwards.
+        """Check the introduction date of `categorical_precipitation_type_surface`.
+
+        The column is all-null when init_time <= 2024-11-12, and is never null afterwards.
 
         Confirmed by direct inspection of the source data: the 2024-11-13 00Z run is the first
         run with `ptype` populated (0% null across all lead times), while 2024-11-12 and earlier
         are 100% null.
         """
-        threshold_date = datetime(2024, 11, 12, tzinfo=timezone.utc)
+        threshold_date = datetime(2024, 11, 12, tzinfo=UTC)
 
         # Partition the dataframe based on the threshold date
         partition_col = "is_before_or_on_threshold"
@@ -452,7 +485,9 @@ class Nwp(pt.Model):
 
 
 def _deaccumulated_null_breakdown(dataframe: pl.DataFrame) -> pl.DataFrame:
-    """Per (variable, init_time, ensemble_member, valid_time) beyond lead-0: null-/total-cell counts.
+    """Null- and total-cell counts per (variable, init_time, ensemble_member, valid_time).
+
+    Covers every slice beyond lead-0.
 
     Returns only slices that have at least one null. Shared by the fatal wholly-missing-variable
     check and the non-fatal :func:`assess_nwp_quality`, so both agree on what a "null" is, and so
@@ -504,8 +539,9 @@ class NwpQualityReport:
 
     @property
     def n_whole_null_slices(self) -> int:
-        """Affected slices that arrived *entirely* null — the field is missing for that one
-        (variable, member, valid_time).
+        """Affected slices that arrived *entirely* null.
+
+        The field is missing altogether for that one (variable, member, valid_time).
 
         Worth watching separately from the scatter: a rising count is the shape a partial upstream
         publication takes, whereas scatter is the steady-state #722 corruption.
@@ -547,8 +583,9 @@ def assess_nwp_quality(dataframe: pt.DataFrame[Nwp]) -> NwpQualityReport:
 
 @dataclass(frozen=True)
 class NwpRunCompletenessReport:
-    """Run-level shape summary for one ingested NWP run: is the whole (member x step x cell) grid
-    there?
+    """Run-level shape summary for one ingested NWP run.
+
+    Answers a single question: is the whole (member x step x cell) grid there?
 
     Deliberately a *report* rather than an exception. A short run is the upstream provider
     misbehaving, not a contract violation, and the
@@ -600,8 +637,10 @@ class NwpRunCompletenessReport:
 
     @property
     def is_complete(self) -> bool:
-        """True when the frame is one run whose member set, forecast-step set, H3 cell *count* and
-        row count all match the expectation.
+        """True when the run carries the shape we expect.
+
+        That is, when the frame is one run whose member set, forecast-step set, H3 cell *count*
+        and row count all match the expectation.
 
         Cells are compared by count, not by set: the report never receives the expected `h3_index`
         values, only how many there should be. Substituting one cell for another would therefore
@@ -621,8 +660,11 @@ class NwpRunCompletenessReport:
 
     @property
     def h3_cell_shortfall(self) -> int:
-        """Expected H3 cells minus observed — *net*, so it is negative if the run carries extra
-        cells and zero if one cell was swapped for another."""
+        """Expected H3 cells minus observed.
+
+        The difference is *net*, so it is negative if the run carries extra cells and zero if one
+        cell was swapped for another.
+        """
         return self.expected_n_h3_cells - self.n_h3_cells
 
     def describe(self) -> str:

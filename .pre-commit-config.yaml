@@ -13,11 +13,37 @@ repos:
 
   - repo: local
     hooks:
+      # Two ruff-check hooks, split on one thing: whether `--fix` is safe to run on the file.
+      #
+      # When an autofix needs a name the file does not import yet, ruff inserts the import into the
+      # file's *top-level* import block. In a marimo notebook that is the wrong place: marimo never
+      # executes module-level statements, it rebuilds the notebook from `with app.setup:` plus the
+      # `@app.cell` functions, so the new import is invisible to every cell and the notebook dies
+      # with a NameError the next time it is opened. `ruff check` then reports success, because the
+      # file it produced is perfectly valid Python.
+      #
+      # This is a whole class, not one rule — any fix that adds an import does it (UP017 and UP035
+      # today; the FURB/PERF fixes that reach for `itertools` would too) — and ruff has no per-file
+      # fixability setting to express it: `unfixable` is global, and `per-file-ignores` would
+      # silence the check as well as the fix. So the notebooks are checked but never auto-fixed,
+      # and a finding in one is applied by hand, into `app.setup`.
       - id: ruff-check
-        name: ruff check
+        name: ruff check (--fix)
         entry: uv run ruff check --fix --force-exclude
         language: system
         types: [python]
+        # `[^/]+` cannot cross a directory separator, so this reaches the marimo apps sitting
+        # directly in each package and never `packages/dashboard/src/` or `packages/*/tests/`.
+        # Deliberately generic rather than a list of the six filenames: a seventh notebook would
+        # otherwise be exposed to exactly the silent breakage this exists to prevent.
+        exclude: &marimo_notebooks >-
+          ^packages/(notebooks|dashboard)/[^/]+\.py$
+      - id: ruff-check-marimo
+        name: ruff check (marimo notebooks, no --fix)
+        entry: uv run ruff check --force-exclude
+        language: system
+        types: [python]
+        files: *marimo_notebooks
       - id: ruff-format
         name: ruff format
         entry: uv run ruff format --force-exclude

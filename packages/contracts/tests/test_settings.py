@@ -38,7 +38,7 @@ def test_settings_validation_invalid_url():
 
 
 def test_paths_derive_from_data_root():
-    """Unset data-table paths derive from data_path_internal; nested tables sit under nged_data_path."""
+    """Unset data-table paths derive from data_path_internal; nested ones from nged_data_path."""
     settings = Settings(
         data_path_internal="/srv/data",
     )
@@ -91,7 +91,9 @@ def test_delivery_fields_are_exactly_the_known_delivery_tables():
 
 
 def test_remote_data_path_keeps_artifacts_local():
-    """A remote data_path_internal yields s3:// data tables while artifacts stay under local_artifacts_path."""
+    """A remote data_path_internal yields s3:// tables; artifacts stay under
+    local_artifacts_path.
+    """
     settings = Settings(
         data_path_internal="s3://bucket/data",
         data_path_delivery="s3://bucket/data",
@@ -201,7 +203,7 @@ def test_settings_builds_without_nged_source_credentials():
 
 
 @pytest.mark.parametrize(
-    "url, access_key, secret, expected_missing",
+    ("url", "access_key", "secret", "expected_missing"),
     [
         ("", "", "", "NGED_S3_BUCKET_URL, NGED_S3_BUCKET_ACCESS_KEY, NGED_S3_BUCKET_SECRET"),
         ("https://example.com", "", "", "NGED_S3_BUCKET_ACCESS_KEY, NGED_S3_BUCKET_SECRET"),

@@ -1,5 +1,7 @@
+"""Opening and downloading one ECMWF ENS run from the Dynamical.org catalog."""
+
 import concurrent.futures
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Final, Literal
 
 import dynamical_catalog
@@ -46,8 +48,8 @@ def open_ecmwf_ens_run(
     """
     # Convention-sensitive to the *real* Dynamical.org catalog: this function bakes in assumptions
     # about its shape (longitude in [-180, 180], descending latitude, coordinate/dimension names).
-    # The offline tests share those assumptions and cannot catch a mismatch with the live catalog, so
-    # after changing this function run the network-gated test manually:
+    # The offline tests share those assumptions and cannot catch a mismatch with the live
+    # catalog, so after changing this function run the network-gated test manually:
     #     uv run pytest --run-network -m network
     # See docs/architecture/testing.md ("Network-gated tests").
     if h3_grid.is_empty():
@@ -57,7 +59,7 @@ def open_ecmwf_ens_run(
         raise ValueError(f"nwp_init_time must be timezone aware. {nwp_init_time.tzinfo=}")
 
     # We need to make nwp_init_time tz-naive for the xarray selection.
-    utc_nwp_init_time = np.datetime64(nwp_init_time.astimezone(timezone.utc).replace(tzinfo=None))
+    utc_nwp_init_time = np.datetime64(nwp_init_time.astimezone(UTC).replace(tzinfo=None))
 
     ds = dynamical_catalog.open("ecmwf-ifs-ens-forecast-15-day-0-25-degree", chunks=None)
 
@@ -126,9 +128,7 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
     # though this hasn't been confirmed by pinning back to 2.0.6 and re-testing.
     data_arrays: dict[str, xr.DataArray] = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        futures = [
-            executor.submit(download_array, str(name)) for name in ds_sliced.data_vars.keys()
-        ]
+        futures = [executor.submit(download_array, str(name)) for name in ds_sliced.data_vars]
         for future in concurrent.futures.as_completed(futures):
             data_arrays.update(future.result())
 

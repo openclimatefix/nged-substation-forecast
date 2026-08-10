@@ -8,7 +8,7 @@ from nged_data.read_nged_json import _extract_power_time_series, _extract_time_s
 
 
 @pytest.mark.parametrize(
-    "filename, expected_time_series_id, expected_name, expected_units, expected_h3",
+    ("filename", "expected_time_series_id", "expected_name", "expected_units", "expected_h3"),
     [
         ("TimeSeries_10.json", 10, "SPILSBY 33 11kV S STN", "MW", 599423199024775167),
         ("TimeSeries_11.json", 11, "INGOLDMELLS 33 11kV S STN", "MVA", 599422966022799359),
@@ -23,7 +23,7 @@ def test_nged_json_to_metadata_df_and_time_series_df(
 ):
     file_path = Path(__file__).parent / "data" / filename
 
-    with open(file_path, "rb") as f:
+    with file_path.open("rb") as f:
         json_bytes = f.read()
 
     df = pl.read_json(json_bytes)
@@ -77,10 +77,17 @@ def test_extract_power_time_series_drops_malformed_time_rows():
     PowerTimeSeries.validate(extracted.dataframe)
 
 
-def test_nged_json_to_metadata_df_and_time_series_df_invalid_data_types():
-    # Valid JSON structure but invalid data types
-    # The function expects a specific structure, so this might fail earlier
-    invalid_json = b'{"time_series_id": 1, "Area": {"latitude": 50, "longitude": 0}, "data": [{"endTime": "2026-01-01T00:00:00Z", "value": "not_a_float"}]}'
+def test_extract_power_time_series_rejects_non_numeric_value():
+    """A non-numeric `value` is rejected rather than dropped.
+
+    Contrast `test_extract_power_time_series_drops_malformed_time_rows`: a malformed `time` is
+    dropped and counted, because a bad timestamp costs one row, whereas a bad `value` means the
+    whole payload is not the shape we think it is.
+    """
+    invalid_json = (
+        b'{"time_series_id": 1, "Area": {"latitude": 50, "longitude": 0},'
+        b' "data": [{"endTime": "2026-01-01T00:00:00Z", "value": "not_a_float"}]}'
+    )
     df = pl.read_json(invalid_json)
-    with pytest.raises(Exception):
-        _extract_time_series_metadata(df)
+    with pytest.raises(pl.exceptions.InvalidOperationError, match="conversion from `str` to `f32`"):
+        _extract_power_time_series(df, time_series_id=1)

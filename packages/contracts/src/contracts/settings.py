@@ -1,3 +1,8 @@
+"""`Settings`: every data path and object-store credential the pipeline reads.
+
+Values are resolved from the environment and the workspace `.env`.
+"""
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Final, Self
@@ -341,7 +346,9 @@ class Settings(BaseSettings):
     )
     sentry_traces_sample_rate: float = Field(
         default=0.0,
-        description="Fraction of transactions sampled for Sentry performance tracing (off by default).",
+        description=(
+            "Fraction of transactions sampled for Sentry performance tracing (off by default)."
+        ),
     )
     sentry_monitor_forecasts: bool = Field(
         default=False,

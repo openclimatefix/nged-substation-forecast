@@ -94,9 +94,9 @@ def test_grid_weights_preserve_geographic_orientation() -> None:
     (lat -3, lon +56), in the Indian Ocean, and is caught here. ``compute_h3_grid_weights`` fills
     ``nwp_lat`` from ``cell_to_lat`` and ``nwp_lon`` from ``cell_to_lng`` directly — it has no
     axis-flip or transpose code path — so the bug this actually guards is that swap (verified by
-    mutation: exchanging the two ``cell_to_*`` calls fails this test). The relative check below (north
-    keeps the larger latitude, west the smaller longitude) is cheap defence-in-depth against a future
-    refactor that introduces axis handling.
+    mutation: exchanging the two ``cell_to_*`` calls fails this test). The relative check below
+    (north keeps the larger latitude, west the smaller longitude) is cheap defence-in-depth
+    against a future refactor that introduces axis handling.
 
     See the orientation-coverage table in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#nwp-grid-h3-orientation-coverage>
@@ -118,10 +118,14 @@ def test_grid_weights_preserve_geographic_orientation() -> None:
 
     # Absolute: each landmark's grid points sit within ~1° of the landmark itself. This is what a
     # lat/lon swap breaks (it would put Edinburgh's nwp_lat near -3, not +56).
-    assert 55.0 <= min(edinburgh_lats) and max(edinburgh_lats) <= 57.0
-    assert -4.0 <= min(edinburgh_lons) and max(edinburgh_lons) <= -2.0
-    assert 49.0 <= min(lands_end_lats) and max(lands_end_lats) <= 51.0
-    assert -7.0 <= min(lands_end_lons) and max(lands_end_lons) <= -4.0
+    assert min(edinburgh_lats) >= 55.0
+    assert max(edinburgh_lats) <= 57.0
+    assert min(edinburgh_lons) >= -4.0
+    assert max(edinburgh_lons) <= -2.0
+    assert min(lands_end_lats) >= 49.0
+    assert max(lands_end_lats) <= 51.0
+    assert min(lands_end_lons) >= -7.0
+    assert max(lands_end_lons) <= -4.0
 
     # Relative: north stays north (larger lat), west stays west (smaller lon).
     assert min(edinburgh_lats) > max(lands_end_lats)

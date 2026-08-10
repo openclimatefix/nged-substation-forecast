@@ -10,6 +10,7 @@ from pathlib import Path
 import mlflow
 import pytest
 from dagster import DagsterInstance, ExecuteInProcessResult, RunConfig
+from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
 
 from nged_substation_forecast.defs.cv_assets import CV_EXPERIMENT_FOLDS_NAME
@@ -67,7 +68,7 @@ def _partition_keys(instance: DagsterInstance) -> list[str]:
     return sorted(instance.get_dynamic_partitions(CV_EXPERIMENT_FOLDS_NAME))
 
 
-def _parent_run(experiment_id: str):
+def _parent_run(experiment_id: str) -> Run:
     runs = MlflowClient().search_runs(
         experiment_ids=[experiment_id], filter_string="tags.cv_role = 'parent'"
     )
@@ -164,7 +165,8 @@ def test_re_registration_with_a_changed_config_leaves_no_half_written_state(
     # Assert *why* it failed, so the test cannot pass on an unrelated error. Dagster wraps the op's
     # exception in a DagsterExecutionStepExecutionError, so the original is the `cause`.
     failure = result.failure_data_for_node("register_experiment")
-    assert failure is not None and failure.error is not None
+    assert failure is not None
+    assert failure.error is not None
     cause = failure.error.cause
     assert cause is not None
     assert cause.cls_name == "ExperimentIdentityChangedError"

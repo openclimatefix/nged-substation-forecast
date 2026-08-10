@@ -7,7 +7,7 @@ each file, every continuous variable rounded to ``NWP_SIGNIFICAND_BITS``, and ap
 as separate ``(nwp_model_id, init_time)`` Hive partitions.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -17,7 +17,7 @@ import pyarrow.parquet as pq
 from contracts.weather_schemas import Nwp
 from delta_store.nwp import NWP_SIGNIFICAND_BITS, NWP_SORT_COLS, write_nwp
 
-_T0 = datetime(2025, 6, 1, tzinfo=timezone.utc)
+_T0 = datetime(2025, 6, 1, tzinfo=UTC)
 
 _CONTINUOUS_BASE_VALUES = {
     "temperature_2m": 15.7031,

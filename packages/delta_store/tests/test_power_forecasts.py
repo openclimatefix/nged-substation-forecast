@@ -6,7 +6,7 @@ rounded to ``POWER_FCST_SIGNIFICAND_BITS``, and the replace-partition / append s
 ``cv_power_forecasts`` relies on for idempotent re-materialisation.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -20,7 +20,7 @@ from delta_store.power_forecasts import (
     write_power_forecasts,
 )
 
-_T0 = datetime(2025, 7, 1, tzinfo=timezone.utc)
+_T0 = datetime(2025, 7, 1, tzinfo=UTC)
 
 
 def _make_forecasts(

@@ -181,9 +181,10 @@ def _reject_changed_identity(
     An experiment's identity **is** its config: every fold of an experiment must be trained and
     scored under one config, or its leaderboard row silently mixes two different models. Folds
     already materialised under the old config cannot be un-trained, and the assets read the config
-    back from the experiment tag (``load_experiment_forecaster``), so re-pointing that tag mid-flight
-    would poison every comparison built on the experiment. A changed config is therefore a *new*
-    experiment, and the only correct answer is to reject it — before anything has been written.
+    back from the experiment tag (``load_experiment_forecaster``), so re-pointing that tag
+    mid-flight would poison every comparison built on the experiment. A changed config is therefore
+    a *new* experiment, and the only correct answer is to reject it — before anything has been
+    written.
 
     Called with the experiment's stored tags before any write, so a rejection leaves MLflow exactly
     as it found it. A tag absent from ``stored_tags`` is not a change: that is the untagged

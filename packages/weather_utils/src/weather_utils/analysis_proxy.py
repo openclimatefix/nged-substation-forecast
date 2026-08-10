@@ -16,9 +16,9 @@ NWP_PUBLICATION_DELAY_HOURS: Final[int] = 6
 """Default delay between an NWP run's ``init_time`` and when it becomes publicly available.
 
 A run initialised at ``init_time`` cannot be used to reconstruct the analysis at an as-of time
-earlier than ``init_time + NWP_PUBLICATION_DELAY_HOURS`` — this is the delay ``select_analysis_proxy``
-applies for its optional ``available_at`` leakage cut, and the same delay the feature pipeline uses
-to derive ``power_fcst_init_time`` from ``nwp_init_time``.
+earlier than ``init_time + NWP_PUBLICATION_DELAY_HOURS`` — this is the delay
+``select_analysis_proxy`` applies for its optional ``available_at`` leakage cut, and the same delay
+the feature pipeline uses to derive ``power_fcst_init_time`` from ``nwp_init_time``.
 """
 
 NWP_ANALYSIS_MEMBER: Final[int] = 0
@@ -42,11 +42,12 @@ def select_analysis_proxy(
     """Select the freshest-run analysis proxy: one row per ``(group_key, valid_time)``.
 
     Keeps only the control ``member``, then — for each ``(group_key, valid_time)`` and *per column*
-    — takes the value from the freshest NWP run (the latest ``init_time_col``) that has a **non-null**
-    value there. A null cell in the freshest run therefore falls back to the next-freshest run that
-    holds a value: this fills the accumulated variables' lead-0 nulls (precipitation and radiation
-    are null at the first forecast step by ECMWF convention) from the overlapping older run, rather
-    than leaving a gap. A cell is null in the result only when *every* candidate run is null there.
+    — takes the value from the freshest NWP run (the latest ``init_time_col``) that has a
+    **non-null** value there. A null cell in the freshest run therefore falls back to the
+    next-freshest run that holds a value: this fills the accumulated variables' lead-0 nulls
+    (precipitation and radiation are null at the first forecast step by ECMWF convention) from the
+    overlapping older run, rather than leaving a gap. A cell is null in the result only when
+    *every* candidate run is null there.
     Because the fallback is per column, one output row can source different columns from different
     runs; the reported ``init_time_col`` is the freshest run's, so it no longer necessarily matches
     every value's source run. The ``ensemble_member`` column is dropped from the result.

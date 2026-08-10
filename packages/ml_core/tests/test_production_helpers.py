@@ -7,9 +7,10 @@ only reads a plain disk directory).
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import patito as pt
 import polars as pl
 import pytest
 from contracts.common import UTC_DATETIME_DTYPE
@@ -21,9 +22,7 @@ from ml_core._production_helpers import (
 )
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
-import patito as pt
-
-_POWER_FCST_INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=timezone.utc)
+_POWER_FCST_INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------

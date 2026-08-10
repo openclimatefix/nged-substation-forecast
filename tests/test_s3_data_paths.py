@@ -24,15 +24,15 @@ Marked ``integration``; skipped automatically if ``moto`` is not installed.
 import socket
 import urllib.request
 from collections.abc import Iterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import patito as pt
 import polars as pl
 import pytest
 from contracts._uri import object_exists
-from contracts.typing_utils import typeddict_to_dict
 from contracts.power_schemas import PowerForecast, TimeSeriesMetadata
 from contracts.settings import Settings
+from contracts.typing_utils import typeddict_to_dict
 from contracts.weather_schemas import Nwp
 from delta_store.nwp import write_nwp
 from delta_store.power_forecasts import write_power_forecasts
@@ -44,7 +44,7 @@ pytestmark = pytest.mark.integration
 
 ThreadedMotoServer = pytest.importorskip("moto.server").ThreadedMotoServer
 
-_T0 = datetime(2025, 7, 1, tzinfo=timezone.utc)
+_T0 = datetime(2025, 7, 1, tzinfo=UTC)
 _BUCKET = "nged-test-bucket"
 
 _CONTINUOUS_BASE_VALUES = {
@@ -222,7 +222,7 @@ def test_power_forecasts_round_trip_and_pruning_over_s3(s3_endpoint: str) -> Non
 
 
 def test_nwp_round_trip_over_s3(s3_endpoint: str) -> None:
-    """``write_nwp`` writes to S3 and ``Nwp.scan_delta`` reads it back with the same storage opts."""
+    """``write_nwp`` writes to S3, and ``Nwp.scan_delta`` reads it back with the same options."""
     settings = _s3_settings(s3_endpoint, "nwp")
     uri = settings.nwp_data_path
     opts = settings.storage_options

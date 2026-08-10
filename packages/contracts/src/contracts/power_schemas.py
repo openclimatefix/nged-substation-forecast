@@ -25,6 +25,8 @@ class DropImplausibleRowsResult(NamedTuple):
 
 
 class PowerTimeSeries(pt.Model):
+    """Half-hourly power observations (MW or MVA), one row per (time_series_id, time)."""
+
     time_series_id: int = _get_time_series_id_dtype()
 
     time: datetime = pt.Field(
@@ -41,7 +43,10 @@ class PowerTimeSeries(pt.Model):
         dtype=pl.Float32,
         ge=-1000,
         le=1000,
-        description="Average power (MW or MVA) over the preceding 30-minute period. Unit defined in TimeSeriesMetadata.",
+        description=(
+            "Average power (MW or MVA) over the preceding 30-minute period. Unit defined in "
+            "TimeSeriesMetadata."
+        ),
     )
 
     @classmethod
@@ -165,6 +170,8 @@ Notes:
 
 
 class TimeSeriesMetadata(pt.Model):
+    """One row per substation or asset: its name, location, H3 index, and substation type."""
+
     time_series_id: int = _get_time_series_id_dtype(unique=True)
 
     time_series_name: str = pt.Field(
@@ -179,12 +186,17 @@ class TimeSeriesMetadata(pt.Model):
 
     time_series_type: str = pt.Field(
         dtype=pl.Enum(LIST_OF_TIME_SERIES_TYPES),
-        description="Asset category (e.g. ‘PV’, ‘Wind’, ‘Disaggregated Demand’). See LIST_OF_TIME_SERIES_TYPES.",
+        description=(
+            "Asset category (e.g. ‘PV’, ‘Wind’, ‘Disaggregated Demand’). See "
+            "LIST_OF_TIME_SERIES_TYPES."
+        ),
     )
 
     units: str = pt.Field(
         dtype=pl.Enum(["MW", "MVA"]),
-        description="Power unit for this time series: ‘MW’ (active power) or ‘MVA’ (apparent power).",
+        description=(
+            "Power unit for this time series: ‘MW’ (active power) or ‘MVA’ (apparent power)."
+        ),
     )
 
     licence_area: str = pt.Field(
@@ -196,26 +208,38 @@ class TimeSeriesMetadata(pt.Model):
         dtype=pl.Int32,
         gt=0,
         lt=1_000_000,
-        description="Perhaps surprisingly, each customer meter in the NGED trial area has its own substation_number (not one per physical substation).",
+        description=(
+            "Perhaps surprisingly, each customer meter in the NGED trial area has its own "
+            "substation_number (not one per physical substation)."
+        ),
     )
 
     substation_type: str = pt.Field(
         dtype=pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"]),
-        description="Substation voltage level / role: BSP, EHV Customer, GSP, HV Customer, or Primary. HV = high voltage. EHV = extra high voltage.",
+        description=(
+            "Substation voltage level / role: BSP, EHV Customer, GSP, HV Customer, or Primary."
+            " HV = high voltage. EHV = extra high voltage."
+        ),
     )
 
     latitude: float = pt.Field(
         dtype=pl.Float32,
         ge=49,
         le=61,  # UK latitude range
-        description="Latitude in decimal degrees. For customer time series, gives the location of the substation, not the customer's site.",
+        description=(
+            "Latitude in decimal degrees. For customer time series, gives the location of the "
+            "substation, not the customer's site."
+        ),
     )
 
     longitude: float = pt.Field(
         dtype=pl.Float32,
         ge=-9,
         le=2,  # UK longitude range
-        description="Longitude in decimal degrees. For customer time series, gives the location of the substation, not the customer's site.",
+        description=(
+            "Longitude in decimal degrees. For customer time series, gives the location of the "
+            "substation, not the customer's site."
+        ),
     )
 
     information: str | None = pt.Field(
@@ -231,20 +255,27 @@ class TimeSeriesMetadata(pt.Model):
         description=(
             "WKT polygon for the asset’s area. In the trial, only Primary substations have this."
             " NGED don’t have polygons for customer sites (though they hope to add that in future)."
-            " For customer sites, where present, refers to the area covered by the generator itself."
+            " For customer sites, where present, refers to the area covered by the generator"
+            " itself."
         ),
     )
 
     area_center_lat: float | None = pt.Field(
         dtype=pl.Float32,
         allow_missing=True,
-        description="Centroid latitude of the area polygon. For customer sites, the area, where present, refers to the area covered by the generator itself.",
+        description=(
+            "Centroid latitude of the area polygon. For customer sites, the area, where present, "
+            "refers to the area covered by the generator itself."
+        ),
     )
 
     area_center_lon: float | None = pt.Field(
         dtype=pl.Float32,
         allow_missing=True,
-        description="Centroid longitude of the area polygon. For customer sites, the area, where present, refers to the area covered by the generator itself.",
+        description=(
+            "Centroid longitude of the area polygon. For customer sites, the area, where present, "
+            "refers to the area covered by the generator itself."
+        ),
     )
 
     h3_res_5: int = pt.Field(
@@ -294,7 +325,9 @@ class PowerForecast(pt.Model):
     ml_flow_experiment_id: int | None = pt.Field(
         dtype=pl.Int32,
         allow_missing=True,
-        description="MLflow experiment ID; links to the MLflow experiment that produced this forecast.",
+        description=(
+            "MLflow experiment ID; links to the MLflow experiment that produced this forecast."
+        ),
     )
 
     nwp_init_time: datetime | None = pt.Field(
@@ -308,13 +341,16 @@ class PowerForecast(pt.Model):
 
     power_fcst_model_name: str = pt.Field(
         dtype=pl.String,  # String, not Categorical — see experiment_name below.
-        description="Identifier for our ML-based power forecasting model. Model-family identity set by the BaseForecaster subclass (MODEL_NAME).",
+        description=(
+            "Identifier for our ML-based power forecasting model. Model-family identity set by the "
+            "BaseForecaster subclass (MODEL_NAME)."
+        ),
     )
 
     # String (not Categorical): experiment_name/fold_id are the Delta partition columns and delta-rs
     # stores dictionary-encoded columns as String anyway; String keeps them cast-free and lets
-    # predicate pushdown work. See the "declare Delta filter/partition columns as String" gotcha:
-    # ../../../../CLAUDE.md#delta-lake-dictionary-encoded-columns-declare-delta-filterpartition-columns-as-string
+    # predicate pushdown work. See CLAUDE.md, "Delta Lake dictionary-encoded columns: declare
+    # Delta filter/partition columns as `String`".
     experiment_name: str = pt.Field(
         dtype=pl.String,
         description=(
@@ -328,12 +364,17 @@ class PowerForecast(pt.Model):
 
     power_fcst_model_version: int = pt.Field(
         dtype=pl.Int16,
-        description="Model version integer, bumped with each breaking change to the model implementation.",
+        description=(
+            "Model version integer, bumped with each breaking change to the model implementation."
+        ),
     )
 
     power_fcst_init_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description="The datetime that the power forecast was initialised. This might be called `t0` in some other OCF projects.",
+        description=(
+            "The datetime that the power forecast was initialised. This might be called `t0` in "
+            "some other OCF projects."
+        ),
     )
 
     power_fcst: float = pt.Field(
