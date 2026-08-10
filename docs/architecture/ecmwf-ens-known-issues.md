@@ -16,8 +16,12 @@ the *variable*, so the gate needs no magic thresholds:
 - An **instantaneous** variable (temperature, winds, pressures) is never legitimately null, so any
   null in one is anomalous, and any null is fatal.
 - A **de-accumulated** variable (precipitation, the two radiation fluxes) is null by design at
-  lead-0 and carries known upstream corruption beyond it, so its nulls are in-distribution. They
-  are tolerated right up to the point where the column carries no weather at all.
+  lead-0 and carries known upstream corruption beyond it, so its nulls are in-distribution. Every
+  null pattern in one of these is tolerated, with exactly one exception: it is fatal when that
+  variable is null in **every single** `(ensemble_member, valid_time)` slice beyond lead-0 of the
+  run being ingested — that is, when the column holds no weather anywhere in the run. The test is
+  literally "is anything left?", so a run with 4283 of one variable's 4284 slices empty still
+  lands (with a warning); only 4284 of 4284 fails.
 
 ## Nulls in the de-accumulated variables (tolerated)
 
