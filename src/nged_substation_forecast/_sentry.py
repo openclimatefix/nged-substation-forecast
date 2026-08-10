@@ -97,8 +97,8 @@ def init_sentry(settings: Settings) -> None:
     even the swallowed telemetry error in :func:`report_power_freshness` — would be shipped as an
     event, defeating the design where *only* the three explicit senders reach Sentry: the failure
     hook, the freshness ``capture_message``, and :func:`report_check_degradation`. Breadcrumbs (the
-    integration's default ``level=INFO``) are
-    kept, so log context still rides along with the events the two intended paths do send.
+    integration's default ``level=INFO``) are kept, so log context still rides along with the
+    events those senders do send.
 
     Args:
         settings: The project settings carrying the Sentry DSN, environment, and sample rate.
