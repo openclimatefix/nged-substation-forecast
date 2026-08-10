@@ -21,9 +21,16 @@ tracked in full elsewhere* and must not be settled here.
    landing #476 as one of its options, and
    [`docs/live_service/operations.md`](../docs/live_service/operations.md) already carries the
    operator rule ("Do not re-materialise a partition that has already landed") pointing at #476.
-   Doing half of #476 here would pre-empt a design decision #476 exists to make. **Action:** post a
-   comment on #509 saying its second bullet is subsumed by #476, and let #509 close on the rule-7
-   fix alone.
+   Doing half of #476 here would pre-empt a design decision #476 exists to make.
+
+   **Action — and this is *not* a plain "subsumed by #476".** #476's stated scope is the *replace*
+   path (how an operator overwrites a landed partition, and the `Timestamp`-predicate verification
+   it needs). It does **not** cover the narrower question in Risks Q1 below: should `write_nwp`
+   *refuse* to append onto a partition that already exists? Closing #509 while saying "the write
+   half is #476's" would leave that question tracked nowhere. So: comment on **#476** adding the
+   refusal guard to its "What to build" (it is the same decision as "day-to-day materialisations
+   stay strictly append-only by default", which #476 already asserts), then comment on #509
+   recording the split, and let #509 close on the rule-7 fix alone.
 
 2. **The issue asks "should the checks move above the write?" as an either/or with the
    `try`/`except`. It is both, and neither alone is sufficient.**
@@ -38,9 +45,12 @@ tracked in full elsewhere* and must not be settled here.
    house catch-all. After that, the only thing between the append and the return is constructing a
    `MaterializeResult` from already-computed values.
 
-3. **Correction: the 8-retry ladder cannot fire after the write, so this is not an
-   automatic-retry hazard.** The issue's parenthetical ("`ecmwf_ens` retries up to 8 times…")
-   reads as if the retry ladder applies to a post-write raise. It does not: `RetryRequested` is
+3. **Clarification: the 8-retry ladder cannot fire after the write, so this is not an
+   automatic-retry hazard.** The issue's title ("…duplicates NWP rows on retry") and its
+   "The partition is then retried" read as if the retry ladder applies to a post-write raise — its
+   own parenthetical already scopes the ladder correctly and names the manual route, so this is a
+   sharpening of the issue rather than a correction of it, and a PR body should not claim
+   otherwise. It does not: `RetryRequested` is
    raised only inside the `try` block wrapping `open_ecmwf_ens_run` / `download_ecmwf_ens_data` /
    `convert_nwp_xarray_dataset_to_polars_dataframe`
    ([`assets.py:271-283`](../src/nged_substation_forecast/defs/assets.py)), strictly *before*
@@ -55,10 +65,12 @@ tracked in full elsewhere* and must not be settled here.
 4. **Reordering is free — nothing is lost by assessing the in-memory frame before the write.**
    Worth stating because it is the obvious objection: `live_forecasts_are_healthy` deliberately
    reads back *off disk* so it can catch "the run succeeded but wrote nothing usable". These two
-   checks never did that — both take the in-memory `nwp` frame as their only argument. And
-   `write_nwp` cannot change what they would report: it rounds significands (which cannot create or
-   destroy a null) and sorts rows (which cannot change any count). The pre-write report and the
-   post-write report are identical.
+   checks never did that — both read only the in-memory `nwp` frame (completeness also takes the
+   scalar `expected_n_h3_cells`, derived from `h3_grid`, not from the table). And `write_nwp` cannot
+   change what they would report, for a stronger reason than "rounding preserves nulls and sorting
+   preserves counts": `write_nwp` never mutates its argument at all — it builds a `rounded` copy
+   and hands an Arrow table to delta-rs. The pre-write and post-write reports are computed from the
+   same object.
 
 ## What changes, file by file
 
@@ -70,22 +82,35 @@ tracked in full elsewhere* and must not be settled here.
   dedup, so anything that can fail after the append turns a bug into duplicated primary keys on the
   operator's inevitable re-materialisation (cross-reference #476 for the write-side fix).
 - **Two new guarded helpers**, one per declared check, so a bug in one does not blind the other:
-  - `_assess_nwp_quality_or_degraded(nwp, log) -> AssetCheckResult`
-  - `_assess_nwp_run_completeness_or_degraded(nwp, expected_n_h3_cells, log) -> tuple[AssetCheckResult, dict[str, MetadataValue]]`
+  - `_assess_nwp_quality_or_degraded(nwp, context) -> AssetCheckResult`
+  - `_assess_nwp_run_completeness_or_degraded(nwp, expected_n_h3_cells, context) -> tuple[AssetCheckResult, dict[str, MetadataValue]]`
 
   Each wraps its existing `assess_*` call *and* its existing `_nwp_*_check_result` builder (and,
   for completeness, `_nwp_run_shape_metadata`) in the catch-all already used twice in
   [`defs/checks.py`](../src/nged_substation_forecast/defs/checks.py): `except BaseException`,
-  re-raise `KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError`, `logger.exception`,
+  re-raise `KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError`, log the traceback,
   `report_check_degradation(<check name>, exc)`, return a `passed=False`,
-  `AssetCheckSeverity.WARN` result whose description names the failure. Do not re-derive the
-  reasoning in a comment — point at the existing one in `power_data_is_fresh`, per the repo's
-  doc-link rule.
-- **Hard constraint on the degraded path — it must still emit *both* check names.** Verified by
-  execution against the pinned Dagster: an asset that declares two `check_specs` and returns a
-  `MaterializeResult` carrying only one `AssetCheckResult` **fails the step** (`success=False`, no
-  check evaluations recorded at all). A fallback that silently drops a check would therefore
-  reintroduce the very failure it is meant to prevent. Independent guards give this for free.
+  `AssetCheckSeverity.WARN` result whose description names the failure (include `{exc!r}`, matching
+  `live_forecasts_are_healthy`). Do not re-derive the reasoning in a comment — point at the
+  existing one in `power_data_is_fresh`, per the repo's doc-link rule.
+- **Log through `context.log`, not a module logger.** `defs/assets.py` has no module-level `logger`
+  (unlike `checks.py:86`), and the runbook tells operators the full traceback is "in the run's
+  logs", which `context.log` guarantees. Confirm `DagsterLogManager.exception` exists on the pinned
+  version; fall back to `context.log.error(..., exc_info=True)` if not. This is why the helpers take
+  `context` rather than a bare logger.
+- **Hard constraint on the degraded path — it must emit *both* check names, and each result must
+  carry an explicit `check_name`.** Verified by execution against the pinned Dagster: an asset that
+  declares two `check_specs` and returns a `MaterializeResult` carrying only one `AssetCheckResult`
+  **fails the step** (`success=False`, no check evaluations recorded at all). Independent guards
+  give the "both" half for free. The second half is a live trap: the fallback this plan points at,
+  `power_data_is_fresh`'s at
+  [`checks.py:333-337`](../src/nged_substation_forecast/defs/checks.py), passes **no**
+  `check_name`, because a standalone `@asset_check` does not need one — and an `AssetCheckResult`
+  with no `check_name` inside a multi-check asset fails the step identically
+  (`DagsterInvariantViolationError` from `resolve_target_check_key`). So each fallback must set
+  `check_name=_NWP_QUALITY_CHECK_NAME` / `check_name=_NWP_COMPLETENESS_CHECK_NAME` explicitly.
+  Copying the model fallback verbatim would turn the degraded path into exactly the step failure
+  this change exists to prevent.
 - **Degraded materialisation metadata:** on the completeness path degrading, *omit* the five shape
   keys (`n_ensemble_members`, `n_valid_times`, `n_h3_cells`, `valid_time_min`, `valid_time_max`)
   rather than emitting sentinel values. `_nwp_run_shape_metadata`'s existing comment warns that a
@@ -97,12 +122,17 @@ tracked in full elsewhere* and must not be settled here.
 
 ### `src/nged_substation_forecast/_sentry.py`
 
-- `report_check_degradation`'s docstring says "Both of this function's callers — the standalone
-  `@asset_check`s `power_data_is_fresh` and `live_forecasts_are_healthy`…". That becomes wrong: the
-  new callers are *in-asset* check results, not standalone `@asset_check`s, and the "the run no
-  longer fails and `sentry_capture_failure` no longer fires" argument holds for them identically
-  (`ecmwf_ens_job` carries the same hook). Rewrite the sentence to describe the current set without
-  narrating the change.
+Two places make the same now-wrong claim, and both must change:
+
+- `report_check_degradation`'s docstring (`:136-137`) says "Both of this function's callers — the
+  standalone `@asset_check`s `power_data_is_fresh` and `live_forecasts_are_healthy`…". The new
+  callers are *in-asset* check results, not standalone `@asset_check`s, and the "the run no longer
+  fails and `sentry_capture_failure` no longer fires" argument holds for them identically
+  (`ecmwf_ens_job` carries the same hook).
+- The **module** docstring (`:9-11`) narrows the covered fault to "a standalone `@asset_check` that
+  caught its own exception". Widen it to any guarded warning path.
+
+Rewrite both to describe the current set, without narrating the change.
 
 ## Design-philosophy check
 
@@ -111,8 +141,12 @@ tracked in full elsewhere* and must not be settled here.
   [rule 7](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules),
   and it strengthens
   [rule 6](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules):
-  both checks stay `AssetCheckSeverity.WARN` / `blocking=False`, and after this change *nothing*
-  either check's body does can fail its own step.
+  both checks stay `AssetCheckSeverity.WARN` / `blocking=False`, and after this change nothing
+  either check's *body* does can fail its own step. State it with that carve-out rather than
+  absolutely: what remains outside every guard is Dagster serialising the returned results into
+  events, and process death — the same residual `checks.py`'s module docstring already names. Here
+  that residual is worth one honest sentence rather than silence, because for a standalone check it
+  costs a failed run whereas here it costs duplicated NWP rows on the operator's re-run.
 - **No principle is traded away.** No new failure mode is introduced: a run that would have
   materialised still materialises, with the same results, on every non-degraded path.
 - **Hypotheses.** This is an
@@ -135,15 +169,19 @@ All in `tests/test_assets.py`, in the existing `--- ecmwf_ens ---` section, reus
    `_check_evaluations(result)["nwp_has_no_unexpected_nulls"]` exists, `passed is False`,
    `severity == AssetCheckSeverity.WARN`; and `["nwp_run_is_complete"]` is still *evaluated* (the
    two guards are independent).
-   **Fails on `main`:** today the `RuntimeError` propagates out of the asset, so `result.success`
-   is False and no check evaluations are recorded at all.
+   **Fails on `main`:** the assessment runs post-write today, so the `RuntimeError` propagates out
+   of the asset. Note the precise mechanism, because the obvious phrasing is wrong: `materialize()`
+   defaults to `raise_on_error=True` (every existing test here relies on that), so on `main` the
+   exception escapes the `materialize(...)` call itself and the test **errors** — it never reaches
+   `assert result.success`. Still a genuine main-failing test; do not describe it in a PR body as
+   "`result.success` is False".
 
 2. **`test_ecmwf_ens_lands_the_run_when_the_completeness_assessment_raises`**
    Same shape, patching `assets.assess_nwp_run_completeness`. Additionally asserts that
    `nwp_has_no_unexpected_nulls` still **passed** (a clean frame), proving the failure domains are
    separate, and that the materialisation metadata still carries `n_rows` while the five shape keys
    are absent.
-   **Fails on `main`:** the raise propagates; run fails.
+   **Fails on `main`:** the raise propagates, by the same `raise_on_error=True` mechanism as above.
 
 3. **`test_ecmwf_ens_assesses_before_writing`** — the test that actually pins *this issue's* fix
    rather than rule 7 in general. Patch `assets.assess_nwp_quality` to raise
@@ -183,10 +221,25 @@ Written to describe how the code works *now*, per CLAUDE.md's "write about the p
   safe. State the one residual caveat plainly: a process killed between the Delta commit and
   Dagster recording success leaves a red partition with rows on disk, so check the table before
   re-running a partition that failed for an infrastructure reason rather than a code one.
+- **[`docs/live_service/operations.md`](../docs/live_service/operations.md), second edit** — the
+  page teaches the operator to read `power_data_is_fresh`'s degraded description ("`Could not
+  evaluate power-data freshness: …` is the check reporting that it could not read its own
+  inputs … also sent to Sentry tagged `asset_check:power_data_is_fresh`"). Both NWP checks gain
+  that same state, and the NWP sections say nothing about it. Add the equivalent line there —
+  otherwise the change ships a new operator-visible check state with no runbook entry, which is
+  exactly what **T1.4** measures.
+- **[`docs/architecture/production-deployment.md`](../docs/architecture/production-deployment.md)**
+  — this is the most concrete miss the review found. The page states outright: "(The two NWP checks
+  are computed inside the `ecmwf_ens` asset and **have no catch-all**, so a raise there does fail
+  the run and the hook does see it.)" That parenthetical becomes false, and it is the sentence
+  explaining why `report_check_degradation` has exactly two callers. Rewrite it.
 - **[`docs/architecture/ecmwf-ens-known-issues.md`](../docs/architecture/ecmwf-ens-known-issues.md)**
   — the sentence "A run that fails ingest writes nothing (validation runs before the Delta append),
-  so there are no partial partitions to clean up" becomes "validation and both non-fatal
-  assessments run before the Delta append".
+  so there are no partial partitions to clean up". Do **not** rewrite it to "validation and both
+  assessments run before the append": after this change an assessment can no longer fail ingest at
+  all, so citing it as a reason a *failed* ingest wrote nothing muddles the sentence. Keep
+  validation as that reason, and add a separate sentence that the assessments now precede the
+  append too, so no warning-path bug can land a second copy of a run.
 - **[`docs/design-philosophy/inherent-stability.md`](../docs/design-philosophy/inherent-stability.md)**
   — rule 7 currently names `power_data_is_fresh` and `live_forecasts_are_healthy` as the checks
   running under a catch-all. Add the two in-asset `ecmwf_ens` checks, and (this is the part worth
@@ -257,4 +310,51 @@ see the `mkdocs-authoring` skill).
 
 ## Review findings (step 5)
 
-*Filled in after the adversarial review.*
+A fresh sub-agent reviewed this plan with no access to the reasoning that produced it. It confirmed
+the four load-bearing claims about current behaviour (assessments run post-write; `write_nwp` is
+append-only with no dedup; the retry ladder cannot fire post-write and nothing auto-retries; and
+pre- vs post-write assessment is identical), and independently reproduced the two-`check_specs`
+Dagster experiment. Each finding below was re-verified against the code before being applied.
+
+### Accepted and folded in
+
+1. **The fallback `AssetCheckResult` must set `check_name` explicitly.** The model fallback
+   (`checks.py:333-337`) omits it because a standalone check does not need one; inside a
+   multi-check asset an omitted `check_name` fails the step exactly like an omitted result.
+   Verified: `checks.py:333-337` has no `check_name`. This was the one finding that would have
+   shipped a fail-closed degraded path.
+2. **`defs/assets.py` has no module-level `logger`.** Verified (`getLogger` appears only at
+   `checks.py:86`). Resolved by logging through `context.log`, which also matches the runbook's
+   "the traceback is in the run's logs".
+3. **`docs/architecture/production-deployment.md` explicitly asserts the two NWP checks "have no
+   catch-all".** Verified at `:174-176`. Was missing from the docs list; added.
+4. **`_sentry.py`'s *module* docstring makes the same claim as the function docstring.** Verified
+   at `:9-11`. Only the function docstring was listed; both now are.
+5. **`operations.md` teaches the degraded-check description for `power_data_is_fresh` only.**
+   Verified at `:169-176`. Added as a second edit to that page.
+6. **Tests 1 and 2 fail on `main` for a different mechanism than stated** — `materialize()` defaults
+   to `raise_on_error=True`, so the test errors rather than asserting `success is False`. The
+   conclusion (they fail on `main`) is unchanged; the wording was.
+7. **"Nothing can fail its own step" was overstated** — Dagster's own event serialisation and
+   process death remain outside every guard. Carve-out added, with the note that the residual costs
+   more here than it does for a standalone check.
+8. **"Subsumed by #476" was the wrong disposal.** #476 owns the *replace* path, not "should
+   `write_nwp` refuse to append onto an existing partition". Closing #509 on the original wording
+   would have left that untracked. The action is now: add it to #476 explicitly.
+9. **Departure 3 was framed as a correction the issue had partly already made** — the issue's own
+   parenthetical scopes the retry ladder correctly. Softened to a clarification, with a note not to
+   claim otherwise in the PR body.
+10. **Minor:** `assess_nwp_run_completeness` also takes `expected_n_h3_cells`, so "the in-memory
+    frame as their only argument" was wrong; and the identical-report argument is stronger than
+    stated, because `write_nwp` never mutates its argument at all. Both corrected.
+
+### Considered and rejected
+
+- **`report_check_degradation`'s own guard is `except Exception`, narrower than the
+  `except BaseException` guard that calls it** — so a `BaseException` out of `sentry_sdk` would
+  escape into the caller's handler and fail the run. **Rejected for this issue, not on the merits:**
+  it is pre-existing, affects the two existing callers identically, and is out of #509's scope
+  (CLAUDE.md: report design mistakes outside the issue's scope rather than fixing them). Flagged to
+  Jack in the report below; worth its own one-line issue.
+- **Nothing was rejected as factually wrong.** The review found no false finding this time, which is
+  itself worth recording — the usual expectation is that some are.
