@@ -61,11 +61,18 @@ The patch was reverted; this branch carries no code.
 
 3. **The change is deliberately made on the class, not at the resolver boundary.** The narrower
    alternative — validate override keys against `config_cls.model_fields` inside
-   `_resolve_forecaster_config` — would guard one function and leave every direct construction
-   (`scripts/run_baseline_experiment.py`, tests, any future programmatic caller) as leaky as
-   today. `extra="forbid"` on the base class is the naming-poka-yoke form: one declaration, no way
-   to route around it. This is the issue's own proposal; recorded here because the alternative is
-   the obvious one a reviewer will ask about.
+   `_resolve_forecaster_config` — would in fact cover every *construction* path in the repo, since
+   there is no direct `Config(**kwargs)` in production code at all
+   (`scripts/run_baseline_experiment.py:78-97` goes through `RegisterExperimentConfig` and the
+   resolver; `cv_assets.py:400` passes an already-built config object). What it would not cover is
+   **deserialisation**: `XGBoostForecaster.load`
+   (`packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py:238`) and
+   `load_experiment_forecaster` (`packages/ml_core/src/ml_core/_mlflow_runs.py:56`) would both
+   stay lenient, so a stale `meta.json` or a stale MLflow `config` tag would keep silently falling
+   back to defaults. That is the decisive argument for putting the rule on the class — one
+   declaration, no way to route around it, and it is the naming-poka-yoke form. This is the
+   issue's own proposal; recorded here because the alternative is the obvious one a reviewer will
+   ask about.
 
 ## What changes, file by file
 
@@ -96,12 +103,23 @@ The patch was reverted; this branch carries no code.
   "Every `model_params` key is overridable except those in `_UNOVERRIDABLE_MODEL_PARAMS`", which
   now reads as though any *other* key is accepted. State that an override must name a declared
   field of the config class, and add `ValidationError` to the `Raises:` section.
+- Update `RegisterExperimentConfig.config_overrides`'s `Field(description=...)` (lines 40–46).
+  This string is what Dagster renders in the launchpad run-config dialog — the one place an
+  experimenter actually reads what an override may contain — and it currently says only
+  "Key-value overrides applied to the base YAML's model_params, replacing whole values". Add that
+  an override must name a field the config class declares.
 
-No other production code changes. `XGBoostForecaster.load`
+No other production code changes. The two deserialisation sites — `XGBoostForecaster.load`
 (`packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py:238`) and
-`load_experiment_forecaster` (`packages/ml_core/src/ml_core/_mlflow_runs.py:56`) both deserialise
-output of `model_dump(mode="json")` / `model_dump_json()` from the same class, so they are
-unaffected — verified by the green suite, which exercises both round-trips.
+`load_experiment_forecaster` (`packages/ml_core/src/ml_core/_mlflow_runs.py:56`) — read state that
+was *persisted* by an earlier version of the class, so "same class, so the round-trip is safe" is
+not an argument the test suite can make (it only ever exercises same-process round-trips). Checked
+against the actual persisted state instead: `data/production_model/meta.json`'s `model_params` and
+both `config` experiment tags in `mlflow.db` (experiment ids 5 and 7) contain **only** declared
+`XGBoostConfig` fields — zero extras in all three. So nothing already on disk is invalidated. Note
+that fields *have* been removed from `BaseForecasterConfig` in the past (`model_family`,
+`power_fcst_model_name`, `power_fcst_model_version`, `task`), which is exactly how a stale key
+would arise in future; see the design-philosophy check for why raising is then the right answer.
 
 ## Design-philosophy check
 
@@ -140,10 +158,13 @@ All in `tests/test_jobs.py`, beside the existing resolver tests.
    returns successfully with `n_estimators == 500`, so `pytest.raises` gets no exception.
 
 2. **`test_resolve_accepts_every_key_the_base_yaml_declares`** — asserts
-   `_resolve_forecaster_config(_BASE_CONFIG, {}, "exp")` succeeds *and* that
-   `set(model_params) <= set(XGBoostConfig.model_fields)` for the real
-   `conf/model/xgboost.yaml`, so adding an undeclared key to the YAML fails the test rather than
-   only failing at registration time. This one **passes on `main`** and is a regression guard for
+   `_resolve_forecaster_config(_BASE_CONFIG, {}, "exp")` succeeds *and* that every key of the real
+   `conf/model/xgboost.yaml`'s `model_params` is a declared `XGBoostConfig` field. **The
+   comparison must run on `model_params` after `_target_` has been popped** — take
+   `_required_targets(yaml.safe_load(...), path)`'s third return value
+   (`src/nged_substation_forecast/defs/jobs.py:99`) rather than the raw YAML mapping. Verified:
+   the raw mapping is *not* a subset (`extra keys: {'_target_'}`), so an implementer writing the
+   naive comparison gets a red test. This one **passes on `main`** and is a regression guard for
    the YAML, not a test of the change — it is included because the issue's "check before landing"
    is otherwise a one-off manual check that nothing re-checks. Flagged explicitly so it is not
    mistaken for evidence.
@@ -158,10 +179,14 @@ Add to `tests/test_forecaster_config_serialisation.py`:
 
 1. **`test_every_config_class_forbids_extra_keys`** — parametrised over the existing
    `_CONFIG_CLASSES` list, asserts `config_cls.model_config.get("extra") == "forbid"`. *Fails on
-   `main`*: the value is `None` today, verified above. This is the test that catches a future
-   forecaster config that sets its own `model_config` and drops the inherited strictness — the
-   same shape as that module's existing set-serialiser invariant, and it belongs there because
-   that module is already the place where cross-subclass config invariants are enforced.
+   `main`*: the value is `None` today, for both `BaseForecasterConfig` and `XGBoostConfig`,
+   verified above. What it catches is a future forecaster config that **re-declares**
+   `extra="ignore"`/`"allow"`. It is not guarding against a subclass merely setting its own
+   `model_config` — pydantic v2 *merges* parent config into child, verified: a subclass declaring
+   `ConfigDict(frozen=True)` still reports `extra='forbid'`. The test belongs in this module
+   because it is already the place where cross-subclass config invariants are enforced, and for
+   the same stated reason: enforcing one means importing every concrete forecaster, a dependency
+   `ml_core` itself must not take on.
 
 ## Docs to update
 
@@ -182,6 +207,18 @@ Add to `tests/test_forecaster_config_serialisation.py`:
   "A registered experiment's `config_overrides` replace whole values under `model_params`". Add
   that an override naming a key the config class does not declare is rejected — this file is where
   someone reads the key names, so it is where the rule is cheapest to learn.
+- **`docs/live_service/operations.md`**, item 1 of the `live_forecasts` "What the asset does" list
+  (around line 108), which currently says the asset "Raises if the model has no trained time
+  series (re-promote first)". That list is where the asset's raise conditions are documented for
+  an operator, so the new one — a saved config the current code no longer declares — belongs
+  there. Risk 1 below calls this behaviour change "invisible in the diff"; this page is where it
+  becomes visible.
+- **`tests/test_forecaster_config_serialisation.py`**'s module docstring, which declares the
+  module to be about the canonical-*serialisation* invariant and says so four times in its first
+  twelve lines. Adding the `extra="forbid"` test broadens its remit to config invariants that
+  need every concrete forecaster imported; rewrite the docstring to say that, keeping the existing
+  explanation of why the module lives in the app tier rather than in `packages/ml_core`. It is a
+  docstring, so the docstring-markdown lint applies.
 
 No roadmap item is completed by this issue, so no ship-time roadmap triage (no status banner to
 move, no "Implementation details" section to delete).
@@ -215,8 +252,14 @@ No network-marked tests are needed: nothing here touches NWP conversion or S3.
 1. **Does the promoted-model load path becoming fail-closed need Jack's sign-off?** Recommendation:
    **no, land it as-is.** Reasoning in the design-philosophy check above — the alternative is
    serving forecasts under a config the model was not trained under, and the asset already raises
-   on the neighbouring "our own bug" condition. Raised here because it is the one behaviour change
-   outside R&D, and it is invisible in the diff.
+   on the neighbouring "our own bug" condition. Two further facts make this safer than it first
+   looks. Nothing currently persisted would be rejected: `data/production_model/meta.json` and
+   both MLflow `config` tags hold only declared fields (checked, see above). And on the production
+   box the drift cannot arise at all — `Dockerfile:29-31` and `:61` copy `src/`, `packages/` and
+   `data/production_model/` into the same image from the same tree, so code and saved config ship
+   together. The only way to hit the new raise is a laptop holding a stale
+   `data/production_model/` beside newer code, where raising is unambiguously right. Raised here
+   only because it is the one behaviour change outside R&D and it is invisible in the diff.
 
 2. **`CvConfig` and `CvFoldConfig` have the identical weakness — out of scope, flagged not fixed.**
    `packages/contracts/src/contracts/config_schemas.py:86,107` are plain `BaseModel`s loaded from
@@ -235,4 +278,45 @@ No network-marked tests are needed: nothing here touches NWP conversion or S3.
 
 ## Review findings
 
-Filled in at step 5, after the adversarial review.
+A fresh sub-agent, given the issue and the plan file but none of the reasoning behind it, attacked
+the plan against the code. Its verdict was that the plan is substantially correct — premise, fix,
+blast radius and design-philosophy argument all hold — with seven refinements. **All seven were
+independently re-verified against the code and all seven were accepted**; none was rejected. What
+each changed:
+
+1. **Departure 3's rationale was wrong.** It claimed a resolver-boundary check would leave
+   `scripts/run_baseline_experiment.py` leaky. It would not — that script goes through
+   `RegisterExperimentConfig` and the resolver (`scripts/run_baseline_experiment.py:78-97`), and
+   there is no direct `Config(**kwargs)` in production code anywhere. Rewritten to give the
+   argument that actually decides it: the two *deserialisation* sites a boundary check cannot
+   reach.
+2. **Proposed test 2 would have been red on `main` as written.** `conf/model/xgboost.yaml`'s
+   `model_params` includes `_target_`, so the raw mapping is not a subset of
+   `XGBoostConfig.model_fields`. Confirmed empirically; the test now specifies the post-pop
+   mapping.
+3. **The Dagster launchpad description was missing** from the update list
+   (`src/nged_substation_forecast/defs/jobs.py:40-46`) — the one string an experimenter actually
+   reads when filling in `config_overrides`. Added.
+4. **`tests/test_forecaster_config_serialisation.py`'s module docstring** goes stale when the
+   module gains a non-serialisation invariant. Added to the docs list.
+5. **"Unaffected — verified by the green suite" was an overclaim** about the two deserialisation
+   sites: the suite only exercises same-process round-trips, and fields *have* been removed from
+   `BaseForecasterConfig` before. Replaced with a check of the actual persisted state — zero
+   undeclared keys in `data/production_model/meta.json` and in both `mlflow.db` `config` tags.
+6. **`docs/live_service/operations.md`** documents `live_forecasts`' raise conditions for an
+   operator and was missing from the docs list. Added.
+7. **The rationale for the `extra="forbid"` invariant test was wrong about pydantic.** v2 *merges*
+   parent `model_config` into the child, so a subclass cannot drop the strictness by declaring its
+   own config — only by re-declaring `extra` explicitly. Confirmed empirically; reworded.
+
+The reviewer also noted that risk 1 understates its own case, because the Dockerfile ships code
+and the promoted model from the same tree. Verified and folded into risk 1.
+
+Findings the reviewer investigated and cleared, recorded so they are not re-litigated: the
+blast-radius list is exhaustive (`jobs.py:157`, `forecaster.py:238`, `_mlflow_runs.py:56` are the
+only places a superset dict can reach a forecaster config; `XGBoostConfig` is the only subclass;
+nothing in `scripts/`, `packages/dashboard/`, `packages/notebooks/` or `src/dashboard/` constructs
+one); `conf/model/xgboost.yaml` is the only model YAML; tests 1 and 4 do fail on `main`; no
+asset check validates a config (`checks.py:706-742` reads `meta.json` as raw JSON inside a
+degrade handler, so no warning path can now raise); and the fail-closed argument survives
+`inherent-stability.md`'s rules 1 and 2 and its "missing versus wrong" distinction.
