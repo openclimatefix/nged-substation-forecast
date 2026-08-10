@@ -797,6 +797,21 @@ This suite is shared machinery: the same transforms drive the CI degradation smo
 [Engineering Health](engineering-health.md) and, later, the outage-shaped training augmentation that
 makes the weather-blind claim true rather than hopeful.
 
+## Scoring against reanalysis — a diagnostic scope 🚧
+
+Once [ERA5 is ingested](training-history.md), scoring an experiment on ERA5 rather than ENS
+separates the two things total error confounds: the weather-to-power response, which we can
+actually improve, and the implicit hedging against forecast error, which we cannot (NWP error is
+exogenous to us). Without the split, a change in the ENS-scored number could be either.
+
+It lands as a **new `evaluation_scope`** alongside `leaderboard` / `production_monitoring` /
+`ad_hoc`, never as a fold. The **ENS-scored leaderboard stays the promotion criterion**, because
+total error at real lead times is what NGED receives — and keeping ERA5 out of the fold set is what
+preserves both
+[principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically)
+and the standing
+[rejection of reanalysis-backed validation folds](../architecture/ml-orchestration.md#yearly-folds-backed-by-era5-rejected-for-validation).
+
 ---
 
 ## Time-slices for performance evaluation

@@ -97,6 +97,7 @@ nav:
       - Metrics & Leaderboard: roadmap/metrics-and-leaderboard.md
       - Net-Demand Disaggregation: roadmap/disaggregation.md
       - Switching Events: roadmap/switching-events.md
+      - Training History (ERA5): roadmap/training-history.md
       - XGBoost Improvements: roadmap/xgboost-improvements.md
   - API Reference:
       - Overview: api/index.md
