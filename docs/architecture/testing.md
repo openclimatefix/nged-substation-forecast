@@ -1,9 +1,9 @@
 # Testing
 
 How the test suite is wired up, the house style for writing tests, and the notable test suites
-that guard tricky invariants. Two testing *gotchas* are documented alongside the other gotchas in
-CLAUDE.md rather than here: the moto S3 backend being process-global (reset it per test), and Polars
-row counts wrapping past 2³² rows.
+that guard tricky invariants. One testing gotcha lives elsewhere because it is not really about
+tests: Polars row counts wrapping past 2³² rows, in
+[Performance and Scale](performance.md#the-other-hard-ceiling-polars-32-bit-row-index).
 
 ## Where tests and their dependencies live
 
@@ -50,6 +50,14 @@ row counts wrapping past 2³² rows.
   (`monkeypatch.setattr(some_module, "open", fake_open)`) through the built-in fixture. For S3,
   drive the in-process `moto` server instead of mocking — `tests/test_s3_data_paths.py` is the
   canonical pattern.
+- **Reset the moto S3 backend per test.** The in-process `moto` server keeps its bucket contents
+  in a **process-global backend that outlives the `ThreadedMotoServer` object**, so a
+  module-scoped server does not hand each test a clean slate. A test whose write path runs twice
+  against that server — a re-run, or state left behind by an earlier test — reads stale data: an
+  appended Delta table returns double the rows, and an `object_exists` precondition sees a
+  leftover parquet. Keep the *server* module-scoped for speed, but give each test a
+  **function-scoped** fixture that `POST`s to `/moto-api/reset` and recreates the bucket before
+  the test body runs, so every test starts pristine and independent of execution order.
 - **Take the `dagster_instance` fixture; never call `DagsterInstance.ephemeral()` in a test.** The
   fixture (in `tests/conftest.py`) enters the instance as a context manager, so `dispose()` runs
   when the test ends.
@@ -230,6 +238,42 @@ present):
 `test_ecmwf_ens_network.py` (network-gated, above) composes all three against the live catalog and is
 the only layer that can catch *future upstream drift* — a change in Dynamical.org's own conventions
 that the committed slice, frozen at capture time, cannot.
+
+## Marimo notebooks bind every name their cells reference
+
+Marimo rebuilds a notebook from its `with app.setup:` block plus its `@app.cell` functions, and
+never runs the module-level statements in between. A name bound at module level is therefore
+invisible to every cell: the notebook raises `NameError` the next time it is opened, while ruff, ty
+and pytest all pass, because the file they were handed is valid Python. Two tools produce exactly
+that shape from a working notebook — `ruff check --fix`, which writes an import an autofix needs
+into the top-level import block, and `marimo check --fix`, which deletes such an import and
+rewrites the cell that used the name as `def _(name)`, leaving a cell input nothing defines.
+
+`scripts/check_marimo_notebooks.py` reads each cell's `refs` and `defs` and reports any name a cell
+references that no cell binds. It runs as a pre-commit hook over changed notebooks, and
+`tests/test_marimo_notebooks.py` runs it over every notebook in `packages/notebooks/` and
+`packages/dashboard/`. Three properties are worth knowing:
+
+- **It is static.** Nothing executes, so the check needs none of the notebooks' runtime
+  dependencies — only marimo itself, which the root environment has via the `dashboard` dev
+  dependency. It cannot catch a notebook that binds every name and still fails inside a Polars or
+  Altair call; executing the notebooks is not an option, because they read real Delta tables and
+  S3.
+- **It rides on private marimo API.** `Cell.refs` and `Cell.defs` are documented, but loading a
+  notebook without running it is not. So the checker raises rather than reporting "no findings"
+  whenever a file does not parse into at least one cell, and the tests keep a positive control —
+  a deliberately broken notebook, held as a string so ruff never sees it — that fails if a marimo
+  release stops the check detecting a real breakage.
+- **Every `.py` file directly inside those two directories must be a notebook**, and a file that
+  is not one is a finding. The ruff pre-commit hooks share that assumption: they use it to decide
+  which files must never be auto-fixed.
+
+Testing what a notebook's cells actually *do* is a separate job, and
+`packages/notebooks/plot_missing_NWP_data.py` is the worked example. Its chart-building helper is
+an `@app.function` — marimo's form for a top-level reusable function — so an ordinary `test_*`
+function in the same notebook can exercise it on a synthetic frame. Naming the notebook in
+`python_files` is what makes a plain `uv run pytest` collect it. The authoring rules for writing
+one are in the `marimo-notebooks` skill.
 
 ## Assertion style for Patito frames
 

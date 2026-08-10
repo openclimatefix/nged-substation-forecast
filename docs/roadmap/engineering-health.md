@@ -64,8 +64,8 @@ remains:
   extend `docs/ml_experimentation/dagster-workflow.md` with the live-forecast and monitoring
   flows, and update the "Known limitation" and MLflow-logging notes in
   `docs/architecture/ml-orchestration.md` if the implementations diverged from the plans.
-- Run the ship-time triage (per CLAUDE.md) on any roadmap content the live-service work
-  implemented — e.g. flip the relevant 🚧 statuses in
+- Run the ship-time triage (per the `github-issue-pr-workflow` skill) on any roadmap content
+  the live-service work implemented — e.g. flip the relevant 🚧 statuses in
   `docs/roadmap/metrics-and-leaderboard.md` once monitoring lands.
 
 **Verification.** Full `uv run pytest` green from the repo root, **including the full-stack

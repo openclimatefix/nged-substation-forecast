@@ -235,7 +235,8 @@ def time_series_coverage(
 
     Returns an empty (but correctly typed) frame if the Delta table does not exist yet.
     ``min``/``max`` grouped by ``time_series_id`` are value aggregations, so they are safe from
-    the Polars 32-bit row-count wraparound even on a very large table (see CLAUDE.md).
+    the Polars 32-bit row-count wraparound even on a very large table (see
+    ``docs/architecture/code-style.md``).
 
     Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops
     the ``power`` column, but a group-wise ``min``/``max`` cannot be answered from Parquet

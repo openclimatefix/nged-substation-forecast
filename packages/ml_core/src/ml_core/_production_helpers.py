@@ -121,7 +121,7 @@ def build_live_power_frame(
     times_lf = pl.LazyFrame({"time": grid_times}, schema={"time": UTC_DATETIME_DTYPE})
     spine = ids_lf.join(times_lf, how="cross")
 
-    # Strip the Patito subclass before joining (see CLAUDE.md's cross-model-join gotcha).
+    # Strip the Patito subclass before joining (see the `polars-patito-gotchas` skill).
     power_plain = pl.LazyFrame._from_pyldf(observed_power._ldf)
     dense = spine.join(power_plain, on=["time_series_id", "time"], how="left").sort(
         ["time_series_id", "time"]

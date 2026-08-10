@@ -6,6 +6,11 @@ end-to-end tests that drive the real ``@asset_check`` — writing temp Delta tab
 roster and a promoted-model ``meta.json`` — so the Settings plumbing, the Delta scans and the
 ``AssetCheckResult`` mapping are all exercised together.
 
+One case goes further and drives ``power_data_is_fresh`` through Dagster's executor rather than
+calling it: asserting that the *run* still succeeds when the check's internals blow up is the only
+way to pin the property the catch-all exists for, and a returned ``AssetCheckResult`` cannot show
+it.
+
 The one path not reachable from here is ``live_forecasts_are_healthy`` running *partitioned*:
 ``build_asset_check_context`` cannot carry a partition key, so that path is covered by
 ``tests/test_live_forecasts.py::test_check_passes_after_a_real_live_materialisation``, which
@@ -27,8 +32,12 @@ from contracts.settings import Settings
 from dagster import (
     AssetCheckResult,
     AssetCheckSeverity,
+    AssetSelection,
+    DagsterExecutionInterruptedError,
+    DagsterInstance,
     TableMetadataValue,
     build_asset_check_context,
+    materialize,
 )
 from deltalake import write_deltalake
 
@@ -281,6 +290,148 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
     assert captured[0] is sentinel  # the exact evaluated object, not a recomputation
     # ...and that same object drove the returned check result (n_late == n_stale + n_never == 7).
     assert check_result.metadata["n_late"].value == 7
+
+
+def _write_one_fresh_series(settings: Settings) -> None:
+    """Write a minimal ``power_time_series`` Delta table holding one up-to-date series."""
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1], dtype=pl.Int32),
+            "time": pl.Series([datetime.now(UTC) - timedelta(hours=1)]).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0], dtype=pl.Float32),
+        }
+    ).write_delta(settings.power_time_series_data_path)
+
+
+class _FakePanic(BaseException):
+    """Stands in for pyo3's ``PanicException``, which also derives from ``BaseException``.
+
+    The real class cannot be imported: each compiled extension defines its own, and there is no
+    importable ``pyo3_runtime`` module to reach them through. What matters to the checks' guard is
+    only that a panic is *not* an ``Exception``, which this reproduces exactly.
+    """
+
+
+def _raise_inside_the_check(**_kwargs: object) -> PowerFreshnessResult:
+    """Stand in for ``evaluate_power_freshness`` to simulate a bug inside the check."""
+    raise RuntimeError("simulated bug inside the check")
+
+
+def _panic_inside_the_check(**_kwargs: object) -> PowerFreshnessResult:
+    """Stand in for ``evaluate_power_freshness`` to simulate a Rust panic inside the check."""
+    raise _FakePanic("simulated rust panic inside the check")
+
+
+def _never_called(name: str, exc: BaseException) -> None:
+    """Stand in for ``report_check_degradation`` on a path that must not report to Sentry."""
+    raise AssertionError(f"report_check_degradation({name!r}, {exc!r}) should not have been called")
+
+
+def test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet(env: Path) -> None:
+    """A half-written roster is a realistic on-disk raiser: ``metadata.parquet`` is written in
+    place, so a process killed mid-write leaves a file that exists and will not parse. The check
+    must warn rather than raise — it is one step of the hooked
+    ``power_time_series_and_metadata_job``.
+
+    It is not the only raiser on that state: in an hour where new data arrives, ``upsert_metadata``
+    reads the same file first and fails the asset outright. This pins the check's half.
+
+    The assertion is on our own description prefix rather than on Polars' message, which is not
+    ours to pin.
+    """
+    settings = Settings()
+    _write_one_fresh_series(settings)
+    Path(settings.metadata_path).write_bytes(b"not a parquet file")
+
+    result = checks.power_data_is_fresh()
+    assert isinstance(result, AssetCheckResult)
+    assert result.passed is False
+    assert result.severity == AssetCheckSeverity.WARN
+    assert "Could not evaluate power-data freshness" in str(result.description)
+
+
+def test_power_data_is_fresh_never_fails_the_run(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The whole point of the catch-all, and the one property the return-value tests cannot pin.
+
+    A raise inside this check fails the *step*, and so the hourly run, and so pages via
+    ``power_time_series_and_metadata_job``'s ``sentry_capture_failure`` hook — even though the
+    check is ``blocking=False``, which governs only whether a *failed* check blocks downstream
+    assets, not whether an *erroring* one fails the run. Running the check through Dagster's
+    executor is the only way to assert that; ``AssetSelection.checks`` runs the check step alone,
+    so no asset materialises and nothing touches S3. No fixture data is needed either: with no
+    tables on disk ``time_series_coverage`` returns an empty frame and ``_read_roster_ids`` returns
+    ``None``, so the patched evaluator is still reached.
+    """
+    monkeypatch.setattr(checks, "evaluate_power_freshness", _raise_inside_the_check)
+    reported: list[tuple[str, BaseException]] = []
+    monkeypatch.setattr(
+        checks, "report_check_degradation", lambda name, exc: reported.append((name, exc))
+    )
+
+    result = materialize(
+        [checks.power_data_is_fresh],
+        selection=AssetSelection.checks(checks.power_data_is_fresh),
+        instance=dagster_instance,
+        raise_on_error=False,
+    )
+
+    assert result.success
+    (evaluation,) = result.get_asset_check_evaluations()
+    assert evaluation.passed is False
+    assert evaluation.severity == AssetCheckSeverity.WARN
+    assert "simulated bug inside the check" in str(evaluation.description)
+    # Not failing the run means the Sentry failure hook no longer fires, so the handler must send
+    # the exception itself or the fault reaches nobody outside Dagster's Checks view.
+    assert [name for name, _ in reported] == ["power_data_is_fresh"]
+    assert isinstance(reported[0][1], RuntimeError)
+
+
+def test_power_data_is_fresh_degrades_on_a_rust_panic(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The reason the guard catches ``BaseException`` rather than ``Exception``.
+
+    A panic in any of the pyo3 extensions this check reads through — Polars, delta-rs (via
+    ``delta_table_exists``) or obstore (via ``object_exists``) — is not an ``Exception``, so a
+    narrower guard would let it through and fail the hourly run. This is the test that fails if
+    someone tidies the guard back down to ``except Exception``; the cancellation test below cannot
+    catch that, because ``DagsterExecutionInterruptedError`` is not an ``Exception`` either and so
+    propagates out of a narrow guard on its own.
+    """
+    monkeypatch.setattr(checks, "evaluate_power_freshness", _panic_inside_the_check)
+    reported: list[tuple[str, BaseException]] = []
+    monkeypatch.setattr(
+        checks, "report_check_degradation", lambda name, exc: reported.append((name, exc))
+    )
+
+    result = checks.power_data_is_fresh()
+    assert isinstance(result, AssetCheckResult)
+    assert result.passed is False
+    assert result.severity == AssetCheckSeverity.WARN
+    assert "simulated rust panic inside the check" in str(result.description)
+    assert [name for name, _ in reported] == ["power_data_is_fresh"]
+
+
+def test_power_data_is_fresh_re_raises_a_cancelled_run(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The one thing the catch-all must *not* swallow.
+
+    It catches ``BaseException``, because a pyo3 panic derives from that rather than from
+    ``Exception``. Cancellation lands in the same net, so the handler re-raises it explicitly: a
+    run the operator cancelled has to stop, not report itself as merely unhealthy.
+    """
+
+    def _cancel(**_kwargs: object) -> PowerFreshnessResult:
+        raise DagsterExecutionInterruptedError
+
+    monkeypatch.setattr(checks, "evaluate_power_freshness", _cancel)
+    monkeypatch.setattr(checks, "report_check_degradation", _never_called)
+
+    with pytest.raises(DagsterExecutionInterruptedError):
+        checks.power_data_is_fresh()
 
 
 # ---------------------------------------------------------------------------
@@ -964,16 +1115,45 @@ def test_live_forecasts_check_does_not_raise_on_an_empty_table(env: Path) -> Non
     assert result.metadata["n_rows"].value == 0
 
 
+@pytest.mark.parametrize("raiser", [RuntimeError, _FakePanic])
 def test_live_forecasts_check_contains_an_internal_error(
-    env: Path, monkeypatch: pytest.MonkeyPatch
+    env: Path, monkeypatch: pytest.MonkeyPatch, raiser: type[BaseException]
 ) -> None:
-    """Even a bug inside the check itself must surface as a warning, never as a raise."""
+    """Even a bug inside the check itself must surface as a warning, never as a raise.
+
+    Parametrised over both sides of the guard's width: an ordinary ``Exception``, and a
+    ``BaseException`` standing in for the pyo3 panic that a plain ``except Exception`` would miss.
+    """
 
     def _boom(*_args: object, **_kwargs: object) -> None:
-        raise RuntimeError("simulated bug inside the check")
+        raise raiser("simulated bug inside the check")
 
     monkeypatch.setattr(checks, "_read_live_forecast_rows", _boom)
+    reported: list[tuple[str, BaseException]] = []
+    monkeypatch.setattr(
+        checks, "report_check_degradation", lambda name, exc: reported.append((name, exc))
+    )
+
     result = _run_live_check()
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
     assert "simulated bug inside the check" in str(result.description)
+    # Not failing the run means the Sentry failure hook no longer fires, so the handler must send
+    # the exception itself or the fault reaches nobody outside Dagster's Checks view.
+    assert [name for name, _ in reported] == ["live_forecasts_are_healthy"]
+    assert isinstance(reported[0][1], raiser)
+
+
+def test_live_forecasts_are_healthy_re_raises_a_cancelled_run(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cancellation lands in the same net as a panic, and must come straight back out."""
+
+    def _cancel(*_args: object, **_kwargs: object) -> None:
+        raise DagsterExecutionInterruptedError
+
+    monkeypatch.setattr(checks, "_read_live_forecast_rows", _cancel)
+    monkeypatch.setattr(checks, "report_check_degradation", _never_called)
+
+    with pytest.raises(DagsterExecutionInterruptedError):
+        _run_live_check()

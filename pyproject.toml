@@ -132,7 +132,7 @@ line-length = 100
 # E711, E712, E713, E714, E721, E731, E741, E742 and E743. E4/E7/E9 are therefore listed
 # explicitly.
 select = [
-    "ANN",   # flake8-annotations: complete signatures are a house rule (see CLAUDE.md)
+    "ANN",   # flake8-annotations: complete signatures are a house rule (see docs/architecture/code-style.md)
     "ASYNC", # flake8-async
     "B",     # flake8-bugbear
     "BLE",   # flake8-blind-except
@@ -153,7 +153,7 @@ select = [
     "INT",   # flake8-gettext
     "ISC",   # flake8-implicit-str-concat
     "LOG",   # flake8-logging
-    "N",     # pep8-naming: the naming conventions CLAUDE.md mandates
+    "N",     # pep8-naming: the naming conventions docs/architecture/code-style.md mandates
     "PERF",  # perflint
     "PGH",   # pygrep-hooks
     "PIE",   # flake8-pie
@@ -187,7 +187,7 @@ select = [
 # here (and its justification) over dropping a whole family from `select`.
 ignore = [
     # --- Rules that fight this repo's own conventions ---
-    # CLAUDE.md explicitly blesses long-but-clear parameter lists ("Eight parameters is acceptable
+    # docs/architecture/code-style.md explicitly blesses long-but-clear parameter lists ("Eight parameters is acceptable
     # when each is distinct"), and prefers extracting named helpers with more parameters over
     # letting a function body grow.
     "PLR0913", # too many arguments
@@ -200,7 +200,7 @@ ignore = [
     # f-strings in log calls are fine here: this is not a high-volume hot path, and the eager
     # formatting cost is worth the readability.
     "G004", # logging statement uses f-string
-    # CLAUDE.md asks for *complete* type hints, which is what the rest of flake8-annotations
+    # docs/architecture/code-style.md asks for *complete* type hints, which is what the rest of flake8-annotations
     # enforces. It does not ask for the elimination of `Any`, and the places that use it — a
     # `**kwargs: Any` forwarded verbatim, a test double that accepts and ignores every argument —
     # have no honest narrower type.
@@ -212,10 +212,12 @@ ignore = [
     # are quantile levels, longitude bounds and similar domain literals that read better inline
     # than as named constants. Tighten to a tests-only entry if that ever stops being true.
     "PLR2004", # magic value used in comparison
-    # CLAUDE.md asks for UPPER_SNAKE_CASE constants, and N806 rejects that spelling for a constant
+    # docs/architecture/code-style.md asks for UPPER_SNAKE_CASE constants, and N806 rejects that spelling for a
+    # constant
     # that happens to be function-local (`RAD_TO_DEG`, `COMPRESSION`), as well as domain-conventional
     # names such as `X` for a feature matrix. The rest of pep8-naming (N801 classes, N802 functions,
-    # N815/N816 mixedCase) is left on and does encode the conventions CLAUDE.md states. N803 is
+    # N815/N816 mixedCase) is left on and does encode the conventions docs/architecture/code-style.md
+    # states. N803 is
     # *not* ignored here — every site is a marimo-generated cell parameter, so it is declined in
     # `per-file-ignores` for the notebooks alone and stays live over `src/` and the tests.
     "N806", # variable in function should be lowercase
@@ -287,7 +289,7 @@ ignore = [
 "**/conftest.py" = ["ANN201", "D", "DTZ"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
-# pandas is strictly forbidden in this repo — Polars only. See CLAUDE.md, "Code Style".
+# pandas is strictly forbidden in this repo — Polars only. See docs/architecture/code-style.md.
 "pandas".msg = "pandas is forbidden in this repo: use Polars (`pl.LazyFrame`/`pl.DataFrame`)."
 
 [tool.ruff.lint.pydocstyle]
@@ -309,6 +311,12 @@ docstring-code-line-length = 100
 # with `uv run pytest --run-network` — see docs/architecture/testing.md. The gate lives in a hook,
 # not in an `addopts` `-m "not network"`, because any caller-supplied `-m` would silently override it.
 addopts = "--import-mode=importlib"
+# The first two patterns are pytest's default, restated because naming any pattern replaces the
+# default list. The notebook is named as well because a marimo notebook is an ordinary Python file
+# that pytest can collect, and this one holds a `test_*` function exercising its chart-building
+# helper. See docs/architecture/testing.md. Patterns containing a `/` match against the path
+# rather than the basename, so this reaches exactly one file.
+python_files = ["test_*.py", "*_test.py", "packages/notebooks/plot_missing_NWP_data.py"]
 # Put the root `tests/` dir on sys.path so its integration tests can import shared, non-fixture
 # test data (e.g. `_nwp_test_data`) by bare name — importlib mode does not add each test file's
 # own directory to sys.path the way prepend mode does.
