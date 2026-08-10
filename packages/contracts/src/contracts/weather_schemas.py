@@ -327,8 +327,9 @@ class Nwp(pt.Model):
         *interior* wholly-null slice does not survive that way: `interpolate()` fills it from the
         neighbouring steps, so the model sees a fabricated value rather than a null. The real
         argument is narrower — a tolerated slice is a small, isolated part of one member's
-        trajectory, and interpolating across a 3- or 6-hour step is the same treatment the
-        scattered corruption already receives.
+        trajectory, and bridging it (6 hours in the 3-hourly part of the horizon, 12 in the
+        6-hourly part, since the fill spans the steps *either side* of the missing one) is the same
+        treatment the scattered corruption already receives.
 
         The judgement is made per `init_time`, so a run whose column is empty is caught even inside
         a frame holding other, healthy runs. There is no tunable fraction here — the test is that

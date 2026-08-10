@@ -267,9 +267,14 @@ NaN":
 
 Two consequences. First, a model trained with NWP features and run without them does *not* thereby
 become a weather-blind model — it falls back on arbitrary default directions, so the rung-2 claim
-has to be earned by training for the outage, not assumed. Second, the one case where the guarantee
-genuinely holds is the chronic ECMWF null scatter described below, because it is present in every
-training run.
+has to be earned by training for the outage, not assumed. Second, the case where the guarantee
+genuinely holds is narrower than it first looks. The chronic ECMWF nulls described below are
+present in every training run, so where they reach the model the guarantee does hold — but that is
+only the *leading* ones, the lead-0 window. `_upsample_nwp_to_half_hourly` interpolates *interior*
+nulls away when it resamples to the half-hourly grid, so a scattered or whole-slice null beyond
+lead-0 arrives at the model as a bridged value rather than as missingness. Those are handled by
+silent interpolation, not by NaN routing, which is a different mechanism with a different failure
+mode: a fabricated number carries no signal that it was fabricated.
 
 ### Widening bands: the in-band signal
 
@@ -357,9 +362,16 @@ source accumulation: scattered per-pixel in the ordinary case, occasionally a wh
 `(ensemble_member, valid_time)` slice. See
 [Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md) for the full account. Mostly
 this is element-wise rather than blocky, and either way it is present in every training run, so it
-is in-distribution — the one case where "XGBoost handles the missingness it saw during training"
-genuinely holds. It needs no scenario, and the main risk is that someone later "fixes" it by
-imputing.
+is in-distribution and needs no scenario.
+
+Be precise about what "handled" means here, because two different mechanisms are at work and only
+one of them is XGBoost's. The lead-0 nulls reach the model *as* nulls and are routed by the learned
+default directions — that is the case where "XGBoost handles the missingness it saw during
+training" genuinely holds. The nulls *beyond* lead-0 mostly never reach the model at all:
+`_upsample_nwp_to_half_hourly` interpolates interior nulls away while resampling to the half-hourly
+grid, so they arrive as bridged values. That is imputation, already happening, chosen by nobody —
+which turns the old worry here, that someone would later "fix" this by imputing, into something
+closer to its opposite: the fill exists and is unbounded, unflagged and unmeasured.
 
 The whole-slice case is the awkward member of this bucket and is worth naming as such: it *is*
 blocky, and it is only chronic in the sense of recurring across runs at low volume. It sits here
