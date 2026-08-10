@@ -217,8 +217,8 @@ by running them, not by reading.
 2. `test_load_forecaster_from_dir_accepts_the_current_vocabulary` — the same shape with
    `{"local_utc_offset_minutes", "temperature_2m", "power_lag_24h", "windchill"}`; asserts no raise
    and that `selected_features` round-tripped. Passes on `main` too. It is the negative control
-   that stops test 1 being satisfied by a guard that rejects everything — its docstring says so, so
-   a reviewer does not mistake it for a test of this change.
+   that stops the previous test being satisfied by a guard that rejects everything — its docstring
+   says so, so a reviewer does not mistake it for a test of this change.
 
 3. `test_a_model_without_selected_features_is_not_rejected` — a hand-written `meta.json` holding
    `model_class` and `model_params` without a `selected_features` key must not raise. Pins the
@@ -228,7 +228,7 @@ by running them, not by reading.
 **In `packages/ml_core/tests/test_base_forecaster.py`** (file-store MLflow, existing fixtures, no
 model-library dependency):
 
-4. `test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable` — save a
+1. `test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable` — save a
    `_FakeForecaster` with a good vocabulary to run A and promote it to `dest`; save one with
    `selected_features={"local_utc_offset"}` to run B; assert `fetch_model_artifacts(B, dest)`
    raises **and** that `dest`'s `meta.json` still holds run A's vocabulary and `promotion.json`
@@ -238,7 +238,7 @@ model-library dependency):
 
 **In `tests/test_promoted_model.py`** (integration marker, real file-store MLflow + Dagster):
 
-5. `test_promoted_model_refuses_a_model_with_an_unparseable_feature` — assert the materialisation
+1. `test_promoted_model_refuses_a_model_with_an_unparseable_feature` — assert the materialisation
    fails and `production_model_path` was not created.
 
    **`dagster.materialize` defaults to `raise_on_error=True`**, so after the change the exception
