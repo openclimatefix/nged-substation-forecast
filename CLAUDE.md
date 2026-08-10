@@ -10,7 +10,7 @@ uv sync
 
 # Linting & formatting
 uv run ruff check .            # check
-uv run ruff check . --fix      # fix
+uv run ruff check . --fix      # fix (never over a marimo notebook - see the Marimo section)
 uv run ruff format .           # format
 uv run ty check                # type checking
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md  # markdown lint

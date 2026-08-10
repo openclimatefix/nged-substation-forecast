@@ -15,7 +15,7 @@ The file is written as netCDF3 (``engine="scipy"``) so that neither capture nor 
 netCDF4/h5netcdf dependency; ``ensemble_member`` is downcast to int32 for netCDF3 compatibility.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -28,7 +28,7 @@ _BOUNDARY = shapely.box(-3.5, 55.5, -3.0, 56.0)  # ~0.5° box over Edinburgh
 
 
 def main() -> None:
-    init_time = (datetime.now(timezone.utc) - timedelta(days=3)).replace(
+    init_time = (datetime.now(UTC) - timedelta(days=3)).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     h3_grid = compute_h3_grid_weights_for_boundary(

@@ -116,8 +116,9 @@ line-length = 100
 #
 # The families here are chosen from ruff's defaults, then widened. Note that ruff's defaults are
 # *not* a superset of the older E4/E7/E9/F gate: of pycodestyle-E they keep only E722 and E902, so
-# adopting the defaults verbatim would stop enforcing E401, E402, E711, E712, E713, E714, E721 and
-# E731. E4/E7/E9 are therefore listed explicitly.
+# adopting the defaults verbatim would stop enforcing all fourteen of E401, E402, E701, E702, E703,
+# E711, E712, E713, E714, E721, E731, E741, E742 and E743. E4/E7/E9 are therefore listed
+# explicitly.
 select = [
     "ANN",   # flake8-annotations: complete signatures are a house rule (see CLAUDE.md)
     "ASYNC", # flake8-async
@@ -153,9 +154,9 @@ select = [
     # flake8-bandit, restricted to the three rules ruff enables by default. The whole family
     # reports 1,150 findings, of which 1,129 are S101 (`assert` used) — almost all of them the
     # asserts that *are* the test suite. Exempting S101 in tests the way the DTZ/D entries below do
-    # leaves 29: our own `git`/`uv` invocations (S603/S607 ×12), settings and moto dummy credentials
-    # (S106 ×4), `urlopen` against a local moto server and the MLflow test server (S310 ×5), and 8
-    # asserts outside tests. That is 29 suppressions for no signal in a repo that handles no
+    # leaves 30: our own `git`/`uv` invocations (S603/S607 ×12), settings and moto dummy credentials
+    # (S106 ×4), `urlopen` against a local moto server and the MLflow test server (S310 ×5), and 9
+    # asserts outside tests. That is 30 suppressions for no signal in a repo that handles no
     # untrusted input. Real security linting is a separate decision, not a side effect of this file.
     "S102",  # exec used
     "S110",  # try-except-pass
@@ -216,6 +217,9 @@ ignore = [
     "TC001", # move application import into a type-checking block
     "TC002", # move third-party import into a type-checking block
     "TC003", # move standard-library import into a type-checking block
+    # TC006 moves no imports, so the reason above does not cover it. It wants every `typing.cast()`
+    # target quoted, which costs 15 edits and buys nothing here: `cast` never evaluates its type
+    # argument at runtime in a way that a quote would rescue, and the unquoted form reads better.
     "TC006", # add quotes to type expression in `typing.cast()`
 
     # --- Rules whose cure is worse than the disease ---
