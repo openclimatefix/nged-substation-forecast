@@ -14,6 +14,7 @@ from contracts.weather_schemas import (
     ECMWF_ENS_H3_RESOLUTION,
     NwpQualityReport,
     NwpRunCompletenessReport,
+    NwpVariableWhollyMissing,
     assess_nwp_quality,
     assess_nwp_run_completeness,
 )
@@ -182,8 +183,10 @@ its 00Z run has actually landed, matching Dynamical's publication lag; shared wi
 
 _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
 """Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≈ 4h of coverage past the 08:30 UTC schedule
-(``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time. Only applies to
-``NwpRunNotYetAvailable``; a genuine bug fails immediately instead of retrying for hours."""
+(``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time — and past the
+3h25m the one measured republication took. Applies to ``NwpRunNotYetAvailable`` and
+``NwpVariableWhollyMissing``, the two ways an upstream run says "not ready yet"; a genuine bug
+fails immediately instead of retrying for hours."""
 
 _ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800
 """How long to wait between retries of a not-yet-published ECMWF run."""
@@ -250,19 +253,26 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         )
     ).set_model(H3GridWeights)
 
-    # Download and convert
+    # Download and convert. Both retryable failures mean "the upstream run is not ready yet", they
+    # just say it at different points: the run is absent from the catalog, or it is present but a
+    # weather variable is still wholesale empty. Dynamical.org publishes each run as ~40 separate
+    # Icechunk commits, so an in-progress publication is genuinely readable and genuinely
+    # incomplete, and a defective one gets republished — the 2026-08-09 00Z run was repaired 3h25m
+    # after its first publication, inside this asset's four-hour retry budget. Every other error
+    # still fails immediately.
     try:
         ds_lazy = open_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
-    except NwpRunNotYetAvailable as exc:
+        context.log.info("Lazily opened Icechunk store.")
+
+        ds = download_ecmwf_ens_data(ds_lazy)
+        context.log.info("Downloaded Icechunk data.")
+
+        nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
+    except (NwpRunNotYetAvailable, NwpVariableWhollyMissing) as exc:
+        context.log.warning(f"ECMWF ENS run not usable yet, requesting a retry: {exc}")
         raise RetryRequested(
             max_retries=_ECMWF_ENS_MAX_RETRIES, seconds_to_wait=_ECMWF_ENS_RETRY_DELAY_SECONDS
         ) from exc
-    context.log.info("Lazily opened Icechunk store.")
-
-    ds = download_ecmwf_ens_data(ds_lazy)
-    context.log.info("Downloaded Icechunk data.")
-
-    nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
     context.log.info(f"Converted NWP data to Polars. Columns: {nwp.columns}")
 
     nwp_data_path = settings.nwp_data_path
@@ -342,21 +352,27 @@ def _nwp_quality_check_result(report: NwpQualityReport) -> AssetCheckResult:
     else:
         variables = ", ".join(report.affected_variables)
         description = (
-            f"{report.n_null_cells} scattered null cell(s) beyond lead-0 in {variables} — known "
-            "upstream ECMWF ENS corruption, tolerated. See "
+            f"{report.n_null_cells} null cell(s) beyond lead-0 in {variables}, across "
+            f"{report.n_scattered_slices} partly-null and {report.n_whole_null_slices} wholly-null "
+            "(member, valid_time) slice(s) — known upstream ECMWF ENS corruption, tolerated. See "
             "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
         )
     return AssetCheckResult(
         check_name=_NWP_QUALITY_CHECK_NAME,
-        # WARN, never fail: the scatter is expected upstream corruption we deliberately ingest.
+        # WARN, never fail: these nulls are expected upstream corruption we deliberately ingest.
+        # Only a variable empty in *every* slice is fatal, and Nwp.validate has already rejected
+        # that before this runs.
         passed=report.is_healthy,
         severity=AssetCheckSeverity.WARN,
         description=description,
         metadata={
-            "n_scattered_null_cells": report.n_null_cells,
+            "n_null_cells": report.n_null_cells,
             "n_affected_slices": report.n_affected_slices,
+            # Broken out because the two mean different things: scatter is the steady-state #722
+            # corruption, whereas wholly-null slices are a field that arrived missing.
+            "n_whole_null_slices": report.n_whole_null_slices,
             "affected_variables": list(report.affected_variables),
-            "affected_slices": _nwp_null_slices_metadata(report.scattered),
+            "affected_slices": _nwp_null_slices_metadata(report.affected),
         },
     )
 
@@ -369,13 +385,14 @@ the exact totals live in the scalar metadata, so the table only needs the worst 
 useful — bounding it keeps the Dagster event log from bloating on a bad day."""
 
 
-def _nwp_null_slices_metadata(scattered: pl.DataFrame) -> TableMetadataValue:
+def _nwp_null_slices_metadata(affected: pl.DataFrame) -> TableMetadataValue:
     """Render the worst affected (variable, member, valid_time) slices as a Dagster metadata table.
 
     Capped at ``_NWP_NULL_SLICES_TABLE_LIMIT`` rows (most-null first); the full counts are in the
-    scalar metadata alongside.
+    scalar metadata alongside. Sorting by ``n_null`` puts the wholly-null slices at the top, which
+    is the order an operator wants: those are the ones naming a field that arrived missing.
     """
-    top = scattered.sort("n_null", descending=True).head(_NWP_NULL_SLICES_TABLE_LIMIT)
+    top = affected.sort("n_null", descending=True).head(_NWP_NULL_SLICES_TABLE_LIMIT)
     records = [
         TableRecord(
             {

@@ -141,7 +141,8 @@ code as it stands; "intended" describes where this principle takes it.
 | NWP absent, or too old to cover the horizon | **Hard failure** — the asset raises and NGED gets nothing (tracked to change in [#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) | Weather-blind forecast, wide bands, warning row 🚧 | No |
 | Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns and names the late series | Unchanged, plus regime-appropriate band widening 🚧 | No |
 | A meter reporting detectably wrong values | Partly detected at ingest; see [Missing versus wrong](#missing-versus-wrong) | Treated as missing, which routes it into the always-output path 🚧 | No |
-| A whole ECMWF slice corrupt | `Nwp.validate` rejects it at ingest, so it manifests downstream as a missed run | Unchanged | No |
+| A whole ECMWF slice corrupt | Landed; `nwp_has_no_unexpected_nulls` warns, naming the slice | Unchanged | No |
+| A whole ECMWF weather variable absent | `ecmwf_ens` retries for up to 4h; if the column is still empty, `Nwp.validate` rejects it and it manifests downstream as a missed run | Unchanged | No |
 | The promoted model is empty or unloadable | **Hard failure** — the asset raises | Unchanged: this is a promotion bug, not a data outage | Yes, next business day |
 | The service is not running at all | Sentry missed-check-in alarm fires from outside the deployment | Unchanged | Yes, next business day |
 | Any of the above during model R&D | Fails fast | Unchanged — see [R&D fails the other way](#rd-fails-the-other-way) | n/a |
@@ -349,8 +350,9 @@ Our missingness comes in two kinds, and the distinction decides what has to be e
 
 **Chronic and fine-grained.** Three de-accumulated variables — `precipitation_surface`,
 `downward_short_wave_radiation_flux_surface` and `downward_long_wave_radiation_flux_surface` — are
-legitimately null at lead-0 in *every* run, and beyond lead-0 carry scattered per-pixel nulls rooted
-in corrupt ECMWF source accumulation. See
+legitimately null at lead-0 in *every* run, and beyond lead-0 carry nulls rooted in corrupt ECMWF
+source accumulation: scattered per-pixel in the ordinary case, occasionally a whole
+`(ensemble_member, valid_time)` slice. See
 [Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md) for the full account. This is
 element-wise rather than blocky, but it is present in every training run, so it is in-distribution —
 the one case where "XGBoost handles the missingness it saw during training" genuinely holds. It
@@ -363,10 +365,13 @@ enumerated — and the combinatorics stay tractable: NWP {fresh, *n* runs missed
 structured, outage-shaped dropout is feasible, and it matches reality far better than element-wise
 random dropout would.
 
-The ingest gate keeps the two apart. A *whole-slice* null in a de-accumulated variable is fatal in
-`Nwp.validate`, so wholesale corruption never lands as silently-broken data; it manifests downstream
-as a missed run, which is rung 1 of the ladder. Fine-grained catastrophe is converted into
-coarse-grained absence — the form the rest of this design already handles.
+The ingest gate keeps the two apart, and it draws the line at the point where the two kinds
+genuinely differ. A de-accumulated variable that is null in *every* slice beyond lead-0 is fatal in
+`Nwp.validate` — that is an absent column rather than a chronic one, and it would otherwise land as
+silently-broken data — so it manifests downstream as a missed run, which is rung 1 of the ladder.
+Everything below that threshold, including a whole slice, stays in the chronic bucket and is
+landed: a null pattern the model has seen throughout training is not the catastrophe, an empty
+column is.
 
 **How each model family represents absence.** The mechanisms differ completely, and it is worth
 setting them side by side, because the differences are less instructive than what they share.

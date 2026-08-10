@@ -169,9 +169,13 @@ decommissioned or renamed substation rather than an outage — check the roster 
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from
 the frame already in memory, and is likewise non-blocking WARN. A small scattered fraction of
 nulls in the three de-accumulated variables is *expected* and is not a fault — see
-[Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md). A whole slice of
-nulls is rejected at ingest by `Nwp.validate`, which means the day's run simply does not land: the
-symptom you will actually see is a **missed run**, not corrupt data.
+[Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md). The check's
+`n_whole_null_slices` metadata is the one worth a second look: those are
+`(variable, ensemble_member, valid_time)` slices where the field arrived wholesale empty. A handful
+is still not a fault and the run is kept regardless, but a count that climbs run after run is worth
+raising with Dynamical.org. Only a variable empty in *every* slice is rejected at ingest by
+`Nwp.validate`, and even then `ecmwf_ens` retries for up to four hours first — so the symptom of
+that case is a **missed run** at the end of a long-running job, not corrupt data.
 
 **Reading the NWP completeness check.** `nwp_run_is_complete` also runs inside `ecmwf_ens`, also
 non-blocking WARN, and asks the other question: did the whole run arrive? Its description names

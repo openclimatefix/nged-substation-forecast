@@ -97,7 +97,8 @@ Airflow 3.2.0 (April 2026) and 3.3.0 (July 2026) closed several of the gaps abov
   released 29 May 2026. No open issues in that class remain. One live caveat: AWS MWAA's
   newest supported version is 3.2.1, which predates the fix.
 - **Retry policies became pluggable** (AIP-105, in 3.3.0) — "retry only on
-  `NwpRunNotYetAvailable`, fail fast on genuine bugs" is now expressible directly.
+  `NwpRunNotYetAvailable` and `NwpVariableWhollyMissing`, fail fast on genuine bugs" is now
+  expressible directly.
 - **Airflow runs Python 3.14** (since 3.2.0).
 
 ### What an Airflow-native experiment workflow would look like
@@ -264,7 +265,7 @@ The assessment cuts both ways — Airflow would bring some genuine improvements:
   [would need a custom Dagster launcher](production-deployment.md#running-the-data-ingest-runs-on-the-control-plane-vm).
   The trade is ~1 minute of task provisioning latency per *task* instead of per *run*.
 - **Pluggable retry policies** (AIP-105, Airflow 3.3) map cleanly onto "retry only on
-  `NwpRunNotYetAvailable`, fail fast on genuine bugs".
+  `NwpRunNotYetAvailable` and `NwpVariableWhollyMissing`, fail fast on genuine bugs".
 - **Organisational alignment and managed hosting.** OCF runs Airflow for its existing
   production services (alongside Dagster for the on-prem data pipelines), and has been
   discussing standardising on Airflow since around August 2025. If that lands as a platform
