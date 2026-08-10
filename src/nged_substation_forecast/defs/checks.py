@@ -305,9 +305,14 @@ _NWP_RUN_INTERVAL: Final[timedelta] = timedelta(days=1)
 _NWP_RUN_EXPECTED_ON_DISK_BY: Final[timedelta] = timedelta(hours=14)
 """How long after its ``init_time`` a daily NWP run must be on disk before it counts as missed.
 
-``ecmwf_ens_schedule`` fires at 08:30 UTC and ``ecmwf_ens`` retries a not-yet-published run every
-30 minutes for up to 4 hours, so the latest moment a *healthy* ingest can land the day's 00Z run
-is about 12:30 UTC; 14:00 UTC leaves margin for the download and write themselves. The deadline
+``ecmwf_ens_schedule`` fires at 08:30 UTC and ``ecmwf_ens`` retries an unusable run every 30
+minutes, up to 8 times. The delays alone put the last healthy landing at about 12:30 UTC, but one
+of the two retryable failures (``NwpVariableWhollyMissing``) is raised *after* the download, so
+the worst case pays a download and convert on every attempt too — about 12:40 UTC at the ~1
+min/run measured in ``docs/architecture/performance.md``. 14:00 UTC absorbs that with margin, and
+is only breached if a single attempt runs past roughly 10 minutes; the 645 s download recorded in
+``dynamical_data.ecmwf_ens.download`` shows that is possible, though it was a since-fixed
+regression rather than the norm. The deadline
 is deliberately generous because the two errors cost very different amounts: too tight and the
 check cries wolf daily (exactly the failure mode of an absolute age threshold), too loose and a
 genuinely missed run is reported one 6-hourly slot later than it might have been. At 14 hours the

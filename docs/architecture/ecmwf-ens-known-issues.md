@@ -38,10 +38,16 @@ Usually the corruption is scattered per-pixel, a few percent of a slice. Occasio
 and 360-hour steps — 2 of that variable's 4284 `(member, step)` slices (51 ensemble members × the
 84 steps beyond lead-0).
 
-Both patterns are tolerated at ingest, for the same two reasons. First, all three variables are
-already legitimately null at lead-0 (the de-accumulation has no previous step to difference
-against), so every model must handle their nulls regardless. Second, the run that failing would
-discard is overwhelmingly good. Take that 2026-08-09 run as the worked example: 0.05% of one
+Both patterns are tolerated at ingest, for two reasons. First, a tolerated gap is a small,
+isolated part of one member's trajectory, and it is absorbed the same way the scattered corruption
+already is. Be careful with the tempting shorter version of that argument — "these variables are
+null at lead-0 anyway, so models handle their nulls" — because it does not quite transfer. Lead-0
+nulls reach the model *as nulls* only because they are *leading*, and `_upsample_nwp_to_half_hourly`
+leaves leading nulls alone; an *interior* wholly-null slice is interpolated from its neighbouring
+steps, so the model sees a fabricated value instead. That is acceptable across one 3- or 6-hour
+step, and it is what already happens to the scattered nulls — but it is a different claim from
+"the model sees a null and copes". Second, the run that failing would discard is overwhelmingly
+good. Take that 2026-08-09 run as the worked example: 0.05% of one
 already-nullable variable is not worth the other 4282 slices of that same variable, nor the twelve
 other variables that arrived complete, and rejecting it leaves the live forecast on a run 24 hours
 older. That is exactly the trade
@@ -78,7 +84,9 @@ partial partitions to clean up.
 ### A wholly-missing variable is retried, not failed outright
 
 `NwpVariableWhollyMissing` is its own exception type because the `ecmwf_ens` asset **retries** it,
-on the same ladder as a run that is not in the catalog yet: every 30 minutes for up to 4 hours.
+on the same ladder as a run that is not in the catalog yet: every 30 minutes, up to 8 times. (That
+is *at least* four hours of waiting — this failure is only detectable after downloading, so each
+of those attempts pays for a download too.)
 Both mean "the upstream run is not ready yet"; they just say it at different points.
 
 That is worth doing because Dynamical.org publishes each 00Z run as roughly 40 separate Icechunk

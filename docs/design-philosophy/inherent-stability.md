@@ -337,7 +337,9 @@ That is zero in every healthy slot, whichever slot it is.
 half is where the care goes. It is derived from a deadline — how long after a run's `init_time` a
 healthy ingest should have landed it — rather than from the publication time, because what matters
 is when the run reaches *our* disk. The deadline therefore has to clear `ecmwf_ens_schedule`'s
-08:30 UTC start plus that asset's four-hour retry window, so it sits at 14 hours. The consequence
+08:30 UTC start plus that asset's retry ladder — eight retries at 30 minutes, plus a download on
+each attempt for the failure mode that is only detectable after downloading — so it sits at 14
+hours. The consequence
 is a one-run leniency at the 12:00 slot, where today's run has landed but is not yet *demanded*: a
 download that fails today is reported from the 18:00 slot onwards rather than six hours earlier.
 That is the right way round to be wrong. A tighter deadline would buy those six hours at the price
@@ -353,10 +355,18 @@ Our missingness comes in two kinds, and the distinction decides what has to be e
 legitimately null at lead-0 in *every* run, and beyond lead-0 carry nulls rooted in corrupt ECMWF
 source accumulation: scattered per-pixel in the ordinary case, occasionally a whole
 `(ensemble_member, valid_time)` slice. See
-[Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md) for the full account. This is
-element-wise rather than blocky, but it is present in every training run, so it is in-distribution —
-the one case where "XGBoost handles the missingness it saw during training" genuinely holds. It
-needs no scenario, and the main risk is that someone later "fixes" it by imputing.
+[Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md) for the full account. Mostly
+this is element-wise rather than blocky, and either way it is present in every training run, so it
+is in-distribution — the one case where "XGBoost handles the missingness it saw during training"
+genuinely holds. It needs no scenario, and the main risk is that someone later "fixes" it by
+imputing.
+
+The whole-slice case is the awkward member of this bucket and is worth naming as such: it *is*
+blocky, and it is only chronic in the sense of recurring across runs at low volume. It sits here
+rather than in the episodic bucket because it is a fraction of one member's trajectory rather than
+an outage of an input, and because a model trained across many runs has seen it. But it is the
+point where the two buckets touch, and if these ever became frequent enough to shift a variable's
+distribution, they would belong in an enumerated scenario instead.
 
 **Episodic and coarse-grained.** Missed or stale runs, a wholesale-absent variable, a telemetry
 stall. These are rare or wholly absent from training data, which is exactly why they must be

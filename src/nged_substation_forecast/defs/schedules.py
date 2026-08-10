@@ -55,7 +55,7 @@ def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
     UTC / 9am BST); ``ecmwf_ens_partitions``' ``end_offset=1`` means today's partition key
     already exists by this point. If the run isn't usable yet — absent from the catalog, or
     present with a weather variable still wholesale empty — ``ecmwf_ens`` retries every 30
-    minutes for up to 4 hours (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` →
+    minutes, up to 8 times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` →
     ``RetryRequested`` in ``defs/assets.py``) rather than failing outright; any other error still
     fails immediately.
     Live inference (``live_forecasts``) always uses the freshest run genuinely present

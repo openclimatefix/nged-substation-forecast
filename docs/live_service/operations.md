@@ -172,10 +172,21 @@ nulls in the three de-accumulated variables is *expected* and is not a fault —
 [Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md). The check's
 `n_whole_null_slices` metadata is the one worth a second look: those are
 `(variable, ensemble_member, valid_time)` slices where the field arrived wholesale empty. A handful
-is still not a fault and the run is kept regardless, but a count that climbs run after run is worth
+is not a fault and the run is kept regardless, but a count that climbs run after run is worth
 raising with Dynamical.org. Only a variable empty in *every* slice is rejected at ingest by
-`Nwp.validate`, and even then `ecmwf_ens` retries for up to four hours first — so the symptom of
-that case is a **missed run** at the end of a long-running job, not corrupt data.
+`Nwp.validate`, and even then `ecmwf_ens` retries first — so the symptom of that case is a
+**missed run** at the end of a long-running job, not corrupt data.
+
+**This check is the only place a badly-degraded run is reported, and the run is already on disk by
+the time you read it.** Everything short of a wholly-empty variable lands, so
+`n_whole_null_slices` is not merely informational — it is the sole signal distinguishing a run
+that lost two slices from one that lost nearly all of them, and both land looking equally green.
+Nothing downstream consumes it: no training filter, no metric, and no Sentry alert, because
+Sentry fires on a failed *run* and a WARN check is not one. Combined with the append-only write
+above, a badly-degraded run cannot be corrected in place either. So if this count is ever large
+rather than a handful, treat it as an incident to act on deliberately — the pipeline will not act
+on it for you. Making a large count escalate is tracked in
+[issue #501](https://github.com/openclimatefix/nged-substation-forecast/issues/501).
 
 **Reading the NWP completeness check.** `nwp_run_is_complete` also runs inside `ecmwf_ens`, also
 non-blocking WARN, and asks the other question: did the whole run arrive? Its description names

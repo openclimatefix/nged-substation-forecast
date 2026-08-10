@@ -318,8 +318,17 @@ class Nwp(pt.Model):
         both the scattered per-pixel corruption known upstream and the occasional whole slice that
         arrives empty — a run can carry 2 wholly-null slices out of one variable's 4284 (51 members
         × 84 steps beyond lead-0) and still be worth the other 4282, plus the twelve variables that
-        arrived complete. Nulls in these three variables are in-distribution regardless: all three
-        are legitimately null at lead-0 in every run, so every model already handles them.
+        arrived complete.
+
+        Be precise about *why* that is survivable, because the obvious argument is wrong. It is
+        true that all three variables are legitimately null at lead-0 in every run, so every model
+        handles nulls in them — but those lead-0 nulls reach the model *as nulls* only because they
+        are leading, and `_upsample_nwp_to_half_hourly` leaves leading nulls alone. An
+        *interior* wholly-null slice does not survive that way: `interpolate()` fills it from the
+        neighbouring steps, so the model sees a fabricated value rather than a null. The real
+        argument is narrower — a tolerated slice is a small, isolated part of one member's
+        trajectory, and interpolating across a 3- or 6-hour step is the same treatment the
+        scattered corruption already receives.
 
         The judgement is made per `init_time`, so a run whose column is empty is caught even inside
         a frame holding other, healthy runs. There is no tunable fraction here — the test is that
