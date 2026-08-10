@@ -563,6 +563,17 @@ every cell. Two authoring rules follow from how Marimo scopes names and how ruff
   defined — so a genuinely missing import is invisible to the linter and only blows up at runtime.
   Keeping all imports in `app.setup` keeps them statically checkable and available to every cell.
 
+- **Never run `ruff check --fix` over a Marimo notebook.** When an autofix needs a name the file
+  does not import yet, ruff inserts the import into the file's *top-level* import block — outside
+  `app.setup`, where no cell can see it. The notebook then dies with a `NameError` the next time it
+  is opened, while `ruff check` reports success, because what ruff produced is valid Python. This
+  is a whole class, not one rule: any fix that adds an import does it, and ruff has no per-file
+  fixability setting to prevent it (`unfixable` is global, and `per-file-ignores` would silence the
+  check as well as the fix). The pre-commit hook is split so notebooks are checked but never
+  auto-fixed; a bare `uv run ruff check . --fix` typed by hand is *not* covered, so after running
+  one, check `git diff` for an import that landed above `import marimo` and move it into
+  `app.setup`.
+
 ### MkDocs Gotcha: a list item needs a blank line before it if it follows an indented continuation
 
 Python-Markdown (MkDocs' renderer) doesn't let a list item interrupt a paragraph the way
