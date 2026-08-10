@@ -50,6 +50,23 @@ Never squash-merge. Jack wants the full commit history preserved in `main`, so u
 (`gh pr merge --merge`) or rebase (`gh pr merge --rebase`), not `gh pr merge --squash`. Under the
 `implement-issue` routine you stop and wait for Jack's review rather than merging at all.
 
+**Check what the merge will close, before you merge:**
+
+```bash
+gh pr view <N> --json closingIssuesReferences --jq '.closingIssuesReferences[].number'
+```
+
+Every number listed is closed the moment the PR merges. The list is *sticky*: a closing keyword
+in an early draft of the PR body, or in any commit message on the branch, registers the link
+permanently, and later editing that text away does not remove it. So a PR whose body now says
+"filed rather than fixed, see #512" can still be holding a closing link to #512 from a draft —
+reading the current body is not enough, and neither is grepping the commits.
+
+If the list contains an issue you did not mean to close, either sort it out before merging or
+watch for it afterwards: `gh issue reopen <N>`, then put its project Status back (the board
+automation moves a closed issue to Done, and reopening it lands on In Progress, not Todo — see
+the `github-graphql` skill for `gh project item-edit`).
+
 ## GraphQL calls
 
 Attaching and reordering sub-issues, setting an issue's Type, and setting a project field all need
