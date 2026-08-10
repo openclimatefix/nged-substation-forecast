@@ -1,16 +1,16 @@
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import patito as pt
 import polars as pl
 import pytest
-
 from xgboost_forecaster import XGBoostConfig, XGBoostForecaster
 
 _UTC = pl.Datetime("us", "UTC")
-_BASE_TIME = datetime(2024, 1, 1, tzinfo=timezone.utc)
+_BASE_TIME = datetime(2024, 1, 1, tzinfo=UTC)
 _FEATURES: set[str] = {"local_time_of_day_sin", "local_time_of_day_cos"}
 
 
@@ -49,7 +49,7 @@ def _make_df(
     )
 
 
-def _make_config(**overrides) -> XGBoostConfig:
+def _make_config(**overrides: Any) -> XGBoostConfig:
     defaults: dict = {
         "selected_features": _FEATURES,
         "ml_flow_experiment_id": None,
@@ -62,7 +62,7 @@ def _ts_ids(df: pl.DataFrame) -> list[int]:
     return df["time_series_id"].unique().sort().to_list()
 
 
-def _trained(df: pl.DataFrame, **config_overrides) -> XGBoostForecaster:
+def _trained(df: pl.DataFrame, **config_overrides: Any) -> XGBoostForecaster:
     lf = pt.LazyFrame.from_existing(df.lazy())
     forecaster = XGBoostForecaster(_make_config(**config_overrides))
     forecaster.train(lf, _ts_ids(df))

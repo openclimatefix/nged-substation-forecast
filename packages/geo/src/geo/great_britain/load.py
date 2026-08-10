@@ -1,3 +1,5 @@
+"""Loading the Great Britain boundary polygon that the NWP H3 grid is clipped to."""
+
 import logging
 from pathlib import Path
 

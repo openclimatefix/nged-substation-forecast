@@ -502,9 +502,22 @@ raises `invalid-assignment`, and calling `.encode()` before `.mark_*()` just mov
 type variable to the function's return. When ty fixes the bug, every suppression turns into an
 `unused-ignore-comment` warning, which is the signal to delete them all.
 
-Ruff's lint rule *selection* is pinned in `pyproject.toml` (`[tool.ruff.lint] select`) for the
-same class of reason: ruff 0.16 widened its default rule set, and pinning keeps a ruff upgrade
-from silently changing which rules the repo enforces.
+Ruff's lint rule *selection* is written out in `pyproject.toml` (`[tool.ruff.lint] select`) for
+the same class of reason: ruff's defaults are a curated menu with no stability promise, so an
+inherited selection lets a `uv lock` refresh change which rules the repo enforces. `select` names
+whole families; `ignore` names each family member we decline, with the reason on the line above
+it. **When a rule fires somewhere it should not, add an `ignore` entry (or a `per-file-ignores`
+entry) with its justification — do not drop the whole family.** Note that ruff's defaults are not
+a superset of the old `E4`/`E7`/`E9`/`F` gate: of pycodestyle-E they keep only `E722` and `E902`,
+which is why `E4`/`E7`/`E9` are listed explicitly.
+
+Two traps when editing `[tool.ruff.lint.per-file-ignores]`:
+
+- **`*` crosses `/`.** A key of `packages/dashboard/*.py` also silences
+  `packages/dashboard/src/dashboard/*.py`. Name individual files when you mean "just the ones in
+  this directory"; `**/tests/**` is the right way to say "every tests directory, root included".
+- **A `# noqa` cannot live inside a docstring**, because it would become part of the string. An
+  over-long docstring line has to be reworded or re-wrapped, never suppressed.
 
 ### numpy Gotcha: `ty` mis-types `.view(np.uint32)` — pass `np.dtype(np.uint32)` instead
 

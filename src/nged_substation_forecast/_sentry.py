@@ -59,12 +59,13 @@ LIVE_FORECAST_MONITOR_SLUG: Final[str] = "live-forecasts"
 Laptop testing must use a *different*, throwaway slug (e.g. ``"live-forecasts-test"``) so an
 intermittently-run laptop never registers a stale environment on the production monitor."""
 
-LIVE_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {
+LIVE_FORECAST_MONITOR_CONFIG: Final[MonitorConfig] = {
     # DUPLICATED SCHEDULE: this crontab must match live_forecast_partitions.cron_schedule in
     # defs/production_assets.py — it is the cadence Sentry expects a heartbeat on, so it has to
     # track the cadence the live_forecasts asset actually runs on. The value is copied rather than
     # imported because defs/production_assets.py imports this module (for send_forecast_checkin), so
-    # importing back would be a circular import. If you change the live schedule there, change it here.
+    # importing back would be a circular import. If you change the live schedule there, change it
+    # here.
     "schedule": {"type": "crontab", "value": "0 0,6,12,18 * * *"},
     "timezone": "UTC",
     "checkin_margin": 120,
@@ -175,8 +176,11 @@ line pointing at the fuller context when it overflows."""
 
 
 class _LateSeriesEntry(TypedDict):
-    """One late series in the freshness event: its id, when last seen (``"never"`` if it never
-    reported), how many hours late it is (``None`` if never reported), and its status."""
+    """One late series in the freshness event.
+
+    Carries its id, when it was last seen (``"never"`` if it never reported), how many hours late
+    it is (``None`` if it never reported), and its status.
+    """
 
     time_series_id: int
     last_seen: str
@@ -184,7 +188,7 @@ class _LateSeriesEntry(TypedDict):
     status: str
 
 
-def report_power_freshness(settings: Settings, result: "PowerFreshnessResult") -> None:
+def report_power_freshness(settings: Settings, result: PowerFreshnessResult) -> None:
     """Forward per-series power-data staleness to Sentry as a warning, or do nothing if healthy.
 
     A no-op when Sentry is unconfigured (empty ``settings.sentry_dsn``) or when no series is late
@@ -211,7 +215,7 @@ def report_power_freshness(settings: Settings, result: "PowerFreshnessResult") -
         logger.exception("Failed to report power-data freshness to Sentry")
 
 
-def _capture_power_freshness_warning(settings: Settings, result: "PowerFreshnessResult") -> None:
+def _capture_power_freshness_warning(settings: Settings, result: PowerFreshnessResult) -> None:
     """Build and send the freshness warning event on an isolated Sentry scope.
 
     Split from :func:`report_power_freshness` so the latter's ``try``/``except`` wraps the whole
@@ -248,14 +252,17 @@ def _capture_power_freshness_warning(settings: Settings, result: "PowerFreshness
         sentry_sdk.capture_message(_freshness_message(result, late_series), level="warning")
 
 
-def _freshness_message(result: "PowerFreshnessResult", late_series: list[_LateSeriesEntry]) -> str:
-    """Compose the warning message: a one-line summary (Sentry's issue title) followed by the
-    leading late series and how late each is.
+def _freshness_message(result: PowerFreshnessResult, late_series: list[_LateSeriesEntry]) -> str:
+    """Compose the warning message.
+
+    The message is a one-line summary (Sentry's issue title) followed by the leading late series
+    and how late each one is.
 
     The per-series lines are capped at :data:`MAX_LATE_SERIES_IN_MESSAGE`; if more series are late,
     a trailing ``…and N more`` line reports the remainder (with the fuller list in the event's
     ``power_freshness`` context). ``late_series`` is already ordered never-reported first, then
-    most-stale first, so the message leads with the worst offenders."""
+    most-stale first, so the message leads with the worst offenders.
+    """
     summary = (
         f"NGED power data stale: {result.n_late}/{result.n_series_total} time series late "
         f"({result.n_stale} stale >{result.threshold_hours:.0f}h, {result.n_never} never reported)"
@@ -269,8 +276,11 @@ def _freshness_message(result: "PowerFreshnessResult", late_series: list[_LateSe
 
 
 def _late_series_line(entry: _LateSeriesEntry) -> str:
-    """One human-readable line for a late series: how many hours late it is, or that it never
-    reported (a null ``hours_late`` marks a never-reported series)."""
+    """One human-readable line for a late series.
+
+    States how many hours late the series is, or that it never reported (a null ``hours_late``
+    marks a never-reported series).
+    """
     hours_late = entry["hours_late"]
     if hours_late is None:
         return f"  • series {entry['time_series_id']}: never reported"

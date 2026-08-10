@@ -25,8 +25,10 @@ _SCHEME_SEP: Final[str] = "://"
 
 
 class ObjectStoreOptions(TypedDict, total=False):
-    """object_store options for the managed data tables — the shared ``aws_*`` aliases understood
-    by delta-rs, Polars, and obstore alike, so one value feeds every IO site.
+    """object_store options for the managed data tables.
+
+    These are the shared ``aws_*`` aliases understood by delta-rs, Polars, and obstore alike, so
+    one value feeds every IO site.
 
     Authored as a ``TypedDict`` (rather than a bare ``dict[str, str]``) so ``ty`` checks every key
     where it is written — see ``Settings.storage_options``. Widen it to the plain ``dict`` the IO

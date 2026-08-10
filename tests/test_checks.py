@@ -15,7 +15,7 @@ materialises the asset and its check together for a real partition.
 import json
 from collections.abc import Sequence
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -42,7 +42,7 @@ from nged_substation_forecast.defs.checks import (
     evaluate_power_freshness,
 )
 
-_NOW = datetime(2026, 7, 20, 12, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 7, 20, 12, 0, tzinfo=UTC)
 _THRESHOLD = timedelta(hours=24)
 
 
@@ -173,7 +173,7 @@ def _write_metadata_roster(path: str, ids: list[int]) -> None:
 def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """One fresh series, one stale series, one never-reported roster id → a WARN naming all late."""
     # Freeze "now" so the fresh/stale split is deterministic regardless of wall-clock.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     fresh_time = now - timedelta(hours=1)
     stale_time = now - timedelta(hours=48)
 
@@ -203,7 +203,7 @@ def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPat
 
 
 def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     settings = Settings()
     pl.DataFrame(
         {
@@ -248,7 +248,7 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
         late=pl.DataFrame(
             {
                 "time_series_id": pl.Series(range(7), dtype=pl.Int32),
-                "last_seen": pl.Series([datetime(2020, 1, 1, tzinfo=timezone.utc)] * 7).cast(
+                "last_seen": pl.Series([datetime(2020, 1, 1, tzinfo=UTC)] * 7).cast(
                     UTC_DATETIME_DTYPE
                 ),
                 "hours_late": pl.Series([9999.0] * 7, dtype=pl.Float64),
@@ -264,7 +264,7 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
 
     # The check still reads coverage + roster before calling the (patched) evaluator, so a minimal
     # Delta table and roster must exist for those reads to succeed.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     settings = Settings()
     pl.DataFrame(
         {
@@ -287,7 +287,7 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
 # count_missed_nwp_runs: the pure missed-daily-run arithmetic.
 # ---------------------------------------------------------------------------
 
-_TODAY = datetime(2026, 7, 20, tzinfo=timezone.utc)
+_TODAY = datetime(2026, 7, 20, tzinfo=UTC)
 """Midnight of the arbitrary "today" the slot arithmetic tests are anchored on."""
 
 _NWP_DOWNLOAD_HOUR = 9
@@ -543,7 +543,7 @@ def test_check_result_is_a_non_blocking_warning() -> None:
 
 def _current_slot() -> datetime:
     """The slot an unpartitioned invocation of the check reports on: ``now`` floored to 6 hours."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return now.replace(hour=now.hour // 6 * 6, minute=0, second=0, microsecond=0)
 
 
@@ -881,7 +881,8 @@ def test_live_forecasts_check_reports_missed_nwp_runs_end_to_end(env: Path) -> N
     # answer survives the Delta partition read (the exact figure is 4 or 5 depending on which
     # 6-hourly slot the test happens to run in).
     expected_missed = count_missed_nwp_runs(stale_runs, as_of=slot).n_missed
-    assert expected_missed is not None and expected_missed >= 4
+    assert expected_missed is not None
+    assert expected_missed >= 4
     assert result.metadata["n_missed_nwp_runs"].value == expected_missed
     assert "daily run(s) behind" in str(result.description)
 

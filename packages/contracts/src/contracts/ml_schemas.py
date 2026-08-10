@@ -1,9 +1,15 @@
+"""Contracts for the ML pipeline.
+
+The feature vocabulary, the joined `AllFeatures` frame handed to models, the eligible-time-series
+population, and the metrics schema.
+"""
+
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Final, Literal, Sequence
+from typing import Final, Literal, Self
 
 import patito as pt
 import polars as pl
-from typing_extensions import Self
 
 from contracts.power_schemas import LIST_OF_TIME_SERIES_TYPES
 
@@ -65,7 +71,10 @@ class AllFeatures(pt.Model):
 
     power_fcst_init_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description="When OCF's power forecast model was initialised. This might be called `t0` in other OCF projects.",
+        description=(
+            "When OCF's power forecast model was initialised. This might be called `t0` in other "
+            "OCF projects."
+        ),
     )
 
     nwp_init_time: datetime | None = pt.Field(
@@ -318,8 +327,8 @@ class Metrics(pt.Model):
 
     # String (not Categorical): fold_id/experiment_name are Delta partition columns and delta-rs
     # stores dictionary-encoded columns as String anyway; String keeps them cast-free and lets
-    # predicate pushdown work. See the "declare Delta filter/partition columns as String" gotcha:
-    # ../../../../CLAUDE.md#delta-lake-dictionary-encoded-columns-declare-delta-filterpartition-columns-as-string
+    # predicate pushdown work. See CLAUDE.md, "Delta Lake dictionary-encoded columns: declare
+    # Delta filter/partition columns as `String`".
     power_fcst_model_name: str = pt.Field(
         dtype=pl.String,
         description="Identifier for the ML-based power forecasting model family.",
@@ -327,13 +336,17 @@ class Metrics(pt.Model):
 
     fold_id: str = pt.Field(
         dtype=pl.String,
-        description="CV fold year (e.g. '2022'), or 'live' for production forecasts. Matches PowerForecast.fold_id.",
+        description=(
+            "CV fold year (e.g. '2022'), or 'live' for production forecasts. Matches "
+            "PowerForecast.fold_id."
+        ),
     )
 
     horizon_slice: str = pt.Field(
         dtype=pl.Enum(HORIZON_SLICES),
         description=(
-            "'all' aggregates over all forecast horizons.  Other values select the HORIZON_SLICES bands."
+            "'all' aggregates over all forecast horizons. Other values select the HORIZON_SLICES"
+            " bands."
         ),
     )
 
@@ -439,6 +452,9 @@ class EligibleTimeSeries(pt.Model):
 
     fold_id: str = pt.Field(
         dtype=pl.String,
-        description="The CV fold this eligibility row belongs to (e.g. 'mid_2025_to_mid_2026'); the Delta partition key.",
+        description=(
+            "The CV fold this eligibility row belongs to (e.g. 'mid_2025_to_mid_2026'); the Delta "
+            "partition key."
+        ),
     )
     time_series_id: int = _get_time_series_id_dtype()

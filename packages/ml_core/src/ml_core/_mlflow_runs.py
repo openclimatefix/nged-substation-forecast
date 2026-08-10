@@ -16,7 +16,7 @@ helpers run against a file-based MLflow in tests with no server.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Final, cast
 
 import hydra
@@ -135,14 +135,16 @@ def get_or_create_fold_run(experiment_id: str, parent_run_id: str, fold_id: str)
     # Resume the parent so the new run nests beneath it (MLflow nests under the active run).
     # experiment_id must be passed explicitly: resuming a run does not switch the active
     # experiment, so without it the child would land in the default experiment ("0").
-    with mlflow.start_run(run_id=parent_run_id):
-        with mlflow.start_run(
+    with (
+        mlflow.start_run(run_id=parent_run_id),
+        mlflow.start_run(
             experiment_id=experiment_id,
             run_name=fold_id,
             nested=True,
             tags={"cv_role": "fold", "fold_id": fold_id},
-        ) as fold_run:
-            return fold_run.info.run_id
+        ) as fold_run,
+    ):
+        return fold_run.info.run_id
 
 
 @dataclass(frozen=True)
@@ -171,7 +173,7 @@ def list_promotable_runs() -> list[PromotableRun]:
             run_id=run.info.run_id,
             experiment_name=experiment.name,
             fold_id=run.data.tags.get("fold_id", "unknown"),
-            start_time=datetime.fromtimestamp(run.info.start_time / 1000, tz=timezone.utc),
+            start_time=datetime.fromtimestamp(run.info.start_time / 1000, tz=UTC),
         )
         for experiment in client.search_experiments()
         for run in client.search_runs(

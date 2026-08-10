@@ -1,10 +1,12 @@
+from datetime import UTC
+
 import marimo
 
 __generated_with = "0.23.6"
 app = marimo.App()
 
 with app.setup:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     import altair as alt
     import plotting.ocf_theme  # noqa: F401 — registers OCF Altair theme as side effect
@@ -58,8 +60,8 @@ def _(df, nwp_vars):
         plot_df = melted.with_columns(
             # Check for both database Nulls and float NaNs
             is_missing=pl.col("value").is_null() | pl.col("value").is_nan(),
-            # Create a string like "temperature_2m (Member 0)"
-            # row_label=(pl.col("variable") + " (Member " + pl.col("ensemble_member").cast(pl.Utf8) + ")"),
+            # Create a string like "temperature_2m (Member 0)" row_label=(pl.col("variable") + "
+            # (Member " + pl.col("ensemble_member").cast(pl.Utf8) + ")"),
             row_label=pl.col("ensemble_member"),
         )
 
@@ -87,21 +89,23 @@ def _(df, nwp_vars):
         )
 
         # Combine the layers and configure the chart size
-        chart = (
+        return (
             (background_lines + missing_marks)
             .properties(
-                title=f"Missing NWP Data | init_time: {target_init_time.strftime('%Y-%m-%d')} | {nwp_vars} | H3: {target_h3_index}",
+                title=(
+                    f"Missing NWP Data | init_time: {target_init_time.strftime('%Y-%m-%d')}"
+                    f" | {nwp_vars} | H3: {target_h3_index}"
+                ),
                 width=800,
-                height=alt.Step(10),  # Dynamically scales chart height based on the number of rows
+                # Dynamically scales chart height based on the number of rows
+                height=alt.Step(10),
             )
             .configure_axis(labelFontSize=11, titleFontSize=13)
         )
 
-        return chart
-
     chart = plot_null_distribution(
         df,
-        target_init_time=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        target_init_time=datetime(2026, 5, 1, tzinfo=UTC),
         target_h3_index=599148110664433663,
         nwp_vars=nwp_vars[0],  # ["downward_short_wave_radiation_flux_surface"], #
     )

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import patito as pt
 import polars as pl
@@ -6,7 +6,7 @@ import pytest
 from contracts.weather_schemas import Nwp, assess_nwp_quality
 
 # A run initialised after 2024-11-12, when categorical_precipitation_type_surface became non-null.
-_INIT_TIME = datetime(2024, 12, 1, tzinfo=timezone.utc)
+_INIT_TIME = datetime(2024, 12, 1, tzinfo=UTC)
 _BEYOND_LEAD0 = _INIT_TIME + timedelta(hours=3)
 
 
@@ -139,12 +139,12 @@ def test_categorical_precipitation_type_surface_validation() -> None:
         {
             "nwp_model_id": ["ECMWF_ENS_0_25_degree", "ECMWF_ENS_0_25_degree"],
             "init_time": [
-                datetime(2024, 11, 12, tzinfo=timezone.utc),
-                datetime(2024, 11, 13, tzinfo=timezone.utc),
+                datetime(2024, 11, 12, tzinfo=UTC),
+                datetime(2024, 11, 13, tzinfo=UTC),
             ],
             "valid_time": [
-                datetime(2024, 11, 12, 0, tzinfo=timezone.utc),
-                datetime(2024, 11, 13, 1, tzinfo=timezone.utc),
+                datetime(2024, 11, 12, 0, tzinfo=UTC),
+                datetime(2024, 11, 13, 1, tzinfo=UTC),
             ],
             "ensemble_member": [1, 1],
             "h3_index": [1, 1],
@@ -183,12 +183,12 @@ def test_categorical_precipitation_type_surface_validation() -> None:
 
 
 @pytest.mark.parametrize(
-    "column, time, expected_error",
+    ("column", "time", "expected_error"),
     [
-        ("init_time", datetime(1840, 6, 1, tzinfo=timezone.utc), "before MIN_PLAUSIBLE_DATETIME"),
-        ("init_time", datetime(3000, 6, 1, tzinfo=timezone.utc), "after MAX_PLAUSIBLE_DATETIME"),
-        ("valid_time", datetime(1840, 6, 1, tzinfo=timezone.utc), "before MIN_PLAUSIBLE_DATETIME"),
-        ("valid_time", datetime(3000, 6, 1, tzinfo=timezone.utc), "after MAX_PLAUSIBLE_DATETIME"),
+        ("init_time", datetime(1840, 6, 1, tzinfo=UTC), "before MIN_PLAUSIBLE_DATETIME"),
+        ("init_time", datetime(3000, 6, 1, tzinfo=UTC), "after MAX_PLAUSIBLE_DATETIME"),
+        ("valid_time", datetime(1840, 6, 1, tzinfo=UTC), "before MIN_PLAUSIBLE_DATETIME"),
+        ("valid_time", datetime(3000, 6, 1, tzinfo=UTC), "after MAX_PLAUSIBLE_DATETIME"),
     ],
 )
 def test_out_of_range_nwp_time_is_fatal(column: str, time: datetime, expected_error: str) -> None:

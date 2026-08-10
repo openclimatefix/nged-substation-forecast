@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import patito as pt
 import polars as pl
@@ -44,10 +44,10 @@ def test_split_by_datetime_plausibility_partitions_by_bound():
         {
             "id": [1, 2, 3, 4],
             "t": [
-                datetime(1840, 1, 1, tzinfo=timezone.utc),  # before MIN_PLAUSIBLE_DATETIME
+                datetime(1840, 1, 1, tzinfo=UTC),  # before MIN_PLAUSIBLE_DATETIME
                 MIN_PLAUSIBLE_DATETIME,  # inclusive lower bound
                 MAX_PLAUSIBLE_DATETIME,  # inclusive upper bound
-                datetime(3000, 1, 1, tzinfo=timezone.utc),  # after MAX_PLAUSIBLE_DATETIME
+                datetime(3000, 1, 1, tzinfo=UTC),  # after MAX_PLAUSIBLE_DATETIME
             ],
         }
     )

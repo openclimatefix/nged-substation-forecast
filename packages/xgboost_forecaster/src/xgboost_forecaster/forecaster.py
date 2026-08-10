@@ -25,7 +25,7 @@ def _prepare_features(df: pl.DataFrame, feature_cols: list[str]) -> pl.DataFrame
     exprs = []
     for col in feature_cols:
         dtype = df[col].dtype
-        if dtype == pl.String or dtype == pl.Categorical or isinstance(dtype, pl.Enum):
+        if dtype in (pl.String, pl.Categorical) or isinstance(dtype, pl.Enum):
             exprs.append(pl.col(col).cast(pl.Categorical).to_physical().cast(pl.Float32).alias(col))
         else:
             exprs.append(pl.col(col).cast(pl.Float32).alias(col))
@@ -81,6 +81,7 @@ class XGBoostForecaster(BaseForecaster):
     model_params: XGBoostConfig  # narrows the base class annotation for type checkers
 
     def __init__(self, model_params: XGBoostConfig) -> None:
+        """Start with no trained boosters; ``train`` populates one per ``time_series_id``."""
         super().__init__(model_params)
         self._models: dict[int, xgb.Booster] = {}
 
@@ -112,7 +113,8 @@ class XGBoostForecaster(BaseForecaster):
         ``docs/architecture/overview.md``.
 
         Only the requested ``time_series_ids`` are trained; a requested series with no non-null
-        ``power`` rows (e.g. none in the training window) simply does not appear and gets no Booster.
+        ``power`` rows (e.g. none in the training window) simply does not appear and gets no
+        Booster.
         """
         feature_cols = self._feature_cols
         requested = set(time_series_ids)
@@ -146,8 +148,8 @@ class XGBoostForecaster(BaseForecaster):
         ``data`` is collected once and grouped in memory by ``time_series_id``. Rows for a
         ``time_series_id`` this model was not trained on are ignored (the model only scores its own
         trained population — see ``trained_time_series_ids``). Keeping the collect bounded is the
-        caller's job: at validation every NWP ensemble member is present, so the caller engineers one
-        H3 cell at a time (see ``cv_power_forecasts`` and ``docs/architecture/overview.md``).
+        caller's job: at validation every NWP ensemble member is present, so the caller engineers
+        one H3 cell at a time (see ``cv_power_forecasts`` and ``docs/architecture/overview.md``).
 
         ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
         supplies it). Defaults to the ``"live"`` production sentinel.

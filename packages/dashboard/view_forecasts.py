@@ -66,9 +66,10 @@ def _(settings):
     # Sorting by type first clusters e.g. all the PV sites / all the primaries together, so one
     # kind of series is easy to find in the dropdown.
     series_options = {
-        f"{row['time_series_type']} · {row['time_series_name']} ({row['units']}) — id {row['time_series_id']}": row[
-            "time_series_id"
-        ]
+        (
+            f"{row['time_series_type']} · {row['time_series_name']}"
+            f" ({row['units']}) — id {row['time_series_id']}"
+        ): row["time_series_id"]
         for row in metadata_df.sort("time_series_type", "time_series_name").iter_rows(named=True)
     }
     # Default to time_series_id 24 rather than the alphabetically-first option — id 20 (a BESS)
@@ -95,7 +96,7 @@ def _(settings):
             settings.power_forecasts_data_path,
             storage_options=typeddict_to_dict(settings.storage_options),
         ).partitions()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 — report any read failure in the callout, never crash.
         forecast_partitions = []
         _load_error = f": `{error}`"
     else:
@@ -416,7 +417,7 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
             .drop("nwp_model_id", "h3_index")
             .collect()
         )
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 — report any read failure in the callout, never crash.
         nwp = pl.DataFrame()
         nwp_analysis = pl.DataFrame()
         _load_error = f": `{error}`"

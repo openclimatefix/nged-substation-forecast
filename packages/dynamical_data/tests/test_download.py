@@ -6,7 +6,7 @@ offline.
 """
 
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import numpy as np
 import patito as pt
@@ -15,7 +15,7 @@ import xarray as xr
 from contracts.geo_schemas import H3GridWeights
 from dynamical_data.ecmwf_ens import download
 
-_INIT_TIME = datetime(2024, 1, 1, tzinfo=timezone.utc)
+_INIT_TIME = datetime(2024, 1, 1, tzinfo=UTC)
 _INIT_NP = np.datetime64("2024-01-01T00:00:00", "ns")
 
 
@@ -87,7 +87,7 @@ def test_open_raises_when_run_not_available(
     ds = make_ens_dataset(init_time=_INIT_TIME, init_time_as_dim=True)
     _patch_catalog(monkeypatch, ds)
 
-    missing = datetime(2025, 6, 1, tzinfo=timezone.utc)
+    missing = datetime(2025, 6, 1, tzinfo=UTC)
     with pytest.raises(download.NwpRunNotYetAvailable):
         download.open_ecmwf_ens_run(missing, default_h3_grid)
 

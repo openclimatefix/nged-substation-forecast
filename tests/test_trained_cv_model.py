@@ -6,22 +6,21 @@ artifact round-trips from MLflow and that training honoured the fold's eligible 
 inclusive training window.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import mlflow
 import polars as pl
 import pytest
+from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
 from contracts.ml_schemas import EligibleTimeSeries
+from contracts.settings import Settings
 from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
 from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
 from xgboost_forecaster.forecaster import XGBoostForecaster
 
-from contracts.settings import Settings
-
-from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
 from nged_substation_forecast.defs.cv_assets import _load_engineering_inputs, trained_cv_model
 from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
@@ -35,8 +34,8 @@ PARTITION_KEY = f"{EXPERIMENT_NAME}__{FOLD_ID}"
 # train_end 2025-06-30 (eligible, but excluded by the training-window filter).
 _TS1_CELL = 10
 _TS2_CELL = 20
-_IN_WINDOW = datetime(2024, 6, 1, tzinfo=timezone.utc)
-_AFTER_TRAIN_END = datetime(2025, 8, 1, tzinfo=timezone.utc)
+_IN_WINDOW = datetime(2024, 6, 1, tzinfo=UTC)
+_AFTER_TRAIN_END = datetime(2025, 8, 1, tzinfo=UTC)
 
 
 def _write_power(path: str) -> None:
@@ -93,7 +92,7 @@ def _write_nwp(path: str) -> None:
             "ensemble_member": pl.UInt8,
             "h3_index": pl.UInt64,
             "categorical_precipitation_type_surface": pl.UInt8,
-            **{col: pl.Float32 for col in NWP_CONTINUOUS_COL_VALUES},
+            **dict.fromkeys(NWP_CONTINUOUS_COL_VALUES, pl.Float32),
         }
     )
     write_deltalake(table_or_uri=path, data=df.to_arrow())
@@ -176,8 +175,8 @@ def test_load_engineering_inputs_filters_ensemble_members(env: None) -> None:
     across all ~51 members against the same power target — the source of the training OOM.
     """
     settings = Settings()
-    train_start = datetime(2024, 4, 1, tzinfo=timezone.utc)
-    train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=timezone.utc)
+    train_start = datetime(2024, 4, 1, tzinfo=UTC)
+    train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=UTC)
 
     _, _, nwp_control = _load_engineering_inputs(
         settings, [1, 2], train_start, train_end, ensemble_members=[0]
@@ -195,8 +194,8 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
 ) -> None:
     """NWP is pruned to the requested series' H3 cells and the window's ``init_time`` partitions."""
     settings = Settings()
-    train_start = datetime(2024, 4, 1, tzinfo=timezone.utc)
-    train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=timezone.utc)
+    train_start = datetime(2024, 4, 1, tzinfo=UTC)
+    train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=UTC)
 
     # Requesting only ts1 must scan only ts1's cell, never ts2's.
     _, _, nwp_ts1 = _load_engineering_inputs(settings, [1], train_start, train_end)

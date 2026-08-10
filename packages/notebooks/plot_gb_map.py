@@ -4,10 +4,9 @@ __generated_with = "0.23.5"
 app = marimo.App(width="full")
 
 with app.setup:
-    from lonboard import Map, H3HexagonLayer
-
     from geo.great_britain.load import load_gb_boundary
     from geo.h3 import compute_h3_grid_weights_for_boundary
+    from lonboard import H3HexagonLayer, Map
 
 
 @app.cell

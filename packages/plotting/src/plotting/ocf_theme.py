@@ -44,7 +44,7 @@ GRID: Final[LiteralString] = "#EAEAEA"
 """Axis grid line colour."""
 
 ENSEMBLE_LINE: Final[LiteralString] = "#808080"
-"""Colour for individual ensemble member lines; mid-grey stays visible at low opacity on BACKGROUND."""
+"""Colour for individual ensemble-member lines; mid-grey stays visible at low opacity."""
 
 _TEXT: Final[LiteralString] = "#292B2B"
 

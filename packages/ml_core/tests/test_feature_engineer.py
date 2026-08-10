@@ -50,7 +50,7 @@ def test_attach_nearest_nwp_cell_maps_cells_to_series() -> None:
     assert "time_series_id" in result.columns
     # Cells 10 and 20 matched to ts1 and ts2; cell 99 dropped (inner join).
     assert sorted(result["time_series_id"].to_list()) == [1, 2]
-    temp_by_ts = dict(zip(result["time_series_id"], result["temperature_2m"]))
+    temp_by_ts = dict(zip(result["time_series_id"], result["temperature_2m"], strict=True))
     assert temp_by_ts == {1: 10.0, 2: 12.0}
 
 

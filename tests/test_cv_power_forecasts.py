@@ -7,7 +7,7 @@ and assert the forecasts land in the ``power_forecasts`` Delta table — stamped
 and written idempotently so a re-materialisation does not duplicate rows.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import mlflow
@@ -15,12 +15,12 @@ import numpy as np
 import polars as pl
 import pyarrow.parquet as pq
 import pytest
+from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
 from contracts.ml_schemas import EligibleTimeSeries
 from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
 from mlflow.tracking import MlflowClient
 
-from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
 from nged_substation_forecast.defs.cv_assets import cv_power_forecasts, trained_cv_model
 from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
@@ -33,10 +33,8 @@ PARTITION_KEY = f"{EXPERIMENT_NAME}__{FOLD_ID}"
 # ts1 sits in H3 cell 10. It has training-window data (so the fold model trains a Booster for it)
 # and validation-window NWP across three ensemble members (so prediction spans the ensemble).
 _TS1_CELL = 10
-_TRAIN_DAY = datetime(
-    2024, 6, 1, tzinfo=timezone.utc
-)  # inside train window [2024-04-01, 2025-06-30]
-_VAL_DAY = datetime(2025, 8, 1, tzinfo=timezone.utc)  # inside val window [2025-07-01, 2026-06-30]
+_TRAIN_DAY = datetime(2024, 6, 1, tzinfo=UTC)  # inside train window [2024-04-01, 2025-06-30]
+_VAL_DAY = datetime(2025, 8, 1, tzinfo=UTC)  # inside val window [2025-07-01, 2026-06-30]
 _VAL_MEMBERS = (0, 1, 2)  # stands in for the full 51-member ensemble in this synthetic fixture
 
 
@@ -76,7 +74,7 @@ def _nwp_records(cell: int, day: datetime, members: tuple[int, ...]) -> list[dic
 
 
 def _write_nwp(path: str) -> None:
-    """Training NWP (control member) plus validation NWP across the ensemble, both for ts1's cell."""
+    """Training NWP (control member) plus validation NWP across the ensemble, both in ts1's cell."""
     records = _nwp_records(_TS1_CELL, _TRAIN_DAY, (0,)) + _nwp_records(
         _TS1_CELL, _VAL_DAY, _VAL_MEMBERS
     )
@@ -87,7 +85,7 @@ def _write_nwp(path: str) -> None:
             "ensemble_member": pl.UInt8,
             "h3_index": pl.UInt64,
             "categorical_precipitation_type_surface": pl.UInt8,
-            **{col: pl.Float32 for col in NWP_CONTINUOUS_COL_VALUES},
+            **dict.fromkeys(NWP_CONTINUOUS_COL_VALUES, pl.Float32),
         }
     )
     write_deltalake(table_or_uri=path, data=df.to_arrow())
@@ -225,7 +223,7 @@ def test_cv_power_forecasts_storage_format(
             )
             for i in range(row_group.num_columns)
         }
-        for column, (compression, encodings) in encodings_by_column.items():
+        for column, (compression, _encodings) in encodings_by_column.items():
             assert compression == "ZSTD", f"{column} written as {compression}, expected ZSTD"
         assert "DELTA_BINARY_PACKED" in encodings_by_column["valid_time"][1]
         assert "BYTE_STREAM_SPLIT" in encodings_by_column["power_fcst"][1]

@@ -1,5 +1,4 @@
-"""
-Extracts metadata and time series from NGED JSON data.
+"""Extracts metadata and time series from NGED JSON data.
 
 The JSON is expected to have a structure where metadata fields are at the top level,
 and a 'data' field contains an array of time series data points.
@@ -65,7 +64,8 @@ def _extract_power_time_series(df: pl.DataFrame, time_series_id: int) -> Extract
     If NGED's meter reported no values, then the `data` field in the JSON will be Null (or, less
     commonly, an empty array `[]`, which `pl.read_json` infers as `List(Null)`), and this function
     will raise the following exception:
-        polars.exceptions.InvalidOperationError: invalid dtype: expected 'Struct', got 'Null' for 'data'
+        polars.exceptions.InvalidOperationError: invalid dtype: expected 'Struct', got 'Null' for
+        'data'
     """
     # Extract time series data: explode the 'data' column and unnest the struct.
     # 'explode' expands the list of structs into individual rows.

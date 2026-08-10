@@ -1,3 +1,5 @@
+"""Spatial contracts: the H3-cell-to-NWP-grid weights that drive the spatial NWP aggregation."""
+
 import patito as pt
 import polars as pl
 
@@ -5,9 +7,10 @@ import polars as pl
 class H3GridWeights(pt.Model):
     """Schema for the pre-computed H3 grid weights.
 
-    This contract defines the mapping between H3 hexagons and a regular latitude/longitude grid.
-    It is used to ensure type safety when passing spatial mapping data from generic geospatial
-    utilities (like `packages/geo`) to dataset-specific ingestion pipelines (like `packages/dynamical_data`).
+    This contract defines the mapping between H3 hexagons and a regular latitude/longitude grid. It
+    is used to ensure type safety when passing spatial mapping data from generic geospatial
+    utilities (like `packages/geo`) to dataset-specific ingestion pipelines (like
+    `packages/dynamical_data`).
     """
 
     h3_index: int = pt.Field(dtype=pl.UInt64, description="H3 cell index.")

@@ -1,3 +1,5 @@
+from typing import Any
+
 import patito as pt
 import pytest
 from contracts.power_schemas import TimeSeriesMetadata
@@ -29,7 +31,7 @@ def test_time_series_metadata_validation():
 
 
 @pytest.mark.parametrize(
-    "data, expected_error",
+    ("data", "expected_error"),
     [
         # Invalid latitude (too high)
         (
@@ -113,7 +115,7 @@ def test_time_series_metadata_validation():
         ),
     ],
 )
-def test_time_series_metadata_invalid_data(data, expected_error):
+def test_time_series_metadata_invalid_data(data: dict[str, list[Any]], expected_error: str):
     # We need to cast to ensure the types are checked
     df = pt.DataFrame(data).set_model(TimeSeriesMetadata)
 

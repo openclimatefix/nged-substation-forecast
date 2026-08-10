@@ -19,7 +19,7 @@ See also the offline orientation test
 labels are geographically right). This test composes both against the genuine dataset.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import shapely
@@ -33,7 +33,7 @@ from geo.h3 import compute_h3_grid_weights_for_boundary
 
 def _recent_init_time() -> datetime:
     """A 00:00 UTC ECMWF ENS run old enough to be reliably published (three days ago)."""
-    three_days_ago = datetime.now(timezone.utc) - timedelta(days=3)
+    three_days_ago = datetime.now(UTC) - timedelta(days=3)
     return three_days_ago.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
@@ -57,10 +57,13 @@ def test_real_ecmwf_ens_pipeline_conventions_match_offline_fixtures() -> None:
     lats = sliced.latitude.values
     lons = sliced.longitude.values
     assert lats[0] > lats[-1], "latitude must be descending, as the offline fixture assumes"
-    assert lons.min() >= -180.0 and lons.max() <= 180.0, "longitude must be in [-180, 180]"
+    assert lons.min() >= -180.0, "longitude must be in [-180, 180]"
+    assert lons.max() <= 180.0, "longitude must be in [-180, 180]"
     # The slice must land on the requested box, not its lat/lon transpose.
-    assert 55.0 <= lats.min() and lats.max() <= 56.5
-    assert -3.6 <= lons.min() and lons.max() <= -2.9
+    assert lats.min() >= 55.0
+    assert lats.max() <= 56.5
+    assert lons.min() >= -3.6
+    assert lons.max() <= -2.9
 
     downloaded = download.download_ecmwf_ens_data(sliced)
     df = convert(ds=downloaded, h3_grid=h3_grid)

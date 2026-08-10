@@ -14,10 +14,19 @@
 
 ## Formatting & Linting (Ruff)
 
-- **Line Length**: 100 characters.
+- **Line Length**: 100 characters, enforced by `ruff check` (`E501`) as well as by the formatter.
+  The formatter breaks code but not comments, docstrings, or long string literals, so those have
+  to be wrapped by hand.
 - **Quotes**: Use **double quotes** (`"`) for strings.
-- **Docstrings**: Use **Google convention** for docstrings.
-- **Imports**: Sorted automatically by `ruff` (isort rules).
+- **Docstrings**: Use **Google convention**, enforced by the `D` rules. Every public module,
+  package, class, and function needs one; tests and marimo notebooks are exempt.
+- **Type annotations**: Enforced by the `ANN` rules on every signature. `typing.Any` is allowed
+  where no honest narrower type exists.
+- **Imports**: Sorted automatically by `ruff` (isort rules). `import pandas` is banned outright
+  (`TID251`), not merely discouraged.
+- **Rule selection**: `[tool.ruff.lint] select` in `pyproject.toml` names the enabled families
+  explicitly rather than inheriting ruff's defaults, so a ruff upgrade cannot quietly change the
+  gate. Each declined rule is an `ignore` entry carrying its justification.
 - **Naming**:
     - Variables/Functions: `snake_case`
     - Classes: `PascalCase`

@@ -1,6 +1,6 @@
 """Unit tests for the pure CV helpers (no I/O)."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import polars as pl
 from contracts.hydra_schemas import CvFoldConfig
@@ -16,8 +16,10 @@ from pydantic import BaseModel
 _UTC = pl.Datetime("us", "UTC")
 
 
-def _utc(year: int, month: int, day: int, hour: int = 0, minute: int = 0, second: int = 0):
-    return datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
+def _utc(
+    year: int, month: int, day: int, hour: int = 0, minute: int = 0, second: int = 0
+) -> datetime:
+    return datetime(year, month, day, hour, minute, second, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------

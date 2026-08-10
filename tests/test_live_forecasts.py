@@ -8,18 +8,24 @@ valid times just after ``power_fcst_init_time`` — so ``live`` and ``replay`` a
 are forced to pick different runs.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import patito as pt
 import polars as pl
 import pytest
+from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
 from contracts.ml_schemas import AllFeatures
-from dagster import AssetCheckSeverity, DagsterInstance, RunConfig, materialize
+from dagster import (
+    AssetCheckSeverity,
+    DagsterInstance,
+    ExecuteInProcessResult,
+    RunConfig,
+    materialize,
+)
 from deltalake import write_deltalake
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
-from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
 from nged_substation_forecast.defs.checks import live_forecasts_are_healthy
 from nged_substation_forecast.defs.production_assets import LiveForecastsConfig, live_forecasts
 
@@ -28,7 +34,7 @@ pytestmark = pytest.mark.integration
 # power_fcst_init_time = the partition's forecast init time (window end); the partition *key* is
 # the window start, 6 hours earlier (live_forecast_partitions ticks every 6h) — see
 # live_forecasts's docstring.
-_POWER_FCST_INIT_TIME = datetime(2026, 7, 4, 0, 0, tzinfo=timezone.utc)
+_POWER_FCST_INIT_TIME = datetime(2026, 7, 4, 0, 0, tzinfo=UTC)
 _PARTITION_KEY = "2026-07-03-18:00"
 
 # The tick 6h before _POWER_FCST_INIT_TIME: still after _DAY_EARLIER_RUN, still before
@@ -86,7 +92,7 @@ def _write_nwp(path: str) -> None:
             "ensemble_member": pl.UInt8,
             "h3_index": pl.UInt64,
             "categorical_precipitation_type_surface": pl.UInt8,
-            **{col: pl.Float32 for col in NWP_CONTINUOUS_COL_VALUES},
+            **dict.fromkeys(NWP_CONTINUOUS_COL_VALUES, pl.Float32),
         }
     )
     write_deltalake(
@@ -95,7 +101,7 @@ def _write_nwp(path: str) -> None:
 
 
 def _write_power(path: str) -> None:
-    """A little history before ``_POWER_FCST_INIT_TIME`` for both the trained and untrained series."""
+    """A little history before ``_POWER_FCST_INIT_TIME``, for the trained and untrained series."""
     times = [
         _POWER_FCST_INIT_TIME - timedelta(hours=1),
         _POWER_FCST_INIT_TIME - timedelta(minutes=30),
@@ -123,7 +129,7 @@ def _write_metadata(path: Path) -> None:
 
 def _save_promoted_model(path: Path) -> None:
     """A tiny real ``XGBoostForecaster`` trained on ts1 only, saved straight to disk."""
-    times = [datetime(2025, 1, 1, hour, tzinfo=timezone.utc) for hour in (0, 1, 2)]
+    times = [datetime(2025, 1, 1, hour, tzinfo=UTC) for hour in (0, 1, 2)]
     train_df = pl.DataFrame(
         {
             "time_series_id": [1, 1, 1],
@@ -165,7 +171,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
 
 def _materialize(
     instance: DagsterInstance, availability_mode: str, partition_key: str = _PARTITION_KEY
-):
+) -> ExecuteInProcessResult:
     return materialize(
         [live_forecasts],
         partition_key=partition_key,

@@ -1,5 +1,8 @@
+"""Reading NGED's telemetry JSON from S3 and writing power observations and metadata to storage."""
+
 import logging
-from typing import Final, NamedTuple, Sequence, TypedDict, overload
+from collections.abc import Sequence
+from typing import Final, NamedTuple, TypedDict, overload
 
 import obstore
 import patito as pt
@@ -87,7 +90,7 @@ def _process_file_listing(
         .with_columns(
             # Extract:    start_time,    end_time,       time_series_id
             #            ↓↓↓↓↓↓↓↓↓↓↓↓↓ ↓↓↓↓↓↓↓↓↓↓↓↓↓            ↓↓
-            # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+            # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json  # noqa: E501 — the arrows above must stay aligned with the real key.
             regex_captures=(
                 pl.col("path").str.extract_groups(
                     r"/(?<start_time>\d+)_(?<end_time>\d+)/TimeSeries_(?<time_series_id>\d{1,2})"
@@ -112,8 +115,9 @@ def remove_small_files_from_listing(
     file_listing: pt.DataFrame[_ProcessedFileListing],
     size_threshold_bytes: int = 1000,
 ) -> pt.DataFrame[_ProcessedFileListing]:
-    """Remove files that are too small. This is used to remove NGED JSON files that have no `data`
-    field.
+    """Remove files that are too small.
+
+    This is used to remove NGED JSON files that have no `data` field.
 
     Typical files sizes for NGED JSON files:
         -  486 bytes: no `data` and no `WKT`.
@@ -124,7 +128,7 @@ def remove_small_files_from_listing(
 
 
 class NoNewData(Exception):
-    pass
+    """Raised when a listing of NGED files yields no rows we have not already stored."""
 
 
 class DownloadAndParseResult(NamedTuple):
@@ -143,8 +147,9 @@ class DownloadAndParseResult(NamedTuple):
 def download_and_parse_files(
     store: obstore.store.S3Store, paths_df: pt.DataFrame[_ProcessedFileListing]
 ) -> DownloadAndParseResult:
-    """Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
-    there are any duplicates.
+    """Load data end_time by end_time, in order.
+
+    Loading in order means more recent data overwrites older duplicates, if there are any.
 
     Raises NoNewData if there is no new data.
     """
@@ -296,14 +301,13 @@ def select_new_rows(
     delta_path: str,
     storage_options: ObjectStoreOptions | None = None,
 ) -> pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing]:
-    """
-    Return rows in `time_series` that are more recent than the most recent
-    data already in our Delta table, on a time_series_id by time_series_id basis.
+    """Return rows in `time_series` newer than what our Delta table already holds.
+
+    The comparison is made on a time_series_id by time_series_id basis.
 
     `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
     `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
     """
-
     if not delta_table_exists(delta_path, storage_options):
         log.info(f"{delta_path=} does not exist yet.")
         return time_series
@@ -345,6 +349,8 @@ def select_new_rows(
 
 
 class UpsertMetadataStats(TypedDict, total=False):
+    """What ``upsert_metadata`` changed, published as Dagster output metadata."""
+
     metadata_n_new_TimeSeriesIDs: int
     metadata_n_updated_TimeSeriesIDs: int
     metadata_updated_TimeSeriesIDs: Sequence[int]
@@ -355,8 +361,7 @@ def upsert_metadata(
     metadata_path: str,
     storage_options: ObjectStoreOptions | None = None,
 ) -> UpsertMetadataStats:
-    """
-    Upserts metadata to a Parquet file.
+    """Upserts metadata to a Parquet file.
 
     This function assumes it is called by one thread at a time so no
     explicit locking is required.

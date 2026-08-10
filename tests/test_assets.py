@@ -9,7 +9,7 @@ the wiring, branching, and metadata each asset owns — stubbing the S3/network 
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import patito as pt
@@ -123,7 +123,7 @@ def _make_nwp(init_time: datetime, n: int = 4) -> pl.DataFrame:
 
 
 def _write_h3_grid_weights(path: str) -> None:
-    """A minimal valid ``H3GridWeights`` parquet — the ``ecmwf_ens`` asset reads it before download."""
+    """A minimal valid ``H3GridWeights`` parquet — ``ecmwf_ens`` reads it before downloading."""
     H3GridWeights.DataFrame(
         {"h3_index": [100], "nwp_lat": [52.5], "nwp_lon": [-1.0], "proportion": [1.0]}
     ).cast().validate().write_parquet(path)
@@ -192,11 +192,11 @@ def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(
             "endTime": "1840-06-01 00:30:00+0000",
         },
     ]
-    files = {
-        "timeseries/1774512000000_1774533600000/TimeSeries_10_20260326T080000Z_20260326T140000Z.json": (
-            json.dumps(fixture).encode()
-        ),
-    }
+    object_key = (
+        "timeseries/1774512000000_1774533600000"
+        "/TimeSeries_10_20260326T080000Z_20260326T140000Z.json"
+    )
+    files = {object_key: json.dumps(fixture).encode()}
     monkeypatch.setattr(assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(files))
 
     result = materialize([power_time_series_and_metadata], instance=dagster_instance)
@@ -204,7 +204,7 @@ def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(
 
     power = pl.read_delta(str(env / "NGED" / "power_time_series.delta"))
     assert power.height == 1
-    assert power["time"][0] == datetime(2026, 3, 5, 12, 30, tzinfo=timezone.utc)
+    assert power["time"][0] == datetime(2026, 3, 5, 12, 30, tzinfo=UTC)
 
     materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
     metadata = {k: v for mat in materialisations for k, v in mat.metadata.items()}
@@ -214,7 +214,7 @@ def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(
 def test_power_time_series_and_metadata_handles_no_new_data(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """``NoNewData`` from ``download_and_parse_files`` → the asset returns early, writing nothing."""
+    """``NoNewData`` from ``download_and_parse_files`` → the asset returns early, writes nothing."""
     monkeypatch.setattr(
         assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
     )
@@ -236,8 +236,11 @@ def test_power_time_series_and_metadata_handles_no_new_data(
 def test_h3_grid_weights_materialises_and_writes_parquet(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """Materialise ``h3_grid_weights`` against a small stand-in boundary (the real GB boundary
-    buffers for ~30 s and is exercised in ``packages/geo``); assert a valid parquet lands on disk."""
+    """Materialise ``h3_grid_weights`` against a small stand-in boundary, and assert a valid
+    parquet lands on disk.
+
+    The real GB boundary buffers for ~30 s, and is exercised in ``packages/geo`` instead.
+    """
     # A 1×1-degree box over central GB — enough to yield several H3 cells, milliseconds to compute.
     monkeypatch.setattr(assets, "load_gb_boundary", lambda: shapely.box(-2.0, 52.0, -1.0, 53.0))
 
@@ -271,7 +274,7 @@ def test_ecmwf_ens_materialises_and_appends_nwp(
     NWP Delta table via ``write_nwp``."""
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     # After 2024-11-12, when categorical_precipitation_type_surface became a non-null Nwp variable.
-    init_time = datetime(2024, 12, 1, tzinfo=timezone.utc)
+    init_time = datetime(2024, 12, 1, tzinfo=UTC)
     captured: dict[str, datetime] = {}
 
     def _open(*, nwp_init_time: datetime, h3_grid: object) -> object:
@@ -319,7 +322,7 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
     """Scattered per-pixel nulls in a de-accumulated variable (the known upstream ECMWF ENS
     corruption) are tolerated: the run still materialises, and the data-quality check WARNs."""
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=timezone.utc)
+    init_time = datetime(2024, 12, 1, tzinfo=UTC)
 
     # One (member, valid_time) slice across three h3 cells, one cell's precipitation nulled.
     scattered = _make_nwp(init_time, n=3).with_columns(
@@ -328,7 +331,13 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
         ensemble_member=pl.lit(0, dtype=pl.UInt8),
         precipitation_surface=pl.Series([0.001, None, 0.001], dtype=pl.Float32),
     )
-    monkeypatch.setattr(assets, "open_ecmwf_ens_run", lambda *, nwp_init_time, h3_grid: object())
+    # `object` cannot be inlined in place of this stub: the real function is called with
+    # keyword arguments, which `object()` rejects.
+    monkeypatch.setattr(
+        assets,
+        "open_ecmwf_ens_run",
+        lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
+    )
     monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
     monkeypatch.setattr(
         assets, "convert_nwp_xarray_dataset_to_polars_dataframe", lambda ds, h3_grid: scattered
@@ -352,8 +361,14 @@ def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
     a cross-product), which is nothing like a complete 51 x 85 x 1 ECMWF ENS run.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=timezone.utc)
-    monkeypatch.setattr(assets, "open_ecmwf_ens_run", lambda *, nwp_init_time, h3_grid: object())
+    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    # `object` cannot be inlined in place of this stub: the real function is called with
+    # keyword arguments, which `object()` rejects.
+    monkeypatch.setattr(
+        assets,
+        "open_ecmwf_ens_run",
+        lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
+    )
     monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
     monkeypatch.setattr(
         assets,
@@ -423,9 +438,9 @@ def test_definitions_resolve(env: Path) -> None:
     """
     from dagster import AssetKey
 
+    from nged_substation_forecast.definitions import defs
     from nged_substation_forecast.defs.assets import ecmwf_ens_partitions
     from nged_substation_forecast.defs.production_assets import live_forecast_partitions
-    from nged_substation_forecast.definitions import defs
 
     repo = defs.get_repository_def()
     asset_graph = repo.asset_graph
@@ -467,9 +482,9 @@ def test_definitions_resolve(env: Path) -> None:
 
     # Neither partitioned job passes `partitions_def` to `define_asset_job` — Dagster infers it from
     # the selected asset at resolution time. Assert the inferred definition equals the one the asset
-    # declares, so a job silently resolving to `None`, or to a different cadence or start, fails here
-    # rather than at the next schedule tick. (Equality, not identity: what matters is that the job
-    # targets the same partitions, and Dagster is free to hand back an equal copy.)
+    # declares, so a job silently resolving to `None`, or to a different cadence or start, fails
+    # here rather than at the next schedule tick. (Equality, not identity: what matters is that the
+    # job targets the same partitions, and Dagster is free to hand back an equal copy.)
     assert repo.get_job("ecmwf_ens_job").partitions_def == ecmwf_ens_partitions
     assert repo.get_job("live_forecasts_job").partitions_def == live_forecast_partitions
 
@@ -487,7 +502,7 @@ def test_definitions_resolve(env: Path) -> None:
 def _file_listing(
     n: int, time_series_ids: list[int] | None = None
 ) -> pt.DataFrame[_ProcessedFileListing]:
-    base = datetime(2026, 3, 26, 8, tzinfo=timezone.utc)
+    base = datetime(2026, 3, 26, 8, tzinfo=UTC)
     ids = time_series_ids if time_series_ids is not None else list(range(9, 9 + n))
     return (
         _ProcessedFileListing.DataFrame(
@@ -521,7 +536,7 @@ def test_file_listing_summary_non_empty() -> None:
 
 
 def test_power_time_series_summary_non_empty() -> None:
-    base = datetime(2026, 3, 26, 8, tzinfo=timezone.utc)
+    base = datetime(2026, 3, 26, 8, tzinfo=UTC)
     df = (
         PowerTimeSeries.DataFrame(
             {
@@ -541,7 +556,7 @@ def test_power_time_series_summary_non_empty() -> None:
 
 
 @pytest.mark.parametrize(
-    "summary_cls, empty_df",
+    ("summary_cls", "empty_df"),
     [
         (_FileListingSummary, _ProcessedFileListing.DataFrame(schema=_ProcessedFileListing.dtypes)),
         (_PowerTimeSeriesSummary, PowerTimeSeries.DataFrame(schema=PowerTimeSeries.dtypes)),

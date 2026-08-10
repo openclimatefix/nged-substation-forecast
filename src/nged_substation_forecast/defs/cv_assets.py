@@ -6,7 +6,7 @@ the logic stays fast to unit-test and the assets stay readable.
 """
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -43,12 +43,6 @@ from ml_core._cv_helpers import (
     eligible_time_series_ids,
     parse_cv_partition_key,
 )
-from ml_core.metrics import (
-    NoOverlappingActualsError,
-    build_mlflow_aggregate_metrics,
-    compute_metrics,
-    enrich_metrics_rows,
-)
 from ml_core._mlflow_runs import (
     get_or_create_experiment,
     get_or_create_fold_run,
@@ -56,6 +50,12 @@ from ml_core._mlflow_runs import (
     load_experiment_forecaster,
 )
 from ml_core._repro import MlflowTags, provenance_tags
+from ml_core.metrics import (
+    NoOverlappingActualsError,
+    build_mlflow_aggregate_metrics,
+    compute_metrics,
+    enrich_metrics_rows,
+)
 from nged_data.storage import time_series_coverage
 
 # The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
@@ -177,11 +177,11 @@ def _compute_effective_capacity(
 
     ``time`` is set to that series' **latest** observed timestep (``time.max()``). The v0.1 capacity
     is a single scalar per series, so ``time`` is really an "as of" marker — it stamps the estimate
-    as current to the end of the observed history — rather than a timestep the value varies over. The
-    v0.7 upgrade makes capacity genuinely time-varying (one row per ``(time_series_id,
-    time)``), and only then does ``time`` carry per-row meaning. v0.1 stays one scalar row per
-    series rather than the value repeated at every half-hour: densifying a constant adds rows
-    without information, and the metrics join is by ``time_series_id`` alone until capacity varies.
+    as current to the end of the observed history — rather than a timestep the value varies over.
+    The v0.7 upgrade makes capacity genuinely time-varying (one row per ``(time_series_id, time)``),
+    and only then does ``time`` carry per-row meaning. v0.1 stays one scalar row per series rather
+    than the value repeated at every half-hour: densifying a constant adds rows without information,
+    and the metrics join is by ``time_series_id`` alone until capacity varies.
 
     Kept as a pure helper (no Dagster, no IO) so the P99 logic is unit-testable in isolation.
     """
@@ -291,11 +291,14 @@ def _load_engineering_inputs(
             the control member (``[0]``) to avoid fanning every forecast row out across all ~51
             members against the same power target; prediction passes ``None`` because the
             probabilistic leaderboard metrics need the full ensemble.
-        init_time_start, init_time_end: Optional explicit ``init_time`` partition bounds. When
-            ``None`` they default to ``[window_start - _MAX_NWP_LEAD, window_end]`` (every run that
-            can cover the window). ``cv_power_forecasts`` passes a narrower sub-range to process the
-            validation window in ``init_time`` chunks, so the full-ensemble forecast frame for one
-            chunk stays in RAM while the rest streams from the partition-pruned scan.
+        init_time_start: Optional explicit lower ``init_time`` partition bound. When ``None`` it
+            defaults to ``window_start - _MAX_NWP_LEAD``, the earliest run that can cover the
+            window.
+        init_time_end: Optional explicit upper ``init_time`` partition bound. When ``None`` it
+            defaults to ``window_end``. Together with ``init_time_start`` this lets
+            ``cv_power_forecasts`` pass a narrower sub-range and process the validation window in
+            ``init_time`` chunks, so the full-ensemble forecast frame for one chunk stays in RAM
+            while the rest streams from the partition-pruned scan.
 
     Returns:
         ``(power_time_series, metadata, nwp)`` — a lazy power frame, an eager metadata frame, and a
@@ -655,12 +658,12 @@ class PopulationFilter(Config):
         if self.valid_time_min is not None:
             min_dt = datetime.fromisoformat(self.valid_time_min)
             if min_dt.tzinfo is None:
-                min_dt = min_dt.replace(tzinfo=timezone.utc)
+                min_dt = min_dt.replace(tzinfo=UTC)
             lf = lf.filter(pl.col("valid_time") >= min_dt)
         if self.valid_time_max is not None:
             max_dt = datetime.fromisoformat(self.valid_time_max)
             if max_dt.tzinfo is None:
-                max_dt = max_dt.replace(tzinfo=timezone.utc)
+                max_dt = max_dt.replace(tzinfo=UTC)
             lf = lf.filter(pl.col("valid_time") <= max_dt)
         return pt.LazyFrame.from_existing(lf).set_model(PowerForecast)
 
@@ -713,7 +716,8 @@ def _resolve_eval_window(
     window_start = bounds["window_start"][0]
     window_end = bounds["window_end"][0]
     # groups is derived from a non-empty forecast scan, so min/max are always non-null datetimes.
-    assert isinstance(window_start, datetime) and isinstance(window_end, datetime)
+    assert isinstance(window_start, datetime)
+    assert isinstance(window_end, datetime)
     return window_start, window_end, "ad_hoc"
 
 
@@ -833,8 +837,9 @@ def _score_forecast_group(
     storage_options: ObjectStoreOptions | None = None,
     provenance: MlflowTags | None = None,
 ) -> tuple[int, dict[str, float] | None]:
-    """Score one ``(experiment_name, fold_id)`` group, write ``Metrics`` to Delta, and
-    optionally log to MLflow.
+    """Score one ``(experiment_name, fold_id)`` group.
+
+    Writes ``Metrics`` to Delta and optionally logs to MLflow.
 
     The group is scored in per-series batches of ``_METRICS_SERIES_BATCH_SIZE`` so that peak
     memory is one batch, never the whole fold (a single V1 fold is already too big to
@@ -1008,7 +1013,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     )
 
     if_local_path_then_make_parent_dir(settings.forecast_metrics_data_path)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Provenance for every fold + parent run this materialisation touches: the code SHA and the
     # versions of the three Delta tables scoring reads (forecasts, actuals, capacity). Built once
     # — all groups are scored in this one process, so they share a single code + data snapshot.

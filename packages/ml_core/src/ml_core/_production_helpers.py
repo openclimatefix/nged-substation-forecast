@@ -12,9 +12,10 @@ The ``live_forecasts`` and ``promoted_model`` Dagster assets
 import json
 import shutil
 import tempfile
-from datetime import datetime, timedelta, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Literal, Sequence, cast
+from typing import Literal, cast
 
 import hydra
 import patito as pt
@@ -45,7 +46,9 @@ def select_nwp_init_time(
     availability_mode: AvailabilityModeType,
     nwp_publication_delay_hours: int = NWP_PUBLICATION_DELAY_HOURS,
 ) -> datetime:
-    """Return the freshest NWP ``init_time`` available at ``power_fcst_init_time`` under the given mode.
+    """Return the freshest NWP ``init_time`` available at ``power_fcst_init_time``.
+
+    Which runs count as available depends on ``mode``.
 
     Args:
         available_init_times: The ``init_time``s genuinely present in the NWP Delta table
@@ -170,8 +173,8 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
     Downloads and unpacks into a temporary directory first, so a failed or interrupted download
     never touches ``dest`` — only a fully-downloaded model is moved into place (via ``rmtree`` +
     ``move``). The run holds the model as a single archive artifact
-    (``ml_core.base_forecaster._MLFLOW_MODEL_ARTIFACT``), so ``dest`` gets exactly the files the last
-    ``save_to_mlflow`` wrote and can never inherit a stale file from an earlier, larger model.
+    (``ml_core.base_forecaster._MLFLOW_MODEL_ARTIFACT``), so ``dest`` gets exactly the files the
+    last ``save_to_mlflow`` wrote and can never inherit a stale file from an earlier, larger model.
 
     Also writes a ``promotion.json`` (``{"mlflow_run_id", "promoted_at"}``) into ``dest`` for
     provenance; a ``BaseForecaster.load`` implementation reads its own population from its saved
@@ -189,7 +192,7 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
         downloaded_dir = _download_and_unpack_model(run_id, Path(tmp_dir))
         promotion = {
             "mlflow_run_id": run_id,
-            "promoted_at": datetime.now(timezone.utc).isoformat(),
+            "promoted_at": datetime.now(UTC).isoformat(),
         }
         (downloaded_dir / "promotion.json").write_text(json.dumps(promotion))
 

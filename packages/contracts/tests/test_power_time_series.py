@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 import patito as pt
 import polars as pl
@@ -13,7 +14,7 @@ def test_power_time_series_validation():
         pt.DataFrame(
             {
                 "time_series_id": [123],
-                "time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+                "time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
                 "power": [10.0],
             }
         )
@@ -26,13 +27,13 @@ def test_power_time_series_validation():
 
 
 @pytest.mark.parametrize(
-    "data, expected_error",
+    ("data", "expected_error"),
     [
         # Invalid power (too high)
         (
             {
                 "time_series_id": [123],
-                "time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+                "time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
                 "power": [1000.1],
             },
             "power",
@@ -41,7 +42,7 @@ def test_power_time_series_validation():
         (
             {
                 "time_series_id": [123],
-                "time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+                "time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
                 "power": [-1000.1],
             },
             "power",
@@ -50,7 +51,7 @@ def test_power_time_series_validation():
         (
             {
                 "time_series_id": [123],
-                "time": [datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc)],
+                "time": [datetime(2026, 1, 1, 0, 15, tzinfo=UTC)],
                 "power": [10.0],
             },
             "time must be at the top or bottom of the hour",
@@ -59,7 +60,7 @@ def test_power_time_series_validation():
         (
             {
                 "time_series_id": ["abc"],
-                "time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+                "time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
                 "power": [10.0],
             },
             "time_series_id",
@@ -69,8 +70,8 @@ def test_power_time_series_validation():
             {
                 "time_series_id": [123, 123],
                 "time": [
-                    datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),
-                    datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),
+                    datetime(2026, 1, 1, 0, 30, tzinfo=UTC),
+                    datetime(2026, 1, 1, 0, 30, tzinfo=UTC),
                 ],
                 "power": [10.0, 20.0],
             },
@@ -78,7 +79,7 @@ def test_power_time_series_validation():
         ),
     ],
 )
-def test_power_time_series_invalid_data(data, expected_error):
+def test_power_time_series_invalid_data(data: dict[str, list[Any]], expected_error: str):
     # We need to cast to ensure the types are checked
     df = pt.DataFrame(data).set_model(PowerTimeSeries)
 
@@ -99,26 +100,26 @@ def _one_row(time: datetime) -> pt.DataFrame[PowerTimeSeries]:
 
 
 @pytest.mark.parametrize(
-    "time, expected_error",
+    ("time", "expected_error"),
     [
         # Pre-modern: `Europe/London` ran on local mean time (UTC-0:01:15) until 1847, so a
         # timestamp like this makes every local-time feature nonsensical.
         (
-            datetime(1840, 6, 1, 0, 30, tzinfo=timezone.utc),
+            datetime(1840, 6, 1, 0, 30, tzinfo=UTC),
             "before MIN_PLAUSIBLE_DATETIME",
         ),
         # The last half-hour before the lower bound: the bound itself is inclusive, this is not.
         (
-            datetime(1999, 12, 31, 23, 30, tzinfo=timezone.utc),
+            datetime(1999, 12, 31, 23, 30, tzinfo=UTC),
             "before MIN_PLAUSIBLE_DATETIME",
         ),
         # Far future — how a Unix-epoch value in milliseconds read as seconds shows up.
         (
-            datetime(3000, 6, 1, 0, 30, tzinfo=timezone.utc),
+            datetime(3000, 6, 1, 0, 30, tzinfo=UTC),
             "after MAX_PLAUSIBLE_DATETIME",
         ),
         (
-            datetime(2100, 1, 1, 0, 30, tzinfo=timezone.utc),
+            datetime(2100, 1, 1, 0, 30, tzinfo=UTC),
             "after MAX_PLAUSIBLE_DATETIME",
         ),
     ],
@@ -136,7 +137,7 @@ def test_power_time_series_rejects_out_of_range_time(time: datetime, expected_er
     [
         MIN_PLAUSIBLE_DATETIME,  # The bounds are inclusive at both ends.
         MAX_PLAUSIBLE_DATETIME,
-        datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),  # An ordinary reading.
+        datetime(2026, 1, 1, 0, 30, tzinfo=UTC),  # An ordinary reading.
     ],
 )
 def test_power_time_series_accepts_in_range_time(time: datetime) -> None:
@@ -150,9 +151,9 @@ def test_power_time_series_bounds_span_all_plausible_nged_data() -> None:
     the range has to comfortably contain that. It must also start well after 1847, when
     ``Europe/London`` stopped running on local mean time at UTC-0:01:15.
     """
-    assert MIN_PLAUSIBLE_DATETIME < datetime(2015, 1, 1, tzinfo=timezone.utc)
-    assert MIN_PLAUSIBLE_DATETIME > datetime(1900, 1, 1, tzinfo=timezone.utc)
-    assert MAX_PLAUSIBLE_DATETIME > datetime(2050, 1, 1, tzinfo=timezone.utc)
+    assert datetime(2015, 1, 1, tzinfo=UTC) > MIN_PLAUSIBLE_DATETIME
+    assert datetime(1900, 1, 1, tzinfo=UTC) < MIN_PLAUSIBLE_DATETIME
+    assert datetime(2050, 1, 1, tzinfo=UTC) < MAX_PLAUSIBLE_DATETIME
 
 
 def test_power_time_series_empty_frame_passes_bounds_check() -> None:
@@ -160,14 +161,14 @@ def test_power_time_series_empty_frame_passes_bounds_check() -> None:
     PowerTimeSeries.DataFrame(schema=PowerTimeSeries.dtypes).validate()
 
 
-_OK = datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)
+_OK = datetime(2026, 1, 1, 0, 30, tzinfo=UTC)
 """A plausible, aligned `time` — the row that must survive every case below."""
 
-_OK2 = datetime(2026, 1, 1, 1, 0, tzinfo=timezone.utc)
+_OK2 = datetime(2026, 1, 1, 1, 0, tzinfo=UTC)
 """A second survivor, distinct from `_OK` so that assertions on survivor order can fail."""
 
-_OUT_OF_RANGE = datetime(1840, 6, 1, 0, 30, tzinfo=timezone.utc)
-_MISALIGNED = datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc)
+_OUT_OF_RANGE = datetime(1840, 6, 1, 0, 30, tzinfo=UTC)
+_MISALIGNED = datetime(2026, 1, 1, 0, 15, tzinfo=UTC)
 
 
 def _frame(times: list[datetime | None]) -> pl.DataFrame:
@@ -184,7 +185,7 @@ def _frame(times: list[datetime | None]) -> pl.DataFrame:
 
 
 @pytest.mark.parametrize(
-    "times, expected_survivors",
+    ("times", "expected_survivors"),
     [
         pytest.param([_OK2, _OK], [_OK2, _OK], id="all_well_formed"),
         pytest.param([_OUT_OF_RANGE, _OK], [_OK], id="out_of_range_time"),

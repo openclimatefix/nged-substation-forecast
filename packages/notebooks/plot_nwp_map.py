@@ -1,10 +1,12 @@
+from datetime import UTC
+
 import marimo
 
 __generated_with = "0.23.6"
 app = marimo.App(width="full")
 
 with app.setup:
-    from datetime import datetime, timezone
+    from datetime import datetime
     from typing import cast
 
     import altair as alt
@@ -30,7 +32,7 @@ def _(df):
 
 @app.cell
 def _(df):
-    NWP_INIT_TIME = datetime(2026, 5, 15, tzinfo=timezone.utc)
+    NWP_INIT_TIME = datetime(2026, 5, 15, tzinfo=UTC)
     NWP_VAR_TO_PLOT = "temperature_2m"
 
     _df = (
@@ -38,7 +40,7 @@ def _(df):
             pl.col("h3_index") == 599148110664433663,
             pl.col("init_time") == NWP_INIT_TIME,
         )
-        .select(["valid_time", "ensemble_member"] + [NWP_VAR_TO_PLOT])
+        .select(["valid_time", "ensemble_member", NWP_VAR_TO_PLOT])
         .collect()
     )
 
@@ -61,7 +63,7 @@ def _(df):
 
 @app.cell
 def _(NWP_INIT_TIME):
-    VALID_TIME_TO_PLOT = datetime(2026, 5, 15, hour=12, tzinfo=timezone.utc)
+    VALID_TIME_TO_PLOT = datetime(2026, 5, 15, hour=12, tzinfo=UTC)
     ENS_MEMBER_TO_PLOT = 0
 
     assert VALID_TIME_TO_PLOT >= NWP_INIT_TIME

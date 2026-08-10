@@ -202,6 +202,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Export the requested fold's forecasts and print where each file landed."""
     args = _parse_args()
     paths = export_forecasts(args.experiment_name, args.fold_id, args.output_dir)
     for kind, path in paths.items():

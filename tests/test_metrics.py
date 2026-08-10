@@ -18,7 +18,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import mlflow
@@ -53,8 +53,8 @@ PARTITION_KEY = f"{EXPERIMENT_NAME}__{FOLD_ID}"
 
 _TS1_CELL = 10
 # Train day inside window [2024-04-01, 2025-06-30]; val day inside [2025-07-01, 2026-06-30].
-_TRAIN_DAY = datetime(2024, 6, 1, tzinfo=timezone.utc)
-_VAL_DAY = datetime(2025, 8, 1, tzinfo=timezone.utc)
+_TRAIN_DAY = datetime(2024, 6, 1, tzinfo=UTC)
+_VAL_DAY = datetime(2025, 8, 1, tzinfo=UTC)
 _VAL_MEMBERS = (0, 1, 2)
 
 _NWP_CONTINUOUS_COLS = (
@@ -108,7 +108,7 @@ def _nwp_records(cell: int, day: datetime, members: tuple[int, ...]) -> list[dic
                 "h3_index": cell,
                 "categorical_precipitation_type_surface": None,
             }
-            record.update({col: 2000 for col in _NWP_CONTINUOUS_COLS})
+            record.update(dict.fromkeys(_NWP_CONTINUOUS_COLS, 2000))
             records.append(record)
     return records
 
@@ -124,7 +124,7 @@ def _write_nwp(path: str) -> None:
             "ensemble_member": pl.UInt8,
             "h3_index": pl.UInt64,
             "categorical_precipitation_type_surface": pl.UInt8,
-            **{col: pl.Int16 for col in _NWP_CONTINUOUS_COLS},
+            **dict.fromkeys(_NWP_CONTINUOUS_COLS, pl.Int16),
         }
     )
     write_deltalake(table_or_uri=path, data=df.to_arrow())
@@ -352,7 +352,7 @@ def _read_metric(metrics_path: Path, metric_name: str) -> float:
 def test_metrics_raises_without_effective_capacity(
     file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
 ) -> None:
-    """The metrics asset requires the effective_capacity table and fails cleanly when it is absent."""
+    """The metrics asset requires the effective_capacity table, and fails cleanly without it."""
     _run_cv_pipeline(dagster_instance, materialise_capacity=False)
 
     result = materialize(
@@ -430,8 +430,8 @@ def test_score_forecast_group_per_series_batches(
     from nged_substation_forecast.defs import cv_assets
 
     times = [
-        datetime(2025, 8, 1, 6, 0, tzinfo=timezone.utc),
-        datetime(2025, 8, 1, 6, 30, tzinfo=timezone.utc),
+        datetime(2025, 8, 1, 6, 0, tzinfo=UTC),
+        datetime(2025, 8, 1, 6, 30, tzinfo=UTC),
     ]
     # Series 1 and 2 overlap the actuals below; series 3's valid times are a year later.
     far_times = [t.replace(year=2026) for t in times]
@@ -507,7 +507,7 @@ def test_score_forecast_group_per_series_batches(
         capacity_df,
         "ad_hoc",
         str(metrics_path),
-        datetime.now(timezone.utc),
+        datetime.now(UTC),
         None,
     )
 
@@ -594,9 +594,7 @@ def test_population_filter_prunes_partitions(tmp_path: Path) -> None:
     partition's Parquet path and never the other experiment's.
     """
     path = str(tmp_path / "power_forecasts")
-    valid_time = pl.Series([datetime(2025, 8, 1, 6, tzinfo=timezone.utc)] * 4).dt.cast_time_unit(
-        "us"
-    )
+    valid_time = pl.Series([datetime(2025, 8, 1, 6, tzinfo=UTC)] * 4).dt.cast_time_unit("us")
     df = pl.DataFrame(
         {
             "experiment_name": ["expA", "expA", "expB", "expB"],
@@ -679,10 +677,11 @@ def _wait_for_mlflow_server(
             )
         try:
             urllib.request.urlopen(url, timeout=1)
-            return
         # Unparenthesised except-tuple (PEP 758, Python 3.14+); ruff format emits this form.
         except urllib.error.URLError, OSError:
             time.sleep(0.5)
+        else:
+            return
     pytest.fail(
         f"MLflow server at {url} did not become ready within {timeout_s}s:\n{_server_output()}"
     )

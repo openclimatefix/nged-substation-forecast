@@ -96,20 +96,19 @@ def _power_observation_times(run_init: datetime) -> list[datetime]:
 def _build_fixtures() -> tuple[
     pt.LazyFrame[PowerTimeSeries], pt.DataFrame[TimeSeriesMetadata], pl.LazyFrame
 ]:
-    nwp_rows = []
-    for run in _NWP_RUNS:
-        for member in _MEMBERS:
-            for vt in _run_valid_times(run):
-                nwp_rows.append(
-                    {
-                        "time_series_id": "ts1",
-                        "valid_time": vt,
-                        "ensemble_member": member,
-                        "init_time": run,
-                        "temperature_2m": 10.0 + vt.hour + member * 0.5,
-                        "wind_speed_10m": 3.0 + (vt.minute / 30.0) + member,
-                    }
-                )
+    nwp_rows = [
+        {
+            "time_series_id": "ts1",
+            "valid_time": vt,
+            "ensemble_member": member,
+            "init_time": run,
+            "temperature_2m": 10.0 + vt.hour + member * 0.5,
+            "wind_speed_10m": 3.0 + (vt.minute / 30.0) + member,
+        }
+        for run in _NWP_RUNS
+        for member in _MEMBERS
+        for vt in _run_valid_times(run)
+    ]
     nwp_df = pl.DataFrame(nwp_rows)
 
     # Power observations span each run's full window plus the pre-NWP-window history, so a

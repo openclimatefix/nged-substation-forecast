@@ -29,6 +29,7 @@ import mlflow
 from contracts.settings import Settings
 from dagster import DagsterInstance, RunConfig, materialize
 from mlflow.tracking import MlflowClient
+
 from nged_substation_forecast.defs.cv_assets import (
     MetricsConfig,
     PopulationFilter,
@@ -99,7 +100,7 @@ def _register(instance: DagsterInstance) -> None:
 
 
 def _report_metrics() -> None:
-    """Print the leaderboard aggregate metrics logged to the experiment's parent (cv_summary) run."""
+    """Print the leaderboard aggregate metrics logged to the experiment's parent cv_summary run."""
     client = MlflowClient()
     experiment = client.get_experiment_by_name(EXPERIMENT_NAME)
     if experiment is None:
@@ -154,6 +155,7 @@ def _run_pipeline(instance: DagsterInstance) -> None:
 
 
 def main() -> None:
+    """Run the baseline experiment end to end against an ephemeral Dagster instance."""
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 

@@ -1,5 +1,7 @@
-"""Reusable typing shims — domain-agnostic helpers that reconcile expressive in-code types
-with the plainer types third-party APIs annotate.
+"""Reusable typing shims.
+
+These are domain-agnostic helpers that reconcile the expressive in-code types we prefer with the
+plainer types third-party APIs annotate.
 
 Kept generic and separate from any one domain so they can be shared across the workspace (and
 promoted to their own package if they grow). The first inhabitant bridges the gap between a

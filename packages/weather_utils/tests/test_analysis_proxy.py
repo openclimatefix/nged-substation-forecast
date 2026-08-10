@@ -7,7 +7,6 @@ frames whose expected freshest-run / availability behaviour is obvious by inspec
 from datetime import UTC, datetime, timedelta
 
 import polars as pl
-
 from weather_utils import NWP_PUBLICATION_DELAY_HOURS, select_analysis_proxy
 
 

@@ -1,13 +1,12 @@
 """Tests for compute_metrics() and build_mlflow_aggregate_metrics()."""
 
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import patito as pt
 import polars as pl
 import pytest
 from contracts.ml_schemas import Metrics
-from polars.testing import assert_frame_equal
 from contracts.power_schemas import (
     LIST_OF_TIME_SERIES_TYPES,
     EffectiveCapacity,
@@ -20,10 +19,11 @@ from ml_core.metrics import (
     build_mlflow_aggregate_metrics,
     compute_metrics,
 )
+from polars.testing import assert_frame_equal
 
 
 def _utc(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> datetime:
-    return datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
+    return datetime(year, month, day, hour, minute, tzinfo=UTC)
 
 
 def _make_actuals(

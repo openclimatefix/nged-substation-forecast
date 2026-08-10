@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import get_args
 
 import patito as pt
+import polars as pl
 import pytest
 from contracts.ml_schemas import (
     AllFeatures,
@@ -16,9 +17,9 @@ def test_all_features_validation():
     df = (
         pt.DataFrame(
             {
-                "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
-                "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
-                "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=timezone.utc)],
+                "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
+                "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=UTC)],
+                "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=UTC)],
                 "time_series_id": [123],
                 "time_series_type": ["BESS"],
                 "power": [10.0],
@@ -36,9 +37,9 @@ def test_all_features_invalid_day_of_week():
     # Invalid day of week
     df = pt.DataFrame(
         {
-            "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
-            "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
-            "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=timezone.utc)],
+            "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
+            "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=UTC)],
+            "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=UTC)],
             "time_series_id": [123],
             "time_series_type": ["BESS"],
             "power": [10.0],
@@ -47,8 +48,10 @@ def test_all_features_invalid_day_of_week():
         }
     ).set_model(AllFeatures)
 
-    # We expect validation to fail, either during cast or validate
-    with pytest.raises(Exception):
+    # The Enum cast rejects the value before `validate()` is ever reached.
+    with pytest.raises(
+        pl.exceptions.InvalidOperationError, match="conversion from `str` to `enum`"
+    ):
         df.cast().validate()
 
 
@@ -56,9 +59,9 @@ def test_all_features_invalid_time_series_type():
     # Invalid time_series_type
     df = pt.DataFrame(
         {
-            "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
-            "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
-            "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=timezone.utc)],
+            "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
+            "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=UTC)],
+            "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=UTC)],
             "time_series_id": [123],
             "time_series_type": ["InvalidType"],
             "power": [10.0],
@@ -67,8 +70,10 @@ def test_all_features_invalid_time_series_type():
         }
     ).set_model(AllFeatures)
 
-    # We expect validation to fail, either during cast or validate
-    with pytest.raises(Exception):
+    # The Enum cast rejects the value before `validate()` is ever reached.
+    with pytest.raises(
+        pl.exceptions.InvalidOperationError, match="conversion from `str` to `enum`"
+    ):
         df.cast().validate()
 
 
@@ -122,10 +127,10 @@ def test_metrics_validation_with_scope_and_window_columns():
                 "metric_value": [5.2],
                 "evaluation_scope": ["leaderboard"],
                 "time_series_type": ["all"],
-                "window_start": [datetime(2022, 1, 1, 0, 0, tzinfo=timezone.utc)],
-                "window_end": [datetime(2022, 12, 31, 23, 59, 59, tzinfo=timezone.utc)],
+                "window_start": [datetime(2022, 1, 1, 0, 0, tzinfo=UTC)],
+                "window_end": [datetime(2022, 12, 31, 23, 59, 59, tzinfo=UTC)],
                 "window_label": ["2022"],
-                "computed_at": [datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)],
+                "computed_at": [datetime(2026, 6, 24, 12, 0, tzinfo=UTC)],
                 "mlflow_run_id": ["abc123"],
             }
         )

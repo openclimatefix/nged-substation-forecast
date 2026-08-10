@@ -51,9 +51,11 @@ def source_status_message(source: DataSourceType, settings: Settings) -> tuple[s
     """
     if source == "s3" and not DASHBOARD_S3_ENV.exists():
         return (
-            f"No `{DASHBOARD_S3_ENV.name}` found next to this app. Copy "
-            f"`{DASHBOARD_S3_ENV.name}.example` to `{DASHBOARD_S3_ENV.name}` and fill in "
-            "the S3 buckets and credentials. Falling back to local data.",
+            (
+                f"No `{DASHBOARD_S3_ENV.name}` found next to this app. Copy "
+                f"`{DASHBOARD_S3_ENV.name}.example` to `{DASHBOARD_S3_ENV.name}` and fill in "
+                "the S3 buckets and credentials. Falling back to local data."
+            ),
             True,
         )
     return f"Reading **{source}** data from `{settings.nged_data_path}`.", False

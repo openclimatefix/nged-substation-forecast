@@ -28,6 +28,7 @@ import polars as pl
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import Nwp
+from weather_utils import select_analysis_proxy
 
 from ml_core.features._lags import _apply_power_lag, _apply_weather_lag, _nullify_leaky_lags
 from ml_core.features._nwp import (
@@ -38,7 +39,6 @@ from ml_core.features._nwp import (
 )
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, ParsedFeatures
 from ml_core.features.feature_engineer import FeatureEngineer
-from weather_utils import select_analysis_proxy
 
 
 def _attach_nearest_nwp_cell(
@@ -78,6 +78,11 @@ class TabularFeatureEngineer(FeatureEngineer):
         nwp_init_time: datetime | None = None,
         nwp_publication_delay_hours: int = NWP_PUBLICATION_DELAY_HOURS,
     ) -> pt.LazyFrame[AllFeatures]:
+        """Map each NWP cell to its nearest time series, then run the tabular feature pipeline.
+
+        See :meth:`FeatureEngineer.engineer` for the argument and operating-mode contract, and
+        ``_engineer_features`` in this module for the pipeline itself.
+        """
         nwp_per_time_series = _attach_nearest_nwp_cell(nwp, time_series_metadata)
         return _engineer_features(
             selected_features,
@@ -172,12 +177,15 @@ def _engineer_features(
     else:
         processed_nwp = None
     weather_lags = [lag for lag in parsed_features.lags if lag.base_col != "power"]
-    if processed_nwp is not None and weather_lags:
-        if processed_nwp.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty():
-            raise ValueError(
-                "Weather lag features require the NWP control member (ensemble_member == 0) "
-                "to build historical weather, but no such rows were found in the NWP data."
-            )
+    if (
+        processed_nwp is not None
+        and weather_lags
+        and processed_nwp.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty()
+    ):
+        raise ValueError(
+            "Weather lag features require the NWP control member (ensemble_member == 0) "
+            "to build historical weather, but no such rows were found in the NWP data."
+        )
     historical_weather = (
         select_analysis_proxy(
             processed_nwp, group_key="time_series_id", init_time_col="nwp_init_time"

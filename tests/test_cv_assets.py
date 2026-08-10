@@ -6,7 +6,8 @@ and the non-leaderboard ``smoke_test`` fold in ``conf/cv/default.yaml``. The pur
 eligibility logic is unit-tested in ``packages/ml_core/tests/test_cv_helpers.py``.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path
 
 import polars as pl
 import pytest
@@ -26,7 +27,7 @@ SMOKE_FOLD_ID = "smoke_test"
 
 
 def _utc(year: int, month: int, day: int) -> datetime:
-    return datetime(year, month, day, tzinfo=timezone.utc)
+    return datetime(year, month, day, tzinfo=UTC)
 
 
 def _write_synthetic_power(power_delta_path: str) -> None:
@@ -67,7 +68,7 @@ def _write_synthetic_power(power_delta_path: str) -> None:
 
 
 @pytest.fixture
-def cv_paths(tmp_path, monkeypatch) -> dict[str, str]:
+def cv_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     """Redirect Settings' data paths to a temp dir and supply dummy required secrets.
 
     Settings reads these from the environment, which takes precedence over any ``.env`` file, so
@@ -93,12 +94,12 @@ def _read_eligible(eligible_path: str, fold_id: str) -> list[int]:
     )
 
 
-def test_eligible_time_series_materialises_per_fold_population(cv_paths) -> None:
+def test_eligible_time_series_materialises_per_fold_population(cv_paths: dict[str, str]) -> None:
     assert materialize([eligible_time_series], partition_key=FOLD_ID).success
     assert _read_eligible(cv_paths["eligible"], FOLD_ID) == [1]
 
 
-def test_eligible_time_series_is_idempotent(cv_paths) -> None:
+def test_eligible_time_series_is_idempotent(cv_paths: dict[str, str]) -> None:
     """Re-materialising a fold overwrites its partition rather than appending duplicates."""
     assert materialize([eligible_time_series], partition_key=FOLD_ID).success
     assert materialize([eligible_time_series], partition_key=FOLD_ID).success
@@ -108,7 +109,9 @@ def test_eligible_time_series_is_idempotent(cv_paths) -> None:
     assert fold_rows["time_series_id"].to_list() == [1]
 
 
-def test_eligible_time_series_honours_per_fold_min_training_months_override(cv_paths) -> None:
+def test_eligible_time_series_honours_per_fold_min_training_months_override(
+    cv_paths: dict[str, str],
+) -> None:
     """The smoke fold's min_training_months=1 override widens eligibility to include ts4.
 
     ts4 (first obs 2024-12-01) would be excluded under the config-level default of 6 months but is
@@ -118,7 +121,7 @@ def test_eligible_time_series_honours_per_fold_min_training_months_override(cv_p
     assert _read_eligible(cv_paths["eligible"], SMOKE_FOLD_ID) == [1, 2, 4]
 
 
-def test_eligible_time_series_overwrite_is_partition_scoped(cv_paths) -> None:
+def test_eligible_time_series_overwrite_is_partition_scoped(cv_paths: dict[str, str]) -> None:
     """The partition overwrite touches only its own fold, leaving sibling folds intact.
 
     Pre-seed the eligible table with a row for an unrelated fold (e.g. a prior leaderboard epoch),
@@ -145,7 +148,7 @@ def test_eligible_time_series_overwrite_is_partition_scoped(cv_paths) -> None:
     assert _read_eligible(cv_paths["eligible"], FOLD_ID) == [1]
 
 
-def test_effective_capacity_materialises_one_row_per_series(cv_paths) -> None:
+def test_effective_capacity_materialises_one_row_per_series(cv_paths: dict[str, str]) -> None:
     """The asset writes one full-history P99 row per time series with a plausible capacity.
 
     The synthetic power fixture has ``power == 1.0`` for every observation, so P99(|power|) == 1.0
@@ -160,7 +163,7 @@ def test_effective_capacity_materialises_one_row_per_series(cv_paths) -> None:
     assert capacity.filter(pl.col("time_series_id") == 1)["time"][0] == _utc(2026, 7, 1)
 
 
-def test_effective_capacity_is_idempotent(cv_paths) -> None:
+def test_effective_capacity_is_idempotent(cv_paths: dict[str, str]) -> None:
     """Re-materialising overwrites the whole table rather than appending duplicate rows."""
     assert materialize([effective_capacity]).success
     assert materialize([effective_capacity]).success

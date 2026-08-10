@@ -1,3 +1,8 @@
+"""`BaseForecaster`: the interface every forecasting model implements.
+
+Also holds `BaseForecasterConfig`, which carries a trained model's experiment identity.
+"""
+
 import tarfile
 import tempfile
 from abc import ABC, abstractmethod
@@ -185,6 +190,7 @@ class BaseForecaster(ABC):
     """
 
     def __init__(self, model_params: BaseForecasterConfig) -> None:
+        """Store the config that carries this model's hyper-parameters and experiment identity."""
         self.model_params = model_params
 
     @property
@@ -230,13 +236,11 @@ class BaseForecaster(ABC):
         caller left there is gone afterwards. (Depositing a file *after* a save is fine, and is how
         ``_production_helpers.fetch_model_artifacts`` puts ``promotion.json`` beside the model.)
         """
-        pass
 
     @classmethod
     @abstractmethod
     def load(cls, path: Path) -> Self:
         """Reconstruct a trained instance from a previously saved directory."""
-        pass
 
     def save_to_mlflow(self, run_id: str) -> None:
         """Upload this trained model to the given MLflow run, as one replaceable archive.
@@ -289,13 +293,12 @@ class BaseForecaster(ABC):
 
         Args:
             data: The engineered features (lazy; the caller must not pre-collect).
-            time_series_ids: The population the model must train on — the caller's eligible set. The
-                model decides how to map it onto boosters: one booster per id (``XGBoostForecaster``),
-                or one booster per group of ids (e.g. all solar sites) for a future model. It is the
-                model's frozen record of who it trained on (the train==predict invariant), and bounds
-                ``predict`` to that same population.
+            time_series_ids: The population the model must train on — the caller's eligible set.
+                The model decides how to map it onto boosters: one booster per id
+                (``XGBoostForecaster``), or one booster per group of ids (e.g. all solar sites) for
+                a future model. It is the model's frozen record of who it trained on (the
+                train==predict invariant), and bounds ``predict`` to that same population.
         """
-        pass
 
     @abstractmethod
     def predict(
@@ -310,4 +313,3 @@ class BaseForecaster(ABC):
                 context), so the caller supplies it: ``cv_power_forecasts`` passes the fold's
                 label, while production inference keeps the ``"live"`` default.
         """
-        pass

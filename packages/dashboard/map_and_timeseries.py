@@ -4,7 +4,7 @@ __generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 with app.setup:
-    from datetime import datetime
+    from datetime import UTC, datetime
     from typing import cast
 
     import altair as alt
@@ -114,7 +114,7 @@ def _(settings):
         storage_options=typeddict_to_dict(settings.storage_options),
     ).filter(
         # Filter to only show recent data. Altair crashes if you try to show too much data.
-        pl.col("time") > pl.lit(datetime(2026, 5, 1)).cast(UTC_DATETIME_DTYPE)
+        pl.col("time") > pl.lit(datetime(2026, 5, 1, tzinfo=UTC)).cast(UTC_DATETIME_DTYPE)
     )
     return (delta_df,)
 
@@ -137,7 +137,7 @@ def _(delta_df, df, layer_widget, map):
                 pt.DataFrame[PowerTimeSeries],
                 delta_df.filter(pl.col("time_series_id") == time_series_id).collect(),
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — surface any read failure in the pane, never crash.
             right_pane = mo.md(f"{e}")
         else:
             if filtered_demand.height == 0:
@@ -156,7 +156,11 @@ def _(delta_df, df, layer_widget, map):
                         tooltip=["time", "power"],
                     )
                     .properties(
-                        title=f"{selected_df['time_series_name'].item()} - {selected_df['substation_type'].item()} - {selected_df['time_series_type'].item()}",
+                        title=(
+                            f"{selected_df['time_series_name'].item()}"
+                            f" - {selected_df['substation_type'].item()}"
+                            f" - {selected_df['time_series_type'].item()}"
+                        ),
                         height=300,
                         width="container",  # Fill available width
                     )

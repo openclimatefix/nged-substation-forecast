@@ -107,10 +107,149 @@ registry_modules = [
 line-length = 100
 
 [tool.ruff.lint]
-# ruff 0.16 widened its *default* rule set well beyond the E4/E7/E9/F that 0.15 and earlier
-# enabled. Pin that older selection explicitly, so upgrading ruff never silently changes which
-# rules this repo enforces. Adopting any of the newer rules is a deliberate, separate change.
-select = ["E4", "E7", "E9", "F"]
+# `select` is always written out here, never inherited. Ruff's *default* rule set is a curated
+# menu, not a standard: the docs state no selection criteria and make no stability promise, so an
+# inherited selection means a `uv lock` refresh can change which rules this repo enforces. Naming
+# the families keeps that decision ours. A ruff upgrade that adds a rule to a family below can
+# still surface new findings — but it does so by failing CI on the lock-bump PR, which is one
+# visible decision to take, not silent drift.
+#
+# The families here are chosen from ruff's defaults, then widened. Note that ruff's defaults are
+# *not* a superset of the older E4/E7/E9/F gate: of pycodestyle-E they keep only E722 and E902, so
+# adopting the defaults verbatim would stop enforcing E401, E402, E711, E712, E713, E714, E721 and
+# E731. E4/E7/E9 are therefore listed explicitly.
+select = [
+    "ANN",   # flake8-annotations: complete signatures are a house rule (see CLAUDE.md)
+    "ASYNC", # flake8-async
+    "B",     # flake8-bugbear
+    "BLE",   # flake8-blind-except
+    "C4",    # flake8-comprehensions
+    "D",     # pydocstyle (google convention, configured below)
+    "DTZ",   # flake8-datetimez: naive datetimes can silently corrupt our UTC-everywhere data
+    "E4",    # pycodestyle: import placement
+    "E5",    # pycodestyle: line length (the formatter does not wrap comments or long strings)
+    "E7",    # pycodestyle: statement-level errors
+    "E9",    # pycodestyle: syntax and IO errors
+    "EXE",   # flake8-executable
+    "F",     # pyflakes
+    "FA",    # flake8-future-annotations
+    "FLY",   # flynt
+    "FURB",  # refurb
+    "G",     # flake8-logging-format
+    "I",     # isort
+    "INT",   # flake8-gettext
+    "ISC",   # flake8-implicit-str-concat
+    "LOG",   # flake8-logging
+    "N",     # pep8-naming: the naming conventions CLAUDE.md mandates
+    "PERF",  # perflint
+    "PGH",   # pygrep-hooks
+    "PIE",   # flake8-pie
+    "PL",    # pylint
+    "PT",    # flake8-pytest-style
+    "PTH",   # flake8-use-pathlib
+    "PYI",   # flake8-pyi
+    "RET",   # flake8-return
+    "RUF",   # ruff-specific rules
+    # flake8-bandit, restricted to the three rules ruff enables by default. The rest of the family
+    # is aimed at code that handles untrusted input; here it only fires on our own `git`/`uv`
+    # invocations (S603/S607), on moto's published dummy credentials (S106) and on `urlopen`
+    # against a local moto server (S310). Turning the family on would buy eight suppressions and
+    # no signal. Real security linting is a separate decision, not a side effect of this file.
+    "S102",  # exec used
+    "S110",  # try-except-pass
+    "S112",  # try-except-continue
+    "SIM",   # flake8-simplify
+    "T10",   # flake8-debugger: never commit a breakpoint
+    "TC",    # flake8-type-checking
+    "TID251",  # flake8-tidy-imports banned-api only (see banned-api table below)
+    "TRY",   # tryceratops
+    "UP",    # pyupgrade
+    "W",     # pycodestyle warnings
+    "YTT",   # flake8-2020
+]
+
+# Every entry is a family member we deliberately decline, with the reason. Prefer adding a line
+# here (and its justification) over dropping a whole family from `select`.
+ignore = [
+    # --- Rules that fight this repo's own conventions ---
+    # CLAUDE.md explicitly blesses long-but-clear parameter lists ("Eight parameters is acceptable
+    # when each is distinct"), and prefers extracting named helpers with more parameters over
+    # letting a function body grow.
+    "PLR0913", # too many arguments
+    "PLR0917", # too many positional arguments
+    # Our prose — docstrings and error messages alike — uses en-dashes and typographic quotes on
+    # purpose. RUF001-003 flag every one of them as an "ambiguous" Unicode character.
+    "RUF001", # ambiguous character in a string
+    "RUF002", # ambiguous character in a docstring
+    "RUF003", # ambiguous character in a comment
+    # f-strings in log calls are fine here: this is not a high-volume hot path, and the eager
+    # formatting cost is worth the readability.
+    "G004", # logging statement uses f-string
+    # CLAUDE.md asks for *complete* type hints, which is what the rest of flake8-annotations
+    # enforces. It does not ask for the elimination of `Any`, and the places that use it — a
+    # `**kwargs: Any` forwarded verbatim, a test double that accepts and ignores every argument —
+    # have no honest narrower type.
+    "ANN401", # dynamically typed expressions (`typing.Any`) are disallowed
+    # Asserting against a literal is the whole point of a unit test, and `magic-value-comparison`
+    # cannot tell a test's expected value from a hard-coded constant in production code.
+    "PLR2004", # magic value used in comparison
+    # CLAUDE.md asks for UPPER_SNAKE_CASE constants; N803/N806 reject that spelling for a constant
+    # that happens to be function-local, and also reject domain-conventional names such as
+    # `X` for a feature matrix. The rest of pep8-naming (N801 classes, N802 functions, N815/N816
+    # mixedCase) is left on and does encode the conventions CLAUDE.md states.
+    "N803", # argument name should be lowercase
+    "N806", # variable in function should be lowercase
+    # Renaming `NoNewData` and `NwpRunNotYetAvailable` is a public-API change across several
+    # packages, not a lint fix. Revisit deliberately if we ever want the `Error` suffix.
+    "N818", # exception name should be suffixed with `Error`
+
+    # --- Rules that would break Patito/pydantic ---
+    # Patito and pydantic build their models from *runtime* annotations, so moving an annotation-only
+    # import into an `if TYPE_CHECKING:` block turns a working schema into a NameError at import
+    # time. TC004/TC005/TC007/TC010 (the rules ruff enables by default) are safe and stay on.
+    "TC001", # move application import into a type-checking block
+    "TC002", # move third-party import into a type-checking block
+    "TC003", # move standard-library import into a type-checking block
+    "TC006", # add quotes to type expression in `typing.cast()`
+
+    # --- Rules whose cure is worse than the disease ---
+    # TRY003 wants every message moved into a custom exception class. We raise plain built-in
+    # exceptions with a specific, readable message; a class per message would be pure ceremony.
+    "TRY003", # long message outside the exception class
+    # Deliberate late imports: breaking an import cycle, deferring a slow import, or importing
+    # inside a test so a `monkeypatch` lands first.
+    "PLC0415", # `import` should be at the top level of a file
+    # Overlaps with the formatter, which owns line breaks inside implicit string concatenations.
+    "ISC001", # single-line implicit string concatenation
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Marimo notebooks are not ordinary modules. A cell ends in a bare expression to render its output
+# (B018), and marimo writes a trailing `return` into every cell (PLR1711); neither is a defect.
+# Cells are `def _(...)` functions with no docstring and no annotations, which is marimo's own
+# generated shape, not something we hand-maintain.
+#
+# Note these are *file* patterns, not directory patterns: ruff matches globs with `*` crossing `/`,
+# so `packages/dashboard/*.py` would also silence `packages/dashboard/src/dashboard/*.py` — real
+# library code. The two marimo apps are therefore named individually.
+"packages/dashboard/map_and_timeseries.py" = ["ANN", "B018", "D", "PLR1711"]
+"packages/dashboard/view_forecasts.py" = ["ANN", "B018", "D", "PLR1711"]
+"packages/notebooks/*.py" = ["ANN", "B018", "D", "PLR1711"]
+# `**/tests/**` covers both the root `tests/` directory and every `packages/*/tests/`.
+#
+# DTZ: test frames are hand-built with `datetime(2023, 1, 1, 12, 0)` and fed to helpers that are
+#   indifferent to time zone. The rule earns its keep where a naive datetime could reach stored
+#   data, which is `src/`, not here.
+# D: a test's name is its documentation; requiring a docstring per test case adds noise, not
+#   information.
+# ANN201: every test function returns `None`; spelling that out on each one is pure boilerplate.
+"**/tests/**" = ["ANN201", "D", "DTZ"]
+# conftest.py is test scaffolding and follows the same conventions as the tests it serves.
+"**/conftest.py" = ["ANN201", "D", "DTZ"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# pandas is strictly forbidden in this repo — Polars only. See CLAUDE.md, "Code Style".
+"pandas".msg = "pandas is forbidden in this repo: use Polars (`pl.LazyFrame`/`pl.DataFrame`)."
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
