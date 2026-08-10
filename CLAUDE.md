@@ -44,6 +44,7 @@ needed one, the mistake is already written.
 
 | Skill | Load it before… |
 |---|---|
+| `code-style` | writing or editing **any** Python in this repo |
 | `polars-patito-gotchas` | writing Polars/Patito code that joins, casts, filters a `pt.LazyFrame`, declares a Patito field, or reads/writes Delta |
 | `mkdocs-authoring` | editing markdown MkDocs renders — `docs/`, READMEs, `SKILL.md`, docstrings — especially nested lists, list items with code blocks, or wrapped links |
 | `marimo-notebooks` | creating or editing a Marimo notebook (`packages/dashboard/*.py`, `packages/notebooks/*.py`) |
@@ -223,11 +224,11 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 
 ## Code Style
 
-**Read [`docs/architecture/code-style.md`](docs/architecture/code-style.md) before writing or
-editing any Python.** It is the single source of truth for code style in this repo — Python
-version, ruff configuration and its traps, naming, how expressive a signature has to be, comments
-and doc links, Polars and Patito conventions, data handling, error handling — and none of it is
-repeated here. Skipping it means guessing at rules that are written down.
+**Load the `code-style` skill before writing or editing any Python.** It takes you to
+[`docs/architecture/code-style.md`](docs/architecture/code-style.md), the single source of truth —
+Python version, ruff configuration and its traps, naming, how expressive a signature has to be,
+comments and doc links, Polars and Patito conventions, data handling, error handling. None of it is
+repeated here, so skipping it means guessing at rules that are written down.
 
 ## This is a young project
 

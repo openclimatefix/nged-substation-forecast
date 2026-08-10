@@ -2,8 +2,9 @@
 
 (This is mostly written for LLM coding agents!)
 
-This page is the **single source of truth for code style in this repo**. `CLAUDE.md` does not
-repeat any of it — it points here. Read this page before writing or editing Python.
+This page is the **single source of truth for code style in this repo**. Nothing repeats it:
+`CLAUDE.md` and the `code-style` skill both route here, and the skill exists to make sure this page
+gets read before any Python is written or edited. Change a rule here and nowhere else.
 
 ## General Principles
 
