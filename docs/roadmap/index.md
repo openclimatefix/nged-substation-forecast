@@ -35,6 +35,10 @@ Technical plans change as we learn more — treat this as a best-estimate, not a
   (runbooks, alert-on-absence, infra-as-code, NGED landing-zone probing, game days).
 - [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort
   tiers, ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
+- [Extending the training history](training-history.md) — using ERA5 to train on the power data
+  that predates the ECMWF ENS archive: the era-confounding hazard that dictates the ingest's
+  scope, the reconciliation and pooling variants, the COVID covariate, and why ERA5 scoring is a
+  diagnostic rather than a promotion criterion.
 - [Engineering health](engineering-health.md) — reproducibility stamping, Hydra removal, and
   scientific-rigor tests.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate
@@ -143,8 +147,18 @@ AWS — see [Live service](live-service.md).
 
 Establish a strong XGBoost baseline before investing in capacity estimation and switching event detection.
 
-The full experiment backlog — fifteen ideas across four effort tiers, ordered best
-bang-for-the-buck within each tier — is in [XGBoost improvements](xgboost-improvements.md).
+The full experiment backlog — four effort tiers, ordered best bang-for-the-buck within each
+tier — is in [XGBoost improvements](xgboost-improvements.md).
+
+This milestone also carries the **ERA5 ingest**
+([#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143), moved here from
+v0.7) and the **pre-training experiments** it unlocks
+([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)) — see
+[Extending the training history](training-history.md). Our power data reaches back to late 2019
+while the ENS archive starts 2024-04-01, and Dynamical.org's ENS back-fill is not expected until
+~November 2027, so ERA5 is how the seasonal experiments on this page get more than one winter to
+learn from. The Tier-1 and Tier-2 config wins do not wait for it.
+
 This milestone also carries the **quantile-ensemble pipeline** (per-member quantile forecasts
 pooled into delivered percentiles — Phase D of
 [Delivering the probabilistic metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics);
@@ -201,9 +215,7 @@ only for first month, then shared with NGED.*
 
 - Estimate the effective capacity of the *metered* wind and solar PV generators over time — it bumps up and down with maintenance, faults and build-out — by racing several candidate estimators head-to-head on the same data: a [convex (CVXPY)](../techniques/convex-optimisation.md) censored quantile-envelope estimator, a [differentiable-physics (PyTorch)](../techniques/differentiable-physics.md) variational estimator, and cheap baselines. The winner ships in v1; the judging criteria (including uncertainty quality and [robustness to missing inputs](capacity-estimation.md#robustness-to-missing-inputs), scored against the same failure-scenario vocabulary the forecasting leaderboard uses) are on the [capacity estimation](capacity-estimation.md) page. This is the first model family we must actively *build* for missingness — a differentiable-physics estimator [degrades most gracefully of all](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing), and that should count in the judging. A deliberate secondary goal of the contest is building hands-on CVXPY experience, to inform v2 tooling choices and our advice to NGED. The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is [v2 research](disaggregation.md).
 - Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
-- Ingest additional weather datasets needed for capacity estimation:
-    - **ERA5** (ECMWF global reanalysis) — the project's single reanalysis: near-real-time (ERA5T, ~5 days behind) weather for capacity estimation, plus pre-training history back to 1940 ([data sources](data-sources.md#weather-data))
-    - **CM SAF** (Satellite Application Facility on Climate Monitoring) — high-resolution satellite-derived irradiance, used to estimate solar PV capacity
+- Ingest **CM SAF** (Satellite Application Facility on Climate Monitoring) — high-resolution satellite-derived irradiance, used to estimate solar PV capacity ([data sources](data-sources.md#weather-data)). Capacity estimation also needs ERA5, which is already ingested by this point — it moved to [v0.5](#v05-xgboost-upgrades-quick-wins) to serve the pre-training experiments
 - Populate the `effective_capacity` Delta table
 
 **Dynamic effective capacity estimation for substations**:
@@ -281,7 +293,11 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   ([#363](https://github.com/openclimatefix/nged-substation-forecast/issues/363)): explore
   whether adding ICON-EU from Dynamical.org improves forecast skill over ECMWF ENS alone — the
   v1 nice-to-have version of the broader "further NWP sources" idea on the
-  [v2.0 research list](#v20-scale-up-future-research). Because ICON-EU's history starts early
+  [v2.0 research list](#v20-scale-up-future-research). **Sized by the v0.5
+  [perfect-weather ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates)**:
+  a low ceiling means there is little forecast-error headroom to chase and this drops down the
+  list — though not off it, because ICON-EU's ~6.5 km grid could still beat 31 km ERA5 on
+  representativeness, which that ceiling does not bound. Because ICON-EU's history starts early
   2026 (shorter than the canonical CV folds) it is assessed via a controlled ad-hoc ablation,
   not the leaderboard, until it has ~1–2 complete years of history. See
   [Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).
@@ -330,7 +346,7 @@ delivery of the v2 live service)*
 - **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
 - **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the graph-structured disaggregation engine
 - **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (see [the graph-structured engine](disaggregation.md#the-graph-structured-engine) and [MVA metering](disaggregation.md#apparent-power-mva-metering))
-- **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history. The ICON-EU trial specifically is also pulled forward as a [v0.9 nice-to-have](#v09-nice-to-haves-if-we-have-time); this v2.0 item is the wider question of further sources beyond it
+- **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. The v0.5 [perfect-weather ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates) sizes the forecast-error headroom a further source could recover; the separate case for a *finer-resolution* source survives a low ceiling, because that ceiling is measured on a 31 km reanalysis. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history. The ICON-EU trial specifically is also pulled forward as a [v0.9 nice-to-have](#v09-nice-to-haves-if-we-have-time); this v2.0 item is the wider question of further sources beyond it
 
 **Stretch goals**:
 

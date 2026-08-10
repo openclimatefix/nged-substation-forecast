@@ -797,6 +797,58 @@ This suite is shared machinery: the same transforms drive the CI degradation smo
 [Engineering Health](engineering-health.md) and, later, the outage-shaped training augmentation that
 makes the weather-blind claim true rather than hopeful.
 
+## Scoring against reanalysis — a diagnostic scope 🚧
+
+Once [ERA5 is ingested](training-history.md), scoring an experiment on ERA5 rather than ENS
+separates the two things total error confounds: the weather-to-power response, which we can
+actually improve, and the implicit hedging against forecast error, which we cannot (NWP error is
+exogenous to us). Without the split, a change in the ENS-scored number could be either.
+
+It lands as a **new `evaluation_scope`** alongside `leaderboard` / `production_monitoring` /
+`ad_hoc`, never as a fold. The **ENS-scored leaderboard stays the promotion criterion**, because
+total error at real lead times is what NGED receives — and keeping ERA5 out of the fold set is what
+preserves both
+[principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically)
+and the standing
+[rejection of reanalysis-backed validation folds](../architecture/ml-orchestration.md#yearly-folds-backed-by-era5-rejected-for-validation).
+
+### The perfect-weather ceiling — what it gates
+
+Train *and* score on near-perfect weather, and the resulting skill bounds what we could buy by
+removing **forecast error** from the weather input — the channel that more ensemble members, better
+ensemble post-processing and sharper interpolation all work through. If that ceiling sits close to
+today's ENS-scored skill, most of our error is not the weather forecast's fault and the effort
+belongs in the modelling instead. So run this **before** ingesting another NWP source, not after:
+it is the cheap test that sizes the prize the expensive one is chasing.
+
+Two rungs, in increasing order of "cheating":
+
+- **ERA5.** A reanalysis, so it assimilates observations, but still a 31 km model field — good, not
+  perfect. Free once the [ingest](training-history.md) lands.
+
+- **Observations.** Closer to truth at the site, and worth the second rung precisely because ERA5's
+  remaining error is not small. The UK Met Office's MIDAS Open (via CEDA) supplies hourly
+  land-surface temperature, wind and pressure from GB stations — spatially sparse, so
+  nearest-station matched. [CM SAF](data-sources.md#weather-data) SARAH-3 is the equivalent rung for
+  solar, at 0.05°, and is already planned for v0.7.
+
+Three conditions on reading the result.
+
+- **It must be trained on the better weather, not merely scored on it.** Feeding reanalysis to an
+  ENS-trained model measures a train/serve mismatch instead of a ceiling.
+
+- **It bounds forecast error, not resolution.** ERA5 is a 31 km field, while ICON-EU is ~6.5 km and
+  post-2023 ENS is 9 km, so a finer *forecast* can carry site-relevant structure that a coarse
+  *analysis* averages away. A low ERA5 ceiling therefore deprioritises a second NWP source without
+  ruling one out; it is the observations rung that closes this gap, since station and satellite data
+  are at-site rather than grid-cell means.
+
+- **It is a ceiling for the current model family and feature set.** A model that cannot exploit
+  perfect weather shows a low ceiling for reasons that have nothing to do with weather availability.
+  That does not weaken the decision it gates — a model that cannot use perfect weather will not be
+  rescued by a better forecast of it — but it does mean the ceiling is re-measured after any large
+  modelling change rather than treated as a standing fact.
+
 ---
 
 ## Time-slices for performance evaluation

@@ -171,6 +171,12 @@ apples-to-oranges. Reanalysis is valuable, but for **pre-training** (see
 [Cross-validation folds: Target](../ml_experimentation/cross-validation-folds.md#target-multiple-yearly-folds)),
 not for validation.
 
+This rejects reanalysis as a *promotion criterion*, not as a measurement. Scoring against ERA5 is
+legitimate as a **diagnostic** — it decomposes total error into the weather-to-power response and
+the implicit hedging against forecast error — and lands as its own `evaluation_scope`, leaving the
+leaderboard folds ENS-only. See
+[Extending the training history](../roadmap/training-history.md#evaluation).
+
 ## Two metric stores, one division of labour
 
 Metrics live in **both** MLflow and the `forecast_metrics` Delta table, deliberately, because
