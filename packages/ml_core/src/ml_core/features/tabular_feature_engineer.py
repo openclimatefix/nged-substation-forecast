@@ -54,7 +54,7 @@ def _attach_nearest_nwp_cell(
     ``time_series_id`` (not ``h3_index``), which is what ``_engineer_features`` expects.
     """
     # Strip the Patito subclasses so Polars' cross-subclass join type check doesn't reject the
-    # join (see CLAUDE.md). Zero-copy: same underlying Rust LazyFrames.
+    # join (see the `polars-patito-gotchas` skill). Zero-copy: same underlying Rust LazyFrames.
     nwp_plain = pl.LazyFrame._from_pyldf(nwp._ldf)
     cell_to_ts = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf).select(
         "time_series_id", "h3_res_5"
