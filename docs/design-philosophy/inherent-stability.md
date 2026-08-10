@@ -274,9 +274,9 @@ become a weather-blind model — it falls back on arbitrary default directions, 
 has to be earned by training for the outage, not assumed. Second, the case where the guarantee
 genuinely holds is narrower than it first looks. The chronic ECMWF nulls described below are
 present in every training run, so where they reach the model the guarantee does hold — but that is
-only the *leading* ones, the lead-0 window. `_upsample_nwp_to_half_hourly` interpolates *interior*
-nulls away when it resamples to the half-hourly grid, so a whole-slice null beyond lead-0 arrives
-at the model as a bridged value rather than as missingness. Those are handled by silent
+mostly the *leading* ones, the lead-0 window. `_upsample_nwp_to_half_hourly` interpolates
+*interior* nulls away when it resamples to the half-hourly grid, so an interior whole-slice null
+beyond lead-0 arrives at the model as a bridged value rather than as missingness. Those are handled by silent
 interpolation, not by NaN routing, which is a different mechanism with a different failure mode: a
 fabricated number carries no signal that it was fabricated.
 
@@ -370,12 +370,14 @@ present in every run we ingest, so it is in-distribution and needs no scenario.
 Be precise about what "handled" means here, because *three* different mechanisms are at work and
 only one of them is XGBoost's. The scattered per-pixel corruption mostly never becomes a null in
 our data at all: the ingest aggregates the 0.25° grid onto H3 cells, renormalising each cell over
-the grid points that did arrive, so a corrupt pixel costs its share of one cell's spatial detail
-rather than the cell. The lead-0 nulls do reach the model *as* nulls and are routed by the learned
-default directions — that is the case where "XGBoost handles the missingness it saw during
-training" genuinely holds. The blocky nulls *beyond* lead-0 never reach the model either:
-`_upsample_nwp_to_half_hourly` interpolates interior nulls away while resampling to the half-hourly
-grid, so they arrive as bridged values. That third one is imputation, already happening, chosen by
+the grid points that did arrive, so a corrupt pixel costs its share of each of the ~4.9 cells it
+feeds rather than those cells entirely. The lead-0 nulls do reach the model *as* nulls and are
+routed by the learned default directions — that is the case where "XGBoost handles the missingness
+it saw during training" genuinely holds. The blocky nulls *beyond* lead-0 mostly do not reach the
+model either: `_upsample_nwp_to_half_hourly` interpolates interior nulls away while resampling to
+the half-hourly grid, so they arrive as bridged values. The exception is a slice at the very end of
+the horizon, because `interpolate()` leaves trailing nulls alone just as it leaves leading ones —
+those do reach the model as nulls. That third mechanism is imputation, already happening, chosen by
 nobody — which turns the old worry here, that someone would later "fix" this by imputing, into
 something closer to its opposite: the fill exists and is unbounded, unflagged and unmeasured.
 Making it deliberate is

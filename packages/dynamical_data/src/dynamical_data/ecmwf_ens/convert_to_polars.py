@@ -146,6 +146,14 @@ def _aggregate_grid_points_to_h3_cells(
     every downstream check. Nulling it is what makes the failure visible — see
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
 
+    Renormalising each variable over *its own* contributing weight is what makes a variable's
+    corruption cost only that variable, but it does mean two variables in one cell can end up
+    averaged over different sub-areas of the hexagon. That matters only for `wind_u_*`/`wind_v_*`,
+    where `_calc_wind_speed` and `_calc_wind_direction` later combine the pair: if `u` and `v` have
+    different null footprints, the derived vector mixes two sub-areas. Upstream corruption has
+    always been co-located across variables, so this is theoretical today, and a shared denominator
+    would be worse — it would let one variable's corruption null every other variable in the cell.
+
     Args:
         joined: The H3 grid weights left-joined onto one chunk's NWP grid values. NaN must already
             have been normalised to null, since the contributing weight is computed from nullness.

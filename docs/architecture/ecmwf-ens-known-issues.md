@@ -25,12 +25,21 @@ the *variable*, so the gate needs no magic thresholds:
 
 The gate judges the **H3 cells we store**, not the raw grid points upstream sent us, and the two
 differ because a cell is the area-weighted mean of the ~2.9 grid points that overlap it — see
-[the next section](#spatial-aggregation-is-where-a-grid-points-null-is-resolved). A cell is null
-only when *no* grid point contributed a value to it, since a null at one of its points is absorbed
-by the others. So "any null is fatal" is a statement about a cell with nothing behind it, and a
-scattered grid-point null in an instantaneous variable usually never reaches the gate at all. The
-exception is a cell fed by a single grid point, where that point *is* the cell and one null is
-still fatal; the V1 grid has 10 such cells out of 1671.
+[the next section](#spatial-aggregation-is-where-a-grid-points-null-is-resolved). For the numeric
+variables a cell is null only when *no* grid point contributed a value to it, since a null at one
+of its points is absorbed by the others. So "any null is fatal" is a statement about a cell with
+nothing behind it, and a scattered grid-point null in an instantaneous variable usually never
+reaches the gate at all. One kind of cell is exempt: a cell fed by a single grid point, where that
+point *is* the cell and one null is still fatal; the V1 grid has 10 such cells out of 1671.
+
+`categorical_precipitation_type_surface` does not follow that rule, and the difference is large
+enough to be worth stating before anyone relies on it. It is aggregated with `mode()` rather than
+by a weighted mean, and Polars counts null as a candidate value, so its cell comes out null
+whenever nulls *strictly outnumber* every distinct value that did arrive — two missing points out
+of three, for instance, or two missing out of four when the two survivors disagree. Cell sizes on
+the V1 grid are `{1: 10, 2: 707, 3: 343, 4: 607, 5: 4}` points, so that is a far weaker condition
+than losing the cell entirely, and a null there is fatal for any `init_time` after 2024-11-12.
+Fixing it is [issue #507](https://github.com/openclimatefix/nged-substation-forecast/issues/507).
 
 ## Spatial aggregation is where a grid point's null is resolved
 
@@ -40,14 +49,15 @@ grid point's null is resolved before anything on this page ever sees it. On the 
 resolution 5 over the GB boundary) a cell averages **2.93 grid points**, and only 10 of its 1671
 cells are fed by a single point.
 
-Each variable is renormalised over the points that actually supplied a value: the weighted sum is
-divided by the *contributing* weight rather than by 1.0. A null grid point therefore costs its own
-share of one cell's spatial detail, and nothing more. The alternative — dividing by 1.0 regardless
-— silently treats an absent point as contributing zero, so the cell comes out low in proportion to
-how much of it went missing. That is the imputation the
+Each numeric variable is renormalised over the points that actually supplied a value: the weighted
+sum is divided by the *contributing* weight rather than by 1.0. A null grid point therefore costs
+its own share of each of the ~4.9 cells it feeds, and nothing more. The alternative — dividing by
+1.0 regardless — silently treats an absent point as contributing zero, so the cell comes out low in
+proportion to how much of it went missing. That is the imputation the
 [never zero-fill rule](../design-philosophy/inherent-stability.md#missingness-in-learned-models)
 warns about, which is worth saying plainly because it inverts the intuition: renormalising
-*removes* a fill from the ingest rather than adding one, so it leaves the provenance guarantees of
+*replaces* an implicit zero-fill with an available-case area mean rather than adding a fill on top
+of clean data, so it leaves the provenance guarantees of
 [principle 9](../design-philosophy/design-principles.md#9-provenance-travels-with-the-forecast-data)
 intact. Nothing is fabricated from another time step, another run or another cell.
 
@@ -106,13 +116,19 @@ isolated part of one member's trajectory, and it is absorbed the same way the sc
 already is. Be careful with the tempting shorter version of that argument — "these variables are
 null at lead-0 anyway, so models handle their nulls" — because it does not quite transfer. Lead-0
 nulls reach the model *as nulls* only because they are *leading*, and `_upsample_nwp_to_half_hourly`
-leaves leading nulls alone; an *interior* wholly-null slice is interpolated from its neighbouring
+interpolates only *interior* nulls; an interior wholly-null slice is bridged from its neighbouring
 steps, so the model sees a fabricated value instead. Note the span that bridges: losing one native
 step means interpolating between the steps *either side* of it, so 6 hours in the 3-hourly part of
 the horizon and 12 in the 6-hourly part. That is acceptable, but it is a different claim from "the
-model sees a null and copes" — and it is the reason a *spatial* fill from the same step's
+model sees a null and copes" — and it is the reason a *spatial* average over the same step's
 neighbouring grid points, which is what the aggregation above does to the scattered nulls, is the
-better of the two. Second, the
+better of the two.
+
+Which of those two a slice gets depends on where it sits in the horizon, and the dswrf example
+above is the awkward case: 360 h is the *last* of the 85 steps, and `interpolate()` leaves trailing
+nulls alone exactly as it leaves leading ones. So that slice is neither absorbed nor bridged — it
+reaches the model as a null, which is benign for a variable that is already null at lead-0 in every
+run, but it is not the "absorbed" case. Second, the
 run that failing would discard is overwhelmingly good. Take that 2026-08-09 run as the worked example: 0.05% of one
 already-nullable variable is not worth the other 4282 slices of that same variable, nor the twelve
 other variables that arrived complete, and rejecting it leaves the live forecast on a run 24 hours
@@ -139,9 +155,11 @@ Two null patterns *do* fail ingest:
 
     A cell reaches this state only when *every* grid point feeding it is missing, because of the
     renormalisation described [above](#spatial-aggregation-is-where-a-grid-points-null-is-resolved).
-    A blocky failure like 2026-07-14's is caught exactly as before — the whole grid is gone, so
-    every cell is empty — while a *scattered* grid-point null in an instantaneous variable is
-    absorbed by the cell's other points, unless it lands on one of the 10 single-point cells, which
+    (These are all numeric variables, so the `mode()` caveat on
+    `categorical_precipitation_type_surface` does not apply here.) A blocky failure like
+    2026-07-14's is caught exactly as before — the whole grid is gone, so every cell is empty —
+    while a *scattered* grid-point null in an instantaneous variable is absorbed by the cell's other
+    points, unless it lands on one of the 10 single-point cells, which
     have no others. That is a deliberate trade rather than an oversight: an instantaneous
     variable's nulls have only ever arrived as whole-step dropouts, and losing an entire run over
     one bad pixel is the outage
@@ -218,11 +236,15 @@ A dropped *grid point* is not covered by this check either, and is worth knowing
 is handled by the aggregation rather than by any check. A point the H3 grid weights name but the
 source dataset does not carry misses the left join, and is then excluded from its cell's
 contributing weight exactly as an upstream null is — so the cell is renormalised over whatever else
-feeds it, and only a cell that loses *every* one of its points comes out null. That takes either a
-dropped point feeding one of the 10 single-point cells, or enough neighbouring points dropping
-together, which is what a whole missing coordinate slice would look like. The resulting null is
-fatal for the instantaneous variables, so it costs the whole partition and shows up as a missed
-run — a blunt response to a small cause. Relaxing it to a warning and an absent row is tracked in
+feeds it, and only a cell that loses *every* one of its numeric points comes out null. That takes
+either a dropped point feeding one of the 10 single-point cells, or enough neighbouring points
+dropping together, which is what a whole missing coordinate slice would look like. The resulting
+null is fatal for the instantaneous variables, so it costs the whole partition and shows up as a
+missed run — a blunt response to a small cause. `categorical_precipitation_type_surface` goes null
+on a weaker condition than that, described
+under [the guiding principle](#the-guiding-principle), and is fatal on its own
+for any `init_time` after 2024-11-12 — so in practice a couple of dropped points next to each other
+is enough to cost the run. Relaxing it to a warning and an absent row is tracked in
 [issue #478](https://github.com/openclimatefix/nged-substation-forecast/issues/478).
 
 ### Where the expected shape comes from
