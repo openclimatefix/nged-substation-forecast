@@ -9,9 +9,9 @@ which needs the Dagster instance.
 import json
 from typing import Any, Final, Literal, cast
 
-import hydra
 import mlflow
-from contracts.hydra_schemas import CvConfig, load_cv_config
+import yaml
+from contracts.config_schemas import CvConfig, class_target, import_class, load_cv_config
 from contracts.settings import PROJECT_ROOT, Settings
 from dagster import Config, OpExecutionContext, job, op
 from ml_core._cv_helpers import CV_PARTITION_KEY_SEPARATOR, flatten_config
@@ -19,7 +19,6 @@ from ml_core._mlflow_runs import get_or_create_experiment, get_or_create_parent_
 from ml_core._repro import provenance_tags
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 from mlflow.tracking import MlflowClient
-from omegaconf import OmegaConf
 from pydantic import Field
 
 from nged_substation_forecast.defs.cv_assets import CV_EXPERIMENT_FOLDS_NAME
@@ -40,7 +39,7 @@ class RegisterExperimentConfig(Config):
     config_overrides: dict[str, Any] = Field(
         default_factory=dict,
         description=(
-            "Key-value overrides merged onto the base YAML's model_params,"
+            "Key-value overrides applied to the base YAML's model_params, replacing whole values,"
             " e.g. {'selected_features': ['lag_1h'], 'n_estimators': 300}."
         ),
     )
@@ -62,37 +61,31 @@ def _resolve_forecaster_config(
 ) -> tuple[type[BaseForecaster], BaseForecasterConfig]:
     """Build the concrete forecaster class + config from a model YAML and overrides.
 
-    Loads the base model YAML, merges ``config_overrides`` onto its ``model_params``, then
-    instantiates the ``BaseForecasterConfig`` subclass via Hydra. The forecaster class is resolved
-    too, for its ``MODEL_NAME`` (used as the ``model_family`` tag).
+    Loads the base model YAML, applies ``config_overrides`` to its ``model_params``, then
+    constructs the ``BaseForecasterConfig`` subclass named by ``model_params._target_``, which is
+    where pydantic validates the hyper-parameters. The forecaster class is resolved too, for its
+    ``MODEL_NAME`` (used as the ``model_family`` tag).
 
     Args:
         base_model_config: Path relative to ``PROJECT_ROOT`` of the base model YAML.
-        config_overrides: Overrides merged onto ``model_params`` (whole-value replacement; lists
-            are replaced, not extended).
+        config_overrides: Overrides applied to ``model_params`` as **whole-value replacement**: an
+            override replaces the base value outright rather than merging into it. Lists are
+            replaced, not extended, and a mapping is replaced entire — overriding one key of a
+            nested mapping drops the base's other keys, so an override of a nested value must
+            restate the whole mapping.
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
         A ``(forecaster_cls, forecaster_config)`` tuple.
     """
-    cfg = OmegaConf.merge(
-        OmegaConf.load(PROJECT_ROOT / base_model_config),
-        {"model_params": config_overrides},
-    )
-    forecaster_cls = cast(type[BaseForecaster], hydra.utils.get_class(cfg._target_))
-    forecaster_config: BaseForecasterConfig = hydra.utils.instantiate(cfg.model_params)
+    raw = yaml.safe_load((PROJECT_ROOT / base_model_config).read_text())
+    model_params = raw["model_params"]
+    model_params.update(config_overrides)
+    forecaster_cls = cast(type[BaseForecaster], import_class(raw["_target_"]))
+    config_cls = cast(type[BaseForecasterConfig], import_class(model_params.pop("_target_")))
+    forecaster_config = config_cls(**model_params)
     forecaster_config.experiment_name = experiment_name
     return forecaster_cls, forecaster_config
-
-
-def _class_target(obj: type | object) -> str:
-    """Return the fully-qualified import path of a class (or an instance's class).
-
-    Used to stamp the forecaster and config class identity onto the MLflow experiment so assets
-    can reconstruct them later via ``hydra.utils.get_class`` (see ``load_experiment_forecaster``).
-    """
-    cls = obj if isinstance(obj, type) else type(obj)
-    return f"{cls.__module__}.{cls.__qualname__}"
 
 
 IdentityTagType = Literal["config", "forecaster_target", "config_target"]
@@ -134,8 +127,8 @@ def _identity_tags(
     """
     return {
         "config": forecaster_config.model_dump_json(),
-        "forecaster_target": _class_target(forecaster_cls),
-        "config_target": _class_target(forecaster_config),
+        "forecaster_target": class_target(forecaster_cls),
+        "config_target": class_target(forecaster_config),
     }
 
 

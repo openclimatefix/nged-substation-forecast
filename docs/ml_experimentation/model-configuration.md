@@ -10,7 +10,7 @@ Each model family has a base YAML in `conf/model/`. The only one today is
 `conf/model/xgboost.yaml`. The file has two required top-level keys:
 
 ```yaml
-# Identifies the BaseForecaster subclass to instantiate (Hydra _target_).
+# Identifies the BaseForecaster subclass to instantiate.
 _target_: xgboost_forecaster.forecaster.XGBoostForecaster
 
 model_params:
@@ -28,8 +28,9 @@ model_params:
   ...
 ```
 
-`_target_` values are fully-qualified Python class paths resolved by Hydra at registration time.
-You should not change them unless you are wiring up a new model family.
+`_target_` values are fully-qualified Python class paths, resolved by
+`contracts.config_schemas.import_class` at registration time. You should not change them unless
+you are wiring up a new model family.
 
 ---
 
@@ -172,8 +173,8 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 ## Tweaking a config for an experiment
 
 You never edit a YAML file per experiment. Instead, pass `config_overrides` to
-`register_experiment_job`. Overrides are merged onto `model_params` by OmegaConf before
-instantiation, so any `model_params` key can be overridden.
+`register_experiment_job`. Each override is applied to `model_params` before the config object is
+constructed, so any `model_params` key can be overridden.
 
 **Example — reduce tree depth and add a feature:**
 
@@ -190,9 +191,10 @@ instantiation, so any `model_params` key can be overridden.
 }
 ```
 
-Note that `selected_features` is a **whole-value replacement**, not an extension. If you want to
-add one feature to the baseline set you must list all the features you want, not just the new
-one.
+Every override is a **whole-value replacement**, not a merge. `selected_features` is the case
+you will meet first: to add one feature to the baseline set you must list all the features you
+want, not just the new one. The same holds for a nested mapping — overriding one of its keys
+replaces the mapping entire, so restate every key you want to keep.
 
 The resolved config (YAML defaults merged with your overrides) is frozen as a JSON tag on the
 MLflow experiment at registration time. That frozen record is what `trained_cv_model` reads back

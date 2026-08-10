@@ -7,5 +7,5 @@
 ::: contracts.weather_schemas
 ::: contracts.geo_schemas
 ::: contracts.ml_schemas
-::: contracts.hydra_schemas
+::: contracts.config_schemas
 ::: contracts.settings

@@ -17,10 +17,10 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal, cast
 
-import hydra
 import patito as pt
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
+from contracts.config_schemas import import_class
 from contracts.power_schemas import PowerTimeSeries
 
 from ml_core.base_forecaster import BaseForecaster, _download_and_unpack_model
@@ -132,8 +132,8 @@ def build_live_power_frame(
 def load_forecaster_from_dir(path: Path) -> BaseForecaster:
     """Load the production model from a plain disk directory (no MLflow at inference time).
 
-    Reads ``meta.json`` and resolves ``model_class`` via ``hydra.utils.get_class`` (the same
-    mechanism ``ml_core._mlflow_runs.load_experiment_forecaster`` uses), then calls the
+    Reads ``meta.json`` and resolves ``model_class`` via ``contracts.config_schemas.import_class``
+    (the same mechanism ``ml_core._mlflow_runs.load_experiment_forecaster`` uses), then calls the
     concrete subclass's ``load(path)``.
 
     Args:
@@ -163,7 +163,7 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
             "be reconstructed. Re-promote the model with a code version that stamps "
             "model_class (see BaseForecaster.save)."
         )
-    forecaster_cls = cast(type[BaseForecaster], hydra.utils.get_class(model_class))
+    forecaster_cls = cast(type[BaseForecaster], import_class(model_class))
     return forecaster_cls.load(path)
 
 

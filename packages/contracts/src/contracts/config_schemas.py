@@ -1,12 +1,77 @@
-"""Hydra configuration schemas for the NGED substation forecast project."""
+"""Configuration schemas, and the class-path round-trip that ``_target_`` strings ride on."""
 
+import importlib
 from datetime import date
 from pathlib import Path
 
-from omegaconf import OmegaConf
+import yaml
 from pydantic import BaseModel, Field
 
 from contracts.power_schemas import FoldId
+
+
+def class_target(obj: type | object) -> str:
+    """Return the fully-qualified import path of a class (or of an instance's class).
+
+    The inverse of ``import_class``. Together they are how a config file, an MLflow experiment tag
+    and a saved model's ``meta.json`` all name a Python class: a ``module.ClassName`` string that
+    survives being written to disk and read back in another process.
+
+    Args:
+        obj: The class to name, or an instance whose class should be named.
+
+    Returns:
+        The ``module.ClassName`` path, e.g. ``"xgboost_forecaster.forecaster.XGBoostForecaster"``.
+
+    Raises:
+        ValueError: ``obj``'s class is nested inside another class. ``import_class`` resolves a
+            single attribute lookup on a module, so a nested class would produce a path that
+            cannot be resolved. Failing here, where the class is defined, beats emitting a target
+            string that only breaks when something later tries to load it.
+    """
+    cls = obj if isinstance(obj, type) else type(obj)
+    if "." in cls.__qualname__:
+        raise ValueError(
+            f"{cls.__qualname__} is nested inside another class, so it has no importable "
+            "module-level path. Move it to module level to use it as a _target_."
+        )
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
+def import_class(target: str) -> type:
+    """Resolve a fully-qualified class path to the class object.
+
+    The inverse of ``class_target``: imports the module and looks the class up on it.
+
+    Args:
+        target: A ``module.ClassName`` path, as produced by ``class_target``.
+
+    Returns:
+        The class named by ``target``.
+
+    Raises:
+        ValueError: ``target`` names no module path, its module cannot be imported, the module has
+            no such attribute, or the attribute is not a class.
+    """
+    module_path, _, class_name = target.rpartition(".")
+    if not module_path:
+        raise ValueError(f"{target!r} is not a fully-qualified class path (expected 'module.Cls').")
+    try:
+        module = importlib.import_module(module_path)
+    except ImportError as error:
+        raise ValueError(f"Cannot import module {module_path!r} of target {target!r}.") from error
+    try:
+        resolved = getattr(module, class_name)
+    except AttributeError as error:
+        raise ValueError(f"Module {module_path!r} has no attribute {class_name!r}.") from error
+    if not isinstance(resolved, type):
+        # TRY004 wants a TypeError, but the isinstance check is on what `target` *resolved to*,
+        # not on `target` itself, which is a perfectly well-typed str. What is wrong is its value,
+        # so every failure here is one ValueError and a caller needs to catch only that.
+        raise ValueError(  # noqa: TRY004
+            f"Target {target!r} resolved to {resolved!r}, which is not a class."
+        )
+    return resolved
 
 
 class CvFoldConfig(BaseModel):
@@ -91,5 +156,4 @@ def load_cv_config(path: Path) -> CvConfig:
     Returns:
         The validated ``CvConfig``.
     """
-    raw = OmegaConf.to_container(OmegaConf.load(path), resolve=True)
-    return CvConfig.model_validate(raw)
+    return CvConfig.model_validate(yaml.safe_load(path.read_text()))

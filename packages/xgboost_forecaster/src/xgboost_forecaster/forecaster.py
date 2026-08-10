@@ -9,6 +9,7 @@ import numpy as np
 import patito as pt
 import polars as pl
 import xgboost as xgb
+from contracts.config_schemas import class_target
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
@@ -215,7 +216,7 @@ class XGBoostForecaster(BaseForecaster):
                 {
                     "model_params": self.model_params.model_dump(mode="json"),
                     "trained_time_series_ids": self.trained_time_series_ids,
-                    "model_class": f"{type(self).__module__}.{type(self).__qualname__}",
+                    "model_class": class_target(self),
                 }
             )
         )

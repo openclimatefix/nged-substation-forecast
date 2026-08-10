@@ -11,8 +11,9 @@ from datetime import date
 from typing import Any
 
 import pytest
-from contracts.hydra_schemas import CvConfig, CvFoldConfig
+from contracts.config_schemas import CvConfig, CvFoldConfig
 from ml_core._cv_helpers import flatten_config
+from pydantic import ValidationError
 from xgboost_forecaster import XGBoostConfig, XGBoostForecaster
 
 from nged_substation_forecast.defs.jobs import (
@@ -52,6 +53,22 @@ def test_resolve_no_overrides_uses_yaml_defaults() -> None:
     assert isinstance(config, XGBoostConfig)
     assert config.n_estimators == 500
     assert config.experiment_name == "exp"
+
+
+def test_resolve_rejects_an_ill_typed_override() -> None:
+    """Pydantic validates every hyperparameter at registration, before any fold is trained."""
+    with pytest.raises(ValidationError, match="max_depth"):
+        _resolve_forecaster_config(_BASE_CONFIG, {"max_depth": "high"}, "exp")
+
+
+def test_resolve_does_not_mutate_the_base_yaml_on_disk() -> None:
+    """Overrides are applied to a freshly-parsed copy, so one call cannot leak into the next."""
+    _resolve_forecaster_config(_BASE_CONFIG, {"n_estimators": 7}, "exp")
+
+    _, config = _resolve_forecaster_config(_BASE_CONFIG, {}, "exp")
+
+    assert isinstance(config, XGBoostConfig)
+    assert config.n_estimators == 500
 
 
 def _mixed_fold_config() -> CvConfig:

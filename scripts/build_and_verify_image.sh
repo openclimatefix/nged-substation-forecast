@@ -34,9 +34,8 @@
 #   - --network=none: proves runtime inference needs no network at all — the whole point of
 #     baking the model in.
 #   - Job selected with `-j live_forecasts_job`, not `--partition`: `dagster job execute` has no
-#     --partition flag, and `dagster asset materialize --select` hits an unrelated antlr4 / Python
-#     3.14 incompatibility in Dagster's own asset-selection parser. Selecting by job name and
-#     passing the partition via --tags skips that parser entirely.
+#     --partition flag. Selecting by job name and passing the partition via --tags exercises
+#     exactly the entry point the EcsRunLauncher invokes in production.
 #
 # What it gates on, and what it does not:
 #   - HARD FAIL (exit 1) if the runtime touches MLflow. Baking the model in exists precisely so

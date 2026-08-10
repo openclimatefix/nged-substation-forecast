@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime, time
 from typing import Any, Final
 
 import polars as pl
-from contracts.hydra_schemas import CvFoldConfig
+from contracts.config_schemas import CvFoldConfig
 from pydantic import BaseModel
 
 CV_PARTITION_KEY_SEPARATOR: Final[str] = "__"

@@ -26,7 +26,6 @@ dependencies = [
     "deltalake",
     "dynamical_data",
     "geo",
-    "hydra-core",
     "ml_core",
     "mlflow-skinny",
     "nged_data",
@@ -35,6 +34,7 @@ dependencies = [
     "plotting",
     "polars>=1.0.0",
     "pyarrow",
+    "pyyaml",
     "requests>=2.31.0",
     "sentry-sdk>=2.66,<3",
     "xgboost_forecaster",
@@ -69,6 +69,16 @@ repository = "https://github.com/openclimatefix/nged-substation-forecast"
 
 # --- UV WORKSPACE CONFIG ---
 # See: https://docs.astral.sh/uv/concepts/projects/workspaces
+
+[tool.uv]
+# Dagster's asset-selection parser is *generated* by ANTLR 4.13.2, and ANTLR changed its
+# serialised-ATN format at 4.10: the 4.9 runtime reads the ATN as characters and the 4.13 one
+# reads it as integers. Resolving the 4.9 runtime therefore breaks every asset-selection string —
+# `AssetSelection.from_string(...)`, and so `dg launch --assets` and `dagster asset materialize
+# --select` — with `TypeError: ord() expected string of length 1, but int found`. Dagster itself
+# only requires `<4.14`, so nothing else in the tree holds the lower bound; this floor does.
+# `tests/test_asset_selection_parses.py` is the backstop that shows what a violation costs.
+constraint-dependencies = ["antlr4-python3-runtime>=4.13"]
 
 [tool.uv.workspace]
 members = ["packages/*"]

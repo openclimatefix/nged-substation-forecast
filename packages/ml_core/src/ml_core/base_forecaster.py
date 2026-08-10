@@ -111,12 +111,12 @@ class BaseForecasterConfig(BaseModel):
 
     Subclasses add model-specific hyperparameters. Having a shared base ensures that every
     forecaster carries its own feature list and optional MLflow experiment id in one
-    serialisable object, simplifying save/load and Hydra config wiring.
+    serialisable object, simplifying save/load and the ``conf/model/*.yaml`` config wiring.
 
     The tag fields (weather_source, training_strategy) are stamped onto MLflow runs for
-    leaderboard grouping. They live here so that
-    ``hydra.utils.instantiate(model_cfg.model_params)`` validates them at load time — they
-    are present in every ``conf/model/*.yaml`` file under ``model_params``.
+    leaderboard grouping. They live here so that constructing the config from a model YAML's
+    ``model_params`` validates them at load time — they are present in every
+    ``conf/model/*.yaml`` file under ``model_params``.
 
     ``experiment_name`` is the per-experiment key (set to the MLflow experiment name at
     registration and stored in the saved config); it is stamped onto every ``PowerForecast``
