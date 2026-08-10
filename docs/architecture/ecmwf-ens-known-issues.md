@@ -32,11 +32,11 @@ nothing behind it, and a scattered grid-point null in an instantaneous variable 
 reaches the gate at all. One kind of cell is exempt: a cell fed by a single grid point, where that
 point *is* the cell and one null is still fatal; the V1 grid has 10 such cells out of 1671.
 
-`categorical_precipitation_type_surface` cannot be averaged, so it reaches the same rule by a
-different route: its cell takes whichever category covers the most of the cell's area, and points
-that supplied no category are excluded from that ranking rather than competing in it. So it too is
-null only when *no* point supplied a value, and a null there is fatal for any `init_time` after
-2024-11-12.
+`categorical_precipitation_type_surface` reaches the same rule by a different route, since a
+category cannot be averaged: its cell takes whichever category covers the most of the cell's area,
+and points that supplied no category are excluded from that ranking rather than competing in it. So
+it too is null only when *no* point supplied a value, and a null there is fatal for any `init_time`
+after 2024-11-12.
 
 ## Spatial aggregation is where a grid point's null is resolved
 
@@ -58,14 +58,17 @@ of clean data, so it leaves the provenance guarantees of
 [principle 9](../design-philosophy/design-principles.md#9-provenance-travels-with-the-forecast-data)
 intact. Nothing is fabricated from another time step, another run or another cell.
 
-`categorical_precipitation_type_surface` cannot be averaged, so it gets the same treatment by a
-different route: the `proportion` weights are summed per category and the category covering most
-of the cell's area wins, with the lowest category code breaking an exact tie. Points that supplied
-no category are excluded from that ranking rather than competing in it — the distinction matters,
+`categorical_precipitation_type_surface` cannot be averaged, so the `proportion` weights are summed
+per category and the category covering most of the cell's area wins. Points that supplied no
+category are excluded from that ranking rather than competing in it — the distinction matters,
 because a mode that counts null as a candidate value nulls a cell whenever the missing points
-outnumber each surviving category, which is a far weaker condition than losing the cell. The
-tie-break is arbitrary but deterministic, and it has to be: a cell split evenly between two
-categories is ordinary geometry, and an order-dependent answer would drift with Polars' internals.
+outnumber each surviving category, which is a far weaker condition than losing the cell.
+
+An exact tie is broken on the lowest category code. That is arbitrary, but it has to be
+deterministic: ties are reachable, because two grid points in one cell can carry identical
+`proportion` weights — 185 of the V1 grid's 1671 cells contain such a pair — and an order-dependent
+answer would drift with Polars' internals. Be aware which way the bias runs: code 0 is "no
+precipitation", so a tied cell leans dry.
 
 The renormalisation is worth most where the corruption is scattered rather than blocky, which is
 exactly the shape the de-accumulated variables take. Dividing by 1.0 lets a single bad point null

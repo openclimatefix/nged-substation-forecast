@@ -549,6 +549,39 @@ def test_convert_weights_the_categorical_variable_by_area(
     assert df["categorical_precipitation_type_surface"].item() == 1
 
 
+def test_convert_weights_the_categorical_variable_within_each_cell_separately(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """Each cell ranks categories by *its own* area, not by area across the whole grid.
+
+    The per-category weight is a window over ``(h3_index, variable)``. Dropping ``h3_index`` from
+    those keys turns it into a grid-wide total, so every cell reports whichever category covers
+    most of GB — and no single-cell test can see the difference. Here cell 10 is 0.6 category 1 to
+    0.4 category 5, so it must report 1, while cell 20 is wholly category 5. A grid-wide weight
+    would give category 5 a total of 1.4 against category 1's 0.6 and flip cell 10.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0, -0.75, -0.5),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={
+            "categorical_precipitation_type_surface": np.array([[1.0, 5.0, 5.0]], dtype=np.float32)
+        },
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 10, 20],
+        nwp_lat=[52.0, 52.0, 52.0],
+        nwp_lon=[-1.0, -0.75, -0.5],
+        proportion=[0.6, 0.4, 1.0],
+    )
+
+    df = convert(ds=ds, h3_grid=h3).sort("h3_index")
+
+    assert df["categorical_precipitation_type_surface"].to_list() == [1, 5]
+
+
 def test_convert_does_not_let_missing_points_win_the_categorical_vote(
     make_ens_dataset: Callable[..., xr.Dataset],
     make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
@@ -612,7 +645,9 @@ def test_convert_breaks_a_categorical_tie_deterministically(
         proportion=[0.5, 0.5],
     )
 
-    # The higher code is listed first, so a first-wins implementation would return 5.
+    # The higher code is listed first, which an order-preserving implementation would return. An
+    # unweighted mode is not even that: its answer for this input is unspecified, so the assertion
+    # pins the documented tie-break rather than discriminating against any particular wrong one.
     assert convert(ds=ds, h3_grid=h3)["categorical_precipitation_type_surface"].item() == 1
 
 

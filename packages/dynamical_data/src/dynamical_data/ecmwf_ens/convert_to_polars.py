@@ -156,10 +156,13 @@ def _aggregate_grid_points_to_h3_cells(
     A categorical variable cannot be averaged, so its cell takes the category covering the most of
     the cell's area: the `proportion` weights are summed per category and the heaviest wins, with
     the lowest category code breaking an exact tie. That tie-break is arbitrary but deterministic,
-    which matters because ties are reachable — a cell split evenly between two categories is
-    ordinary geometry — and an order-dependent answer would vary with Polars' internals. Points
-    that supplied no category are excluded from the ranking rather than competing in it, so the
-    cell is null only when *no* point supplied one, matching the numeric rule above.
+    which matters because ties are reachable — two grid points in one cell can carry identical
+    `proportion` weights, which happens for 185 of the V1 grid's 1671 cells — and an
+    order-dependent answer would vary with Polars' internals. Note the direction of the bias it
+    introduces: **ties resolve to the lowest category code, and code 0 is "no precipitation", so an
+    evenly-split cell leans dry.** Points that supplied no category are excluded from the ranking
+    rather than competing in it, so the cell is null only when *no* point supplied one, matching
+    the numeric rule above.
 
     Renormalising each variable over *its own* contributing weight is what makes a variable's
     corruption cost only that variable, but it does mean two variables in one cell can end up
