@@ -1,9 +1,9 @@
 # Testing
 
 How the test suite is wired up, the house style for writing tests, and the notable test suites
-that guard tricky invariants. Two testing *gotchas* are documented alongside the other gotchas in
-CLAUDE.md rather than here: the moto S3 backend being process-global (reset it per test), and Polars
-row counts wrapping past 2³² rows.
+that guard tricky invariants. One testing gotcha lives elsewhere because it is not really about
+tests: Polars row counts wrapping past 2³² rows, in
+[Performance and Scale](performance.md#the-other-hard-ceiling-polars-32-bit-row-index).
 
 ## Where tests and their dependencies live
 
@@ -50,6 +50,14 @@ row counts wrapping past 2³² rows.
   (`monkeypatch.setattr(some_module, "open", fake_open)`) through the built-in fixture. For S3,
   drive the in-process `moto` server instead of mocking — `tests/test_s3_data_paths.py` is the
   canonical pattern.
+- **Reset the moto S3 backend per test.** The in-process `moto` server keeps its bucket contents
+  in a **process-global backend that outlives the `ThreadedMotoServer` object**, so a
+  module-scoped server does not hand each test a clean slate. A test whose write path runs twice
+  against that server — a re-run, or state left behind by an earlier test — reads stale data: an
+  appended Delta table returns double the rows, and an `object_exists` precondition sees a
+  leftover parquet. Keep the *server* module-scoped for speed, but give each test a
+  **function-scoped** fixture that `POST`s to `/moto-api/reset` and recreates the bucket before
+  the test body runs, so every test starts pristine and independent of execution order.
 - **Take the `dagster_instance` fixture; never call `DagsterInstance.ephemeral()` in a test.** The
   fixture (in `tests/conftest.py`) enters the instance as a context manager, so `dispose()` runs
   when the test ends.
