@@ -735,10 +735,10 @@ as nulls, which is why the lead-0 convention holds and why that function's docst
 about it. The "leave them un-imputed" position is therefore true of leading nulls and false of
 interior ones, and nobody chose that split — it fell out of an upsampling implementation.
 
-**How much is left to fill is smaller than it used to be, and the remainder is the blocky half.**
-The ingest aggregates the 0.25° grid onto H3 cells and renormalises each cell over the grid points
-that arrived, so the scattered per-pixel corruption mostly never becomes a null that this
-interpolation could reach. What still arrives as an interior null is a whole
+**What is left to fill is the blocky half, and not much of it.** The ingest aggregates the 0.25°
+grid onto H3 cells and renormalises each cell over the grid points that arrived, so the scattered
+per-pixel corruption mostly never becomes a null that this interpolation could reach. What still
+arrives as an interior null is a whole
 `(ensemble_member, valid_time)` slice, or a cell whose every grid point went missing at once. That
 narrows this item in two ways worth knowing before starting it: the fill it is bounding is the
 long-span, blocky one, which is the case where an unbounded bridge is *least* defensible; and the

@@ -105,8 +105,9 @@ def test_instantaneous_null_beyond_lead0_is_fatal(instantaneous_var: str) -> Non
 
 @pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
 def test_scattered_deaccumulated_null_beyond_lead0_is_tolerated(deaccumulated_var: str) -> None:
-    """Scattered per-pixel nulls in a de-accumulated variable (the 2026-07-12 / #722 class) are
-    tolerated at ingest and surfaced by the quality assessor, not failed."""
+    """Scattered null *cells* in a de-accumulated variable (the 2026-07-12 / #722 class, as it
+    survives the H3 aggregation) are tolerated at ingest and surfaced by the quality assessor,
+    not failed."""
     valid_value = _valid_value(deaccumulated_var)
     df = _nwp_slice(
         overrides={deaccumulated_var: [valid_value, None, valid_value]}

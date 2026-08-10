@@ -448,7 +448,10 @@ def test_convert_rejects_a_run_with_a_wholly_uncovered_cell(
         proportion=[1.0, 1.0],
     )
 
-    with pytest.raises(DataFrameValidationError):
+    # Match on "missing value" specifically: an implementation that let the empty cell through as
+    # NaN rather than null would also raise here, but as an out-of-bounds error, which is not the
+    # behaviour this test is for.
+    with pytest.raises(DataFrameValidationError, match="missing value"):
         convert(ds=ds, h3_grid=h3)
 
 

@@ -350,8 +350,9 @@ class Nwp(pt.Model):
 
         Every smaller null pattern is *tolerated* and reported by :func:`assess_nwp_quality`
         instead, because the run it would otherwise discard is overwhelmingly good. That covers
-        both the scattered per-pixel corruption known upstream and the occasional whole slice that
-        arrives empty — a run can carry 2 wholly-null slices out of one variable's 4284 (51 members
+        both the occasional whole slice that arrives empty and the cells where the upstream
+        per-pixel corruption took out every contributing grid point — a run can carry 2 wholly-null
+        slices out of one variable's 4284 (51 members
         × 84 steps beyond lead-0) and still be worth the other 4282, plus the twelve variables that
         arrived complete.
 
@@ -363,8 +364,10 @@ class Nwp(pt.Model):
         neighbouring steps, so the model sees a fabricated value rather than a null. The real
         argument is narrower — a tolerated slice is a small, isolated part of one member's
         trajectory, and bridging it (6 hours in the 3-hourly part of the horizon, 12 in the
-        6-hourly part, since the fill spans the steps *either side* of the missing one) is the same
-        treatment the scattered corruption already receives.
+        6-hourly part, since the fill spans the steps *either side* of the missing one) is a
+        tolerable approximation. Note that it is a poorer one than the *spatial* fill the H3
+        aggregation applies to the scattered corruption, which stays inside one hexagon at one
+        step.
 
         The judgement is made per `init_time`, so a run whose column is empty is caught even inside
         a frame holding other, healthy runs. There is no tunable fraction here — the test is that

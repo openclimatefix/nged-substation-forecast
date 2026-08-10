@@ -28,7 +28,9 @@ differ because a cell is the area-weighted mean of the ~2.9 grid points that ove
 [the next section](#spatial-aggregation-is-where-a-grid-points-null-is-resolved). A cell is null
 only when *no* grid point contributed a value to it, since a null at one of its points is absorbed
 by the others. So "any null is fatal" is a statement about a cell with nothing behind it, and a
-scattered grid-point null in an instantaneous variable never reaches the gate at all.
+scattered grid-point null in an instantaneous variable usually never reaches the gate at all. The
+exception is a cell fed by a single grid point, where that point *is* the cell and one null is
+still fatal; the V1 grid has 10 such cells out of 1671.
 
 ## Spatial aggregation is where a grid point's null is resolved
 
@@ -51,8 +53,8 @@ intact. Nothing is fabricated from another time step, another run or another cel
 
 The renormalisation is worth most where the corruption is scattered rather than blocky, which is
 exactly the shape the de-accumulated variables take. Dividing by 1.0 lets a single bad point null
-its whole cell, and because a grid point feeds ~4 cells, that *amplifies* the corruption on its way
-in.
+its whole cell, and because a grid point feeds 4.92 cells on average, that *amplifies* the
+corruption on its way in.
 
 Measured on 2025-06-04 00Z — the worst run in the archive by this measure — where 0.014% of
 `precipitation_surface`'s grid points and 0.009% of
@@ -139,12 +141,14 @@ Two null patterns *do* fail ingest:
     renormalisation described [above](#spatial-aggregation-is-where-a-grid-points-null-is-resolved).
     A blocky failure like 2026-07-14's is caught exactly as before — the whole grid is gone, so
     every cell is empty — while a *scattered* grid-point null in an instantaneous variable is
-    absorbed by the cell's other points and never becomes fatal. That is a deliberate trade rather
-    than an oversight: an instantaneous variable's nulls have only ever arrived as whole-step
-    dropouts, and losing an entire run over one bad pixel is the outage
+    absorbed by the cell's other points, unless it lands on one of the 10 single-point cells, which
+    have no others. That is a deliberate trade rather than an oversight: an instantaneous
+    variable's nulls have only ever arrived as whole-step dropouts, and losing an entire run over
+    one bad pixel is the outage
     [principle 7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary)'s
     granularity clause exists to prevent. What it costs is a detector, and that cost is real:
-    scattered corruption in a variable that should never carry any is no longer visible at ingest.
+    scattered corruption in a variable that should never carry any is now mostly invisible at
+    ingest.
 
 - **A de-accumulated variable null in *every* slice beyond lead-0 of a run** — the column is absent
   rather than degraded, so `Nwp._check_no_wholly_missing_deaccumulated_variable` raises
@@ -214,10 +218,11 @@ A dropped *grid point* is not covered by this check either, and is worth knowing
 is handled by the aggregation rather than by any check. A point the H3 grid weights name but the
 source dataset does not carry misses the left join, and is then excluded from its cell's
 contributing weight exactly as an upstream null is — so the cell is renormalised over whatever else
-feeds it, and only a cell that loses *every* one of its points comes out null. That null is fatal
-for the instantaneous variables, so a wholly-dropped point costs the whole partition and shows up
-as a missed run, which is a blunt response to a small cause: relaxing it to a warning and an absent
-row is tracked in
+feeds it, and only a cell that loses *every* one of its points comes out null. That takes either a
+dropped point feeding one of the 10 single-point cells, or enough neighbouring points dropping
+together, which is what a whole missing coordinate slice would look like. The resulting null is
+fatal for the instantaneous variables, so it costs the whole partition and shows up as a missed
+run — a blunt response to a small cause. Relaxing it to a warning and an absent row is tracked in
 [issue #478](https://github.com/openclimatefix/nged-substation-forecast/issues/478).
 
 ### Where the expected shape comes from

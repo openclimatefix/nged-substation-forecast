@@ -379,8 +379,10 @@ def _nwp_quality_check_result(report: NwpQualityReport) -> AssetCheckResult:
         metadata={
             "n_null_cells": report.n_null_cells,
             "n_affected_slices": report.n_affected_slices,
-            # Broken out because the two mean different things: scatter is the steady-state #722
-            # corruption, whereas wholly-null slices are a field that arrived missing.
+            # Broken out because the two mean different things, and because this is the one the
+            # report measures well: a wholly-null slice reaches the cells intact however they are
+            # aggregated, whereas the scattered remainder is whatever upstream corruption happened
+            # to take out every grid point of a cell.
             "n_whole_null_slices": report.n_whole_null_slices,
             "affected_variables": list(report.affected_variables),
             "affected_slices": _nwp_null_slices_metadata(report.affected),
