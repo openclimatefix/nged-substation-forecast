@@ -89,8 +89,9 @@ Full description and a "which place do I use?" table: `docs/documentation-guide.
 - **`docs/design-philosophy/engineering-hypotheses.md`** holds the falsifiable claims the
   engineering is meant to deliver. Cite them by label (`H1`, `T1.2`); labels are append-only —
   never renumber.
-- **`plans/`** holds at most one file: the in-flight PR's mechanical checklist, deleted on
-  merge. Usually empty.
+- **`plans/`** holds at most one file: the in-flight branch's implementation plan, written by the
+  `plan-issue` skill before any code is touched and deleted on merge. One worktree per branch is
+  what keeps it to one file, so parallel sessions never collide. Usually empty on `main`.
 
 **Creating GitHub issues** — whenever you create an issue, also set:
 
@@ -145,6 +146,12 @@ must also:
 
 When dispatching a sub-agent (or a fresh Claude Code/Desktop session) to solve a GitHub issue in
 this repo, give it these steps up front — a report back after step 1 is not finished work:
+
+This routine starts from an **approved plan**. The `plan-issue` skill
+(`.claude/skills/plan-issue/`, invoked as `/plan-issue <N>`) is how you get one: it reads the
+issue, decides whether it is worth implementing at all, writes `plans/<branch-name>.md`, has a
+fresh sub-agent adversarially review the plan, and stops for Jack. It also does step 1 below, so
+when it hands over, the worktree and branch already exist and implementation resumes at step 2.
 
 1. **Set up an isolated worktree** so concurrent sessions don't collide:
 
@@ -620,6 +627,9 @@ The project is a new, green-field project. No one else is using this code yet. W
   all the downstream code.)
 - Our aim is to make the code well-organised and easy to use.
 - None of this code is "written in stone" or battle-tested.
+- We haven't trained any "serious" ML models yet, so a change that invalidates an existing trained
+  model or its saved config costs us a retrain, not a migration path. Don't design for backwards
+  compatibility with models we've already trained.
 - If you see a design mistake _anywhere_ in the code, then please flag that design mistake to me.
   I'd much rather end up with a project that's well engineered. (That said, if we're working on
   feature X, and you spot a mistake in some code that isn't obviously in scope for X, then please
