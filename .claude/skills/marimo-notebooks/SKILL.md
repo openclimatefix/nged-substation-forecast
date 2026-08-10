@@ -1,13 +1,15 @@
 ---
 name: marimo-notebooks
 description: >-
-  Three authoring rules for this repo's Marimo notebooks (`packages/dashboard/*.py`,
-  `packages/notebooks/*.py`), each reversing a normal Python habit: a leading underscore makes a
-  name cell-local, so cross-cell helpers must be public; every import belongs in `with app.setup:`
-  or ruff stops seeing it; and `ruff check --fix` must never be run over a notebook, because an
-  autofix can insert an import outside `app.setup` and break it while reporting success. Load
-  before creating or editing a Marimo notebook, or when one fails with a `NameError` on a helper
-  or an import that looks present.
+  Authoring rules for this repo's Marimo notebooks (`packages/dashboard/*.py`,
+  `packages/notebooks/*.py`), most of them reversing a normal Python habit: a leading underscore
+  makes a name cell-local, so cross-cell helpers must be public; every import belongs in `with
+  app.setup:` or ruff stops seeing it; `ruff check --fix` must never be run over a notebook,
+  because an autofix can insert an import outside `app.setup` and break it while reporting
+  success; and a helper belongs in the `@app.function` form marimo itself writes. Load before
+  creating or editing a Marimo notebook, when one fails with a `NameError` on a helper or an
+  import that looks present, or when the `check-marimo-notebooks` hook reports a cell referencing
+  a name no cell defines.
 ---
 
 # Authoring Marimo notebooks
@@ -47,3 +49,21 @@ does it, and ruff has no per-file fixability setting to prevent it (`unfixable` 
 The pre-commit hook is split so notebooks are checked but never auto-fixed; a bare `uv run ruff
 check . --fix` typed by hand is *not* covered, so after running one, check `git diff` for an
 import that landed above `import marimo` and move it into `app.setup`.
+
+`marimo check --fix` does not rescue a notebook in that state either: it deletes the module-level
+import and rewrites the cell that used the name as `def _(name)`, which leaves the name as a cell
+input nothing defines — broken in a second way.
+
+Both shapes are caught by `scripts/check_marimo_notebooks.py`, which runs as a pre-commit hook over
+changed notebooks and over every notebook from `tests/test_marimo_notebooks.py`. So a mistake here
+fails the commit or CI rather than surviving to whoever next opens the notebook. What it catches
+and what it cannot:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#marimo-notebooks-bind-every-name-their-cells-reference>
+
+## Let `marimo check --fix` settle a notebook's shape before committing
+
+A helper hand-written inside an `@app.cell` gets rewritten to a top-level `@app.function` the next
+time marimo saves the notebook, so committing the hand-written form buys a large diff for no
+change. Write helpers — and any `test_*` function exercising them — in the `@app.function` form,
+or run `marimo check --fix` before committing. `packages/notebooks/plot_missing_NWP_data.py` is
+the worked example.

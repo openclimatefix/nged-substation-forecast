@@ -166,6 +166,15 @@ series with `last_seen` and `hours_late`. A warning therefore never stops foreca
 produced; it tells you which feed to chase. A handful of persistently-late series is usually a
 decommissioned or renamed substation rather than an outage — check the roster before escalating.
 
+One description means something different from all the others. `Could not evaluate power-data
+freshness: …` is the check reporting that it could not read its own inputs — suspect the object
+store, or a `metadata.parquet` left half-written by a killed process — not that the feed has
+stalled. The named exception is in the description, the full traceback is in the run's logs, and
+the exception is also sent to Sentry tagged `asset_check:power_data_is_fresh`, so this one reaches
+you without your watching the Checks view. The check degrades this way on purpose rather than
+raising, so the hourly ingest keeps running; nothing is known about staleness while it persists, so
+treat it as "unknown", not "healthy".
+
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from
 the frame already in memory, and is likewise non-blocking WARN. Nulls in the three de-accumulated
 variables are *expected* and are not a fault — see
