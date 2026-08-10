@@ -1,30 +1,18 @@
 """Check that every name a marimo notebook's cells reference is bound inside the notebook.
 
-Marimo never executes a notebook's module-level statements: it rebuilds the notebook from the
-`with app.setup:` block plus the `@app.cell` functions. A name bound at module level is therefore
-invisible to every cell, and the notebook dies with a `NameError` the next time it is opened —
-while `ruff`, `ty` and `pytest` all report success, because the file they were handed is perfectly
-valid Python.
+Marimo never executes a notebook's module-level statements, so a name bound there is invisible to
+every cell and the notebook dies with a `NameError` the next time it is opened — while ruff, ty and
+pytest all pass, because the file they were handed is valid Python. `ruff check --fix` and
+`marimo check --fix` each produce that shape from a working notebook. Full rationale, and what this
+check can and cannot catch:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#marimo-notebooks-bind-every-name-their-cells-reference>
 
-Two tools turn a working notebook into exactly that shape:
-
-- `ruff check --fix` writes an import that an autofix needs into the file's *top-level* import
-  block (`UP017` and `UP035` today, and any future fix that reaches for `itertools`). The
-  pre-commit hooks are split so notebooks are never auto-fixed, but a hand-typed
-  `uv run ruff check . --fix` is not covered by that split.
-- `marimo check --fix` deletes such an import and rewrites the cell that used the name as
-  `def _(name)`, which leaves the name as a cell input that nothing defines.
-
-This script catches both, and a cell input left dangling by hand. It is a *static* name-binding
-check: it reads `Cell.refs` and `Cell.defs` — marimo's documented public API for the names a cell
-reads and the names it binds — without executing a single cell, so it needs none of the notebooks'
-runtime dependencies. It cannot catch a notebook that binds every name and still fails inside a
-Polars or Altair call.
-
-Loading a notebook *without* executing it needs `marimo._ast`, which is private API. So that a
-marimo release cannot quietly downgrade this check to a no-op, `unbound_cells` raises whenever a
-file does not parse into at least one cell, and `tests/test_marimo_notebooks.py` keeps a positive
-control that fails if the check ever stops detecting a real breakage.
+`Cell.refs` and `Cell.defs` are public marimo API; loading a notebook without running it is not, so
+this reads `marimo._ast`. Attaching line numbers costs a second private entry point
+(`get_notebook_status`) on top of `load_app` — worth it for a hook whose output should be
+clickable, but it is the first thing to drop if keeping up with marimo gets expensive. Nothing here
+may fail quietly: every way of not reaching an answer raises, and `tests/test_marimo_notebooks.py`
+keeps a positive control that fails if this stops detecting a real breakage.
 """
 
 import builtins
@@ -37,8 +25,13 @@ from marimo._ast.app import InternalApp
 from marimo._ast.load import get_notebook_status, load_app
 from marimo._ast.parse import MarimoFileError, NonMarimoPythonScriptError
 
-BUILTIN_NAMES: Final[frozenset[str]] = frozenset(dir(builtins))
-"""Names a cell may reference without any cell defining them."""
+ALWAYS_BOUND: Final[frozenset[str]] = frozenset(dir(builtins)) | {"__file__"}
+"""Names a cell may reference without any cell defining them.
+
+`__file__` is not a builtin: marimo injects it into the cell globals itself (`_runtime.runtime`
+sets it from the notebook's filename), so a cell locating a data file relative to the notebook is
+correct code and must not be flagged.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +50,7 @@ def unbound_cells(path: Path) -> list[UnboundCell]:
 
     A name counts as bound if any cell defines it — cell order is irrelevant, because marimo
     derives execution order from the dependency graph rather than from position in the file — or
-    if it is a Python builtin.
+    if it is in `ALWAYS_BOUND`.
 
     Args:
         path: Path to a marimo notebook.
@@ -65,27 +58,27 @@ def unbound_cells(path: Path) -> list[UnboundCell]:
     Raises:
         MarimoFileError: if `path` is not a marimo notebook.
         NonMarimoPythonScriptError: if `path` is an ordinary Python script.
-        ValueError: if `path` parses into no cells at all, or if marimo's two views of the
-            notebook disagree about how many cells it has. Either means the private API this
-            check rides on has moved, and is raised rather than reported as "no findings" so that
-            the check fails loudly instead of silently passing everything.
+        ValueError: if the notebook cannot be checked in full — it holds no marimo app, it holds a
+            cell marimo cannot compile, or marimo's two views of it disagree about how many cells
+            it has (which would mean the private API this rides on has moved). Raised rather than
+            reported as "no findings", so that the check cannot degrade into passing everything.
     """
     app = load_app(str(path))
     load_result = get_notebook_status(str(path))
     if app is None or load_result.notebook is None:
-        raise ValueError(f"{path}: holds no marimo app — expected a notebook.")
-    cell_data = list(InternalApp(app).cell_manager.cell_data())
+        raise ValueError(f"not a usable marimo notebook (marimo status: {load_result.status})")
+    compiled = list(InternalApp(app).cell_manager.cell_data())
     serialized = load_result.notebook.cells
-    if not cell_data:
-        raise ValueError(f"{path}: parsed into zero marimo cells.")
-    if len(cell_data) != len(serialized):
+    if len(compiled) != len(serialized):
         raise ValueError(
-            f"{path}: marimo reports {len(cell_data)} compiled cells but {len(serialized)} "
-            "serialized ones, so cells can no longer be matched to line numbers."
+            f"marimo reports {len(compiled)} compiled cells but {len(serialized)} serialized "
+            "ones, so cells can no longer be matched to line numbers"
         )
-    # `cell` is None for a cell marimo could not compile; those carry no refs or defs to check.
-    cells = [(source.lineno, data.cell) for data, source in zip(cell_data, serialized, strict=True)]
-    defined = BUILTIN_NAMES.union(*(cell.defs for _, cell in cells if cell is not None))
+    cells = [(source.lineno, data.cell) for data, source in zip(compiled, serialized, strict=True)]
+    for lineno, cell in cells:
+        if cell is None:
+            raise ValueError(f"marimo cannot compile the cell at line {lineno}")
+    defined = ALWAYS_BOUND.union(*(cell.defs for _, cell in cells if cell is not None))
     return [
         UnboundCell(lineno, tuple(sorted(cell.refs - defined)))
         for lineno, cell in cells
@@ -94,18 +87,17 @@ def unbound_cells(path: Path) -> list[UnboundCell]:
 
 
 def _check_file(path: Path) -> list[str]:
-    """Return one human-readable finding per unbound-name cell in the notebook at `path`."""
+    """Return one human-readable finding per unbound-name cell in the notebook at `path`.
+
+    A file that cannot be checked at all is itself a finding, rather than a raised exception, so
+    that one bad path cannot hide the findings for the others the hook was given.
+    """
     try:
         unbound = unbound_cells(path)
     except (MarimoFileError, NonMarimoPythonScriptError) as error:
-        return [
-            (
-                f"{path}: not a marimo notebook ({error}). Every `.py` file directly inside "
-                "`packages/notebooks/` or `packages/dashboard/` is taken to be one, both here and "
-                "by the `ruff check --fix` exclusion in .pre-commit-config.yaml — so an ordinary "
-                "module put there would silently stop being auto-fixed."
-            )
-        ]
+        return [f"{path}: not a marimo notebook: {error}"]
+    except (OSError, SyntaxError, ValueError) as error:
+        return [f"{path}: cannot be checked: {error}"]
     return [
         f"{path}:{cell.lineno}: cell references name(s) that no cell defines: "
         f"{', '.join(cell.names)}"
@@ -115,10 +107,12 @@ def _check_file(path: Path) -> list[str]:
 
 def main(argv: list[str]) -> int:
     """Check each marimo notebook path in `argv`; return the process exit code."""
-    findings = [finding for arg in argv for finding in _check_file(Path(arg))]
-    for finding in findings:
-        print(finding)
-    return 1 if findings else 0
+    found = False
+    for arg in argv:
+        for finding in _check_file(Path(arg)):
+            print(finding)
+            found = True
+    return 1 if found else 0
 
 
 if __name__ == "__main__":

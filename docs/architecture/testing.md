@@ -261,11 +261,16 @@ references that no cell binds. It runs as a pre-commit hook over changed noteboo
   which files must never be auto-fixed.
 
 Testing what a notebook's cells actually *do* is a separate job, and
-`packages/notebooks/plot_missing_NWP_data.py` is the worked example: it keeps its chart-building
-helper in its own cell and a cell of `test_*` functions that exercises it on a synthetic frame.
-marimo runs those in cell scope — the same scope the notebook really runs in, and the reason they
-would catch a misplaced import that an ordinary `import` of the notebook module would not. Naming
-the notebook in `python_files` is what makes a plain `uv run pytest` collect it.
+`packages/notebooks/plot_missing_NWP_data.py` is the worked example. Its chart-building helper is
+an `@app.function` — marimo's form for a function that closes over nothing but the setup cell — so
+it is an ordinary function that a `test_*` function in the same notebook exercises on a synthetic
+frame. Naming the notebook in `python_files` is what makes a plain `uv run pytest` collect it.
+
+Write the helper and its test in that `@app.function` form, and let `marimo check --fix` settle
+the file's shape before committing: a helper hand-written inside an `@app.cell` gets rewritten to
+the same thing the next time marimo saves the notebook, which is a large diff for no change. This
+test tells you the chart still computes what it should; it is not a second line of defence for
+name binding, which is the checker's job.
 
 ## Assertion style for Patito frames
 

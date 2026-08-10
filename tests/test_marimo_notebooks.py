@@ -2,8 +2,9 @@
 
 The check itself lives in `scripts/check_marimo_notebooks.py`, which is also a pre-commit hook;
 its module docstring explains what the failure looks like and which tools produce it. These tests
-run it over every notebook in the repo, and — because it rides on private marimo API — keep two
-positive controls that fail if a marimo release ever stops it detecting a real breakage.
+run it over every notebook in the repo, and — because it rides on private marimo API — keep hand-
+written notebooks either side of the line: two that it must flag, so a marimo release cannot
+quietly turn it into a no-op, and one correct notebook that it must not.
 """
 
 import importlib.util
@@ -51,6 +52,27 @@ if __name__ == "__main__":
 """
 """A notebook broken exactly as `ruff check --fix` breaks one, held as a string rather than as a
 file under `tests/data/` so that ruff never sees a deliberately-broken notebook to "fix"."""
+
+DUNDER_FILE_NOTEBOOK: Final[str] = """import marimo
+
+__generated_with = "0.23.16"
+app = marimo.App()
+
+with app.setup:
+    import pathlib
+
+
+@app.cell
+def _():
+    print(pathlib.Path(__file__).name)
+    return
+
+
+if __name__ == "__main__":
+    app.run()
+"""
+"""A correct notebook that locates itself. `__file__` is not a builtin — marimo injects it into
+the cell globals — so it is the one name that would otherwise look unbound in working code."""
 
 
 def _load_checker() -> ModuleType:
@@ -122,9 +144,8 @@ def test_checker_rejects_a_file_that_is_not_a_notebook(tmp_path: Path):
     assert "not a marimo notebook" in result.stdout
 
 
-def test_checker_passes_over_every_notebook_at_once():
-    # Covers the hook's own invocation: exit code 0 and nothing printed when all is well.
-    result = _run_checker(*_notebooks())
+def test_checker_allows_a_cell_to_reference_dunder_file(tmp_path: Path):
+    notebook = tmp_path / "locates_itself.py"
+    notebook.write_text(DUNDER_FILE_NOTEBOOK)
 
-    assert result.returncode == 0, result.stdout
-    assert not result.stdout
+    assert not CHECKER.unbound_cells(notebook)

@@ -45,10 +45,9 @@ repos:
         types: [python]
         files: *marimo_notebooks
       # The hooks above never auto-fix a notebook, but a hand-typed `uv run ruff check . --fix`
-      # still can, and `marimo check --fix` leaves the same shape behind by a different route. So
-      # every commit that touches a notebook also checks that each name its cells reference is
-      # bound by some cell — the breakage those fixes cause, and the one thing ruff, ty and
-      # pytest all miss. `tests/test_marimo_notebooks.py` runs the same check over every notebook.
+      # still can, and `marimo check --fix` leaves the same breakage behind by another route. So
+      # every commit that touches a notebook also checks its cells bind every name they reference
+      # — see the script's docstring. `tests/test_marimo_notebooks.py` runs the same check in CI.
       - id: check-marimo-notebooks
         name: marimo notebooks (no unbound names)
         entry: uv run python scripts/check_marimo_notebooks.py

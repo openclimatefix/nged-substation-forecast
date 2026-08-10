@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.6"
+__generated_with = "0.23.16"
 app = marimo.App()
 
 with app.setup:
@@ -39,86 +39,83 @@ def _():
     return (nwp_vars,)
 
 
-@app.cell
-def _():
-    def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
-        """Chart where `nwp_vars` is missing, one row per ensemble member.
+@app.function
+def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
+    """Chart where `nwp_vars` is missing, one row per ensemble member.
 
-        Args:
-            df: Lazy scan of the NWP Delta table.
-            target_init_time: The single NWP run to plot.
-            target_h3_index: The single H3 cell to plot.
-            nwp_vars: The NWP variable name (or list of names) to plot.
-        """
-        # 1. Filter down to the specific init_time and h3_index
-        filtered = df.filter(
-            (pl.col("init_time") == target_init_time) & (pl.col("h3_index") == target_h3_index)
+    Args:
+        df: Lazy scan of the NWP Delta table.
+        target_init_time: The single NWP run to plot.
+        target_h3_index: The single H3 cell to plot.
+        nwp_vars: The NWP variable name (or list of names) to plot.
+    """
+    # 1. Filter down to the specific init_time and h3_index
+    filtered = df.filter(
+        (pl.col("init_time") == target_init_time) & (pl.col("h3_index") == target_h3_index)
+    )
+
+    # 2. Unpivot (melt) the data so we can plot all variables on a single Y-axis
+    melted = filtered.unpivot(
+        on=nwp_vars,
+        index=["valid_time", "ensemble_member"],
+        variable_name="variable",
+        value_name="value",
+    )
+
+    # 3. Create a boolean flag for missing data and a combined label for the Y-axis. Altair
+    # only accepts materialised data, so collect once the filter has cut the scan down to a
+    # single NWP run and a single H3 cell.
+    plot_df = melted.with_columns(
+        # Check for both database Nulls and float NaNs
+        is_missing=pl.col("value").is_null() | pl.col("value").is_nan(),
+        # Create a string like "temperature_2m (Member 0)":
+        # row_label=(
+        #     pl.col("variable") + " (Member " + pl.col("ensemble_member").cast(pl.Utf8) + ")"
+        # ),
+        row_label=pl.col("ensemble_member"),
+    ).collect()
+
+    # 5. Build the Altair Chart
+    base = alt.Chart(plot_df).encode(
+        y=alt.Y("row_label:N", title="Ensemble Member", sort="ascending")
+    )
+
+    # Layer 1: A light gray background line showing the full time series extent
+    background_line = base.mark_line(color=GRID, strokeWidth=1)
+    background_lines = background_line.encode(  # ty: ignore[unresolved-attribute]
+        x=alt.X("valid_time:T", title="Valid Time"),
+        detail="row_label:N",  # Ensures lines don't connect across different rows
+    )
+
+    # Layer 2: Red ticks superimposed exactly where the data is missing
+    missing_marks = (
+        base.transform_filter(alt.datum.is_missing)
+        .mark_tick(
+            color=ORANGE_RED,
+            thickness=3,  # Make the red mark stand out
+            size=12,  # Height of the tick mark
         )
+        .encode(x="valid_time:T")  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
+    )
 
-        # 2. Unpivot (melt) the data so we can plot all variables on a single Y-axis
-        melted = filtered.unpivot(
-            on=nwp_vars,
-            index=["valid_time", "ensemble_member"],
-            variable_name="variable",
-            value_name="value",
+    # Combine the layers and configure the chart size
+    return (
+        (background_lines + missing_marks)
+        .properties(
+            title=(
+                f"Missing NWP Data | init_time: {target_init_time.strftime('%Y-%m-%d')}"
+                f" | {nwp_vars} | H3: {target_h3_index}"
+            ),
+            width=800,
+            # Dynamically scales chart height based on the number of rows
+            height=alt.Step(10),
         )
-
-        # 3. Create a boolean flag for missing data and a combined label for the Y-axis. Altair
-        # only accepts materialised data, so collect once the filter has cut the scan down to a
-        # single NWP run and a single H3 cell.
-        plot_df = melted.with_columns(
-            # Check for both database Nulls and float NaNs
-            is_missing=pl.col("value").is_null() | pl.col("value").is_nan(),
-            # Create a string like "temperature_2m (Member 0)":
-            # row_label=(
-            #     pl.col("variable") + " (Member " + pl.col("ensemble_member").cast(pl.Utf8) + ")"
-            # ),
-            row_label=pl.col("ensemble_member"),
-        ).collect()
-
-        # 5. Build the Altair Chart
-        base = alt.Chart(plot_df).encode(
-            y=alt.Y("row_label:N", title="Ensemble Member", sort="ascending")
-        )
-
-        # Layer 1: A light gray background line showing the full time series extent
-        background_line = base.mark_line(color=GRID, strokeWidth=1)
-        background_lines = background_line.encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("valid_time:T", title="Valid Time"),
-            detail="row_label:N",  # Ensures lines don't connect across different rows
-        )
-
-        # Layer 2: Red ticks superimposed exactly where the data is missing
-        missing_marks = (
-            base.transform_filter(alt.datum.is_missing)
-            .mark_tick(
-                color=ORANGE_RED,
-                thickness=3,  # Make the red mark stand out
-                size=12,  # Height of the tick mark
-            )
-            .encode(x="valid_time:T")  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
-        )
-
-        # Combine the layers and configure the chart size
-        return (
-            (background_lines + missing_marks)
-            .properties(
-                title=(
-                    f"Missing NWP Data | init_time: {target_init_time.strftime('%Y-%m-%d')}"
-                    f" | {nwp_vars} | H3: {target_h3_index}"
-                ),
-                width=800,
-                # Dynamically scales chart height based on the number of rows
-                height=alt.Step(10),
-            )
-            .configure_axis(labelFontSize=11, titleFontSize=13)
-        )
-
-    return (plot_null_distribution,)
+        .configure_axis(labelFontSize=11, titleFontSize=13)
+    )
 
 
 @app.cell
-def _(df, nwp_vars, plot_null_distribution):
+def _(df, nwp_vars):
     chart = plot_null_distribution(
         df,
         target_init_time=datetime(2026, 5, 1, tzinfo=UTC),
@@ -129,33 +126,36 @@ def _(df, nwp_vars, plot_null_distribution):
     return
 
 
-@app.cell
-def _(plot_null_distribution):
-    def test_plot_null_distribution_flags_nulls_and_nans():
-        init_time = datetime(2026, 5, 1, tzinfo=UTC)
-        h3_index = 599148110664433663
-        readings = pl.LazyFrame(
-            {
-                "init_time": [init_time] * 4,
-                "valid_time": [datetime(2026, 5, 1, hour=h, tzinfo=UTC) for h in range(4)],
-                "ensemble_member": [0, 0, 0, 0],
-                "h3_index": [h3_index] * 4,
-                "temperature_2m": pl.Series([1.0, None, float("nan"), 4.0], dtype=pl.Float32),
-            }
-        )
+@app.function
+def test_plot_null_distribution_flags_nulls_and_nans():
+    init_time = datetime(2026, 5, 1, tzinfo=UTC)
+    other_init_time = datetime(2026, 5, 2, tzinfo=UTC)
+    h3_index = 599148110664433663
+    other_h3_index = 599148110664433662
+    # The last two readings are missing too, but belong to another NWP run and another H3 cell, so
+    # the filter must drop them rather than plot them.
+    readings = pl.LazyFrame(
+        {
+            "init_time": [init_time] * 4 + [other_init_time, init_time],
+            "valid_time": [datetime(2026, 5, 1, hour=h, tzinfo=UTC) for h in range(6)],
+            "ensemble_member": [0, 0, 0, 0, 0, 0],
+            "h3_index": [h3_index] * 5 + [other_h3_index],
+            "temperature_2m": pl.Series(
+                [1.0, None, float("nan"), 4.0, None, None], dtype=pl.Float32
+            ),
+        }
+    )
 
-        chart = plot_null_distribution(
-            readings,
-            target_init_time=init_time,
-            target_h3_index=h3_index,
-            nwp_vars="temperature_2m",
-        )
+    chart = plot_null_distribution(
+        readings,
+        target_init_time=init_time,
+        target_h3_index=h3_index,
+        nwp_vars="temperature_2m",
+    )
 
-        # Altair inlines the chart's data as its single named dataset.
-        (rows,) = chart.to_dict()["datasets"].values()
-        assert [row["is_missing"] for row in rows] == [False, True, True, False]
-
-    return
+    # Altair inlines the chart's data as its single named dataset.
+    (rows,) = chart.to_dict()["datasets"].values()
+    assert [row["is_missing"] for row in rows] == [False, True, True, False]
 
 
 if __name__ == "__main__":
