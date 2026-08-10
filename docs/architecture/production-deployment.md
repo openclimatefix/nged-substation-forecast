@@ -81,6 +81,20 @@ The severity is a warning rather than a failure: a stalled feed is expected to s
 NGED recovers (the pipeline back-fills the gap automatically), so it must not block downstream
 assets.
 
+Nothing the check's **body** does can fail its own step. It runs as a step of the hooked
+`power_time_series_and_metadata_job`, and Dagster fails a run whose check step *errors* however
+non-blocking that check is — so an object-store error, a half-written `metadata.parquet` or a bug
+in the check itself would otherwise fail the hourly production run and page, turning fail-open into
+fail-closed at exactly the wrong moment. The whole body therefore sits under a catch-all that logs
+the traceback and returns an unhealthy result naming the fault. It catches `BaseException` and
+re-raises only cancellation, because a Rust panic in any of the pyo3 extensions the check reads
+through (Polars, delta-rs, obstore) does not derive from `Exception`, and each of those extensions
+compiles a `PanicException` class of its own — so listing the classes to catch could never stay
+complete, while the list of classes that must propagate can. (Dagster's own machinery — resource
+init, and serialising the returned result into an event — is still outside the guard.) The
+degradation still reaches Sentry, via
+[`report_check_degradation`](#send-telemetry-to-sentry-and-alarm-on-absence).
+
 This in-Dagster check is complementary to — not a replacement for — the
 [missed-check-in alarm](#send-telemetry-to-sentry-and-alarm-on-absence). The alarm fires on total
 silence from *outside* the deployment, because a dead daemon cannot report itself; this check
@@ -125,10 +139,15 @@ freshest run" deadline is 14 hours rather than the publication time, is in
 Two design points follow the `power_data_is_fresh` pattern deliberately. The check is **WARN** and
 **non-blocking**, like every other check in the repo — a degraded slot is still the best forecast
 we have, and blocking would contradict the principle that a partition fails only when there is
-genuinely no useful data. And it **cannot raise**: every read is guarded, and the whole body sits
-under a catch-all that logs the traceback and returns an unhealthy result, because a raise inside a
-warning path would trip `live_forecasts_job`'s failure hook and turn fail-open into fail-closed at
-exactly the wrong moment.
+genuinely no useful data. And its whole body sits under the same **catch-all**, so it cannot fail
+its own step and trip `live_forecasts_job`'s failure hook.
+
+Beyond that shared pattern, this check salvages more before falling back on it: an absent
+`power_forecasts` or NWP table reads as empty, and an absent *or unreadable* promoted-model
+`meta.json` degrades to "population unknown", so the rest of the report survives. (A read *error*
+on either table still costs the whole report.) `power_data_is_fresh` deliberately salvages
+nothing — its only per-read fallback would be "roster unknown", which a fresh power table would
+then render as a green tick over a corrupt roster.
 
 The check covers the slots where the asset *succeeded*. A slot whose asset raised never reaches it —
 Dagster does not run a check whose asset op failed — and that case is already loud, so nothing is
@@ -151,6 +170,13 @@ is configured — so laptops and CI stay silent by default.
   hook is attached to the three *scheduled* asset jobs, so it covers the whole unattended production
   workload; because log capture is off, failures in a manual UI materialisation, a replay backfill,
   or an experiment job are watched by the operator at the Dagster UI, not routed to Sentry.
+
+    One production fault the hook cannot see is a standalone `@asset_check` that caught its own
+    exception instead of failing the run — which, by design, is both of them. (The two NWP checks
+    are computed inside the `ecmwf_ens` asset and have no catch-all, so a raise there does fail the
+    run and the hook does see it.) `report_check_degradation` covers exactly that gap: each check's
+    catch-all sends the same exception the hook would have sent, tagged `asset_check` with the
+    check's name. Since log capture is off, the handler's `ERROR` log alone would reach nobody.
 
 - **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
   `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron
@@ -176,9 +202,9 @@ is configured — so laptops and CI stay silent by default.
   capped — the message to a short leading slice with an `…and N more` line, the context to a larger
   slice — so a whole-feed stall at V2 scale can't attach thousands of rows; the true late count is
   always carried by the `n_late` tag, so a capped list never makes a large stall look small. Sending
-  is best-effort: `report_power_freshness` never raises, so a Sentry hiccup can't fail the
-  `blocking=False` check (which, inside the hooked hourly job, would otherwise trip the failure hook
-  and fail the run).
+  is best-effort: `report_power_freshness` never raises, so a Sentry hiccup costs no more than its
+  own event. Were it to raise, the check's catch-all would swallow it and discard the whole
+  freshness evaluation with it — every late series, in the very hour they went late.
 
   Freshness is a *two-way* state (stale ↔ recovered) modelled with a *one-way* primitive: a warning
   event has no "resolved" counterpart. So **recovery is signalled by the events stopping** — the

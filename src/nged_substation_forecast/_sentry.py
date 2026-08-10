@@ -5,7 +5,9 @@ Sentry configuration:
 
 - **Error telemetry** — :func:`init_sentry` initialises the SDK once per process (a no-op unless
   ``Settings.sentry_dsn`` is set), and the :data:`sentry_capture_failure` Dagster failure hook
-  reports the real exception (with traceback) from inside the run worker. The hook is used rather
+  reports the real exception (with traceback) from inside the run worker.
+  :func:`report_check_degradation` covers a production fault the hook cannot see, because it never
+  fails a run: a standalone ``@asset_check`` that caught its own exception. The hook is used rather
   than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry` explicitly
   disables — because Dagster logs a step failure without ``exc_info``, so the log-based path would
   yield a message-only event with no stack trace, *and* would fire for every ``ERROR`` log anywhere
@@ -93,9 +95,10 @@ def init_sentry(settings: Settings) -> None:
     ``ERROR``), so ``ERROR``-level log records no longer become Sentry events. Without this, every
     ``ERROR`` log anywhere in the process — Dagster's startup/step logs, ad-hoc materialisations,
     even the swallowed telemetry error in :func:`report_power_freshness` — would be shipped as an
-    event, defeating the design where *only* the failure hook and the explicit freshness
-    ``capture_message`` reach Sentry. Breadcrumbs (the integration's default ``level=INFO``) are
-    kept, so log context still rides along with the events the two intended paths do send.
+    event, defeating the design where *only* the three explicit senders reach Sentry: the failure
+    hook, the freshness ``capture_message``, and :func:`report_check_degradation`. Breadcrumbs (the
+    integration's default ``level=INFO``) are kept, so log context still rides along with the
+    events those senders do send.
 
     Args:
         settings: The project settings carrying the Sentry DSN, environment, and sample rate.
@@ -125,6 +128,37 @@ def sentry_capture_failure(context: HookContext) -> None:
     exception = context.op_exception
     if exception is not None:
         sentry_sdk.capture_exception(exception)
+
+
+def report_check_degradation(check_name: str, exc: BaseException) -> None:
+    """Report an asset check that could not evaluate its own inputs, as a Sentry error event.
+
+    Both of this function's callers — the standalone ``@asset_check``s ``power_data_is_fresh`` and
+    ``live_forecasts_are_healthy`` — catch everything rather than raising (rule 7 of
+    [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)),
+    so the run no longer fails and :data:`sentry_capture_failure` no longer fires. Without this,
+    a check that cannot read its own inputs would show up only as a yellow tick in Dagster's Checks
+    view — and ``power_time_series_and_metadata_job`` has no cron monitor to notice the silence, so
+    nobody would be told. Sending the same exception the failure hook used to send restores the
+    signal without restoring the failure.
+
+    A no-op when Sentry is uninitialised (empty DSN), like every other path here, and never raises:
+    it is called from inside a check's own ``except`` handler, where a raise would escape the guard
+    and fail the run outright — the very thing the handler exists to prevent.
+
+    Args:
+        check_name: The Dagster asset-check name, attached as a tag so events can be filtered per
+            check. Set on an isolated scope so it cannot leak into later unrelated events.
+        exc: The exception the check degraded on.
+    """
+    try:
+        with sentry_sdk.new_scope() as scope:
+            scope.set_tag("asset_check", check_name)
+            sentry_sdk.capture_exception(exc)
+    except Exception:
+        # Same reasoning as report_power_freshness: telemetry is best-effort, but a genuine bug in
+        # here must still be visible, so log at ERROR with the traceback rather than swallowing.
+        logger.exception(f"Failed to report the degraded {check_name} check to Sentry")
 
 
 def send_forecast_checkin(
@@ -196,8 +230,10 @@ def report_power_freshness(settings: Settings, result: "PowerFreshnessResult") -
     Sends a single ``warning``-level event fingerprinted per environment; the hourly re-reports of
     an ongoing stall collapse into one issue, and recovery is signalled by the events stopping (a
     warning event has no "resolved" counterpart — the operator resolves the issue). Never raises:
-    telemetry must not fail the ``blocking=False`` freshness check, which — inside the hooked
-    ``power_time_series_and_metadata_job`` — would otherwise trip the failure hook and fail the run.
+    ``power_data_is_fresh`` calls this from inside its own catch-all, so a raise here would not
+    fail the run but would cost the *whole* freshness report — every late series, in the very hour
+    they went late — by degrading the check to "could not evaluate". Guarding here keeps a
+    telemetry hiccup from taking the evaluation down with it.
 
     Args:
         settings: The project settings carrying the Sentry DSN and environment.

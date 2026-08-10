@@ -30,12 +30,23 @@ old depending on the slot, so any absolute age threshold would fire on two slots
 The full argument is in
 [Inherent Stability → Three audiences, three channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
 
-Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and
-``live_forecasts_are_healthy`` additionally cannot raise — every read it makes is guarded and its
-whole body sits under a
-catch-all — because a warning path that fails would turn fail-open into fail-closed at exactly the
-wrong moment (rule 7 of
+Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and nothing either one's *body*
+does can fail its own step: each sits under a catch-all which logs the traceback, reports the
+exception to Sentry (the run no longer fails, so the failure hook no longer fires) and returns an
+unhealthy result. Catching ``BaseException`` is what makes that absolute — a Rust panic in any of
+the pyo3 extensions these bodies read through arrives as a ``PanicException``, which does not
+derive from ``Exception``. Only cancellation is re-raised, which is what we want: a cancelled run
+should cancel. What remains outside the guard is Dagster's own machinery: resource init, and
+serialising the returned ``AssetCheckResult`` into an event. A warning path that could fail would
+turn fail-open into fail-closed at exactly the wrong moment (rule 7 of
 [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+
+The two differ in how much they salvage short of that catch-all. In ``live_forecasts_are_healthy``
+an absent ``power_forecasts`` or NWP table reads as empty, and an absent *or unreadable*
+promoted-model ``meta.json`` degrades to "population unknown", so the rest of the report survives;
+a read *error* on either table still costs the whole report. ``power_data_is_fresh`` salvages
+nothing below the catch-all on purpose: its only per-read fallback would be "roster unknown", and a
+fresh power table would then render an unreadable roster as a green tick.
 """
 
 import json
@@ -55,6 +66,7 @@ from dagster import (
     AssetCheckExecutionContext,
     AssetCheckResult,
     AssetCheckSeverity,
+    DagsterExecutionInterruptedError,
     MetadataValue,
     TableColumn,
     TableRecord,
@@ -63,7 +75,7 @@ from dagster import (
 )
 from nged_data.storage import time_series_coverage
 
-from nged_substation_forecast._sentry import report_power_freshness
+from nged_substation_forecast._sentry import report_check_degradation, report_power_freshness
 from nged_substation_forecast.defs.assets import power_time_series_and_metadata
 from nged_substation_forecast.defs.production_assets import (
     LIVE_FORECAST_HORIZON,
@@ -259,6 +271,28 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
     )
 
 
+def _check_power_data_freshness() -> AssetCheckResult:
+    """Read the power table's recency off disk and judge it.
+
+    Split out from the check itself so the check's ``except`` wraps the whole body.
+    """
+    settings = Settings()
+    storage_options = settings.storage_options
+    coverage = time_series_coverage(settings.power_time_series_data_path, storage_options)
+    roster_ids = _read_roster_ids(settings.metadata_path, storage_options)
+    result = evaluate_power_freshness(
+        coverage=coverage,
+        roster_ids=roster_ids,
+        now=datetime.now(UTC),
+        threshold=_POWER_DATA_STALENESS_THRESHOLD,
+    )
+    # Forward per-series staleness to Sentry (a no-op unless a DSN is set and some series is late).
+    # Best-effort: report_power_freshness never raises, so a telemetry hiccup costs no more than
+    # its own event — were it to raise, the caller's catch-all would discard this whole evaluation.
+    report_power_freshness(settings, result)
+    return _to_asset_check_result(result)
+
+
 @asset_check(
     asset=power_time_series_and_metadata,
     blocking=False,
@@ -273,21 +307,34 @@ def power_data_is_fresh() -> AssetCheckResult:
     Runs automatically alongside every ``power_time_series_and_metadata`` materialisation (hourly
     via ``power_time_series_and_metadata_schedule``), so the check re-evaluates freshness each
     hour regardless of whether new data landed.
+
+    Cannot fail its own step: the whole body is guarded, so an object-store error, a half-written
+    ``metadata.parquet`` or a bug in here degrades to an unhealthy result rather than failing the
+    hourly production run. (A merely *slow* object store makes a slow check, not a degraded one —
+    nothing here imposes a step-level timeout.)
     """
-    settings = Settings()
-    storage_options = settings.storage_options
-    coverage = time_series_coverage(settings.power_time_series_data_path, storage_options)
-    roster_ids = _read_roster_ids(settings.metadata_path, storage_options)
-    result = evaluate_power_freshness(
-        coverage=coverage,
-        roster_ids=roster_ids,
-        now=datetime.now(UTC),
-        threshold=_POWER_DATA_STALENESS_THRESHOLD,
-    )
-    # Forward per-series staleness to Sentry (a no-op unless a DSN is set and some series is late).
-    # Best-effort: report_power_freshness never raises, so a telemetry hiccup can't fail this check.
-    report_power_freshness(settings, result)
-    return _to_asset_check_result(result)
+    try:
+        return _check_power_data_freshness()
+    except BaseException as exc:
+        # `BaseException`, not `Exception`: a Rust panic surfaces as a pyo3 `PanicException`, which
+        # derives from `BaseException`, and each compiled extension this body reads through (polars,
+        # delta-rs, obstore) defines its own class — so there is no one name to catch. Naming what
+        # must propagate instead is the only version that stays true as dependencies come and go.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        # The width has one cost worth knowing when writing tests: pytest's `fail` and `skip` raise
+        # from `BaseException` too, so they are swallowed here. Never use one as a "must not be
+        # called" sentinel inside this body; assert after the call instead.
+        # Rule 7: a non-blocking check that *errors* still fails its run, and this job carries the
+        # `sentry_capture_failure` hook, so a raise here would turn fail-open into fail-closed.
+        # Sentry is told explicitly because not failing the run means that hook no longer fires.
+        logger.exception("Could not evaluate power-data freshness")
+        report_check_degradation("power_data_is_fresh", exc)
+        return AssetCheckResult(
+            passed=False,
+            severity=AssetCheckSeverity.WARN,
+            description=f"Could not evaluate power-data freshness: {exc!r}",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -847,13 +894,14 @@ def live_forecasts_are_healthy(context: AssetCheckExecutionContext) -> AssetChec
     """
     try:
         return _evaluate_live_forecasts(context)
-    except Exception as exc:
-        # Catch-all is deliberate. A warning path must never be able to fail the thing it warns
-        # about: this check is non-blocking, but it runs inside `live_forecasts_job`, whose
-        # `sentry_capture_failure` hook would turn a raise here into a failed production run —
-        # fail-open silently becoming fail-closed. Logged at ERROR with the traceback (never a
-        # silent swallow) and surfaced as an unhealthy check, so a bug in here stays visible.
+    except BaseException as exc:
+        # The same guard as `power_data_is_fresh`, for the same reason — see the comment there for
+        # why it catches `BaseException`, what that costs when writing tests, and rule 7 for why a
+        # warning path may never raise.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
         logger.exception("Could not evaluate live-forecast health")
+        report_check_degradation("live_forecasts_are_healthy", exc)
         return AssetCheckResult(
             passed=False,
             severity=AssetCheckSeverity.WARN,
