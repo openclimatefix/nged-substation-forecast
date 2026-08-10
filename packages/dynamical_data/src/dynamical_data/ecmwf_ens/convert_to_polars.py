@@ -21,6 +21,13 @@ _CONTRIBUTING_WEIGHT_SUFFIX: Final[str] = "__contributing_weight"
 These columns are intermediate: they are dropped before the aggregated frame is returned.
 """
 
+_CATEGORY_WEIGHT_SUFFIX: Final[str] = "__category_weight"
+"""Suffix of the per-category area weight the H3 aggregation ranks a categorical variable by.
+
+These columns are intermediate: they exist only on the pre-`group_by` frame, so they never reach
+the aggregated output.
+"""
+
 
 def convert_nwp_xarray_dataset_to_polars_dataframe(
     ds: xr.Dataset,
@@ -146,6 +153,14 @@ def _aggregate_grid_points_to_h3_cells(
     every downstream check. Nulling it is what makes the failure visible — see
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
 
+    A categorical variable cannot be averaged, so its cell takes the category covering the most of
+    the cell's area: the `proportion` weights are summed per category and the heaviest wins, with
+    the lowest category code breaking an exact tie. That tie-break is arbitrary but deterministic,
+    which matters because ties are reachable — a cell split evenly between two categories is
+    ordinary geometry — and an order-dependent answer would vary with Polars' internals. Points
+    that supplied no category are excluded from the ranking rather than competing in it, so the
+    cell is null only when *no* point supplied one, matching the numeric rule above.
+
     Renormalising each variable over *its own* contributing weight is what makes a variable's
     corruption cost only that variable, but it does mean two variables in one cell can end up
     averaged over different sub-areas of the hexagon. That matters only for `wind_u_*`/`wind_v_*`,
@@ -158,7 +173,7 @@ def _aggregate_grid_points_to_h3_cells(
         joined: The H3 grid weights left-joined onto one chunk's NWP grid values. NaN must already
             have been normalised to null, since the contributing weight is computed from nullness.
         numeric_vars: Weather variables aggregated as a renormalised weighted mean.
-        categorical_vars: Weather variables aggregated by mode.
+        categorical_vars: Weather variables aggregated as an area-weighted mode.
     """
     contributing_weights = [
         pl.col("proportion")
@@ -167,13 +182,34 @@ def _aggregate_grid_points_to_h3_cells(
         .alias(var + _CONTRIBUTING_WEIGHT_SUFFIX)
         for var in numeric_vars
     ]
+    # Total area each category covers within the cell. Null where the category itself is null, so
+    # that `nulls_last` below drops missing points out of the running rather than letting them win.
+    category_weights = [
+        pl.when(pl.col(var).is_not_null())
+        .then(pl.col("proportion").sum().over(["h3_index", var]))
+        .otherwise(None)
+        .alias(var + _CATEGORY_WEIGHT_SUFFIX)
+        for var in categorical_vars
+    ]
+    # Heaviest category wins; the lowest category code breaks an exact tie.
+    weighted_modes = [
+        pl.col(var)
+        .sort_by(
+            pl.col(var + _CATEGORY_WEIGHT_SUFFIX),
+            pl.col(var),
+            descending=[True, False],
+            nulls_last=True,
+        )
+        .first()
+        for var in categorical_vars
+    ]
     return (
-        joined.with_columns(pl.col(numeric_vars) * pl.col("proportion"))
+        joined.with_columns(pl.col(numeric_vars) * pl.col("proportion"), *category_weights)
         .group_by("h3_index")
         .agg(
             pl.col(numeric_vars).sum(),
             *contributing_weights,
-            pl.col(categorical_vars).mode().first(ignore_nulls=True),
+            *weighted_modes,
         )
         .with_columns(
             **{

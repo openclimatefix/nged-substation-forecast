@@ -490,10 +490,10 @@ def test_convert_categorical_precipitation_type(
     make_ens_dataset: Callable[..., xr.Dataset],
     make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
 ) -> None:
-    # One H3 cell fed by five grid points whose categories are [null, 1, 2, 2, 3]. The aggregation
-    # (mode().first(ignore_nulls=True)) must return the dominant category 2 — which is neither the
-    # min (1), the max (3), nor a value the null could corrupt. A NaN input becomes a null category
-    # that must be ignored, not counted or forbidden by validation.
+    # One H3 cell fed by five equally-weighted grid points whose categories are [null, 1, 2, 2, 3].
+    # The area-weighted mode must return the dominant category 2 — which is neither the min (1),
+    # the max (3), nor a value the null could corrupt. A NaN input becomes a null category that is
+    # excluded from the ranking, not counted and not forbidden by validation.
     ds = make_ens_dataset(
         latitudes=(52.0,),
         longitudes=(-1.0, -0.75, -0.5, -0.25, 0.0),
@@ -517,6 +517,150 @@ def test_convert_categorical_precipitation_type(
     assert df.height == 1
     assert df["categorical_precipitation_type_surface"].dtype == pl.UInt8
     assert df["categorical_precipitation_type_surface"].item() == 2
+
+
+def test_convert_weights_the_categorical_variable_by_area(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """The category covering most of the cell wins, not the one held by the most grid points.
+
+    One dominant point at 0.9 says category 1; two slivers at 0.05 each agree on category 5. An
+    unweighted mode reports 5, so the cell claims snow because a tenth of its area is snowy.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0, -0.75, -0.5),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={
+            "categorical_precipitation_type_surface": np.array([[1.0, 5.0, 5.0]], dtype=np.float32)
+        },
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 10, 10],
+        nwp_lat=[52.0, 52.0, 52.0],
+        nwp_lon=[-1.0, -0.75, -0.5],
+        proportion=[0.9, 0.05, 0.05],
+    )
+
+    df = convert(ds=ds, h3_grid=h3)
+
+    assert df["categorical_precipitation_type_surface"].item() == 1
+
+
+def test_convert_does_not_let_missing_points_win_the_categorical_vote(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """A cell keeps its category when most of its points are missing but one supplied a value.
+
+    Polars' ``mode()`` counts null as a candidate, so nulls that strictly outnumber every real
+    value make the cell null even though data arrived — and that null is fatal for any
+    ``init_time`` after 2024-11-12. Missing points must be excluded from the ranking instead.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0, -0.75, -0.5),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={
+            "categorical_precipitation_type_surface": np.array(
+                [[float("nan"), float("nan"), 7.0]], dtype=np.float32
+            )
+        },
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 10, 10],
+        nwp_lat=[52.0, 52.0, 52.0],
+        nwp_lon=[-1.0, -0.75, -0.5],
+        proportion=[0.4, 0.35, 0.25],
+    )
+
+    df = convert(ds=ds, h3_grid=h3)
+
+    # The single surviving point carries the least area of the three, so this cannot pass by the
+    # weighting alone — the two nulls have to be out of the running entirely.
+    assert df["categorical_precipitation_type_surface"].item() == 7
+
+
+def test_convert_breaks_a_categorical_tie_deterministically(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """Two categories covering exactly half the cell each resolve to the lower category code.
+
+    An evenly-split cell is ordinary geometry, and an unweighted ``mode().first()`` returns
+    whichever value Polars happens to emit first — unspecified, and not necessarily stable across
+    versions. This is a **regression guard, not a proof**: the old implementation cannot be made to
+    fail it reliably, precisely because its answer was unspecified rather than wrong. What this
+    pins is that the documented tie-break is the one actually implemented.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0, -0.75),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={
+            "categorical_precipitation_type_surface": np.array([[5.0, 1.0]], dtype=np.float32)
+        },
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 10],
+        nwp_lat=[52.0, 52.0],
+        nwp_lon=[-1.0, -0.75],
+        proportion=[0.5, 0.5],
+    )
+
+    # The higher code is listed first, so a first-wins implementation would return 5.
+    assert convert(ds=ds, h3_grid=h3)["categorical_precipitation_type_surface"].item() == 1
+
+
+def test_aggregation_nulls_the_categorical_variable_only_when_no_point_supplied_one(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """A cell whose every point lacks a category is null, matching the numeric rule.
+
+    Asserted on the aggregation, because ``convert`` would reject this frame at the ``Nwp``
+    boundary for an ``init_time`` after 2024-11-12 rather than returning it. This is a **regression
+    guard**: the old implementation nulled this cell too, for the wrong reason. It is here because
+    excluding missing points from the ranking must not go so far that a cell with nothing behind it
+    acquires a category.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0, -0.75),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={
+            "categorical_precipitation_type_surface": np.array(
+                [[float("nan"), float("nan")]], dtype=np.float32
+            )
+        },
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 10],
+        nwp_lat=[52.0, 52.0],
+        nwp_lon=[-1.0, -0.75],
+        proportion=[0.5, 0.5],
+    )
+    lat_grid, lon_grid = np.meshgrid(
+        ds.latitude.values.astype(np.float32),
+        ds.longitude.values.astype(np.float32),
+        indexing="ij",
+    )
+
+    aggregated = _process_chunk_for_1_lead_time_and_1_ens_member(
+        ds=ds.isel(lead_time=0, ensemble_member=0),
+        h3_grid=h3,
+        lat_grid=lat_grid.ravel(),
+        lon_grid=lon_grid.ravel(),
+    )
+
+    assert aggregated["categorical_precipitation_type_surface"].item() is None
+    # The numeric variables arrived, so this is not merely "the whole cell is empty".
+    assert aggregated["temperature_2m"].item() == pytest.approx(15.0)
 
 
 def test_full_pipeline_open_download_convert(
