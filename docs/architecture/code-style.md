@@ -132,8 +132,8 @@ stricter type exists — a genuinely heterogeneous or open-ended dict stays `dic
   modulo 2³² with **no error**. Use the Delta log instead — `DeltaTable(path).count()`, or sum
   `num_records` over `get_add_actions(flatten=True)` — both metadata-only and exact. Value
   aggregations (`sum`, `min`/`max`, quantiles) are unaffected, and so are filtered queries whose
-  *result* stays under the cap. NWP (~5.9B rows) is past it today; `power_forecasts` will be at V2
-  scale. Full analysis:
+  *result* stays under the cap. NWP (~5.9B rows) is past it today; `power_forecasts` will pass it
+  at V2 scale. Full analysis:
   [The other hard ceiling](performance.md#the-other-hard-ceiling-polars-32-bit-row-index).
 - **Persistence**: Prefer partitioned Parquet files for tabular data.
 
@@ -191,9 +191,9 @@ confusing failure:
 - Leverage Sentry for observability in production-like code.
 - Validate data at boundaries using data contracts.
 
-In production code the rule is stronger and is set out in full on the
-[Inherent stability](../design-philosophy/inherent-stability.md) page: never raise because an input
-is absent or stale — degrade, widen the uncertainty bands, and record the degradation on the row.
+Production code is bound by a stronger rule about *when* to raise at all, summarised in
+`CLAUDE.md` and set out in full on the
+[Inherent stability](../design-philosophy/inherent-stability.md) page.
 
 ## Testing
 

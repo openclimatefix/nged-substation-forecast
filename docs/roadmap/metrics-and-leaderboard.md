@@ -346,8 +346,8 @@ only skill floor the NWP ensemble must clear at long horizons.
 
 **Cross-cutting.** (1) **Issue hygiene:** create one tracked sub-issue per PR under epic
 [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) / #147 following the
-`github-issue-pr-workflow` issue-creation rules (labels, Type, OCF project fields, sub-issue
-ordering), *including* one for `nged_incumbent_holiday_aligned` so it survives #147 closing. (2) **Re-run recipe:** add a
+`github-issue-pr-workflow` skill's issue-creation rules (labels, Type, OCF project fields,
+sub-issue ordering), *including* one for `nged_incumbent_holiday_aligned` so it survives #147 closing. (2) **Re-run recipe:** add a
 short "Re-running CV for an experiment" subsection to `docs/ml_experimentation/dagster-workflow.md`
 describing the `trained_cv_model++` backfill, written only after the drill is verified end-to-end,
 and mentioning `PopulationFilter` for single-experiment scoring. (3) **MLflow re-logging** on a

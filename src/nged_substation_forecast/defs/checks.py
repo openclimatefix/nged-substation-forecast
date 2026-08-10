@@ -593,8 +593,7 @@ def _read_live_forecast_rows(
     then to the one ``power_fcst_init_time``, and every column is reduced to a scalar inside
     Polars, so only the aggregates cross back into Python. The ``pl.len()`` is safe from the
     32-bit row-count wraparound documented in ``docs/architecture/code-style.md``: it counts one
-    slot's rows (~1M at V1
-    scale, ~86M at V2), not the whole table.
+    slot's rows (~1M at V1 scale, ~86M at V2), not the whole table.
     """
     if not delta_table_exists(power_forecasts_path, storage_options):
         return _EMPTY_LIVE_FORECAST_ROWS

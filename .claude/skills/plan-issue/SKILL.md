@@ -110,8 +110,8 @@ The plan covers:
   code works *now* (CLAUDE.md, "Write about the present, not the past"). Include ship-time
   triage if this issue completes a roadmap item: promote surviving design decisions to their
   permanent home, delete the "Implementation details" section, update the roadmap status banner.
-- **Verification commands** — the green-before-push set from CLAUDE.md, plus anything this
-  change specifically needs (for example `uv run pytest --run-network -m network` for
+- **Verification commands** — the green-before-push set from the `implement-issue` skill, plus
+  anything this change specifically needs (for example `uv run pytest --run-network -m network` for
   convention-sensitive NWP conversion code, or `uv run mkdocs build --strict` *and reading the
   rendered HTML* for any change that touches links).
 - **Risks and open questions** — the things Jack should decide, stated as questions with your

@@ -4,12 +4,17 @@ description: >-
   Ways Python-Markdown (MkDocs' renderer) renders a page visibly wrong while `pymarkdown scan`
   and `mkdocs build --strict` both pass: nested sub-bullets need a full 4-space indent, a sibling
   list item needs a blank line after an indented continuation, and a wrapped link whose
-  continuation line starts with `#` becomes a heading. Load before editing any page under `docs/`
-  — especially nested lists, list items containing code blocks, or wrapped links — and when a
-  rendered page looks wrong but the linters are clean.
+  continuation line starts with `#` becomes a heading. Load before editing any markdown MkDocs
+  renders — `docs/` pages, README files, `SKILL.md` files, and Python docstrings — especially ones
+  with nested lists, list items containing code blocks, or wrapped links, and when a rendered page
+  looks wrong but the linters are clean.
 ---
 
 # Authoring markdown that MkDocs renders correctly
+
+This applies to everything Python-Markdown renders, not just `docs/` pages: README files, the
+`SKILL.md` files, and Python docstrings (linted by `scripts/lint_docstring_markdown.py` and
+rendered by mkdocstrings) all go through the same renderer.
 
 Python-Markdown is stricter and weirder than CommonMark in ways this repo's linters do not catch.
 The standing rule that follows: **any docs change that touches links or non-trivial lists should

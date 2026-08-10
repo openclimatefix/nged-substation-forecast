@@ -10,7 +10,7 @@ uv sync
 
 # Linting & formatting
 uv run ruff check .            # check
-uv run ruff check . --fix      # fix (never over a marimo notebook - see the Marimo section)
+uv run ruff check . --fix      # fix (never over a marimo notebook - see marimo-notebooks skill)
 uv run ruff format .           # format
 uv run ty check                # type checking
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md  # markdown lint
@@ -45,7 +45,7 @@ needed one, the mistake is already written.
 | Skill | Load it before… |
 |---|---|
 | `polars-patito-gotchas` | writing Polars/Patito code that joins, casts, filters a `pt.LazyFrame`, declares a Patito field, or reads/writes Delta |
-| `mkdocs-authoring` | editing any page under `docs/` — especially nested lists, list items containing code blocks, or wrapped links |
+| `mkdocs-authoring` | editing markdown MkDocs renders — `docs/`, READMEs, `SKILL.md`, docstrings — especially nested lists, list items with code blocks, or wrapped links |
 | `marimo-notebooks` | creating or editing a Marimo notebook (`packages/dashboard/*.py`, `packages/notebooks/*.py`) |
 | `ty-workarounds` | acting on a `ty` error in Altair chart code or numpy `.view()` code, or adding any `# ty: ignore` |
 | `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — writes a reviewed plan, no code |
