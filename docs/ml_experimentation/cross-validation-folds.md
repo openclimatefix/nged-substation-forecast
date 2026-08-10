@@ -65,11 +65,14 @@ per leaderboard epoch by the `eligible_time_series` asset.
 target protocol: an expanding training window with one **complete-year** validation fold per year
 (2022, 2023, 2024, 2025, …), validated on real forecast NWP throughout. Adding those folds starts
 a **new leaderboard epoch** (every experiment is re-scored against the new fold set), and is a
-`conf/cv/default.yaml` edit with no schema change.
+`conf/cv/default.yaml` edit with no schema change. That back-fill is not expected until
+**~November 2027** — after v1.0 — and covers 00Z initialisations only
+([reformatters#446](https://github.com/dynamical-org/reformatters/issues/446)).
 
-Separately, and later, we plan to **pre-train** on weather reanalysis (ERA5) so models can use the
-long power histories that some assets have back to 2020, then fine-tune on ECMWF ENS. Pre-training
-is a training-time technique, distinct from the validation folds described here.
+Because of that timescale, the plan for using the long power histories some assets have back to
+2020 is to **pre-train** on ERA5 reanalysis and fine-tune on ECMWF ENS. Pre-training is a
+training-time technique, distinct from the validation folds described here; the design is in
+[Extending the training history](../roadmap/training-history.md).
 
 ---
 
