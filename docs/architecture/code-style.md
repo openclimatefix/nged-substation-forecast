@@ -25,8 +25,22 @@
 - **Imports**: Sorted automatically by `ruff` (isort rules). `import pandas` is banned outright
   (`TID251`), not merely discouraged.
 - **Rule selection**: `[tool.ruff.lint] select` in `pyproject.toml` names the enabled families
-  explicitly rather than inheriting ruff's defaults, so a ruff upgrade cannot quietly change the
-  gate. Each declined rule is an `ignore` entry carrying its justification.
+  explicitly rather than inheriting ruff's defaults, so a `uv lock` refresh cannot quietly change
+  which rules the repo enforces. `select` names whole families; `ignore` names each family member
+  we decline, with the reason on the line above it. **When a rule fires somewhere it should not,
+  add an `ignore` entry (or a `per-file-ignores` entry) with its justification — do not drop the
+  whole family.** Ruff's defaults are not a superset of the old `E4`/`E7`/`E9`/`F` gate: of
+  pycodestyle-E they keep only `E722` and `E902`, which is why `E4`/`E7`/`E9` are listed
+  explicitly.
+- **Two traps when editing `[tool.ruff.lint.per-file-ignores]`**:
+
+    - **`*` crosses `/`.** A key of `packages/dashboard/*.py` also silences
+      `packages/dashboard/src/dashboard/*.py`. Name individual files when you mean "just the ones
+      in this directory"; `**/tests/**` is the right way to say "every tests directory, root
+      included".
+    - **A `# noqa` cannot live inside a docstring**, because it would become part of the string.
+      An over-long docstring line has to be reworded or re-wrapped, never suppressed.
+
 - **Naming**:
     - Variables/Functions: `snake_case`
     - Classes: `PascalCase`
@@ -38,7 +52,7 @@
 - **Lazy evaluation**: Use `pl.LazyFrame` throughout the pipeline. **Do not call `.collect()` before the model boundary.** See [Lazy evaluation strategy](performance.md#lazy-evaluation-strategy) for the full contract.
 - **Gridded/NWP Data**: Use **Xarray** and **Zarr**.
 - **Data Contracts**: Use **Patito** for defining and validating data schemas. Use Patito type annotations (`pt.DataFrame[MySchema]`, `pt.LazyFrame[MySchema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
-- **Patito friction budget**: CLAUDE.md documents four Patito-vs-Polars gotchas (cross-model LazyFrame joins, dict-`.cast` on model-bearing frames, `.filter()` dropping the Patito subclass, and Delta dictionary-encoded columns). Four workarounds is an acceptable price for schema validation — but if a fifth becomes necessary, revisit the approach: either validate only at I/O boundaries (typed annotations everywhere, `.validate()` only at persistence edges) or evaluate an alternative such as `dataframely`.
+- **Patito friction budget**: the `polars-patito-gotchas` skill documents five Patito gotchas (cross-model LazyFrame joins, dict-`.cast` on model-bearing frames, `ge`/`le` silently ignored on a datetime field, `.filter()` dropping the Patito subclass, and Delta dictionary-encoded columns). Five workarounds is an acceptable price for schema validation — but if a sixth becomes necessary, revisit the approach: either validate only at I/O boundaries (typed annotations everywhere, `.validate()` only at persistence edges) or evaluate an alternative such as `dataframely`.
 - **Persistence**: Prefer partitioned Parquet files for tabular data.
 
 ## Machine Learning (PyTorch)

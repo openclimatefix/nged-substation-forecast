@@ -8,7 +8,7 @@ description: >-
   review. Use this whenever Jack asks for a plan for an issue, says "plan issue N" or
   "/plan-issue N", asks whether an issue is worth doing, or asks you to think through how to
   implement an issue before touching code. Do not use it to implement an issue — that is the
-  "Sub-agent routine" in CLAUDE.md, which starts once a plan from this skill has been approved.
+  `implement-issue` skill, which starts once a plan from this skill has been approved.
 ---
 
 # Plan a GitHub issue
@@ -76,7 +76,7 @@ departing from and why.
 ## 3. Write the plan
 
 The plan is a committed file on the issue's own branch, so set up the worktree now rather than
-leaving it to implementation — this is step 1 of CLAUDE.md's "Sub-agent routine", pulled forward:
+leaving it to implementation — this is step 1 of the `implement-issue` skill, pulled forward:
 
 ```bash
 git worktree add .claude/worktrees/<branch-name> -b <branch-name>
@@ -156,6 +156,6 @@ Report to Jack: the verdict from step 2, a short summary of the plan, what the r
 what it found that you rejected. Give the branch name and the path to the plan file.
 
 **Do not write any code, and do not open a PR.** Once Jack approves the plan, implementation runs
-under CLAUDE.md's "Sub-agent routine", resuming at its step 2 in the worktree this skill already
+under the `implement-issue` skill, resuming at its step 2 in the worktree this skill already
 created — implement, verify, PR, a second and independent adversarial review of the *diff*,
 triage, stop.

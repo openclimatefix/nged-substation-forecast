@@ -6,7 +6,7 @@ description: >-
   reordering sub-issues within a parent, setting an issue's org-level Type, and setting a GitHub
   Projects (v2) field (Status/Project/Area) on an item. Use this skill whenever you're about to
   run one of those four operations for openclimatefix/nged-substation-forecast — e.g. when
-  CLAUDE.md's "Creating GitHub issues" section says to attach/position a sub-issue, set Type, or
+  the `github-issue-pr-workflow` skill says to attach/position a sub-issue, set Type, or
   set project fields, or whenever you'd otherwise reach for `gh api graphql` and aren't sure of
   the mutation name, its input fields, or how to obtain the node IDs it needs.
 ---

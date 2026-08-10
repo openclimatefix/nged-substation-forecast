@@ -90,9 +90,9 @@ def write_nwp(
 
     # Strip the Patito model before the dict-cast: `nwp_model_id` is declared `Enum` for
     # in-memory type safety, but delta-rs can't store `Enum`/`Categorical` (see the "Delta Lake
-    # dictionary-encoded columns" gotcha in CLAUDE.md). A dict-cast on a *model-bearing* frame
-    # would silently swallow the mapping and revert other columns to the model's declared dtypes
-    # instead — strip first so this is a plain-Polars cast.
+    # dictionary-encoded columns" gotcha in the `polars-patito-gotchas` skill). A dict-cast on a
+    # *model-bearing* frame would silently swallow the mapping and revert other columns to the
+    # model's declared dtypes instead — strip first so this is a plain-Polars cast.
     prepared = pl.DataFrame._from_pydf(rounded._df).cast({"nwp_model_id": pl.String}).to_arrow()
 
     write_deltalake(
