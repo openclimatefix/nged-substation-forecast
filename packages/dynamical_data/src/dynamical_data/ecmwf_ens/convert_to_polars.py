@@ -194,7 +194,9 @@ def _aggregate_grid_points_to_h3_cells(
         .alias(var + _CATEGORY_WEIGHT_SUFFIX)
         for var in categorical_vars
     ]
-    # Heaviest category wins; the lowest category code breaks an exact tie.
+    # The category covering the most of the cell's area wins. An exact tie goes to the lowest
+    # category code, which leans dry: code 0 is "no precipitation", so a cell split exactly between
+    # "no precipitation" and "snow" is recorded as "no precipitation".
     weighted_modes = [
         pl.col(var)
         .sort_by(
