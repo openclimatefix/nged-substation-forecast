@@ -10,14 +10,15 @@ Branch: `claude/plan-issue-510-c197dd`
 iterates the whole `late` frame with no cap, while all three sibling listings do cap —
 `_MAX_MISSING_SERIES_LISTED = 20` (checks.py:379), `MAX_LATE_SERIES_IN_CONTEXT = 50` and
 `MAX_LATE_SERIES_IN_MESSAGE = 20` (`_sentry.py:197`, `:204`). The uncapped one is also the only
-listing written to **durable** storage: in the AWS deployment Dagster's event log is Postgres,
-`pg_dump`ed to S3 nightly (`docs/live_service/aws.md`), so an uncapped table inflates the backup as
-well as the database.
+listing written to **durable** storage as a structured table: in the AWS deployment Dagster's event
+log is Postgres (`docs/live_service/aws.md:982-992`), `pg_dump`ed to S3 nightly (`:1273-1277`), so
+an uncapped table inflates the backup as well as the database.
 
-Scale of the waste, if a total feed stall persists at V2 (~2,500 series): one record serialises to
-roughly 110 bytes of JSON, so ~275 KB per hourly evaluation, ~6.6 MB/day, ~2.4 GB/year — versus
-~5.5 KB/hour with a 50-row cap. At V1 (32 series) the table is trivially small, which is why this is
-"before V2", not urgent.
+Scale of the waste, if a total feed stall persists at V2 (~2,500 series): one record serialises
+through Dagster's serdes to **143 bytes** — measured, and including the
+`{"__class__": "TableRecord", "data": {…}}` envelope — so ~349 KB per hourly evaluation, ~8.4
+MB/day, **~3.1 GB/year**, versus ~7 KB/hour and ~63 MB/year with a 50-row cap. At V1 (32 series) the
+table is trivially small, which is why this is "before V2", not urgent.
 
 The change is small and self-contained. It is the same rule the neighbours already follow, so it
 removes an inconsistency rather than adding a mechanism.
@@ -34,11 +35,24 @@ the point of the cap is to make the *unguarded* step small, not to guard it.
 ## Decision 1 — the cap is 50
 
 `_MAX_LATE_SERIES_IN_TABLE: Final[int] = 50`, matching `MAX_LATE_SERIES_IN_CONTEXT` rather than the
-two 20s. The two caps of 20 govern *at-a-glance prose* — a one-line check description and a Sentry
-issue title — where anything longer stops being readable. The Dagster table and the Sentry event
-context play the same role as each other: a structured payload the operator browses when drilling
-into a stall. Matching them means the operator sees the same leading 50 series in both places, which
-is one fewer thing to reconcile at 3pm on a bad day.
+two 20s.
+
+There is no clean precedent to follow, and the issue body's table is misleading on this point:
+it labels `_MAX_MISSING_SERIES_LISTED` as "the sibling check's description", but that one constant
+caps *both* a prose line (checks.py:762-765) **and** a durable Dagster metadata field
+(checks.py:812-814). So the repo does not in fact reserve 20 for prose and 50 for structured
+payloads; one of the 20s already covers a durable listing.
+
+The argument for 50 therefore rests on role rather than on precedent. `MAX_LATE_SERIES_IN_MESSAGE`
+caps a Sentry *issue title* and `_MAX_MISSING_SERIES_LISTED` caps a one-line check *description* —
+both are read at a glance, and both must stay short for that reason; `missing_time_series_ids`
+inherits their number only because it reuses the same constant, and it is a `str(list[int])`, which
+is a fraction of a `TableRecord`'s cost per entry. The Dagster late-series table is not read at a
+glance: it is a sortable, browsable drill-down, the same role the Sentry event *context* plays. 50
+in both means the operator sees the same leading 50 series in each place, which is one fewer thing
+to reconcile at 3pm on a bad day, and 50 × 143 B is ~7 KB — negligible either way.
+
+Cutting to 20 would be defensible and cheap; see open question 1.
 
 The rows are already sorted worst-first (never-reported, then most-stale first, by
 `evaluate_power_freshness`'s `.sort(["status", "hours_late"], ...)`), so a head-50 is the 50 most
@@ -53,8 +67,9 @@ comprehension.
 pure function's honest output, and `report_power_freshness` takes its own independent
 `head(MAX_LATE_SERIES_IN_CONTEXT)` from it (`_sentry.py:264`). Capping at the source would silently
 couple the Sentry context cap to the Dagster table cap and would make the pure function lie about
-what it found. `n_stale` / `n_never` are computed before the sort, so they are unaffected either
-way — but that is luck, not a reason.
+what it found. (`n_stale` / `n_never` are `stale.height` / `never.height`, read off the two
+pre-`concat` frames the sort never touches, so they would survive a source-level cap — but that is
+luck, not a reason.)
 
 ## Decision 3 — the house rule that keeps a truncated table honest
 
@@ -78,13 +93,22 @@ is an `int`, so Dagster keeps one type per key across runs and can plot it (the 
    style of its three siblings: what it caps, why 50 rather than 20, that the table lands in
    Dagster's event log (Postgres, nightly `pg_dump`) so it is durable, and that `n_late` carries the
    true count so a truncated table never makes a large stall look small.
-2. **`_late_table_metadata`** — take `late.head(_MAX_LATE_SERIES_IN_TABLE)` before the
-   comprehension; extend the docstring to say the listing is capped and ordered worst-first.
-3. **`_to_asset_check_result`** — add `"n_late_listed": min(result.n_late, _MAX_LATE_SERIES_IN_TABLE)`
-   to the metadata dict. Prefer deriving it from the built record list (i.e. have
-   `_late_table_metadata` or its caller expose the length) over recomputing the `min`, so the two
-   can never drift; the implementer picks whichever reads cleanest without adding a second return
-   value to a one-line function.
+2. **`_to_asset_check_result`** — truncate **once**, here, and use the same local for both metadata
+   entries:
+
+    - bind `listed = result.late.head(_MAX_LATE_SERIES_IN_TABLE)`;
+    - pass `listed` to `_late_table_metadata`;
+    - add `"n_late_listed": listed.height` to the metadata dict.
+
+   One truncation point means the row count and the table can never disagree. Do **not** try to read
+   the length back off `_late_table_metadata`'s return value: it is annotated `-> MetadataValue`,
+   which has no `records` attribute, so `.records` is an `unresolved-attribute` error under `ty`
+   (only the narrower `TableMetadataValue` has it). Deriving the count in the caller avoids both
+   that and a redundant second `min`.
+
+3. **`_late_table_metadata`** — unchanged in body; extend the docstring to say it renders an
+   already-truncated frame and to name `_MAX_LATE_SERIES_IN_TABLE` as where the cap is applied, so
+   the single caller relationship is documented rather than assumed.
 
 No signature changes, no behaviour change to `evaluate_power_freshness`, `PowerFreshnessResult` or
 the Sentry path.
@@ -154,6 +178,11 @@ stale rows, call `checks._to_asset_check_result(...)`, and assert
 - the retained records are the worst offenders: with `hours_late` descending in the fixture, the
   ids present are the leading slice, not an arbitrary one.
 
+Assert `isinstance(late_table, TableMetadataValue)` before touching `.records`, exactly as
+test_checks.py:209 already does — without that narrowing, `ty` rejects `.records` on the
+`MetadataValue` the metadata dict is typed to hold. Calling a private helper directly from a test
+has precedent at test_checks.py:683 (`checks._to_live_forecast_check_result`).
+
 Building the frame follows the existing pattern at test_checks.py:252-267 (the sentinel
 `PowerFreshnessResult` in `test_power_data_is_fresh_hands_evaluated_result_to_sentry`), which
 already shows the exact dtypes: `time_series_id` `Int32`, `last_seen` cast to `UTC_DATETIME_DTYPE`,
@@ -191,10 +220,12 @@ notebook in the diff.
 
 ## Risks and open questions
 
-1. **Is 50 the right cap, or should it be 20 like the description caps?** *Recommendation: 50*, for
-   the "same role as the Sentry context" argument above. If Jack would rather every listing in the
-   codebase share one number, 20 is the alternative and costs only drill-down detail; the Sentry
-   context still carries 50.
+1. **Is 50 the right cap, or should it be 20?** *Recommendation: 50*, for the "same role as the
+   Sentry context" argument in Decision 1 — but note that argument is weaker than it first looked:
+   `_MAX_MISSING_SERIES_LISTED = 20` already caps a durable metadata field as well as a description,
+   so there is no clean "structured payloads get 50" precedent to appeal to. If Jack would rather
+   every listing in the codebase share one number, 20 is the alternative and costs only drill-down
+   detail; the Sentry context still carries 50.
 2. **Is `n_late_listed` worth a new metadata key?** *Recommendation: yes* — it is one int, it
    mirrors the Sentry context field, and it makes a truncated table self-describing. If Jack thinks
    `n_late` alone is enough, dropping it removes one bullet from the test and nothing else.
@@ -205,4 +236,39 @@ notebook in the diff.
 
 ## Adversarial review
 
-Reviewer findings and their triage are appended below at step 5.
+A fresh sub-agent reviewed this plan against the code with no sight of the reasoning that produced
+it. It confirmed the factual claims about current behaviour (line numbers, constants, sort order,
+existing metadata keys), confirmed by running them that all three "fails on `main`" assertions
+really do fail today, confirmed no consumer of `PowerFreshnessResult.late` or doc page is missed
+(the four consumers are `_late_table_metadata`, `_capture_power_freshness_warning`,
+`tests/test_sentry.py:34-51` and the snippet at `docs/live_service/sentry.md:68-95`; the last two go
+through the Sentry path only), and confirmed the fail-open analysis and the Postgres/`pg_dump`
+claim. It raised three defects.
+
+### Accepted and fixed
+
+1. **The byte estimate omitted Dagster's serdes envelope.** A `TableRecord` serialises to 143 bytes,
+   not ~110, because of the `{"__class__": "TableRecord", "data": {…}}` wrapper. Verified
+   independently by running `serialize_value` on a representative record. Every derived figure was
+   ~30% low; the Verdict section now carries the measured numbers (~349 KB/hour, ~3.1 GB/year at V2,
+   ~63 MB/year capped). The error was in the safe direction, but these numbers will be quoted in the
+   PR body.
+2. **Decision 1's justification was factually wrong.** It claimed the two caps of 20 govern
+   at-a-glance prose only, but `_MAX_MISSING_SERIES_LISTED` also caps the durable
+   `missing_time_series_ids` metadata field (checks.py:812-814) — the plan's own "Not in scope"
+   section said as much, so the plan contradicted itself, having inherited the mislabelling in the
+   issue body's table. Decision 1 is rewritten to say there is no clean precedent and to argue for
+   50 on role and cost instead, and open question 1 now flags the weakened argument rather than
+   presenting 50 as the obvious inheritance.
+3. **"No signature changes" contradicted the preferred way of computing `n_late_listed`.**
+   `_late_table_metadata` returns `MetadataValue`, which has no `.records`, so deriving the count
+   from its return value is an `unresolved-attribute` error under `ty` unless the return type is
+   narrowed to `TableMetadataValue`. Resolved by truncating once in `_to_asset_check_result` and
+   using `listed.height` — no signature change, no drift, no redundant `min`. The two nits the
+   reviewer raised alongside are also folded in: the `n_stale`/`n_never` aside is reworded (they are
+   read from the two pre-`concat` frames, not "before the sort"), and the new test is now told to
+   narrow with `isinstance(..., TableMetadataValue)` before touching `.records`.
+
+### Rejected
+
+Nothing. The reviewer manufactured no findings and explicitly declined to pad the list.
