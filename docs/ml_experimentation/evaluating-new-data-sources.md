@@ -9,8 +9,9 @@ overlapping history), so its evaluation lives entirely in the `metrics` asset's
 **For a new *weather* source, check the ceiling first.** Before ingesting one at all, measure what
 near-perfect weather would buy — see
 [the perfect-weather ceiling](../roadmap/metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates).
-If a model trained and scored on reanalysis barely beats the ENS-scored champion, no NWP source
-will, and the patterns below are not yet worth running.
+If a model trained and scored on reanalysis barely beats the ENS-scored champion, there is little
+forecast-error headroom for a further source to recover, and the patterns below are not yet worth
+running — unless the candidate's case rests on *resolution*, which that ceiling does not bound.
 
 Three patterns, answering three different questions.
 

@@ -814,12 +814,12 @@ and the standing
 
 ### The perfect-weather ceiling — what it gates
 
-Train *and* score on near-perfect weather, and the resulting skill is an **upper bound on
-everything we could buy by improving the weather input**: a second NWP source, more ensemble
-members, neighbouring-cell context, sharper interpolation. If that ceiling sits close to today's
-ENS-scored skill, no amount of NWP investment will move the number much and the effort belongs in
-the modelling instead. So run this **before** ingesting another NWP source, not after — it is the
-cheap test that decides whether the expensive one is worth doing.
+Train *and* score on near-perfect weather, and the resulting skill bounds what we could buy by
+removing **forecast error** from the weather input — the channel that more ensemble members, better
+ensemble post-processing and sharper interpolation all work through. If that ceiling sits close to
+today's ENS-scored skill, most of our error is not the weather forecast's fault and the effort
+belongs in the modelling instead. So run this **before** ingesting another NWP source, not after:
+it is the cheap test that sizes the prize the expensive one is chasing.
 
 Two rungs, in increasing order of "cheating":
 
@@ -832,13 +832,22 @@ Two rungs, in increasing order of "cheating":
   nearest-station matched. [CM SAF](data-sources.md#weather-data) SARAH-3 is the equivalent rung for
   solar, at 0.05°, and is already planned for v0.7.
 
-Two conditions on reading the result. It must be **trained** on the better weather, not merely
-scored on it: feeding reanalysis to an ENS-trained model measures a train/serve mismatch instead of
-a ceiling. And it is a ceiling **for the current model family and feature set** — a model that
-cannot exploit perfect weather shows a low ceiling for reasons that have nothing to do with weather
-availability. That does not weaken the decision it gates (a model that cannot use perfect weather
-will not be rescued by a better NWP either), but it does mean the ceiling is re-measured after any
-large modelling change rather than treated as a standing fact.
+Three conditions on reading the result.
+
+- **It must be trained on the better weather, not merely scored on it.** Feeding reanalysis to an
+  ENS-trained model measures a train/serve mismatch instead of a ceiling.
+
+- **It bounds forecast error, not resolution.** ERA5 is a 31 km field, while ICON-EU is ~6.5 km and
+  post-2023 ENS is 9 km, so a finer *forecast* can carry site-relevant structure that a coarse
+  *analysis* averages away. A low ERA5 ceiling therefore deprioritises a second NWP source without
+  ruling one out; it is the observations rung that closes this gap, since station and satellite data
+  are at-site rather than grid-cell means.
+
+- **It is a ceiling for the current model family and feature set.** A model that cannot exploit
+  perfect weather shows a low ceiling for reasons that have nothing to do with weather availability.
+  That does not weaken the decision it gates — a model that cannot use perfect weather will not be
+  rescued by a better forecast of it — but it does mean the ceiling is re-measured after any large
+  modelling change rather than treated as a standing fact.
 
 ---
 

@@ -36,10 +36,11 @@ reconciliation question below into estimation rather than guesswork.
 - **Lead-time-zero framing.** Do not degrade; treat ERA5 as a forecast at lead zero and let the
   lead-time feature carry the discounting. This separates the physical weather-to-power response
   (genuinely lead-time-invariant) from how far to trust it as forecast error grows. Cheapest arm
-  and the right first run, but note the tension: pre-2024 rows then carry only lead zero, so any
-  tree splitting on lead time isolates the modern rows, and the extra history reaches the 3–10 day
-  band only through structure shared with trees that do not split on it. Expect the win at short
-  leads unless the invariance assumption holds strongly.
+  and the right first run, but note the tension: pre-2024 rows then carry only lead zero, so every
+  split on lead time partitions the modern rows off beneath it, and the extra history reaches the
+  3–10 day band only through the structure above such splits and in the trees that never make one.
+  Boosting shares more across trees than that phrasing might suggest, so this is a weakening rather
+  than a wall — but expect the win at short leads unless the invariance assumption holds strongly.
 
 - **Degrade ERA5 towards ENS error statistics.** Fit the `ENS − ERA5` residual distribution per
   variable, per lead time, per season on the overlap, then sample from it when synthesising
@@ -141,8 +142,8 @@ carry the connection dates needed to check.
   disagree: under perfect weather the best model leans hard on weather features, so a large
   divergence is information about how much hedging a model does, not a bug. The same scope carries
   the [perfect-weather ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates),
-  which bounds what any weather-input improvement — a second NWP, more ensemble members,
-  neighbouring-cell context — could ever buy, and so gates whether we ingest another NWP at all. It
+  which sizes how much of our error is the weather *forecast's* fault and so gates how much to
+  invest in the weather input at all. It
   lands as a new `evaluation_scope`, not as a new fold, so leaderboard folds stay ENS-only and both
   [principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically)
   and the
