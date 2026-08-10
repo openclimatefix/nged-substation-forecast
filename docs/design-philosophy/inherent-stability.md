@@ -371,7 +371,9 @@ training" genuinely holds. The nulls *beyond* lead-0 mostly never reach the mode
 `_upsample_nwp_to_half_hourly` interpolates interior nulls away while resampling to the half-hourly
 grid, so they arrive as bridged values. That is imputation, already happening, chosen by nobody —
 which turns the old worry here, that someone would later "fix" this by imputing, into something
-closer to its opposite: the fill exists and is unbounded, unflagged and unmeasured.
+closer to its opposite: the fill exists and is unbounded, unflagged and unmeasured. Making it
+deliberate is
+[a planned experiment](../roadmap/xgboost-improvements.md#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible).
 
 The whole-slice case is the awkward member of this bucket and is worth naming as such: it *is*
 blocky, and it is only chronic in the sense of recurring across runs at low volume. It sits here

@@ -38,8 +38,11 @@ missingness patterns present in the training data. Two consequences for the wins
 trained with NWP features does **not** behave like a weather-blind model when NWP vanishes (beating
 the incumbent during an outage needs outage-shaped training data, not NaN routing), and the chronic
 per-pixel nulls in the de-accumulated ECMWF variables are the one case the guarantee genuinely
-covers, so they should be left un-imputed. Full argument:
+covers. Full argument:
 [Inherent Stability → Default directions, and their limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
+Note that the second consequence is narrower than it sounds, because only *leading* nulls reach
+the model as nulls — `_upsample_nwp_to_half_hourly` already interpolates interior ones away. See
+[the null-filling item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible).
 
 ## Tier 1 — config-level changes (hours each)
 
@@ -712,6 +715,81 @@ carries the same ERA5 dependency as the precipitation one. The genuinely cheap c
 lengthen the EWM only as far as the trajectory allows (~7–10 days), which is a weaker experiment
 and should be labelled as one.
 
+### Make the existing NWP null-filling deliberate, bounded and visible
+
+**Start from what the pipeline already does, which is not what the docs imply.** The three
+de-accumulated ECMWF variables carry nulls beyond lead-0 — usually scattered per-pixel,
+occasionally a whole `(ensemble_member, valid_time)` slice — and the ingest deliberately lands them
+([known issues](../architecture/ecmwf-ens-known-issues.md#nulls-in-the-de-accumulated-variables-tolerated)).
+The stated position is to leave them un-imputed:
+[Missingness in learned models](../design-philosophy/inherent-stability.md#missingness-in-learned-models)
+says of this exact pattern that the main risk is *someone later "fixes" it by imputing*.
+
+But `_upsample_nwp_to_half_hourly` resamples NWP from its native 3- and 6-hourly steps to the
+half-hourly grid with `interpolate()`, and Polars' `interpolate()` fills **interior** nulls as a
+side effect. So an interior null — scattered cell or whole slice — is *already* filled today, from
+its temporal neighbours within the same `(member, cell)` group, silently and unflagged. Only
+*leading* nulls survive to the model as nulls, which is why the lead-0 convention holds and why
+that function's docstring is careful about it. The "leave them un-imputed" position is therefore
+true of leading nulls and false of interior ones, and nobody chose that split — it fell out of an
+upsampling implementation.
+
+The experiment is therefore not "should we start interpolating?" but **"the interpolation already
+happening should be deliberate, bounded and visible"**:
+
+- **Bounded.** `interpolate()` will span an arbitrarily long interior gap. Note that even the
+  cheapest case bridges further than it sounds: the fill runs between the steps *either side* of
+  the missing one, so losing a single native step is a 6-hour bridge in the 3-hourly part of the
+  horizon and a **12-hour** one in the 6-hourly part — and the 6-hourly part is the 3–10 day band
+  users act on. Several consecutive missing steps are bridged just as confidently. Cap the span
+  and leave anything longer as null.
+- **Visible.** Carry an `is_imputed` flag per filled variable so the model can condition on it, and
+  so a forecast built on a bridged gap is distinguishable after the fact.
+- **Measured.** With the flag in place, compare against today's silent behaviour, and against
+  leaving interior nulls unfilled entirely. A null result is worth having: it turns the standing
+  position from an assertion into a measured one — and, either way, this replaces an accident with
+  a decision.
+
+**Filling within a run is the only fill worth having, which is at least one thing today's accident
+gets right.** The obvious alternative is worse. Filling from the *previous* NWP run looks
+attractive —
+a 24-hour-older forecast of the same target time is a decent estimate — but ECMWF regenerates its
+perturbations every cycle, so ensemble member 34 of today's run and member 34 of yesterday's are
+not the same trajectory continued; they are two unrelated draws sharing a label. Only member 0,
+the unperturbed control, is comparable run to run. A cross-run fill would therefore graft one
+weather scenario's irradiance into another scenario's row, breaking the internal coherence that
+is the whole point of a per-member row. We do not ingest cloud cover, but it is latent behind
+several variables we do carry — short-wave and long-wave radiation respond to the same cloud field
+in opposite directions, and precipitation with them — so a cross-run fill of one of them leaves a
+row describing two different skies at once. Same-run interpolation has no such problem: the
+neighbouring steps belong to the same trajectory, so coherence survives, and no row ends up
+mixing NWP lead times either.
+
+Mechanics: the change lands in `_upsample_nwp_to_half_hourly`, which is where the interpolation
+already happens — not as a new pass elsewhere, which would leave two fills to reason about. It
+must stay lazy, per
+[principle 11](../design-philosophy/design-principles.md#11-push-the-work-down-to-the-engine-materialise-once-as-late-as-possible),
+and it must stay out of the ingest: imputed values in the NWP Delta table would destroy the
+provenance
+[principle 9](../design-philosophy/design-principles.md#9-provenance-travels-with-the-forecast-data)
+guarantees. The gap bound is the substantive part — `interpolate()` has no notion of how far it is
+reaching, so the bound has to be imposed around it: identify runs of consecutive nulls (a run-length
+id over `valid_time` within each group), interpolate, then restore the nulls wherever the run was
+too long. **Express the bound in hours, not in rows or steps**, and measure it as the span between
+the bracketing non-null values: a "3 steps" bound means 9 hours early in the horizon and 18 hours
+late in it, and counting *rows* is worse still because the interpolation runs after upsampling, so
+a row is half an hour rather than a native step. Hours are the only unit that means the same thing
+across the horizon. The `is_imputed` flags are new `AllFeatures` columns, and that schema change —
+plus a bounded, still-lazy interpolation — is why this sits in this tier rather than among the
+day-scale items.
+
+Two caveats shape what a win would mean. The de-accumulated variables are *rates over the
+preceding step*, so interpolating them across a 6-hourly gap is a coarser approximation than it
+would be for an instantaneous field — and the 6-hourly steps are exactly the 3–10 day band users
+act on. Second, whatever is decided must apply identically in training and at inference, or the
+change buys a train/serve skew — the failure mode the NaN-handling limit at the top of this page
+warns about — in exchange for the one it fixes. Read the horizon slices either way.
+
 ## Tier 4 — structural model changes (weeks)
 
 ### Pre-train on the ERA5-backed history
@@ -771,6 +849,105 @@ Member training is also one of the
 [double-counting mitigations](../techniques/probabilistic-forecasting.md#caveat-double-counting-weather-uncertainty)
 for the Phase-D quantile-ensemble pipeline — a second reason to land it, alongside this item
 and the lead-time feature, before or with the quantile model family.
+
+### Ensemble *statistics* as features, instead of member-by-member rows
+
+The fork in the road that the item above assumes away. Today every ensemble member is its own
+row: `AllFeatures`' primary key is
+`(time_series_id, power_fcst_init_time, valid_time, ensemble_member)`, and a member is pushed
+through the model one at a time. The alternative is to collapse the member axis at feature-build
+time, so each `(time_series_id, valid_time)` gets **one** row whose weather columns are
+*statistics over the members* — and then predict once.
+
+**Use quantiles, not mean and standard deviation.** Per variable, something like p10/p25/p50/p75/p90,
+as *columns* on that one row. Mean-and-spread implicitly assumes a near-Gaussian member
+distribution, which the cloud field driving irradiance badly violates: "half the members are
+overcast and half are clear" is a common and highly consequential state whose mean describes no
+member at all. Quantiles keep the marginal shape, including skew and some of the bimodality, for
+the price of a few more columns.
+
+**A smaller bet, worth pricing separately: shrink the member axis instead of removing it.** The
+collapse above is 51× fewer rows *however many* statistics ride on each one — quantile levels are
+columns, not rows, so preferring quantiles to mean-and-spread does not make the bet any smaller.
+What does make it smaller is keeping one row per scenario and using fewer scenarios: subsample a
+handful of representative members, or cluster the ensemble and take one member per cluster. That
+is a ~5–10× row reduction rather than 51×, and it is *qualitatively* different from the collapse,
+because a subsampled member is still a physically coherent trajectory — so the mixture pooling
+discussed below still works, and none of the coherence disadvantages apply. If the aim is mostly
+cost, try this first; the full collapse is only worth its disadvantages if what you want is
+spread-as-a-feature or the resilience property.
+
+**Advantages.**
+
+- **Resilience, by construction.** This is the strongest practical argument. A statistic is
+  computed over whatever members actually arrived, so a missing ensemble member shifts a quantile
+  slightly instead of removing rows, and a variable that is null for a few members degrades the
+  estimate instead of nulling whole rows. The
+  [2026-08-09 incident](../architecture/ecmwf-ens-known-issues.md#nulls-in-the-de-accumulated-variables-tolerated)
+  — one member's radiation missing at two lead times — would not have been an event at all. It
+  also makes the [incomplete-run](../architecture/ecmwf-ens-known-issues.md#an-incomplete-run-tolerated-and-reported)
+  warning much less consequential.
+- **Cost and scale.** Up to 51× fewer feature rows: the ~321M-row validation prediction, the
+  memory ceiling that shapes input pruning and `init_time` chunking, and the
+  [32-bit row-index ceiling](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index)
+  all get dramatically easier at once, and inference gets ~51× cheaper. That is direct support for
+  [principle 6](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)
+  at V2 scale, where it is the claim most at risk.
+- **Spread becomes an explicit input.** The model can learn that a wide member spread means a
+  less certain forecast, which is the natural feed for the
+  [band-widening](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal)
+  that is designed but not built.
+- **No ensemble-member identity problem.** A quantile is identity-free, so it is comparable
+  across runs in a way a member index is not — which is what would make a cross-run fill
+  defensible (see
+  [the null-filling item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)).
+
+**Disadvantages.**
+
+- **It gives up the weather-versus-model uncertainty decomposition.** This is the serious one, and
+  it is a decision about the *product*, not just the model. The planned probabilistic design is a
+  [mixture of conditional distributions](../techniques/probabilistic-forecasting.md#the-fix-formally-a-mixture-of-conditional-distributions):
+  each member yields a conditional distribution $F_m$ ("how uncertain is power *given* this
+  weather story"), and the disagreement *between* members carries the weather uncertainty. Pool
+  them and both survive. Collapse the member axis and there is no $F_m$, so there is no linear
+  pool and no source for
+  [Representation 3](delivery-tables.md#representation-3-ensemble-of-percentile-forecasts) — the
+  ensemble-of-percentiles delivery table. A quantile-regression model fed weather quantiles still
+  produces a predictive distribution, but it is a single conflated one: it cannot answer "is this
+  forecast uncertain because the weather is uncertain, or because the model is?" — the question
+  behind a control-room user asking whether to wait for tomorrow's run.
+    - The honest counterweight: that conflation removes the
+      [double-counting](../techniques/probabilistic-forecasting.md#caveat-double-counting-weather-uncertainty)
+      risk by construction, so the collapsed model might be *better calibrated* while being less
+      informative. Calibration and attribution are genuinely different goods here.
+- **Aggregating in weather space rather than power space.** Substation net load is a strongly
+  non-linear function of irradiance and wind speed (PV clipping, the cubic turbine ramp), so
+  $\mathbb{E}[f(x)] \neq f(\mathbb{E}[x])$. Pushing each member through the model and combining in
+  *power* space is the correct order of operations, and it is what the current design does.
+- **Per-variable quantiles destroy cross-variable coherence.** A sharper form of the point above:
+  the p90 of irradiance and the p90 of temperature need not co-occur in any single member, so a
+  quantile row can describe a physically impossible joint state. A member row cannot. Mitigations
+  exist (member-rank-based statistics, or quantiles of a derived physics proxy rather than of each
+  raw variable), and testing one is part of the experiment.
+- **51× less training data.** The mirror image of the cost win, and in direct tension with
+  [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) above, whose whole
+  argument is that member rows multiply the training set. The two items are alternatives at the
+  same fork, so decide them together rather than in sequence.
+- **It moves the `AllFeatures` primary key**, and therefore touches cross-validation, metrics and
+  the leaderboard.
+  [Principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically)
+  means it must be scored against the existing board by a controlled comparison, not swapped in.
+
+**How to evaluate.** One registered experiment against the member-by-member champion on the same
+folds and population, with four arms: quantile features, representative-member subsampling,
+control-member only (today), and all-member training. Running the subsampling arm alongside the
+collapse is what separates "the cost saving was the win" from "the member axis was carrying
+information", which the two-arm version cannot distinguish.
+Headline NMAE sliced by horizon and `time_series_type` as usual, but this item also needs the
+[probabilistic metrics](../techniques/evaluation-metrics.md#probabilistic-metrics) — spread-skill
+ratio and PICP — because the thing being traded away is uncertainty structure, which NMAE cannot
+see. A result where quantile features match on NMAE and lose on spread-skill is the outcome that
+tells you the decomposition was doing real work.
 
 ### Global model per `time_series_type`
 
