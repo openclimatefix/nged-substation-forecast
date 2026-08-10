@@ -7,8 +7,9 @@ description: >-
   app.setup:` or ruff stops seeing it; `ruff check --fix` must never be run over a notebook,
   because an autofix can insert an import outside `app.setup` and break it while reporting
   success; and a helper belongs in the `@app.function` form marimo itself writes. Load before
-  creating or editing a Marimo notebook, or when one fails with a `NameError` on a helper or an
-  import that looks present.
+  creating or editing a Marimo notebook, when one fails with a `NameError` on a helper or an
+  import that looks present, or when the `check-marimo-notebooks` hook reports a cell referencing
+  a name no cell defines.
 ---
 
 # Authoring Marimo notebooks

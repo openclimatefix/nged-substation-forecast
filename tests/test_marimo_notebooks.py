@@ -7,9 +7,11 @@ written notebooks either side of the line: two that it must flag, so a marimo re
 quietly turn it into a no-op, and one correct notebook that it must not.
 """
 
+import ast
 import importlib.util
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from types import ModuleType
 from typing import Final
@@ -52,6 +54,31 @@ if __name__ == "__main__":
 """
 """A notebook broken exactly as `ruff check --fix` breaks one, held as a string rather than as a
 file under `tests/data/` so that ruff never sees a deliberately-broken notebook to "fix"."""
+
+UNPARSABLE_NOTEBOOK: Final[str] = '''import marimo
+
+__generated_with = "0.23.16"
+app = marimo.App()
+
+with app.setup:
+    from datetime import datetime
+
+
+app._unparsable_cell(
+    r"""
+    print(datetime(2026, 1, 1)
+    """,
+    name="_",
+)
+
+if __name__ == "__main__":
+    app.run()
+'''
+"""What marimo writes when a cell is saved with a syntax error.
+
+Its names cannot be analysed, so a checker that quietly skipped it would report a notebook holding
+one as clean.
+"""
 
 DUNDER_FILE_NOTEBOOK: Final[str] = """import marimo
 
@@ -144,8 +171,44 @@ def test_checker_rejects_a_file_that_is_not_a_notebook(tmp_path: Path):
     assert "not a marimo notebook" in result.stdout
 
 
+def test_checker_flags_a_cell_marimo_cannot_compile(tmp_path: Path):
+    # Such a cell has no names to analyse, so skipping it would pass a notebook marimo itself
+    # reports as broken.
+    notebook = tmp_path / "unparsable_cell.py"
+    notebook.write_text(UNPARSABLE_NOTEBOOK)
+
+    result = _run_checker(notebook)
+
+    assert result.returncode == 1, result.stdout
+    assert "cannot compile" in result.stdout
+
+
 def test_checker_allows_a_cell_to_reference_dunder_file(tmp_path: Path):
     notebook = tmp_path / "locates_itself.py"
     notebook.write_text(DUNDER_FILE_NOTEBOOK)
 
     assert not CHECKER.unbound_cells(notebook)
+
+
+def test_checker_passes_over_every_notebook_at_once():
+    # The only test of the exit-0 path: without it, a checker that rejected every notebook it was
+    # given would still pass this whole file.
+    result = _run_checker(*_notebooks())
+
+    assert result.returncode == 0, result.stdout
+    assert not result.stdout
+
+
+def test_every_notebook_named_in_python_files_exists_and_holds_tests():
+    # `python_files` reaches the notebook's own `test_*` functions by naming one exact path, so a
+    # rename would silently stop collecting them — the same silent-drop failure this file exists
+    # to prevent, one layer up.
+    config = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
+    patterns = config["tool"]["pytest"]["ini_options"]["python_files"]
+    named = [REPO_ROOT / pattern for pattern in patterns if "/" in pattern and "*" not in pattern]
+    assert named, "expected python_files to name the notebook holding test cells"
+    for path in named:
+        assert path.is_file(), f"{path} is named in python_files but does not exist"
+        tree = ast.parse(path.read_text())
+        tests = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
+        assert any(n.name.startswith("test_") for n in tests), f"{path} defines no test_ function"

@@ -25,12 +25,18 @@ from marimo._ast.app import InternalApp
 from marimo._ast.load import get_notebook_status, load_app
 from marimo._ast.parse import MarimoFileError, NonMarimoPythonScriptError
 
-ALWAYS_BOUND: Final[frozenset[str]] = frozenset(dir(builtins)) | {"__file__"}
+ALWAYS_BOUND: Final[frozenset[str]] = frozenset(dir(builtins)) | {
+    "__builtin__",
+    "__builtins__",
+    "__file__",
+}
 """Names a cell may reference without any cell defining them.
 
-`__file__` is not a builtin: marimo injects it into the cell globals itself (`_runtime.runtime`
-sets it from the notebook's filename), so a cell locating a data file relative to the notebook is
-correct code and must not be flagged.
+The three dunders are not builtins — they are the names marimo seeds the cell globals with, in
+`marimo._runtime.patches.create_main_module`. A cell locating a data file relative to the notebook
+(`__file__`) or sandboxing an `eval` (`__builtins__`) is correct code and must not be flagged. Take
+any addition here from that function, not from what looks plausible: `__marimo__`, for instance, is
+bound in the editor kernel but *not* when the notebook runs as a script, so it stays flagged.
 """
 
 
@@ -66,9 +72,17 @@ def unbound_cells(path: Path) -> list[UnboundCell]:
     app = load_app(str(path))
     load_result = get_notebook_status(str(path))
     if app is None or load_result.notebook is None:
-        raise ValueError(f"not a usable marimo notebook (marimo status: {load_result.status})")
+        # marimo reports an unparsable file as `empty` too, so only trust that status for a file
+        # that really is empty; anything else with no app is a file we could not read as one.
+        if load_result.status == "empty" and not path.read_text().strip():
+            raise ValueError("file is empty")
+        raise ValueError(
+            f"could not be read as a marimo notebook (marimo status: {load_result.status})"
+        )
     compiled = list(InternalApp(app).cell_manager.cell_data())
     serialized = load_result.notebook.cells
+    if not serialized:
+        raise ValueError("parsed into zero marimo cells")
     if len(compiled) != len(serialized):
         raise ValueError(
             f"marimo reports {len(compiled)} compiled cells but {len(serialized)} serialized "
@@ -95,7 +109,13 @@ def _check_file(path: Path) -> list[str]:
     try:
         unbound = unbound_cells(path)
     except (MarimoFileError, NonMarimoPythonScriptError) as error:
-        return [f"{path}: not a marimo notebook: {error}"]
+        return [
+            (
+                f"{path}: not a marimo notebook: {error} Every `.py` file directly inside "
+                "`packages/notebooks/` or `packages/dashboard/` is taken to be one — an ordinary "
+                "module put there silently stops being auto-fixed by the ruff pre-commit hook."
+            )
+        ]
     except (OSError, SyntaxError, ValueError) as error:
         return [f"{path}: cannot be checked: {error}"]
     return [
