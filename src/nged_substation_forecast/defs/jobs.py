@@ -55,6 +55,22 @@ class RegisterExperimentConfig(Config):
     description: str = Field(default="", description="Stored as an MLflow experiment tag.")
 
 
+_UNOVERRIDABLE_MODEL_PARAMS: Final[dict[str, str]] = {
+    "_target_": (
+        "it names the config class, which a forecaster comes paired with, so base_model_config is"
+        " what fixes it — point that at a different YAML instead"
+    ),
+    "experiment_name": "it is set from the job's own experiment_name parameter",
+}
+"""The ``model_params`` keys a run's ``config_overrides`` may not set, mapped to why not.
+
+Both are ordinary keys as far as the override merge is concerned, and both would be discarded
+without a word downstream of it: ``_target_`` by pydantic's ``extra="ignore"``, because the config
+class was already resolved from the file; ``experiment_name`` by the assignment that stamps the
+job's own value over it.
+"""
+
+
 def _required_targets(raw: Any, config_path: Path) -> tuple[str, str, dict[str, Any]]:
     """Pull the two ``_target_`` paths and the ``model_params`` mapping out of a parsed model YAML.
 
@@ -87,8 +103,9 @@ def _required_targets(raw: Any, config_path: Path) -> tuple[str, str, dict[str, 
             " '_target_' naming the BaseForecaster subclass, and a 'model_params' mapping whose"
             f" own '_target_' names the config class. Got: {error!r}"
         ) from error
-    # An empty `_target_:` parses to None, which would otherwise reach import_class and fail there
-    # with a bare AttributeError from str.rpartition — the very thing this helper exists to avoid.
+    # The lookups above catch an absent `_target_`, not a present-but-not-a-string one: an empty
+    # `_target_:` parses to None and a number stays a number. Either reaches import_class, which
+    # fails on `str.rpartition` — or, if the other target is resolved first, blames the wrong one.
     if not isinstance(forecaster_target, str) or not isinstance(config_target, str):
         # TRY004 wants a TypeError, but this is one of several ways the *file's contents* can be
         # unusable, and a caller should need to catch only one exception type to mean "bad config".
@@ -117,28 +134,23 @@ def _resolve_forecaster_config(
             override replaces the base value outright rather than merging into it. Lists are
             replaced, not extended, and a value that is itself a mapping is replaced whole, so
             an override must restate every key of that mapping it wants to keep. Every
-            ``model_params`` key is overridable except ``_target_``.
+            ``model_params`` key is overridable except those in ``_UNOVERRIDABLE_MODEL_PARAMS``.
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
         A ``(forecaster_cls, forecaster_config)`` tuple.
 
     Raises:
-        ValueError: ``config_overrides`` tries to override ``_target_``, or the YAML is not a
-            usable model config.
+        ValueError: ``config_overrides`` names an unoverridable key, or the YAML is not a usable
+            model config.
     """
+    for key, reason in _UNOVERRIDABLE_MODEL_PARAMS.items():
+        if key in config_overrides:
+            raise ValueError(f"config_overrides may not override {key!r}: {reason}.")
     config_path = PROJECT_ROOT / base_model_config
     with config_path.open(encoding="utf-8") as file:
         raw = yaml.safe_load(file)
     forecaster_target, config_target, model_params = _required_targets(raw, config_path)
-    # Which config class to build is a property of the model YAML, not of a run's overrides: a
-    # forecaster and its config class come as a pair, so swapping one alone cannot work. Rejecting
-    # the key beats letting pydantic's extra="ignore" swallow it and silently build the base class.
-    if "_target_" in config_overrides:
-        raise ValueError(
-            "config_overrides may not override '_target_': the config class is fixed by"
-            f" {config_path}. Point base_model_config at a different YAML instead."
-        )
     model_params.update(config_overrides)
     forecaster_cls = cast(type[BaseForecaster], import_class(forecaster_target))
     config_cls = cast(type[BaseForecasterConfig], import_class(config_target))

@@ -174,9 +174,10 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 
 You never edit a YAML file per experiment. Instead, pass `config_overrides` to
 `register_experiment_job`. Each override is applied to `model_params` before the config object is
-constructed, so any `model_params` key can be overridden — except `_target_`, which names the
-config class itself and is rejected. To use a different config class, point `base_model_config`
-at a different YAML.
+constructed, so any `model_params` key can be overridden — except two, which are rejected rather
+than silently discarded. `_target_` names the config class itself: to use a different one, point
+`base_model_config` at a different YAML. `experiment_name` comes from the job's own
+`experiment_name` parameter.
 
 **Example — reduce tree depth and add a feature:**
 

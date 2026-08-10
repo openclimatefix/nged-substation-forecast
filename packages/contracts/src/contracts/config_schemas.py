@@ -55,7 +55,9 @@ def import_class(target: str) -> type:
         ValueError: ``target`` names no module path, is relative, its module cannot be imported,
             the module has no such attribute, or the attribute is not a class. A module that
             fails on its *own* imports is reported the same way — the original ``ImportError``
-            is chained as ``__cause__``.
+            is chained as ``__cause__``. Any other failure of the module's body (a ``SyntaxError``,
+            say) propagates unchanged, so a broken module reports its own error rather than
+            hiding behind "cannot import".
     """
     module_path, _, class_name = target.rpartition(".")
     # A leading dot would make import_module read the target as a relative import and demand a
