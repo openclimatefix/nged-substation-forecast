@@ -220,10 +220,11 @@ def test_windchill_feature():
     result = df.with_columns(STATIC_FEATURE_REGISTRY["windchill"])
 
     assert "windchill" in result.columns
-    # Formula: 13.12 + 0.6215 * T - 11.37 * (V ** 0.16) + 0.3965 * T * (V ** 0.16) V is in km/h, so
-    # V = wind_speed_10m * 3.6 For T=0, V=18: 13.12 + 0 - 11.37 * (18 ** 0.16) + 0 = 13.12 - 11.37 *
-    # 1.583 = -4.88 For T=-10, V=36: 13.12 - 6.215 - 11.37 * (36 ** 0.16) - 3.965 * (36 ** 0.16) =
-    # 6.905 - 15.335 * 1.768 = -20.2
+    # Formula: 13.12 + 0.6215 * T - 11.37 * (V ** 0.16) + 0.3965 * T * (V ** 0.16)
+    # V is in km/h, so V = wind_speed_10m * 3.6
+    # For T=0, V=18: 13.12 + 0 - 11.37 * (18 ** 0.16) + 0 = 13.12 - 11.37 * 1.583 = -4.88
+    # For T=-10, V=36: 13.12 - 6.215 - 11.37 * (36 ** 0.16) - 3.965 * (36 ** 0.16)
+    #                = 6.905 - 15.335 * 1.768 = -20.2
     assert result["windchill"][0] == pytest.approx(-4.88, abs=0.1)
     assert result["windchill"][1] == pytest.approx(-20.3, abs=0.1)
 

@@ -1,12 +1,10 @@
-from datetime import UTC
-
 import marimo
 
 __generated_with = "0.23.6"
 app = marimo.App(width="full")
 
 with app.setup:
-    from datetime import datetime
+    from datetime import UTC, datetime
     from typing import cast
 
     import altair as alt

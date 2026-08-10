@@ -1,12 +1,10 @@
-from datetime import UTC
-
 import marimo
 
 __generated_with = "0.23.6"
 app = marimo.App()
 
 with app.setup:
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     import altair as alt
     import plotting.ocf_theme  # noqa: F401 — registers OCF Altair theme as side effect
@@ -60,8 +58,10 @@ def _(df, nwp_vars):
         plot_df = melted.with_columns(
             # Check for both database Nulls and float NaNs
             is_missing=pl.col("value").is_null() | pl.col("value").is_nan(),
-            # Create a string like "temperature_2m (Member 0)" row_label=(pl.col("variable") + "
-            # (Member " + pl.col("ensemble_member").cast(pl.Utf8) + ")"),
+            # Create a string like "temperature_2m (Member 0)":
+            # row_label=(
+            #     pl.col("variable") + " (Member " + pl.col("ensemble_member").cast(pl.Utf8) + ")"
+            # ),
             row_label=pl.col("ensemble_member"),
         )
 
