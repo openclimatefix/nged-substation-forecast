@@ -345,7 +345,7 @@ class Metrics(pt.Model):
     horizon_slice: str = pt.Field(
         dtype=pl.Enum(HORIZON_SLICES),
         description=(
-            "'all' aggregates over all forecast horizons. Other values select the HORIZON_SLICES"
+            "'all' aggregates over all forecast horizons.  Other values select the HORIZON_SLICES"
             " bands."
         ),
     )

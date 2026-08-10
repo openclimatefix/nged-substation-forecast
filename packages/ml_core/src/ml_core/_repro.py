@@ -131,7 +131,7 @@ def get_delta_versions(
                 versions[key] = ABSENT
                 continue
             versions[key] = str(DeltaTable(path, storage_options=options).version())
-        except Exception:
+        except Exception:  # Provenance must never fail the surrounding run.
             logger.warning("Could not read Delta version for %r at %s", name, path, exc_info=True)
             versions[key] = ABSENT
     return versions

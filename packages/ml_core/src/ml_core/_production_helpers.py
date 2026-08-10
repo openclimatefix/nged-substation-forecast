@@ -48,7 +48,7 @@ def select_nwp_init_time(
 ) -> datetime:
     """Return the freshest NWP ``init_time`` available at ``power_fcst_init_time``.
 
-    Which runs count as available depends on ``mode``.
+    Which runs count as available depends on ``availability_mode``.
 
     Args:
         available_init_times: The ``init_time``s genuinely present in the NWP Delta table

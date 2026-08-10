@@ -77,7 +77,7 @@ def test_extract_power_time_series_drops_malformed_time_rows():
     PowerTimeSeries.validate(extracted.dataframe)
 
 
-def test_nged_json_to_metadata_df_and_time_series_df_invalid_data_types():
+def test_extract_power_time_series_rejects_non_numeric_value():
     """A non-numeric `value` is rejected rather than dropped.
 
     Contrast `test_extract_power_time_series_drops_malformed_time_rows`: a malformed `time` is

@@ -152,8 +152,8 @@ select = [
     "RET",   # flake8-return
     "RUF",   # ruff-specific rules
     # flake8-bandit, restricted to the three rules ruff enables by default. The whole family
-    # reports 1,150 findings, of which 1,129 are S101 (`assert` used) — almost all of them the
-    # asserts that *are* the test suite. Exempting S101 in tests the way the DTZ/D entries below do
+    # reports about 1,170 findings, of which ~1,149 are S101 (`assert` used) — almost all of them
+    # the asserts that *are* the test suite. Exempting S101 in tests the way the DTZ/D entries do
     # leaves 30: our own `git`/`uv` invocations (S603/S607 ×12), settings and moto dummy credentials
     # (S106 ×4), `urlopen` against a local moto server and the MLflow test server (S310 ×5), and 9
     # asserts outside tests. That is 30 suppressions for no signal in a repo that handles no
@@ -194,7 +194,11 @@ ignore = [
     # have no honest narrower type.
     "ANN401", # dynamically typed expressions (`typing.Any`) are disallowed
     # Asserting against a literal is the whole point of a unit test, and `magic-value-comparison`
-    # cannot tell a test's expected value from a hard-coded constant in production code.
+    # cannot tell a test's expected value from a hard-coded constant in production code. That
+    # argument covers 162 of the 169 findings; the rule is nonetheless declined repo-wide rather
+    # than under `**/tests/**`, which would leave 7 sites live in `src/` and the notebooks. Those 7
+    # are quantile levels, longitude bounds and similar domain literals that read better inline
+    # than as named constants. Tighten to a tests-only entry if that ever stops being true.
     "PLR2004", # magic value used in comparison
     # CLAUDE.md asks for UPPER_SNAKE_CASE constants, and N806 rejects that spelling for a constant
     # that happens to be function-local (`RAD_TO_DEG`, `COMPRESSION`), as well as domain-conventional
@@ -203,9 +207,9 @@ ignore = [
     # *not* ignored here — every site is a marimo-generated cell parameter, so it is declined in
     # `per-file-ignores` for the notebooks alone and stays live over `src/` and the tests.
     "N806", # variable in function should be lowercase
-    # The only two sites are `NoNewData` and `NwpRunNotYetAvailable`; renaming either is a
-    # public-API change across several packages, not a lint fix. Revisit deliberately if we ever
-    # want the `Error` suffix.
+    # The three sites are `NoNewData`, `NwpRunNotYetAvailable` and `NwpVariableWhollyMissing`;
+    # renaming any of them is a public-API change across several packages, not a lint fix. Revisit
+    # deliberately if we ever want the `Error` suffix.
     "N818", # exception name should be suffixed with `Error`
 
     # --- Rules that would break Patito/pydantic ---
@@ -226,9 +230,9 @@ ignore = [
     # TRY003 wants every message moved into a custom exception class. We raise plain built-in
     # exceptions with a specific, readable message; a class per message would be pure ceremony.
     "TRY003", # long message outside the exception class
-    # All 12 sites are deliberate late imports in tests (importing inside the test body so a
-    # `monkeypatch` lands first) and in a marimo notebook cell. Nothing in `src/` defers an import
-    # today; the rule is ignored rather than per-file-ignored so that a future cycle-breaking late
+    # All 13 sites are deliberate late imports in tests (importing inside the test body so a
+    # `monkeypatch` lands first, ×11) and in a marimo notebook cell (×2). Nothing in `src/` defers
+    # an import today; the rule is ignored rather than per-file-ignored so that a future late
     # import in `src/` does not have to argue with the linter.
     "PLC0415", # `import` should be at the top level of a file
     # Overlaps with the formatter, which owns line breaks inside implicit string concatenations.
@@ -242,11 +246,22 @@ ignore = [
 # generated shape, not something we hand-maintain.
 #
 # Note these are *file* patterns, not directory patterns: ruff matches globs with `*` crossing `/`,
-# so `packages/dashboard/*.py` would also silence `packages/dashboard/src/dashboard/*.py` — real
-# library code. The two marimo apps are therefore named individually.
+# so `packages/notebooks/*.py` would also silence `packages/notebooks/src/` and
+# `packages/notebooks/tests/` — real library and test code. A character class does not rescue it
+# either: in `packages/notebooks/[!/]*.py` the trailing `*` still crosses. Every notebook is
+# therefore named individually.
+#
+# Contrast the marimo `exclude:` regex in .pre-commit-config.yaml, which is deliberately generic
+# rather than a list of filenames. The asymmetry is intentional, because the two failure modes
+# differ: forgetting to add a new notebook here is *loud* (the notebook fails lint on rules it was
+# never meant to face), whereas forgetting to add it there is *silent* (ruff --fix rewrites the
+# notebook into something marimo cannot run, and reports success).
 "packages/dashboard/map_and_timeseries.py" = ["ANN", "B018", "D", "PLR1711"]
 "packages/dashboard/view_forecasts.py" = ["ANN", "B018", "D", "PLR1711"]
-"packages/notebooks/*.py" = ["ANN", "B018", "D", "N803", "PLR1711"]
+"packages/notebooks/plot_gb_map.py" = ["ANN", "B018", "D", "N803", "PLR1711"]
+"packages/notebooks/plot_missing_NWP_data.py" = ["ANN", "B018", "D", "N803", "PLR1711"]
+"packages/notebooks/plot_nwp_map.py" = ["ANN", "B018", "D", "N803", "PLR1711"]
+"packages/notebooks/view_baseline_export.py" = ["ANN", "B018", "D", "N803", "PLR1711"]
 # `**/tests/**` covers both the root `tests/` directory and every `packages/*/tests/`.
 #
 # DTZ: test frames are hand-built with `datetime(2023, 1, 1, 12, 0)` and fed to helpers that are
