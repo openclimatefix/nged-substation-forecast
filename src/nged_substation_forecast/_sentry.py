@@ -196,8 +196,10 @@ def report_power_freshness(settings: Settings, result: "PowerFreshnessResult") -
     Sends a single ``warning``-level event fingerprinted per environment; the hourly re-reports of
     an ongoing stall collapse into one issue, and recovery is signalled by the events stopping (a
     warning event has no "resolved" counterpart — the operator resolves the issue). Never raises:
-    telemetry must not fail the ``blocking=False`` freshness check, which — inside the hooked
-    ``power_time_series_and_metadata_job`` — would otherwise trip the failure hook and fail the run.
+    the ``power_data_is_fresh`` check calls this last, under its own catch-all, so a raise here
+    would not fail the run but would cost the *whole* freshness report — every late series, in the
+    very hour they went late — by degrading the check to "could not evaluate". Guarding here keeps
+    a telemetry hiccup from taking the evaluation down with it.
 
     Args:
         settings: The project settings carrying the Sentry DSN and environment.

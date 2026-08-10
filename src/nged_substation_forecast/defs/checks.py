@@ -30,12 +30,15 @@ old depending on the slot, so any absolute age threshold would fire on two slots
 The full argument is in
 [Inherent Stability → Three audiences, three channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
 
-Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and
-``live_forecasts_are_healthy`` additionally cannot raise — every read it makes is guarded and its
-whole body sits under a
-catch-all — because a warning path that fails would turn fail-open into fail-closed at exactly the
-wrong moment (rule 7 of
+Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and neither can fail its own
+step: each one's whole body sits under a catch-all for ``Exception`` and for pyo3's
+``PanicException``, which logs the traceback and returns an unhealthy result. Only Dagster's own
+interrupt errors propagate, which is what we want — a cancelled run should cancel. A warning path
+that could fail would turn fail-open into fail-closed at exactly the wrong moment (rule 7 of
 [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+``live_forecasts_are_healthy`` goes further and guards each read individually, so an absent
+promoted model weakens its report rather than costing all of it; ``power_data_is_fresh``
+deliberately does not, because an unreadable roster there would otherwise pass for a healthy feed.
 """
 
 import json
@@ -62,6 +65,7 @@ from dagster import (
     asset_check,
 )
 from nged_data.storage import time_series_coverage
+from polars.exceptions import PanicException
 
 from nged_substation_forecast._sentry import report_power_freshness
 from nged_substation_forecast.defs.assets import power_time_series_and_metadata
@@ -259,20 +263,12 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
     )
 
 
-@asset_check(
-    asset=power_time_series_and_metadata,
-    blocking=False,
-    description=(
-        "Warn if any time series has no fresh power data within the staleness threshold "
-        "(stale) or has never reported at all (never)."
-    ),
-)
-def power_data_is_fresh() -> AssetCheckResult:
-    """Report how many time series are late on the ``power_time_series`` Delta table.
+def _check_power_data_freshness() -> AssetCheckResult:
+    """Read the power table's recency off disk and judge it.
 
-    Runs automatically alongside every ``power_time_series_and_metadata`` materialisation (hourly
-    via ``power_time_series_and_metadata_schedule``), so the check re-evaluates freshness each
-    hour regardless of whether new data landed.
+    Split out from the check itself so the check's ``except`` wraps everything — the ``Settings``
+    load, both reads, the evaluation, the Sentry report and the metadata build — rather than only
+    part of it.
     """
     settings = Settings()
     storage_options = settings.storage_options
@@ -288,6 +284,45 @@ def power_data_is_fresh() -> AssetCheckResult:
     # Best-effort: report_power_freshness never raises, so a telemetry hiccup can't fail this check.
     report_power_freshness(settings, result)
     return _to_asset_check_result(result)
+
+
+@asset_check(
+    asset=power_time_series_and_metadata,
+    blocking=False,
+    description=(
+        "Warn if any time series has no fresh power data within the staleness threshold "
+        "(stale) or has never reported at all (never)."
+    ),
+)
+def power_data_is_fresh() -> AssetCheckResult:
+    """Report how many time series are late on the ``power_time_series`` Delta table.
+
+    Runs automatically alongside every ``power_time_series_and_metadata`` materialisation (hourly
+    via ``power_time_series_and_metadata_schedule``), so the check re-evaluates freshness each
+    hour regardless of whether new data landed.
+
+    Cannot fail its own step: the whole body is guarded, so a stalled object store, a half-written
+    ``metadata.parquet`` or a bug in here degrades to an unhealthy result rather than failing the
+    hourly production run.
+    """
+    try:
+        return _check_power_data_freshness()
+    except (Exception, PanicException) as exc:
+        # Catch-all is deliberate. This check is non-blocking, but it runs as its own step inside
+        # `power_time_series_and_metadata_job`, whose `sentry_capture_failure` hook would turn a
+        # raise here into a failed production run — fail-open silently becoming fail-closed.
+        # `PanicException` is named explicitly because pyo3 derives it from `BaseException`, not
+        # `Exception`, so a Rust panic inside a Polars or delta-rs read would otherwise sail
+        # straight past this handler. Dagster's own interrupt errors are `BaseException` too and
+        # deliberately keep propagating: a cancelled run should cancel. Logged at ERROR with the
+        # traceback (never a silent swallow) and surfaced as an unhealthy check, so a fault in here
+        # stays visible.
+        logger.exception("Could not evaluate power-data freshness")
+        return AssetCheckResult(
+            passed=False,
+            severity=AssetCheckSeverity.WARN,
+            description=f"Could not evaluate power-data freshness: {exc!r}",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -846,12 +881,16 @@ def live_forecasts_are_healthy(context: AssetCheckExecutionContext) -> AssetChec
     """
     try:
         return _evaluate_live_forecasts(context)
-    except Exception as exc:
+    except (Exception, PanicException) as exc:
         # Catch-all is deliberate. A warning path must never be able to fail the thing it warns
         # about: this check is non-blocking, but it runs inside `live_forecasts_job`, whose
         # `sentry_capture_failure` hook would turn a raise here into a failed production run —
-        # fail-open silently becoming fail-closed. Logged at ERROR with the traceback (never a
-        # silent swallow) and surfaced as an unhealthy check, so a bug in here stays visible.
+        # fail-open silently becoming fail-closed. `PanicException` is named explicitly because
+        # pyo3 derives it from `BaseException`, not `Exception`, so a Rust panic inside a Polars or
+        # delta-rs read would otherwise sail straight past this handler; Dagster's own interrupt
+        # errors are `BaseException` too and deliberately keep propagating, because a cancelled run
+        # should cancel. Logged at ERROR with the traceback (never a silent swallow) and surfaced
+        # as an unhealthy check, so a bug in here stays visible.
         logger.exception("Could not evaluate live-forecast health")
         return AssetCheckResult(
             passed=False,

@@ -6,6 +6,11 @@ end-to-end tests that drive the real ``@asset_check`` — writing temp Delta tab
 roster and a promoted-model ``meta.json`` — so the Settings plumbing, the Delta scans and the
 ``AssetCheckResult`` mapping are all exercised together.
 
+One case goes further and drives ``power_data_is_fresh`` through Dagster's executor rather than
+calling it: asserting that the *run* still succeeds when the check's internals blow up is the only
+way to pin the property the catch-all exists for, and a returned ``AssetCheckResult`` cannot show
+it.
+
 The one path not reachable from here is ``live_forecasts_are_healthy`` running *partitioned*:
 ``build_asset_check_context`` cannot carry a partition key, so that path is covered by
 ``tests/test_live_forecasts.py::test_check_passes_after_a_real_live_materialisation``, which
@@ -27,8 +32,11 @@ from contracts.settings import Settings
 from dagster import (
     AssetCheckResult,
     AssetCheckSeverity,
+    AssetSelection,
+    DagsterInstance,
     TableMetadataValue,
     build_asset_check_context,
+    materialize,
 )
 from deltalake import write_deltalake
 
@@ -281,6 +289,89 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
     assert captured[0] is sentinel  # the exact evaluated object, not a recomputation
     # ...and that same object drove the returned check result (n_late == n_stale + n_never == 7).
     assert check_result.metadata["n_late"].value == 7
+
+
+def _write_one_fresh_series(settings: Settings) -> None:
+    """Write a minimal ``power_time_series`` Delta table holding one up-to-date series."""
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1], dtype=pl.Int32),
+            "time": pl.Series([datetime.now(UTC) - timedelta(hours=1)]).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0], dtype=pl.Float32),
+        }
+    ).write_delta(settings.power_time_series_data_path)
+
+
+def _raise_inside_the_check(**_kwargs: object) -> PowerFreshnessResult:
+    """Stand in for ``evaluate_power_freshness`` to simulate a bug inside the check."""
+    raise RuntimeError("simulated bug inside the check")
+
+
+def test_power_data_is_fresh_contains_an_internal_error(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Even a bug inside the check itself must surface as a warning, never as a raise.
+
+    No fixture data is needed: with no tables on disk ``time_series_coverage`` returns an empty
+    frame and ``_read_roster_ids`` returns ``None``, so the patched evaluator is still reached.
+    """
+    monkeypatch.setattr(checks, "evaluate_power_freshness", _raise_inside_the_check)
+
+    result = checks.power_data_is_fresh()
+    assert isinstance(result, AssetCheckResult)
+    assert result.passed is False
+    assert result.severity == AssetCheckSeverity.WARN
+    assert "simulated bug inside the check" in str(result.description)
+
+
+def test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet(env: Path) -> None:
+    """A half-written roster is a realistic on-disk raiser: ``metadata.parquet`` is written in
+    place, so a process killed mid-write leaves a file that exists and will not parse. The check
+    must warn rather than raise — it is one step of the hooked
+    ``power_time_series_and_metadata_job``.
+
+    It is not the only raiser on that state: in an hour where new data arrives, ``upsert_metadata``
+    reads the same file first and fails the asset outright. This pins the check's half.
+
+    The assertion is on our own description prefix rather than on Polars' message, which is not
+    ours to pin.
+    """
+    settings = Settings()
+    _write_one_fresh_series(settings)
+    Path(settings.metadata_path).write_bytes(b"not a parquet file")
+
+    result = checks.power_data_is_fresh()
+    assert isinstance(result, AssetCheckResult)
+    assert result.passed is False
+    assert result.severity == AssetCheckSeverity.WARN
+    assert "Could not evaluate power-data freshness" in str(result.description)
+
+
+def test_power_data_is_fresh_never_fails_the_run(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The whole point of the catch-all, and the one property the return-value tests cannot pin.
+
+    A raise inside this check fails the *step*, and so the hourly run, and so pages via
+    ``power_time_series_and_metadata_job``'s ``sentry_capture_failure`` hook — even though the
+    check is ``blocking=False``, which governs only whether a *failed* check blocks downstream
+    assets, not whether an *erroring* one fails the run. Running the check through Dagster's
+    executor is the only way to assert that; ``AssetSelection.checks`` runs the check step alone,
+    so no asset materialises and nothing touches S3.
+    """
+    monkeypatch.setattr(checks, "evaluate_power_freshness", _raise_inside_the_check)
+
+    result = materialize(
+        [checks.power_data_is_fresh],
+        selection=AssetSelection.checks(checks.power_data_is_fresh),
+        instance=dagster_instance,
+        raise_on_error=False,
+    )
+
+    assert result.success
+    (evaluation,) = result.get_asset_check_evaluations()
+    assert evaluation.passed is False
+    assert evaluation.severity == AssetCheckSeverity.WARN
 
 
 # ---------------------------------------------------------------------------
