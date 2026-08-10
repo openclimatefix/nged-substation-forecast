@@ -1,251 +1,295 @@
-# Plan — #486: reject a promoted model the running code cannot serve
+# Plan — #486: reject a promoted model whose features this code cannot parse
 
 Issue: <https://github.com/openclimatefix/nged-substation-forecast/issues/486>
 Branch: `claude/reject-unservable-promoted-model-486`
 
 ## Verdict
 
-**Worth implementing, but the issue's account of what the guard buys is wrong, and the guard
-belongs one layer lower than the issue puts it.**
+**Worth implementing, and cheaply — but it is a preventive guard against the *next* feature
+rename, not a fix for anything currently broken. The issue oversells what it buys, and the plan
+says so rather than inheriting the overclaim.**
 
-The hazard is real and live *right now*. `list_promotable_runs()` on Jack's laptop returns three
-candidates, and two of them carry the **pre-#463** feature vocabulary:
+Two corrections to the issue's framing, both verified rather than argued:
 
-| run id | experiment | vocabulary |
-|---|---|---|
-| `7acafbe3…` | `xgboost_cv_0002` | `local_utc_offset_minutes` (current) |
-| `aecc8c3f…` | `xgboost_no_power_lags` | `local_utc_offset` (**stale**) |
-| `cf8ddd29…` | `xgboost_cv_0001` | `local_utc_offset` (**stale**) |
+### Departure 1 — this guard would not have caught the incident the issue opens with
 
-`promotable_model_runs` renders all three side by side in one metadata table with nothing to
-distinguish them, and the pick is explicitly "by eye" (`operations.md`, Step 1). Two thirds of the
-menu is poison. That alone justifies the change.
+The issue presents this as the fix for the #463 breakage. It is not.
 
-### Departure 1 — the guard would *not* have caught the incident the issue opens with
+- PR #463 (the `local_utc_offset` → `local_utc_offset_minutes` rename) merged **2026-08-07
+  13:22 UTC**.
+- `data/production_model/promotion.json` shows the model currently on disk was promoted
+  **2026-08-07 17:35 UTC** — after the rename — and its `meta.json` carries the new name.
+- The issue reports live ticks failing *before* that, which is only possible if the model being
+  served had been promoted earlier, under the old vocabulary. (That is the issue's testimony, not
+  something recoverable from disk: the directory holds only the current model, and a previous
+  promotion leaves no trace in it.)
 
-The issue frames this as the fix for the #463 breakage. It is not, and the plan should not claim
-it is. The timeline, verified from git and from the promoted artefacts on disk:
+So #463 was **promote-then-change-the-code**. A promotion-time guard runs before the breaking
+change and sees nothing wrong. What it catches is the **mirror image** — promoting a model whose
+vocabulary the *current* code cannot parse. That is a genuine hazard, but a different one, and the
+PR body must not claim otherwise.
 
-- PR #463 (the `local_utc_offset` → `local_utc_offset_minutes` rename) merged at
-  **2026-08-07 14:22 +0100**.
-- The model that was being served at that moment had been promoted **before** the rename.
-- The model currently on disk (`data/production_model/promotion.json`) was promoted at
-  **2026-08-07 17:35 UTC**, i.e. *after* the rename, and carries the new name.
+### Departure 2 — the hazard is forward-looking; nothing in the store today would trip it
 
-So #463 was a *promote-then-change-the-code* failure. A guard that runs only at promotion time
-runs before the breaking change and sees nothing wrong. What it catches is the **mirror-image**
-case — promoting a model whose vocabulary the *current* code cannot parse — which is exactly the
-live hazard tabulated above, and exactly the trap an operator falls into when they reach for
-`xgboost_cv_0001` off the candidate list.
+It is tempting to point at MLflow and say the trap is already set. `list_promotable_runs()` returns
+three candidates, and two of them do carry the stale vocabulary:
 
-The plan therefore covers **both directions**, and says which mechanism covers which. That is the
-substantive addition to the issue, and it costs one extra call site rather than a second feature.
+| run id | experiment | vocabulary | artifacts |
+|---|---|---|---|
+| `7acafbe3…` | `xgboost_cv_0002` | `local_utc_offset_minutes` (current) | `model.tar.gz` |
+| `aecc8c3f…` | `xgboost_no_power_lags` | `local_utc_offset` (stale) | `model/` |
+| `cf8ddd29…` | `xgboost_cv_0001` | `local_utc_offset` (stale) | `model/` |
 
-### Departure 2 — validate inside `load_forecaster_from_dir`, not inside `promoted_model`
+But both stale runs predate the single-archive change, so they hold the old `model/` **directory**
+layout, and `_download_and_unpack_model` already refuses them with an actionable
+`MlflowException` naming `model.tar.gz` — a gate that exists today and runs strictly before
+anything this plan adds. Promoting either fails right now, loudly, for a different reason.
+
+So the honest statement of value: **every run trained from now on is stored as a promotable
+archive regardless of its feature vocabulary, and the next rename recreates the trap with no gate
+in front of it.** Renames happen — #431/#463 is one, three months into the project. The guard costs
+a few lines and one `meta.json` read; a re-promotion of a pre-rename run costs a broken live
+service until someone reads a stack trace. Worth building on those terms, not on "two thirds of the
+candidate list is poison".
+
+### Departure 3 — where the check goes, and what it reads
 
 The issue proposes validating in the `promoted_model` asset after `fetch_model_artifacts`, and
-notes as an open question that validating before the atomic swap would be better. It would, and
-there is a placement that gets that *and* covers the second direction with no duplication:
+notes as an open question that validating before the atomic swap would be better. It would. The
+placement here goes one step further, and deliberately does **not** load the model to do it:
 
-Put the check in **`ml_core._production_helpers.load_forecaster_from_dir`**, and have
-`fetch_model_artifacts` call `load_forecaster_from_dir` against the freshly-unpacked staging
-directory *before* the swap. One check function, one place it is written, three places it fires:
+**One pure function, `_check_selected_features_are_parseable(selected_features, source)`, in
+`ml_core._production_helpers`. Two call sites:**
 
-| Call site | Direction caught | Effect |
+| Call site | Reads | What it buys |
 |---|---|---|
-| `fetch_model_artifacts`, pre-swap | promoting a stale model into current code | Promotion refuses; the previous working champion stays on disk untouched |
-| `live_forecasts` (already calls `load_forecaster_from_dir`) | code changed after promotion | The tick fails *at model load*, before the 15-day power read and the NWP scan, with a message naming the feature and saying "retrain and re-promote" |
-| `scripts/build_and_verify_image.sh` smoke test | code changed after promotion, before the AWS deploy | The offline container run fails at model load with the same message, ahead of the expected NWP failure |
+| `fetch_model_artifacts`, after unpack and **before** the swap | the staged `meta.json`'s `model_params.selected_features` | Promotion refuses; `dest` is never touched, so the previous champion keeps serving |
+| `load_forecaster_from_dir` | the reconstructed `forecaster.model_params.selected_features` | Every `live_forecasts` tick fails *at load* rather than deep in `engineer()`, with a message naming the feature and the remedy |
 
-The third row is the one that closes #463's own direction for the AWS deployment: the image is
-built from the *current* checkout but copies `data/production_model/` as promoted earlier, so the
-smoke test is the first moment the new code and the old artefact meet. That script's header already
-documents that the model loads *before* the NWP lookup fails, so the guard lands inside the window
-the script already exercises.
+**Why `fetch_model_artifacts` reads `meta.json` directly rather than calling
+`load_forecaster_from_dir` on the staging directory** (the obvious-looking alternative, which is
+wrong three ways):
 
-Validating in `promoted_model` itself instead would leave a broken model written to
-`production_model_path` (the issue spots this), and would miss both other rows.
+1. It would break two existing tests. `packages/ml_core/tests/test_base_forecaster.py`'s
+   `_FakeForecaster.save` writes `{"model_class": "fake"}` (line 55–57), and `import_class("fake")`
+   raises `ValueError: 'fake' is not a fully-qualified class path`. Both
+   `test_fetch_model_artifacts_unpacks_the_archive_into_dest` (line 220) and the #470
+   shrinking-population test (line 194) call `fetch_model_artifacts` on that fake.
+2. That file's docstring says the fake exists to keep these tests "free of any model-library
+   dependency", and `packages/ml_core/pyproject.toml` does not depend on `xgboost_forecaster`.
+   Routing through `load_forecaster_from_dir` would force a real model into `ml_core`'s test suite.
+3. It would load every booster at promotion time — several GB at V2's ~2,500 series — to answer a
+   question that is answerable from one JSON field.
 
-### Departure 3 — booster `feature_names` comparison: **rejected**, with evidence
+Reading the field directly is cheaper, keeps `ml_core`'s tests model-library-free, and matches what
+the issue itself proposed (`ParsedFeatures.from_strings(set(model_params["selected_features"]))`).
+
+The cost of not loading: promotion no longer proves `model_class` is importable or the boosters
+readable. That is out of this issue's scope and is already caught at the first `live_forecasts`
+tick, which is loud (the run fails and `live_forecasts_job`'s Sentry failure hook reports it).
+
+### Departure 4 — booster `feature_names` comparison: **rejected**, with evidence
 
 The issue's second open question asks whether to compare `Booster.feature_names` against
 `selected_features`. Verified empirically against the installed xgboost 3.4.0:
 
 - `xgb.QuantileDMatrix(polars_df, …)` sets `feature_names` from the frame's columns, and those
   names survive a `.ubj` `save_model`/`load_model` round-trip.
-- `Booster.predict` validates them and raises
-  `ValueError: feature_names mismatch: [...] [...] / training data did not have the following
-  fields: …`.
+- `Booster.predict` validates them and raises `ValueError: feature_names mismatch: […] […] /
+  training data did not have the following fields: …`.
 
-`XGBoostForecaster._feature_cols` is `sorted(self.model_params.selected_features)` and
-`_prepare_features` selects exactly those columns, so a `meta.json`-vs-booster disagreement already
-fails loudly, with a message that names the offending column, at the first `predict`. It is not the
-*silent* class of failure this issue exists to close. It can also only arise from hand-editing
-`meta.json`, which is already ruled out. Adding it would need either a new hook on the
-`BaseForecaster` ABC or model-specific code in a model-agnostic helper — real machinery for a
-failure mode that is already loud and that nothing has produced. Not in this change.
-
-(If Jack wants it anyway, the cheap version is a self-consistency check inside
-`XGBoostForecaster.load` — the boosters are already loaded there, so it costs three lines and no
-new ABC surface. Flagged under Open questions.)
+`XGBoostForecaster._feature_cols` is `sorted(self.model_params.selected_features)`
+(`forecaster.py:90-91`) and `_prepare_features` selects exactly those columns, so a
+`meta.json`-versus-booster disagreement already fails loudly, naming the offending column, at the
+first `predict`. It is not the *silent* class of failure this issue exists to close, and it can only
+arise from hand-editing `meta.json`, which is already ruled out. Adding it needs either a new hook
+on the `BaseForecaster` ABC or model-specific code in a model-agnostic helper. Not in this change.
 
 ## What changes, file by file
 
 ### `packages/ml_core/src/ml_core/_production_helpers.py`
 
-- **New private function `_check_selected_features_are_parseable(forecaster, path)`.** Calls
-  `ParsedFeatures.from_strings(forecaster.model_params.selected_features)` and, on `ValueError`,
-  re-raises a `ValueError` `from` it whose message states: the directory, the model's
-  `experiment_name`, the underlying parse error (which already names the offending feature), and
-  the remedy — *re-train and re-promote; never hand-edit `meta.json`*. Nothing else; no swallowing.
-- **`load_forecaster_from_dir`** — call it on the loaded forecaster before returning, and add a
-  `Raises:` entry for the new `ValueError`. Its docstring gains one sentence saying the returned
-  forecaster is one this code can actually engineer features for, not merely one it could
-  deserialise.
-- **`fetch_model_artifacts`** — between `_download_and_unpack_model` and the `rmtree`/`move`,
-  call `load_forecaster_from_dir(downloaded_dir)` and discard the result. Ordering: unpack →
-  validate → write `promotion.json` → swap, so a rejected promotion writes nothing at all and
-  `dest` is never touched. Docstring: state that the atomic swap now also gates on the model being
-  loadable *and* servable by this code, and that a rejected promotion leaves the previous champion
-  in place.
-- **Module docstring** — it currently calls both disk/MLflow helpers "thin, single-purpose IO
-  wrappers". Reword to reflect that they are the promotion/serving gate.
+- **New private function** `_check_selected_features_are_parseable(selected_features: set[str] |
+  None, source: str) -> None`. Calls `ParsedFeatures.from_strings(...)`; on `ValueError`, re-raises
+  a `ValueError` `from` it whose message names `source` (the directory or run being validated), the
+  underlying parse error (which already names the offending feature), and the remedy — *re-train
+  and re-promote; never hand-edit `meta.json`*. A `None` `selected_features` returns without
+  checking: an absent key is not a malformed vocabulary, and `BaseForecaster.save`'s documented
+  contract mandates only `model_class`.
 
-Import note: `ml_core.base_forecaster` already imports from `ml_core.features`, so importing
-`ParsedFeatures` here adds no new cycle.
+  **Message constraint (easy to trip):** the message must not contain the substring `mlflow` in any
+  casing. `scripts/build_and_verify_image.sh` hard-fails the image on `grep -qi "mlflow"` over the
+  container log as its one automated hermeticity gate, and this message can reach that log. Say
+  "re-promote", never "re-promote from MLflow".
+
+  Import `ParsedFeatures` from `ml_core.features._parsed_features` — `ml_core/features/__init__.py`
+  exports only `FeatureEngineer` and `TabularFeatureEngineer`, and widening that public surface for
+  one internal caller is not worth it. No import cycle: `ml_core.base_forecaster` already imports
+  from `ml_core.features`.
+
+- **`fetch_model_artifacts`** — after `_download_and_unpack_model`, before `promotion.json` is
+  written and before the `rmtree`/`move`: read the staged `meta.json`, pull
+  `model_params.selected_features` (absent → `None`), and call the check with the run id as
+  `source`. Ordering is unpack → validate → stamp → swap, so a rejected promotion writes nothing
+  anywhere and `dest` is untouched. Docstring gains: the swap now gates on the model's feature
+  vocabulary, and a rejected promotion leaves the previous champion in place.
+- **`load_forecaster_from_dir`** — call the check on the loaded forecaster's
+  `model_params.selected_features` before returning; add the `ValueError` to `Raises:`. Docstring
+  gains one sentence: the returned forecaster is one this code can engineer features for, not
+  merely one it could deserialise.
+- **Module docstring** — it calls both disk/MLflow helpers "thin, single-purpose IO wrappers".
+  Reword: they are now the gate between a saved model and this code's ability to serve it.
 
 ### `src/nged_substation_forecast/defs/production_assets.py`
 
-- `promoted_model` — no code change. Its docstring gains a sentence that promotion now refuses a
-  model whose `selected_features` this code cannot parse, and that the refusal happens before the
-  directory swap so the previous champion survives.
-- `live_forecasts` — no code change (it already calls `load_forecaster_from_dir`). Its docstring's
-  "Loads the production model…" paragraph gains the same fact, next to the existing empty-model
-  raise.
+No code change in either asset. Docstring edits only:
 
-### `packages/ml_core/src/ml_core/features/__init__.py`
+- `promoted_model` — promotion refuses a model whose `selected_features` this code cannot parse,
+  and refuses it before the directory swap, so the previous champion survives.
+- `live_forecasts` — the "Loads the production model…" paragraph gains the same fact, beside the
+  existing empty-population raise it sits next to.
 
-Check `ParsedFeatures` is exported; if it is only reachable as
-`ml_core.features._parsed_features.ParsedFeatures`, import it from the private module rather than
-widening the package's public surface for one caller.
+### `packages/ml_core/tests/test_base_forecaster.py`
+
+`_FakeForecaster.save` gains `"model_params": self.model_params.model_dump(mode="json")` in the
+`meta.json` it writes. That makes the fake faithful to what every real `BaseForecaster.save` writes,
+and is what lets the new promotion test below be written here with no model-library dependency. The
+two existing `fetch_model_artifacts` tests keep passing: the fake's default config is
+`BaseForecasterConfig(selected_features=set())`, which parses fine.
 
 ## Design-philosophy check
-
-This code path straddles both postures, and the split is exactly the one
-`docs/design-philosophy/inherent-stability.md` already draws.
 
 - **Rule 1** reserves raising for "states that are our own bug — an empty promoted model, a
   contract violation". A promoted model whose feature vocabulary the serving code cannot parse is
   the same class as the empty-promoted-model raise sitting fifteen lines away in `live_forecasts`.
   It is not the outside world misbehaving; it is an artefact we produced meeting code we wrote.
-  #486's own comment makes this argument by reference to #446, and #446 makes it in the opposite
-  direction for NWP staleness. Consistent.
+  This issue's own comment makes that argument by reference to #446, and #446 makes it in the
+  opposite direction for NWP staleness. Consistent.
 - The failure-modes table already carries the row **"The promoted model is empty or unloadable →
   Hard failure — the asset raises → Unchanged: this is a promotion bug, not a data outage → Yes,
   next business day."** This change is that row, made true of one more way a model can be
-  unloadable. The row's wording is widened rather than a new row added (see Docs below).
+  unusable. Widen the row's wording; do not add a row.
 - **Rule 2** (liberal about missing, strict about malformed): `selected_features` naming a feature
-  that does not exist is malformed input at a contract boundary, rejected there.
-- **Rule 6/7** are untouched: this adds **no asset check**, so nothing warns, nothing runs
-  `blocking=False`, and no warning path gains a way to raise.
-- **Rule 8** (capability in the training loop rather than the serving path): the guard is a
-  promotion-time gate, not a serving-path branch; `live_forecasts` gets no new `if`. What it gets
-  is the *same* failure it already had, moved earlier and given a message.
-- **Rule 10** ("damp the corrections… hysteresis on model promotion"): a promotion that refuses
-  rather than half-lands is damping in the small.
-- Hypotheses: this serves
+  that does not exist is malformed input at a contract boundary, rejected there. An *absent*
+  `selected_features` key is missing rather than malformed, which is why it passes.
+- **Rules 6 and 7** are untouched: this adds **no asset check**, so nothing warns and no warning
+  path gains a way to raise. Confirmed by tracing the one check that reads the promoted model,
+  `_read_promoted_model_facts` (`defs/checks.py:706-742`) — it parses `meta.json` by hand, degrades
+  to `_UNKNOWN_PROMOTED_MODEL`, never touches `ParsedFeatures`, and `live_forecasts_are_healthy`
+  runs its whole body under a `BaseException` catch-all regardless.
+- **Rule 8** (capability in the training loop, not the serving path): partially in tension, and
+  worth stating plainly rather than glossing. The check *does* run on the serving path — every
+  6-hourly tick calls `load_forecaster_from_dir`. That is deliberate: parsing ~24 strings is cheap
+  enough that one function can serve both the promotion gate and the serving path, which is better
+  than two implementations that can drift apart. `live_forecasts` gains no branch and no fallback;
+  the failure it already had simply moves earlier and acquires a message.
+- **Rule 10** ("hysteresis on model promotion"): a promotion that refuses rather than half-lands is
+  damping in the small.
+- Hypotheses: serves
   [H1 — a service that mostly runs itself](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h1-a-service-that-mostly-runs-itself)
-  and its test **T1.1**, by removing an `our-bug` intervention category from the
+  and its test **T1.1**, by removing an `our-bug`-category entry from the
   [intervention log](https://openclimatefix.github.io/nged-substation-forecast/live_service/intervention-log/)
-  before it can happen — T1.1 predicts ≥90% of entries are `upstream-contract`, and the #463 class
-  of incident is `our-bug`.
-- Design principles: no principle is traded away.
+  before it can happen. T1.1 predicts ≥90% of entries are `upstream-contract`; the #463 class is
+  `our-bug`.
+- Design principles: none traded away.
   [Principle 7, strict contracts at every boundary](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#7-strict-contracts-at-every-boundary),
-  is *strengthened* — the model directory becomes a validated boundary rather than an assumed one.
+  is strengthened — the promoted-model directory becomes a validated boundary rather than an
+  assumed one.
 
 ## Tests
 
-All new tests are unit tests in `packages/ml_core/tests/test_production_helpers.py`, alongside the
-existing `load_forecaster_from_dir` round-trip tests, except where noted. Each is stated with the
-assertion that fails on `main` today.
+Each is stated with the assertion that fails on `main` today. Construction facts below were checked
+by running them, not by reading.
 
-1. **`test_load_forecaster_from_dir_rejects_an_unparseable_feature`** — save a real
-   `XGBoostForecaster` whose `selected_features` includes a name the current code cannot parse
-   (`"local_utc_offset"` — the actual stale name, so the test doubles as a regression pin), then
-   `load_forecaster_from_dir(tmp_path)`. Assert `pytest.raises(ValueError, match=...)` naming the
-   offending feature. **On `main` this returns a forecaster happily** — the load path never touches
-   `ParsedFeatures` — so the test fails on `main` with "DID NOT RAISE".
+**In `packages/ml_core/tests/test_production_helpers.py`** (beside the existing
+`load_forecaster_from_dir` round-trip tests):
 
-   Construction note: `XGBoostConfig(selected_features={"local_utc_offset", …})` is accepted by
-   pydantic (`selected_features: set[str]`, no validator), and training is not required — `save()`
-   with no boosters still writes a `meta.json` with `model_params` and an empty
-   `trained_time_series_ids`. Keep the test that cheap.
+1. `test_load_forecaster_from_dir_rejects_an_unparseable_feature` — save a real
+   `XGBoostForecaster` whose `selected_features` includes `"local_utc_offset"` (the actual stale
+   name, so the test doubles as a regression pin), then `load_forecaster_from_dir(tmp_path)`.
+   `pytest.raises(ValueError, match="local_utc_offset")`. **On `main` this returns a forecaster
+   without complaint**, so the test fails with "DID NOT RAISE".
 
-2. **`test_load_forecaster_from_dir_accepts_the_current_vocabulary`** — the same shape with
-   `{"local_utc_offset_minutes", "temperature_2m", "power_lag_24h", "windchill"}`, asserting no
-   raise and that `model_params.selected_features` round-tripped. Passes on `main` too; it is the
-   negative control that stops finding #1 by making the guard reject everything. Stated as such in
-   its docstring so a reviewer does not mistake it for a test of this change.
+   Cheap construction, verified: `XGBoostConfig(selected_features={"local_utc_offset", …})` is
+   accepted (`selected_features: set[str]`, no validator), and `save()` with zero trained boosters
+   writes a usable `meta.json` carrying the full `model_params` — no training needed.
 
-3. **`test_fetch_model_artifacts_leaves_the_previous_model_in_place_when_the_new_one_is
-   _unservable`** — in `packages/ml_core/tests/test_base_forecaster.py`, where the existing
-   `fetch_model_artifacts` tests live (file-store MLflow, `MLFLOW_ALLOW_FILE_STORE=true` per the
-   existing fixtures). Save a good model to run A, promote it to `dest`; save a stale-vocabulary
-   model to run B; assert `fetch_model_artifacts(B, dest)` raises **and** that `dest`'s
-   `meta.json` still names run A's experiment and `promotion.json` still names run A. **On `main`
-   this overwrites `dest`**, so both post-conditions fail.
+2. `test_load_forecaster_from_dir_accepts_the_current_vocabulary` — the same shape with
+   `{"local_utc_offset_minutes", "temperature_2m", "power_lag_24h", "windchill"}`; asserts no raise
+   and that `selected_features` round-tripped. Passes on `main` too. It is the negative control
+   that stops test 1 being satisfied by a guard that rejects everything — its docstring says so, so
+   a reviewer does not mistake it for a test of this change.
 
-4. **`test_promoted_model_refuses_a_model_with_an_unparseable_feature`** — in
-   `tests/test_promoted_model.py` (integration marker, real file-store MLflow + Dagster, reusing
-   `_save_trained_model_to_mlflow` with a `selected_features` parameter added). Assert
-   `materialize(...)` does **not** succeed and that `production_model_path` was not created.
-   **On `main` the materialisation succeeds**, so `assert not result.success` fails. This is the
-   test that pins the issue's actual headline claim at the asset level.
+3. `test_a_model_without_selected_features_is_not_rejected` — a hand-written `meta.json` holding
+   `model_class` and `model_params` without a `selected_features` key must not raise. Pins the
+   deliberate missing-versus-malformed asymmetry (rule 2) so a later edit cannot quietly tighten it
+   into a fail-closed. Passes on `main`; stated as a contract pin, not as a test of this change.
 
-   `_save_trained_model_to_mlflow` currently hard-codes `selected_features={"temperature_2m"}`;
-   give it a keyword-only `selected_features` parameter defaulting to that, so the three existing
-   tests are untouched.
+**In `packages/ml_core/tests/test_base_forecaster.py`** (file-store MLflow, existing fixtures, no
+model-library dependency):
 
-No test asserts on the *exact* wording of the message beyond the offending feature name — matching
-full prose makes the test a spellchecker.
+4. `test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable` — save a
+   `_FakeForecaster` with a good vocabulary to run A and promote it to `dest`; save one with
+   `selected_features={"local_utc_offset"}` to run B; assert `fetch_model_artifacts(B, dest)`
+   raises **and** that `dest`'s `meta.json` still holds run A's vocabulary and `promotion.json`
+   still names run A. **On `main` `dest` is overwritten**, so all three post-conditions fail. This
+   is the test that pins "a rejected promotion leaves the previous champion in place", which is the
+   plan's main departure from the issue's proposed placement.
+
+**In `tests/test_promoted_model.py`** (integration marker, real file-store MLflow + Dagster):
+
+5. `test_promoted_model_refuses_a_model_with_an_unparseable_feature` — assert the materialisation
+   fails and `production_model_path` was not created.
+
+   **`dagster.materialize` defaults to `raise_on_error=True`**, so after the change the exception
+   propagates out of `materialize` and any `assert not result.success` would never run. Write this
+   as `pytest.raises(...)` around the `materialize` call, or pass `raise_on_error=False` and assert
+   on `result.success`. On `main` the materialisation succeeds either way, so the test fails there.
+
+   `_save_trained_model_to_mlflow` hard-codes `selected_features={"temperature_2m"}`; give it a
+   keyword-only `selected_features` parameter defaulting to that, leaving the three existing tests
+   untouched.
+
+No test matches the message beyond the offending feature name — asserting on full prose makes the
+test a spellchecker.
 
 ## Docs to update
 
-- **`docs/live_service/operations.md`, Step 2** — the numbered "What the asset does" list gains the
-  refusal as its own step, before the download's atomic replace, saying what a refusal looks like
-  and that the previous champion is untouched. Also worth one line under Step 1 warning that the
-  candidate table lists *every* fold run ever trained, including ones whose feature vocabulary
-  predates a rename — which is precisely the state Jack's MLflow store is in today.
-- **`docs/live_service/operations.md`, Step 3** — the "What the asset does" item 1 currently says
-  "Raises if the model has no trained time series (re-promote first)". Extend to the new raise.
+- **`docs/live_service/operations.md`, Step 2** — the "What the asset does" list gains the refusal
+  as its own numbered step, ahead of the atomic replace, saying what a refusal looks like and that
+  the previous champion is untouched. Add one line under Step 1 warning that the candidate table
+  lists *every* fold run ever trained, including ones whose feature vocabulary predates a rename.
+- **`docs/live_service/operations.md`, Step 3** — item 1 says "Raises if the model has no trained
+  time series (re-promote first)". Extend to the new raise.
 - **`docs/design-philosophy/inherent-stability.md`** — the failure-modes row "The promoted model is
   empty or unloadable" becomes "empty, unloadable, or built from features this code no longer
-  recognises". One-word-scale edit; do not add a row.
-- **`docs/architecture/production-deployment.md:353`** — describes `fetch_model_artifacts` as "a
-  pure, asset-independent helper". Read the surrounding paragraph and adjust if the new validation
-  makes the sentence untrue.
-- **`docs/architecture/ml-orchestration.md:55`** — mentions `fetch_model_artifacts` unpacking into a
-  temporary directory. Check whether the pre-swap validation belongs in that sentence.
+  recognises". A few words; do not add a row.
 - **`scripts/build_and_verify_image.sh` header** — the "What it gates on, and what it does not"
   section says the container is expected to fail at the NWP lookup, "which runs *after* the model
-  has already loaded. That ordering is the proof the model loaded." Still true, and now stronger:
-  add a sentence that a failure *at* model load with the feature-vocabulary message means the
-  baked-in model predates a feature change and must be re-promoted from a re-trained run.
-- **Not a roadmap-completing change**, so no "Implementation details" deletion and no status-banner
-  edit. Confirm against `docs/roadmap/live-service.md` during implementation.
+  has already loaded. That ordering is the proof the model loaded." Still true. Add a sentence that
+  a failure *at* model load naming a feature means the baked-in model predates a feature change and
+  must be re-promoted from a re-trained run. Re-read the `grep -qi "mlflow"` gate below it while
+  editing — that is where the message constraint above comes from.
+- **`docs/live_service/aws.md`** (Step 4's cloud twin, the "dying at the lookup means
+  `load_forecaster_from_dir` already succeeded" paragraph) — verify it is still accurate. It should
+  be, and stronger; change it only if the new failure mode makes the sentence read as exhaustive.
+- **`docs/architecture/production-deployment.md`** and **`docs/architecture/ml-orchestration.md`**
+  — both name `fetch_model_artifacts`. Re-read the surrounding paragraphs and adjust only where the
+  added validation makes a sentence untrue. See "Out of scope" below before editing
+  `production-deployment.md`.
+- **Not a roadmap-completing change**: no "Implementation details" deletion, no status-banner edit.
+  Confirm against `docs/roadmap/live-service.md` during implementation.
 
-Everything above is written in the present tense, describing how the code works now — no "used to",
-no issue numbers in the prose (CLAUDE.md, "Write about the present, not the past").
+All doc prose in the present tense, describing the code as it then stands — no "used to", no issue
+numbers in the prose (CLAUDE.md, "Write about the present, not the past").
 
 ## Verification commands
-
-The green-before-push set:
 
 ```bash
 uv run ruff check . && uv run ruff format . && uv run --all-packages ty check && uv run pytest
 ```
 
-Docs were touched, so also:
+Docs are touched, so also:
 
 ```bash
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
@@ -255,37 +299,76 @@ uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 uv run mkdocs build --strict
 ```
 
-No new or changed links are planned, so reading the rendered HTML is only needed if implementation
-introduces one. Specific to this change, and worth running by hand once:
+No new or changed links are planned, so reading the rendered HTML is needed only if implementation
+introduces one. Run the directly-affected suites by hand once:
 
 ```bash
 uv run pytest tests/test_promoted_model.py packages/ml_core/tests/test_production_helpers.py packages/ml_core/tests/test_base_forecaster.py -v
 ```
 
-No `--run-network` tests are involved. **Do not** run a real promotion against `data/production_model/`
-while verifying — the model on disk is the current champion.
+No `--run-network` tests are involved. **Do not run a real promotion against
+`data/production_model/` while verifying** — the model there is the current champion.
 
-## Risks and open questions
+## Out of scope — report, do not fix
 
-1. **Does `fetch_model_artifacts` loading the model cost too much at V2 scale?** At ~2,500 series
-   the boosters are several GB. *Recommendation: accept it.* `live_forecasts` already loads every
-   booster on every 6-hourly tick, so promotion loading them proves nothing more than that the
-   serving path can. If it does not fit at promotion, it does not fit at serving either, and
-   finding that out with an operator present is the point.
+`docs/architecture/production-deployment.md` states "**The Docker build reuses this same asset**
+(headlessly, via `dagster asset materialize`)". It does not: `Dockerfile:61` is
+`COPY data/production_model/ data/production_model/`, and the build never talks to Dagster or
+MLflow. Pre-existing staleness, unrelated to this change, but the implementer is sent to read that
+paragraph and will land on it. Flag it to Jack; do not fix it here (CLAUDE.md: discuss out-of-scope
+changes first).
 
-2. **Should the booster `feature_names` check go in `XGBoostForecaster.load` anyway?** Three lines,
-   no new ABC surface, and it guards exactly the hand-edit-`meta.json` shortcut. *Recommendation:
-   no, not in this issue* — it is already loud at `predict` (verified above), and it widens the
-   diff past the issue's scope. Easy to add later as its own issue if the temptation to hand-edit
-   ever bites.
+## Open questions
 
+1. **Should the guard also prove the model *loads* — `model_class` importable, boosters readable —
+   at promotion time?** *Recommendation: no.* It costs a full booster load (several GB at V2), needs
+   a model library inside `ml_core`'s tests, and the failure is already loud at the first tick.
+   Worth its own issue if a promotion ever lands a model that parses but will not load.
+2. **Should the booster `feature_names` check go into `XGBoostForecaster.load` anyway?** Three
+   lines, no new ABC surface, and it guards the hand-edit-`meta.json` shortcut specifically.
+   *Recommendation: no, not in this issue* — already loud at `predict` (verified above), and it
+   widens the diff past scope.
 3. **Should the guard be widened from "features parse" to "features engineer"?** Parsing catches a
-   renamed or removed feature name. It does not catch a feature whose *name* survived but whose
-   engineering changed (a new required NWP variable, say). The full version is a synthetic-data
-   smoke `engineer()` + `predict()` at promotion time. *Recommendation: no.* That is a much larger
-   change needing a realistic `AllFeatures` fixture, and the parse check covers every failure this
-   project has actually had. Worth its own issue if a second incident argues for it.
-
+   renamed or removed feature name, not a feature whose name survived but whose engineering changed
+   (a newly-required NWP variable, say). The full version is a synthetic-data `engineer()` +
+   `predict()` smoke test at promotion time. *Recommendation: no* — much larger, needs a realistic
+   `AllFeatures` fixture, and parsing covers every failure this project has actually had.
 4. **Should `live_forecasts` degrade rather than raise on an unservable model?** *Recommendation:
-   no* — and this is settled, not open: rule 1 and #446's `trained_ids` argument both put a
-   promotion bug on the loud side. Recorded here only so the choice is visible in review.
+   no*, and this is settled rather than open: rule 1 and #446's `trained_ids` argument both put a
+   promotion bug on the loud side. Recorded so the choice is visible in review.
+
+## What the adversarial review changed
+
+A fresh sub-agent reviewed this plan with no access to the reasoning behind it. Findings accepted
+and folded in above:
+
+- **Routing `fetch_model_artifacts` through `load_forecaster_from_dir` would break two existing
+  tests** — `_FakeForecaster` writes `model_class: "fake"`, which `import_class` rejects. Verified.
+  This reshaped the whole mechanism: the check now reads `meta.json` directly, which also removes
+  the V2 booster-loading cost the first draft had listed as an open risk.
+- **`dagster.materialize` defaults to `raise_on_error=True`**, so the planned
+  `assert not result.success` would never execute. Verified against the signature.
+- **The two stale MLflow runs are already unpromotable** (old `model/` directory layout, rejected by
+  `_download_and_unpack_model`). Verified by listing their artifacts. This demolished the first
+  draft's headline "the hazard is live right now" and forced the honest forward-looking framing in
+  the Verdict.
+- **The plan claimed the container smoke test "closes" the code-changed-after-promotion direction.**
+  It does not: the script's only automated gate is the MLflow-hermeticity grep, and its own header
+  says the model-load-then-NWP ordering is confirmed by eye. Table rewritten; the overclaim is gone.
+- **The new error message must not contain "mlflow"** in any casing, or the smoke test hard-fails
+  the image. Genuinely non-obvious; now recorded as a constraint on the message.
+- **The rule-8 justification was wrong** — the check does run on the serving path, every tick.
+  Rewritten to say so and defend it, rather than deny it.
+- **`docs/architecture/production-deployment.md`'s "the Docker build reuses this same asset" is
+  stale.** Recorded under "Out of scope — report, do not fix".
+
+Findings noted but **not** acted on:
+
+- *"Row 2 of the placement table over-claims: `live_forecasts` already fails today, so detection is
+  unchanged."* Half right, and the table now says "fails at load rather than deep in `engineer()`"
+  instead of "caught". Rejected as a reason to drop the call site: moving a failure ahead of a
+  15-day power read and a full NWP partition scan, and attaching a message that names the remedy, is
+  the difference between an operator reading a stack trace and an operator reading an instruction.
+- *"`docs/live_service/aws.md`'s twin paragraph should be updated alongside the script header."* The
+  paragraph stays true after the change, so it is listed as a check-during-implementation rather than
+  a scheduled edit — rewriting prose that is already correct is churn.
