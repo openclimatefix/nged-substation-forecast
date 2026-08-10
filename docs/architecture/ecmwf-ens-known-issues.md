@@ -35,15 +35,16 @@ data.
 Usually the corruption is scattered per-pixel, a few percent of a slice. Occasionally a whole
 `(ensemble_member, valid_time)` slice arrives null across the grid: the 2026-08-09 00Z run had
 `downward_short_wave_radiation_flux_surface` null worldwide for ensemble member 34 at the 354-hour
-and 360-hour steps — 2 of that run's 4284 `(variable, member, step)` slices.
+and 360-hour steps — 2 of that variable's 4284 `(member, step)` slices (51 ensemble members × the
+84 steps beyond lead-0).
 
 Both patterns are tolerated at ingest, for the same two reasons. First, all three variables are
 already legitimately null at lead-0 (the de-accumulation has no previous step to difference
 against), so every model must handle their nulls regardless. Second, the run that failing would
 discard is overwhelmingly good. Take that 2026-08-09 run as the worked example: 0.05% of one
-already-nullable variable is not worth the other 4282 slices, all 13 variables and all 51 ensemble
-members, and rejecting it leaves the live forecast on a run 24 hours older. That is exactly the
-trade
+already-nullable variable is not worth the other 4282 slices of that same variable, nor the twelve
+other variables that arrived complete, and rejecting it leaves the live forecast on a run 24 hours
+older. That is exactly the trade
 [principle 7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary)
 warns against, in its own words: throwing away an otherwise-good NWP run converts a tolerable
 problem into an outage.

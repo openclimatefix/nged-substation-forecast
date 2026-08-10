@@ -316,10 +316,10 @@ class Nwp(pt.Model):
         Every smaller null pattern is *tolerated* and reported by :func:`assess_nwp_quality`
         instead, because the run it would otherwise discard is overwhelmingly good. That covers
         both the scattered per-pixel corruption known upstream and the occasional whole slice that
-        arrives empty — a run can carry 2 wholly-null slices out of 4284 and still be worth every
-        one of the other 4282, across all 13 variables and all 51 ensemble members. Nulls in these
-        three variables are in-distribution regardless: all three are legitimately null at lead-0
-        in every run, so every model already handles them.
+        arrives empty — a run can carry 2 wholly-null slices out of one variable's 4284 (51 members
+        × 84 steps beyond lead-0) and still be worth the other 4282, plus the twelve variables that
+        arrived complete. Nulls in these three variables are in-distribution regardless: all three
+        are legitimately null at lead-0 in every run, so every model already handles them.
 
         The judgement is made per `init_time`, so a run whose column is empty is caught even inside
         a frame holding other, healthy runs. There is no tunable fraction here — the test is that

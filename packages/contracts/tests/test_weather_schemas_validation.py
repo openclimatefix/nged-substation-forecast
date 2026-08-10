@@ -123,7 +123,8 @@ def test_scattered_deaccumulated_null_beyond_lead0_is_tolerated(deaccumulated_va
 @pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
 def test_whole_slice_deaccumulated_null_beyond_lead0_is_tolerated(deaccumulated_var: str) -> None:
     """One wholly-null (member, valid_time) slice is tolerated while the variable still carries
-    weather elsewhere in the run — the 2026-08-09 class, where 2 of 4284 slices arrived empty.
+    weather elsewhere in the run — the 2026-08-09 class, where 2 of that variable's 4284
+    (member, step) slices arrived empty.
 
     Failing here would discard an otherwise-good run for a fraction of one already-nullable
     variable, so the slice is landed and reported by the quality assessor instead.

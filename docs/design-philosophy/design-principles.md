@@ -308,8 +308,9 @@ de-accumulated variable that is null in *every* slice beyond lead-0 — a column
 at all — but tolerates every smaller null pattern, from scattered per-pixel corruption up to a
 whole `(ensemble_member, valid_time)` slice, which the `nwp_has_no_unexpected_nulls` check reports
 as a `WARN`. That line is this principle's granularity clause doing real work: a run can arrive
-with 2 of its 4284 slices empty, and rejecting it over 0.05% of one already-nullable variable is
-exactly the tolerable-problem-into-an-outage trade the clause exists to forbid.
+with 2 of one variable's 4284 `(member, step)` slices empty, and rejecting it over 0.05% of a
+single already-nullable variable is exactly the tolerable-problem-into-an-outage trade the clause
+exists to forbid.
 
 *Serves:*
 [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
