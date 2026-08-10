@@ -194,6 +194,16 @@ def test_import_class_rejects_a_bare_name():
         import_class("CvConfig")
 
 
+def test_import_class_rejects_a_relative_target():
+    """A ``_target_`` is read in whatever process loads it, so it has no package to be relative to.
+
+    Rejected before ``import_module`` sees it, which would raise a ``TypeError`` asking for the
+    ``package`` argument rather than a ``ValueError`` naming the malformed target.
+    """
+    with pytest.raises(ValueError, match="not a fully-qualified class path"):
+        import_class(".config_schemas.CvConfig")
+
+
 def test_import_class_rejects_an_unimportable_module():
     with pytest.raises(ValueError, match="Cannot import module"):
         import_class("contracts.no_such_module.CvConfig")

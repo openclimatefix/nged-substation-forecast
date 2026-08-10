@@ -174,7 +174,9 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 
 You never edit a YAML file per experiment. Instead, pass `config_overrides` to
 `register_experiment_job`. Each override is applied to `model_params` before the config object is
-constructed, so any `model_params` key can be overridden.
+constructed, so any `model_params` key can be overridden — except `_target_`, which names the
+config class itself and is rejected. To use a different config class, point `base_model_config`
+at a different YAML.
 
 **Example — reduce tree depth and add a feature:**
 
@@ -197,7 +199,6 @@ want, not just the new one. The same holds when a `model_params` value is itself
 an override replaces the whole mapping, dropping the base's other keys, so restate every key
 you want to keep.
 
-The resolved config (the YAML defaults with your overrides applied) is frozen as a JSON tag on
-the
+The resolved config (the YAML defaults with your overrides applied) is frozen as a JSON tag on the
 MLflow experiment at registration time. That frozen record is what `trained_cv_model` reads back
 at train time — so changing the YAML after registering an experiment has no effect on it.

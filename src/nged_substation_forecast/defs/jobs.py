@@ -74,8 +74,8 @@ def _required_targets(raw: Any, config_path: Path) -> tuple[str, str, dict[str, 
         mapping — with its ``_target_`` removed, so it is ready to splat into the config class.
 
     Raises:
-        ValueError: The file is not a mapping, or is missing either ``_target_`` or
-            ``model_params``.
+        ValueError: The file is not a mapping, is missing either ``_target_`` or ``model_params``,
+            or has a ``_target_`` that is not a string.
     """
     try:
         forecaster_target = raw["_target_"]
@@ -87,6 +87,15 @@ def _required_targets(raw: Any, config_path: Path) -> tuple[str, str, dict[str, 
             " '_target_' naming the BaseForecaster subclass, and a 'model_params' mapping whose"
             f" own '_target_' names the config class. Got: {error!r}"
         ) from error
+    # An empty `_target_:` parses to None, which would otherwise reach import_class and fail there
+    # with a bare AttributeError from str.rpartition — the very thing this helper exists to avoid.
+    if not isinstance(forecaster_target, str) or not isinstance(config_target, str):
+        # TRY004 wants a TypeError, but this is one of several ways the *file's contents* can be
+        # unusable, and a caller should need to catch only one exception type to mean "bad config".
+        raise ValueError(  # noqa: TRY004
+            f"{config_path} is not a usable model config: both '_target_' values must be strings"
+            f" naming a class; got {forecaster_target!r} and {config_target!r}."
+        )
     return forecaster_target, config_target, model_params
 
 
@@ -107,16 +116,29 @@ def _resolve_forecaster_config(
         config_overrides: Overrides applied to ``model_params`` as **whole-value replacement**: an
             override replaces the base value outright rather than merging into it. Lists are
             replaced, not extended, and a value that is itself a mapping is replaced whole, so
-            an override must restate every key of that mapping it wants to keep.
+            an override must restate every key of that mapping it wants to keep. Every
+            ``model_params`` key is overridable except ``_target_``.
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
         A ``(forecaster_cls, forecaster_config)`` tuple.
+
+    Raises:
+        ValueError: ``config_overrides`` tries to override ``_target_``, or the YAML is not a
+            usable model config.
     """
     config_path = PROJECT_ROOT / base_model_config
     with config_path.open(encoding="utf-8") as file:
         raw = yaml.safe_load(file)
     forecaster_target, config_target, model_params = _required_targets(raw, config_path)
+    # Which config class to build is a property of the model YAML, not of a run's overrides: a
+    # forecaster and its config class come as a pair, so swapping one alone cannot work. Rejecting
+    # the key beats letting pydantic's extra="ignore" swallow it and silently build the base class.
+    if "_target_" in config_overrides:
+        raise ValueError(
+            "config_overrides may not override '_target_': the config class is fixed by"
+            f" {config_path}. Point base_model_config at a different YAML instead."
+        )
     model_params.update(config_overrides)
     forecaster_cls = cast(type[BaseForecaster], import_class(forecaster_target))
     config_cls = cast(type[BaseForecasterConfig], import_class(config_target))

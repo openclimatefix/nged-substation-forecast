@@ -391,7 +391,7 @@ itself a relevant statistic (visible as the MLflow experiment count).
 - Add a `final_test` fold `2026-04-01 → 2026-06-30` with a new per-fold flag
   `final_test: true` (extend `CvConfig` / the fold schema in
   `packages/contracts/src/contracts/config_schemas.py`; it is neither a leaderboard fold nor a
-  dev fold — `_fold_ids_for_run_mode` in `defs/jobs.py:96` must *not* include it in any
+  dev fold — `_fold_ids_for_run_mode` in `defs/jobs.py` must *not* include it in any
   run mode, so no experiment trains or scores on it in the normal flow).
 - Scoring against the final-test window is a deliberate, rare act — only for champion
   candidates immediately before promotion — via the `metrics` asset with

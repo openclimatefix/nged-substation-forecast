@@ -52,19 +52,20 @@ def import_class(target: str) -> type:
         The class named by ``target``.
 
     Raises:
-        ValueError: ``target`` names no module path, is not absolute, its module cannot be found,
-            the module has no such attribute, or the attribute is not a class. An exception raised
-            by the module's *own* import propagates unchanged, so a broken module reports its own
-            failure rather than hiding behind "cannot import".
+        ValueError: ``target`` names no module path, is relative, its module cannot be imported,
+            the module has no such attribute, or the attribute is not a class. A module that
+            fails on its *own* imports is reported the same way — the original ``ImportError``
+            is chained as ``__cause__``.
     """
     module_path, _, class_name = target.rpartition(".")
-    if not module_path:
+    # A leading dot would make import_module read the target as a relative import and demand a
+    # package to resolve it against; that is a malformed target, so reject it here rather than
+    # letting it surface as the TypeError import_module would raise.
+    if not module_path or module_path.startswith("."):
         raise ValueError(f"{target!r} is not a fully-qualified class path (expected 'module.Cls').")
     try:
         module = importlib.import_module(module_path)
-    # TypeError is what a leading dot earns — import_module reads it as a relative import and
-    # demands a package to resolve against. That is a malformed target, not a missing module.
-    except (ImportError, TypeError) as error:
+    except ImportError as error:
         raise ValueError(f"Cannot import module {module_path!r} of target {target!r}.") from error
     try:
         resolved = getattr(module, class_name)

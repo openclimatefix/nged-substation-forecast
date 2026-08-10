@@ -71,6 +71,9 @@ def test_resolve_rejects_an_ill_typed_override() -> None:
         pytest.param("_target_: x.Y\nmodel_params:\n", id="null_model_params"),
         pytest.param("_target_: x.Y\nmodel_params:\n  - a\n", id="model_params_is_a_list"),
         pytest.param("_target_: x.Y\nmodel_params:\n  n: 1\n", id="no_config_target"),
+        pytest.param("_target_:\nmodel_params:\n  _target_: x.Y\n", id="null_forecaster_target"),
+        pytest.param("_target_: x.Y\nmodel_params:\n  _target_:\n", id="null_config_target"),
+        pytest.param("_target_: 123\nmodel_params:\n  _target_: x.Y\n", id="non_string_target"),
     ],
 )
 def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
@@ -78,9 +81,9 @@ def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
 ) -> None:
     """``base_model_config`` is free text on the launchpad, so every typo must say what is wrong.
 
-    Without this the six shapes below surface as a bare ``KeyError``, ``TypeError`` or
-    ``AttributeError`` that names neither the file nor which of the two ``_target_`` keys is
-    missing.
+    Without this the shapes below surface as a bare ``KeyError``, ``TypeError`` or
+    ``AttributeError`` that names neither the file nor which of the two ``_target_`` keys is at
+    fault — the last three reaching ``import_class`` before failing, on ``None.rpartition``.
     """
     (tmp_path / "bad.yaml").write_text(yaml_body)
     monkeypatch.setattr("nged_substation_forecast.defs.jobs.PROJECT_ROOT", tmp_path)
@@ -89,6 +92,17 @@ def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
         _resolve_forecaster_config("bad.yaml", {}, "exp")
 
     assert "bad.yaml" in str(excinfo.value)
+
+
+def test_resolve_rejects_an_attempt_to_override_the_config_class() -> None:
+    """``_target_`` names the config class, which the model YAML fixes and an override may not swap.
+
+    The config class arrives as a ``model_params`` key like any other, so without this check it
+    would be splatted into the config constructor and dropped by pydantic's ``extra="ignore"`` —
+    the base class built, the override silently doing nothing.
+    """
+    with pytest.raises(ValueError, match="may not override '_target_'"):
+        _resolve_forecaster_config(_BASE_CONFIG, {"_target_": "some.other.Config"}, "exp")
 
 
 def test_overrides_do_not_leak_between_calls() -> None:
