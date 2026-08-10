@@ -78,7 +78,12 @@ def test_extract_power_time_series_drops_malformed_time_rows():
 
 
 def test_nged_json_to_metadata_df_and_time_series_df_invalid_data_types():
-    """A `value` that is not a number is a malformed input, so it is rejected, not degraded."""
+    """A non-numeric `value` is rejected rather than dropped.
+
+    Contrast `test_extract_power_time_series_drops_malformed_time_rows`: a malformed `time` is
+    dropped and counted, because a bad timestamp costs one row, whereas a bad `value` means the
+    whole payload is not the shape we think it is.
+    """
     invalid_json = (
         b'{"time_series_id": 1, "Area": {"latitude": 50, "longitude": 0},'
         b' "data": [{"endTime": "2026-01-01T00:00:00Z", "value": "not_a_float"}]}'

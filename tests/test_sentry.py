@@ -215,7 +215,9 @@ def test_report_power_freshness_noop_when_healthy(monkeypatch: pytest.MonkeyPatc
 def test_report_power_freshness_sends_warning_with_fingerprint_and_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """DSN + late series ⇒ one warning, fingerprinted per environment, counts as tags/context."""
+    """DSN + late series ⇒ one warning, fingerprinted per environment, with counts as
+    tags/context.
+    """
     calls = _capture_message_recorder(monkeypatch)
     _sentry.report_power_freshness(
         _settings(sentry_dsn=_DSN, sentry_environment="jacks-laptop"),

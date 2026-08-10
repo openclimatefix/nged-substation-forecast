@@ -462,8 +462,8 @@ def test_apply_rolling_mean_feature_partitions_by_group(
         pl.DataFrame(columns).lazy(), "temperature_2m", 2
     ).collect()
     sorted_result = result.sort([partition_col, "valid_time"])
-    # Group A: mean([10]) = 10, mean([10, 20]) = 15. Group B: mean([100]) = 100, mean([100, 200]) =
-    # 150.
+    # Group A: mean([10]) = 10, mean([10, 20]) = 15.
+    # Group B: mean([100]) = 100, mean([100, 200]) = 150.
     assert sorted_result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 100.0, 150.0]
 
 

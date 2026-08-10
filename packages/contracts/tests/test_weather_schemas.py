@@ -17,7 +17,9 @@ def test_weather_feature_literal_matches_model_fields():
 
 
 def test_continuous_and_categorical_partition_all_weather_vars():
-    """continuous_var_names and categorical_var_names must partition all_weather_var_names."""
+    """continuous_var_names and categorical_var_names must partition all_weather_var_names
+    exactly.
+    """
     all_vars = Nwp.all_weather_var_names()
     continuous = Nwp.continuous_var_names()
     categorical = frozenset(Nwp.categorical_var_names)

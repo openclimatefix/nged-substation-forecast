@@ -59,7 +59,7 @@ LIVE_FORECAST_MONITOR_SLUG: Final[str] = "live-forecasts"
 Laptop testing must use a *different*, throwaway slug (e.g. ``"live-forecasts-test"``) so an
 intermittently-run laptop never registers a stale environment on the production monitor."""
 
-LIVE_FORECAST_MONITOR_CONFIG: Final[MonitorConfig] = {
+LIVE_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {  # noqa: UP037
     # DUPLICATED SCHEDULE: this crontab must match live_forecast_partitions.cron_schedule in
     # defs/production_assets.py — it is the cadence Sentry expects a heartbeat on, so it has to
     # track the cadence the live_forecasts asset actually runs on. The value is copied rather than
@@ -188,7 +188,7 @@ class _LateSeriesEntry(TypedDict):
     status: str
 
 
-def report_power_freshness(settings: Settings, result: PowerFreshnessResult) -> None:
+def report_power_freshness(settings: Settings, result: "PowerFreshnessResult") -> None:  # noqa: UP037
     """Forward per-series power-data staleness to Sentry as a warning, or do nothing if healthy.
 
     A no-op when Sentry is unconfigured (empty ``settings.sentry_dsn``) or when no series is late
@@ -215,7 +215,10 @@ def report_power_freshness(settings: Settings, result: PowerFreshnessResult) -> 
         logger.exception("Failed to report power-data freshness to Sentry")
 
 
-def _capture_power_freshness_warning(settings: Settings, result: PowerFreshnessResult) -> None:
+def _capture_power_freshness_warning(
+    settings: Settings,
+    result: "PowerFreshnessResult",  # noqa: UP037
+) -> None:
     """Build and send the freshness warning event on an isolated Sentry scope.
 
     Split from :func:`report_power_freshness` so the latter's ``try``/``except`` wraps the whole
@@ -252,7 +255,10 @@ def _capture_power_freshness_warning(settings: Settings, result: PowerFreshnessR
         sentry_sdk.capture_message(_freshness_message(result, late_series), level="warning")
 
 
-def _freshness_message(result: PowerFreshnessResult, late_series: list[_LateSeriesEntry]) -> str:
+def _freshness_message(
+    result: "PowerFreshnessResult",  # noqa: UP037
+    late_series: list[_LateSeriesEntry],
+) -> str:
     """Compose the warning message.
 
     The message is a one-line summary (Sentry's issue title) followed by the leading late series
