@@ -23,6 +23,61 @@ the *variable*, so the gate needs no magic thresholds:
   literally "is anything left?", so a run with 4283 of one variable's 4284 slices empty still
   lands (with a warning); only 4284 of 4284 fails.
 
+The gate judges the **H3 cells we store**, not the raw grid points upstream sent us, and the two
+differ because a cell is the area-weighted mean of the ~2.9 grid points that overlap it — see
+[the next section](#spatial-aggregation-is-where-a-grid-points-null-is-resolved). A cell is null
+only when *no* grid point contributed a value to it, since a null at one of its points is absorbed
+by the others. So "any null is fatal" is a statement about a cell with nothing behind it, and a
+scattered grid-point null in an instantaneous variable never reaches the gate at all.
+
+## Spatial aggregation is where a grid point's null is resolved
+
+We do not store the raw 0.25° grid. `convert_nwp_xarray_dataset_to_polars_dataframe` aggregates it
+onto H3 cells, each of which is the area-weighted mean of the grid points overlapping it, so a
+grid point's null is resolved before anything on this page ever sees it. On the V1 grid (H3
+resolution 5 over the GB boundary) a cell averages **2.93 grid points**, and only 10 of its 1671
+cells are fed by a single point.
+
+Each variable is renormalised over the points that actually supplied a value: the weighted sum is
+divided by the *contributing* weight rather than by 1.0. A null grid point therefore costs its own
+share of one cell's spatial detail, and nothing more. The alternative — dividing by 1.0 regardless
+— silently treats an absent point as contributing zero, so the cell comes out low in proportion to
+how much of it went missing. That is the imputation the
+[never zero-fill rule](../design-philosophy/inherent-stability.md#missingness-in-learned-models)
+warns about, which is worth saying plainly because it inverts the intuition: renormalising
+*removes* a fill from the ingest rather than adding one, so it leaves the provenance guarantees of
+[principle 9](../design-philosophy/design-principles.md#9-provenance-travels-with-the-forecast-data)
+intact. Nothing is fabricated from another time step, another run or another cell.
+
+The renormalisation is worth most where the corruption is scattered rather than blocky, which is
+exactly the shape the de-accumulated variables take. Dividing by 1.0 lets a single bad point null
+its whole cell, and because a grid point feeds ~4 cells, that *amplifies* the corruption on its way
+in.
+
+Measured on 2025-06-04 00Z — the worst run in the archive by this measure — where 0.014% of
+`precipitation_surface`'s grid points and 0.009% of
+`downward_short_wave_radiation_flux_surface`'s arrived null beyond lead-0:
+
+| | Null cells in the ingested run |
+|---|---:|
+| Dividing by 1.0 | 4,394 |
+| Renormalised | 339 |
+
+The 339 that remain are cells where *every* contributing point was corrupt — the corruption is
+spatially clustered, so a scattered null rate of one part in ten thousand still wipes out whole
+cells occasionally. No cell became null that was not null before.
+
+Keep the magnitude in proportion: across the whole archive (862 runs, 6.24 billion rows) only 12
+runs carry any de-accumulated null beyond the lead-0 floor at all, totalling 6,550 cells. Most of
+the upstream scatter documented above lands outside the small GB box we download. This is
+therefore a correctness fix — the estimator was wrong, and a wholly-uncovered cell was a false
+zero — rather than a change that recovers much data.
+
+A cell where *no* point contributed is a different case, and it yields **null**, never `0.0`. That
+distinction is the whole reason the contributing weight is computed rather than assumed: Polars
+sums an all-null group to `0.0`, which for weather is a physically plausible, in-bounds lie
+(0 °C, 0 Pa, 0 m s⁻¹) that would pass every check on this page.
+
 ## Nulls in the de-accumulated variables (tolerated)
 
 The three de-accumulated variables — `precipitation_surface`,
@@ -36,7 +91,9 @@ to zero. This is documented and WONTFIX upstream in
 looser clamp threshold would only convert visibly-null corrupt data into invisibly-zeroed corrupt
 data.
 
-Usually the corruption is scattered per-pixel, a few percent of a slice. Occasionally a whole
+Usually the corruption is scattered per-pixel, a few percent of a slice, and most of that is
+absorbed by the spatial aggregation above rather than reaching the stored table as nulls at all.
+Occasionally a whole
 `(ensemble_member, valid_time)` slice arrives null across the grid: the 2026-08-09 00Z run had
 `downward_short_wave_radiation_flux_surface` null worldwide for ensemble member 34 at the 354-hour
 and 360-hour steps — 2 of that variable's 4284 `(member, step)` slices (51 ensemble members × the
@@ -50,8 +107,10 @@ nulls reach the model *as nulls* only because they are *leading*, and `_upsample
 leaves leading nulls alone; an *interior* wholly-null slice is interpolated from its neighbouring
 steps, so the model sees a fabricated value instead. Note the span that bridges: losing one native
 step means interpolating between the steps *either side* of it, so 6 hours in the 3-hourly part of
-the horizon and 12 in the 6-hourly part. That is acceptable, and it is what already happens to the
-scattered nulls — but it is a different claim from "the model sees a null and copes". Second, the
+the horizon and 12 in the 6-hourly part. That is acceptable, but it is a different claim from "the
+model sees a null and copes" — and it is the reason a *spatial* fill from the same step's
+neighbouring grid points, which is what the aggregation above does to the scattered nulls, is the
+better of the two. Second, the
 run that failing would discard is overwhelmingly good. Take that 2026-08-09 run as the worked example: 0.05% of one
 already-nullable variable is not worth the other 4282 slices of that same variable, nor the twelve
 other variables that arrived complete, and rejecting it leaves the live forecast on a run 24 hours
@@ -75,6 +134,17 @@ Two null patterns *do* fail ingest:
   pattern behind the 2026-07-14 run, where a whole forecast step went missing for 50 of 51
   ensemble members across every variable — reported upstream as
   [dynamical-org/reformatters#765](https://github.com/dynamical-org/reformatters/issues/765).
+
+    A cell reaches this state only when *every* grid point feeding it is missing, because of the
+    renormalisation described [above](#spatial-aggregation-is-where-a-grid-points-null-is-resolved).
+    A blocky failure like 2026-07-14's is caught exactly as before — the whole grid is gone, so
+    every cell is empty — while a *scattered* grid-point null in an instantaneous variable is
+    absorbed by the cell's other points and never becomes fatal. That is a deliberate trade rather
+    than an oversight: an instantaneous variable's nulls have only ever arrived as whole-step
+    dropouts, and losing an entire run over one bad pixel is the outage
+    [principle 7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary)'s
+    granularity clause exists to prevent. What it costs is a detector, and that cost is real:
+    scattered corruption in a variable that should never carry any is no longer visible at ingest.
 
 - **A de-accumulated variable null in *every* slice beyond lead-0 of a run** — the column is absent
   rather than degraded, so `Nwp._check_no_wholly_missing_deaccumulated_variable` raises
@@ -140,10 +210,15 @@ run — every member, step and cell present, but some (member, step, cell) combi
 which the three marginal counts all miss. Both would start to matter if that converter were ever
 replaced by one that can emit such a frame.
 
-A dropped *grid point* is not covered by this check at all, and is worth knowing about: because the
-left join misses and the weighted `sum` over an all-null group returns `0.0`, a dropped point lands
-as a plausible-looking all-zero cell (0 °C, 0 Pa, 0 m s⁻¹) rather than as an absent one. That is
-inside physical bounds, so `Nwp.validate` accepts it and neither non-fatal check sees it.
+A dropped *grid point* is not covered by this check either, and is worth knowing about, because it
+is handled by the aggregation rather than by any check. A point the H3 grid weights name but the
+source dataset does not carry misses the left join, and is then excluded from its cell's
+contributing weight exactly as an upstream null is — so the cell is renormalised over whatever else
+feeds it, and only a cell that loses *every* one of its points comes out null. That null is fatal
+for the instantaneous variables, so a wholly-dropped point costs the whole partition and shows up
+as a missed run, which is a blunt response to a small cause: relaxing it to a warning and an absent
+row is tracked in
+[issue #478](https://github.com/openclimatefix/nged-substation-forecast/issues/478).
 
 ### Where the expected shape comes from
 

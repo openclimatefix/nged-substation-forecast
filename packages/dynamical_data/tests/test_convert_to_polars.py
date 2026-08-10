@@ -16,12 +16,21 @@ from contracts.geo_schemas import H3GridWeights
 from contracts.weather_schemas import Nwp
 from dynamical_data.ecmwf_ens import download
 from dynamical_data.ecmwf_ens.convert_to_polars import (
+    _process_chunk_for_1_lead_time_and_1_ens_member,
+)
+from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe as convert,
 )
+from patito.exceptions import DataFrameValidationError
 
 # After 2024-11-12 so the populated categorical_precipitation_type_surface column is valid; see
 # Nwp._check_variables_that_were_introduced_after_start_of_dataset.
 _INIT_TIME = datetime(2025, 1, 1, tzinfo=UTC)
+
+# On or before 2024-11-12, where categorical_precipitation_type_surface is legitimately all-null —
+# the only era in which a wholly-uncovered H3 cell reaches the numeric columns without that
+# column's own historical invariant rejecting the frame first.
+_INIT_TIME_BEFORE_PTYPE = datetime(2024, 1, 1, tzinfo=UTC)
 
 
 def _single_cell_grid(
@@ -230,6 +239,247 @@ def test_convert_preserves_nulls_after_aggregation(
     )
     df = convert(ds=ds, h3_grid=_single_cell_grid(make_h3_grid))
 
+    assert df["downward_short_wave_radiation_flux_surface"].item() is None
+
+
+def test_convert_renormalises_weights_over_a_corrupt_grid_point(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """One NaN grid point costs its own contribution to the cell, not the whole cell.
+
+    The cell's surviving point carries full information about it, so the renormalised value is that
+    point's own value rather than 0.75 of it. Without the renormalisation the cell would be NaN
+    (NaN propagates through the weighted ``sum``), which is fatal for a non-nullable instantaneous
+    variable.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0, -0.75),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={"temperature_2m": np.array([[10.0, float("nan")]], dtype=np.float32)},
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 10],
+        nwp_lat=[52.0, 52.0],
+        nwp_lon=[-1.0, -0.75],
+        proportion=[0.75, 0.25],
+    )
+
+    df = convert(ds=ds, h3_grid=h3)
+
+    assert df.height == 1
+    assert df["temperature_2m"].item() == pytest.approx(10.0)
+
+
+def test_convert_renormalises_a_deaccumulated_variable(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """The renormalised value is the mean of the surviving points, not their weighted sum.
+
+    Five equally-weighted points, one corrupt: the answer must be the mean of the four that
+    arrived (0.0025), not 0.8 of it (0.002). Pins the arithmetic rather than merely asserting the
+    cell is non-null. Values are inside ``precipitation_surface``'s ``le=0.01`` bound.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0, -0.75, -0.5, -0.25, 0.0),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={
+            "precipitation_surface": np.array(
+                [[0.001, 0.002, 0.003, 0.004, float("nan")]], dtype=np.float32
+            )
+        },
+    )
+    h3 = make_h3_grid(
+        h3_index=[10] * 5,
+        nwp_lat=[52.0] * 5,
+        nwp_lon=[-1.0, -0.75, -0.5, -0.25, 0.0],
+        proportion=[0.2] * 5,
+    )
+
+    df = convert(ds=ds, h3_grid=h3)
+
+    assert df.height == 1
+    assert df["precipitation_surface"].item() == pytest.approx(0.0025)
+
+
+def test_convert_renormalises_over_a_grid_point_missing_from_the_dataset(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """A grid point the weights name but the dataset lacks is excluded, not counted as zero.
+
+    The H3 weights expect (52.0, -0.75); the dataset carries only (52.0, -1.0), so the join misses.
+    Without renormalisation the absent point is silently worth 0, and the cell reports 0.75 * 10.0
+    = 7.5 degC forever — a plausible-looking value that nothing downstream can detect.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0,),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={"temperature_2m": 10.0},
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 10],
+        nwp_lat=[52.0, 52.0],
+        nwp_lon=[-1.0, -0.75],
+        proportion=[0.75, 0.25],
+    )
+
+    df = convert(ds=ds, h3_grid=h3)
+
+    assert df.height == 1
+    assert df["temperature_2m"].item() == pytest.approx(10.0)
+
+
+def test_convert_renormalises_each_variable_independently(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """A null in one variable must not disturb another variable in the same cell.
+
+    The contributing weight is per (cell, variable), never per cell. A single shared denominator
+    would be wrong in both directions here: it would either drag ``temperature_2m`` off its correct
+    15.0, or leave ``precipitation_surface`` un-renormalised at half its true value. That
+    distinction matters far beyond this test, because the three de-accumulated variables are
+    legitimately null at lead-0 in every single run.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0, -0.75),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={
+            "temperature_2m": np.array([[10.0, 20.0]], dtype=np.float32),
+            "precipitation_surface": np.array([[0.004, float("nan")]], dtype=np.float32),
+        },
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 10],
+        nwp_lat=[52.0, 52.0],
+        nwp_lon=[-1.0, -0.75],
+        proportion=[0.5, 0.5],
+    )
+
+    df = convert(ds=ds, h3_grid=h3)
+
+    assert df.height == 1
+    assert df["temperature_2m"].item() == pytest.approx(0.5 * 10.0 + 0.5 * 20.0)
+    assert df["precipitation_surface"].item() == pytest.approx(0.004)
+
+
+def test_aggregation_of_a_wholly_uncovered_cell_is_null_not_zero(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """A cell whose every grid point is absent yields null, never a physically-plausible zero.
+
+    Asserted on the aggregation itself rather than through ``convert``, because this is the defect:
+    Polars sums an all-null group to 0.0, so the cell would otherwise land as 0 degC / 0 Pa —
+    inside every bound the ``Nwp`` contract declares. ``convert``'s own rejection of that frame is
+    the downstream symptom, covered by the test below.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,), longitudes=(-1.0,), lead_time_hours=(0,), ensemble_members=(0,)
+    )
+    # Cell 10 sits on the dataset's only grid point; cell 20's grid point is nowhere in it.
+    h3 = make_h3_grid(
+        h3_index=[10, 20],
+        nwp_lat=[52.0, 49.0],
+        nwp_lon=[-1.0, -5.0],
+        proportion=[1.0, 1.0],
+    )
+    lat_grid, lon_grid = np.meshgrid(
+        ds.latitude.values.astype(np.float32),
+        ds.longitude.values.astype(np.float32),
+        indexing="ij",
+    )
+
+    aggregated = _process_chunk_for_1_lead_time_and_1_ens_member(
+        ds=ds.isel(lead_time=0, ensemble_member=0),
+        h3_grid=h3,
+        lat_grid=lat_grid.ravel(),
+        lon_grid=lon_grid.ravel(),
+    )
+
+    uncovered = aggregated.filter(pl.col("h3_index") == 20)
+    assert uncovered["temperature_2m"].item() is None
+    assert uncovered["pressure_surface"].item() is None
+    # The covered cell is untouched, so this is not merely "everything became null".
+    assert aggregated.filter(pl.col("h3_index") == 10)["temperature_2m"].item() == pytest.approx(
+        15.0
+    )
+
+
+def test_convert_rejects_a_run_with_a_wholly_uncovered_cell(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """A wholly-uncovered cell fails ingest, rather than landing as a plausible all-zero cell.
+
+    The instantaneous variables are non-nullable, so the null from the aggregation above becomes a
+    validation failure and the whole partition is missed. That is deliberately blunt — a missed run
+    is rung 1 of the degradation ladder, whereas a silently-zeroed cell would train and serve
+    forever — and it is temporary; see
+    <https://github.com/openclimatefix/nged-substation-forecast/issues/478>.
+
+    The init time is deliberately pre-2024-11-13. Later runs must carry a populated
+    ``categorical_precipitation_type_surface``, and an uncovered cell nulls that column too, so
+    they are rejected by that column's historical invariant before the numeric columns are ever
+    judged. This era is therefore the only one where the numeric nulls are what fails the frame.
+    """
+    ds = make_ens_dataset(
+        init_time=_INIT_TIME_BEFORE_PTYPE,
+        latitudes=(52.0,),
+        longitudes=(-1.0,),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={"categorical_precipitation_type_surface": float("nan")},
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 20],
+        nwp_lat=[52.0, 49.0],
+        nwp_lon=[-1.0, -5.0],
+        proportion=[1.0, 1.0],
+    )
+
+    with pytest.raises(DataFrameValidationError):
+        convert(ds=ds, h3_grid=h3)
+
+
+def test_convert_nulls_a_multi_point_cell_whose_every_point_is_corrupt(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    """Zero contributing weight yields null, not the 0.0 that a naive refactor would produce.
+
+    ``test_convert_preserves_nulls_after_aggregation`` covers the single-point case; this is its
+    multi-point sibling, and it is the one that would break if NaN were normalised to null before
+    the aggregation without a contributing-weight denominator to catch the empty group. It is also
+    the shape every lead-0 row of the three de-accumulated variables takes in every real run.
+    """
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0, -0.75),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={"downward_short_wave_radiation_flux_surface": float("nan")},
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 10],
+        nwp_lat=[52.0, 52.0],
+        nwp_lon=[-1.0, -0.75],
+        proportion=[0.5, 0.5],
+    )
+
+    df = convert(ds=ds, h3_grid=h3)
+
+    assert df.height == 1
     assert df["downward_short_wave_radiation_flux_surface"].item() is None
 
 

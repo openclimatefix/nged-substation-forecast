@@ -282,7 +282,10 @@ class Nwp(pt.Model):
 
     They share a de-accumulation step whose known upstream corruption leaves nulls beyond lead-0 —
     usually scattered per-pixel, occasionally a whole (ensemble_member, valid_time) slice (and all
-    three are legitimately null at lead-0). Both are tolerated at ingest and reported by
+    three are legitimately null at lead-0). The scattered case mostly does not survive the H3
+    spatial aggregation as a null, because a cell is renormalised over the grid points that did
+    arrive; what reaches a frame validated here is therefore the blocky remainder plus whatever
+    scatter took out every point of a cell. Both are tolerated at ingest and reported by
     :func:`assess_nwp_quality`; only a variable that is null in *every* slice beyond lead-0 is
     fatal. See
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
@@ -515,12 +518,17 @@ def _deaccumulated_null_breakdown(dataframe: pl.DataFrame) -> pl.DataFrame:
 class NwpQualityReport:
     """Non-fatal data-quality summary for one NWP run.
 
-    Carries the *tolerated* nulls in the de-accumulated variables beyond lead-0 — the known
-    upstream ECMWF ENS corruption. That is scattered per-pixel nulls in the ordinary case, and
-    occasionally a whole (ensemble_member, valid_time) slice that arrived empty; the two are
-    counted separately because they warrant different responses, but neither fails the run. Only a
-    variable that is null in *every* slice is fatal, and :meth:`Nwp.validate` rejects that before
-    this runs.
+    Carries the *tolerated* nulls that the de-accumulated variables still hold after the H3 spatial
+    aggregation, beyond lead-0. Usually that means whole (ensemble_member, valid_time) slices that
+    arrived empty, plus the cells where upstream scatter happened to take out every contributing
+    grid point; the two are counted separately because they warrant different responses, but
+    neither fails the run. Only a variable that is null in *every* slice is fatal, and
+    :meth:`Nwp.validate` rejects that before this runs.
+
+    Read this as "how much did we lose", not as "how corrupt was the feed". The aggregation absorbs
+    most per-pixel upstream corruption before it reaches a cell, so this report is a poor proxy for
+    the upstream null rate; measuring that rate where it lives is tracked in
+    <https://github.com/openclimatefix/nged-substation-forecast/issues/505>.
     """
 
     affected: pl.DataFrame
@@ -543,8 +551,9 @@ class NwpQualityReport:
 
         The field is missing altogether for that one (variable, member, valid_time).
 
-        Worth watching separately from the scatter: a rising count is the shape a partial upstream
-        publication takes, whereas scatter is the steady-state #722 corruption.
+        Worth watching separately from the scattered case below: a rising count is the shape a
+        partial upstream publication takes, and it is the number this report is best at, because a
+        wholly-null slice reaches the cells intact however they are aggregated.
         """
         if not self.affected.height:
             return 0
@@ -552,7 +561,12 @@ class NwpQualityReport:
 
     @property
     def n_scattered_slices(self) -> int:
-        """Affected slices carrying only *some* null cells — the ordinary upstream corruption."""
+        """Affected slices carrying only *some* null cells.
+
+        Expect this to be small. Scattered upstream corruption is mostly absorbed by the H3
+        aggregation, so a slice reaches this count only where the scatter took out every grid
+        point of some cell. It is *not* a measure of the upstream per-pixel null rate.
+        """
         return self.n_affected_slices - self.n_whole_null_slices
 
     @property
@@ -572,8 +586,9 @@ def assess_nwp_quality(dataframe: pt.DataFrame[Nwp]) -> NwpQualityReport:
     """Summarise the tolerated-but-noteworthy nulls in a *validated* NWP run.
 
     Reports the nulls in the de-accumulated variables (precipitation/radiation) beyond lead-0 that
-    :meth:`Nwp.validate` deliberately tolerates: the scattered per-pixel corruption known upstream,
-    and whole (ensemble_member, valid_time) slices that arrived empty. Pure and Dagster-free
+    :meth:`Nwp.validate` deliberately tolerates: whole (ensemble_member, valid_time) slices that
+    arrived empty, and the cells where the upstream per-pixel corruption survived the H3
+    aggregation by taking out every grid point of a cell. Pure and Dagster-free
     (unit-testable in isolation); the ``ecmwf_ens`` asset wraps the result into a WARN
     ``AssetCheckResult``. See
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.

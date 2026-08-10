@@ -772,8 +772,8 @@ design document.
 **A canonical failure-scenario suite.** A named, versioned set of degradation transforms over an
 `AllFeatures` frame — NWP {fresh, *n* runs missed, absent} × telemetry {present, partial, absent} ×
 metadata — on the order of ten to twenty realistic regimes rather than a combinatorial explosion.
-Only the *episodic* class needs enumerating; the chronic per-pixel null scatter in the
-de-accumulated ECMWF variables is present in every training run and so is already in-distribution
+Only the *episodic* class needs enumerating; the chronic nulls the de-accumulated ECMWF variables
+carry are present in every run we ingest and so are already in-distribution
 (see
 [Inherent Stability → Missingness in learned models](../design-philosophy/inherent-stability.md#missingness-in-learned-models)).
 The vocabulary is a **contract**: it is stamped onto every metrics row, so changing it later

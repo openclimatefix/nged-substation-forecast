@@ -36,13 +36,15 @@ winners into `conf/model/xgboost.yaml` one at a time to keep attribution clean.
 **A limit worth knowing before you rely on NaN handling.** XGBoost's NaN routing only covers the
 missingness patterns present in the training data. Two consequences for the wins below: a model
 trained with NWP features does **not** behave like a weather-blind model when NWP vanishes (beating
-the incumbent during an outage needs outage-shaped training data, not NaN routing), and the chronic
-per-pixel nulls in the de-accumulated ECMWF variables are the one case the guarantee genuinely
-covers. Full argument:
+the incumbent during an outage needs outage-shaped training data, not NaN routing), and the nulls
+the de-accumulated ECMWF variables carry are the one case the guarantee genuinely covers. Full
+argument:
 [Inherent Stability → Default directions, and their limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
-Note that the second consequence is narrower than it sounds, because only *leading* nulls reach
-the model as nulls — `_upsample_nwp_to_half_hourly` already interpolates interior ones away. See
-[the null-filling item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible).
+Note that the second consequence is narrower than it sounds. Only *leading* nulls reach the model
+as nulls: `_upsample_nwp_to_half_hourly` already interpolates interior ones away (see
+[the null-filling item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)), and
+the scattered per-pixel corruption mostly never becomes a null in the first place, because the
+ingest renormalises each H3 cell over the grid points that arrived.
 
 ## Tier 1 — config-level changes (hours each)
 
@@ -727,12 +729,21 @@ says of this exact pattern that the main risk is *someone later "fixes" it by im
 
 But `_upsample_nwp_to_half_hourly` resamples NWP from its native 3- and 6-hourly steps to the
 half-hourly grid with `interpolate()`, and Polars' `interpolate()` fills **interior** nulls as a
-side effect. So an interior null — scattered cell or whole slice — is *already* filled today, from
-its temporal neighbours within the same `(member, cell)` group, silently and unflagged. Only
-*leading* nulls survive to the model as nulls, which is why the lead-0 convention holds and why
-that function's docstring is careful about it. The "leave them un-imputed" position is therefore
-true of leading nulls and false of interior ones, and nobody chose that split — it fell out of an
-upsampling implementation.
+side effect. So an interior null is *already* filled today, from its temporal neighbours within
+the same `(member, cell)` group, silently and unflagged. Only *leading* nulls survive to the model
+as nulls, which is why the lead-0 convention holds and why that function's docstring is careful
+about it. The "leave them un-imputed" position is therefore true of leading nulls and false of
+interior ones, and nobody chose that split — it fell out of an upsampling implementation.
+
+**How much is left to fill is smaller than it used to be, and the remainder is the blocky half.**
+The ingest aggregates the 0.25° grid onto H3 cells and renormalises each cell over the grid points
+that arrived, so the scattered per-pixel corruption mostly never becomes a null that this
+interpolation could reach. What still arrives as an interior null is a whole
+`(ensemble_member, valid_time)` slice, or a cell whose every grid point went missing at once. That
+narrows this item in two ways worth knowing before starting it: the fill it is bounding is the
+long-span, blocky one, which is the case where an unbounded bridge is *least* defensible; and the
+population the experiment can measure on is smaller, so a null result will be harder to
+distinguish from no effect.
 
 The experiment is therefore not "should we start interpolating?" but **"the interpolation already
 happening should be deliberate, bounded and visible"**:
