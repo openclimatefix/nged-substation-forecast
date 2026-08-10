@@ -12,8 +12,8 @@ test suite or the Dagster UI parses a selection string — only the CLI does (``
 ``dagster asset materialize --select``).
 """
 
-from dagster._core.definitions.asset_selection import AssetSelection
+from dagster import AssetSelection
 
 
-def test_an_asset_selection_string_parses() -> None:
-    assert AssetSelection.from_string('key:"ecmwf_ens"') is not None
+def test_an_asset_selection_string_round_trips() -> None:
+    assert str(AssetSelection.from_string('key:"ecmwf_ens"')) == 'key:"ecmwf_ens"'

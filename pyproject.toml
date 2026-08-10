@@ -76,8 +76,10 @@ repository = "https://github.com/openclimatefix/nged-substation-forecast"
 # reads it as integers. Resolving the 4.9 runtime therefore breaks every asset-selection string —
 # `AssetSelection.from_string(...)`, and so `dg launch --assets` and `dagster asset materialize
 # --select` — with `TypeError: ord() expected string of length 1, but int found`. Dagster itself
-# only requires `<4.14`, so nothing else in the tree holds the lower bound; this floor does.
-# `tests/test_asset_selection_parses.py` is the backstop that shows what a violation costs.
+# only requires `<4.14`. Today uv picks 4.13.2 anyway, because it resolves to the highest
+# compatible version; this floor is the guard for the day some other dependency pins lower,
+# and it makes that conflict surface as a resolution failure on the lock-bump PR rather than
+# as a broken CLI. `tests/test_asset_selection_parses.py` is the backstop that shows the cost.
 constraint-dependencies = ["antlr4-python3-runtime>=4.13"]
 
 [tool.uv.workspace]

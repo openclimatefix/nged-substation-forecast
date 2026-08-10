@@ -4,6 +4,10 @@ Defines the "data contracts": the schemas defining the precise shape of each dat
 
 ## Dependency Isolation
 
+It also owns the thin configuration layer that sits beside those schemas: the CV fold config,
+and the `class_target`/`import_class` pair that turns a class into a `_target_` string and
+back. Those are stdlib-only and model-agnostic, so they cost the package nothing.
+
 This package is designed to be extremely lightweight. It defines the *shape* of the data using Patito and Polars, but it does **not** contain any ML-specific logic or heavy dependencies like MLflow. This ensures that any component in the system (e.g., a data ingestion script or a dashboard) can import these schemas without bringing in the entire ML stack.
 
 ## Key Data Contracts

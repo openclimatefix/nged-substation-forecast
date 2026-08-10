@@ -193,9 +193,11 @@ constructed, so any `model_params` key can be overridden.
 
 Every override is a **whole-value replacement**, not a merge. `selected_features` is the case
 you will meet first: to add one feature to the baseline set you must list all the features you
-want, not just the new one. The same holds for a nested mapping — overriding one of its keys
-replaces the mapping entire, so restate every key you want to keep.
+want, not just the new one. The same holds when a `model_params` value is itself a mapping —
+an override replaces the whole mapping, dropping the base's other keys, so restate every key
+you want to keep.
 
-The resolved config (YAML defaults merged with your overrides) is frozen as a JSON tag on the
+The resolved config (the YAML defaults with your overrides applied) is frozen as a JSON tag on
+the
 MLflow experiment at registration time. That frozen record is what `trained_cv_model` reads back
 at train time — so changing the YAML after registering an experiment has no effect on it.

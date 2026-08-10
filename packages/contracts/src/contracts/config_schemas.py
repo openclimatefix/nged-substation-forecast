@@ -24,16 +24,18 @@ def class_target(obj: type | object) -> str:
         The ``module.ClassName`` path, e.g. ``"xgboost_forecaster.forecaster.XGBoostForecaster"``.
 
     Raises:
-        ValueError: ``obj``'s class is nested inside another class. ``import_class`` resolves a
-            single attribute lookup on a module, so a nested class would produce a path that
-            cannot be resolved. Failing here, where the class is defined, beats emitting a target
-            string that only breaks when something later tries to load it.
+        ValueError: ``obj``'s class is not defined at module level — it is nested inside another
+            class or inside a function. ``import_class`` resolves a single attribute lookup on a
+            module, so such a class has no path it could resolve. Failing here, where the class is
+            defined, beats emitting a target string that only breaks when something later tries to
+            load it.
     """
     cls = obj if isinstance(obj, type) else type(obj)
     if "." in cls.__qualname__:
         raise ValueError(
-            f"{cls.__qualname__} is nested inside another class, so it has no importable "
-            "module-level path. Move it to module level to use it as a _target_."
+            f"{cls.__module__}.{cls.__qualname__} is not defined at module level (it is nested "
+            "inside a class or a function), so it has no importable path. Move it to module level "
+            "to use it as a _target_."
         )
     return f"{cls.__module__}.{cls.__qualname__}"
 
@@ -50,15 +52,19 @@ def import_class(target: str) -> type:
         The class named by ``target``.
 
     Raises:
-        ValueError: ``target`` names no module path, its module cannot be imported, the module has
-            no such attribute, or the attribute is not a class.
+        ValueError: ``target`` names no module path, is not absolute, its module cannot be found,
+            the module has no such attribute, or the attribute is not a class. An exception raised
+            by the module's *own* import propagates unchanged, so a broken module reports its own
+            failure rather than hiding behind "cannot import".
     """
     module_path, _, class_name = target.rpartition(".")
     if not module_path:
         raise ValueError(f"{target!r} is not a fully-qualified class path (expected 'module.Cls').")
     try:
         module = importlib.import_module(module_path)
-    except ImportError as error:
+    # TypeError is what a leading dot earns — import_module reads it as a relative import and
+    # demands a package to resolve against. That is a malformed target, not a missing module.
+    except (ImportError, TypeError) as error:
         raise ValueError(f"Cannot import module {module_path!r} of target {target!r}.") from error
     try:
         resolved = getattr(module, class_name)
@@ -156,4 +162,5 @@ def load_cv_config(path: Path) -> CvConfig:
     Returns:
         The validated ``CvConfig``.
     """
-    return CvConfig.model_validate(yaml.safe_load(path.read_text()))
+    with path.open(encoding="utf-8") as file:
+        return CvConfig.model_validate(yaml.safe_load(file))

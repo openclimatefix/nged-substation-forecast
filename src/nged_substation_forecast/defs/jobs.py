@@ -7,6 +7,7 @@ which needs the Dagster instance.
 """
 
 import json
+from pathlib import Path
 from typing import Any, Final, Literal, cast
 
 import mlflow
@@ -54,6 +55,41 @@ class RegisterExperimentConfig(Config):
     description: str = Field(default="", description="Stored as an MLflow experiment tag.")
 
 
+def _required_targets(raw: Any, config_path: Path) -> tuple[str, str, dict[str, Any]]:
+    """Pull the two ``_target_`` paths and the ``model_params`` mapping out of a parsed model YAML.
+
+    ``base_model_config`` is free text on the launchpad, so a typo points this at the wrong file —
+    ``conf/cv/default.yaml``, say, or a file that does not parse to a mapping at all. Reading the
+    three required pieces in one place means every such mistake reports the path and the whole
+    expected shape, instead of a bare ``KeyError`` that does not say which of the two ``_target_``
+    keys was missing.
+
+    Args:
+        raw: Whatever ``yaml.safe_load`` returned for the model YAML — ``Any``, because
+            that is genuinely all a parsed YAML file is known to be until checked here.
+        config_path: The file it came from, named in the error message.
+
+    Returns:
+        The forecaster's ``_target_``, the config class's ``_target_``, and the ``model_params``
+        mapping — with its ``_target_`` removed, so it is ready to splat into the config class.
+
+    Raises:
+        ValueError: The file is not a mapping, or is missing either ``_target_`` or
+            ``model_params``.
+    """
+    try:
+        forecaster_target = raw["_target_"]
+        model_params = dict(raw["model_params"])
+        config_target = model_params.pop("_target_")
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(
+            f"{config_path} is not a usable model config: it must be a mapping with a top-level"
+            " '_target_' naming the BaseForecaster subclass, and a 'model_params' mapping whose"
+            f" own '_target_' names the config class. Got: {error!r}"
+        ) from error
+    return forecaster_target, config_target, model_params
+
+
 def _resolve_forecaster_config(
     base_model_config: str,
     config_overrides: dict[str, Any],
@@ -70,19 +106,20 @@ def _resolve_forecaster_config(
         base_model_config: Path relative to ``PROJECT_ROOT`` of the base model YAML.
         config_overrides: Overrides applied to ``model_params`` as **whole-value replacement**: an
             override replaces the base value outright rather than merging into it. Lists are
-            replaced, not extended, and a mapping is replaced entire — overriding one key of a
-            nested mapping drops the base's other keys, so an override of a nested value must
-            restate the whole mapping.
+            replaced, not extended, and a value that is itself a mapping is replaced whole, so
+            an override must restate every key of that mapping it wants to keep.
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
         A ``(forecaster_cls, forecaster_config)`` tuple.
     """
-    raw = yaml.safe_load((PROJECT_ROOT / base_model_config).read_text())
-    model_params = raw["model_params"]
+    config_path = PROJECT_ROOT / base_model_config
+    with config_path.open(encoding="utf-8") as file:
+        raw = yaml.safe_load(file)
+    forecaster_target, config_target, model_params = _required_targets(raw, config_path)
     model_params.update(config_overrides)
-    forecaster_cls = cast(type[BaseForecaster], import_class(raw["_target_"]))
-    config_cls = cast(type[BaseForecasterConfig], import_class(model_params.pop("_target_")))
+    forecaster_cls = cast(type[BaseForecaster], import_class(forecaster_target))
+    config_cls = cast(type[BaseForecasterConfig], import_class(config_target))
     forecaster_config = config_cls(**model_params)
     forecaster_config.experiment_name = experiment_name
     return forecaster_cls, forecaster_config

@@ -151,6 +151,13 @@ def test_load_cv_config_reads_canonical_yaml():
 # ---------------------------------------------------------------------------
 
 
+class _Outer:
+    """Host for a genuinely module-level nested class, which class_target must reject."""
+
+    class Inner:
+        """Nested one level down, so its qualname is ``_Outer.Inner``."""
+
+
 def test_class_target_and_import_class_round_trip():
     """The pair is an inverse: a class survives being named and resolved back."""
     target = class_target(CvConfig)
@@ -166,15 +173,20 @@ def test_class_target_accepts_an_instance():
     assert class_target(config) == class_target(CvConfig)
 
 
-def test_class_target_rejects_a_nested_class():
+def test_class_target_rejects_a_class_nested_in_a_class():
     """A nested class has no module-level path, so naming one fails where it is defined."""
+    with pytest.raises(ValueError, match="not defined at module level"):
+        class_target(_Outer.Inner)
 
-    class Outer:
-        class Inner:
-            pass
 
-    with pytest.raises(ValueError, match="nested inside another class"):
-        class_target(Outer.Inner)
+def test_class_target_rejects_a_class_defined_in_a_function():
+    """A function-local class is equally unresolvable, and must not be reported as nested."""
+
+    class Local:
+        pass
+
+    with pytest.raises(ValueError, match="not defined at module level"):
+        class_target(Local)
 
 
 def test_import_class_rejects_a_bare_name():

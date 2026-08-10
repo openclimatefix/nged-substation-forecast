@@ -8,6 +8,7 @@ is covered by the integration test in ``test_register_experiment_job.py``.
 
 import json
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -61,7 +62,36 @@ def test_resolve_rejects_an_ill_typed_override() -> None:
         _resolve_forecaster_config(_BASE_CONFIG, {"max_depth": "high"}, "exp")
 
 
-def test_resolve_does_not_mutate_the_base_yaml_on_disk() -> None:
+@pytest.mark.parametrize(
+    "yaml_body",
+    [
+        pytest.param("", id="empty_file"),
+        pytest.param("model_params:\n  _target_: x.Y\n", id="no_forecaster_target"),
+        pytest.param("_target_: x.Y\n", id="no_model_params"),
+        pytest.param("_target_: x.Y\nmodel_params:\n", id="null_model_params"),
+        pytest.param("_target_: x.Y\nmodel_params:\n  - a\n", id="model_params_is_a_list"),
+        pytest.param("_target_: x.Y\nmodel_params:\n  n: 1\n", id="no_config_target"),
+    ],
+)
+def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, yaml_body: str
+) -> None:
+    """``base_model_config`` is free text on the launchpad, so every typo must say what is wrong.
+
+    Without this the six shapes below surface as a bare ``KeyError``, ``TypeError`` or
+    ``AttributeError`` that names neither the file nor which of the two ``_target_`` keys is
+    missing.
+    """
+    (tmp_path / "bad.yaml").write_text(yaml_body)
+    monkeypatch.setattr("nged_substation_forecast.defs.jobs.PROJECT_ROOT", tmp_path)
+
+    with pytest.raises(ValueError, match="is not a usable model config") as excinfo:
+        _resolve_forecaster_config("bad.yaml", {}, "exp")
+
+    assert "bad.yaml" in str(excinfo.value)
+
+
+def test_overrides_do_not_leak_between_calls() -> None:
     """Overrides are applied to a freshly-parsed copy, so one call cannot leak into the next."""
     _resolve_forecaster_config(_BASE_CONFIG, {"n_estimators": 7}, "exp")
 
