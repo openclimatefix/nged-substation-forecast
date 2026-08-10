@@ -92,7 +92,8 @@ about how it used to work, what a change replaced, or which issue changed it —
 in git, in the PR and in the issue tracker, and repeating it here turns every page into a running
 changelog and makes the docs unreadable. When a change invalidates a passage, rewrite the passage
 to describe the new behaviour rather than appending a note about what changed. This is the
-"comments and docs must reflect current state only" rule under Code Style, applied to prose.
+"comments and docs must reflect current state only" rule in
+[`docs/architecture/code-style.md`](docs/architecture/code-style.md), applied to prose.
 
 ## How planning works
 
@@ -222,114 +223,11 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 
 ## Code Style
 
-The rules that come up in almost every edit are below. The fuller write-up — the ruff rule
-selection and its `per-file-ignores` traps, error handling, the Patito friction budget — is
-[`docs/architecture/code-style.md`](docs/architecture/code-style.md); keep the two consistent when
-you change either.
-
-- **Python 3.14+** required.
-- **Polars only** — pandas is strictly forbidden. Use `pl.LazyFrame` throughout the pipeline and
-  **do not call `.collect()` before the model boundary**; the full contract is
-  [Lazy evaluation strategy](docs/architecture/performance.md#lazy-evaluation-strategy).
-- **Patito** for all DataFrame schema definitions and validation. Use Patito type annotations (`pt.DataFrame[Schema]`, `pt.LazyFrame[Schema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
-- **Prefer small functions.** Extract private helpers (`_name`) rather than letting a function body grow long, even if that means more parameters. A well-named helper with a clear docstring beats a long inline block. Eight parameters is acceptable when each is distinct and the division of labour is clear.
-- **Ruff**: 100-char line length, double quotes, Google-style docstrings.
-- **Comments and docs must reflect current state only** — never reference previous iterations of
-  the code or deleted files. See "Write about the present, not the past" under Docs.
-- **Code links only to durable docs** — `docs/design-philosophy/`, `docs/background/`, `docs/techniques/`,
-  `docs/architecture/`, `docs/ml_experimentation/`, `docs/live_service/`. Never link from code *or* docs to `plans/`
-  files, and never from code to `docs/roadmap/` pages or to any
-  "Implementation details (deleted when this ships)" section — all of those are deleted when
-  the work lands, so the reference rots. (Docs-to-docs links into `docs/roadmap/` are fine;
-  retargeting them is part of ship-time triage.) Linking from a docstring to a durable page —
-  e.g. `docs/architecture/` — is encouraged.
-- **MkDocs-compatible constant docs** — document module-level constants with a string literal
-  immediately after the assignment, not with Sphinx-style `#:` comments. This is correct:
-
-  ```python
-  MY_CONST: Final[str] = "value"
-  """One-line summary.
-
-  Optional further detail.
-  """
-  ```
-
-- `snake_case` for variables/functions, `PascalCase` for classes, `UPPER_SNAKE_CASE` for constants.
-- All function signatures must have complete type hints including return types.
-- **Prefer self-documenting type hints over bare containers — a signature is documentation.**
-  Jack strongly prefers expressive signatures and is happy to spend a few extra lines of code to
-  get them, as long as complexity stays low. Whenever you would write `dict[str, str]` (or a bare
-  `str` for a value from a fixed set, or a tuple of positional values), stop and ask whether a more
-  self-documenting type is practical. Reach for: a `Type`-suffixed `Literal` alias for a closed set
-  of string values (`StageType = Literal["register", "train", "predict", "metrics"]`); a named
-  alias for a recurring shape (`MlflowTags = dict[str, str]`) so the intent is stated once and
-  reused; a `TypedDict` for a structured mapping with known keys (e.g. `ObjectStoreOptions`) —
-  taking the `TypedDict` in the signature and widening to a plain dict at the call boundary.
-  Constraining `dict` *keys* to a `Literal` alias (`dict[TableNameType, str]`) is worthwhile for a
-  closed vocabulary and works with bidirectional inference when callers pass dict literals.
-  `packages/ml_core/src/ml_core/_repro.py` is the worked example. Don't force it where no honest
-  stricter type exists — a genuinely heterogeneous or open-ended dict stays `dict[str, str]`.
-- All consts must be marked with the maximally "constant" type.
-  e.g. `CONST_SEQ: Final[tuple[str, ...]] = ("a", "b")` or `FOO: Final[str] = "bar"`
-- Never relax an existing test to make it pass.
-
-### Polars Style
-
-These rules are all about making Polars code easy to read.
-
-- When casting, prefer using the `cast` method like this: `df.cast({"foo": pl.Int8})`, in favour of
-  using `df.with_columns(pl.col("foo").cast(pl.Int8))`. **Caveat:** this is only safe on a plain
-  Polars frame — passing a `{column: dtype}` mapping to a *model-bearing* Patito frame silently does
-  the wrong thing. See the `polars-patito-gotchas` skill.
-- When using `.with_columns`, prefer specifying the destination column name as a key word argument
-  like this: `df.with_columns(bar=pl.col("foo").expression())` instead of using `alias` like this:
-  `df.with_columns(pl.col("foo").expression().alias("bar"))`
-
-- **`Literal` type aliases — use a `Type` suffix** to distinguish them from the runtime tuples
-  that drive Polars `Enum` declarations. Example:
-
-  ```python
-  EVALUATION_SCOPES: Final[tuple[str, ...]] = ("leaderboard", "production_monitoring", "ad_hoc")
-  """Runtime tuple — used as pl.Enum(EVALUATION_SCOPES)."""
-
-  EvalScopeType = Literal["leaderboard", "ad_hoc"]
-  """Type annotation — currently-implemented subset; update when adding a new scope."""
-  ```
-
-  The `Type`-suffixed alias is what goes in function signatures; the `UPPER_SNAKE_CASE` tuple is
-  what goes into `pl.Enum(...)`. They serve different purposes and should both exist.
-
-### Gotchas that fail silently
-
-Patito's model machinery collides with Polars and with delta-rs in five ways, and **none of them
-raise at the point of the mistake**: a cross-model `.join()` that has to have its right-hand
-operand stripped, a `{column: dtype}` `.cast` that gets swallowed on a model-bearing frame,
-`ge`/`le` doing nothing at all on a datetime field, `.filter()` dropping the Patito subclass, and
-a dictionary-encoded column blocking Delta predicate pushdown so a partition-filtered query reads
-the whole table. They are written up, with the workaround for each, in the
-**`polars-patito-gotchas`** skill. Load it before writing the code, not after the confusing
-`validate()` error.
-
-Two more live in their own skills: **`marimo-notebooks`** (leading underscores are cell-local,
-imports belong in `app.setup`, never `ruff check --fix` a notebook) and **`ty-workarounds`**
-(known upstream `ty` bugs on Altair and numpy, where the code is correct and the checker is not).
-
-### Polars Gotcha: row counts silently wrap past 2³² rows (32-bit `IdxSize`)
-
-Default Polars builds use a 32-bit row index (`IdxSize`), capping any single materialised frame,
-row count, or row index at 2³² (~4.29 billion) rows. Past the cap there is **no error** — counts
-wrap modulo 2³², streaming engine included.
-
-- **Never row-count a table that can exceed 2³² rows with Polars.** Use the Delta log instead —
-  `DeltaTable(path).count()`, or sum `num_records` over `get_add_actions(flatten=True)` — both
-  metadata-only and exact.
-- Filtered/partition-pruned queries whose *result* stays under 2³² rows are correct even when the
-  underlying scan is bigger, and value aggregations (`sum`, `min`/`max`, quantiles) over >2³² rows
-  are unaffected — only row counts and row indices wrap.
-- Tables past the cap today: NWP (~5.9B rows). `power_forecasts` will pass it at V2 scale.
-
-The measurements behind all of that, and the reasoning:
-[Performance and Scale → The other hard ceiling](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#the-other-hard-ceiling-polars-32-bit-row-index).
+**Read [`docs/architecture/code-style.md`](docs/architecture/code-style.md) before writing or
+editing any Python.** It is the single source of truth for code style in this repo — Python
+version, ruff configuration and its traps, naming, how expressive a signature has to be, comments
+and doc links, Polars and Patito conventions, data handling, error handling — and none of it is
+repeated here. Skipping it means guessing at rules that are written down.
 
 ## This is a young project
 

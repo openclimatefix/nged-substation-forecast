@@ -60,9 +60,9 @@ result = pl.DataFrame._from_pydf(patito_df._df).cast({"foo": pl.Categorical})
 Patito use and is correct. Expression/Series casts like `pl.col("foo").cast(pl.Int8)` are always
 plain Polars and unaffected.)
 
-This is the caveat behind the Polars style rule in CLAUDE.md that prefers `df.cast({"foo":
-pl.Int8})` over `df.with_columns(pl.col("foo").cast(pl.Int8))`: the preference holds only on a
-plain Polars frame.
+This is the caveat behind the Polars style rule in `docs/architecture/code-style.md` that prefers
+`df.cast({"foo": pl.Int8})` over `df.with_columns(pl.col("foo").cast(pl.Int8))`: the preference
+holds only on a plain Polars frame.
 
 ## `ge`/`le` are silently ignored on a datetime field
 

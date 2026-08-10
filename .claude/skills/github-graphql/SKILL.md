@@ -1,14 +1,11 @@
 ---
 name: github-graphql
 description: >-
-  Concrete gh api graphql invocations for the GitHub operations this repo's issue/PR workflow
-  needs but plain gh issue/pr commands can't do: attaching a sub-issue to its parent epic,
-  reordering sub-issues within a parent, setting an issue's org-level Type, and setting a GitHub
-  Projects (v2) field (Status/Project/Area) on an item. Use this skill whenever you're about to
-  run one of those four operations for openclimatefix/nged-substation-forecast — e.g. when
-  the `github-issue-pr-workflow` skill says to attach/position a sub-issue, set Type, or
-  set project fields, or whenever you'd otherwise reach for `gh api graphql` and aren't sure of
-  the mutation name, its input fields, or how to obtain the node IDs it needs.
+  Concrete `gh api graphql` invocations for the four GitHub operations plain `gh issue`/`gh pr`
+  can't do: attaching a sub-issue to its parent epic, reordering sub-issues, setting an issue's
+  org-level Type, and setting a Projects (v2) field (Status/Project/Area). Load before running any
+  of them for openclimatefix/nged-substation-forecast, or whenever you'd reach for `gh api graphql`
+  and aren't sure of the mutation name, its input fields, or how to get the node IDs it needs.
 ---
 
 # GitHub GraphQL cheatsheet
@@ -20,11 +17,9 @@ normally works with. Get a node ID with:
 gh issue view <number> --json id --jq .id   # works for PRs too via `gh pr view`
 ```
 
-All commands below assume the repo `openclimatefix/nged-substation-forecast`; swap the owner/name
-if pointed at a different repo. Each mutation's input fields were confirmed against GitHub's live
-schema via `gh api graphql` introspection (`{ __type(name: "<MutationName>Input") { inputFields {
-name } } }`) — re-check with the same technique if a call below ever starts failing, since GitHub
-occasionally adds/renames fields.
+All commands assume `openclimatefix/nged-substation-forecast`; swap the owner/name for another
+repo. If a call starts failing, re-check its input fields by introspection — GitHub occasionally
+renames them: `{ __type(name: "<MutationName>Input") { inputFields { name } } }`.
 
 ## Attach a sub-issue to its parent
 

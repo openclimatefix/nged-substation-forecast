@@ -22,7 +22,7 @@ Marimo treats any name starting with `_` (a variable *or* a function) as *cell-l
 exported to other cells, so a `_helper()` defined in one cell (or in `app.setup`) is invisible
 everywhere else and the call fails at runtime. A helper that multiple cells call must have a
 public name (no leading underscore). This is the opposite of the usual `_private` convention that
-CLAUDE.md's Code Style section asks for elsewhere in the repo, so it is easy to get wrong; the
+`docs/architecture/code-style.md` asks for elsewhere in the repo, so it is easy to get wrong; the
 leading-underscore-means-private habit does not apply inside a Marimo notebook.
 
 ## Put every import in the `with app.setup:` block
