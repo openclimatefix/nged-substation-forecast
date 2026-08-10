@@ -635,8 +635,8 @@ def _read_live_forecast_rows(
     The scan is pruned to the matching ``(experiment_name, fold_id="live")`` Delta partitions and
     then to the one ``power_fcst_init_time``, and every column is reduced to a scalar inside
     Polars, so only the aggregates cross back into Python. The ``pl.len()`` is safe from the
-    32-bit row-count wraparound documented in ``CLAUDE.md``: it counts one slot's rows (~1M at V1
-    scale, ~86M at V2), not the whole table.
+    32-bit row-count wraparound documented in ``docs/architecture/code-style.md``: it counts one
+    slot's rows (~1M at V1 scale, ~86M at V2), not the whole table.
     """
     if not delta_table_exists(power_forecasts_path, storage_options):
         return _EMPTY_LIVE_FORECAST_ROWS
@@ -716,7 +716,8 @@ def _read_promoted_model_facts(production_model_path: str) -> PromotedModelFacts
         if ids is not None and not isinstance(ids, list):
             # A JSON string, int, etc. here is malformed, not merely a different shape: iterating
             # a str with int() would silently mis-parse it (e.g. "12" -> (1, 2)) instead of
-            # degrading, which is the "strict about malformed input" rule from CLAUDE.md.
+            # degrading, which is the "strict about malformed input" rule from CLAUDE.md
+            # ("Inherent stability").
             raise TypeError(  # noqa: TRY301 — raised to reach this function's own degrade handler.
                 f"trained_time_series_ids must be a list, got {type(ids).__name__}: {ids!r}"
             )
