@@ -2,21 +2,19 @@
 name: plan-issue
 description: >-
   Turn a GitHub issue in openclimatefix/nged-substation-forecast into a reviewed implementation
-  plan, without writing any code. Reads the issue and its comments, decides whether the issue is
-  worth implementing at all, writes a plan that may overrule a stale issue body, has a fresh
-  sub-agent adversarially review that plan, triages the findings, and then stops for Jack's
-  review. Use this whenever Jack asks for a plan for an issue, says "plan issue N" or
-  "/plan-issue N", asks whether an issue is worth doing, or asks you to think through how to
-  implement an issue before touching code. Do not use it to implement an issue — that is the
-  "Sub-agent routine" in CLAUDE.md, which starts once a plan from this skill has been approved.
+  plan, writing no code: read the issue and its comments, decide whether it is worth implementing
+  at all, write a plan that may overrule a stale issue body, have a fresh sub-agent adversarially
+  review it, triage the findings, stop for Jack. Load whenever Jack asks for a plan for an issue,
+  says "plan issue N" or "/plan-issue N", asks whether an issue is worth doing, or asks you to
+  think through an implementation before touching code. To implement an approved plan, use
+  `implement-issue` instead.
 ---
 
 # Plan a GitHub issue
 
-The output of this skill is a **plan file and a recommendation**, never a code change. Planning
-and implementing are deliberately separate: Jack approves a plan before any code moves, so that
-his review of the eventual diff is checking execution rather than discovering the design for the
-first time.
+The output is a **plan file and a recommendation**, never a code change. Jack approves a plan
+before any code moves, so his review of the eventual diff checks execution rather than discovering
+the design for the first time.
 
 Take the issue number from the invocation (`/plan-issue 500`). If several are given, run the whole
 procedure once per issue, each on its own branch — do not merge them into one plan unless the
@@ -76,7 +74,7 @@ departing from and why.
 ## 3. Write the plan
 
 The plan is a committed file on the issue's own branch, so set up the worktree now rather than
-leaving it to implementation — this is step 1 of CLAUDE.md's "Sub-agent routine", pulled forward:
+leaving it to implementation — this is step 1 of the `implement-issue` skill, pulled forward:
 
 ```bash
 git worktree add .claude/worktrees/<branch-name> -b <branch-name>
@@ -86,13 +84,11 @@ ln -s /home/jack/dev/python/nged-substation-forecast/.env .env   # if it exists 
 
 Then write the plan to **`plans/<branch-name>.md`** inside that worktree, and commit it.
 
-One worktree per issue means one checkout per branch, so `plans/` holds exactly one file on each
-branch and the "at most one plan" rule in `plans/README.md` holds without any coordination
-between parallel sessions. Committing it now rather than at implementation time is what makes the
-plan durable: it survives Claude Code shutting down, and it is already in the diff when the
-implementation PR opens, so the reviewer sees the plan next to the code that claims to follow it.
-It is deleted at ship time, with its content pasted into the PR body — the existing rule, not a
-new one.
+One worktree per issue means `plans/` holds exactly one file on each branch, so the "at most one
+plan" rule in `plans/README.md` holds with no coordination between parallel sessions. Committing
+now rather than at implementation time makes the plan durable: it survives Claude Code shutting
+down, and it is already in the diff when the PR opens, so the reviewer sees the plan next to the
+code that claims to follow it. It is deleted at ship time into the PR body, per the existing rule.
 
 The plan covers:
 
@@ -114,8 +110,8 @@ The plan covers:
   code works *now* (CLAUDE.md, "Write about the present, not the past"). Include ship-time
   triage if this issue completes a roadmap item: promote surviving design decisions to their
   permanent home, delete the "Implementation details" section, update the roadmap status banner.
-- **Verification commands** — the green-before-push set from CLAUDE.md, plus anything this
-  change specifically needs (for example `uv run pytest --run-network -m network` for
+- **Verification commands** — the green-before-push set from the `implement-issue` skill, plus
+  anything this change specifically needs (for example `uv run pytest --run-network -m network` for
   convention-sensitive NWP conversion code, or `uv run mkdocs build --strict` *and reading the
   rendered HTML* for any change that touches links).
 - **Risks and open questions** — the things Jack should decide, stated as questions with your
@@ -156,6 +152,6 @@ Report to Jack: the verdict from step 2, a short summary of the plan, what the r
 what it found that you rejected. Give the branch name and the path to the plan file.
 
 **Do not write any code, and do not open a PR.** Once Jack approves the plan, implementation runs
-under CLAUDE.md's "Sub-agent routine", resuming at its step 2 in the worktree this skill already
+under the `implement-issue` skill, resuming at its step 2 in the worktree this skill already
 created — implement, verify, PR, a second and independent adversarial review of the *diff*,
 triage, stop.
