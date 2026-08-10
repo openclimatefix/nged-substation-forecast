@@ -297,6 +297,13 @@ docstring-code-line-length = 100
 # with `uv run pytest --run-network` — see docs/architecture/testing.md. The gate lives in a hook,
 # not in an `addopts` `-m "not network"`, because any caller-supplied `-m` would silently override it.
 addopts = "--import-mode=importlib"
+# `test_*.py` is pytest's default; the notebook is named as well because marimo notebooks are
+# ordinary Python files that pytest can collect, and it holds a cell of `test_*` functions
+# exercising a helper defined in another cell. marimo runs those in *cell* scope, which is the
+# only scope that matches how the notebook really runs — a plain `import` of the notebook module
+# would resolve names against module globals instead and so could not see a name bound in the
+# wrong place. Patterns containing a `/` are matched against the whole path, not the basename.
+python_files = ["test_*.py", "packages/notebooks/plot_missing_NWP_data.py"]
 # Put the root `tests/` dir on sys.path so its integration tests can import shared, non-fixture
 # test data (e.g. `_nwp_test_data`) by bare name — importlib mode does not add each test file's
 # own directory to sys.path the way prepend mode does.

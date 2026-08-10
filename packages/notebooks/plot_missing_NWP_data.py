@@ -9,13 +9,14 @@ with app.setup:
     import altair as alt
     import plotting.ocf_theme  # noqa: F401 — registers OCF Altair theme as side effect
     import polars as pl
+    from contracts.weather_schemas import Nwp
     from plotting.ocf_theme import GRID, ORANGE_RED
 
 
 @app.cell
 def _():
-    # TODO: Load polars DataFrame from local Delta Table of NWP data.
-    return
+    df = Nwp.scan_delta().drop("nwp_model_id")
+    return (df,)
 
 
 @app.cell
@@ -39,8 +40,16 @@ def _():
 
 
 @app.cell
-def _(df, nwp_vars):
+def _():
     def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
+        """Chart where `nwp_vars` is missing, one row per ensemble member.
+
+        Args:
+            df: Lazy scan of the NWP Delta table.
+            target_init_time: The single NWP run to plot.
+            target_h3_index: The single H3 cell to plot.
+            nwp_vars: The NWP variable name (or list of names) to plot.
+        """
         # 1. Filter down to the specific init_time and h3_index
         filtered = df.filter(
             (pl.col("init_time") == target_init_time) & (pl.col("h3_index") == target_h3_index)
@@ -54,7 +63,9 @@ def _(df, nwp_vars):
             value_name="value",
         )
 
-        # 3. Create a boolean flag for missing data and a combined label for the Y-axis
+        # 3. Create a boolean flag for missing data and a combined label for the Y-axis. Altair
+        # only accepts materialised data, so collect once the filter has cut the scan down to a
+        # single NWP run and a single H3 cell.
         plot_df = melted.with_columns(
             # Check for both database Nulls and float NaNs
             is_missing=pl.col("value").is_null() | pl.col("value").is_nan(),
@@ -63,7 +74,7 @@ def _(df, nwp_vars):
             #     pl.col("variable") + " (Member " + pl.col("ensemble_member").cast(pl.Utf8) + ")"
             # ),
             row_label=pl.col("ensemble_member"),
-        )
+        ).collect()
 
         # 5. Build the Altair Chart
         base = alt.Chart(plot_df).encode(
@@ -103,6 +114,11 @@ def _(df, nwp_vars):
             .configure_axis(labelFontSize=11, titleFontSize=13)
         )
 
+    return (plot_null_distribution,)
+
+
+@app.cell
+def _(df, nwp_vars, plot_null_distribution):
     chart = plot_null_distribution(
         df,
         target_init_time=datetime(2026, 5, 1, tzinfo=UTC),
@@ -110,6 +126,35 @@ def _(df, nwp_vars):
         nwp_vars=nwp_vars[0],  # ["downward_short_wave_radiation_flux_surface"], #
     )
     chart.show()
+    return
+
+
+@app.cell
+def _(plot_null_distribution):
+    def test_plot_null_distribution_flags_nulls_and_nans():
+        init_time = datetime(2026, 5, 1, tzinfo=UTC)
+        h3_index = 599148110664433663
+        readings = pl.LazyFrame(
+            {
+                "init_time": [init_time] * 4,
+                "valid_time": [datetime(2026, 5, 1, hour=h, tzinfo=UTC) for h in range(4)],
+                "ensemble_member": [0, 0, 0, 0],
+                "h3_index": [h3_index] * 4,
+                "temperature_2m": pl.Series([1.0, None, float("nan"), 4.0], dtype=pl.Float32),
+            }
+        )
+
+        chart = plot_null_distribution(
+            readings,
+            target_init_time=init_time,
+            target_h3_index=h3_index,
+            nwp_vars="temperature_2m",
+        )
+
+        # Altair inlines the chart's data as its single named dataset.
+        (rows,) = chart.to_dict()["datasets"].values()
+        assert [row["is_missing"] for row in rows] == [False, True, True, False]
+
     return
 
 

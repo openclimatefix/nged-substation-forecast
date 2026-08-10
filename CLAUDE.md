@@ -572,7 +572,11 @@ every cell. Two authoring rules follow from how Marimo scopes names and how ruff
   check as well as the fix). The pre-commit hook is split so notebooks are checked but never
   auto-fixed; a bare `uv run ruff check . --fix` typed by hand is *not* covered, so after running
   one, check `git diff` for an import that landed above `import marimo` and move it into
-  `app.setup`.
+  `app.setup`. `marimo check --fix` does not rescue it: that deletes the module-level import and
+  rewrites the cell that used the name as `def _(name)`, leaving the name as a cell input nothing
+  defines. Both shapes are caught by `scripts/check_marimo_notebooks.py` — a pre-commit hook, and
+  run over every notebook by `tests/test_marimo_notebooks.py` — so a broken notebook fails the
+  commit or CI rather than surviving to whoever next opens it.
 
 ### MkDocs Gotcha: a list item needs a blank line before it if it follows an indented continuation
 
