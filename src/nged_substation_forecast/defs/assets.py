@@ -182,11 +182,17 @@ its 00Z run has actually landed, matching Dynamical's publication lag; shared wi
 ``ecmwf_ens_job``/``ecmwf_ens_schedule`` in ``defs/schedules.py``."""
 
 _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
-"""Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≈ 4h of coverage past the 08:30 UTC schedule
+"""Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≥ 4h of coverage past the 08:30 UTC schedule
 (``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time — and past the
-3h25m the one measured republication took. Applies to ``NwpRunNotYetAvailable`` and
+3h25m a measured republication took. Applies to ``NwpRunNotYetAvailable`` and
 ``NwpVariableWhollyMissing``, the two ways an upstream run says "not ready yet"; a genuine bug
-fails immediately instead of retrying for hours."""
+fails immediately instead of retrying for hours.
+
+"≥" rather than "≈" because only ``NwpRunNotYetAvailable`` is raised before the download.
+``NwpVariableWhollyMissing`` comes from validation *after* it, so each of those retries also pays
+for a full re-download (22.5s at best, minutes when the upstream fetch is slow) and re-takes the
+``ECMWF`` concurrency pool slot. That is the price of not discarding the partition, and the
+elapsed window is wider than the delays alone imply."""
 
 _ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800
 """How long to wait between retries of a not-yet-published ECMWF run."""
@@ -388,11 +394,18 @@ useful — bounding it keeps the Dagster event log from bloating on a bad day.""
 def _nwp_null_slices_metadata(affected: pl.DataFrame) -> TableMetadataValue:
     """Render the worst affected (variable, member, valid_time) slices as a Dagster metadata table.
 
-    Capped at ``_NWP_NULL_SLICES_TABLE_LIMIT`` rows (most-null first); the full counts are in the
-    scalar metadata alongside. Sorting by ``n_null`` puts the wholly-null slices at the top, which
-    is the order an operator wants: those are the ones naming a field that arrived missing.
+    Capped at ``_NWP_NULL_SLICES_TABLE_LIMIT`` rows; the full counts are in the scalar metadata
+    alongside. Wholly-null slices sort first, then the most-null of the rest — that is the order an
+    operator wants, because a wholly-null slice names a field that arrived missing. Sorting on
+    ``n_null`` alone would not achieve it: slices need not have equal cell counts (a short run is
+    tolerated), so a wholly-null slice of few cells can carry fewer nulls than a partly-null slice
+    of many.
     """
-    top = affected.sort("n_null", descending=True).head(_NWP_NULL_SLICES_TABLE_LIMIT)
+    top = (
+        affected.with_columns(is_whole_null=pl.col("n_null") == pl.col("n_total"))
+        .sort(["is_whole_null", "n_null"], descending=True)
+        .head(_NWP_NULL_SLICES_TABLE_LIMIT)
+    )
     records = [
         TableRecord(
             {

@@ -70,16 +70,19 @@ source can use a different one) is tracked in
 
 
 class NwpVariableWhollyMissing(ValueError):
-    """A de-accumulated NWP variable is null in *every* slice beyond lead-0 of the frame.
+    """A de-accumulated NWP variable is null in *every* slice beyond lead-0 of a run.
 
     The field is wholesale absent rather than locally corrupt, so `Nwp.validate` rejects it: an
     all-null weather column would otherwise train and serve as a silently-degraded input for the
     full 15-day horizon, which is worse than falling back on the previous run.
 
     A distinct exception type rather than a bare `ValueError` because the `ecmwf_ens` asset
-    retries it. An upstream publication that is still in progress presents exactly this way — the
-    variable's chunks read as fill-value NaN until the worker writing them commits — so waiting is
-    a better first response than failing the partition. See
+    retries it. An upstream publication still in progress can present this way — a variable's
+    chunks read as fill-value null until the worker writing them commits — so waiting is a better
+    first response than failing the partition. Note the limit of that: it only reaches this check
+    when the unwritten variables are the de-accumulated ones, since the ten instantaneous variables
+    are non-nullable and a frame missing one of those is rejected by base Patito validation first,
+    with no retry. See
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
     """
 
@@ -302,52 +305,58 @@ class Nwp(pt.Model):
     @classmethod
     def _check_no_wholly_missing_deaccumulated_variable(cls, dataframe: pt.DataFrame[Self]) -> None:
         """Reject a de-accumulated variable that is null in *every* (ensemble_member, valid_time)
-        slice beyond lead-0 — the column carries no weather at all.
+        slice beyond lead-0 of a run — the column carries no weather at all.
+
+        An all-null weather column is an absent input rather than a degraded one: it would train
+        and serve silently for the whole 15-day horizon, so a run 24 hours old but *complete* is
+        the better degradation. It is also one shape a half-published upstream run takes, which is
+        why :class:`NwpVariableWhollyMissing` is retried rather than failed outright.
 
         Every smaller null pattern is *tolerated* and reported by :func:`assess_nwp_quality`
         instead, because the run it would otherwise discard is overwhelmingly good. That covers
         both the scattered per-pixel corruption known upstream and the occasional whole slice that
-        arrives empty: on 2026-08-09, 2 of 4284 (variable, member, valid_time) slices were wholly
-        null, and failing the partition for 0.05% of one already-nullable variable would have cost
-        the live forecast every one of the other 4282 slices, all 13 variables and all 51 members
-        — converting a tolerable problem into a run 24 hours staler. Nulls in these three variables
-        are in-distribution regardless: all three are legitimately null at lead-0 in every run, so
-        every model already handles them.
+        arrives empty — a run can carry 2 wholly-null slices out of 4284 and still be worth every
+        one of the other 4282, across all 13 variables and all 51 ensemble members. Nulls in these
+        three variables are in-distribution regardless: all three are legitimately null at lead-0
+        in every run, so every model already handles them.
 
-        The gate survives because the failure it is aimed at is coarser than any of that. An
-        all-null weather column is not a degraded input, it is an absent one, and it would train
-        and serve silently for the whole 15-day horizon; a run 24 hours old but *complete* is the
-        better degradation. It is also the shape a half-published upstream run takes, which is why
-        :class:`NwpVariableWhollyMissing` is retried rather than failed outright.
+        The judgement is made per `init_time`, so a run whose column is empty is caught even inside
+        a frame holding other, healthy runs. There is no tunable fraction here — the test is that
+        *nothing* survives — though it is still a cliff rather than a slope: a run one slice short
+        of empty lands with a warning.
 
-        Deliberately threshold-free, so no magic fraction decides what is fatal. Safe on the
-        arbitrary frames `validate` runs against (filtered fixtures, pruned scans): a filtered
-        frame of *good* data still has non-null slices, so — unlike completeness, which is false
-        by construction on any partial frame and therefore lives in the asset — this stays
-        meaningful wherever it is asked. See
+        The one place this is sharper than it looks: a frame filtered down to nothing *but* a
+        wholly-null slice is indistinguishable from an empty column and does raise, even though
+        the same slice was deliberately landed when the whole run was validated. That is latent
+        rather than live — the only production caller validates one whole run, and reads go
+        through `scan_delta`/`set_model`, which do not validate. See
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
         """
-        n_slices = (
+        slices_per_run = (
             dataframe.filter(pl.col("valid_time") > pl.col("init_time"))
-            .select("init_time", "ensemble_member", "valid_time")
-            .n_unique()
+            .group_by("init_time")
+            .agg(n_slices=pl.struct("ensemble_member", "valid_time").n_unique())
         )
-        if not n_slices:
-            return  # A lead-0-only frame: these variables are legitimately null throughout.
-
         wholly_missing = (
             _deaccumulated_null_breakdown(dataframe)
             .filter(pl.col("n_null") == pl.col("n_total"))
-            .group_by("variable")
+            .group_by("variable", "init_time")
             .agg(n_whole_null_slices=pl.len())
-            .filter(pl.col("n_whole_null_slices") == n_slices)
+            # Per `init_time`: comparing a variable's wholly-null slice count against the frame's
+            # *total* would let a wholly-missing run hide behind a healthy one in the same frame.
+            .join(slices_per_run, on="init_time", how="inner")
+            .filter(pl.col("n_whole_null_slices") == pl.col("n_slices"))
         )
         if wholly_missing.height:
-            variables = sorted(wholly_missing["variable"].to_list())
+            offenders = sorted(
+                (row["variable"], str(row["init_time"]), row["n_slices"])
+                for row in wholly_missing.iter_rows(named=True)
+            )
             raise NwpVariableWhollyMissing(
-                f"De-accumulated NWP variable(s) {variables} are null in every one of the "
-                f"{n_slices} (ensemble_member, valid_time) slice(s) beyond lead-0 — the field is "
-                "wholesale absent, not the locally-corrupt scatter we tolerate."
+                "De-accumulated NWP variable(s) null in every (ensemble_member, valid_time) slice "
+                "beyond lead-0 of their run — the field is wholesale absent, not the "
+                f"locally-corrupt scatter we tolerate. Offending (variable, init_time, n_slices): "
+                f"{offenders}"
             )
 
     @classmethod
@@ -485,7 +494,7 @@ class NwpQualityReport:
     @property
     def n_whole_null_slices(self) -> int:
         """Affected slices that arrived *entirely* null — the field is missing for that one
-        (variable, member, valid_time), while the rest of the run is intact.
+        (variable, member, valid_time).
 
         Worth watching separately from the scatter: a rising count is the shape a partial upstream
         publication takes, whereas scatter is the steady-state #722 corruption.

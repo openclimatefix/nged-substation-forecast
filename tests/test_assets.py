@@ -19,7 +19,7 @@ import shapely
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
-from contracts.weather_schemas import Nwp, NwpVariableWhollyMissing
+from contracts.weather_schemas import Nwp
 from dagster import (
     AssetCheckEvaluation,
     AssetCheckSeverity,
@@ -343,17 +343,17 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
     assert evaluation.metadata["n_whole_null_slices"].value == 0
 
 
-def test_ecmwf_ens_warns_on_whole_null_slice_but_still_materialises(
+def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """A wholly-null (member, valid_time) slice — the 2026-08-09 class — reaches the operator as a
-    WARN naming it, rather than passing silently.
+    WARN that counts it, rather than passing silently.
 
-    This pins the *reporting* half of the change; that `Nwp.validate` no longer rejects such a
-    slice is pinned by ``test_whole_slice_deaccumulated_null_beyond_lead0_is_tolerated`` in the
-    contracts package (validation is stubbed out here along with the converter). It fails on
-    ``main``, where ``assess_nwp_quality`` filtered wholly-null slices out of its report entirely,
-    so the check passed and the missing field was never surfaced anywhere.
+    Scoped to the *reporting* half deliberately: the converter is stubbed here, so `Nwp.validate`
+    never sees this frame, and that it no longer rejects such a slice is pinned by
+    ``test_whole_slice_deaccumulated_null_beyond_lead0_is_tolerated`` in the contracts package.
+    What fails on ``main`` is the count: ``assess_nwp_quality`` filtered wholly-null slices out of
+    its report entirely, so the check passed and the missing field was surfaced nowhere.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=timezone.utc)
@@ -385,34 +385,44 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
 ) -> None:
     """``NwpVariableWhollyMissing`` → ``RetryRequested``, not a failed partition.
 
-    An all-null weather column is how a half-published upstream run reads, and Dynamical.org
+    An all-null weather column is one way a half-published upstream run reads, and Dynamical.org
     republishes a defective one — the 2026-08-09 repair landed 3h25m later, inside this budget.
-    The exception surfaces from the *converter*, past where ``main``'s ``try`` block ended, so
-    this fails on ``main``.
+
+    The stub calls the *real* ``Nwp.validate``, so this pins the whole chain the widened ``try``
+    exists for: an empty column raises from validation, which the converter calls, which sits past
+    where ``main``'s ``try`` block ended. It fails on ``main``, where the exception escaped as a
+    hard failure.
     """
     from dagster import RetryRequested
 
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(2024, 12, 1, tzinfo=timezone.utc)
+    # A run whose radiation column carries no weather at all, exactly as the converter would hand
+    # it over: `_make_nwp` gives each row its own (member, valid_time), so nulling every row empties
+    # the column across every slice beyond lead-0.
+    wholly_missing = _make_nwp(init_time, n=3).with_columns(
+        downward_short_wave_radiation_flux_surface=pl.Series([None] * 3, dtype=pl.Float32)
+    )
 
-    def _raise_wholly_missing(ds: object, h3_grid: object) -> None:
-        raise NwpVariableWhollyMissing("downward_short_wave_radiation_flux_surface")
+    def _convert_via_real_validation(ds: object, h3_grid: object) -> pt.DataFrame[Nwp]:
+        return Nwp.validate(wholly_missing)
 
     monkeypatch.setattr(assets, "open_ecmwf_ens_run", lambda *, nwp_init_time, h3_grid: object())
     monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
     monkeypatch.setattr(
-        assets, "convert_nwp_xarray_dataset_to_polars_dataframe", _raise_wholly_missing
+        assets, "convert_nwp_xarray_dataset_to_polars_dataframe", _convert_via_real_validation
     )
 
     with (
-        build_asset_context(partition_key="2024-05-01") as context,
+        build_asset_context(partition_key="2024-12-01") as context,
         pytest.raises(RetryRequested) as exc_info,
     ):
         ecmwf_ens(context)
 
     assert exc_info.value.max_retries == _ECMWF_ENS_MAX_RETRIES
     assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS
-    # Nothing was written: validation runs before the Delta append, so there is no partial
-    # partition for the retry (or a later manual re-run) to double-count against.
+    # Validation runs before the Delta append, so a retry (or a later manual re-run) has no partial
+    # partition to double-count against.
     assert not Path(Settings().nwp_data_path).exists()
 
 

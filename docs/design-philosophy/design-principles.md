@@ -307,9 +307,9 @@ conventions, and every `PowerForecast` row is self-describing. `Nwp.validate` re
 de-accumulated variable that is null in *every* slice beyond lead-0 — a column carrying no weather
 at all — but tolerates every smaller null pattern, from scattered per-pixel corruption up to a
 whole `(ensemble_member, valid_time)` slice, which the `nwp_has_no_unexpected_nulls` check reports
-as a `WARN`. Where that line sits is this principle's granularity clause doing real work: it was
-moved outwards after the 2026-08-09 run was rejected over 2 of its 4284 slices, which converted a
-tolerable problem into exactly the outage the clause exists to prevent.
+as a `WARN`. That line is this principle's granularity clause doing real work: a run can arrive
+with 2 of its 4284 slices empty, and rejecting it over 0.05% of one already-nullable variable is
+exactly the tolerable-problem-into-an-outage trade the clause exists to forbid.
 
 *Serves:*
 [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),

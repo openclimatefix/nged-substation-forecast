@@ -142,7 +142,7 @@ code as it stands; "intended" describes where this principle takes it.
 | Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns and names the late series | Unchanged, plus regime-appropriate band widening 🚧 | No |
 | A meter reporting detectably wrong values | Partly detected at ingest; see [Missing versus wrong](#missing-versus-wrong) | Treated as missing, which routes it into the always-output path 🚧 | No |
 | A whole ECMWF slice corrupt | Landed; `nwp_has_no_unexpected_nulls` warns, naming the slice | Unchanged | No |
-| A whole ECMWF weather variable absent | `ecmwf_ens` retries for up to 4h; if the column is still empty, `Nwp.validate` rejects it and it manifests downstream as a missed run | Unchanged | No |
+| A whole ECMWF weather variable absent | `Nwp.validate` rejects it; `ecmwf_ens` turns each rejection into a retry for up to 4h, and once those are exhausted it manifests downstream as a missed run | Unchanged | No |
 | The promoted model is empty or unloadable | **Hard failure** — the asset raises | Unchanged: this is a promotion bug, not a data outage | Yes, next business day |
 | The service is not running at all | Sentry missed-check-in alarm fires from outside the deployment | Unchanged | Yes, next business day |
 | Any of the above during model R&D | Fails fast | Unchanged — see [R&D fails the other way](#rd-fails-the-other-way) | n/a |
@@ -369,9 +369,10 @@ The ingest gate keeps the two apart, and it draws the line at the point where th
 genuinely differ. A de-accumulated variable that is null in *every* slice beyond lead-0 is fatal in
 `Nwp.validate` — that is an absent column rather than a chronic one, and it would otherwise land as
 silently-broken data — so it manifests downstream as a missed run, which is rung 1 of the ladder.
-Everything below that threshold, including a whole slice, stays in the chronic bucket and is
-landed: a null pattern the model has seen throughout training is not the catastrophe, an empty
-column is.
+Anything short of that, including a whole slice, stays in the chronic bucket and is landed: a null
+pattern the model has seen throughout training is not the catastrophe, an empty column is. Note
+that this is a cliff rather than a tunable fraction — a run one slice short of empty still lands,
+with a warning — which is deliberate, because no honest threshold sits anywhere in between.
 
 **How each model family represents absence.** The mechanisms differ completely, and it is worth
 setting them side by side, because the differences are less instructive than what they share.

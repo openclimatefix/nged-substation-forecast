@@ -24,6 +24,7 @@ def _valid_value(deaccumulated_var: str) -> float:
 
 def _nwp_slice(
     *,
+    init_time: datetime = _INIT_TIME,
     valid_time: datetime = _BEYOND_LEAD0,
     h3_indices: tuple[int, ...] = (100, 101, 102),
     member: int = 0,
@@ -37,7 +38,7 @@ def _nwp_slice(
     n = len(h3_indices)
     columns: dict[str, object] = {
         "nwp_model_id": ["ECMWF_ENS_0_25_degree"] * n,
-        "init_time": [_INIT_TIME] * n,
+        "init_time": [init_time] * n,
         "valid_time": [valid_time] * n,
         "ensemble_member": [member] * n,
         "h3_index": list(h3_indices),
@@ -156,6 +157,51 @@ def test_wholly_missing_deaccumulated_variable_is_fatal(deaccumulated_var: str) 
 
 
 @pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
+def test_wholly_missing_variable_is_judged_per_init_time(deaccumulated_var: str) -> None:
+    """A run with an empty column is fatal even inside a frame that also holds a healthy run.
+
+    Counting a variable's wholly-null slices against the *frame's* total slice count instead of
+    its run's would let the healthy run's slices outvote the broken one, and the empty column
+    would land.
+    """
+    other_init_time = _INIT_TIME + timedelta(days=1)
+    df = _nwp_run(
+        # The broken run: its only slice beyond lead-0 carries no weather for this variable.
+        _nwp_slice(overrides={deaccumulated_var: [None] * 3}),
+        # A healthy run alongside it.
+        _nwp_slice(init_time=other_init_time, valid_time=other_init_time + timedelta(hours=3)),
+    )
+    with pytest.raises(NwpVariableWhollyMissing, match="wholesale absent"):
+        _validate(df)
+
+
+def test_wholly_missing_variables_are_all_named() -> None:
+    """Two empty columns at once are both named, so the message is actionable rather than
+    reporting whichever happened to sort first."""
+    df = _nwp_run(
+        _nwp_slice(
+            overrides={
+                "precipitation_surface": [None] * 3,
+                "downward_short_wave_radiation_flux_surface": [None] * 3,
+            }
+        ),
+        _nwp_slice(
+            valid_time=_LATER_BEYOND_LEAD0,
+            overrides={
+                "precipitation_surface": [None] * 3,
+                "downward_short_wave_radiation_flux_surface": [None] * 3,
+            },
+        ),
+    )
+    with pytest.raises(NwpVariableWhollyMissing) as exc_info:
+        _validate(df)
+
+    message = str(exc_info.value)
+    assert "precipitation_surface" in message
+    assert "downward_short_wave_radiation_flux_surface" in message
+
+
+@pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
 def test_wholly_missing_variable_is_judged_beyond_lead0_only(deaccumulated_var: str) -> None:
     """Lead-0 nulls never count towards "wholly missing": every de-accumulated variable is
     legitimately null there, so a run whose only null slice is lead-0 must pass."""
@@ -173,7 +219,7 @@ def test_wholly_missing_variable_is_judged_beyond_lead0_only(deaccumulated_var: 
 @pytest.mark.parametrize("deaccumulated_var", _DEACCUMULATED_VARS)
 def test_lead0_only_frame_is_not_wholly_missing(deaccumulated_var: str) -> None:
     """A frame with no rows beyond lead-0 has no slice that *could* carry weather, so the fatal
-    check must abstain rather than read "every slice is null" off an empty set."""
+    check must abstain rather than treat "no surviving slices" as "the column is empty"."""
     df = _nwp_slice(valid_time=_INIT_TIME, overrides={deaccumulated_var: [None, None, None]})
     validated = _validate(df)  # does not raise
     assert assess_nwp_quality(validated).is_healthy
