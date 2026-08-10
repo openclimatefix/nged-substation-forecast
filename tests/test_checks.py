@@ -316,12 +316,20 @@ def test_power_data_is_fresh_contains_an_internal_error(
     frame and ``_read_roster_ids`` returns ``None``, so the patched evaluator is still reached.
     """
     monkeypatch.setattr(checks, "evaluate_power_freshness", _raise_inside_the_check)
+    reported: list[tuple[str, BaseException]] = []
+    monkeypatch.setattr(
+        checks, "report_check_degradation", lambda name, exc: reported.append((name, exc))
+    )
 
     result = checks.power_data_is_fresh()
     assert isinstance(result, AssetCheckResult)
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
     assert "simulated bug inside the check" in str(result.description)
+    # Not failing the run means the Sentry failure hook no longer fires, so the handler must send
+    # the exception itself or the fault reaches nobody outside Dagster's Checks view.
+    assert [name for name, _ in reported] == ["power_data_is_fresh"]
+    assert isinstance(reported[0][1], RuntimeError)
 
 
 def test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet(env: Path) -> None:

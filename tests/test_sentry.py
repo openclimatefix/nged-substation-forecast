@@ -100,9 +100,10 @@ def test_init_sentry_disables_log_to_event_capture(monkeypatch: pytest.MonkeyPat
 
     This is the guard that keeps ``ERROR`` logs from anywhere in the process — Dagster's
     startup/step logs, ad-hoc materialisations, the swallowed telemetry error in
-    ``report_power_freshness`` — from becoming Sentry events. Only the failure hook and the explicit
-    freshness ``capture_message`` should ever send. If someone drops the ``integrations`` argument,
-    the SDK's default ``LoggingIntegration`` (``event_level=ERROR``) comes back and this fails.
+    ``report_power_freshness`` — from becoming Sentry events. Only the three explicit senders (the
+    failure hook, the freshness ``capture_message`` and ``report_check_degradation``) should ever
+    send. If someone drops the ``integrations`` argument, the SDK's default ``LoggingIntegration``
+    (``event_level=ERROR``) comes back and this fails.
     """
     calls: list[dict[str, Any]] = []
     monkeypatch.setattr(_sentry.sentry_sdk, "init", lambda **kw: calls.append(kw))
@@ -167,6 +168,43 @@ def test_failure_hook_noop_without_exception(monkeypatch: pytest.MonkeyPatch) ->
     assert hook_fn is not None
     hook_fn(build_hook_context(op_exception=None))
     assert captured == []
+
+
+def test_report_check_degradation_captures_the_exception_and_tags_the_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A degraded check sends the same exception the failure hook would have, tagged per check.
+
+    The tag is what makes the event filterable per check; without the capture, a check that caught
+    its own exception would reach nobody, because log-to-event capture is deliberately disabled.
+    """
+    captured: list[BaseException] = []
+    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
+    boom = ValueError("boom")
+
+    _sentry.report_check_degradation("power_data_is_fresh", boom)
+
+    assert captured == [boom]
+    # The tag lived on an isolated scope, so it cannot leak into a later unrelated event.
+    assert _sentry.sentry_sdk.get_current_scope()._tags.get("asset_check") is None
+
+
+def test_report_check_degradation_swallows_and_logs_on_send_error(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """It is called from inside a check's ``except`` handler, so a raise here would escape the
+    guard and fail the very run the handler exists to keep alive."""
+
+    def boom(*_: Any, **__: Any) -> None:
+        raise RuntimeError("sentry down")
+
+    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", boom)
+    with caplog.at_level(logging.ERROR, logger="nged_substation_forecast._sentry"):
+        _sentry.report_check_degradation("power_data_is_fresh", ValueError("boom"))
+    assert any(
+        "power_data_is_fresh" in r.message and r.levelno == logging.ERROR for r in caplog.records
+    )
+    assert any(r.exc_info is not None for r in caplog.records)  # traceback attached
 
 
 def test_failure_hook_is_attached_to_the_scheduled_jobs() -> None:

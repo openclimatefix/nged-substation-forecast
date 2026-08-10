@@ -30,15 +30,22 @@ old depending on the slot, so any absolute age threshold would fire on two slots
 The full argument is in
 [Inherent Stability → Three audiences, three channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
 
-Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and neither can fail its own
-step: each one's whole body sits under a catch-all for ``Exception`` and for pyo3's
-``PanicException``, which logs the traceback and returns an unhealthy result. Only Dagster's own
-interrupt errors propagate, which is what we want — a cancelled run should cancel. A warning path
-that could fail would turn fail-open into fail-closed at exactly the wrong moment (rule 7 of
+Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and nothing either one *does*
+can fail its own step: each body sits under a catch-all for ``Exception`` and for pyo3's
+``PanicException``, which logs the traceback, reports the exception to Sentry (the run no longer
+fails, so the failure hook no longer fires) and returns an unhealthy result. Only Dagster's own
+interrupt errors propagate, which is what we want — a cancelled run should cancel. What remains
+outside the guard is Dagster's own machinery: resource init, and serialising the returned
+``AssetCheckResult`` into an event. A warning path that could fail would turn fail-open into
+fail-closed at exactly the wrong moment (rule 7 of
 [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
-``live_forecasts_are_healthy`` goes further and guards each read individually, so an absent
-promoted model weakens its report rather than costing all of it; ``power_data_is_fresh``
-deliberately does not, because an unreadable roster there would otherwise pass for a healthy feed.
+
+The two differ in how much they salvage short of that catch-all. In ``live_forecasts_are_healthy``
+an absent ``power_forecasts`` or NWP table reads as empty, and an absent *or unreadable*
+promoted-model ``meta.json`` degrades to "population unknown", so the rest of the report survives;
+a read *error* on either table still costs the whole report. ``power_data_is_fresh`` salvages
+nothing below the catch-all on purpose: its only per-read fallback would be "roster unknown", and a
+fresh power table would then render an unreadable roster as a green tick.
 """
 
 import json
@@ -67,7 +74,7 @@ from dagster import (
 from nged_data.storage import time_series_coverage
 from polars.exceptions import PanicException
 
-from nged_substation_forecast._sentry import report_power_freshness
+from nged_substation_forecast._sentry import report_check_degradation, report_power_freshness
 from nged_substation_forecast.defs.assets import power_time_series_and_metadata
 from nged_substation_forecast.defs.production_assets import (
     LIVE_FORECAST_HORIZON,
@@ -281,7 +288,8 @@ def _check_power_data_freshness() -> AssetCheckResult:
         threshold=_POWER_DATA_STALENESS_THRESHOLD,
     )
     # Forward per-series staleness to Sentry (a no-op unless a DSN is set and some series is late).
-    # Best-effort: report_power_freshness never raises, so a telemetry hiccup can't fail this check.
+    # Best-effort: report_power_freshness never raises, so a telemetry hiccup costs no more than
+    # its own event — were it to raise, the caller's catch-all would discard this whole evaluation.
     report_power_freshness(settings, result)
     return _to_asset_check_result(result)
 
@@ -316,8 +324,11 @@ def power_data_is_fresh() -> AssetCheckResult:
         # straight past this handler. Dagster's own interrupt errors are `BaseException` too and
         # deliberately keep propagating: a cancelled run should cancel. Logged at ERROR with the
         # traceback (never a silent swallow) and surfaced as an unhealthy check, so a fault in here
-        # stays visible.
+        # stays visible. Reported to Sentry explicitly as well: not failing the run means the
+        # failure hook no longer fires, and this hourly job has no cron monitor watching it, so
+        # without this the fault would reach nobody outside Dagster's Checks view.
         logger.exception("Could not evaluate power-data freshness")
+        report_check_degradation("power_data_is_fresh", exc)
         return AssetCheckResult(
             passed=False,
             severity=AssetCheckSeverity.WARN,
@@ -889,9 +900,11 @@ def live_forecasts_are_healthy(context: AssetCheckExecutionContext) -> AssetChec
         # pyo3 derives it from `BaseException`, not `Exception`, so a Rust panic inside a Polars or
         # delta-rs read would otherwise sail straight past this handler; Dagster's own interrupt
         # errors are `BaseException` too and deliberately keep propagating, because a cancelled run
-        # should cancel. Logged at ERROR with the traceback (never a silent swallow) and surfaced
-        # as an unhealthy check, so a bug in here stays visible.
+        # should cancel. Logged at ERROR with the traceback (never a silent swallow), reported to
+        # Sentry explicitly (not failing the run means the failure hook no longer fires) and
+        # surfaced as an unhealthy check, so a bug in here stays visible.
         logger.exception("Could not evaluate live-forecast health")
+        report_check_degradation("live_forecasts_are_healthy", exc)
         return AssetCheckResult(
             passed=False,
             severity=AssetCheckSeverity.WARN,
