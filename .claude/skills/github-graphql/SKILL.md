@@ -18,8 +18,9 @@ gh issue view <number> --json id --jq .id   # works for PRs too via `gh pr view`
 ```
 
 All commands assume `openclimatefix/nged-substation-forecast`; swap the owner/name for another
-repo. If a call starts failing, re-check its input fields by introspection — GitHub occasionally
-renames them: `{ __type(name: "<MutationName>Input") { inputFields { name } } }`.
+repo. Every mutation's input fields below were confirmed against GitHub's live schema by
+introspection. If a call starts failing, re-check the same way — GitHub occasionally adds or
+renames fields: `{ __type(name: "<MutationName>Input") { inputFields { name } } }`.
 
 ## Attach a sub-issue to its parent
 

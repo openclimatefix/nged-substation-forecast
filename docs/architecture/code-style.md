@@ -38,8 +38,9 @@ gets read before any Python is written or edited. Change a rule here and nowhere
 - **Imports**: Sorted automatically by `ruff` (isort rules). `import pandas` is banned outright
   (`TID251`), not merely discouraged.
 - **Rule selection**: `[tool.ruff.lint] select` in `pyproject.toml` names the enabled families
-  explicitly rather than inheriting ruff's defaults, so a `uv lock` refresh cannot quietly change
-  which rules the repo enforces. `select` names whole families; `ignore` names each family member
+  explicitly rather than inheriting ruff's defaults. Ruff's defaults are a curated menu with no
+  stability promise, so an inherited selection would let a `uv lock` refresh change which rules the
+  repo enforces. `select` names whole families; `ignore` names each family member
   we decline, with the reason on the line above it. **When a rule fires somewhere it should not,
   add an `ignore` entry (or a `per-file-ignores` entry) with its justification — do not drop the
   whole family.** Ruff's defaults are not a superset of the old `E4`/`E7`/`E9`/`F` gate: of

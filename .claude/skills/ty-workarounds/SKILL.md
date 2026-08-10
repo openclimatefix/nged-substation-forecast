@@ -19,8 +19,9 @@ Altair decorates every `mark_*` method with `@use_signature`, whose return type 
 through a hand-written generic `TypeAliasType` over `Concatenate`. Since ty 0.0.64, ty resolves
 that alias but never solves its type variable, so `alt.Chart(df).mark_line()` infers as the bare
 `T@__call__` and the next call in the chain fails with
-`unresolved-attribute: Object of type 'T@__call__' has no attribute 'encode'`. This is upstream ty
-bug [astral-sh/ty#2520](https://github.com/astral-sh/ty/issues/2520).
+`unresolved-attribute: Object of type 'T@__call__' has no attribute 'encode'`. The code is
+correct — pyright infers `Chart` — and this is upstream ty bug
+[astral-sh/ty#2520](https://github.com/astral-sh/ty/issues/2520).
 
 **How to apply:** put `# ty: ignore[unresolved-attribute]` on the `.encode(` line of each chart
 chain. Restructuring does not help: annotating an intermediate variable as `alt.Chart` instead
