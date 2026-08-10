@@ -685,7 +685,7 @@ that this does not trade away [principle 8 ("*every experiment is scored
 identically*")](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically): the
 leaderboard measurement is unchanged and stays comparable, and the extrapolation check is an
 *additional* acceptance criterion rather than a substitute score. The feature becomes cleanly
-measurable only once [ERA5 pre-training](#explicitly-deferred-not-quick-or-not-skill) extends the
+measurable only once [ERA5 pre-training](training-history.md) extends the
 training history from one summer to several.
 
 **Anchor it to init time, and source it from ERA5.** Compute the accumulator once at
@@ -713,6 +713,26 @@ lengthen the EWM only as far as the trajectory allows (~7–10 days), which is a
 and should be labelled as one.
 
 ## Tier 4 — structural model changes (weeks)
+
+### Pre-train on the ERA5-backed history
+
+Issues: [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143) (ingest),
+[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (experiments)
+
+Our power data reaches back to late 2019 but our ECMWF ENS archive starts 2024-04-01, so today's
+fold trains on 15 months and one winter. Ingesting ERA5 and pre-training on 2020–2023 takes that to
+roughly 5.5 years, which is what makes the seasonal items on this page cleanly measurable — the
+[long-window accumulators](#the-long-window-variant-drought-and-sustained-heat-state) above all,
+and secondarily the holiday, monotone-constraint and global-model items, whose value all turns on
+seasonal or regime coverage the current window does not have. The design, the era-confounding
+hazard that dictates the ingest's scope, and the COVID covariate are on
+[Extending the training history](training-history.md).
+
+Two sequencing notes. The [lead-time feature](#feed-the-model-the-forecast-lead-time-review-discovery-one-line)
+is a prerequisite, because the cheapest reconciliation arm leans on it to discount reanalysis
+weather. And the data-hungry items below — batched training, ensemble-member training, the global
+model — are worth running *after* the history lands, since that is where four extra years change
+the answer most.
 
 ### Per-horizon-window models
 
@@ -784,10 +804,6 @@ PV proxy's exact zeros at night.)
 
 ## Explicitly deferred (not quick, or not skill)
 
-- **[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) ERA5 pre-training** — needs a whole new data-source ingestion (ERA5 download,
-  contracts, reanalysis-vs-forecast handling) before any training trick. The evaluation design
-  belongs to
-  [Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).
 - **[#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) local-time power lags** — a DST edge case affecting a handful of half-hours per year;
   the issue itself says it may not be worth worrying about yet. Revisit if the metrics slices
   ever show a DST-transition artefact.
