@@ -1,9 +1,11 @@
 from datetime import date
 
 import pytest
-from contracts.hydra_schemas import (
+from contracts.config_schemas import (
     CvConfig,
     CvFoldConfig,
+    class_target,
+    import_class,
     load_cv_config,
 )
 from contracts.settings import PROJECT_ROOT
@@ -142,3 +144,76 @@ def test_load_cv_config_reads_canonical_yaml():
     smoke = config.get_fold("smoke_test")
     assert smoke.leaderboard is False
     assert smoke.min_training_months == 1
+
+
+# ---------------------------------------------------------------------------
+# class_target / import_class
+# ---------------------------------------------------------------------------
+
+
+class _Outer:
+    """Host for a genuinely module-level nested class, which class_target must reject."""
+
+    class Inner:
+        """Nested one level down, so its qualname is ``_Outer.Inner``."""
+
+
+def test_class_target_and_import_class_round_trip():
+    """The pair is an inverse: a class survives being named and resolved back."""
+    target = class_target(CvConfig)
+
+    assert target == "contracts.config_schemas.CvConfig"
+    assert import_class(target) is CvConfig
+
+
+def test_class_target_accepts_an_instance():
+    """An instance names its class, so a resolved config object can be tagged directly."""
+    config = CvConfig(folds=[])
+
+    assert class_target(config) == class_target(CvConfig)
+
+
+def test_class_target_rejects_a_class_nested_in_a_class():
+    """A nested class has no module-level path, so naming one fails where it is defined."""
+    with pytest.raises(ValueError, match="not defined at module level"):
+        class_target(_Outer.Inner)
+
+
+def test_class_target_rejects_a_class_defined_in_a_function():
+    """A function-local class is equally unresolvable, and must not be reported as nested."""
+
+    class Local:
+        pass
+
+    with pytest.raises(ValueError, match="not defined at module level"):
+        class_target(Local)
+
+
+def test_import_class_rejects_a_bare_name():
+    with pytest.raises(ValueError, match="not a fully-qualified class path"):
+        import_class("CvConfig")
+
+
+def test_import_class_rejects_a_relative_target():
+    """A ``_target_`` is read in whatever process loads it, so it has no package to be relative to.
+
+    Rejected before ``import_module`` sees it, which would raise a ``TypeError`` asking for the
+    ``package`` argument rather than a ``ValueError`` naming the malformed target.
+    """
+    with pytest.raises(ValueError, match="not a fully-qualified class path"):
+        import_class(".config_schemas.CvConfig")
+
+
+def test_import_class_rejects_an_unimportable_module():
+    with pytest.raises(ValueError, match="Cannot import module"):
+        import_class("contracts.no_such_module.CvConfig")
+
+
+def test_import_class_rejects_a_missing_attribute():
+    with pytest.raises(ValueError, match="has no attribute 'NoSuchClass'"):
+        import_class("contracts.config_schemas.NoSuchClass")
+
+
+def test_import_class_rejects_a_non_class_attribute():
+    with pytest.raises(ValueError, match="is not a class"):
+        import_class("contracts.config_schemas.load_cv_config")

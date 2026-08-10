@@ -8,11 +8,13 @@ is covered by the integration test in ``test_register_experiment_job.py``.
 
 import json
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import pytest
-from contracts.hydra_schemas import CvConfig, CvFoldConfig
+from contracts.config_schemas import CvConfig, CvFoldConfig
 from ml_core._cv_helpers import flatten_config
+from pydantic import ValidationError
 from xgboost_forecaster import XGBoostConfig, XGBoostForecaster
 
 from nged_substation_forecast.defs.jobs import (
@@ -52,6 +54,68 @@ def test_resolve_no_overrides_uses_yaml_defaults() -> None:
     assert isinstance(config, XGBoostConfig)
     assert config.n_estimators == 500
     assert config.experiment_name == "exp"
+
+
+def test_resolve_rejects_an_ill_typed_override() -> None:
+    """Pydantic validates every hyperparameter at registration, before any fold is trained."""
+    with pytest.raises(ValidationError, match="max_depth"):
+        _resolve_forecaster_config(_BASE_CONFIG, {"max_depth": "high"}, "exp")
+
+
+@pytest.mark.parametrize(
+    "yaml_body",
+    [
+        pytest.param("", id="empty_file"),
+        pytest.param("model_params:\n  _target_: x.Y\n", id="no_forecaster_target"),
+        pytest.param("_target_: x.Y\n", id="no_model_params"),
+        pytest.param("_target_: x.Y\nmodel_params:\n", id="null_model_params"),
+        pytest.param("_target_: x.Y\nmodel_params:\n  - a\n", id="model_params_is_a_list"),
+        pytest.param("_target_: x.Y\nmodel_params:\n  n: 1\n", id="no_config_target"),
+        pytest.param("_target_:\nmodel_params:\n  _target_: x.Y\n", id="null_forecaster_target"),
+        pytest.param("_target_: x.Y\nmodel_params:\n  _target_:\n", id="null_config_target"),
+    ],
+)
+def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, yaml_body: str
+) -> None:
+    """``base_model_config`` is free text on the launchpad, so every typo must say what is wrong.
+
+    Without these checks the shapes below surface as a bare ``KeyError``, ``TypeError`` or
+    ``AttributeError`` that names neither the file nor which of the two ``_target_`` keys is at
+    fault. The last two get further still — a ``_target_`` that is present but not a string
+    reaches ``import_class``, where it either dies on ``None.rpartition`` or, once the *other*
+    target happens to be resolved first, reports a failure against that one instead.
+    """
+    (tmp_path / "bad.yaml").write_text(yaml_body)
+    monkeypatch.setattr("nged_substation_forecast.defs.jobs.PROJECT_ROOT", tmp_path)
+
+    with pytest.raises(ValueError, match="is not a usable model config") as excinfo:
+        _resolve_forecaster_config("bad.yaml", {}, "exp")
+
+    assert "bad.yaml" in str(excinfo.value)
+
+
+@pytest.mark.parametrize("key", ["_target_", "experiment_name"])
+def test_resolve_rejects_an_override_of_a_key_it_would_discard(key: str) -> None:
+    """Two ``model_params`` keys are the resolver's to set, and an override of either is refused.
+
+    Both arrive as ordinary keys and both would be thrown away downstream without a word —
+    ``_target_`` by pydantic's ``extra="ignore"``, since the config class was already resolved
+    from the file, and ``experiment_name`` by the assignment that stamps the job's own value over
+    it. An override that does nothing is worse than one that is rejected.
+    """
+    with pytest.raises(ValueError, match=f"may not override '{key}'"):
+        _resolve_forecaster_config(_BASE_CONFIG, {key: "anything"}, "exp")
+
+
+def test_overrides_do_not_leak_between_calls() -> None:
+    """Overrides are applied to a freshly-parsed copy, so one call cannot leak into the next."""
+    _resolve_forecaster_config(_BASE_CONFIG, {"n_estimators": 7}, "exp")
+
+    _, config = _resolve_forecaster_config(_BASE_CONFIG, {}, "exp")
+
+    assert isinstance(config, XGBoostConfig)
+    assert config.n_estimators == 500
 
 
 def _mixed_fold_config() -> CvConfig:

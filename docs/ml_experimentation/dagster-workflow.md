@@ -70,8 +70,9 @@ verify the full pipeline is wired up before committing to a potentially long `fu
 
 **What the job does:**
 
-1. Loads `base_model_config` with OmegaConf and merges `config_overrides` onto `model_params`.
-2. Instantiates the `BaseForecasterConfig` subclass via Hydra.
+1. Loads `base_model_config` as plain YAML and applies `config_overrides` to `model_params`.
+2. Constructs the `BaseForecasterConfig` subclass named by `model_params._target_`, so pydantic
+   validates every hyperparameter before anything is registered.
 3. Creates the MLflow experiment (or resolves the existing one if the name already exists), and
    rejects the registration outright if that name is already registered under a *different*
    config — see "An experiment's identity is its config" below.

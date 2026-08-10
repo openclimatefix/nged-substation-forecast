@@ -1,4 +1,0 @@
-defaults:
-  - model: xgboost
-  - cv: default
-  - _self_

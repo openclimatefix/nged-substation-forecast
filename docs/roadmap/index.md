@@ -39,8 +39,7 @@ Technical plans change as we learn more — treat this as a best-estimate, not a
   that predates the ECMWF ENS archive: the era-confounding hazard that dictates the ingest's
   scope, the reconciliation and pooling variants, the COVID covariate, and why ERA5 scoring is a
   diagnostic rather than a promotion criterion.
-- [Engineering health](engineering-health.md) — reproducibility stamping, Hydra removal, and
-  scientific-rigor tests.
+- [Engineering health](engineering-health.md) — scientific-rigor tests and cleanup.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate
   estimators of the time-varying effective capacity of metered generators: a
   [convex (CVXPY)](../techniques/convex-optimisation.md) censored quantile-envelope estimator, a
@@ -87,7 +86,9 @@ AWS — see [Live service](live-service.md).
 - Verify daylight savings time handling is correct
 - Reproducibility stamping: git SHA + Delta table versions on every MLflow run ✅ (implemented in
   `ml_core._repro`; every MLflow run carries the stamp)
-- Drop Hydra in favour of plain YAML + importlib + pydantic
+- Drop Hydra in favour of plain YAML + importlib + pydantic ✅ (`contracts.config_schemas` owns the
+  `_target_` round-trip; dropping the two dependencies also unpinned `antlr4-python3-runtime`,
+  which had been breaking Dagster's asset-selection strings)
 - Asset check on `live_forecasts` reporting **missed NWP runs** at forecast time
   ([#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424)) ✅
   (`live_forecasts_are_healthy`: it also reads the slot's rows back off disk, so every production

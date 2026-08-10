@@ -7,11 +7,12 @@ which needs the Dagster instance.
 """
 
 import json
+from pathlib import Path
 from typing import Any, Final, Literal, cast
 
-import hydra
 import mlflow
-from contracts.hydra_schemas import CvConfig, load_cv_config
+import yaml
+from contracts.config_schemas import CvConfig, class_target, import_class, load_cv_config
 from contracts.settings import PROJECT_ROOT, Settings
 from dagster import Config, OpExecutionContext, job, op
 from ml_core._cv_helpers import CV_PARTITION_KEY_SEPARATOR, flatten_config
@@ -19,7 +20,6 @@ from ml_core._mlflow_runs import get_or_create_experiment, get_or_create_parent_
 from ml_core._repro import provenance_tags
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 from mlflow.tracking import MlflowClient
-from omegaconf import OmegaConf
 from pydantic import Field
 
 from nged_substation_forecast.defs.cv_assets import CV_EXPERIMENT_FOLDS_NAME
@@ -40,7 +40,7 @@ class RegisterExperimentConfig(Config):
     config_overrides: dict[str, Any] = Field(
         default_factory=dict,
         description=(
-            "Key-value overrides merged onto the base YAML's model_params,"
+            "Key-value overrides applied to the base YAML's model_params, replacing whole values,"
             " e.g. {'selected_features': ['lag_1h'], 'n_estimators': 300}."
         ),
     )
@@ -55,6 +55,67 @@ class RegisterExperimentConfig(Config):
     description: str = Field(default="", description="Stored as an MLflow experiment tag.")
 
 
+_UNOVERRIDABLE_MODEL_PARAMS: Final[dict[str, str]] = {
+    "_target_": (
+        "it names the config class, which a forecaster comes paired with, so base_model_config is"
+        " what fixes it — point that at a different YAML instead"
+    ),
+    "experiment_name": "it is set from the job's own experiment_name parameter",
+}
+"""The ``model_params`` keys a run's ``config_overrides`` may not set, mapped to why not.
+
+Both are ordinary keys as far as the override merge is concerned, and both would be discarded
+without a word downstream of it: ``_target_`` by pydantic's ``extra="ignore"``, because the config
+class was already resolved from the file; ``experiment_name`` by the assignment that stamps the
+job's own value over it.
+"""
+
+
+def _required_targets(raw: Any, config_path: Path) -> tuple[str, str, dict[str, Any]]:
+    """Pull the two ``_target_`` paths and the ``model_params`` mapping out of a parsed model YAML.
+
+    ``base_model_config`` is free text on the launchpad, so a typo points this at the wrong file —
+    ``conf/cv/default.yaml``, say, or a file that does not parse to a mapping at all. Reading the
+    three required pieces in one place means every such mistake reports the path and the whole
+    expected shape, instead of a bare ``KeyError`` that does not say which of the two ``_target_``
+    keys was missing.
+
+    Args:
+        raw: Whatever ``yaml.safe_load`` returned for the model YAML — ``Any``, because
+            that is genuinely all a parsed YAML file is known to be until checked here.
+        config_path: The file it came from, named in the error message.
+
+    Returns:
+        The forecaster's ``_target_``, the config class's ``_target_``, and the ``model_params``
+        mapping — with its ``_target_`` removed, so it is ready to splat into the config class.
+
+    Raises:
+        ValueError: The file is not a mapping, is missing either ``_target_`` or ``model_params``,
+            or has a ``_target_`` that is not a string.
+    """
+    try:
+        forecaster_target = raw["_target_"]
+        model_params = dict(raw["model_params"])
+        config_target = model_params.pop("_target_")
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(
+            f"{config_path} is not a usable model config: it must be a mapping with a top-level"
+            " '_target_' naming the BaseForecaster subclass, and a 'model_params' mapping whose"
+            f" own '_target_' names the config class. Got: {error!r}"
+        ) from error
+    # The lookups above catch an absent `_target_`, not a present-but-not-a-string one: an empty
+    # `_target_:` parses to None and a number stays a number. Either reaches import_class, which
+    # fails on `str.rpartition` — or, if the other target is resolved first, blames the wrong one.
+    if not isinstance(forecaster_target, str) or not isinstance(config_target, str):
+        # TRY004 wants a TypeError, but this is one of several ways the *file's contents* can be
+        # unusable, and a caller should need to catch only one exception type to mean "bad config".
+        raise ValueError(  # noqa: TRY004
+            f"{config_path} is not a usable model config: both '_target_' values must be strings"
+            f" naming a class; got {forecaster_target!r} and {config_target!r}."
+        )
+    return forecaster_target, config_target, model_params
+
+
 def _resolve_forecaster_config(
     base_model_config: str,
     config_overrides: dict[str, Any],
@@ -62,37 +123,40 @@ def _resolve_forecaster_config(
 ) -> tuple[type[BaseForecaster], BaseForecasterConfig]:
     """Build the concrete forecaster class + config from a model YAML and overrides.
 
-    Loads the base model YAML, merges ``config_overrides`` onto its ``model_params``, then
-    instantiates the ``BaseForecasterConfig`` subclass via Hydra. The forecaster class is resolved
-    too, for its ``MODEL_NAME`` (used as the ``model_family`` tag).
+    Loads the base model YAML, applies ``config_overrides`` to its ``model_params``, then
+    constructs the ``BaseForecasterConfig`` subclass named by ``model_params._target_``, which is
+    where pydantic validates the hyper-parameters. The forecaster class is resolved too, for its
+    ``MODEL_NAME`` (used as the ``model_family`` tag).
 
     Args:
         base_model_config: Path relative to ``PROJECT_ROOT`` of the base model YAML.
-        config_overrides: Overrides merged onto ``model_params`` (whole-value replacement; lists
-            are replaced, not extended).
+        config_overrides: Overrides applied to ``model_params`` as **whole-value replacement**: an
+            override replaces the base value outright rather than merging into it. Lists are
+            replaced, not extended, and a value that is itself a mapping is replaced whole, so
+            an override must restate every key of that mapping it wants to keep. Every
+            ``model_params`` key is overridable except those in ``_UNOVERRIDABLE_MODEL_PARAMS``.
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
         A ``(forecaster_cls, forecaster_config)`` tuple.
+
+    Raises:
+        ValueError: ``config_overrides`` names an unoverridable key, or the YAML is not a usable
+            model config.
     """
-    cfg = OmegaConf.merge(
-        OmegaConf.load(PROJECT_ROOT / base_model_config),
-        {"model_params": config_overrides},
-    )
-    forecaster_cls = cast(type[BaseForecaster], hydra.utils.get_class(cfg._target_))
-    forecaster_config: BaseForecasterConfig = hydra.utils.instantiate(cfg.model_params)
+    for key, reason in _UNOVERRIDABLE_MODEL_PARAMS.items():
+        if key in config_overrides:
+            raise ValueError(f"config_overrides may not override {key!r}: {reason}.")
+    config_path = PROJECT_ROOT / base_model_config
+    with config_path.open(encoding="utf-8") as file:
+        raw = yaml.safe_load(file)
+    forecaster_target, config_target, model_params = _required_targets(raw, config_path)
+    model_params.update(config_overrides)
+    forecaster_cls = cast(type[BaseForecaster], import_class(forecaster_target))
+    config_cls = cast(type[BaseForecasterConfig], import_class(config_target))
+    forecaster_config = config_cls(**model_params)
     forecaster_config.experiment_name = experiment_name
     return forecaster_cls, forecaster_config
-
-
-def _class_target(obj: type | object) -> str:
-    """Return the fully-qualified import path of a class (or an instance's class).
-
-    Used to stamp the forecaster and config class identity onto the MLflow experiment so assets
-    can reconstruct them later via ``hydra.utils.get_class`` (see ``load_experiment_forecaster``).
-    """
-    cls = obj if isinstance(obj, type) else type(obj)
-    return f"{cls.__module__}.{cls.__qualname__}"
 
 
 IdentityTagType = Literal["config", "forecaster_target", "config_target"]
@@ -134,8 +198,8 @@ def _identity_tags(
     """
     return {
         "config": forecaster_config.model_dump_json(),
-        "forecaster_target": _class_target(forecaster_cls),
-        "config_target": _class_target(forecaster_config),
+        "forecaster_target": class_target(forecaster_cls),
+        "config_target": class_target(forecaster_config),
     }
 
 

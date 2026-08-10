@@ -19,8 +19,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final, cast
 
-import hydra
 import mlflow
+from contracts.config_schemas import import_class
 from mlflow.tracking import MlflowClient
 
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
@@ -51,8 +51,8 @@ def load_experiment_forecaster(
     if experiment is None:
         raise ValueError(f"No MLflow experiment named {experiment_name!r}.")
     tags = experiment.tags
-    forecaster_cls = cast(type[BaseForecaster], hydra.utils.get_class(tags["forecaster_target"]))
-    config_cls = cast(type[BaseForecasterConfig], hydra.utils.get_class(tags["config_target"]))
+    forecaster_cls = cast(type[BaseForecaster], import_class(tags["forecaster_target"]))
+    config_cls = cast(type[BaseForecasterConfig], import_class(tags["config_target"]))
     forecaster_config = config_cls.model_validate_json(tags["config"])
     return forecaster_cls, forecaster_config
 

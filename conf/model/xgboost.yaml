@@ -2,11 +2,12 @@
 #
 # The top-level _target_ identifies the BaseForecaster subclass to instantiate.
 # model_params._target_ identifies the companion config object.
-# The Dagster asset loads this file with OmegaConf, then does:
+# register_experiment_job loads this file with yaml.safe_load, then does:
 #
-#   forecaster_class = hydra.utils.get_class(cfg._target_)
-#   forecaster_config = hydra.utils.instantiate(cfg.model_params)
-#   results = cross_validate(forecaster_class, forecaster_config, ...)
+#   forecaster_class = import_class(raw["_target_"])
+#   forecaster_config = import_class(model_params.pop("_target_"))(**model_params)
+#
+# A registered experiment's config_overrides replace whole values under model_params.
 
 _target_: xgboost_forecaster.forecaster.XGBoostForecaster
 

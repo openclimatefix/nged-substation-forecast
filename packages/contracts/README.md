@@ -2,6 +2,10 @@
 
 Defines the "data contracts": the schemas defining the precise shape of each data source and its semantics.
 
+It also owns the thin configuration layer that sits beside those schemas: the CV fold config,
+and the `class_target`/`import_class` pair that turns a class into a `_target_` string and
+back. Both are model-agnostic and need nothing heavier than pydantic and PyYAML.
+
 ## Dependency Isolation
 
 This package is designed to be extremely lightweight. It defines the *shape* of the data using Patito and Polars, but it does **not** contain any ML-specific logic or heavy dependencies like MLflow. This ensures that any component in the system (e.g., a data ingestion script or a dashboard) can import these schemas without bringing in the entire ML stack.
