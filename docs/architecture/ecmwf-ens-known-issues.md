@@ -84,9 +84,11 @@ That is worth doing because Dynamical.org publishes each 00Z run as roughly 40 s
 commits between 08:05 and 08:20 UTC, one per worker. A run being written is therefore genuinely
 readable and genuinely incomplete: a variable whose worker has not committed yet reads as
 fill-value null across every member and step, which is precisely this fatal pattern. That covers
-less ground than it sounds, and the limit is worth stating: ten of the thirteen downloaded
-variables are instantaneous and non-nullable, so a half-published run that is also missing one of
-*those* is rejected by base Patito validation first and fails immediately, with no retry. The
+less ground than it sounds, and the limit is worth stating: only 3 of the `Nwp` contract's 13
+weather variables reach this check at all. Nine are instantaneous and non-nullable, so a
+half-published run also missing one of *those* is rejected by base Patito validation first and
+fails immediately, with no retry; the thirteenth, `categorical_precipitation_type_surface`, is
+nullable but has its own historical invariant that rejects an all-null column just as fast. So the
 retry engages when the variables still unwritten are the de-accumulated ones. A *defective*
 run also gets republished — the 2026-08-09 00Z run was repaired by a second sweep at 11:45 UTC,
 3 hours 25 minutes after its first publication, and well inside the retry budget.
