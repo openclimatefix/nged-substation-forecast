@@ -71,12 +71,10 @@ ENTRYPOINT ["dagster"]
 # The default target: live_forecasts_job is the real, already-existing partitioned job
 # (defs/schedules.py). EcsRunLauncher overrides this command per run, and the
 # same image separately serves as the code-location server — this default only matters for
-# `docker run` smoke tests. Partition selection is via --tags, not --select/--partition:
-# `dagster job execute` has no --partition flag at all, and `--select <asset>` hits a pre-
-# existing, unrelated antlr4-python3-runtime/Python-3.14 incompatibility in Dagster's own
-# asset-selection-string parser (confirmed reproducing outside Docker too, on plain `dg dev`).
-# Job-name selection (-j) skips that parser entirely. Inference needs no credentials of any kind,
-# so this is the reliable invocation:
+# `docker run` smoke tests. Partition selection is via --tags, not --partition: `dagster job
+# execute` has no --partition flag at all, and selecting the job by name keeps the smoke test
+# exercising exactly the entry point the EcsRunLauncher uses. Inference needs no credentials of
+# any kind, so this is the reliable invocation:
 #   docker run --network=none \
 #     <image> job execute -j live_forecasts_job --tags '{"dagster/partition": "<key>"}'
 CMD ["job", "execute", "-m", "nged_substation_forecast.definitions", "-j", "live_forecasts_job"]

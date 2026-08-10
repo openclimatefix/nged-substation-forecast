@@ -18,7 +18,7 @@ from contracts._uri import (
     delta_table_exists,
     if_local_path_then_make_parent_dir,
 )
-from contracts.hydra_schemas import load_cv_config
+from contracts.config_schemas import load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
 from contracts.power_schemas import (
     EffectiveCapacity,

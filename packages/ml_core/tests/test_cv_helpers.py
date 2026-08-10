@@ -3,7 +3,7 @@
 from datetime import UTC, date, datetime
 
 import polars as pl
-from contracts.hydra_schemas import CvFoldConfig
+from contracts.config_schemas import CvFoldConfig
 from ml_core._cv_helpers import (
     _subtract_months,
     date_to_utc_datetime,
