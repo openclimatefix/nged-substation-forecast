@@ -183,9 +183,12 @@ def test_report_check_degradation_captures_the_exception_and_tags_the_check() ->
 
     The assertion is on the *built event*, not on the arguments to ``capture_exception``: a tag set
     on the wrong scope, or not set at all, still reaches ``capture_exception`` intact and would slip
-    past an argument-level check. A real client is given a temporary isolation scope so nothing
-    leaks into other tests, and ``before_send`` returns ``None`` so the event is dropped rather than
-    transmitted.
+    past an argument-level check. Building an event needs a real client, which is confined to a
+    temporary isolation scope, and ``before_send`` returns ``None`` so the event is dropped rather
+    than transmitted. Both integration sets are off because ``setup_once`` is *irreversible* and
+    process-global — it monkeypatches ``sys.excepthook``, ``threading.Thread.run``,
+    ``logging.Logger.callHandlers`` and more, none of which leaving the scope would undo, and this
+    suite uses threads (moto), logging (``caplog``) and sqlalchemy (the Dagster instance).
     """
     events: list[Event] = []
 
@@ -195,7 +198,14 @@ def test_report_check_degradation_captures_the_exception_and_tags_the_check() ->
         return None
 
     with sentry_sdk.isolation_scope() as scope:
-        scope.set_client(sentry_sdk.Client(dsn=_DSN, before_send=collect))
+        scope.set_client(
+            sentry_sdk.Client(
+                dsn=_DSN,
+                before_send=collect,
+                default_integrations=False,
+                auto_enabling_integrations=False,
+            )
+        )
         _sentry.report_check_degradation("power_data_is_fresh", ValueError("boom"))
 
     (event,) = events

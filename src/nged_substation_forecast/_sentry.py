@@ -6,8 +6,8 @@ Sentry configuration:
 - **Error telemetry** — :func:`init_sentry` initialises the SDK once per process (a no-op unless
   ``Settings.sentry_dsn`` is set), and the :data:`sentry_capture_failure` Dagster failure hook
   reports the real exception (with traceback) from inside the run worker.
-  :func:`report_check_degradation` covers the one production fault the hook cannot see: an asset
-  check that caught its own exception rather than failing the run. The hook is used rather
+  :func:`report_check_degradation` covers a production fault the hook cannot see, because it never
+  fails a run: a standalone ``@asset_check`` that caught its own exception. The hook is used rather
   than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry` explicitly
   disables — because Dagster logs a step failure without ``exc_info``, so the log-based path would
   yield a message-only event with no stack trace, *and* would fire for every ``ERROR`` log anywhere
@@ -133,7 +133,8 @@ def sentry_capture_failure(context: HookContext) -> None:
 def report_check_degradation(check_name: str, exc: BaseException) -> None:
     """Report an asset check that could not evaluate its own inputs, as a Sentry error event.
 
-    Both data-health checks catch everything rather than raising (rule 7 of
+    Both of this function's callers — the standalone ``@asset_check``s ``power_data_is_fresh`` and
+    ``live_forecasts_are_healthy`` — catch everything rather than raising (rule 7 of
     [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)),
     so the run no longer fails and :data:`sentry_capture_failure` no longer fires. Without this,
     a check that cannot read its own inputs would show up only as a yellow tick in Dagster's Checks

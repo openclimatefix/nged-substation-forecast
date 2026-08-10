@@ -30,8 +30,8 @@ old depending on the slot, so any absolute age threshold would fire on two slots
 The full argument is in
 [Inherent Stability → Three audiences, three channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
 
-Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and nothing either one *does*
-can fail its own step: each body sits under a catch-all which logs the traceback, reports the
+Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and nothing either one's *body*
+does can fail its own step: each sits under a catch-all which logs the traceback, reports the
 exception to Sentry (the run no longer fails, so the failure hook no longer fires) and returns an
 unhealthy result. Catching ``BaseException`` is what makes that absolute — a Rust panic in any of
 the pyo3 extensions these bodies read through arrives as a ``PanicException``, which does not
@@ -308,9 +308,10 @@ def power_data_is_fresh() -> AssetCheckResult:
     via ``power_time_series_and_metadata_schedule``), so the check re-evaluates freshness each
     hour regardless of whether new data landed.
 
-    Cannot fail its own step: the whole body is guarded, so a stalled object store, a half-written
+    Cannot fail its own step: the whole body is guarded, so an object-store error, a half-written
     ``metadata.parquet`` or a bug in here degrades to an unhealthy result rather than failing the
-    hourly production run.
+    hourly production run. (A merely *slow* object store makes a slow check, not a degraded one —
+    nothing here imposes a step-level timeout.)
     """
     try:
         return _check_power_data_freshness()
@@ -320,7 +321,10 @@ def power_data_is_fresh() -> AssetCheckResult:
         # delta-rs, obstore) defines its own class — so there is no one name to catch. Naming what
         # must propagate instead is the only version that stays true as dependencies come and go.
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
-            raise  # A cancelled run must cancel. This also re-raises pytest's own control flow.
+            raise  # A cancelled run must cancel.
+        # The width has one cost worth knowing when writing tests: pytest's `fail` and `skip` raise
+        # from `BaseException` too, so they are swallowed here. Never use one as a "must not be
+        # called" sentinel inside this body; assert after the call instead.
         # Rule 7: a non-blocking check that *errors* still fails its run, and this job carries the
         # `sentry_capture_failure` hook, so a raise here would turn fail-open into fail-closed.
         # Sentry is told explicitly because not failing the run means that hook no longer fires.
@@ -892,9 +896,10 @@ def live_forecasts_are_healthy(context: AssetCheckExecutionContext) -> AssetChec
         return _evaluate_live_forecasts(context)
     except BaseException as exc:
         # The same guard as `power_data_is_fresh`, for the same reason — see the comment there for
-        # why it catches `BaseException`, and rule 7 for why a warning path may never raise.
+        # why it catches `BaseException`, what that costs when writing tests, and rule 7 for why a
+        # warning path may never raise.
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
-            raise  # A cancelled run must cancel. This also re-raises pytest's own control flow.
+            raise  # A cancelled run must cancel.
         logger.exception("Could not evaluate live-forecast health")
         report_check_degradation("live_forecasts_are_healthy", exc)
         return AssetCheckResult(
