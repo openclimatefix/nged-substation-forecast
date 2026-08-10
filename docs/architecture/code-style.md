@@ -180,12 +180,27 @@ confusing failure:
 - **`ty-workarounds`** — known upstream `ty` bugs on Altair and numpy, where the code is correct
   and the checker is not.
 
-## Machine Learning (PyTorch)
+## Machine Learning
 
-- Use **PyTorch** for differentiable physics models.
-- Use **MLFlow** for tracking experiments.
-- Follow the "test-harness" pattern: separate research logic from production orchestration but
-  ensure they use the same data contracts.
+- **Every forecasting model subclasses `BaseForecaster`** (`packages/ml_core`), which fixes
+  `train` / `predict` / `save` / `load` and carries a `feature_engineer` strategy object. A model
+  that needs a different view of the data supplies a different `FeatureEngineer` rather than
+  changing the shared feature pipeline. `XGBoostForecaster` is the only implementation so far.
+- **Use MLflow for experiment tracking.**
+- **Choosing an optimisation tool: convex estimation subproblems → CVXPY; learning shapes, or
+  anything needing posteriors → PyTorch.** "Non-convex" comes in grades, and the grade decides the
+  tool — the full rule is
+  [Where PyTorch is the right tool](../techniques/convex-optimisation.md#where-pytorch-is-the-right-tool),
+  and the physics side is [Differentiable physics](../techniques/differentiable-physics.md).
+  PyTorch is not yet a dependency of the workspace; the first model to need it is the variational
+  capacity estimator in the
+  [v0.7 capacity head-to-head](../roadmap/capacity-estimation.md).
+- **Research and production share one execution path.** There is no research-only implementation of
+  a pipeline step — see
+  [design principle 3](../design-philosophy/design-principles.md#3-one-execution-path-from-research-to-production).
+  What legitimately differs between them is failure policy, not code: the CV, training and metrics
+  assets fail fast, while the production service degrades (see
+  [Inherent stability](../design-philosophy/inherent-stability.md)).
 
 ## Error Handling
 
