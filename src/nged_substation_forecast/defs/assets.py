@@ -312,6 +312,13 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
             raise  # A cancelled run must cancel.
         context.log.exception("Could not assess the ingested NWP run")
+        # Reported once, not once per check: the two share this one assessment and so always
+        # degrade together, which is one fault and deserves one Sentry event — the failure hook
+        # that no longer fires would also have sent one. Reporting twice would not produce two
+        # anyway, because sentry-sdk's default `DedupeIntegration` drops a second capture of the
+        # same exception object. Tagged with the quality check, which is the tag the surviving
+        # event carries; `docs/live_service/operations.md` tells operators to expect that.
+        report_check_degradation(_NWP_QUALITY_CHECK_NAME, exc)
         check_results = [
             _degraded_nwp_check_result(_NWP_QUALITY_CHECK_NAME, exc),
             _degraded_nwp_check_result(_NWP_COMPLETENESS_CHECK_NAME, exc),
@@ -337,14 +344,13 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
 def _degraded_nwp_check_result(check_name: str, exc: BaseException) -> AssetCheckResult:
     """A WARN result for a per-run NWP check that could not be evaluated at all.
 
-    Reports the exception to Sentry on the way past, because not failing the run means
-    ``ecmwf_ens_job``'s ``sentry_capture_failure`` hook no longer fires.
+    Pure: the caller owns telling Sentry, because one failed assessment degrades both checks and
+    should not be reported twice.
 
     ``check_name`` is passed explicitly, unlike the equivalent fallbacks in ``defs/checks.py``: a
     standalone ``@asset_check`` needs no name, but inside an asset declaring two ``AssetCheckSpec``s
     an unnamed result fails the step outright — reinstating the very failure this guard prevents.
     """
-    report_check_degradation(check_name, exc)
     return AssetCheckResult(
         check_name=check_name,
         passed=False,

@@ -8,14 +8,14 @@ Sentry configuration:
   reports the real exception (with traceback) from inside the run worker.
   :func:`report_check_degradation` covers a production fault the hook cannot see, because it never
   fails a run: an asset check that caught its own exception instead of raising. The hook is used
-  rather
-  than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry` explicitly
-  disables — because Dagster logs a step failure without ``exc_info``, so the log-based path would
-  yield a message-only event with no stack trace, *and* would fire for every ``ERROR`` log anywhere
-  in the process (Dagster's own startup/step logs, ad-hoc materialisations, even a swallowed
-  telemetry error), swamping Sentry with events the design never intended to send. The hook is
-  attached to the *scheduled* asset jobs only, so it covers the unattended production workload;
-  manual/backfill/experiment runs are watched by the operator at the Dagster UI, not Sentry.
+  rather than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry`
+  explicitly disables — because Dagster logs a step failure without ``exc_info``, so the log-based
+  path would yield a message-only event with no stack trace, *and* would fire for every ``ERROR``
+  log anywhere in the process (Dagster's own startup/step logs, ad-hoc materialisations, even a
+  swallowed telemetry error), swamping Sentry with events the design never intended to send. The
+  hook is attached to the *scheduled* asset jobs only, so it covers the unattended production
+  workload; manual/backfill/experiment runs are watched by the operator at the Dagster UI, not
+  Sentry.
 - **The missed-check-in alarm** — :func:`send_forecast_checkin` sends a *success-only* heartbeat to
   a Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
   ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error testing

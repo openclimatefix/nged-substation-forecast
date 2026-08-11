@@ -202,12 +202,6 @@ raising with Dynamical.org. Only a variable empty in *every* slice is rejected a
 `Nwp.validate`, and even then `ecmwf_ens` retries first — so the symptom of that case is a
 **missed run** at the end of a long-running job, not corrupt data.
 
-Both NWP checks have one description that means something different from all the others, exactly as
-`power_data_is_fresh` does above: `Could not assess the ingested NWP run: …` says the assessment
-itself failed, not that the run is degraded. The run still lands, the shape metadata is absent from
-that materialisation, and the exception reaches Sentry tagged with the check's name. Nothing is
-known about that run's quality while it persists — treat it as "unknown", not "healthy".
-
 **This check is the only place a badly-degraded run is reported, and the run is already on disk by
 the time you read it.** Everything short of a wholly-empty variable lands, so
 `n_whole_null_slices` is not merely informational — it is the sole signal distinguishing a run
@@ -226,6 +220,15 @@ observed-versus-expected member, step, cell and row counts. **The run has alread
 warns** — a short run is kept, because partial NWP forecasts better than falling back on
 yesterday's run. The action is to chase Dynamical.org, not to touch the table.
 
+**Both NWP checks share one description that means something different from all the others**, just
+as `power_data_is_fresh` does above. `Could not assess the ingested NWP run: …` says the assessment
+itself failed, not that the run is degraded — so it appears on *both* checks at once, and the shape
+metadata (`n_ensemble_members` and the rest) is absent from that materialisation. The run still
+lands. Because the two checks share one assessment, a failure is one fault and sends one Sentry
+event, tagged `asset_check:nwp_has_no_unexpected_nulls` whichever of the two assessments raised.
+Nothing is known about that run's quality while this persists — treat it as "unknown", not
+"healthy".
+
 **Do not re-materialise a partition that has already landed.** `write_nwp` is append-only, so
 re-running the partition after Dynamical republishes the run would append a *second* copy of it
 alongside the short one. `Nwp.validate` checks uniqueness only within the in-memory frame, so the
@@ -235,13 +238,13 @@ which does not exist today — tracked in
 [issue #476](https://github.com/openclimatefix/nged-substation-forecast/issues/476). (Materialising
 a *missed* partition, below, is a different case and is safe: nothing landed for it.)
 
-**A partition whose run *failed* is safe to re-materialise**, because everything that can raise —
+**A partition whose run *failed* is safe to re-materialise**, because the work that can raise —
 validation and both quality assessments alike — runs before the Delta append, so a failed
-`ecmwf_ens` run wrote nothing. The one exception is a run killed by something other than its own
-code, such as the box rebooting or the process being OOM-killed between the Delta commit and
-Dagster recording success: that leaves a red partition with rows on disk. So for a partition that
-failed for an infrastructure reason rather than a raised exception, check the table before
-re-running it.
+`ecmwf_ens` run wrote nothing. Two things still sit after it, and neither is a code path you can
+provoke: Dagster's own validation of the emitted check results, and the process being killed
+between the Delta commit and Dagster recording success (the box rebooting, an OOM kill). Both leave
+a red partition with rows on disk. So for a partition that failed for an infrastructure reason
+rather than a raised exception, check the table before re-running it.
 
 Every materialisation whose completeness assessment succeeded also publishes `n_ensemble_members`,
 `n_valid_times`, `n_h3_cells` and the `valid_time` range as metadata, so the Dagster UI timeline
