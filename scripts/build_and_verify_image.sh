@@ -48,11 +48,9 @@
 #     ordering is the proof the model loaded; there is no reliable log string to grep for it. Read
 #     the printed log and confirm by eye.
 #
-# One failure to read for by name: a traceback that names a feature the code cannot parse means
-# the model baked into this image was trained before that feature was renamed. This is the first
-# moment the new code and the promoted model meet, because the build copies a directory promoted
-# earlier against older code. Re-train against the current feature vocabulary, re-promote, and
-# rebuild — do not hand-edit meta.json, which leaves the boosters carrying the old names.
+# One failure to read for by name: a traceback naming a feature the code cannot parse means the
+# model baked into this image predates a rename of that feature. See docs/live_service/operations.md
+# Step 2 for what to do about it.
 
 set -euo pipefail
 

@@ -42,12 +42,10 @@ leaderboard in the MLflow UI (`uv run mlflow ui --gunicorn-opts "--workers 1"` �
 `http://localhost:5000`; see
 [ML Experimentation: Viewing results in the MLflow UI](../ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)).
 
-Copy the `run_id` of the fold you want to promote.
+A run trained before a feature was renamed in the code cannot be served, and nothing in the table
+marks it — Step 2 refuses it rather than letting you discover that at the next 6-hourly tick.
 
-The table lists every fold run ever trained, including ones trained before a feature was renamed in
-the code. Those runs cannot be served, and nothing in the table says which they are — Step 2 refuses
-them rather than letting you discover it at the next 6-hourly tick. Prefer a run trained against the
-code you are about to deploy.
+Copy the `run_id` of the fold you want to promote.
 
 Promotion (this step and the next) always happens **on your laptop**, whichever environment
 serves the forecasts: the candidate models live in the laptop's local MLflow file store, and
@@ -64,7 +62,7 @@ deployment bakes into its container image at build time.
 1. Downloads that run's saved model artifacts from MLflow
    (`ml_core._production_helpers.fetch_model_artifacts`) into a temporary directory.
 2. Checks the downloaded model's `selected_features` against the running code, and **fails the
-   materialisation if any feature name no longer parses** — naming every one of them. The check
+   materialisation if any feature name no longer parses** — naming the offending feature. The check
    runs before anything is written, so a refused promotion leaves the previous champion in place and
    still serving. Re-train the model against the current feature vocabulary and promote that run;
    never hand-edit `meta.json` to rename a feature, because the trained boosters carry the old

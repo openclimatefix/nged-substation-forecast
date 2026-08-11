@@ -61,10 +61,8 @@ def _save_trained_model_to_mlflow(
         "power_fcst_init_time": times,
         "power": [10.0, 12.0, 11.0],
     }
-    # A feature column sharing a spine column's name would win the union and overwrite the spine
-    # with floats, quietly changing what every caller of this helper trains on.
-    assert not features & spine.keys(), "a requested feature would overwrite a spine column"
-    train_df = pl.DataFrame(spine | {name: [5.0, 6.0, 7.0] for name in features})
+    # Spine last, so a feature sharing a spine column's name cannot overwrite it with floats.
+    train_df = pl.DataFrame({name: [5.0, 6.0, 7.0] for name in features} | spine)
     train_data = pt.LazyFrame.from_existing(train_df.lazy()).set_model(AllFeatures)
     config = XGBoostConfig(
         selected_features=features,
@@ -151,8 +149,7 @@ def test_promoted_model_refuses_a_model_with_an_unparseable_feature(
     """Promoting a model trained before a feature rename fails, leaving nothing behind on disk.
 
     ``promotable_model_runs`` lists every fold run ever trained, so an operator picking by eye off
-    that table can reach a run whose feature vocabulary this code no longer parses. The refusal
-    happens before the directory is replaced, so a first promotion writes nothing at all.
+    that table can reach a run this code no longer parses.
     """
     run_id = _save_trained_model_to_mlflow(
         experiment_name="stale_vocabulary",

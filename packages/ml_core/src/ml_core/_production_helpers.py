@@ -4,9 +4,8 @@ Every function here is unit-testable in isolation: the two data-shaping helpers
 (``select_nwp_init_time``, ``build_live_power_frame``) take ``power_fcst_init_time`` as an
 explicit parameter rather than calling ``datetime.now()`` internally, so a test can pass any
 fixed time and get a deterministic result; the two disk/MLflow helpers
-(``load_forecaster_from_dir``, ``fetch_model_artifacts``) are the gate between a saved model and
-this code's ability to serve it, doing the IO and checking that what arrived is servable. The
-``live_forecasts`` and ``promoted_model`` Dagster assets
+(``load_forecaster_from_dir``, ``fetch_model_artifacts``) do the IO and check that the saved
+model's feature names still parse. The ``live_forecasts`` and ``promoted_model`` Dagster assets
 (``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over these.
 """
 
@@ -23,8 +22,13 @@ import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.config_schemas import import_class
 from contracts.power_schemas import PowerTimeSeries
+from pydantic import ValidationError
 
-from ml_core.base_forecaster import BaseForecaster, _download_and_unpack_model
+from ml_core.base_forecaster import (
+    BaseForecaster,
+    BaseForecasterConfig,
+    _download_and_unpack_model,
+)
 from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
 from ml_core.features._parsed_features import ParsedFeatures
 
@@ -135,19 +139,9 @@ def _check_meta_features_are_parseable(meta: dict[str, Any], source: str) -> Non
     """Raise if this code cannot serve the model that ``meta.json`` describes.
 
     A saved model names its features as strings, so renaming or removing a feature in code leaves
-    every model trained before the change unservable. Raising is the deliberate exception to
-    production's degrade-don't-raise posture: a model this code cannot serve is our own contract
-    violation, not the outside world misbehaving. See
-    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
-
-    ``selected_features`` must be present and be a list of strings, because
-    ``BaseForecasterConfig`` declares it as a required field: a record missing it is one no
-    forecaster in this repo can load, so treating its absence as benign would let promotion
-    replace a working champion with a model that dies at its first ``load``.
-
-    Every requested feature is checked, and every unparseable one is named in sorted order, so an
-    operator re-training after a rename fixes them all in one pass instead of rediscovering them
-    one at a time.
+    every model trained before the change unservable. See
+    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>
+    for why this raises rather than degrading.
 
     Args:
         meta: The parsed contents of a model's ``meta.json``.
@@ -155,39 +149,34 @@ def _check_meta_features_are_parseable(meta: dict[str, Any], source: str) -> Non
             an operator knows which model to re-train.
 
     Raises:
-        ValueError: ``model_params.selected_features`` is absent, malformed, or names a feature
-            that has no meaning to the current code.
+        ValueError: ``model_params`` is not a config this code can build, or ``selected_features``
+            names a feature it cannot parse.
     """
-    # Every message here can reach the container log that scripts/build_and_verify_image.sh greps
-    # case-insensitively for "mlflow" to prove the runtime is hermetic, so none may contain that
-    # word — including through `source`, which is why the promotion call site passes a bare run id.
+    # Both messages can reach the container log that scripts/build_and_verify_image.sh greps
+    # case-insensitively for "mlflow" to prove the runtime is hermetic, so neither may contain that
+    # word.
     remedy = (
         "Re-train against the current feature vocabulary and promote that run; never hand-edit "
         "meta.json, which leaves the trained model carrying the old names."
     )
-    model_params = meta.get("model_params")
-    selected_features = (
-        model_params.get("selected_features") if isinstance(model_params, dict) else None
-    )
-    if not isinstance(selected_features, list) or not all(
-        isinstance(feature, str) for feature in selected_features
-    ):
+    try:
+        config = BaseForecasterConfig.model_validate(meta.get("model_params"))
+    except ValidationError as error:
         raise ValueError(
-            f"The model at {source} has no usable model_params.selected_features (got "
-            f"{selected_features!r}), so it is not a model this code can load. {remedy}"
-        )
+            f"The model at {source} has model_params this code cannot build a config from, so no "
+            f"forecaster here can load it. {remedy}"
+        ) from error
 
-    unparseable: list[str] = []
-    for feature in sorted(selected_features):
+    # One at a time and sorted, so the feature named is the same in every process: they live in a
+    # set, whose iteration order is not.
+    for feature in sorted(config.selected_features):
         try:
             ParsedFeatures.from_strings({feature})
-        except ValueError:
-            unparseable.append(feature)
-    if unparseable:
-        raise ValueError(
-            f"The model at {source} requests {len(unparseable)} feature(s) this code cannot "
-            f"parse: {', '.join(unparseable)}. {remedy}"
-        )
+        except ValueError as error:
+            raise ValueError(
+                f"The model at {source} requests a feature this code cannot parse: {feature}. "
+                f"{remedy}"
+            ) from error
 
 
 def load_forecaster_from_dir(path: Path) -> BaseForecaster:
@@ -265,23 +254,14 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
         dest: Directory to populate — typically ``Settings.production_model_path``.
 
     Raises:
-        FileNotFoundError: The run's archive holds no ``meta.json``, so it is not a model
-            ``BaseForecaster.save`` wrote.
         ValueError: The model's ``selected_features`` are absent, malformed, or name a feature
             this code cannot parse — re-train against the current feature vocabulary and promote
             that run instead.
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
         downloaded_dir = _download_and_unpack_model(run_id, Path(tmp_dir))
-        meta_path = downloaded_dir / "meta.json"
-        if not meta_path.exists():
-            raise FileNotFoundError(
-                f"The model archive on run {run_id} holds no meta.json, so it is not a model "
-                "BaseForecaster.save wrote. Re-materialise `trained_cv_model` for this fold."
-            )
-        _check_meta_features_are_parseable(
-            meta=json.loads(meta_path.read_text()), source=f"run {run_id}"
-        )
+        meta = json.loads((downloaded_dir / "meta.json").read_text())
+        _check_meta_features_are_parseable(meta=meta, source=f"run {run_id}")
 
         promotion = {
             "mlflow_run_id": run_id,

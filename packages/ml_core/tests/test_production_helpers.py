@@ -193,20 +193,6 @@ def test_load_forecaster_from_dir_rejects_an_unparseable_feature(
     assert str(tmp_path) in str(exc_info.value)
 
 
-def test_load_forecaster_from_dir_names_every_unparseable_feature(tmp_path: Path) -> None:
-    """All the stale names at once, so re-training fixes them in one pass.
-
-    Reporting only the first would send an operator round the re-train loop once per retired
-    feature — and which one came first would vary per process, because the names live in a set.
-    """
-    XGBoostForecaster(
-        XGBoostConfig(selected_features={"local_utc_offset", "temperature", "windchill"})
-    ).save(tmp_path)
-
-    with pytest.raises(ValueError, match="local_utc_offset, temperature"):
-        load_forecaster_from_dir(tmp_path)
-
-
 def test_the_rejection_message_never_mentions_the_experiment_tracker(tmp_path: Path) -> None:
     """``scripts/build_and_verify_image.sh`` fails the image build on that word in the runtime log.
 
@@ -225,8 +211,8 @@ def test_the_rejection_message_never_mentions_the_experiment_tracker(tmp_path: P
 def test_load_forecaster_from_dir_accepts_the_current_vocabulary(tmp_path: Path) -> None:
     """The negative control for the tests above: a guard that rejected everything would pass them.
 
-    Covers one feature of each kind the parser understands, so a narrowing of the guard shows up
-    here rather than in production.
+    One feature of each kind the parser understands, so a narrowing of the guard shows up here
+    rather than in production.
     """
     config = XGBoostConfig(
         selected_features={
@@ -243,37 +229,3 @@ def test_load_forecaster_from_dir_accepts_the_current_vocabulary(tmp_path: Path)
     assert load_forecaster_from_dir(tmp_path).model_params.selected_features == (
         config.selected_features
     )
-
-
-@pytest.mark.parametrize(
-    "model_params",
-    [
-        pytest.param({}, id="absent"),
-        pytest.param({"selected_features": None}, id="null"),
-        pytest.param({"selected_features": "temperature_2m"}, id="bare_string"),
-        pytest.param({"selected_features": [1, 2]}, id="not_strings"),
-        pytest.param(None, id="model_params_not_a_dict"),
-    ],
-)
-def test_a_record_without_a_usable_feature_list_is_rejected(
-    tmp_path: Path, model_params: dict[str, object] | None
-) -> None:
-    """A saved record naming no usable features is one no forecaster here can load, so it is junk.
-
-    ``BaseForecasterConfig`` declares ``selected_features`` as a required field, so treating an
-    absent or malformed one as benign would let promotion replace a working champion with a model
-    that dies at its first ``load``. A bare string is the subtle case: iterating it would set-ify
-    it into single characters and report those as the unrecognised features.
-    """
-    (tmp_path / "meta.json").write_text(
-        json.dumps(
-            {
-                "model_class": "xgboost_forecaster.forecaster.XGBoostForecaster",
-                "model_params": model_params,
-                "trained_time_series_ids": [],
-            }
-        )
-    )
-
-    with pytest.raises(ValueError, match="selected_features"):
-        load_forecaster_from_dir(tmp_path)

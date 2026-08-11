@@ -11,7 +11,7 @@ what makes a *shrinking* population observable as files that must vanish from th
 """
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Self
 
@@ -84,11 +84,7 @@ class _FakeForecaster(BaseForecaster):
 
 
 class _MetaWithoutModelParams(_FakeForecaster):
-    """A forecaster whose saved record omits ``model_params`` altogether.
-
-    Stands in for a hand-assembled or foreign model directory: nothing in this repo saves one,
-    because ``BaseForecaster.save``'s contract names only ``model_class`` as mandatory.
-    """
+    """A forecaster whose saved record omits ``model_params`` altogether."""
 
     def save(self, path: Path) -> None:
         super().save(path)
@@ -260,59 +256,49 @@ def test_fetch_model_artifacts_unpacks_the_archive_into_dest(
     assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run
 
 
-def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable(
-    saved_run: str, tmp_path: Path
-) -> None:
-    """A promotion this code could not serve must not displace the champion already in place.
-
-    ``selected_features`` are checked against the running code before the atomic swap, so a run
-    trained before a feature was renamed is refused with ``dest`` untouched — the outgoing champion
-    keeps serving instead of the service breaking at its next tick.
-    """
-    dest = tmp_path / "production_model"
-    fetch_model_artifacts(run_id=saved_run, dest=dest)
-
-    with mlflow.start_run(experiment_id=mlflow.create_experiment("stale_vocabulary")) as run:
-        stale_run_id = run.info.run_id
-    _save(
-        run_id=stale_run_id,
-        payload="stale-model",
-        series=[10],
-        selected_features={"local_utc_offset"},
-    )
-
-    with pytest.raises(ValueError, match="local_utc_offset") as exc_info:
-        fetch_model_artifacts(run_id=stale_run_id, dest=dest)
-
-    # Which run was refused, so an operator knows what to re-train rather than what to re-download.
-    assert stale_run_id in str(exc_info.value)
-    assert _FakeForecaster.load(dest).payload == "hello-model"
-    assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run
+def _save_stale_vocabulary(run_id: str) -> None:
+    """Save a model naming a feature a rename retired."""
+    _save(run_id=run_id, payload="stale", series=[10], selected_features={"local_utc_offset"})
 
 
-def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_names_no_features(
-    saved_run: str, tmp_path: Path
-) -> None:
-    """A record with no ``selected_features`` is junk, not a model with an empty feature list.
-
-    ``BaseForecasterConfig`` declares the field as required, so such a record loads nowhere. Were
-    promotion to wave it through as merely-absent input, it would destroy a working champion to
-    install a model that dies at its first ``load`` — the exact outcome the pre-swap check exists
-    to prevent.
-    """
-    dest = tmp_path / "production_model"
-    fetch_model_artifacts(run_id=saved_run, dest=dest)
-
-    with mlflow.start_run(experiment_id=mlflow.create_experiment("no_features")) as run:
-        featureless_run_id = run.info.run_id
+def _save_without_model_params(run_id: str) -> None:
+    """Save a record with no ``model_params``, which no forecaster here can build a config from."""
     _MetaWithoutModelParams(
         model_params=BaseForecasterConfig(selected_features=set()),
         payload="featureless",
         series=[10],
-    ).save_to_mlflow(featureless_run_id)
+    ).save_to_mlflow(run_id)
 
-    with pytest.raises(ValueError, match="selected_features"):
-        fetch_model_artifacts(run_id=featureless_run_id, dest=dest)
 
+@pytest.mark.parametrize(
+    ("save_unservable", "expected"),
+    [
+        (_save_stale_vocabulary, "local_utc_offset"),
+        (_save_without_model_params, "model_params"),
+    ],
+)
+def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable(
+    saved_run: str,
+    tmp_path: Path,
+    save_unservable: Callable[[str], None],
+    expected: str,
+) -> None:
+    """A promotion this code could not serve must not displace the champion already in place.
+
+    The check runs before the atomic swap, so ``dest`` is untouched and the outgoing champion keeps
+    serving instead of the service breaking at its next tick.
+    """
+    dest = tmp_path / "production_model"
+    fetch_model_artifacts(run_id=saved_run, dest=dest)
+
+    with mlflow.start_run(experiment_id=mlflow.create_experiment(f"unservable_{expected}")) as run:
+        unservable_run_id = run.info.run_id
+    save_unservable(unservable_run_id)
+
+    with pytest.raises(ValueError, match=expected) as exc_info:
+        fetch_model_artifacts(run_id=unservable_run_id, dest=dest)
+
+    # Which run was refused, so an operator knows what to re-train rather than what to re-download.
+    assert unservable_run_id in str(exc_info.value)
     assert _FakeForecaster.load(dest).payload == "hello-model"
     assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run

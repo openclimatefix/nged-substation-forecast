@@ -129,9 +129,6 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
 
     Promotion refuses a model whose ``selected_features`` this code cannot parse, and refuses it
     before the directory is replaced, so the previous champion stays in place and keeps serving.
-    ``promotable_model_runs`` lists every fold run ever trained, including ones whose feature
-    vocabulary predates a rename, so the candidate table alone cannot tell an operator which runs
-    are still servable.
 
     Promotion as a Dagster materialisation gives an audit trail and lineage for free, rather than
     a bare script (a script wrapper for the eventual Docker build (#222) stays trivial by calling
