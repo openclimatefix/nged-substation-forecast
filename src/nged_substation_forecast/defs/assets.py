@@ -28,6 +28,7 @@ from dagster import (
     AssetCheckSeverity,
     AssetCheckSpec,
     AssetExecutionContext,
+    DagsterExecutionInterruptedError,
     DailyPartitionsDefinition,
     MaterializeResult,
     MetadataValue,
@@ -60,6 +61,8 @@ from nged_data.storage import (
     upsert_metadata,
 )
 from pydantic import BaseModel, computed_field, field_validator
+
+from nged_substation_forecast._sentry import report_check_degradation
 
 
 @asset
@@ -283,38 +286,73 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         ) from exc
     context.log.info(f"Converted NWP data to Polars. Columns: {nwp.columns}")
 
+    # Two non-fatal per-run checks. The first surfaces the tolerated scattered nulls (known upstream
+    # ECMWF ENS corruption) that Nwp.validate deliberately let through. The second asks whether the
+    # run is *whole*; a short run is the upstream provider misbehaving, so we keep the rows that did
+    # arrive and WARN rather than discarding the run. Computed before the write, not merely under a
+    # guard — rule 7 of
+    # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules
+    try:
+        quality = assess_nwp_quality(nwp)
+        completeness = assess_nwp_run_completeness(
+            nwp, expected_n_h3_cells=h3_grid["h3_index"].n_unique()
+        )
+        check_results = [
+            _nwp_quality_check_result(quality),
+            _nwp_completeness_check_result(completeness),
+        ]
+        shape_metadata = _nwp_run_shape_metadata(completeness)
+    except BaseException as exc:
+        # The same guard as `power_data_is_fresh` — see the comment there for why it catches
+        # `BaseException`, what that costs when writing tests, and rule 7 for why a warning path
+        # may never raise.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        context.log.exception("Could not assess the ingested NWP run")
+        # One event for one fault: both checks share this assessment, so both degrade together.
+        # The tag names the quality check either way; the operations runbook says to expect that.
+        report_check_degradation(_NWP_QUALITY_CHECK_NAME, exc)
+        check_results = [
+            _degraded_nwp_check_result(_NWP_QUALITY_CHECK_NAME, exc),
+            _degraded_nwp_check_result(_NWP_COMPLETENESS_CHECK_NAME, exc),
+        ]
+        shape_metadata = {}
+
     nwp_data_path = settings.nwp_data_path
     if_local_path_then_make_parent_dir(nwp_data_path)
     write_nwp(nwp, nwp_data_path, storage_options)
     context.log.info(f"Saved NWP data to Delta table at {nwp_data_path}.")
 
-    # Two non-fatal per-run checks. The first surfaces the tolerated scattered nulls (known upstream
-    # ECMWF ENS corruption) that Nwp.validate deliberately let through. The second asks whether the
-    # run is *whole*; a short run is the upstream provider misbehaving, so we keep the rows that did
-    # arrive and WARN rather than discarding the run.
-    quality = assess_nwp_quality(nwp)
-    completeness = assess_nwp_run_completeness(
-        nwp, expected_n_h3_cells=h3_grid["h3_index"].n_unique()
-    )
     return MaterializeResult(
         metadata={
             "n_rows": len(nwp),
             "path": nwp_data_path,
             "init_time": str(nwp_init_time),
-            **_nwp_run_shape_metadata(completeness),
+            **shape_metadata,
         },
-        check_results=[
-            _nwp_quality_check_result(quality),
-            _nwp_completeness_check_result(completeness),
-        ],
+        check_results=check_results,
+    )
+
+
+def _degraded_nwp_check_result(check_name: str, exc: BaseException) -> AssetCheckResult:
+    """A WARN result for a per-run NWP check that could not be evaluated at all.
+
+    Inside an asset declaring two ``AssetCheckSpec``s an unnamed result fails the step outright, so
+    ``check_name`` is required — unlike in a standalone ``@asset_check``.
+    """
+    return AssetCheckResult(
+        check_name=check_name,
+        passed=False,
+        severity=AssetCheckSeverity.WARN,
+        description=f"Could not assess the ingested NWP run: {exc!r}",
     )
 
 
 def _nwp_run_shape_metadata(report: NwpRunCompletenessReport) -> dict[str, MetadataValue]:
     """The run's observed shape.
 
-    Published on *every* materialisation so drift is visible in the Dagster UI timeline even on
-    the runs where the completeness check passes.
+    Published on every materialisation whose completeness assessment succeeded, including the ones
+    where the check passes, so drift is visible in the Dagster UI timeline.
     """
     return {
         "n_ensemble_members": MetadataValue.int(report.n_ensemble_members),

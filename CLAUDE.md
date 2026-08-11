@@ -50,7 +50,7 @@ needed one, the mistake is already written.
 | `marimo-notebooks` | creating or editing a Marimo notebook (`packages/dashboard/*.py`, `packages/notebooks/*.py`) |
 | `ty-workarounds` | acting on a `ty` error in Altair chart code or numpy `.view()` code, or adding any `# ty: ignore` |
 | `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — writes a reviewed plan, no code |
-| `implement-issue` | writing code for an approved plan: worktree, verify set, PR, adversarial review, stop |
+| `implement-issue` | writing code for an approved plan: worktree, verify set, PR, two adversarial reviews, stop |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh pr merge`, or ship-time triage |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
 
@@ -152,8 +152,10 @@ any code moves:
    plan in turn — the first hunting for a simpler approach, the second checking correctness and
    testability — and stops for Jack. It writes no code.
 2. **`implement-issue`** picks up an approved plan: worktree, implement, the green-before-push
-   verification set, PR with labels and assignee, a *further independent* adversarial review
-   of the diff, triage, stop. **Never merge.**
+   verification set, PR with labels and assignee, then two *further independent* adversarial
+   reviews of the diff — the first for correctness and for cutting the code, tests and prose
+   down to what the change needs, the second mutation-testing the change — triaging and pushing
+   after each, stop. **Never merge.**
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
@@ -163,7 +165,9 @@ than the first. The fresh-reviewer requirement exists so the reviewer cannot be 
 implementer's rationale; the triage step exists because reviewer findings are often wrong and
 must not be applied uncritically. Simplicity gets its own reviewer, and gets it first, because a
 plan that is more complicated than the issue requires is the failure mode that survives a
-correctness review intact.
+correctness review intact. Mutation testing gets the last reviewer because a green suite proves
+nothing on its own: whether a test would catch the bug it exists for is only settled by writing
+that bug and watching.
 
 ## Architecture
 

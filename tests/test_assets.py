@@ -19,10 +19,12 @@ import shapely
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
-from contracts.weather_schemas import Nwp
+from contracts.weather_schemas import Nwp, NwpQualityReport
 from dagster import (
     AssetCheckEvaluation,
+    AssetCheckResult,
     AssetCheckSeverity,
+    DagsterExecutionInterruptedError,
     DagsterInstance,
     ExecuteInProcessResult,
     build_asset_context,
@@ -464,19 +466,7 @@ def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=UTC)
-    # `object` cannot be inlined in place of this stub: the real function is called with
-    # keyword arguments, which `object()` rejects.
-    monkeypatch.setattr(
-        assets,
-        "open_ecmwf_ens_run",
-        lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
-    )
-    monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
-    monkeypatch.setattr(
-        assets,
-        "convert_nwp_xarray_dataset_to_polars_dataframe",
-        lambda ds, h3_grid: _make_nwp(init_time),
-    )
+    _stub_ecmwf_download(monkeypatch, init_time)
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success  # WARN, not a failure: the partial run is NOT thrown away
@@ -490,6 +480,156 @@ def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
     assert evaluation.metadata["n_h3_cells"].value == 4
     # The stub frame carries members 0-3, so 4-50 of the 51 ECMWF ENS members are named as absent.
     assert evaluation.metadata["missing_ensemble_members"].value == list(range(4, 51))
+
+
+class _FakePanic(BaseException):
+    """Stands in for pyo3's ``PanicException``, which also derives from ``BaseException``.
+
+    The real class cannot be imported: each compiled extension defines its own.
+    """
+
+
+def _never_called(name: str, exc: BaseException) -> None:
+    """Stand in for ``report_check_degradation`` on a path that must not report to Sentry."""
+    raise AssertionError(f"report_check_degradation({name!r}, {exc!r}) should not have been called")
+
+
+def _stub_ecmwf_download(monkeypatch: pytest.MonkeyPatch, init_time: datetime) -> None:
+    """Stub out the download/convert pipeline so it yields ``_make_nwp(init_time)``.
+
+    ``open_ecmwf_ens_run`` is called with keyword arguments, which a bare ``object()`` rejects.
+    """
+    monkeypatch.setattr(
+        assets,
+        "open_ecmwf_ens_run",
+        lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
+    )
+    monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
+    monkeypatch.setattr(
+        assets,
+        "convert_nwp_xarray_dataset_to_polars_dataframe",
+        lambda ds, h3_grid: _make_nwp(init_time),
+    )
+
+
+def test_ecmwf_ens_assesses_before_writing(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The check *results* are built before the Delta append, not just the assessments.
+
+    ``_nwp_quality_check_result`` reaches ``_nwp_null_slices_metadata``, which sorts the affected
+    frame and builds a ``TableRecord`` per row — the most raise-prone code in the block, and the
+    half a partial fix would leave below the write.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    _stub_ecmwf_download(monkeypatch, init_time)
+
+    table_existed: list[bool] = []
+    real_build = assets._nwp_quality_check_result
+
+    def _record_then_build(report: NwpQualityReport) -> AssetCheckResult:
+        table_existed.append(Path(Settings().nwp_data_path).exists())
+        return real_build(report)
+
+    monkeypatch.setattr(assets, "_nwp_quality_check_result", _record_then_build)
+
+    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
+    assert result.success
+    assert table_existed == [False]
+
+
+@pytest.mark.parametrize("raiser", [RuntimeError, _FakePanic])
+def test_ecmwf_ens_lands_the_run_when_an_assessment_fails(
+    env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    raiser: type[BaseException],
+) -> None:
+    """A bug in either per-run check degrades to a failed WARN result; the run still lands.
+
+    Both declared checks must still be emitted — Dagster fails the step for a missing result *or*
+    for one carrying no ``check_name``. ``_FakePanic`` is the case that fails if someone narrows
+    the guard to ``except Exception``: the assessments run Polars sorts and group-bys, and a pyo3
+    panic from one derives from ``BaseException``.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    _stub_ecmwf_download(monkeypatch, init_time)
+
+    def _raise(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
+        raise raiser("assessment is broken")
+
+    monkeypatch.setattr(assets, "assess_nwp_quality", _raise)
+
+    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
+    assert result.success  # the ingest is not failed by a bug in a *reporting* function
+    assert pl.read_delta(Settings().nwp_data_path).height == 4  # written exactly once
+
+    evaluations = _check_evaluations(result)
+    assert set(evaluations) == {"nwp_has_no_unexpected_nulls", "nwp_run_is_complete"}
+    for evaluation in evaluations.values():
+        assert not evaluation.passed
+        assert evaluation.severity == AssetCheckSeverity.WARN
+        assert "assessment is broken" in str(evaluation.description)
+
+    # The shape keys come from the completeness report, which never got built.
+    (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
+    assert materialisation.metadata["n_rows"].value == 4
+    assert "n_ensemble_members" not in materialisation.metadata
+
+
+def test_ecmwf_ens_reports_a_degraded_assessment_to_sentry_once(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """Sentry is told, exactly once, that the assessment could not run.
+
+    Once because both checks share one assessment; at all because not failing the run means the
+    ``sentry_capture_failure`` hook no longer fires.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    _stub_ecmwf_download(monkeypatch, init_time)
+
+    def _raise(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
+        raise RuntimeError("assessment is broken")
+
+    reported: list[tuple[str, BaseException]] = []
+    monkeypatch.setattr(assets, "assess_nwp_quality", _raise)
+    monkeypatch.setattr(
+        assets, "report_check_degradation", lambda name, exc: reported.append((name, exc))
+    )
+
+    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
+    assert result.success
+    assert [name for name, _ in reported] == ["nwp_has_no_unexpected_nulls"]
+
+
+def test_ecmwf_ens_re_raises_a_cancelled_run_without_writing(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The one thing the guard must *not* swallow — and here swallowing it would also write.
+
+    A swallowed cancellation falls straight through into ``write_nwp``, landing rows under a
+    partition Dagster then marks cancelled.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    _stub_ecmwf_download(monkeypatch, init_time)
+
+    def _cancel(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
+        raise DagsterExecutionInterruptedError
+
+    monkeypatch.setattr(assets, "assess_nwp_quality", _cancel)
+    monkeypatch.setattr(assets, "report_check_degradation", _never_called)
+
+    with (
+        build_asset_context(partition_key="2024-12-01") as context,
+        pytest.raises(DagsterExecutionInterruptedError),
+    ):
+        ecmwf_ens(context)
+
+    assert not Path(Settings().nwp_data_path).exists()
 
 
 def test_ecmwf_ens_retries_when_run_not_yet_available(
