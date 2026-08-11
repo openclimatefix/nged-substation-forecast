@@ -157,6 +157,13 @@ is that one exists.
 
 Name the attacks that apply to this issue:
 
+- **Can the problem actually happen?** For each failure the plan defends against, ask the reviewer
+  to name the caller, the input and the sequence of events that produces it. A bug nobody can
+  reach — because no caller passes that argument, or the Patito schema already rejects that row,
+  or the data source cannot emit that value — is theoretical, and the plan should drop it rather
+  than carry code and tests for it. The degradation paths
+  `docs/design-philosophy/inherent-stability.md` requires in production are the exception: an
+  absent or stale input is always reachable, because the outside world is not ours to constrain.
 - Which parts of the plan solve a problem the issue did not ask about? Cut them and say what
   breaks.
 - Is there an existing function, package or Patito model that already does what a proposed new
@@ -221,5 +228,5 @@ file.
 
 **Do not write any code, and do not open a PR.** Once Jack approves the plan, implementation runs
 under the `implement-issue` skill, resuming at its step 2 in the worktree this skill already
-created — implement, verify, PR, a further independent adversarial review of the *diff*, triage,
-stop.
+created — implement, verify, PR, then two further independent adversarial reviews of the *diff*,
+triaging and pushing after each, stop.
