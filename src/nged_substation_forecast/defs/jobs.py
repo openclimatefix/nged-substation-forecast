@@ -139,8 +139,9 @@ def _resolve_forecaster_config(
             override replaces the base value outright rather than merging into it. Lists are
             replaced, not extended, and a value that is itself a mapping is replaced whole, so
             an override must restate every key of that mapping it wants to keep. Every key must
-            name a field the config class declares, except those in
-            ``_UNOVERRIDABLE_MODEL_PARAMS``, which are the resolver's own to set.
+            name a field the config class declares; an unknown one is rejected. The keys in
+            ``_UNOVERRIDABLE_MODEL_PARAMS`` are rejected too, declared or not — they are the
+            resolver's own to set.
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
@@ -150,8 +151,9 @@ def _resolve_forecaster_config(
         ValueError: ``config_overrides`` names an unoverridable key, or the YAML is not a usable
             model config.
         ValidationError: ``config_overrides`` names a key the config class does not declare, or
-            gives a declared one a value of the wrong type. Both are raised by the config class's
-            own validation, before any fold is scheduled.
+            gives a declared one a value of the wrong type. Both come from the config class's own
+            validation, before any fold is scheduled. A subclass of ``ValueError``, so a caller
+            that wants "the config is unusable" catches ``ValueError`` alone.
     """
     for key, reason in _UNOVERRIDABLE_MODEL_PARAMS.items():
         if key in config_overrides:

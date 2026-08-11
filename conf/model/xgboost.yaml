@@ -8,8 +8,9 @@
 #   forecaster_config = import_class(model_params.pop("_target_"))(**model_params)
 #
 # A registered experiment's config_overrides replace whole values under model_params. Every
-# override key must name a field XGBoostConfig declares — the names below are that list — so a
-# misspelling fails registration instead of quietly training on the value below it.
+# override key must name a field XGBoostConfig declares — the names below, plus the universal
+# fields it inherits from BaseForecasterConfig, which need not appear here to be overridable — so
+# a misspelling fails registration instead of quietly training on the value below it.
 
 _target_: xgboost_forecaster.forecaster.XGBoostForecaster
 

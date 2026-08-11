@@ -154,6 +154,7 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 | `weather_source` | `""` | Leaderboard tag, e.g. `"ecmwf_control"` or `"ecmwf_ens"`. |
 | `training_strategy` | `""` | Leaderboard tag, e.g. `"horizon_as_feature"`. |
 | `random_seed` | `0` | Passed to XGBoost's `seed` param; makes re-training a fold reproduce the same model. |
+| `ml_flow_experiment_id` | `None` | Set at registration; stamped onto every `PowerForecast` row. |
 
 ### XGBoost-specific fields
 
@@ -176,10 +177,11 @@ You never edit a YAML file per experiment. Instead, pass `config_overrides` to
 `register_experiment_job`. Each override is applied to `model_params` before the config object is
 constructed.
 
-**Every key must name a field the config class declares** — the two tables above are that list.
-Write `n_estimtors` instead of `n_estimators` and registration fails with
-`ValidationError: n_estimtors — Extra inputs are not permitted`, before a single fold is
-scheduled. This matters more than a typo usually would, because the searches that drive most
+**Every key must name a field the config class declares** — the two tables above, plus
+`experiment_name`, which is refused for a separate reason given below. Write `n_estimtors` instead
+of `n_estimators` and registration fails, before a single fold is scheduled, with a
+`ValidationError` whose body reads `n_estimtors` / `Extra inputs are not permitted
+[type=extra_forbidden]`. This matters more than a typo usually would, because the searches that drive most
 registrations are unattended: the LLM auto-research agent registers, materialises and reads the
 leaderboard with nobody in the loop, and the variant grid sweeps several dimensions at once. A key
 that was quietly dropped would give you a grid of *identical* runs, each scoring plausibly, each

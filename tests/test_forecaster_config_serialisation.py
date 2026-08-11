@@ -13,20 +13,36 @@ tier, not in ``packages/ml_core``, because enforcing them means importing every 
 forecaster — a dependency ``ml_core`` itself must not take on.
 """
 
-from typing import get_origin
+from typing import Any, get_origin
 
 import pytest
 from ml_core.base_forecaster import BaseForecasterConfig
+from pydantic import ValidationError
 from xgboost_forecaster import XGBoostConfig
 
-_CONFIG_CLASSES: list[type[BaseForecasterConfig]] = [
-    BaseForecasterConfig,
-    *BaseForecasterConfig.__subclasses__(),
-]
-"""Every config class to hold to the invariant.
 
-``__subclasses__()`` only sees classes that have been imported, hence the explicit
-``XGBoostConfig`` import above; it is what picks up a *future* forecaster automatically.
+def _descendants(config_cls: type[BaseForecasterConfig]) -> set[type[BaseForecasterConfig]]:
+    """Every class below ``config_cls``, at any depth.
+
+    ``__subclasses__()`` is one level deep, so recursing is what reaches a config that extends a
+    *concrete* forecaster's config rather than the base — the shape a variant of an existing model
+    would naturally take, and one that would otherwise sit outside these invariants unnoticed.
+    """
+    return {
+        descendant
+        for subclass in config_cls.__subclasses__()
+        for descendant in (subclass, *_descendants(subclass))
+    }
+
+
+_CONFIG_CLASSES: list[type[BaseForecasterConfig]] = sorted(
+    {BaseForecasterConfig, *_descendants(BaseForecasterConfig)}, key=lambda cls: cls.__name__
+)
+"""Every config class to hold to the invariants.
+
+Only classes that have been *imported* are visible, hence the explicit ``XGBoostConfig`` import
+above; the recursion is what picks up a future forecaster's config automatically, wherever it
+sits in the hierarchy. Sorted so the parametrised ids stay in a stable order.
 """
 
 
@@ -41,9 +57,18 @@ def test_every_config_class_forbids_extra_keys(config_cls: type[BaseForecasterCo
 
     Pydantic merges a parent's ``model_config`` into a subclass's, so a subclass declaring its own
     ``model_config`` keeps the strictness. What this catches is one that re-opens ``extra``
-    explicitly.
+    explicitly. Asserted on the behaviour rather than on the flag, so that a subclass which keeps
+    ``extra="forbid"`` but strips unknown keys in a ``model_validator(mode="before")`` fails too.
+
+    Splatted from a dict rather than passed as a keyword, because that is how an unknown key
+    genuinely arrives — ``_resolve_forecaster_config`` merges ``config_overrides`` into the YAML's
+    ``model_params`` and splats the result — and because a literal keyword no parameter matches is
+    a static error, which is not what this test is about.
     """
-    assert config_cls.model_config.get("extra") == "forbid"
+    unknown_key: dict[str, Any] = {"selected_features": set(), "definitely_not_a_declared_field": 1}
+
+    with pytest.raises(ValidationError, match="definitely_not_a_declared_field"):
+        config_cls(**unknown_key)
 
 
 def _set_valued_fields(config_cls: type[BaseForecasterConfig]) -> set[str]:

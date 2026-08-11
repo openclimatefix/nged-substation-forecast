@@ -68,10 +68,8 @@ def test_resolve_rejects_an_ill_typed_override() -> None:
 def test_resolve_rejects_an_unknown_override_key() -> None:
     """A misspelled hyperparameter must fail registration, not train on the YAML's value.
 
-    The searches that will drive most registrations — the LLM auto-research agent, the
-    training-history variant grid — are unattended, so nobody reads the resolved config. Left
-    ignored, one typo turns a whole grid into identical runs that all score plausibly and all reach
-    the leaderboard.
+    Why that is worth failing over:
+    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/model-configuration/#tweaking-a-config-for-an-experiment>.
     """
     with pytest.raises(ValidationError, match="n_estimtors"):
         _resolve_forecaster_config(_BASE_CONFIG, {"n_estimtors": 5000}, "exp")

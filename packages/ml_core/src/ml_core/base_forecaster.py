@@ -143,8 +143,10 @@ class BaseForecasterConfig(BaseModel):
     value. This also makes deserialisation strict: ``model_dump(mode="json")`` emits exactly the
     declared fields, so re-validating a config this class dumped always succeeds, while a *stored*
     config carrying a key the current code no longer declares is refused rather than silently
-    losing it — re-train the model rather than editing the stored config. Why this is worth
-    failing over:
+    losing it. The recovery is to re-train, never to hand-edit the stored config — and for a
+    config stored as an MLflow experiment tag, to register the new config under a *new*
+    experiment name, since re-registering the old name is itself refused as a changed identity.
+    Why this is worth failing over:
     <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/model-configuration/#tweaking-a-config-for-an-experiment>.
     """
 
