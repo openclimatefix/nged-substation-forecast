@@ -289,11 +289,9 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     # Two non-fatal per-run checks. The first surfaces the tolerated scattered nulls (known upstream
     # ECMWF ENS corruption) that Nwp.validate deliberately let through. The second asks whether the
     # run is *whole*; a short run is the upstream provider misbehaving, so we keep the rows that did
-    # arrive and WARN rather than discarding the run.
-    #
-    # Both are computed from the frame in memory, and deliberately *before* the write: `write_nwp`
-    # appends with no dedup, so anything that can fail after it turns a bug in a warning path into
-    # duplicated NWP rows once the failed partition is re-materialised.
+    # arrive and WARN rather than discarding the run. Computed before the write, not merely under a
+    # guard — rule 7 of
+    # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules
     try:
         quality = assess_nwp_quality(nwp)
         completeness = assess_nwp_run_completeness(
@@ -307,17 +305,12 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     except BaseException as exc:
         # The same guard as `power_data_is_fresh` — see the comment there for why it catches
         # `BaseException`, what that costs when writing tests, and rule 7 for why a warning path
-        # may never raise. Ordering is what stops a raise here duplicating rows; the guard is what
-        # stops it costing the run an NWP day.
+        # may never raise.
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
             raise  # A cancelled run must cancel.
         context.log.exception("Could not assess the ingested NWP run")
-        # Reported once, not once per check: the two share this one assessment and so always
-        # degrade together, which is one fault and deserves one Sentry event — the failure hook
-        # that no longer fires would also have sent one. Reporting twice would not produce two
-        # anyway, because sentry-sdk's default `DedupeIntegration` drops a second capture of the
-        # same exception object. Tagged with the quality check, which is the tag the surviving
-        # event carries; `docs/live_service/operations.md` tells operators to expect that.
+        # One event for one fault: both checks share this assessment, so both degrade together.
+        # The tag names the quality check either way; the operations runbook says to expect that.
         report_check_degradation(_NWP_QUALITY_CHECK_NAME, exc)
         check_results = [
             _degraded_nwp_check_result(_NWP_QUALITY_CHECK_NAME, exc),
@@ -344,12 +337,8 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
 def _degraded_nwp_check_result(check_name: str, exc: BaseException) -> AssetCheckResult:
     """A WARN result for a per-run NWP check that could not be evaluated at all.
 
-    Pure: the caller owns telling Sentry, because one failed assessment degrades both checks and
-    should not be reported twice.
-
-    ``check_name`` is passed explicitly, unlike the equivalent fallbacks in ``defs/checks.py``: a
-    standalone ``@asset_check`` needs no name, but inside an asset declaring two ``AssetCheckSpec``s
-    an unnamed result fails the step outright — reinstating the very failure this guard prevents.
+    Inside an asset declaring two ``AssetCheckSpec``s an unnamed result fails the step outright, so
+    ``check_name`` is required — unlike in a standalone ``@asset_check``.
     """
     return AssetCheckResult(
         check_name=check_name,
@@ -362,11 +351,8 @@ def _degraded_nwp_check_result(check_name: str, exc: BaseException) -> AssetChec
 def _nwp_run_shape_metadata(report: NwpRunCompletenessReport) -> dict[str, MetadataValue]:
     """The run's observed shape.
 
-    Published on every materialisation the completeness assessment survives — including the ones
-    where the check passes — so drift is visible in the Dagster UI timeline. The keys are absent
-    only when that assessment itself failed, because there is then no report to read them from;
-    omitting them beats a sentinel, since a key whose metadata *type* varies between runs would
-    break the timeline plot.
+    Published on every materialisation whose completeness assessment succeeded, including the ones
+    where the check passes, so drift is visible in the Dagster UI timeline.
     """
     return {
         "n_ensemble_members": MetadataValue.int(report.n_ensemble_members),

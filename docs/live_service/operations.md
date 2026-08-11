@@ -224,10 +224,8 @@ yesterday's run. The action is to chase Dynamical.org, not to touch the table.
 as `power_data_is_fresh` does above. `Could not assess the ingested NWP run: …` says the assessment
 itself failed, not that the run is degraded — so it appears on *both* checks at once, and the shape
 metadata (`n_ensemble_members` and the rest) is absent from that materialisation. The run still
-lands. Because the two checks share one assessment, a failure is one fault and sends one Sentry
-event, tagged `asset_check:nwp_has_no_unexpected_nulls` whichever of the two assessments raised.
-Nothing is known about that run's quality while this persists — treat it as "unknown", not
-"healthy".
+lands. One Sentry event is sent, tagged `asset_check:nwp_has_no_unexpected_nulls` whichever
+assessment raised.
 
 **Do not re-materialise a partition that has already landed.** `write_nwp` is append-only, so
 re-running the partition after Dynamical republishes the run would append a *second* copy of it
@@ -240,11 +238,10 @@ a *missed* partition, below, is a different case and is safe: nothing landed for
 
 **A partition whose run *failed* is safe to re-materialise**, because the work that can raise —
 validation and both quality assessments alike — runs before the Delta append, so a failed
-`ecmwf_ens` run wrote nothing. Two things still sit after it, and neither is a code path you can
-provoke: Dagster's own validation of the emitted check results, and the process being killed
-between the Delta commit and Dagster recording success (the box rebooting, an OOM kill). Both leave
-a red partition with rows on disk. So for a partition that failed for an infrastructure reason
-rather than a raised exception, check the table before re-running it.
+`ecmwf_ens` run wrote nothing. Two things sit after the append and both leave a red partition with
+rows on disk: Dagster's validation of the returned check results, and the process being killed
+between the Delta commit and Dagster recording success. So for a partition that failed for an
+infrastructure reason rather than a raised exception, check the table before re-running it.
 
 Every materialisation whose completeness assessment succeeded also publishes `n_ensemble_members`,
 `n_valid_times`, `n_h3_cells` and the `valid_time` range as metadata, so the Dagster UI timeline

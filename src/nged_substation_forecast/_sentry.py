@@ -134,9 +134,7 @@ def sentry_capture_failure(context: HookContext) -> None:
 def report_check_degradation(check_name: str, exc: BaseException) -> None:
     """Report an asset check that could not evaluate its own inputs, as a Sentry error event.
 
-    Every caller — the standalone ``@asset_check``s ``power_data_is_fresh`` and
-    ``live_forecasts_are_healthy``, and the two per-run checks computed inside the ``ecmwf_ens``
-    asset — catches everything rather than raising (rule 7 of
+    Every caller catches everything rather than raising (rule 7 of
     [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)),
     so the run no longer fails and :data:`sentry_capture_failure` no longer fires. Without this,
     a check that cannot read its own inputs would show up only as a yellow tick in Dagster's Checks

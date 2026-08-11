@@ -485,8 +485,7 @@ def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
 class _FakePanic(BaseException):
     """Stands in for pyo3's ``PanicException``, which also derives from ``BaseException``.
 
-    The real class cannot be imported: each compiled extension defines its own. What matters to
-    the guard is only that a panic is *not* an ``Exception``, which this reproduces exactly.
+    The real class cannot be imported: each compiled extension defines its own.
     """
 
 
@@ -516,54 +515,50 @@ def _stub_ecmwf_download(monkeypatch: pytest.MonkeyPatch, init_time: datetime) -
 def test_ecmwf_ens_assesses_before_writing(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """The two per-run checks are computed *before* the Delta append, never after.
+    """The check *results* are built before the Delta append, not just the assessments.
 
-    ``write_nwp`` appends with no dedup, so an exception raised after it would fail the run with
-    the rows already committed — and re-materialising the failed partition would append the run a
-    second time. Asserting the ordering directly (rather than the guard's behaviour) is what stops
-    a later refactor quietly moving the assessments back below the write.
+    ``_nwp_quality_check_result`` reaches ``_nwp_null_slices_metadata``, which sorts the affected
+    frame and builds a ``TableRecord`` per row — the most raise-prone code in the block, and the
+    half a partial fix would leave below the write.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=UTC)
     _stub_ecmwf_download(monkeypatch, init_time)
 
-    table_existed: dict[str, bool] = {}
-    real_assess, real_build = assets.assess_nwp_quality, assets._nwp_quality_check_result
-
-    def _record_then_assess(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
-        table_existed["assess"] = Path(Settings().nwp_data_path).exists()
-        return real_assess(nwp)
+    table_existed: list[bool] = []
+    real_build = assets._nwp_quality_check_result
 
     def _record_then_build(report: NwpQualityReport) -> AssetCheckResult:
-        table_existed["build_result"] = Path(Settings().nwp_data_path).exists()
+        table_existed.append(Path(Settings().nwp_data_path).exists())
         return real_build(report)
 
-    monkeypatch.setattr(assets, "assess_nwp_quality", _record_then_assess)
-    # The result *builders* have to precede the write too, not just the assessments:
-    # `_nwp_quality_check_result` reaches `_nwp_null_slices_metadata`, which sorts the affected
-    # frame and builds a `TableRecord` per row — the most raise-prone code in the block.
     monkeypatch.setattr(assets, "_nwp_quality_check_result", _record_then_build)
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success
-    assert table_existed == {"assess": False, "build_result": False}
+    assert table_existed == [False]
 
 
-def test_ecmwf_ens_lands_the_run_when_an_assessment_raises(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+@pytest.mark.parametrize("raiser", [RuntimeError, _FakePanic])
+def test_ecmwf_ens_lands_the_run_when_an_assessment_fails(
+    env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    raiser: type[BaseException],
 ) -> None:
     """A bug in either per-run check degrades to a failed WARN result; the run still lands.
 
-    Rule 7: a warning path may never fail the thing it is warning about. Both declared checks must
-    still be emitted — Dagster fails the step for a missing result *or* for one carrying no
-    ``check_name``, which would reinstate the failure the guard exists to prevent.
+    Both declared checks must still be emitted — Dagster fails the step for a missing result *or*
+    for one carrying no ``check_name``. ``_FakePanic`` is the case that fails if someone narrows
+    the guard to ``except Exception``: the assessments run Polars sorts and group-bys, and a pyo3
+    panic from one derives from ``BaseException``.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=UTC)
     _stub_ecmwf_download(monkeypatch, init_time)
 
     def _raise(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
-        raise RuntimeError("assessment is broken")
+        raise raiser("assessment is broken")
 
     monkeypatch.setattr(assets, "assess_nwp_quality", _raise)
 
@@ -584,40 +579,13 @@ def test_ecmwf_ens_lands_the_run_when_an_assessment_raises(
     assert "n_ensemble_members" not in materialisation.metadata
 
 
-def test_ecmwf_ens_lands_the_run_when_an_assessment_panics(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
-) -> None:
-    """A Rust panic degrades the checks exactly as an ``Exception`` does.
-
-    This is the test that fails if someone tidies the guard down to ``except Exception``: the
-    assessments run Polars sorts and group-bys, and a pyo3 panic from any of them derives from
-    ``BaseException``, not ``Exception``.
-    """
-    _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=UTC)
-    _stub_ecmwf_download(monkeypatch, init_time)
-
-    def _panic(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
-        raise _FakePanic("simulated rust panic inside the assessment")
-
-    monkeypatch.setattr(assets, "assess_nwp_quality", _panic)
-
-    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
-    assert result.success
-    assert pl.read_delta(Settings().nwp_data_path).height == 4
-    assert set(_check_evaluations(result)) == {"nwp_has_no_unexpected_nulls", "nwp_run_is_complete"}
-
-
 def test_ecmwf_ens_reports_a_degraded_assessment_to_sentry_once(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """Sentry is told, exactly once, that the assessment could not run.
 
-    Once because the two checks share one assessment, so a failure degrades both and is one fault
-    — and because ``sentry_sdk``'s default ``DedupeIntegration`` drops a second capture of the same
-    exception object anyway, making a per-check report a silent no-op rather than a second event.
-    Told at all because not failing the run means ``ecmwf_ens_job``'s ``sentry_capture_failure``
-    hook no longer fires, so this is the only signal that leaves Dagster.
+    Once because both checks share one assessment; at all because not failing the run means the
+    ``sentry_capture_failure`` hook no longer fires.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=UTC)
@@ -642,9 +610,8 @@ def test_ecmwf_ens_re_raises_a_cancelled_run_without_writing(
 ) -> None:
     """The one thing the guard must *not* swallow — and here swallowing it would also write.
 
-    The guard sits above the Delta append, so a swallowed cancellation would fall straight through
-    into ``write_nwp`` and land rows under a partition Dagster then marks cancelled: the very
-    "red partition with rows on disk" state the operations runbook warns is unrecoverable.
+    A swallowed cancellation falls straight through into ``write_nwp``, landing rows under a
+    partition Dagster then marks cancelled.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=UTC)
