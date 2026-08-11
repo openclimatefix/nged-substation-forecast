@@ -47,11 +47,21 @@ never-reported series briefly reports.
 **The list is not editable from the Dagster UI, and a returning series is not auto-removed.** Jack's
 most recent comment describes that ideal. It needs operator-writable persistent state plus a UI
 affordance to write it, and the auto-removal puts a *write* inside the one code path that must never
-fail (rule 7). Here the check names the resurrected id and stays yellow until a human deletes the
-line; the yellow is the reminder, and it clears itself the moment the line goes. The UI version
-belongs in a follow-up issue, sequenced after `power_forecast_warnings` (#439, #441) and
-`asset_health_history` (#442) so it is written against the real warning vocabulary rather than a
-guess at it. See open question 2.
+fail (rule 7). Here the check names the resurrected id, and stays yellow for as long as that series
+has data newer than the 24-hour threshold. Be precise about what that does and does not promise:
+`resurrected_ids` is recomputed from scratch every hour with no remembered state, so a series that
+reports for a few hours and dies again shows yellow only during that window and then goes green with
+the silencing still in force. A durable "this came back at least once" signal needs remembered
+state, which is `asset_health_history` (#442) and the follow-up issue, not this one. The plan and
+the operations page both say the transient version, because it is the true one.
+
+**Implemented now, rather than after #439, #441 and #442.** Jack's first comment says this is
+"worth sequencing downstream of those three so the silencing rules are written against the real
+warning vocabulary rather than a guess at it". That reasoning applies to the UI-editable version,
+which invents vocabulary; this version invents none — it reuses the check's existing `stale` /
+`never` / `late` words and adds a constant. Against a five-week-old permanent yellow, waiting for
+three unstarted issues is the worse trade. The follow-up issue keeps the sequencing. See open
+question 2.
 
 **No Sentry change in this issue.** #488 owns the Sentry event shape. Two consequences are recorded
 below as notes for that issue.
@@ -100,19 +110,27 @@ Only `src/nged_substation_forecast/defs/checks.py`, its tests, and three docs pa
   `report_power_freshness` reads and a resurrection is not a stale series. Its docstring says so.
 
   `n_series_total` changes meaning, from "every id we know of" to "every id we are watching". That
-  is what makes the description and the Sentry denominator true with no arithmetic anywhere. Its
-  docstring and the three places that read it say the new meaning.
+  is what makes the description and the Sentry denominator true with no arithmetic. Its docstring
+  and its reader **in `checks.py`** say the new meaning; its two other readers are in `_sentry.py`,
+  which this issue may not touch, so they are note 2 for #488.
 
-- **`_to_asset_check_result`** does two things more than it does today:
+- **`_to_asset_check_result`** does three things more than it does today:
   - `passed = result.is_healthy and result.n_series_total > 0 and not result.resurrected_ids` — a
     resurrection makes the check yellow, which is the "tell me when they come back" requirement.
-  - Appends `Ignoring 2 known-dead time series: 23, 33.` to the description on **every** branch,
-    including the `No power data on disk yet.` one, whenever `silenced_ids` is non-empty; and
-    appends `Series 23 has reported again — remove it from _KNOWN_DEAD_TIME_SERIES_IDS in
-    defs/checks.py.` when `resurrected_ids` is non-empty. The ignoring clause is uncapped, unlike
-    every other listing in this module: the other caps guard against a machine-generated explosion
-    (a whole-feed stall puts 2,500 rows in `late` with no human involved), while this one is bounded
-    by what somebody typed into a source file.
+  - Appends `Ignoring 2 known-dead time series: 23, 33.` to the description on **every** branch
+    whenever `silenced_ids` is non-empty; and appends `Series 23 has reported again — remove it
+    from _KNOWN_DEAD_TIME_SERIES_IDS in defs/checks.py.` when `resurrected_ids` is non-empty. The
+    ignoring clause is uncapped, unlike every other listing in this module: the other caps guard
+    against a machine-generated explosion (a whole-feed stall puts 2,500 rows in `late` with no
+    human involved), while this one is bounded by what somebody typed into a source file.
+  - **Splits the `n_series_total == 0` branch in two**, because the redefinition above gives that
+    guard a second meaning. `n_series_total == 0` with nothing silenced still means "No power data
+    on disk yet."; with something silenced it means every id we know of is on the dead list, which
+    is a different and much louder statement, so it gets its own sentence — `Every known time
+    series is silenced as known-dead: 23, 33.` Both keep `passed=False`: watching nothing is not
+    healthy. This is the one place the meaning change costs an extra branch rather than falling out
+    for free, and it is unreachable at V1 (2 silenced of 32) but trivially reachable on a laptop
+    with a small local table.
 
   Two new metadata keys, emitted on every run so each keeps one type and stays plottable — the rule
   the existing `n_late_listed` follows: `n_silenced`, and `silenced_time_series_ids` as a string of
@@ -120,23 +138,29 @@ Only `src/nged_substation_forecast/defs/checks.py`, its tests, and three docs pa
   own: they already flip `passed` and are named in the description, and the count is zero in every
   run but the rare one.
 
-- **`_check_power_data_freshness`** passes `silenced_ids=_KNOWN_DEAD_TIME_SERIES_IDS`.
+- **`_check_power_data_freshness`** passes `silenced_ids=_KNOWN_DEAD_TIME_SERIES_IDS`. At the call
+  site, not as the parameter's default value — a default is bound at import and
+  `monkeypatch.setattr` on the constant would not reach it, so the end-to-end test below would
+  silently exercise the real ids.
 
 - **`power_data_is_fresh`** and **`_late_table_metadata`** are unchanged.
 
-House style note for the implementer: `docs/architecture/code-style.md` now requires keyword
-arguments at call sites, which is why the new parameter is keyword-only and why the call above names
-it.
+Two notes for the implementer. `docs/architecture/code-style.md` now requires keyword arguments at
+call sites, which is why the new parameter is keyword-only and why the call above names it. And the
+parameter is a `Collection[int]` while the result field is a `tuple[int, ...]`, so the constructor
+needs `tuple(silenced_ids)`.
 
 ## Design-philosophy check
 
 This is production code, so it degrades rather than raises.
 
 - **Rules 6 and 7 hold.** The check stays `AssetCheckSeverity.WARN` with `blocking=False`, and its
-  whole body stays under the existing `BaseException` catch-all. Nothing added can raise at all:
-  after this change the silencing input is a module constant, so there is no I/O, no parse and no
-  failure mode to degrade from. That is the strongest possible answer to "a silencing mechanism must
-  not convert fail-open into fail-closed" — the mechanism has no runtime failure mode.
+  whole body stays under the existing `BaseException` catch-all. The silencing input is a module
+  constant, so there is no I/O, no parse and nothing to degrade from — the mechanism has no runtime
+  failure mode that a well-typed constant can reach. (It is not *unconditionally* unraisable: a
+  non-`int` entry would make `is_in` raise `InvalidOperationError`. `Final[tuple[int, ...]]` plus
+  `ty`, which runs in both pre-commit and CI, is the gate — and even then the catch-all holds, so
+  the worst case is a degraded check, never a failed run.)
 - **The module docstring's "salvages nothing below the catch-all" stays true as written.** The
   earlier YAML-based draft had to carve an exception into it in two places; this one does not.
 - **Rule 2 (strict about malformed) is honoured statically.** A mistyped id is a ruff or `ty` error
@@ -153,41 +177,62 @@ This is production code, so it degrades rather than raises.
 
 ## Tests
 
-All in `tests/test_checks.py`. Five tests and one added assertion; every one fails on `main`.
+All in `tests/test_checks.py`. Seven tests and one added assertion; every one fails on `main`.
 
 | Test | What fails on `main` |
 |---|---|
-| `test_silenced_series_are_withheld_and_others_still_warn` | one fixture — 23 stale and silenced, 33 never-reported and silenced, 7 stale and not silenced, and a fourth silenced id present in neither roster nor coverage — asserting `n_stale == 1`, `n_never == 0`, `late` holds only 7, `n_series_total == 3`, `resurrected_ids == ()`. The fourth id is the mistyped-or-deregistered case, and the state the cutoff-based resurrection rule exists to keep out of `resurrected_ids` |
+| `test_silenced_series_are_withheld_and_others_still_warn` | one fixture, stated in full: 7 stale and not silenced, 1 fresh and not silenced, 23 stale and silenced, 33 never-reported (roster-only) and silenced, 404 silenced but in neither roster nor coverage. Asserts `n_stale == 1`, `n_never == 0`, `late` holds only 7, `resurrected_ids == ()` and **`n_series_total == 2`** — the watched population `{1, 7}`. That last number is the assertion that tells filtering the *inputs* apart from filtering `late`, which answers 4. Id 404 is the mistyped-or-deregistered case; id 23 pins that a silenced series which is still stale is not reported as resurrected |
 | `test_a_feed_whose_only_late_series_are_silenced_is_healthy` | `is_healthy is True` with every late series silenced. This is the load-bearing fact behind the issue's actual request — `report_power_freshness` returns early on a healthy result, so the daily Sentry warning about 23 stops |
-| `test_a_silenced_series_that_reports_again_is_resurrected` | 23 fresh and silenced → `resurrected_ids == (23,)` and `is_healthy is True`, which is why note 1 for #488 is true |
+| `test_a_silenced_series_that_reports_again_is_resurrected` | 23 fresh and silenced → `resurrected_ids == (23,)` and `is_healthy is True`, which is why note 1 for #488 is true. Parametrised over the cutoff boundary: `last_time` exactly at the cutoff is resurrected, a second earlier is not — the exact complement of `stale`'s `<` |
+| `test_silencing_works_without_a_roster` | `roster_ids=None` plus silenced ids: the counts describe the survivors and nothing raises. A missing `if roster_ids is not None` guard would `AttributeError` into the catch-all and leave the check permanently "Could not evaluate", and no existing test pins that combination |
 | `test_the_check_result_reports_silencing` | parametrised over the healthy and the late branch: the description names the ignored ids in **both** (requirement (a) matters most on a green tick), `passed is False` on resurrection with 23 named, and `n_silenced` / `silenced_time_series_ids` present |
+| `test_a_wholly_silenced_roster_is_not_reported_as_an_empty_table` | `n_series_total == 0` with silencing → the description says every known series is silenced and names them, rather than "No power data on disk yet.", and `passed is False`. Pins the branch split |
 | `test_power_data_is_fresh_silences_the_configured_dead_series` | end-to-end: `monkeypatch.setattr(checks, "_KNOWN_DEAD_TIME_SERIES_IDS", …)`, a real Delta table and roster, the check passes and names the ignored ids |
 | *(one added assertion)* in the existing `test_power_data_is_fresh_all_current_passes` | `n_silenced == 0` and `silenced_time_series_ids == "[]"` are emitted when nothing is silenced, so the keys keep one type across runs. The same test already makes this point for `n_late_listed` |
 
-Two notes for whoever writes these. The existing end-to-end tests use ids 1, 2 and 99, so the real
+Three notes for whoever writes these. The existing end-to-end tests use ids 1, 2 and 99, so the real
 `(23, 33)` constant does not collide with any of them — but a new end-to-end test must monkeypatch
-the constant rather than reuse those ids by luck. And the check's catch-all swallows `pytest.fail`,
-so a "must not be called" sentinel inside the check body is useless; assert after the call.
+the constant rather than rely on that. Four of these fail on `main` by signature error (`TypeError`
+on `silenced_ids=`, `AttributeError` from `monkeypatch.setattr` on a constant that does not exist,
+`KeyError` on a new metadata key) rather than by behaviour, so their real worth is mutation
+resistance — which is why `n_series_total == 2` and `n_never == 0` are worth stating exactly:
+dropping the roster filter turns 33 back into a `never` row, and filtering `late` instead of the
+inputs changes the total. And the check's catch-all swallows `pytest.fail`, so a "must not be
+called" sentinel inside the check body is useless; assert after the call.
 
 ## Docs to update
 
-- **`src/nged_substation_forecast/defs/checks.py` module docstring** — a short paragraph on
-  silencing: what the constant does, that filtering happens in the pure evaluator so the Sentry
-  warning inherits it, and that a returning series turns the check yellow rather than being removed
-  automatically.
+- **`src/nged_substation_forecast/defs/checks.py`** — three prose edits inside the file:
+  - The module docstring: a short paragraph on silencing — what the constant does, that filtering
+    happens in the pure evaluator so the Sentry warning inherits it, and that a returning series
+    turns the check yellow for as long as it keeps reporting rather than being removed
+    automatically.
+  - `_MAX_LATE_SERIES_IN_TABLE`'s docstring says "`n_stale` and `n_never_reported` stay exact
+    throughout". They now count the watched population; same rewrite as the operations page below.
+  - The `NOTE` above the `stale` filter proposes intersecting stale ids with `roster_ids` as the
+    remedy for "a permanently-yellow check for a genuinely retired series". That nuisance is now
+    solved three lines above it, by a different mechanism. Rewrite the `NOTE` to say so, or a later
+    reader builds the second mechanism.
 - **`docs/live_service/operations.md`**, "Reading the freshness check" — two edits:
   - The new paragraph: how to silence a series and how to un-silence one (edit the constant, commit,
-    redeploy), what `Ignoring N known-dead…` and `has reported again` mean, that a resurrection
-    stays yellow until the constant is edited, and that the edit is an intervention worth logging.
+    redeploy), what `Ignoring N known-dead…` and `has reported again` mean, that the yellow lasts
+    only while the returned series keeps reporting, that `n_silenced` counts *configured* ids so it
+    can exceed the number actually withheld (a listed id that no longer exists silences nothing),
+    and that the edit is an intervention worth logging.
   - A rewrite of "Read `n_stale` and `n_never_reported` — both always exact" and of "`n_late` … is
     the true count". All three now count the watched population, silenced series excluded. Rewrite
     the passage rather than appending a caveat.
 - **`docs/architecture/production-deployment.md`**, the `power_data_is_fresh` section — why the list
   is a source constant rather than mutable state or a config file, why the filtering sits in the
-  pure evaluator so Sentry inherits it, and the new meaning of `n_series_total`.
+  pure evaluator so Sentry inherits it, the new meaning of `n_series_total`, and the sentence "a
+  green tick when every series is current and a yellow warning naming the late count when the feed
+  has stalled", which now has a third cause: a silenced series reporting again.
 - **`docs/live_service/sentry.md`** — no change. Its `PowerFreshnessResult` smoke script passes
   every field by keyword, so the two new fields' defaults keep it working; this is why they have
   defaults.
+- **`docs/design-philosophy/inherent-stability.md`** — no change. Its ladder row "`power_data_is_fresh`
+  warns and names the late series" stays true for every series that is not silenced, and the page
+  describes the degradation ladder rather than this check's configuration.
 - **`README.md` / `CLAUDE.md`** — no change.
 
 This issue does not complete a roadmap item, so there is no ship-time triage of an "Implementation
@@ -253,12 +298,40 @@ No network-gated tests are involved.
 
 ## Findings from review, and what happened to each
 
-Three reviews: a simplicity pass, a correctness pass, and — after merging main, which brought an
-updated `plan-issue` skill — a second simplicity pass with the skill's new reachability attack and
-its licence to propose a different architecture.
+Four reviews. A simplicity pass and a correctness pass on the first draft; then, after merging main
+brought an updated `plan-issue` skill, a second simplicity pass with the skill's new reachability
+attack and its licence to propose a different architecture — and, because that pass replaced the
+mechanism, a second correctness pass over what it left behind.
 
 ### Accepted
 
+- **The headline test asserted the *pre-change* `n_series_total`** (fourth pass). The fixture as
+  written gives a watched population of one, not three — three is what `main` answers, and what an
+  implementation that filtered `late` instead of the inputs would answer. The fixture is now stated
+  in full and the assertion is the watched value, which makes it the test that tells the two
+  implementations apart.
+- **"Stays yellow until a human deletes the line" was false** (fourth pass). `resurrected_ids` is
+  recomputed hourly with no remembered state, so a series that reports for a few hours and dies
+  again goes yellow and then green with the silencing still on. The plan promised the durable
+  version and would have written it into the operations page. Both now state the transient version,
+  and the durable one is named as needing `asset_health_history` (#442).
+- **The `n_series_total == 0` branch was left incoherent** (fourth pass). Redefining the quantity
+  gave that guard a second meaning: with every id silenced the check would report "No power data on
+  disk yet." over a table that has data. The branch is now split, with its own sentence and its own
+  test. This is the one place the meaning change costs an extra branch instead of falling out free —
+  the plan had claimed it cost none.
+- **The plan sent the implementer into `_sentry.py`** (fourth pass), by saying "the three places
+  that read it" when two of the three are in the file this issue may not touch. Corrected to name
+  the `checks.py` reader only; the other two stay as note 2 for #488.
+- **Three untested behaviours and three missed doc passages** (fourth pass): silencing with no
+  roster (a missing `if roster_ids is not None` would turn the check permanently "Could not
+  evaluate"), the resurrection cutoff boundary, and the wholly-silenced branch; plus
+  `_MAX_LATE_SERIES_IN_TABLE`'s "stay exact throughout" docstring, the `NOTE` that proposes the
+  roster-intersection remedy this change supersedes, and `production-deployment.md`'s "green tick …
+  yellow warning" sentence, which now has a third cause.
+- **A departure from Jack's comment went unlisted** (fourth pass): his first comment sequences this
+  issue after #439, #441 and #442, all still open. Now listed, with the reason it does not apply to
+  this version.
 - **The list is a `Final` tuple, not a YAML file** (third pass). The reachability attack did the
   work: the file would be git-tracked, baked into the image by `COPY conf/`, read on Fargate where
   nobody edits it, and already parsed by a CI test — so the parse guard defended a state reachable
@@ -321,3 +394,18 @@ its licence to propose a different architecture.
 - **"Auto-silence anything stale beyond N days, with no list"** (third pass, weighed and rejected by
   the reviewer itself). It cannot satisfy requirement (b) without remembered state, and it silences
   a broken feed with nobody acknowledging it.
+- **"'Nothing added can raise at all' is overstated"** (fourth pass) — accepted as a wording fix,
+  not as a design change: a non-`int` entry would make `is_in` raise, but `Final[tuple[int, ...]]`
+  plus `ty` in pre-commit and CI is the gate, and the catch-all still holds behind it. The sentence
+  now says that.
+
+### Fourth pass — confirmed sound
+
+The reviewer walked filtering-the-inputs against filtering-`late` through all five cases — silenced
+and stale, silenced and never-reported, silenced and fresh, silenced and present nowhere, and
+silenced but present in `coverage` while absent from the roster (the case the code's own `NOTE`
+singles out) — and found `late`, `n_stale` and `n_never` identical in every one, with
+`n_series_total` the sole deliberate divergence. It also confirmed on the installed Polars that an
+emptied `coverage` still yields "every roster id is never", that the `last_time` dtype lookup is
+unaffected, and that the ordering matters and the plan has it right: `resurrected_ids` is computed
+before the `coverage` filter.
