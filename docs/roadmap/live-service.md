@@ -112,12 +112,12 @@ Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > [access-phasing](#access-phasing) Stages 2–3 and the future-work items (MLflow server, dev
 > dashboard) remain post-v0.1.
 
-The Level 1 ("nothing always-on") design proposed in issue #206 is rejected, on cost grounds
-that do not hold and on two requirements it cannot serve. Its cost case rests on pricing the
+The Level 1 ("nothing always-on") design proposed in issue #206 is rejected: its cost case does
+not hold, and there are two requirements it cannot serve. The cost case rests on pricing the
 always-on control plane at ~£70–105/month, which is a 16 GB box big enough to run the
-*compute*; a small control-plane box costs ~£10–20/month. Its RDS prerequisite dissolves on a
-single machine too (Postgres-in-Docker, or SQLite on a real local filesystem). The two
-requirements Level 1 does not serve:
+*compute*; a small control-plane box costs ~£10–20/month (costed 2026-07-02). Its RDS
+prerequisite dissolves on a single machine too (Postgres-in-Docker, or SQLite on a real local
+filesystem). The two requirements Level 1 does not serve:
 
 1. **Use Dagster "properly"** — persistent run history, one-click UI backfills of missed
    partitions, and the ability to launch backtests on AWS whenever the model improves.
@@ -410,9 +410,7 @@ Sensor preferred over a schedule so it fires on the actual data update.
 
 Note this sensor needs a running Dagster daemon — the
 [accepted option](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month) provides
-one. If the deployment instead ships Option A (nothing always-on), skip the sensor and run the
-monitoring step as the final op of the one-shot production job (the production-job workstream
-below already reserves that slot).
+one.
 
 ### Alert on absence: the missed-check-in alarm
 
@@ -487,10 +485,10 @@ Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > **Status: ✅ Done** (closed 2026-07-10). The native per-asset Dagster schedules that ship with
 > [The `live_forecasts` asset](#the-live_forecasts-asset)
 > (`power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`, `live_forecasts_schedule`)
-> do the whole job: run under `dg dev` with a persistent `DAGSTER_HOME` for several days,
-> confirming 6-hourly forecasts landing with no duplicate rows and a missed slot backfillable in
-> replay mode. No hand-rolled freshness op is needed, and neither is the one-shot
-> `live_pipeline_job` that [Option A](#considered-but-rejected) would require (Option A has no
+> do the whole job. Closing #208 took a several-day soak under `dg dev` with a persistent
+> `DAGSTER_HOME`, which confirmed 6-hourly forecasts landing with no duplicate rows and a missed
+> slot backfillable in replay mode. No hand-rolled freshness op is needed, and neither is the
+> one-shot `live_pipeline_job` that [Option A](#considered-but-rejected) would require (Option A has no
 > daemon to hold schedules) — Option A is rejected, so that job is not specified here.
 
 ### Deployment workstream 3 — AWS infrastructure
