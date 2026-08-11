@@ -44,6 +44,11 @@ leaderboard in the MLflow UI (`uv run mlflow ui --gunicorn-opts "--workers 1"` �
 
 Copy the `run_id` of the fold you want to promote.
 
+The table lists every fold run ever trained, including ones trained before a feature was renamed in
+the code. Those runs cannot be served, and nothing in the table says which they are — Step 2 refuses
+them rather than letting you discover it at the next 6-hourly tick. Prefer a run trained against the
+code you are about to deploy.
+
 Promotion (this step and the next) always happens **on your laptop**, whichever environment
 serves the forecasts: the candidate models live in the laptop's local MLflow file store, and
 the promoted artifacts land in a local directory (`data/production_model/`) that the AWS
@@ -57,10 +62,16 @@ deployment bakes into its container image at build time.
 **What the asset does:**
 
 1. Downloads that run's saved model artifacts from MLflow
-   (`ml_core._production_helpers.fetch_model_artifacts`), stamps a `promotion.json`
-   (`mlflow_run_id`, `promoted_at`), and atomically replaces the directory at
-   `Settings.production_model_path` (`data/production_model/` by default) with the new artifacts.
-2. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, and
+   (`ml_core._production_helpers.fetch_model_artifacts`) into a temporary directory.
+2. Checks the downloaded model's `selected_features` against the running code, and **fails the
+   materialisation if any feature name no longer parses** — naming the offending feature. The check
+   runs before anything is written, so a refused promotion leaves the previous champion in place and
+   still serving. Re-train the model against the current feature vocabulary and promote that run;
+   never hand-edit `meta.json` to rename a feature, because the trained boosters carry the old
+   names too.
+3. Stamps a `promotion.json` (`mlflow_run_id`, `promoted_at`) and atomically replaces the directory
+   at `Settings.production_model_path` (`data/production_model/` by default) with the new artifacts.
+4. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, and
    `n_trained_time_series` as output metadata, so you can confirm the right model landed.
 
 Promotion is a Dagster materialisation rather than a bare script, so every promotion is recorded
@@ -108,7 +119,8 @@ partition's `power_fcst_init_time` is 2026-07-04 06:00 UTC — not at the midnig
 
 1. Loads the production model from `Settings.production_model_path` via a plain disk `load` —
    the concrete forecaster class is reconstructed from `meta.json`'s `model_class` field. Raises
-   if the model has no trained time series (re-promote first).
+   if the model has no trained time series, or if its `selected_features` name a feature this code
+   cannot parse (re-promote first, from a run trained against the current vocabulary).
 2. Resolves which NWP `init_time` to join against via `select_nwp_init_time` and
    `availability_mode` (table above).
 3. Builds the power spine (`build_live_power_frame`), covering 15 days of history (long enough

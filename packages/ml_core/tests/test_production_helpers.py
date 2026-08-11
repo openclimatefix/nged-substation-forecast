@@ -16,6 +16,7 @@ import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries
 from ml_core._production_helpers import (
+    _check_selected_features_are_parseable,
     build_live_power_frame,
     load_forecaster_from_dir,
     select_nwp_init_time,
@@ -166,3 +167,50 @@ def test_load_forecaster_from_dir_raises_on_missing_model_class(tmp_path: Path) 
     )
     with pytest.raises(ValueError, match="model_class"):
         load_forecaster_from_dir(tmp_path)
+
+
+def test_load_forecaster_from_dir_rejects_an_unparseable_feature(tmp_path: Path) -> None:
+    """A model naming a feature this code no longer recognises fails at load, naming the feature.
+
+    ``local_utc_offset`` is the real name a rename retired, so this doubles as a regression pin.
+    No training is needed: an untrained forecaster still saves a ``meta.json`` carrying the config.
+    """
+    XGBoostForecaster(XGBoostConfig(selected_features={"local_utc_offset", "temperature_2m"})).save(
+        tmp_path
+    )
+
+    with pytest.raises(ValueError, match="local_utc_offset"):
+        load_forecaster_from_dir(tmp_path)
+
+
+def test_load_forecaster_from_dir_accepts_the_current_vocabulary(tmp_path: Path) -> None:
+    """The negative control for the test above: a guard that rejected everything would pass it.
+
+    Covers one feature of each kind the parser understands, so a narrowing of the guard shows up
+    here rather than in production.
+    """
+    config = XGBoostConfig(
+        selected_features={
+            "local_utc_offset_minutes",
+            "temperature_2m",
+            "power_lag_24h",
+            "temperature_2m_rolling_mean_6h",
+            "windchill",
+        }
+    )
+    XGBoostForecaster(config).save(tmp_path)
+
+    assert load_forecaster_from_dir(tmp_path).model_params.selected_features == (
+        config.selected_features
+    )
+
+
+def test_a_saved_record_naming_no_features_is_not_rejected() -> None:
+    """An absent ``selected_features`` is missing input, not malformed input, so it must not raise.
+
+    ``BaseForecaster.save``'s contract mandates only ``model_class``, so a saved record that names
+    no features is within contract; ``fetch_model_artifacts`` reaches this path by reading a
+    ``meta.json`` that has no such field. Pinned so a later tightening of the guard into
+    fail-closed has to be deliberate rather than incidental.
+    """
+    _check_selected_features_are_parseable(None, "a model with no feature list")

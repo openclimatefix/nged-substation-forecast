@@ -52,7 +52,13 @@ class _FakeForecaster(BaseForecaster):
         path.mkdir(parents=True, exist_ok=True)
         (path / "payload.txt").write_text(self.payload)
         (path / "meta.json").write_text(
-            json.dumps({"trained_time_series_ids": self._series, "model_class": "fake"})
+            json.dumps(
+                {
+                    "model_params": self.model_params.model_dump(mode="json"),
+                    "trained_time_series_ids": self._series,
+                    "model_class": "fake",
+                }
+            )
         )
         for ts_id in self._series:
             (path / f"{ts_id}.part").write_text(f"model for {ts_id}")
@@ -61,7 +67,7 @@ class _FakeForecaster(BaseForecaster):
     def load(cls, path: Path) -> Self:
         meta = json.loads((path / "meta.json").read_text())
         return cls(
-            BaseForecasterConfig(selected_features=set()),
+            BaseForecasterConfig.model_validate(meta["model_params"]),
             payload=(path / "payload.txt").read_text(),
             series=meta["trained_time_series_ids"],
         )
@@ -101,10 +107,17 @@ def test_trained_time_series_ids_is_abstract() -> None:
         _MissingPopulation(BaseForecasterConfig(selected_features=set()))
 
 
-def _save(run_id: str, payload: str, series: Sequence[int] = ()) -> None:
+def _save(
+    run_id: str,
+    payload: str,
+    series: Sequence[int] = (),
+    selected_features: set[str] | None = None,
+) -> None:
     """Save a ``_FakeForecaster`` carrying ``payload`` and ``series`` into an existing run."""
     forecaster = _FakeForecaster(
-        BaseForecasterConfig(selected_features=set()), payload=payload, series=series
+        BaseForecasterConfig(selected_features=selected_features or set()),
+        payload=payload,
+        series=series,
     )
     forecaster.save_to_mlflow(run_id)
 
@@ -225,5 +238,28 @@ def test_fetch_model_artifacts_unpacks_the_archive_into_dest(
     fetch_model_artifacts(saved_run, dest)
 
     assert not (dest / "model.tar.gz").exists()
+    assert _FakeForecaster.load(dest).payload == "hello-model"
+    assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run
+
+
+def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable(
+    saved_run: str, tmp_path: Path
+) -> None:
+    """A promotion this code could not serve must not displace the champion already in place.
+
+    ``selected_features`` are checked against the running code before the atomic swap, so a run
+    trained before a feature was renamed is refused with ``dest`` untouched — the outgoing champion
+    keeps serving instead of the service breaking at its next tick.
+    """
+    dest = tmp_path / "production_model"
+    fetch_model_artifacts(saved_run, dest)
+
+    with mlflow.start_run(experiment_id=mlflow.create_experiment("stale_vocabulary")) as run:
+        stale_run_id = run.info.run_id
+    _save(stale_run_id, "stale-model", series=[10], selected_features={"local_utc_offset"})
+
+    with pytest.raises(ValueError, match="local_utc_offset"):
+        fetch_model_artifacts(stale_run_id, dest)
+
     assert _FakeForecaster.load(dest).payload == "hello-model"
     assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run

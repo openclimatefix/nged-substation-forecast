@@ -127,6 +127,12 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     which replaces the directory atomically), then reads back ``meta.json`` to report provenance.
     ``live_forecasts`` reads this directory with a plain disk load — never MLflow.
 
+    Promotion refuses a model whose ``selected_features`` this code cannot parse, and refuses it
+    before the directory is replaced, so the previous champion stays in place and keeps serving.
+    ``promotable_model_runs`` lists every fold run ever trained, including ones whose feature
+    vocabulary predates a rename, so the candidate table alone cannot tell an operator which runs
+    are still servable.
+
     Promotion as a Dagster materialisation gives an audit trail and lineage for free, rather than
     a bare script (a script wrapper for the eventual Docker build (#222) stays trivial by calling
     the same ``fetch_model_artifacts`` helper).
@@ -212,7 +218,9 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     Loads the production model from a plain disk directory (``load_forecaster_from_dir`` against
     ``Settings.production_model_path``, populated out-of-band by the ``promoted_model``
     asset) — **no MLflow import or call anywhere in this asset**; live performance is tracked by
-    production monitoring, never logged here. Forecasts exactly
+    production monitoring, never logged here. A model whose ``selected_features`` this code cannot
+    parse — one promoted before a feature was renamed — fails at that load, naming the feature,
+    rather than partway through feature engineering. Forecasts exactly
     ``forecaster.trained_time_series_ids`` (never today's eligibility set — the train==predict
     population invariant) across every NWP ensemble member, using single-run feature engineering
     stamped with this partition's ``power_fcst_init_time``.
