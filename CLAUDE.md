@@ -85,7 +85,7 @@ by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised expor
 
 ### Prose style
 
-These three rules apply to everything we write in prose: `docs/` pages, READMEs, docstrings, code
+These four rules apply to everything we write in prose: `docs/` pages, READMEs, docstrings, code
 comments, and GitHub issue and PR bodies.
 
 **Be concrete and plain; write for a skim-reader.** Assume the reader is skimming and wants the
@@ -99,6 +99,14 @@ Economist*'s house style — short words, active voice, concrete nouns, British 
 acronym expanded on first use — but without the two journalistic habits that would hurt a reference
 doc, so no punning or whimsical headings, and no scene-setting opening: state the conclusion first,
 then explain it.
+
+**Be concise by cutting whole sentences, not words.** Prose should be as short as it can be
+without losing readability, but the compressible material is rarely inside a sentence. It is whole
+sentences and paragraphs that carry no information: restating the heading, summarising what the
+reader has just read, hedging ("it is worth noting that"), listing what we are *not* doing, or a
+closing paragraph that repeats the opening. Delete those outright, and leave the surviving
+sentences intact — buying brevity by clipping words out of a sentence that needs them is the
+mistake the next rule forbids.
 
 **Write full sentences; don't drop the subject.** Don't clip words for terseness
 if it leaves a sentence without a clear subject/verb. Prefer "We split storage across two
