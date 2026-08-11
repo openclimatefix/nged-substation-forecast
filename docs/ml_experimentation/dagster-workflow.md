@@ -61,7 +61,7 @@ step before training.**
 |---|---|---|
 | `experiment_name` | `"xgboost_smoke_test"` | Unique; becomes the MLflow experiment name and partition-key prefix |
 | `base_model_config` | `"conf/model/xgboost.yaml"` | Path relative to `PROJECT_ROOT` |
-| `config_overrides` | `{"n_estimators": 100}` | Merged onto `model_params` in the YAML |
+| `config_overrides` | `{"n_estimators": 100}` | Merged onto `model_params` in the YAML; every key must name a declared config field |
 | `run_mode` | `"smoke_test"` | `smoke_test` adds the non-leaderboard dev folds (e.g. `smoke_test`); `full_cv` or `register_only` adds the leaderboard folds |
 | `description` | `"Quick sanity check"` | Stored as an MLflow tag — optional |
 

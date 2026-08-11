@@ -229,3 +229,22 @@ def test_load_forecaster_from_dir_accepts_the_current_vocabulary(tmp_path: Path)
     assert load_forecaster_from_dir(tmp_path).model_params.selected_features == (
         config.selected_features
     )
+
+
+def test_the_feature_guard_ignores_a_subclass_own_hyperparameters(tmp_path: Path) -> None:
+    """The guard reads ``selected_features`` and nothing else out of a saved config.
+
+    A saved ``model_params`` is always a *subclass* instance, so it carries hyper-parameters the
+    base class never declares. ``BaseForecasterConfig`` forbids unknown keys, so validating the
+    whole mapping against the base class would reject every real model on its own
+    ``n_estimators`` — with a message blaming the feature vocabulary.
+    """
+    config = XGBoostConfig(selected_features={"temperature_2m"}, n_estimators=17, device="cpu")
+    XGBoostForecaster(config).save(tmp_path)
+    saved = json.loads((tmp_path / "meta.json").read_text())
+    assert "n_estimators" in saved["model_params"], "this test is pointless if none are saved"
+
+    loaded = load_forecaster_from_dir(tmp_path)
+
+    assert isinstance(loaded, XGBoostForecaster)
+    assert loaded.model_params.n_estimators == 17

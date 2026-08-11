@@ -41,7 +41,9 @@ class RegisterExperimentConfig(Config):
         default_factory=dict,
         description=(
             "Key-value overrides applied to the base YAML's model_params, replacing whole values,"
-            " e.g. {'selected_features': ['lag_1h'], 'n_estimators': 300}."
+            " e.g. {'selected_features': ['lag_1h'], 'n_estimators': 300}. Every key must name a"
+            " field the config class declares; an unknown one is rejected, so a misspelling fails"
+            " here rather than training on the YAML's value."
         ),
     )
     run_mode: Literal["smoke_test", "full_cv", "register_only"] = Field(
@@ -64,10 +66,13 @@ _UNOVERRIDABLE_MODEL_PARAMS: Final[dict[str, str]] = {
 }
 """The ``model_params`` keys a run's ``config_overrides`` may not set, mapped to why not.
 
-Both are ordinary keys as far as the override merge is concerned, and both would be discarded
-without a word downstream of it: ``_target_`` by pydantic's ``extra="ignore"``, because the config
-class was already resolved from the file; ``experiment_name`` by the assignment that stamps the
-job's own value over it.
+Both are ordinary keys as far as the override merge is concerned, and each needs rejecting for its
+own reason. ``experiment_name`` is a *declared* field, so ``BaseForecasterConfig``'s
+``extra="forbid"`` cannot see it: an override of it validates cleanly and is then overwritten by
+the assignment that stamps the job's own value, discarding it without a word. ``_target_`` would be
+caught by ``extra="forbid"`` unaided, and is listed here only for the message — pydantic would say
+just "extra inputs are not permitted", where this names the key and points at ``base_model_config``
+as the way to change the config class.
 """
 
 
@@ -133,8 +138,10 @@ def _resolve_forecaster_config(
         config_overrides: Overrides applied to ``model_params`` as **whole-value replacement**: an
             override replaces the base value outright rather than merging into it. Lists are
             replaced, not extended, and a value that is itself a mapping is replaced whole, so
-            an override must restate every key of that mapping it wants to keep. Every
-            ``model_params`` key is overridable except those in ``_UNOVERRIDABLE_MODEL_PARAMS``.
+            an override must restate every key of that mapping it wants to keep. Every key must
+            name a field the config class declares, and the keys in
+            ``_UNOVERRIDABLE_MODEL_PARAMS`` are refused on top of that — they are the resolver's
+            own to set.
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
@@ -143,6 +150,9 @@ def _resolve_forecaster_config(
     Raises:
         ValueError: ``config_overrides`` names an unoverridable key, or the YAML is not a usable
             model config.
+        ValidationError: An override names an undeclared key, or gives a declared one a value of
+            the wrong type. Raised by the config class before any fold is scheduled. A subclass of
+            ``ValueError``, so a caller that wants "the config is unusable" catches that alone.
     """
     for key, reason in _UNOVERRIDABLE_MODEL_PARAMS.items():
         if key in config_overrides:
@@ -150,7 +160,9 @@ def _resolve_forecaster_config(
     config_path = PROJECT_ROOT / base_model_config
     with config_path.open(encoding="utf-8") as file:
         raw = yaml.safe_load(file)
-    forecaster_target, config_target, model_params = _required_targets(raw, config_path)
+    forecaster_target, config_target, model_params = _required_targets(
+        raw=raw, config_path=config_path
+    )
     model_params.update(config_overrides)
     forecaster_cls = cast(type[BaseForecaster], import_class(forecaster_target))
     config_cls = cast(type[BaseForecasterConfig], import_class(config_target))
@@ -271,9 +283,9 @@ def _reject_changed_identity(
         for tag in IDENTITY_TAGS
         if tag in stored_tags
         for line in (
-            _config_differences(stored_tags[tag], requested_tags[tag])
+            _config_differences(stored_json=stored_tags[tag], requested_json=requested_tags[tag])
             if tag == "config"
-            else _target_difference(tag, stored_tags[tag], requested_tags[tag])
+            else _target_difference(tag=tag, stored=stored_tags[tag], requested=requested_tags[tag])
         )
     ]
     if not differences:
@@ -318,9 +330,13 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
     forecaster_cls, forecaster_config = _resolve_forecaster_config(
-        config.base_model_config, config.config_overrides, config.experiment_name
+        base_model_config=config.base_model_config,
+        config_overrides=config.config_overrides,
+        experiment_name=config.experiment_name,
     )
-    identity_tags = _identity_tags(forecaster_cls, forecaster_config)
+    identity_tags = _identity_tags(
+        forecaster_cls=forecaster_cls, forecaster_config=forecaster_config
+    )
 
     # get_or_create_experiment writes nothing when the name already exists, so the check below
     # still runs before this registration's first write. On a brand-new name it creates the
@@ -328,7 +344,9 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     experiment_id = get_or_create_experiment(config.experiment_name)
     client = MlflowClient()
     _reject_changed_identity(
-        config.experiment_name, mlflow.get_experiment(experiment_id).tags, identity_tags
+        experiment_name=config.experiment_name,
+        stored_tags=mlflow.get_experiment(experiment_id).tags,
+        requested_tags=identity_tags,
     )
 
     # Log the params before the experiment tags. MLflow params are write-once, so this is the one
@@ -357,15 +375,19 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     # lacks, so assets can reconstruct the exact forecaster + config subclass from MLflow alone.
     # See load_experiment_forecaster.
     for tag_name, tag_value in identity_tags.items():
-        client.set_experiment_tag(experiment_id, tag_name, tag_value)
-    client.set_experiment_tag(experiment_id, "description", config.description)
+        client.set_experiment_tag(experiment_id=experiment_id, key=tag_name, value=tag_value)
+    client.set_experiment_tag(
+        experiment_id=experiment_id, key="description", value=config.description
+    )
 
     cv_config = load_cv_config(settings.cv_config_path)
-    fold_ids = _fold_ids_for_run_mode(config.run_mode, cv_config)
+    fold_ids = _fold_ids_for_run_mode(run_mode=config.run_mode, cv_config=cv_config)
     partition_keys = [
         f"{config.experiment_name}{CV_PARTITION_KEY_SEPARATOR}{fold_id}" for fold_id in fold_ids
     ]
-    context.instance.add_dynamic_partitions(CV_EXPERIMENT_FOLDS_NAME, partition_keys)
+    context.instance.add_dynamic_partitions(
+        partitions_def_name=CV_EXPERIMENT_FOLDS_NAME, partition_keys=partition_keys
+    )
 
     context.add_output_metadata(
         {
