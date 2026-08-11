@@ -80,7 +80,7 @@ observed meter readings).
 **Caveat**: this measures the *instrumental value* of disaggregation for forecasting, not
 disaggregation fidelity. A disaggregation that is wrong-but-harmless-to-the-forecast scores well;
 a correct-but-forecasting-irrelevant disaggregation scores "useless." Report this as a distinct
-quantity from disaggregation accuracy. This is arguably the most decision-relevant evaluation
+quantity from disaggregation accuracy. Spoke 5 is arguably the most decision-relevant evaluation
 for NGED, because their goal is better forecasts for flexibility procurement.
 
 ---

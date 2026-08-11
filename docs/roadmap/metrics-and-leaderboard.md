@@ -57,11 +57,10 @@ view are in the background page): for each target half-hour it takes the observe
 **same weekday & time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13
 analogues** — which NGED plot and read by eye (taking the 95th percentile if they need a single
 number). Reproducing it matters because it is *the bar we have to clear to justify the project* —
-"XGBoost beats persistence" is the minimum bar; "XGBoost beats the incumbent" is the deliverable.
-It is the first baseline we implement; if we implement only one, it is this one.
+"XGBoost beats persistence" is the least we must do; "XGBoost beats the incumbent" is the
+deliverable. It is the first baseline we implement; if we implement only one, it is this one.
 
-It fits our existing machinery, because every one of its 13 members is just a **power
-lag**:
+It fits our existing machinery, because every one of its 13 members is just a **power lag**:
 
 - Weekly group (last 6 weeks, same weekday & time): `power_lag_168h, 336h, 504h, 672h, 840h, 1008h`
 - Annual group (49–55 weeks ago, same weekday & time): `power_lag_8232h, 8400h, 8568h, 8736h,

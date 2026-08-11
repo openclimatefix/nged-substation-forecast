@@ -51,8 +51,8 @@ Flexpectation is a greenfield project, which is a rare chance to **research indu
 test-drive it against real data and a real production service, and report what we find**. The ideas
 worth borrowing are not all from energy forecasting: the
 [inherent stability](design-philosophy/inherent-stability.md) that shapes how the service behaves
-when its inputs degrade comes from vehicle dynamics, and other principles come from avionics,
-manufacturing and site reliability engineering. The
+when its inputs degrade comes from vehicle dynamics, *fail-operational* from avionics autoland, and
+*blast radius* from site reliability engineering. The
 [design principles](design-philosophy/design-principles.md) page records what each principle
 actually decided, which practices we considered and declined, and which we have not yet absorbed.
 

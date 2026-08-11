@@ -469,7 +469,7 @@ that DataFrame in the function's type hints).
 ## And it's excellent for our internal storage too
 
 Choosing Delta Lake for delivery is also a vote for our own infrastructure, because it's the same
-format we already rely on internally — and it justifies that internal use on its own merits:
+format we already rely on internally — and it is a good internal choice for reasons of its own:
 
 - **It's remarkably compact.** The same `delta_store` write policy that packs `power_forecasts`
   to ~1.8 bytes/row ([above](#what-delta-lake-is-and-who-else-uses-it)) works just as well on

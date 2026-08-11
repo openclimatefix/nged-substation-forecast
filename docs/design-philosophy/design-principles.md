@@ -20,10 +20,10 @@ agent can check every new addition against the whole list on every change — pr
 human reviewer's attention is too scarce to do reliably. Principles that live only in an
 experienced engineer's head cannot be applied that way; written-down ones can.
 
-These are **bets, not truths**: each one is scored by the
-[engineering hypotheses](engineering-hypotheses.md), and a principle that fails its test will be
-reported as a negative result, not rewritten out of the record. The defence against merely
-collecting fashionable engineering trends is the admission test described below.
+These are **bets, not truths**: each one is scored by the [engineering
+hypotheses](engineering-hypotheses.md), and a principle that fails its test will be reported as a
+negative result, not rewritten out of the record. The defence against merely collecting
+fashionable engineering trends is the admission test described below.
 
 ## Where these principles come from
 
