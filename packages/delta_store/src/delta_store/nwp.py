@@ -14,7 +14,8 @@ H3 cells / ensemble members round to the same value), which Parquet's *default* 
 encoding captures directly; ``BYTE_STREAM_SPLIT`` scatters that repetition across four separate
 byte planes and loses more than it gains. ``power_forecasts``'s target values have no such
 repetition (near-continuous ML output), so ``BYTE_STREAM_SPLIT`` wins there instead — the two
-tables need different writer properties. See ``docs/architecture/overview.md`` for the measured
+tables need different writer properties. See
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/> for the measured
 GB/yr and read-latency numbers.
 """
 

@@ -48,6 +48,30 @@ gh issue view <N> --comments
   work, `docs/architecture/` for why the current design is what it is, `docs/techniques/` for
   method write-ups, `docs/design-philosophy/` for the rules the plan has to obey.
 
+## 1a. Name the session
+
+As soon as you have the issue title, **open your very next reply with a session-title line and
+nothing above it**:
+
+```text
+Planning: Cap late-series metadata table (#510)
+```
+
+An imperative phrase naming what the issue *changes*, about 50 characters, then the issue number
+in parentheses. Not the issue's own title verbatim — those run long and bury the point (#512's is
+"Reject unknown keys in config_overrides (extra=\"forbid\" on BaseForecasterConfig)", which wants
+to become "Reject unknown config_overrides keys (#512)").
+
+Jack picks sessions out of the desktop app's session list, where the default title is derived from
+the `/plan-issue <N>` invocation and reads "Plan issue 510" — which does not say what the session
+is about once several are open at once.
+
+**Do not reach for a tool to do this.** Every session-management tool refuses the session it is
+running in, by contract, so there is nothing to call. The line above is a hint to whatever titles
+the session, and failing that a title Jack can copy in one gesture. If you find the session list
+still showing "Plan issue \<N\>" after a run, say so rather than working around it — that is the
+signal that this needs solving at the harness level instead.
+
 ## 2. Decide whether it is worth implementing
 
 This is a real gate, not a formality. State a clear verdict before writing any plan, and be
