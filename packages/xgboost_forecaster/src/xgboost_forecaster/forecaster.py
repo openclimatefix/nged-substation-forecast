@@ -111,7 +111,7 @@ class XGBoostForecaster(BaseForecaster):
         the inputs (control member, the relevant H3 cells, the window's ``init_time`` partitions),
         because filtering the engineered output cannot prune the upstream join/upsample. See
         ``_load_engineering_inputs`` and the "NWP scan pruning" notes in
-        ``docs/architecture/overview.md``.
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
 
         Only the requested ``time_series_ids`` are trained; a requested series with no non-null
         ``power`` rows (e.g. none in the training window) simply does not appear and gets no
@@ -124,7 +124,8 @@ class XGBoostForecaster(BaseForecaster):
         # control-member read — but h3_index is not a sort-early column, so cell filtering is still
         # decode-then-filter within the surviving row groups. The streaming engine applies those
         # predicates per morsel, holding peak memory to a few GB where the in-memory engine would
-        # materialise every surviving row first. See docs/architecture/overview.md.
+        # materialise every surviving row first. See
+        # <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
         df = data.drop_nulls(subset=["power"]).collect(engine="streaming")
         for group_key, group in df.group_by(["time_series_id"]):
             ts_id = int(group_key[0])
@@ -150,7 +151,8 @@ class XGBoostForecaster(BaseForecaster):
         ``time_series_id`` this model was not trained on are ignored (the model only scores its own
         trained population — see ``trained_time_series_ids``). Keeping the collect bounded is the
         caller's job: at validation every NWP ensemble member is present, so the caller engineers
-        one H3 cell at a time (see ``cv_power_forecasts`` and ``docs/architecture/overview.md``).
+        one H3 cell at a time (see ``cv_power_forecasts`` and
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>).
 
         ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
         supplies it). Defaults to the ``"live"`` production sentinel.

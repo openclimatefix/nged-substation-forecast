@@ -378,9 +378,10 @@ class Settings(BaseSettings):
         self.h3_grid_weights_path = self.h3_grid_weights_path or uri_join(
             self.data_path_internal, "h3_grid_weights.parquet"
         )
-        # NGED-facing delivery tables (see docs/roadmap/delivery-tables.md) derive from
-        # data_path_delivery instead, so a new delivery table can't silently land in the
-        # internal bucket by inheriting the default derivation.
+        # NGED-facing delivery tables derive from data_path_delivery instead, so a new delivery
+        # table can't silently land in the internal bucket by inheriting the default derivation.
+        # Which tables those are:
+        # <https://openclimatefix.github.io/nged-substation-forecast/roadmap/delivery-tables/>.
         self.power_forecasts_data_path = self.power_forecasts_data_path or uri_join(
             self.data_path_delivery, "power_forecasts"
         )

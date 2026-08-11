@@ -508,8 +508,8 @@ are otherwise bad at. A per-series booster could in principle learn "hot for Jun
 `day_of_year × temperature` interaction, but on the 10⁴–10⁵ rows one series provides it mostly
 will not, so handing it the precomputed anomaly is legitimate inductive bias rather than
 information it already holds. It sits at the end of Tier 3 because its expected win is modest
-(see below) yet it carries a new data-ingestion dependency — more effort per unit skill than the
-residual-lag features above it, which are expected to offer far more bang for the buck.
+(see below) yet it carries a new data-ingestion dependency — far more effort per unit skill than
+the residual-lag features above it.
 
 **Is the anomaly the signal, or is the raw value?** For GB demand the first-order response is to
 *actual* (effective) temperature, which the Tier-2
@@ -747,17 +747,19 @@ population the experiment can measure on is smaller, so a null result will be ha
 distinguish from no effect.
 
 **Measured, that population is smaller still — which is the argument for de-prioritising this
-item.** The null counts it was originally sized against were mostly an artefact of the aggregation
-rather than lost weather. Before the renormalisation, one corrupt grid point turned its *entire*
-cell null, because NaN propagates through a weighted sum, and a grid point feeds 4.92 cells on
-average. So a very small amount of upstream corruption arrived looking like a great deal of
-missingness. On 2025-06-04 00Z, the worst run in the archive by this measure, 0.014% of
-`precipitation_surface` grid points produced **4,394** null cells; renormalising leaves **339**,
-none of them newly null. Across the whole archive — 862 runs, 6.24 billion rows, read from the
+item.** The null count this item is sized against is mostly an artefact of the aggregation
+*estimator* rather than lost weather. Divide each cell by 1.0 instead of renormalising it over
+the grid points that arrived, and one corrupt grid point nulls its *entire* cell, because NaN
+propagates through a weighted sum — and a grid point feeds 4.92 cells on average, so a very
+small amount of upstream corruption looks like a great deal of missingness. On 2025-06-04 00Z,
+the worst run in the archive by this measure, 0.014% of `precipitation_surface` grid points give
+**4,394** null cells under that estimator; renormalising — what the ingest actually does — leaves
+**339**, none of them newly null. Across the whole archive — 862 runs, 6.24 billion rows, read from the
 Delta log's parquet statistics — only **12 runs carry any de-accumulated null beyond the lead-0
 floor at all**, totalling **6,550 cells**.
 
-So roughly 92% of the interior nulls this item proposes to bound were never real, and what remains
+So roughly 92% of the null count this item is sized against is estimator artefact rather than
+missing weather, and what remains
 is rare enough that the experiment would struggle to separate any effect from noise. **Treat it as
 low priority.** Two things would change that: V2's wider download box raises the exposure, since
 the corruption that currently falls outside the GB box starts landing inside it; and

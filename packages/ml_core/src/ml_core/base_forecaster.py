@@ -169,7 +169,8 @@ class BaseForecaster(ABC):
     responsibility: it prunes the inputs (NWP control member, the relevant H3 cells, the window's
     `init_time` partitions) and, where the full ensemble is needed, processes one `init_time` chunk
     at a time — filtering the engineered output cannot prune the upstream join/upsample. See the NWP
-    scan-pruning notes in `docs/architecture/overview.md`.
+    scan-pruning notes in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
 
     Persistence has two layers. Subclasses implement ``save``/``load`` for their own on-disk
     format and need know nothing about MLflow. The concrete ``save_to_mlflow``/``load_from_mlflow``

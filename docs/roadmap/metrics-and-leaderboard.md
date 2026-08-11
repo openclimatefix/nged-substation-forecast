@@ -57,11 +57,10 @@ view are in the background page): for each target half-hour it takes the observe
 **same weekday & time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13
 analogues** — which NGED plot and read by eye (taking the 95th percentile if they need a single
 number). Reproducing it matters because it is *the bar we have to clear to justify the project* —
-"XGBoost beats persistence" is table stakes; "XGBoost beats the incumbent" is the deliverable. It is
-the first baseline we implement; if we implement only one, it is this one.
+"XGBoost beats persistence" is the least we must do; "XGBoost beats the incumbent" is the
+deliverable. It is the first baseline we implement; if we implement only one, it is this one.
 
-It slots into our machinery beautifully, because every one of its 13 members is just a **power
-lag**:
+It fits our existing machinery, because every one of its 13 members is just a **power lag**:
 
 - Weekly group (last 6 weeks, same weekday & time): `power_lag_168h, 336h, 504h, 672h, 840h, 1008h`
 - Annual group (49–55 weeks ago, same weekday & time): `power_lag_8232h, 8400h, 8568h, 8736h,
@@ -299,7 +298,7 @@ only skill floor the NWP ensemble must clear at long horizons.
   cell's power samples. Cell keys derive from **local** (Europe/London) time computed inside the
   forecaster from `valid_time`, aligning with the demand rhythm (and matching the `local_*` time
   features). `save()` writes the lookup as one parquet + `meta.json`.
-- **Member emission — deliberate deviation from an earlier draft.** Emit members at *equiprobable*
+- **Member emission — equiprobable levels, not the delivery levels.** Emit members at *equiprobable*
   quantile levels `(i − 0.5)/m`, **not** at the tail-heavy `DELIVERY_QUANTILES` levels. Fair CRPS and
   the per-run empirical delivery quantiles the metrics layer derives from members treat members as an
   equiprobable sample; feeding 13 members at the delivery levels in with equal weight would put 7.7 %
@@ -495,7 +494,7 @@ is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
 #### Mean versus median — the trade-off
 
 The instinct is to "pick one central statistic and apply it everywhere". But mean and median are not
-interchangeable, and the reason is the crux of the decision:
+interchangeable, and the difference between them decides which one to use where:
 
 - The **mean** is the point forecast that minimises **squared error** — so RMSE (and MBE, which is
   a mean-of-errors and inherits the mean's clean energy-balance / expectations-aggregate reading)
