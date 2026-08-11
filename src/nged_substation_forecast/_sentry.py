@@ -6,15 +6,17 @@ Sentry configuration:
 - **Error telemetry** — :func:`init_sentry` initialises the SDK once per process (a no-op unless
   ``Settings.sentry_dsn`` is set), and the :data:`sentry_capture_failure` Dagster failure hook
   reports the real exception (with traceback) from inside the run worker.
-  :func:`report_check_degradation` covers a production fault the hook cannot see, because it never
-  fails a run: a standalone ``@asset_check`` that caught its own exception. The hook is used rather
-  than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry` explicitly
-  disables — because Dagster logs a step failure without ``exc_info``, so the log-based path would
-  yield a message-only event with no stack trace, *and* would fire for every ``ERROR`` log anywhere
-  in the process (Dagster's own startup/step logs, ad-hoc materialisations, even a swallowed
-  telemetry error), swamping Sentry with events the design never intended to send. The hook is
-  attached to the *scheduled* asset jobs only, so it covers the unattended production workload;
-  manual/backfill/experiment runs are watched by the operator at the Dagster UI, not Sentry.
+  :func:`report_check_degradation` and :func:`report_asset_degradation` cover the production faults
+  the hook cannot see, because they never fail a run: a check, or an asset, that caught its own
+  exception instead of raising. The hook is used
+  rather than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry`
+  explicitly disables — because Dagster logs a step failure without ``exc_info``, so the log-based
+  path would yield a message-only event with no stack trace, *and* would fire for every ``ERROR``
+  log anywhere in the process (Dagster's own startup/step logs, ad-hoc materialisations, even a
+  swallowed telemetry error), swamping Sentry with events the design never intended to send. The
+  hook is attached to the *scheduled* asset jobs only, so it covers the unattended production
+  workload; manual/backfill/experiment runs are watched by the operator at the Dagster UI, not
+  Sentry.
 - **The missed-check-in alarm** — :func:`send_forecast_checkin` sends a *success-only* heartbeat to
   a Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
   ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error testing
@@ -95,10 +97,10 @@ def init_sentry(settings: Settings) -> None:
     ``ERROR``), so ``ERROR``-level log records no longer become Sentry events. Without this, every
     ``ERROR`` log anywhere in the process — Dagster's startup/step logs, ad-hoc materialisations,
     even the swallowed telemetry error in :func:`report_power_freshness` — would be shipped as an
-    event, defeating the design where *only* the three explicit senders reach Sentry: the failure
-    hook, the freshness ``capture_message``, and :func:`report_check_degradation`. Breadcrumbs (the
-    integration's default ``level=INFO``) are kept, so log context still rides along with the
-    events those senders do send.
+    event, defeating the design where *only* the four explicit senders reach Sentry: the failure
+    hook, the freshness ``capture_message``, :func:`report_check_degradation` and
+    :func:`report_asset_degradation`. Breadcrumbs (the integration's default ``level=INFO``) are
+    kept, so log context still rides along with the events those senders do send.
 
     Args:
         settings: The project settings carrying the Sentry DSN, environment, and sample rate.
@@ -130,11 +132,52 @@ def sentry_capture_failure(context: HookContext) -> None:
         sentry_sdk.capture_exception(exception)
 
 
+def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str) -> None:
+    """Send ``exc`` to Sentry, tagged ``tag=value`` on a scope forked so the tag cannot leak.
+
+    Args:
+        tag: Tag name to set on the forked scope.
+        value: Tag value — the check or asset name.
+        exc: The exception to capture.
+        failure_note: Logged with the traceback if Sentry itself fails.
+    """
+    try:
+        with sentry_sdk.new_scope() as scope:
+            scope.set_tag(tag, value)
+            sentry_sdk.capture_exception(exc)
+    except Exception:
+        # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
+        # with the traceback rather than swallowing.
+        logger.exception(failure_note)
+
+
+def report_asset_degradation(asset_name: str, exc: BaseException) -> None:
+    """Report an asset that degraded rather than failing, as a Sentry error event.
+
+    Closes the same gap as :func:`report_check_degradation` below, for an asset:
+    ``power_time_series_and_metadata`` catches a failure of the ``TimeSeriesMetadata`` roster upsert
+    so that the power write still happens (rule 1 of
+    [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+
+    A no-op when Sentry is uninitialised (empty DSN), and never raises.
+
+    Args:
+        asset_name: The Dagster asset name, attached as a ``degraded_asset`` tag so events can be
+            filtered per asset. Set on an isolated scope so it cannot leak into later events.
+        exc: The exception the asset degraded on.
+    """
+    _capture_tagged(
+        tag="degraded_asset",
+        value=asset_name,
+        exc=exc,
+        failure_note=f"Failed to report the degraded {asset_name} asset to Sentry",
+    )
+
+
 def report_check_degradation(check_name: str, exc: BaseException) -> None:
     """Report an asset check that could not evaluate its own inputs, as a Sentry error event.
 
-    Both of this function's callers — the standalone ``@asset_check``s ``power_data_is_fresh`` and
-    ``live_forecasts_are_healthy`` — catch everything rather than raising (rule 7 of
+    Every caller catches everything rather than raising (rule 7 of
     [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)),
     so the run no longer fails and :data:`sentry_capture_failure` no longer fires. Without this,
     a check that cannot read its own inputs would show up only as a yellow tick in Dagster's Checks
@@ -151,14 +194,12 @@ def report_check_degradation(check_name: str, exc: BaseException) -> None:
             check. Set on an isolated scope so it cannot leak into later unrelated events.
         exc: The exception the check degraded on.
     """
-    try:
-        with sentry_sdk.new_scope() as scope:
-            scope.set_tag("asset_check", check_name)
-            sentry_sdk.capture_exception(exc)
-    except Exception:
-        # Same reasoning as report_power_freshness: telemetry is best-effort, but a genuine bug in
-        # here must still be visible, so log at ERROR with the traceback rather than swallowing.
-        logger.exception(f"Failed to report the degraded {check_name} check to Sentry")
+    _capture_tagged(
+        tag="asset_check",
+        value=check_name,
+        exc=exc,
+        failure_note=f"Failed to report the degraded {check_name} check to Sentry",
+    )
 
 
 def send_forecast_checkin(

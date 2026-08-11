@@ -1,36 +1,53 @@
-"""The canonical-serialisation invariant every ``BaseForecasterConfig`` subclass must satisfy.
+"""The invariants every ``BaseForecasterConfig`` subclass must satisfy, whatever it declares.
 
-A config is compared and stored as its *serialised* form: ``register_experiment`` stamps
-``model_dump_json()`` onto the MLflow experiment as the ``config`` tag and compares a
-re-registration against it, and logs ``flatten_config(...)`` as write-once MLflow params. Both
-therefore have to be a pure function of the config's values, and nothing else.
-
-``BaseForecasterConfig`` states this as an invariant on its subclasses; this module is what makes
-it enforceable rather than merely documented. It lives in the app tier, not in
-``packages/ml_core``, because enforcing it means importing every concrete forecaster — a
-dependency ``ml_core`` itself must not take on.
+Both are stated on ``BaseForecasterConfig`` and neither is enforceable by the type checker:
+serialisation must be canonical, and unknown keys must be rejected. This module is what makes them
+enforceable rather than merely documented. It lives in the app tier, not in ``packages/ml_core``,
+because enforcing them means importing every concrete forecaster — a dependency ``ml_core`` itself
+must not take on.
 """
 
 from typing import get_origin
 
 import pytest
 from ml_core.base_forecaster import BaseForecasterConfig
+from pydantic import ValidationError
 from xgboost_forecaster import XGBoostConfig
 
-_CONFIG_CLASSES: list[type[BaseForecasterConfig]] = [
-    BaseForecasterConfig,
-    *BaseForecasterConfig.__subclasses__(),
-]
-"""Every config class to hold to the invariant.
 
-``__subclasses__()`` only sees classes that have been imported, hence the explicit
-``XGBoostConfig`` import above; it is what picks up a *future* forecaster automatically.
+def _config_classes(cls: type[BaseForecasterConfig]) -> set[type[BaseForecasterConfig]]:
+    """``cls`` and every class below it — ``__subclasses__()`` sees only one level."""
+    return {cls}.union(*map(_config_classes, cls.__subclasses__()))
+
+
+_CONFIG_CLASSES: list[type[BaseForecasterConfig]] = sorted(
+    _config_classes(BaseForecasterConfig), key=lambda cls: cls.__name__
+)
+"""Every config class to hold to the invariants.
+
+Only classes that have been *imported* are visible, hence the explicit ``XGBoostConfig`` import
+above. Sorted so the parametrised ids stay in a stable order.
 """
 
 
 def test_every_concrete_forecaster_config_is_covered() -> None:
     """Guard against the list silently emptying out if an import is dropped."""
     assert XGBoostConfig in _CONFIG_CLASSES
+
+
+@pytest.mark.parametrize("config_cls", _CONFIG_CLASSES, ids=lambda cls: cls.__name__)
+def test_every_config_class_forbids_extra_keys(config_cls: type[BaseForecasterConfig]) -> None:
+    """An unknown key must raise, so a misspelled hyperparameter cannot register silently.
+
+    Asserted on the behaviour rather than on the ``model_config`` flag, so a subclass that keeps
+    ``extra="forbid"`` but strips unknown keys in a ``model_validator(mode="before")`` fails too.
+    """
+    # Splatted from a named mapping: a literal keyword is a static error (no such parameter), and
+    # a literal dict trips PIE804. This is the one spelling both linters accept.
+    unknown_key = {"not_a_declared_field": "x"}
+
+    with pytest.raises(ValidationError, match="not_a_declared_field"):
+        config_cls(selected_features=set(), **unknown_key)
 
 
 def _set_valued_fields(config_cls: type[BaseForecasterConfig]) -> set[str]:

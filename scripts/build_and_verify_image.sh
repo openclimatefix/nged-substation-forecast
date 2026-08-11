@@ -47,6 +47,10 @@
 #     at the NWP-availability lookup, which runs *after* the model has already loaded. That
 #     ordering is the proof the model loaded; there is no reliable log string to grep for it. Read
 #     the printed log and confirm by eye.
+#
+# One failure to read for by name: a traceback naming a feature the code cannot parse means the
+# model baked into this image predates a rename of that feature. See docs/live_service/operations.md
+# Step 2 for what to do about it.
 
 set -euo pipefail
 

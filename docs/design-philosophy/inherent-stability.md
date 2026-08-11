@@ -144,6 +144,7 @@ code as it stands; "intended" describes where this principle takes it.
 | A whole ECMWF slice corrupt | Landed; `nwp_has_no_unexpected_nulls` warns, naming the slice | Unchanged | No |
 | A whole ECMWF weather variable absent | `Nwp.validate` rejects it; `ecmwf_ens` turns each rejection into a retry for up to 4h, and once those are exhausted it manifests downstream as a missed run | Unchanged | No |
 | The promoted model is empty or unloadable | **Hard failure** — the asset raises | Unchanged: this is a promotion bug, not a data outage | Yes, next business day |
+| A model is promoted whose features this code no longer recognises | `promoted_model` refuses it before replacing the model on disk, so the outgoing champion stays and keeps forecasting | Unchanged | Yes, at promotion time |
 | The service is not running at all | Sentry missed-check-in alarm fires from outside the deployment | Unchanged | Yes, next business day |
 | Any of the above during model R&D | Fails fast | Unchanged — see [R&D fails the other way](#rd-fails-the-other-way) | n/a |
 
@@ -181,11 +182,16 @@ appear nowhere else.
    house pattern, and there is deliberately no `ERROR`-severity check anywhere in the repo.
 7. **Never let the warning path be able to fail the thing it is warning about.** A bug in a warning
    function that raises would convert fail-open into fail-closed at exactly the wrong moment, which
-   is why `report_power_freshness` never raises and why both asset checks
-   (`power_data_is_fresh`, `live_forecasts_are_healthy`) run their whole body under a catch-all.
-   Non-blocking is not enough on its own: Dagster fails a run whose check step *errors*, whatever
-   its `blocking` setting, and the scheduled jobs carry a Sentry failure hook — so an unguarded
-   warning path both fails the run and pages.
+   is why `report_power_freshness` never raises and why every asset check — the standalone
+   `power_data_is_fresh` and `live_forecasts_are_healthy`, and the two per-run checks computed
+   inside `ecmwf_ens` — runs its whole body under a catch-all. Non-blocking is not enough on its
+   own: Dagster fails a run whose check step *errors*, whatever its `blocking` setting, and the
+   scheduled jobs carry a Sentry failure hook — so an unguarded warning path both fails the run and
+   pages. A warning path computed *inside* an asset must also run **before** that asset's
+   non-idempotent write, not merely under a guard: `ecmwf_ens` appends its NWP run with no dedup, so
+   a bug that raised after the append would leave the rows committed on a failed run and duplicate
+   them when the partition was re-materialised. Ordering decides whether such a bug can corrupt the
+   data; the guard only decides whether it costs a run.
 8. **When a capability could live in the training loop or in the production service, put it in the
    training loop.** See [Where complexity should live](#where-complexity-should-live). *(The
    [complexity-offline

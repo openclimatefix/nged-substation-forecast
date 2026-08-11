@@ -7,6 +7,7 @@ the right Sentry call is made with the right arguments.
 """
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -103,10 +104,10 @@ def test_init_sentry_disables_log_to_event_capture(monkeypatch: pytest.MonkeyPat
 
     This is the guard that keeps ``ERROR`` logs from anywhere in the process — Dagster's
     startup/step logs, ad-hoc materialisations, the swallowed telemetry error in
-    ``report_power_freshness`` — from becoming Sentry events. Only the three explicit senders (the
-    failure hook, the freshness ``capture_message`` and ``report_check_degradation``) should ever
-    send. If someone drops the ``integrations`` argument, the SDK's default ``LoggingIntegration``
-    (``event_level=ERROR``) comes back and this fails.
+    ``report_power_freshness`` — from becoming Sentry events. Only the four explicit senders (the
+    failure hook, the freshness ``capture_message``, ``report_check_degradation`` and
+    ``report_asset_degradation``) should ever send. If someone drops the ``integrations`` argument,
+    the SDK's default ``LoggingIntegration`` (``event_level=ERROR``) comes back and this fails.
     """
     calls: list[dict[str, Any]] = []
     monkeypatch.setattr(_sentry.sentry_sdk, "init", lambda **kw: calls.append(kw))
@@ -173,13 +174,29 @@ def test_failure_hook_noop_without_exception(monkeypatch: pytest.MonkeyPatch) ->
     assert captured == []
 
 
-def test_report_check_degradation_captures_the_exception_and_tags_the_check() -> None:
-    """A degraded check sends the same exception the failure hook would have, tagged per check.
-
-    The tag is what makes the event filterable per check (``operations.md`` documents
-    ``asset_check:power_data_is_fresh`` as the operator's Sentry filter); without the capture, a
-    check that caught its own exception would reach nobody, because log-to-event capture is
-    deliberately disabled.
+@pytest.mark.parametrize(
+    ("report", "tag", "name"),
+    [
+        (
+            lambda name, exc: _sentry.report_check_degradation(check_name=name, exc=exc),
+            "asset_check",
+            "power_data_is_fresh",
+        ),
+        (
+            lambda name, exc: _sentry.report_asset_degradation(asset_name=name, exc=exc),
+            "degraded_asset",
+            "power_time_series_and_metadata",
+        ),
+    ],
+    ids=["check", "asset"],
+)
+def test_degradation_reporters_capture_the_exception_and_tag_the_name(
+    report: Callable[[str, BaseException], None], tag: str, name: str
+) -> None:
+    """A degraded check or asset sends the same exception the failure hook would have, tagged so the
+    event is filterable per check or asset (``operations.md`` documents
+    ``asset_check:power_data_is_fresh`` as the operator's Sentry filter). Without the capture, one
+    that caught its own exception would reach nobody, log-to-event capture being disabled.
 
     The assertion is on the *built event*, not on the arguments to ``capture_exception``: a tag set
     on the wrong scope, or not set at all, still reaches ``capture_exception`` intact and would slip
@@ -206,10 +223,10 @@ def test_report_check_degradation_captures_the_exception_and_tags_the_check() ->
                 auto_enabling_integrations=False,
             )
         )
-        _sentry.report_check_degradation("power_data_is_fresh", ValueError("boom"))
+        report(name, ValueError("boom"))
 
     (event,) = events
-    assert event["tags"] == {"asset_check": "power_data_is_fresh"}
+    assert event["tags"] == {tag: name}
     assert event["exception"]["values"][0]["type"] == "ValueError"
     # The tag lived on a scope forked for the one event, so it cannot leak into a later unrelated
     # one — including via the isolation scope this whole Dagster process shares.
