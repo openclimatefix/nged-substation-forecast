@@ -14,7 +14,7 @@ import patito as pt
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
 from mlflow.exceptions import MlflowException
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 from ml_core.features import FeatureEngineer, TabularFeatureEngineer
 
@@ -136,7 +136,16 @@ class BaseForecasterConfig(BaseModel):
     two dumps of the *same* config differ — a re-registration would then look like a config change
     and its param write would be rejected. ``selected_features`` is therefore serialised sorted. A
     subclass that adds a set-valued (or otherwise unordered) field must do the same.
+
+    **Unknown keys are rejected, not ignored** (``extra="forbid"``). A key no field declares raises
+    ``ValidationError``, so a misspelled hyperparameter in a run's ``config_overrides`` fails at
+    registration, and a *stored* config carrying a key the current code no longer declares is
+    refused rather than silently losing it — the recovery is to re-train, never to hand-edit.
+    Why this is worth failing over:
+    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/model-configuration/#tweaking-a-config-for-an-experiment>.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     selected_features: set[str]
     ml_flow_experiment_id: int | None = None

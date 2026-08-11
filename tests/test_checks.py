@@ -391,8 +391,9 @@ def test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet(env: Path) -
     must warn rather than raise — it is one step of the hooked
     ``power_time_series_and_metadata_job``.
 
-    It is not the only raiser on that state: in an hour where new data arrives, ``upsert_metadata``
-    reads the same file first and fails the asset outright. This pins the check's half.
+    ``upsert_metadata`` reads the same file first and raises, but the asset swallows that so the
+    power write survives. This pins the check's half: it has no roster to read while the fault
+    lasts.
 
     The assertion is on our own description prefix rather than on Polars' message, which is not
     ours to pin.
