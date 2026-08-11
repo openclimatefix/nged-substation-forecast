@@ -5,7 +5,7 @@ lives, and which technologies are adopted. Each principle is stated compactly he
 argument in the pages it links to — the list below is an index, not the argument. Each entry says
 concretely what the principle buys, in several sections:
 
-- The "**Without it**" section paints the everyday failure the principle exists to prevent,
+- The "**Without it**" section describes the everyday failure the principle exists to prevent,
 - "**Decided**" names a real decision it made (informed by this principle),
 - "**Serves**" names the [engineering hypothesis](engineering-hypotheses.md) it is a bet on, and
 - "**Detail**" links the full argument.
@@ -20,10 +20,10 @@ agent can check every new addition against the whole list on every change — pr
 human reviewer's attention is too scarce to do reliably. Principles that live only in an
 experienced engineer's head cannot be applied that way; written-down ones can.
 
-Two things are worth saying up front. These are **bets, not truths**: each one is scored by the
-[engineering hypotheses](engineering-hypotheses.md), and a principle that fails its test will be
-reported as a negative result, not rewritten out of the record. And the defence against merely
-collecting fashionable engineering trends is the admission test described below.
+These are **bets, not truths**: each one is scored by the [engineering
+hypotheses](engineering-hypotheses.md), and a principle that fails its test will be reported as a
+negative result, not rewritten out of the record. The defence against merely collecting
+fashionable engineering trends is the admission test described below.
 
 ## Where these principles come from
 
