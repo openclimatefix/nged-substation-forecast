@@ -350,7 +350,7 @@ def select_new_rows(
 
 
 class UpsertMetadataStats(TypedDict, total=False):
-    """What ``upsert_metadata`` changed, published as Dagster output metadata."""
+    """What the ``TimeSeriesMetadata`` upsert did, published as Dagster output metadata."""
 
     metadata_n_new_TimeSeriesIDs: int
     metadata_n_updated_TimeSeriesIDs: int
@@ -409,10 +409,9 @@ def upsert_metadata(
     TimeSeriesMetadata.validate(existing_metadata)
 
     # `how="diagonal"` because the snapshot and the stored roster can differ in both width and
-    # column order: four TimeSeriesMetadata fields are `allow_missing`, and
-    # `_extract_time_series_metadata` derives each file's columns from that file's own keys.
-    # Aligning them here also makes the `hash_rows` diff below insensitive to the stored column
-    # order, which hashing the two frames separately is not.
+    # column order, four TimeSeriesMetadata fields being `allow_missing`. Aligning them into one
+    # frame also makes the `hash_rows` diff below insensitive to the stored column order, which
+    # hashing the two frames separately is not.
     combined = pl.concat([new_metadata, existing_metadata], how="diagonal")
     new_rows = combined.head(new_metadata.height)
     stored_rows = combined.slice(new_metadata.height)

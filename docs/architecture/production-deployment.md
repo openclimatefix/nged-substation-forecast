@@ -181,10 +181,9 @@ is configured — so laptops and CI stay silent by default.
     `@asset_check`s, and the two per-run checks computed inside the `ecmwf_ens` asset.
     `report_check_degradation` covers exactly that gap: each check's
     catch-all sends the same exception the hook would have sent, tagged `asset_check` with the
-    check's name. `report_asset_degradation` does the same for an *asset* that degrades rather than
-    failing: `power_time_series_and_metadata` guards its `TimeSeriesMetadata` roster upsert, tagged
-    `degraded_asset`, so a roster fault cannot cost the run its power data. Since log capture is off,
-    either handler's `ERROR` log alone would reach nobody.
+    check's name, and `report_asset_degradation` does the same tagged `degraded_asset` for an *asset*
+    that degrades rather than failing — today, `power_time_series_and_metadata`'s roster upsert. Since
+    log capture is off, either handler's `ERROR` log alone would reach nobody.
 
 - **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
   `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron

@@ -175,25 +175,31 @@ def test_power_time_series_and_metadata_ingests_and_writes(
     assert {"nged_s3_paths", "PowerTimeSeries"} <= metadata_keys
 
 
+@pytest.mark.parametrize("raised", [RuntimeError, BaseException], ids=["exception", "rust_panic"])
 def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fails(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+    raised: type[BaseException],
+    env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
 ) -> None:
-    """The headline property of #508: the roster is derived, re-delivered data, so losing one
-    refresh of it must not cost the power stream an hour of telemetry.
+    """The headline property of #508: the roster is derived data NGED re-delivers, so a fault in it
+    must not stall the power stream until an operator intervenes.
 
-    Also asserts the degradation is *reported*. Not failing the step means
-    ``sentry_capture_failure`` no longer fires, and log-to-event capture is off, so without the
-    explicit send this would be a silent hole rather than a degraded run.
+    Also asserts the degradation is *reported*, since a step that no longer fails no longer fires
+    ``sentry_capture_failure``. The ``rust_panic`` case is why the guard catches ``BaseException``:
+    a pyo3 ``PanicException`` from Polars or obstore is not an ``Exception``, and the cancellation
+    test below cannot catch a narrowed guard, because ``DagsterExecutionInterruptedError`` escapes
+    one on its own.
     """
     monkeypatch.setattr(
         assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
     )
 
     def boom(*_: object, **__: object) -> None:
-        raise RuntimeError("roster upsert exploded")
+        raise raised("roster upsert exploded")
 
     monkeypatch.setattr(assets, "upsert_metadata", boom)
-    reported: list[tuple[str, object]] = []
+    reported: list[tuple[str, BaseException]] = []
     monkeypatch.setattr(
         assets,
         "report_asset_degradation",
@@ -214,46 +220,9 @@ def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fail
     assert "metadata_upsert_failed" in metadata_keys
 
     assert [name for name, _ in reported] == ["power_time_series_and_metadata"]
-    assert isinstance(reported[0][1], RuntimeError)
-
-
-def test_power_time_series_and_metadata_degrades_on_a_rust_panic_in_the_upsert(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
-) -> None:
-    """The reason the guard catches ``BaseException`` rather than ``Exception``.
-
-    A panic in any of the pyo3 extensions ``upsert_metadata`` reads through — Polars or obstore (via
-    ``object_exists``) — is not an ``Exception``, so a narrower guard would let it through and fail
-    the hourly run, which is the exact failure this guard exists to prevent. The cancellation test
-    below cannot catch that regression, because ``DagsterExecutionInterruptedError`` is not an
-    ``Exception`` either and so propagates out of a narrow guard on its own.
-    """
-    monkeypatch.setattr(
-        assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
-    )
-
-    class _Panic(BaseException):
-        """Stands in for a pyo3 `PanicException`, which derives from `BaseException`."""
-
-    def _panic(*_: object, **__: object) -> None:
-        raise _Panic("simulated rust panic inside the upsert")
-
-    monkeypatch.setattr(assets, "upsert_metadata", _panic)
-    reported: list[tuple[str, BaseException]] = []
-    monkeypatch.setattr(
-        assets,
-        "report_asset_degradation",
-        lambda asset_name, exc: reported.append((asset_name, exc)),
-    )
-
-    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
-    assert result.success
-    assert set(pl.read_delta(str(env / "NGED" / "power_time_series.delta"))["time_series_id"]) == {
-        10,
-        11,
-    }
-    assert [name for name, _ in reported] == ["power_time_series_and_metadata"]
-    assert isinstance(reported[0][1], _Panic)
+    # `type(...) is`, not `isinstance`: under `isinstance` the `rust_panic` case would pass on a
+    # `RuntimeError`, so a guard narrowed to `except Exception` would still look correct.
+    assert type(reported[0][1]) is raised
 
 
 def test_power_time_series_and_metadata_re_raises_a_cancelled_run(

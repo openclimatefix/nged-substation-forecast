@@ -6,8 +6,9 @@ Sentry configuration:
 - **Error telemetry** — :func:`init_sentry` initialises the SDK once per process (a no-op unless
   ``Settings.sentry_dsn`` is set), and the :data:`sentry_capture_failure` Dagster failure hook
   reports the real exception (with traceback) from inside the run worker.
-  :func:`report_check_degradation` covers a production fault the hook cannot see, because it never
-  fails a run: an asset check that caught its own exception instead of raising. The hook is used
+  :func:`report_check_degradation` and :func:`report_asset_degradation` cover the production faults
+  the hook cannot see, because they never fail a run: a check, or an asset, that caught its own
+  exception instead of raising. The hook is used
   rather than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry`
   explicitly disables — because Dagster logs a step failure without ``exc_info``, so the log-based
   path would yield a message-only event with no stack trace, *and* would fire for every ``ERROR``
@@ -132,14 +133,7 @@ def sentry_capture_failure(context: HookContext) -> None:
 
 
 def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str) -> None:
-    """Send ``exc`` to Sentry on a scope forked for this one event, tagged ``tag=value``.
-
-    Shared by :func:`report_check_degradation` and :func:`report_asset_degradation`, which differ
-    only in their tag. Forking the scope is what keeps the tag from leaking into later unrelated
-    events.
-
-    Never raises: both callers run inside an ``except`` handler whose whole purpose is to keep the
-    run alive, so an exception escaping here would undo that.
+    """Send ``exc`` to Sentry, tagged ``tag=value`` on a scope forked so the tag cannot leak.
 
     Args:
         tag: Tag name to set on the forked scope.
@@ -160,11 +154,10 @@ def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str)
 def report_asset_degradation(asset_name: str, exc: BaseException) -> None:
     """Report an asset that degraded rather than failing, as a Sentry error event.
 
+    Closes the same gap as :func:`report_check_degradation` below, for an asset:
     ``power_time_series_and_metadata`` catches a failure of the ``TimeSeriesMetadata`` roster upsert
     so that the power write still happens (rule 1 of
     [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
-    Not failing the step means :data:`sentry_capture_failure` no longer fires, and log-to-event
-    capture is disabled, so without this the degradation would reach nobody.
 
     A no-op when Sentry is uninitialised (empty DSN), and never raises.
 

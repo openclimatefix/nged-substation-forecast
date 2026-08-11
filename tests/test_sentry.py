@@ -7,6 +7,7 @@ the right Sentry call is made with the right arguments.
 """
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -173,13 +174,29 @@ def test_failure_hook_noop_without_exception(monkeypatch: pytest.MonkeyPatch) ->
     assert captured == []
 
 
-def test_report_check_degradation_captures_the_exception_and_tags_the_check() -> None:
-    """A degraded check sends the same exception the failure hook would have, tagged per check.
-
-    The tag is what makes the event filterable per check (``operations.md`` documents
-    ``asset_check:power_data_is_fresh`` as the operator's Sentry filter); without the capture, a
-    check that caught its own exception would reach nobody, because log-to-event capture is
-    deliberately disabled.
+@pytest.mark.parametrize(
+    ("report", "tag", "name"),
+    [
+        (
+            lambda name, exc: _sentry.report_check_degradation(check_name=name, exc=exc),
+            "asset_check",
+            "power_data_is_fresh",
+        ),
+        (
+            lambda name, exc: _sentry.report_asset_degradation(asset_name=name, exc=exc),
+            "degraded_asset",
+            "power_time_series_and_metadata",
+        ),
+    ],
+    ids=["check", "asset"],
+)
+def test_degradation_reporters_capture_the_exception_and_tag_the_name(
+    report: Callable[[str, BaseException], None], tag: str, name: str
+) -> None:
+    """A degraded check or asset sends the same exception the failure hook would have, tagged so the
+    event is filterable per check or asset (``operations.md`` documents
+    ``asset_check:power_data_is_fresh`` as the operator's Sentry filter). Without the capture, one
+    that caught its own exception would reach nobody, log-to-event capture being disabled.
 
     The assertion is on the *built event*, not on the arguments to ``capture_exception``: a tag set
     on the wrong scope, or not set at all, still reaches ``capture_exception`` intact and would slip
@@ -206,10 +223,10 @@ def test_report_check_degradation_captures_the_exception_and_tags_the_check() ->
                 auto_enabling_integrations=False,
             )
         )
-        _sentry.report_check_degradation("power_data_is_fresh", ValueError("boom"))
+        report(name, ValueError("boom"))
 
     (event,) = events
-    assert event["tags"] == {"asset_check": "power_data_is_fresh"}
+    assert event["tags"] == {tag: name}
     assert event["exception"]["values"][0]["type"] == "ValueError"
     # The tag lived on a scope forked for the one event, so it cannot leak into a later unrelated
     # one — including via the isolation scope this whole Dagster process shares.
@@ -233,41 +250,6 @@ def test_report_check_degradation_swallows_and_logs_on_send_error(
         "power_data_is_fresh" in r.message and r.levelno == logging.ERROR for r in caplog.records
     )
     assert any(r.exc_info is not None for r in caplog.records)  # traceback attached
-
-
-def test_report_asset_degradation_captures_the_exception_and_tags_the_asset() -> None:
-    """An asset that swallows its own failure reaches nobody otherwise: not failing the step means
-    the failure hook does not fire, and log-to-event capture is deliberately disabled.
-
-    Asserts on the built event rather than on ``capture_exception``'s arguments, for the reason
-    given on the ``report_check_degradation`` equivalent above — a tag set on the wrong scope still
-    reaches ``capture_exception`` intact.
-    """
-    events: list[Event] = []
-
-    def collect(event: Event, _hint: Hint) -> Event | None:
-        """Record the built event and return ``None``, which tells the SDK to drop it."""
-        events.append(event)
-        return None
-
-    with sentry_sdk.isolation_scope() as scope:
-        scope.set_client(
-            sentry_sdk.Client(
-                dsn=_DSN,
-                before_send=collect,
-                default_integrations=False,
-                auto_enabling_integrations=False,
-            )
-        )
-        _sentry.report_asset_degradation(
-            asset_name="power_time_series_and_metadata", exc=ValueError("boom")
-        )
-
-    (event,) = events
-    assert event["tags"] == {"degraded_asset": "power_time_series_and_metadata"}
-    assert event["exception"]["values"][0]["type"] == "ValueError"
-    assert sentry_sdk.get_current_scope()._tags == {}
-    assert sentry_sdk.get_isolation_scope()._tags == {}
 
 
 def test_failure_hook_is_attached_to_the_scheduled_jobs() -> None:
