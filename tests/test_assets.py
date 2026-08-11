@@ -350,6 +350,9 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
     assert not evaluation.passed  # WARN: the scatter is surfaced
     assert evaluation.metadata["n_null_cells"].value == 1
     assert evaluation.metadata["n_whole_null_slices"].value == 0
+    # Both halves of the split are emitted, not just the whole-null one: the operations runbook
+    # names `n_scattered_slices` as a number to read off this check.
+    assert evaluation.metadata["n_scattered_slices"].value == 1
 
 
 def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
@@ -393,6 +396,9 @@ def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
     assert not evaluation.passed  # WARN: the missing slice is surfaced
     assert evaluation.metadata["n_whole_null_slices"].value == 1
     assert evaluation.metadata["n_null_cells"].value == 1
+    # The mirror of the scattered test above: the same slice must be counted once, on one side of
+    # the split, so the two metadata fields cannot both claim it.
+    assert evaluation.metadata["n_scattered_slices"].value == 0
 
 
 def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
@@ -500,8 +506,9 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
 
     monkeypatch.setattr(assets, "open_ecmwf_ens_run", _raise_not_available)
 
-    # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()` (see
-    # `docs/architecture/testing.md`) and is used as a context manager here for the same reason
+    # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()`
+    # (<https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>) and is
+    # used as a context manager here for the same reason
     # `dagster_instance` is a fixture: entering it makes disposal happen deterministically at
     # `__exit__`, rather than depending on `__del__` running via garbage collection, which the
     # traceback captured by `pytest.raises` delays past this test — see the fixture's docstring.
