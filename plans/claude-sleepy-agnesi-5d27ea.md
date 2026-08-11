@@ -74,23 +74,29 @@ in the GraphQL output) and renders them as technology badges on the graph node. 
 naming the tool an asset uses — `python`, `s3`, `xgboost` — and there is a hard limit of three per
 asset. Using one for a lifecycle classification would misuse a namespace Dagster owns.
 
-**`group_name` — rejected, but see [open question 2](#risks-and-open-questions).** A group is
-one-per-asset and exclusive, and it is Dagster's *primary* structural axis: it lays out the global
-lineage graph into labelled boxes and is a column in the asset catalog table (verified — the
-catalog's column header reads "Code location / Asset group"; there is no tag column). That makes
-groups genuinely better on one axis: the operator sees the split with nothing to type. Tags win on
-three others — the issue asks for a tag; tags are additive, so grouping by pipeline stage stays
-available later, whereas a group spent on this is spent; and a tag can later be applied to an
-asset that is legitimately needed by both layers. The repo uses `group_name` nowhere today.
+**`group_name` — not chosen, but it is genuinely close; see
+[open question 3](#risks-and-open-questions).** A group is one-per-asset and exclusive, and it is
+Dagster's *primary* structural axis: it lays out the global lineage graph into labelled boxes and
+is a column in the asset catalog table (verified — the catalog's column header reads "Code location
+/ Asset group"; there is no tag column). That makes groups better on the axis the issue cares most
+about: the operator sees the split with nothing to type.
 
-**Bulk application in `definitions.py` — rejected.** `load_assets_from_modules` accepts
-`group_name` but not `tags` (verified: `TypeError: got an unexpected keyword argument 'tags'`);
-`dagster.map_asset_specs` would do it in about eight lines, applying one layer per source module.
-Rejected because the module boundary is not the classification: `defs/production_assets.py`'s own
-docstring says it exists because "`defs/cv_assets.py` is already ~900 lines". Deriving an asset's
-layer from which file it happens to sit in means the next split-a-long-file refactor silently
-re-classifies assets, and no test can catch it — whereas with per-asset tags a new untagged asset
-fails the test in [Tests](#tests). The classification is also worth reading at the asset itself.
+The one argument for tags that survives review is that a group is exclusive and this is not the
+only way we will want to slice the graph. The natural grouping for these eleven assets is by
+pipeline stage — `ingest` / `cv` / `serving` — and under *that* grouping "what does production
+need" is `ingest + serving`, which is a query, not a group. Spending `group_name` on the
+production/R&D split forecloses the grouping we are more likely to want, whereas a tag composes
+with it. (The plan previously also argued that a tag could later mark an asset needed by *both*
+layers; that is dropped, because the test below asserts the two selections are disjoint. It cannot
+be both an argument for tags and a thing the tests forbid.)
+
+**Bulk application in `definitions.py`.** `load_assets_from_modules` accepts `group_name` but not
+`tags` (verified: `TypeError: got an unexpected keyword argument 'tags'`); `dagster.map_asset_specs`
+does it in about six lines, applying one layer per source module, and produces an asset graph
+byte-identical to this plan's. This is the biggest live alternative to the whole plan and it is
+[open question 1](#risks-and-open-questions) — it is not rejected on the merits here. The plan
+continues with per-asset decorators because that is the file surface the work was scoped to, and
+because it keeps the classification readable at the asset and testable per-asset.
 
 ### Vocabulary
 
@@ -134,6 +140,12 @@ asset modules to share two strings is the worse trade. Inside `defs/` rather tha
 `_sentry.py` at the package root, because only `defs/*` consumes it; `dg` does not scan `defs/`
 for components here (`[tool.dagster] module_name = "nged_substation_forecast.definitions"` names
 the entry point explicitly, and `definitions.py` lists the asset modules by hand).
+
+The constants buy one place to change the vocabulary, and nothing more — in particular they do
+**not** buy typo-safety, since the test would share any typo they carried. What catches a
+mistyped tag is the union assertion in [Tests](#tests), which works just as well against inline
+literals. Eleven inline `{"layer": "production"}` dicts would be the honest alternative; the
+module wins on reading, not on safety.
 
 ### `src/nged_substation_forecast/defs/assets.py` — decorator lines only
 
@@ -222,10 +234,11 @@ No design principle is traded away.
 
 ## Tests
 
-One new test in a new file `tests/test_asset_layer_tags.py` — new rather than added to
-`tests/test_assets.py`, because that module is `pytest.mark.integration` and materialises assets
-while this is a fast definition-time assertion, and because a new file cannot collide with the
-parallel sessions editing the existing test modules.
+One new test in a new file `tests/test_asset_layer_tags.py`. The reason for a new file is merge
+collisions, not speed: `main` changed `tests/test_assets.py` by 243 lines in the last 65 commits
+and more sessions are editing it now, whereas a new file cannot conflict. (The `integration` marker
+on that module is *not* a reason — verified, it is declared in `pyproject.toml:355` but nothing
+deselects it, so a plain `uv run pytest` collects all 24 of its tests.)
 
 `test_every_asset_is_classified_as_production_or_rnd` resolves both selections against
 `defs.get_repository_def().asset_graph` and asserts:
@@ -278,12 +291,18 @@ before collection, so the import-time `init_sentry` is a no-op.
    sentence about the Sentry hook.** Saying the tag *is* the fail-fast/fail-operational mechanism
    would make that section promise something the tag does not deliver — see
    [What the tag means](#what-the-tag-means).
-2. **`docs/architecture/production-deployment.md`** — a short new section (working title: "Mark
-   which assets production needs with a `layer` tag") recording the classification, the two
-   selection strings, and one clause on why a tag rather than a group. Keep it to a paragraph plus
-   the two lists; this is a decorator-level change, not a control-plane decision, so it does not
-   warrant the treatment the longer sections on that page get. It must land **before** the
-   `## Considered but rejected designs` heading at line 378, not appended after `## See also`.
+2. **`docs/architecture/overview.md`** — two or three sentences on the *Orchestration* bullet under
+   *Core Components*, naming the `layer` tag, the two selection strings, and which assets fall each
+   side. Jack asked whether `docs/architecture/` should record the classification; the answer is
+   yes, and this is the page for it — `overview.md` describes what is built, in bullets of exactly
+   this size.
+
+   **Not a new section in `production-deployment.md`.** That page's sections are control-plane
+   design decisions — running the control plane on a VM, baking the model into the image, promoting
+   via an asset — and by this plan's own words the change is "a decorator-level change, not a
+   control-plane decision". A new top-level section there would be the wrong weight; the
+   tag-versus-group reasoning goes in a one-line comment above the constants in `defs/_tags.py`,
+   where an editor tempted to change it will be standing.
 3. **`docs/live_service/operations.md`** — one sentence under *Prerequisites*, giving the operator
    `tag:layer=production` to paste into the Dagster UI. This is the issue's actual payoff, so it
    belongs on the page the operator reads.
@@ -312,26 +331,49 @@ end-to-end check that the tag does what the issue asked, through the real CLI pa
 the test's in-process one. (`dagster asset list --select` is verified to work on this repo today.)
 
 `mkdocs build --strict` is on the list because all three doc edits add cross-page links; read the
-rendered HTML for the new `production-deployment.md` section, since the repo's `mkdocs-authoring`
+rendered HTML for the new `overview.md` bullet, since the repo's `mkdocs-authoring`
 skill documents several ways a page renders wrong while both linters pass.
 
 ## Risks and open questions
 
-1. **Is `promoted_model` / `promotable_model_runs` production or R&D?** Recommendation:
-   `production`, reasoning above. This is the only judgement call in the change and it is a
-   one-word edit either way.
-2. **Tag or group?** Recommendation: tag. A group would show the split in the catalog's "Asset
-   group" column and as labelled boxes in the lineage graph, with nothing for the operator to
-   type — a real advantage. It is rejected because the issue asks for a tag, because a group is
-   exclusive and would spend Dagster's one structural axis on this rather than on pipeline stage,
-   and because a tag can later be added to an asset both layers need. Both could be applied
-   together for about eight extra lines if Jack wants the visual split as well.
-3. **Is `layer` / `production` / `rnd` the right vocabulary?** Recommendation: yes. `rnd` is the
+1. **Eleven decorators, or six lines in `definitions.py`?** The simplicity review proposed applying
+   the layer in bulk, one per source module, via `map_asset_specs` — and built it, confirming the
+   resulting asset graph is identical to this plan's on every axis it checked (asset keys, parents,
+   checks, partitions, kinds), with `dagster asset list --select` returning the same 6/5 split.
+   That version deletes `defs/_tags.py`, all eleven decorator edits, three imports, and open
+   question 5 below.
+
+   My first-pass reason for rejecting it does not hold, and I have withdrawn it. I argued the
+   module boundary is incidental, citing `production_assets.py`'s "New file (`defs/cv_assets.py` is
+   already ~900 lines)" — but that parenthetical is the history note this plan already flags for
+   deletion, and the docstrings' actual first lines read "The ingestion Dagster assets",
+   "**Production** Dagster assets" and "**Cross-validation** Dagster assets". The modules *are*
+   named for the layers. Nor is a future misfiling silent: a new module has to be named in one of
+   the two `load_assets_from_modules` calls, on the line that says which layer it is.
+
+   **Recommendation: keep the decorators**, on two grounds that survive. A new asset added to an
+   *existing* module inherits that module's layer with nothing to notice; under decorators it has
+   no tag and the test fails. And answering open question 2 the other way for one asset is a
+   one-word edit here, versus an exception carved out of a bulk rule there. But this is close, the
+   bulk version is genuinely simpler, and the decorator surface is what the work was scoped to —
+   so **Jack's call**, and the answer changes roughly half this plan.
+2. **Is `promoted_model` / `promotable_model_runs` production or R&D?** Recommendation:
+   `production`, reasoning above. A one-word edit either way, and it changes the wording of doc
+   edit 1.
+3. **Tag or group?** Recommendation: tag, but this survived two reviews as the weakest call in the
+   plan. A group shows the split in the catalog's "Asset group" column and as labelled boxes in the
+   lineage graph with nothing for the operator to type, which is closer to what the issue asks for,
+   and the repo spends `group_name` on nothing today. The argument that keeps me on tags is that
+   `ingest` / `cv` / `serving` is the grouping we are more likely to want, and under it "what
+   production needs" is a two-group query rather than a group. Both mechanisms can be applied
+   together for a few extra lines if Jack wants the visual split now.
+4. **Is `layer` / `production` / `rnd` the right vocabulary?** Recommendation: yes. `rnd` is the
    shortest spelling Dagster's character set allows; `research` and `r-and-d` are the alternatives
    if `rnd` reads badly on a UI chip.
-4. **Merge collisions.** Low but real: #505 touches `ecmwf_ens` and #486/#488 touch
-   `production_assets.py`. Adding one argument to a decorator conflicts only if another session
-   edits the same decorator. Worth rebasing on `main` immediately before opening the PR.
+5. **Merge collisions.** Low but real: #505 touches `ecmwf_ens` and #488 touches
+   `production_assets.py` (#486 has landed). Adding one argument to a decorator conflicts only if
+   another session edits the same decorator. Worth merging `main` immediately before opening the
+   PR. Answering open question 1 the other way removes this risk entirely.
 
 ## Re-checked against `main` at 088d21b4
 
@@ -376,18 +418,58 @@ substance:
 
 ### Rejected
 
-1. **Apply the tags in bulk in `definitions.py` via `map_asset_specs`, one layer per source
-   module.** Genuinely fewer lines and it would sidestep the merge-collision risk, but it makes an
-   asset's layer a function of which file it sits in — and `production_assets.py` exists because
-   `cv_assets.py` grew past ~900 lines, not because of the layer split, so the next long-file split
-   would silently re-classify assets with no test able to catch it.
-2. **Cut the `docs/architecture/` section entirely.** Whether the architecture docs should record
+1. **Apply the tags in bulk in `definitions.py`, one layer per source module.** Rejected on the
+   first pass; **that rejection has since been withdrawn** — see the second simplicity pass below
+   and open question 1.
+2. **Cut the `docs/architecture/` record entirely.** Whether the architecture docs should record
    the classification is a question Jack explicitly asked to be answered; the answer is yes, but
    short. Shrunk rather than cut.
 3. **Use `group_name` instead of `tags`.** The reviewer's evidence is good and the point is real,
-   so this is promoted to open question 2 for Jack rather than silently dismissed — but the
-   recommendation stands, for the reasons recorded there.
+   so this is promoted to an open question for Jack rather than silently dismissed.
 4. **Drop `LAYER_TAG_KEY`.** Rejected: the test imports it, so it has a consumer.
+
+## Review findings — simplicity, second pass
+
+The `plan-issue` skill changed after the first pass: the simplicity reviewer is now told it is not
+confined to the plan's scope and may propose a different architecture outright. A fresh reviewer
+ran under that brief against the merged tree, and it landed harder than the first.
+
+### Accepted
+
+1. **My rejection of bulk application was built on the wrong evidence, and is withdrawn.** I had
+   cited `production_assets.py`'s "New file (…already ~900 lines)" as proof the module split is
+   incidental — while elsewhere in this same plan flagging that sentence as a history note that
+   should be deleted. The docstrings' actual first lines name the layers. The proposal is now open
+   question 1, with its case made and a recommendation, rather than a rejected finding.
+2. **The "a tag could later mark an asset needed by both layers" argument is self-contradicting**
+   and has been cut: the plan's own test asserts the two selections are disjoint. The tags-over-
+   groups case now rests on one argument, stated where it can be judged.
+3. **`_tags.py` does not buy typo-safety.** The constants and the test would share any typo. What
+   catches a mistyped tag is the union assertion. Justification corrected; the module stays, on
+   readability alone, with the inline alternative named.
+4. **The new test file's justification was wrong.** `integration` is declared at
+   `pyproject.toml:355` but nothing deselects it — a plain `uv run pytest` collects all 24 tests in
+   `tests/test_assets.py`. The real reason for a separate file is merge collisions, and that is now
+   what the plan says.
+5. **No new section in `production-deployment.md`.** The reviewer quoted my own sentence back at me
+   — "a decorator-level change, not a control-plane decision" — which is exactly the test that page
+   fails. The architecture record moves to a bullet in `docs/architecture/overview.md`, which still
+   answers Jack's question and at the right weight.
+
+### Rejected
+
+1. **Cut the selection-string round-trip assertion as duplicating
+   `tests/test_asset_selection_parses.py`.** That test guards the ANTLR *runtime version*; this one
+   pins the unquoted form so nobody tidies it back into the quoted form the docs must not use.
+   Different failure, one line.
+2. **Fold the test into `test_definitions_resolve`.** The marker argument was wrong, but the
+   collision argument stands on its own — `main` has changed that file by 243 lines since this
+   branch started.
+3. **Drop "What the tag means" and the ambiguity escalation as answering a question the issue did
+   not ask.** The two framings really do disagree, and the disagreement changes how the
+   `inherent-stability.md` sentence must be worded — a finding the correctness reviewer raised
+   independently. Jack also asked for genuinely ambiguous assets to be flagged rather than guessed
+   at. Kept, and the section is short.
 
 ## Review findings — second pass (correctness and testability)
 
