@@ -117,8 +117,10 @@ partition's `power_fcst_init_time` is 2026-07-04 06:00 UTC — not at the midnig
 
 1. Loads the production model from `Settings.production_model_path` via a plain disk `load` —
    the concrete forecaster class is reconstructed from `meta.json`'s `model_class` field. Raises
-   if the model has no trained time series, or if its `selected_features` name a feature this code
-   cannot parse (re-promote first, from a run trained against the current vocabulary).
+   if the model has no trained time series, if its `selected_features` name a feature this code
+   cannot parse, or if its saved `model_params` carry a key this code no longer declares. The last
+   two both mean the promoted model predates the code now serving it: re-promote from a run
+   trained against the current vocabulary, rather than hand-editing what is on disk.
 2. Resolves which NWP `init_time` to join against via `select_nwp_init_time` and
    `availability_mode` (table above).
 3. Builds the power spine (`build_live_power_frame`), covering 15 days of history (long enough
