@@ -54,16 +54,17 @@ def _save_trained_model_to_mlflow(
     """
     features = selected_features or {"temperature_2m"}
     times = [datetime(2025, 1, 1, hour, tzinfo=UTC) for hour in (0, 1, 2)]
-    train_df = pl.DataFrame(
-        {
-            "time_series_id": [1, 1, 1],
-            "valid_time": times,
-            "time_series_type": ["Primary"] * 3,
-            "power_fcst_init_time": times,
-            "power": [10.0, 12.0, 11.0],
-        }
-        | {name: [5.0, 6.0, 7.0] for name in features}
-    )
+    spine = {
+        "time_series_id": [1, 1, 1],
+        "valid_time": times,
+        "time_series_type": ["Primary"] * 3,
+        "power_fcst_init_time": times,
+        "power": [10.0, 12.0, 11.0],
+    }
+    # A feature column sharing a spine column's name would win the union and overwrite the spine
+    # with floats, quietly changing what every caller of this helper trains on.
+    assert not features & spine.keys(), "a requested feature would overwrite a spine column"
+    train_df = pl.DataFrame(spine | {name: [5.0, 6.0, 7.0] for name in features})
     train_data = pt.LazyFrame.from_existing(train_df.lazy()).set_model(AllFeatures)
     config = XGBoostConfig(
         selected_features=features,

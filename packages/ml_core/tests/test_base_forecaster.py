@@ -83,6 +83,20 @@ class _FakeForecaster(BaseForecaster):
         raise NotImplementedError  # pragma: no cover - unused
 
 
+class _MetaWithoutModelParams(_FakeForecaster):
+    """A forecaster whose saved record omits ``model_params`` altogether.
+
+    Stands in for a hand-assembled or foreign model directory: nothing in this repo saves one,
+    because ``BaseForecaster.save``'s contract names only ``model_class`` as mandatory.
+    """
+
+    def save(self, path: Path) -> None:
+        super().save(path)
+        meta = json.loads((path / "meta.json").read_text())
+        del meta["model_params"]
+        (path / "meta.json").write_text(json.dumps(meta))
+
+
 def test_trained_time_series_ids_is_abstract() -> None:
     """A subclass that omits ``trained_time_series_ids`` cannot be instantiated."""
 
@@ -113,7 +127,11 @@ def _save(
     series: Sequence[int] = (),
     selected_features: set[str] | None = None,
 ) -> None:
-    """Save a ``_FakeForecaster`` carrying ``payload`` and ``series`` into an existing run."""
+    """Save a ``_FakeForecaster`` carrying ``payload``, ``series`` and ``selected_features``.
+
+    ``selected_features`` defaults to empty, which every version of the code parses; pass a
+    retired feature name to build a run this code can no longer serve.
+    """
     forecaster = _FakeForecaster(
         BaseForecasterConfig(selected_features=selected_features or set()),
         payload=payload,
@@ -258,8 +276,36 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unse
         stale_run_id = run.info.run_id
     _save(stale_run_id, "stale-model", series=[10], selected_features={"local_utc_offset"})
 
-    with pytest.raises(ValueError, match="local_utc_offset"):
+    with pytest.raises(ValueError, match="local_utc_offset") as exc_info:
         fetch_model_artifacts(stale_run_id, dest)
+
+    # Which run was refused, so an operator knows what to re-train rather than what to re-download.
+    assert stale_run_id in str(exc_info.value)
+    assert _FakeForecaster.load(dest).payload == "hello-model"
+    assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run
+
+
+def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_names_no_features(
+    saved_run: str, tmp_path: Path
+) -> None:
+    """A record with no ``selected_features`` is junk, not a model with an empty feature list.
+
+    ``BaseForecasterConfig`` declares the field as required, so such a record loads nowhere. Were
+    promotion to wave it through as merely-absent input, it would destroy a working champion to
+    install a model that dies at its first ``load`` — the exact outcome the pre-swap check exists
+    to prevent.
+    """
+    dest = tmp_path / "production_model"
+    fetch_model_artifacts(saved_run, dest)
+
+    with mlflow.start_run(experiment_id=mlflow.create_experiment("no_features")) as run:
+        featureless_run_id = run.info.run_id
+    _MetaWithoutModelParams(
+        BaseForecasterConfig(selected_features=set()), payload="featureless", series=[10]
+    ).save_to_mlflow(featureless_run_id)
+
+    with pytest.raises(ValueError, match="selected_features"):
+        fetch_model_artifacts(featureless_run_id, dest)
 
     assert _FakeForecaster.load(dest).payload == "hello-model"
     assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run

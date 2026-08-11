@@ -143,7 +143,8 @@ code as it stands; "intended" describes where this principle takes it.
 | A meter reporting detectably wrong values | Partly detected at ingest; see [Missing versus wrong](#missing-versus-wrong) | Treated as missing, which routes it into the always-output path 🚧 | No |
 | A whole ECMWF slice corrupt | Landed; `nwp_has_no_unexpected_nulls` warns, naming the slice | Unchanged | No |
 | A whole ECMWF weather variable absent | `Nwp.validate` rejects it; `ecmwf_ens` turns each rejection into a retry for up to 4h, and once those are exhausted it manifests downstream as a missed run | Unchanged | No |
-| The promoted model is empty, unloadable, or names features this code no longer recognises | **Hard failure** — the asset raises. `promoted_model` rejects an unrecognised feature vocabulary before it replaces the model on disk, so the previous champion keeps serving | Unchanged: this is a promotion bug, not a data outage | Yes, next business day |
+| The promoted model is empty or unloadable | **Hard failure** — the asset raises | Unchanged: this is a promotion bug, not a data outage | Yes, next business day |
+| A model is promoted whose features this code no longer recognises | `promoted_model` refuses it before replacing the model on disk, so the outgoing champion stays and keeps forecasting | Unchanged: caught while an operator is present, rather than at the next unattended tick | Yes, at promotion time |
 | The service is not running at all | Sentry missed-check-in alarm fires from outside the deployment | Unchanged | Yes, next business day |
 | Any of the above during model R&D | Fails fast | Unchanged — see [R&D fails the other way](#rd-fails-the-other-way) | n/a |
 

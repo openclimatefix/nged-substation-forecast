@@ -16,7 +16,7 @@ import tempfile
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import patito as pt
 import polars as pl
@@ -131,38 +131,63 @@ def build_live_power_frame(
     return pt.LazyFrame.from_existing(dense).set_model(PowerTimeSeries)
 
 
-def _check_selected_features_are_parseable(selected_features: set[str] | None, source: str) -> None:
-    """Raise if this code cannot turn ``selected_features`` into typed feature descriptors.
+def _check_meta_features_are_parseable(meta: dict[str, Any], source: str) -> None:
+    """Raise if this code cannot serve the model that ``meta.json`` describes.
 
-    A saved model names its features as strings, so a feature renamed or removed in code leaves
-    every model trained before the rename unservable. Raising here is the deliberate exception to
+    A saved model names its features as strings, so renaming or removing a feature in code leaves
+    every model trained before the change unservable. Raising is the deliberate exception to
     production's degrade-don't-raise posture: a model this code cannot serve is our own contract
-    violation rather than the outside world misbehaving. See
+    violation, not the outside world misbehaving. See
     <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 
+    ``selected_features`` must be present and be a list of strings, because
+    ``BaseForecasterConfig`` declares it as a required field: a record missing it is one no
+    forecaster in this repo can load, so treating its absence as benign would let promotion
+    replace a working champion with a model that dies at its first ``load``.
+
+    Every requested feature is checked, and every unparseable one is named in sorted order, so an
+    operator re-training after a rename fixes them all in one pass instead of rediscovering them
+    one at a time.
+
     Args:
-        selected_features: The model's requested feature names, or ``None`` when the saved record
-            names none. ``None`` passes: ``BaseForecaster.save``'s contract mandates only
-            ``model_class``, so an absent field is missing input rather than malformed input.
+        meta: The parsed contents of a model's ``meta.json``.
         source: What is being validated — a directory or a run id — quoted back in the message so
             an operator knows which model to re-train.
 
     Raises:
-        ValueError: A feature name has no meaning to the current code.
+        ValueError: ``model_params.selected_features`` is absent, malformed, or names a feature
+            that has no meaning to the current code.
     """
-    if selected_features is None:
-        return
-    try:
-        ParsedFeatures.from_strings(selected_features)
-    except ValueError as error:
-        # This message can reach the container log that scripts/build_and_verify_image.sh greps
-        # case-insensitively for "mlflow" to prove the runtime is hermetic, so it must not contain
-        # that word.
+    # Every message here can reach the container log that scripts/build_and_verify_image.sh greps
+    # case-insensitively for "mlflow" to prove the runtime is hermetic, so none may contain that
+    # word — including through `source`, which is why the promotion call site passes a bare run id.
+    remedy = (
+        "Re-train against the current feature vocabulary and promote that run; never hand-edit "
+        "meta.json, which leaves the trained model carrying the old names."
+    )
+    model_params = meta.get("model_params")
+    selected_features = (
+        model_params.get("selected_features") if isinstance(model_params, dict) else None
+    )
+    if not isinstance(selected_features, list) or not all(
+        isinstance(feature, str) for feature in selected_features
+    ):
         raise ValueError(
-            f"The model at {source} requests a feature this code cannot parse: {error}. Re-train "
-            "against the current feature vocabulary and promote that run; never hand-edit "
-            "meta.json."
-        ) from error
+            f"The model at {source} has no usable model_params.selected_features (got "
+            f"{selected_features!r}), so it is not a model this code can load. {remedy}"
+        )
+
+    unparseable: list[str] = []
+    for feature in sorted(selected_features):
+        try:
+            ParsedFeatures.from_strings({feature})
+        except ValueError:
+            unparseable.append(feature)
+    if unparseable:
+        raise ValueError(
+            f"The model at {source} requests {len(unparseable)} feature(s) this code cannot "
+            f"parse: {', '.join(unparseable)}. {remedy}"
+        )
 
 
 def load_forecaster_from_dir(path: Path) -> BaseForecaster:
@@ -206,9 +231,10 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
             "model_class (see BaseForecaster.save)."
         )
     forecaster_cls = cast(type[BaseForecaster], import_class(model_class))
-    forecaster = forecaster_cls.load(path)
-    _check_selected_features_are_parseable(forecaster.model_params.selected_features, str(path))
-    return forecaster
+    # Before `load`, not after: `load` reads every serialised sub-model off disk, which is a lot of
+    # IO to do on the way to rejecting the directory over one field already parsed above.
+    _check_meta_features_are_parseable(meta, str(path))
+    return forecaster_cls.load(path)
 
 
 def fetch_model_artifacts(run_id: str, dest: Path) -> None:
@@ -241,16 +267,19 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
     Raises:
         FileNotFoundError: The run's archive holds no ``meta.json``, so it is not a model
             ``BaseForecaster.save`` wrote.
-        ValueError: The model's ``selected_features`` name a feature this code cannot parse —
-            re-train against the current feature vocabulary and promote that run instead.
+        ValueError: The model's ``selected_features`` are absent, malformed, or name a feature
+            this code cannot parse — re-train against the current feature vocabulary and promote
+            that run instead.
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
         downloaded_dir = _download_and_unpack_model(run_id, Path(tmp_dir))
-        meta = json.loads((downloaded_dir / "meta.json").read_text())
-        selected_features = meta.get("model_params", {}).get("selected_features")
-        _check_selected_features_are_parseable(
-            None if selected_features is None else set(selected_features), f"MLflow run {run_id}"
-        )
+        meta_path = downloaded_dir / "meta.json"
+        if not meta_path.exists():
+            raise FileNotFoundError(
+                f"The model archive on run {run_id} holds no meta.json, so it is not a model "
+                "BaseForecaster.save wrote. Re-materialise `trained_cv_model` for this fold."
+            )
+        _check_meta_features_are_parseable(json.loads(meta_path.read_text()), f"run {run_id}")
 
         promotion = {
             "mlflow_run_id": run_id,

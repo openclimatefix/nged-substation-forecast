@@ -64,7 +64,7 @@ deployment bakes into its container image at build time.
 1. Downloads that run's saved model artifacts from MLflow
    (`ml_core._production_helpers.fetch_model_artifacts`) into a temporary directory.
 2. Checks the downloaded model's `selected_features` against the running code, and **fails the
-   materialisation if any feature name no longer parses** — naming the offending feature. The check
+   materialisation if any feature name no longer parses** — naming every one of them. The check
    runs before anything is written, so a refused promotion leaves the previous champion in place and
    still serving. Re-train the model against the current feature vocabulary and promote that run;
    never hand-edit `meta.json` to rename a feature, because the trained boosters carry the old

@@ -16,7 +16,6 @@ import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries
 from ml_core._production_helpers import (
-    _check_selected_features_are_parseable,
     build_live_power_frame,
     load_forecaster_from_dir,
     select_nwp_init_time,
@@ -169,22 +168,62 @@ def test_load_forecaster_from_dir_raises_on_missing_model_class(tmp_path: Path) 
         load_forecaster_from_dir(tmp_path)
 
 
-def test_load_forecaster_from_dir_rejects_an_unparseable_feature(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "companion",
+    # The stale name sorts before the companion in the first case and after it in the second, so a
+    # guard that checked only part of the vocabulary would fail one of them.
+    ["temperature_2m", "local_day_of_week"],
+)
+def test_load_forecaster_from_dir_rejects_an_unparseable_feature(
+    tmp_path: Path, companion: str
+) -> None:
     """A model naming a feature this code no longer recognises fails at load, naming the feature.
 
     ``local_utc_offset`` is the real name a rename retired, so this doubles as a regression pin.
     No training is needed: an untrained forecaster still saves a ``meta.json`` carrying the config.
     """
-    XGBoostForecaster(XGBoostConfig(selected_features={"local_utc_offset", "temperature_2m"})).save(
+    XGBoostForecaster(XGBoostConfig(selected_features={"local_utc_offset", companion})).save(
         tmp_path
     )
 
-    with pytest.raises(ValueError, match="local_utc_offset"):
+    with pytest.raises(ValueError, match="local_utc_offset") as exc_info:
+        load_forecaster_from_dir(tmp_path)
+
+    # The message must say which model to go and re-train, not merely that some model is stale.
+    assert str(tmp_path) in str(exc_info.value)
+
+
+def test_load_forecaster_from_dir_names_every_unparseable_feature(tmp_path: Path) -> None:
+    """All the stale names at once, so re-training fixes them in one pass.
+
+    Reporting only the first would send an operator round the re-train loop once per retired
+    feature — and which one came first would vary per process, because the names live in a set.
+    """
+    XGBoostForecaster(
+        XGBoostConfig(selected_features={"local_utc_offset", "temperature", "windchill"})
+    ).save(tmp_path)
+
+    with pytest.raises(ValueError, match="local_utc_offset, temperature"):
         load_forecaster_from_dir(tmp_path)
 
 
+def test_the_rejection_message_never_mentions_the_experiment_tracker(tmp_path: Path) -> None:
+    """``scripts/build_and_verify_image.sh`` fails the image build on that word in the runtime log.
+
+    Its one automated gate greps the smoke-test container's log case-insensitively to prove
+    production inference has no experiment-tracker dependency, and this rejection is raised on the
+    path that smoke test exercises — so the wording is load-bearing, not cosmetic.
+    """
+    XGBoostForecaster(XGBoostConfig(selected_features={"local_utc_offset"})).save(tmp_path)
+
+    with pytest.raises(ValueError, match="local_utc_offset") as exc_info:
+        load_forecaster_from_dir(tmp_path)
+
+    assert "mlflow" not in str(exc_info.value).lower()
+
+
 def test_load_forecaster_from_dir_accepts_the_current_vocabulary(tmp_path: Path) -> None:
-    """The negative control for the test above: a guard that rejected everything would pass it.
+    """The negative control for the tests above: a guard that rejected everything would pass them.
 
     Covers one feature of each kind the parser understands, so a narrowing of the guard shows up
     here rather than in production.
@@ -196,6 +235,7 @@ def test_load_forecaster_from_dir_accepts_the_current_vocabulary(tmp_path: Path)
             "power_lag_24h",
             "temperature_2m_rolling_mean_6h",
             "windchill",
+            "nwp_lead_time_hours",
         }
     )
     XGBoostForecaster(config).save(tmp_path)
@@ -205,12 +245,35 @@ def test_load_forecaster_from_dir_accepts_the_current_vocabulary(tmp_path: Path)
     )
 
 
-def test_a_saved_record_naming_no_features_is_not_rejected() -> None:
-    """An absent ``selected_features`` is missing input, not malformed input, so it must not raise.
+@pytest.mark.parametrize(
+    "model_params",
+    [
+        pytest.param({}, id="absent"),
+        pytest.param({"selected_features": None}, id="null"),
+        pytest.param({"selected_features": "temperature_2m"}, id="bare_string"),
+        pytest.param({"selected_features": [1, 2]}, id="not_strings"),
+        pytest.param(None, id="model_params_not_a_dict"),
+    ],
+)
+def test_a_record_without_a_usable_feature_list_is_rejected(
+    tmp_path: Path, model_params: dict[str, object] | None
+) -> None:
+    """A saved record naming no usable features is one no forecaster here can load, so it is junk.
 
-    ``BaseForecaster.save``'s contract mandates only ``model_class``, so a saved record that names
-    no features is within contract; ``fetch_model_artifacts`` reaches this path by reading a
-    ``meta.json`` that has no such field. Pinned so a later tightening of the guard into
-    fail-closed has to be deliberate rather than incidental.
+    ``BaseForecasterConfig`` declares ``selected_features`` as a required field, so treating an
+    absent or malformed one as benign would let promotion replace a working champion with a model
+    that dies at its first ``load``. A bare string is the subtle case: iterating it would set-ify
+    it into single characters and report those as the unrecognised features.
     """
-    _check_selected_features_are_parseable(None, "a model with no feature list")
+    (tmp_path / "meta.json").write_text(
+        json.dumps(
+            {
+                "model_class": "xgboost_forecaster.forecaster.XGBoostForecaster",
+                "model_params": model_params,
+                "trained_time_series_ids": [],
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="selected_features"):
+        load_forecaster_from_dir(tmp_path)
