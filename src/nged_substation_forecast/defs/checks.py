@@ -95,6 +95,28 @@ _LATE_TABLE_SCHEMA: Final[TableSchema] = TableSchema(
 )
 """Fixed schema for the late-series metadata table (required so an empty table still renders)."""
 
+_MAX_LATE_SERIES_IN_TABLE: Final[int] = 50
+"""Cap on how many late series the check's metadata table lists.
+
+Unlike the other capped listings this one lands in Dagster's event log — Postgres in the AWS
+deployment, `pg_dump`ed to S3 nightly — so it is written to durable storage every hour for as long
+as a stall lasts. Uncapped, a whole-feed stall at V2 scale (~2,500 series) would serialise to about
+355 KB per hourly evaluation; at 50 rows it is about 8 KB.
+
+The rows follow ``_LATE_STATUS_ORDER``: every never-reported series outranks every stale one, and
+the stale ones are most-stale first. So the listing is "the head of that order", not "the 50 series
+in most trouble" — when never-reported series outnumber the cap, no stale series is listed at all,
+however stale it is. That is a real limit of the drill-down at V2 cutover, when the roster is
+populated before data flows; ``n_stale`` and ``n_never_reported`` stay exact throughout, which is
+what the operator should read first.
+
+Matches ``_sentry.MAX_LATE_SERIES_IN_CONTEXT`` rather than the tighter caps on the one-line
+description and the Sentry message body, because a browsable table and the Sentry event context
+serve the same drill-down purpose and showing the same leading series in both is one less thing to
+reconcile. The true count is always carried by the uncapped ``n_late`` metadata field, and
+``n_late_listed`` records how many rows the table actually holds, so a truncated table never makes a
+large stall look small."""
+
 _LATE_STATUS_ORDER: Final[tuple[str, ...]] = ("never", "stale")
 """Runtime tuple — declared order for the ``status`` column's ``pl.Enum``, which is also the
 row order in the late-series table (never-reported series listed before merely-stale ones)."""
@@ -224,7 +246,11 @@ def _read_roster_ids(
 
 
 def _late_table_metadata(late: pl.DataFrame) -> MetadataValue:
-    """Render the late-series frame as a Dagster table for the check's UI metadata."""
+    """Render the late-series frame as a Dagster table for the check's UI metadata.
+
+    Renders every row it is given: the caller truncates to ``_MAX_LATE_SERIES_IN_TABLE`` first, so
+    that the row count reported as ``n_late_listed`` and the table itself cannot disagree.
+    """
     records = [
         TableRecord(
             {
@@ -254,6 +280,8 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
             f"{result.n_stale} stale (>{threshold_h:.0f}h since last data), "
             f"{result.n_never} never reported."
         )
+    # Truncate once, here, so the table and the count that describes it come from one slice.
+    listed = result.late.head(_MAX_LATE_SERIES_IN_TABLE)
     return AssetCheckResult(
         # A stalled feed is expected to self-heal via back-fill, so warn — never fail the run and
         # block downstream assets. Absent data is not "healthy" either, hence the count guard.
@@ -266,7 +294,8 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
             "n_never_reported": result.n_never,
             "n_series_total": result.n_series_total,
             "threshold_hours": threshold_h,
-            "late_time_series": _late_table_metadata(result.late),
+            "n_late_listed": listed.height,
+            "late_time_series": _late_table_metadata(listed),
         },
     )
 
@@ -358,7 +387,9 @@ _NWP_RUN_EXPECTED_ON_DISK_BY: Final[timedelta] = timedelta(hours=14)
 minutes, up to 8 times. The delays alone put the last healthy landing at about 12:30 UTC, but one
 of the two retryable failures (``NwpVariableWhollyMissing``) is raised *after* the download, so
 the worst case pays a download and convert on every attempt too — about 12:40 UTC at the ~1
-min/run measured in ``docs/architecture/performance.md``. That leaves 81 minutes of margin to
+min/run measured in
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/>. That leaves
+81 minutes of margin to
 14:00 UTC, spread over 9 attempts: the deadline is breached only if download-and-convert
 *averages* about 10 minutes across all of them, not if one attempt is slow. So the 645 s download
 recorded in ``dynamical_data.ecmwf_ens.download`` would cost only ~10 of those 81 minutes on its
@@ -377,11 +408,12 @@ Used only to work out which slot to report on when the check is invoked without 
 a partitioned run takes its slot from the partition itself."""
 
 _MAX_MISSING_SERIES_LISTED: Final[int] = 20
-"""Cap on how many missing ``time_series_id``s the description spells out.
+"""Cap on how many missing ``time_series_id``s the description and the metadata spell out.
 
 Keeps the one-line description readable at V2 scale (~2,500 series) when a whole population is
-missing; the true count is always carried by the ``n_time_series_missing`` metadata field, so a
-truncated list never makes a large gap look small."""
+missing; the true count is always carried by the ``n_time_series_missing`` metadata field and
+``n_time_series_missing_listed`` records how many the list holds, so a truncated list never makes a
+large gap look small."""
 
 _UNIX_EPOCH: Final[datetime] = datetime(1970, 1, 1, tzinfo=UTC)
 """Origin for ``_floor_to_interval``'s arithmetic. Both cadences we floor to (daily NWP runs at
@@ -639,8 +671,9 @@ def _read_live_forecast_rows(
     The scan is pruned to the matching ``(experiment_name, fold_id="live")`` Delta partitions and
     then to the one ``power_fcst_init_time``, and every column is reduced to a scalar inside
     Polars, so only the aggregates cross back into Python. The ``pl.len()`` is safe from the
-    32-bit row-count wraparound documented in ``docs/architecture/code-style.md``: it counts one
-    slot's rows (~1M at V1 scale, ~86M at V2), not the whole table.
+    32-bit row-count wraparound documented in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/#data-handling>:
+    it counts one slot's rows (~1M at V1 scale, ~86M at V2), not the whole table.
     """
     if not delta_table_exists(power_forecasts_path, storage_options):
         return _EMPTY_LIVE_FORECAST_ROWS
@@ -809,10 +842,12 @@ def _live_forecast_check_metadata(result: LiveForecastHealthResult) -> dict[str,
         # Gated on the same condition as n_time_series_expected below: an unreadable meta.json
         # makes "how many are missing" as unknown as "how many are expected", so 0 must not be
         # reported here — it would be indistinguishable from a verified-complete population.
+        listed_ids = result.missing_time_series_ids[:_MAX_MISSING_SERIES_LISTED]
         metadata["n_time_series_missing"] = len(result.missing_time_series_ids)
-        metadata["missing_time_series_ids"] = str(
-            list(result.missing_time_series_ids[:_MAX_MISSING_SERIES_LISTED])
-        )
+        metadata["missing_time_series_ids"] = str(list(listed_ids))
+        # How many of them the field above actually spells out, so a capped list is never mistaken
+        # for the whole set. Same rule as `n_late_listed` on the freshness check.
+        metadata["n_time_series_missing_listed"] = len(listed_ids)
         metadata["n_time_series_expected"] = result.n_expected_time_series
     if result.horizon_hours is not None:
         metadata["forecast_horizon_hours"] = round(result.horizon_hours, 1)

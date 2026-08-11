@@ -83,7 +83,32 @@ which took `docs/example_power_forecast.svg` from 571 KB to 296 KB with no visib
 by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised exports tend to trip
 `check-added-large-files`' 500 KB limit, which is the signal that this step was skipped.
 
-**Prose style — write full sentences, don't drop the subject.** Don't clip words for terseness
+### Prose style
+
+These four rules apply to everything we write in prose: `docs/` pages, READMEs, docstrings, code
+comments, and GitHub issue and PR bodies.
+
+**Be concrete and plain; write for a skim-reader.** Assume the reader is skimming and wants the
+meaning to jump off the page, not to spend effort decoding a clever, abstract or metaphorical
+phrase. Name the actual thing — the asset, the column, the number, the failure — rather than
+gesturing at it. Prefer "if the ECMWF download fails, the forecast reuses yesterday's NWP run and
+widens the uncertainty bands" over "the pipeline weathers upstream turbulence"; prefer "one Delta
+table per data source" over "a constellation of storage primitives". Short everyday words beat long
+Latinate ones, and a plain sentence beats an elegant one. A useful shorthand for the target: *The
+Economist*'s house style — short words, active voice, concrete nouns, British spelling, every
+acronym expanded on first use — but without the two journalistic habits that would hurt a reference
+doc, so no punning or whimsical headings, and no scene-setting opening: state the conclusion first,
+then explain it.
+
+**Be concise by cutting whole sentences, not words.** Prose should be as short as it can be
+without losing readability, but the compressible material is rarely inside a sentence. It is whole
+sentences and paragraphs that carry no information: restating the heading, summarising what the
+reader has just read, hedging ("it is worth noting that"), listing what we are *not* doing, or a
+closing paragraph that repeats the opening. Delete those outright, and leave the surviving
+sentences intact — buying brevity by clipping words out of a sentence that needs them is the
+mistake the next rule forbids.
+
+**Write full sentences; don't drop the subject.** Don't clip words for terseness
 if it leaves a sentence without a clear subject/verb. Prefer "We split storage across two
 buckets so that..." over "Two buckets, not one — split so that...". The full form is more
 readable and no less concise in practice.

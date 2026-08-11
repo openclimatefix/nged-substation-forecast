@@ -1,6 +1,6 @@
 # Design Philosophy
 
-**The one-minute description:** We believe that five things can be true at once:
+**The one-minute description:** we are betting that these five claims can all hold at once:
 
 - **A service that mostly runs itself** — manual attention needed only when an upstream data format
   changes, with the forecast degrading gracefully rather than stopping when an input goes missing.
@@ -38,9 +38,10 @@ of several industries, test-drive them against real data and a real production s
 what we find. Those industries are not only energy forecasting: some of the most useful ideas here
 are borrowed from vehicle dynamics, avionics, manufacturing and site reliability engineering. The
 intended output is a field report, not a rulebook: a list of principles that any energy-forecasting
-project might find useful *to consider*, together with honest results about which practices earned
-their keep here, which we declined, which we have not yet absorbed — and, in time, which failed. A
-practice that did not survive contact with our data is as useful a finding as one that did.
+project might find useful *to consider*, together with honest results about which practices were
+worth their cost here, which we declined, which we have not yet absorbed — and, in time, which
+failed. A practice that did not survive contact with our data is as useful a finding as one that
+did.
 
 Three pages, in reading order:
 
@@ -50,7 +51,7 @@ Three pages, in reading order:
   absorbed.
 - **[Engineering Hypotheses](engineering-hypotheses.md)** — the falsifiable claims the engineering
   is meant to deliver, each with a numeric threshold and the window in which it resolves. The
-  principles are the bets; this page is the scoreboard.
+  principles are the bets we make; this page scores them.
 - **[Inherent Stability](inherent-stability.md)** — the largest principle argued in full: how the
   service behaves as its inputs degrade, the degradation ladder, and the rules to follow when
   changing production code.
