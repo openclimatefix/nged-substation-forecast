@@ -104,7 +104,7 @@ tracked in full elsewhere* and must not be settled here.
   **fails the step** (`success=False`, no check evaluations recorded at all). Independent guards
   give the "both" half for free. The second half is a live trap: the fallback this plan points at,
   `power_data_is_fresh`'s at
-  [`checks.py:333-337`](../src/nged_substation_forecast/defs/checks.py), passes **no**
+  [`checks.py:360-366`](../src/nged_substation_forecast/defs/checks.py), passes **no**
   `check_name`, because a standalone `@asset_check` does not need one — and an `AssetCheckResult`
   with no `check_name` inside a multi-check asset fails the step identically
   (`DagsterInvariantViolationError` from `resolve_target_check_key`). So each fallback must set
@@ -124,12 +124,12 @@ tracked in full elsewhere* and must not be settled here.
 
 Two places make the same now-wrong claim, and both must change:
 
-- `report_check_degradation`'s docstring (`:136-137`) says "Both of this function's callers — the
+- `report_check_degradation`'s docstring (`:136`) says "Both of this function's callers — the
   standalone `@asset_check`s `power_data_is_fresh` and `live_forecasts_are_healthy`…". The new
   callers are *in-asset* check results, not standalone `@asset_check`s, and the "the run no longer
   fails and `sentry_capture_failure` no longer fires" argument holds for them identically
   (`ecmwf_ens_job` carries the same hook).
-- The **module** docstring (`:9-11`) narrows the covered fault to "a standalone `@asset_check` that
+- The **module** docstring (`:10`) narrows the covered fault to "a standalone `@asset_check` that
   caught its own exception". Widen it to any guarded warning path.
 
 Rewrite both to describe the current set, without narrating the change.
@@ -319,19 +319,19 @@ Dagster experiment. Each finding below was re-verified against the code before b
 ### Accepted and folded in
 
 1. **The fallback `AssetCheckResult` must set `check_name` explicitly.** The model fallback
-   (`checks.py:333-337`) omits it because a standalone check does not need one; inside a
+   (`checks.py:360-366`) omits it because a standalone check does not need one; inside a
    multi-check asset an omitted `check_name` fails the step exactly like an omitted result.
-   Verified: `checks.py:333-337` has no `check_name`. This was the one finding that would have
+   Verified: `checks.py:360-366` has no `check_name`. This was the one finding that would have
    shipped a fail-closed degraded path.
 2. **`defs/assets.py` has no module-level `logger`.** Verified (`getLogger` appears only at
    `checks.py:86`). Resolved by logging through `context.log`, which also matches the runbook's
    "the traceback is in the run's logs".
 3. **`docs/architecture/production-deployment.md` explicitly asserts the two NWP checks "have no
-   catch-all".** Verified at `:174-176`. Was missing from the docs list; added.
+   catch-all".** Verified at `:180-182`. Was missing from the docs list; added.
 4. **`_sentry.py`'s *module* docstring makes the same claim as the function docstring.** Verified
-   at `:9-11`. Only the function docstring was listed; both now are.
+   at `:10`. Only the function docstring was listed; both now are.
 5. **`operations.md` teaches the degraded-check description for `power_data_is_fresh` only.**
-   Verified at `:169-176`. Added as a second edit to that page.
+   Verified at `:180-186`. Added as a second edit to that page.
 6. **Tests 1 and 2 fail on `main` for a different mechanism than stated** — `materialize()` defaults
    to `raise_on_error=True`, so the test errors rather than asserting `success is False`. The
    conclusion (they fail on `main`) is unchanged; the wording was.
@@ -358,3 +358,26 @@ Dagster experiment. Each finding below was re-verified against the code before b
   Jack in the report below; worth its own one-line issue.
 - **Nothing was rejected as factually wrong.** The review found no false finding this time, which is
   itself worth recording — the usual expectation is that some are.
+
+### Re-verified after merging `main`
+
+`main` was merged into this branch after the review (a docs prose sweep, plus changes to
+`defs/checks.py`, `defs/assets.py` and `weather_schemas.py`). Every claim and citation above was
+re-checked against the merged tree; all survive, with line numbers updated in place:
+
+- `ecmwf_ens`'s ordering is unchanged — `write_nwp` at `assets.py:288`, the two assessments at
+  `:295-298`, `RetryRequested` at `:279-283`. The premise of the issue still holds.
+- `power_data_is_fresh`'s fallback moved to `checks.py:360-366` and **still carries no
+  `check_name`**, so the trap in finding 1 is still live.
+- The three doc passages that contradict the change all survive the sweep verbatim:
+  `production-deployment.md:180-182` still says the NWP checks "have no catch-all",
+  `ecmwf-ens-known-issues.md:193` still carries the "fails ingest writes nothing" sentence, and
+  rule 7 at `inherent-stability.md:182-188` still names only the two standalone checks.
+- `operations.md`'s degraded-description guidance survives at `:180-186`, and the
+  "Do not re-materialise" block at `:223-230`.
+- `assess_nwp_quality` and `assess_nwp_run_completeness` are untouched by the merge; the only
+  relevant change is a new `n_scattered_slices` key in the quality check's metadata, which the
+  degraded-metadata decision above does not interact with (that decision concerns the five
+  *shape* keys on the materialisation, not the check's own metadata).
+- Every test helper the plan names still exists: `_make_nwp` (`:111`), `_write_h3_grid_weights`
+  (`:125`), `env` (`:133`), `_check_evaluations` (`:258`).
