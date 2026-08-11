@@ -4,8 +4,8 @@ Every function here is unit-testable in isolation: the two data-shaping helpers
 (``select_nwp_init_time``, ``build_live_power_frame``) take ``power_fcst_init_time`` as an
 explicit parameter rather than calling ``datetime.now()`` internally, so a test can pass any
 fixed time and get a deterministic result; the two disk/MLflow helpers
-(``load_forecaster_from_dir``, ``fetch_model_artifacts``) are thin, single-purpose IO wrappers.
-The ``live_forecasts`` and ``promoted_model`` Dagster assets
+(``load_forecaster_from_dir``, ``fetch_model_artifacts``) do the IO and check that the saved
+model's feature names still parse. The ``live_forecasts`` and ``promoted_model`` Dagster assets
 (``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over these.
 """
 
@@ -15,16 +15,22 @@ import tempfile
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import patito as pt
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.config_schemas import import_class
 from contracts.power_schemas import PowerTimeSeries
+from pydantic import ValidationError
 
-from ml_core.base_forecaster import BaseForecaster, _download_and_unpack_model
+from ml_core.base_forecaster import (
+    BaseForecaster,
+    BaseForecasterConfig,
+    _download_and_unpack_model,
+)
 from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
+from ml_core.features._parsed_features import ParsedFeatures
 
 AvailabilityModeType = Literal["live", "replay"]
 """Which NWP-availability rule ``select_nwp_init_time`` applies.
@@ -129,12 +135,60 @@ def build_live_power_frame(
     return pt.LazyFrame.from_existing(dense).set_model(PowerTimeSeries)
 
 
+def _check_meta_features_are_parseable(meta: dict[str, Any], source: str) -> None:
+    """Raise if this code cannot serve the model that ``meta.json`` describes.
+
+    A saved model names its features as strings, so renaming or removing a feature in code leaves
+    every model trained before the change unservable. See
+    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>
+    for why this raises rather than degrading.
+
+    Args:
+        meta: The parsed contents of a model's ``meta.json``.
+        source: What is being validated — a directory or a run id — quoted back in the message so
+            an operator knows which model to re-train.
+
+    Raises:
+        ValueError: ``model_params`` is not a config this code can build, or ``selected_features``
+            names a feature it cannot parse.
+    """
+    # Both messages can reach the container log that scripts/build_and_verify_image.sh greps
+    # case-insensitively for "mlflow" to prove the runtime is hermetic, so neither may contain that
+    # word.
+    remedy = (
+        "Re-train against the current feature vocabulary and promote that run; never hand-edit "
+        "meta.json, which leaves the trained model carrying the old names."
+    )
+    try:
+        config = BaseForecasterConfig.model_validate(meta.get("model_params"))
+    except ValidationError as error:
+        raise ValueError(
+            f"The model at {source} has model_params this code cannot build a config from, so no "
+            f"forecaster here can load it. {remedy}"
+        ) from error
+
+    # One at a time and sorted, so the feature named is the same in every process: they live in a
+    # set, whose iteration order is not.
+    for feature in sorted(config.selected_features):
+        try:
+            ParsedFeatures.from_strings({feature})
+        except ValueError as error:
+            raise ValueError(
+                f"The model at {source} requests a feature this code cannot parse: {feature}. "
+                f"{remedy}"
+            ) from error
+
+
 def load_forecaster_from_dir(path: Path) -> BaseForecaster:
     """Load the production model from a plain disk directory (no MLflow at inference time).
 
     Reads ``meta.json`` and resolves ``model_class`` via ``contracts.config_schemas.import_class``
     (the same mechanism ``ml_core._mlflow_runs.load_experiment_forecaster`` uses), then calls the
     concrete subclass's ``load(path)``.
+
+    The forecaster returned is one this code can engineer features for, not merely one it could
+    deserialise: an unparseable feature vocabulary is rejected here, so it surfaces at model load
+    rather than partway through a live tick's feature engineering.
 
     Args:
         path: Directory previously populated by ``fetch_model_artifacts`` (the
@@ -147,7 +201,9 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
         FileNotFoundError: ``path`` or its ``meta.json`` does not exist — materialise the
             ``promoted_model`` asset first.
         ValueError: ``meta.json`` has no ``model_class`` field — it was saved by a code version
-            predating this contract; re-promote with a version that stamps ``model_class``.
+            predating this contract; re-promote with a version that stamps ``model_class``. Or
+            the model's ``selected_features`` name a feature this code cannot parse, in which case
+            re-train and promote the new run.
     """
     meta_path = path / "meta.json"
     if not meta_path.exists():
@@ -164,6 +220,9 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
             "model_class (see BaseForecaster.save)."
         )
     forecaster_cls = cast(type[BaseForecaster], import_class(model_class))
+    # Before `load`, not after: `load` reads every serialised sub-model off disk, which is a lot of
+    # IO to do on the way to rejecting the directory over one field already parsed above.
+    _check_meta_features_are_parseable(meta=meta, source=str(path))
     return forecaster_cls.load(path)
 
 
@@ -176,6 +235,12 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
     (``ml_core.base_forecaster._MLFLOW_MODEL_ARTIFACT``), so ``dest`` gets exactly the files the
     last ``save_to_mlflow`` wrote and can never inherit a stale file from an earlier, larger model.
 
+    The downloaded model's ``selected_features`` are checked against the running code *before* the
+    swap, reading the staged ``meta.json`` rather than loading the model, so a model this code
+    cannot serve is refused while the previous champion stays in ``dest`` and keeps serving.
+    Reading the one field is deliberate: loading would additionally pull every booster into memory
+    to answer a question one JSON field already answers.
+
     Also writes a ``promotion.json`` (``{"mlflow_run_id", "promoted_at"}``) into ``dest`` for
     provenance; a ``BaseForecaster.load`` implementation reads its own population from its saved
     record (e.g. ``XGBoostForecaster`` from ``meta.json``'s ``trained_time_series_ids``), never
@@ -187,9 +252,17 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
     Args:
         run_id: The MLflow run the model was saved under (via ``BaseForecaster.save_to_mlflow``).
         dest: Directory to populate — typically ``Settings.production_model_path``.
+
+    Raises:
+        ValueError: The model's ``selected_features`` are absent, malformed, or name a feature
+            this code cannot parse — re-train against the current feature vocabulary and promote
+            that run instead.
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
         downloaded_dir = _download_and_unpack_model(run_id, Path(tmp_dir))
+        meta = json.loads((downloaded_dir / "meta.json").read_text())
+        _check_meta_features_are_parseable(meta=meta, source=f"run {run_id}")
+
         promotion = {
             "mlflow_run_id": run_id,
             "promoted_at": datetime.now(UTC).isoformat(),
