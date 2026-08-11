@@ -379,11 +379,13 @@ def _nwp_quality_check_result(report: NwpQualityReport) -> AssetCheckResult:
         metadata={
             "n_null_cells": report.n_null_cells,
             "n_affected_slices": report.n_affected_slices,
-            # Broken out because the two mean different things, and because this is the one the
-            # report measures well: a wholly-null slice reaches the cells intact however they are
-            # aggregated, whereas the scattered remainder is whatever upstream corruption happened
-            # to take out every grid point of a cell.
+            # The split of `n_affected_slices`, broken out because the two halves mean different
+            # things and only one of them is measured well: a wholly-null slice reaches the cells
+            # intact however they are aggregated, whereas the scattered remainder is only whatever
+            # upstream corruption happened to take out every grid point of a cell. Both are
+            # emitted so the operations runbook can name either as a number to read off this check.
             "n_whole_null_slices": report.n_whole_null_slices,
+            "n_scattered_slices": report.n_scattered_slices,
             "affected_variables": list(report.affected_variables),
             "affected_slices": _nwp_null_slices_metadata(report.affected),
         },
