@@ -13,8 +13,9 @@ def _isolate_settings_from_ambient_config(monkeypatch: pytest.MonkeyPatch) -> No
 
     ``Settings`` reads ``PROJECT_ROOT/.env`` and process environment variables by default, so a
     developer's real local configuration — e.g. the ``DATA_STORE_*`` credentials that
-    ``docs/live_service/setup.md`` has them put in ``.env`` — would otherwise leak into tests
-    that assert on unset-field defaults (``storage_options == {}``, path derivation, …).
+    <https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/> has them put
+    in ``.env`` — would otherwise leak into tests that assert on unset-field defaults
+    (``storage_options == {}``, path derivation, …).
     """
     # cast: SettingsConfigDict is a TypedDict, whose per-key value types don't unify with
     # monkeypatch.setitem's Mapping[K, V] signature.
@@ -64,8 +65,9 @@ def test_delivery_fields_are_exactly_the_known_delivery_tables():
     """Guards against a new delivery table being added but never wired into _derive_unset_paths.
 
     If this test fails after adding a new *_data_path field, decide whether it belongs in the
-    NGED-facing delivery bucket (see docs/roadmap/delivery-tables.md) and update either this set
-    or Settings._derive_unset_paths accordingly.
+    NGED-facing delivery bucket
+    (<https://openclimatefix.github.io/nged-substation-forecast/roadmap/delivery-tables/>) and
+    update either this set or Settings._derive_unset_paths accordingly.
     """
     known_delivery_fields = {"power_forecasts_data_path", "effective_capacity_data_path"}
     # Always-local artifacts derive from local_artifacts_path, not either data-table root, so

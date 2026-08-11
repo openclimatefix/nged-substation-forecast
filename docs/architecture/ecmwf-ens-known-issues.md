@@ -58,6 +58,14 @@ of clean data, so it leaves the provenance guarantees of
 [principle 9](../design-philosophy/design-principles.md#9-provenance-travels-with-the-forecast-data)
 intact. Nothing is fabricated from another time step, another run or another cell.
 
+Each variable gets its *own* denominator, rather than one shared across the cell. A shared
+denominator would be simpler and is wrong: it would let a single corrupt variable null every other
+variable in the same cell, which is the amplification described below, applied across variables
+instead of across cells. What per-variable denominators cost is that two variables in one cell can
+end up averaged over different sub-areas of the hexagon. That matters only where a pair is later
+recombined — `wind_u_*` with `wind_v_*`, in `_calc_wind_speed` and `_calc_wind_direction` — and
+upstream corruption has so far always been co-located across variables, so it is theoretical today.
+
 `categorical_precipitation_type_surface` cannot be averaged, so the `proportion` weights are summed
 per category and the category covering most of the cell's area wins. Points that supplied no
 category are excluded from that ranking rather than competing in it — the distinction matters,

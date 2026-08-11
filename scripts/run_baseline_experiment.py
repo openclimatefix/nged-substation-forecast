@@ -162,7 +162,8 @@ def main() -> None:
     # Context manager, not a bare ``DagsterInstance.ephemeral()``: ``__exit__`` calls ``dispose()``,
     # closing the two SQLite connections the in-memory run and event-log storages hold open. Letting
     # the local fall out of scope does not do this — Dagster caches retain a used instance until the
-    # interpreter exits. Rationale and measurements: docs/architecture/testing.md.
+    # interpreter exits. Rationale and measurements:
+    # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>.
     with DagsterInstance.ephemeral() as instance:
         _run_pipeline(instance)
 

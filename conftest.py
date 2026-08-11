@@ -8,7 +8,8 @@ Why a collection hook rather than ``-m "not network"`` in ``addopts``: pytest ke
 replaces an ``addopts`` ``-m "not network"`` and re-includes the network tests. A skip applied
 during collection cannot be defeated that way — the gate holds regardless of what ``-m`` the caller
 passes. Run the network tests with ``uv run pytest --run-network`` (add ``-m network`` to run *only*
-them). See docs/architecture/testing.md.
+them). See
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>.
 """
 
 import os

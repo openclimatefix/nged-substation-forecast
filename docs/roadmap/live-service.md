@@ -112,13 +112,12 @@ Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > [access-phasing](#access-phasing) Stages 2–3 and the future-work items (MLflow server, dev
 > dashboard) remain post-v0.1.
 
-An earlier version of this plan committed to the Level 1 ("nothing always-on") design from
-issue #206. A
-2026-07-02 pressure-test of that decision found the #206 cost analysis substantially wrong:
-the always-on control plane it priced at ~£70–105/month actually costs ~£10–20/month (it
-priced a 16 GB box big enough to run the *compute*, not a small control-plane box), and its
-RDS prerequisite dissolves on a single machine (Postgres-in-Docker, or SQLite on a real local
-filesystem). Two requirements also firmed up that Level 1 does not serve:
+The Level 1 ("nothing always-on") design proposed in issue #206 is rejected: its cost case does
+not hold, and there are two requirements it cannot serve. The cost case rests on pricing the
+always-on control plane at ~£70–105/month, which is a 16 GB box big enough to run the
+*compute*; a small control-plane box costs ~£10–20/month (costed 2026-07-02). Its RDS
+prerequisite goes away on a single machine too (Postgres-in-Docker, or SQLite on a real local
+filesystem). The two requirements Level 1 does not serve:
 
 1. **Use Dagster "properly"** — persistent run history, one-click UI backfills of missed
    partitions, and the ability to launch backtests on AWS whenever the model improves.
@@ -411,9 +410,7 @@ Sensor preferred over a schedule so it fires on the actual data update.
 
 Note this sensor needs a running Dagster daemon — the
 [accepted option](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month) provides
-one. If the deployment instead ships Option A (nothing always-on), skip the sensor and run the
-monitoring step as the final op of the one-shot production job (the production-job workstream
-below already reserves that slot).
+one.
 
 ### Alert on absence: the missed-check-in alarm
 
@@ -485,15 +482,14 @@ free. No coupling needed; the ordering is flexible.
 
 Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208) (done)
 
-> **Status: ✅ Done** (closed 2026-07-10). It shipped differently than originally sketched: no
-> hand-rolled freshness op or one-shot `live_pipeline_job` was built. The native per-asset
-> Dagster schedules that ship with [The `live_forecasts` asset](#the-live_forecasts-asset)
+> **Status: ✅ Done** (closed 2026-07-10). The native per-asset Dagster schedules that ship with
+> [The `live_forecasts` asset](#the-live_forecasts-asset)
 > (`power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`, `live_forecasts_schedule`)
-> did the whole job: run under `dg dev` with a persistent `DAGSTER_HOME` for several days,
-> confirming 6-hourly forecasts landing with no duplicate rows and a missed slot backfillable in
-> replay mode. The one-shot `live_pipeline_job` that [Option A](#considered-but-rejected) would
-> have needed (Option A has no daemon to hold schedules) was never required, and is not
-> reproduced here now that Option A is rejected.
+> do the whole job. Closing #208 took a several-day soak under `dg dev` with a persistent
+> `DAGSTER_HOME`, which confirmed 6-hourly forecasts landing with no duplicate rows and a missed
+> slot backfillable in replay mode. No hand-rolled freshness op is needed, and neither is the
+> one-shot `live_pipeline_job` that [Option A](#considered-but-rejected) would require (Option A has no
+> daemon to hold schedules) — Option A is rejected, so that job is not specified here.
 
 ### Deployment workstream 3 — AWS infrastructure
 
@@ -539,11 +535,11 @@ Still 🚧 after v0.1:
   ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) once there's
   enough to justify it — per the
   [Access phasing sequencing note](#access-phasing), that point is Stage 2, not Stage 1.
-  **Open question, not yet decided:** this section originally specified a small Terraform
-  module (one file), but a later conversation argued for **AWS CDK (Python)** instead —
-  specifically for this project, since it's single-cloud (AWS-only), so there's no cross-cloud
-  benefit from HCL, and CDK lets the infra be written in Python rather than learning a new
-  language for it. Terraform vs CDK is Jack's call to make when Stage 2 work starts; this page
+  **Open question, not yet decided:** a small Terraform module (one file) versus **AWS CDK
+  (Python)**. The case for CDK is specific to this project: it's single-cloud (AWS-only), so
+  there's no cross-cloud benefit from HCL, and CDK lets the infra be written in Python rather
+  than learning a new language for it. Terraform vs CDK is Jack's call to make when Stage 2
+  work starts; this page
   does not pick one. The post-NIA operating model (NGED runs the service on NGED's AWS — see
   [Handover to NGED](handover.md#4-infrastructure-as-code-portable-to-ngeds-account)) adds two
   inputs to that call: the infra-as-code must be **account-portable** (no OCF-specific names or
