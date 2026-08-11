@@ -395,7 +395,7 @@ Written to describe how the code works now, per CLAUDE.md's "write about the pre
 - **`docs/live_service/operations.md`** — the same phrase at `:171`, plus a new operator paragraph:
   what `metadata_roster_rebuilt_reason` / `metadata_upsert_failed` mean, the
   `degraded_asset:power_time_series_and_metadata` Sentry filter, how to read the pre-rebuild roster
-  back with time travel, the manual step for a corrupt `_delta_log` (Q2), and the two migration
+  back with time travel, the manual step for a corrupt `_delta_log` (D2), and the two migration
   commands. Also tell the operator to append to the intervention log, as the rest of that section
   does.
 - **`docs/live_service/setup.md:69`** — the derived default is now `metadata.delta`.
@@ -525,7 +525,7 @@ one transactional upsert, which takes raisers 1 and 3 out by construction along 
 read-modify-write race, and makes `_align_to_contract` unnecessary. Delta's version history also
 preserves metadata changes we currently overwrite and lose, which matters for reproducing past CV
 runs, and it subsumes the quarantine copy. Against that, the measured costs above and the corrupt-log
-case in Q2. The conversion covers the roster and the H3 grid weights;
+case in D2. The conversion covers the roster and the H3 grid weights;
 `scripts/export_forecasts_for_alex.py`'s exports stay parquet, being files for a human outside the
 project.
 
@@ -555,7 +555,7 @@ findings that still apply are folded in above; recorded here so nothing is silen
    `checks.py:311-313`, and `_uri.py:7-11`. The first three are in the docs list above; the `_uri.py`
    one is moot, since the conversion adds nothing to that module.
 7. **The R&D readers of the roster** (`cv_assets.py:997-1000`, `cv_power_forecasts`) were missing from
-   the impact list. Folded into Q3.
+   the impact list. Folded into D3.
 8. **Line-reference drift** — `validate(existing_metadata)` is at 408, not 407. Corrected.
 9. **`os.replace` changes the inode**, so a symlinked roster path would be replaced by a plain file.
    Moot with Delta.
