@@ -145,6 +145,31 @@ def test_result_threshold_hours_reflects_threshold() -> None:
     assert result.threshold_hours == 8.0
 
 
+def test_late_series_table_is_capped_but_the_counts_are_not() -> None:
+    """A whole-feed stall lists only the worst ``_MAX_LATE_SERIES_IN_TABLE`` series.
+
+    The table is written to Dagster's event log every hour for as long as a stall lasts, so it is
+    capped; the counts beside it are not, which is what stops a truncated table making a large
+    stall look small.
+    """
+    cap = checks._MAX_LATE_SERIES_IN_TABLE
+    n_late = cap + 10
+    # Series `i` is `i` hours staler than series `i - 1`, so worst-first order is descending id.
+    coverage = _coverage({i: _NOW - timedelta(hours=48 + i) for i in range(1, n_late + 1)})
+    result = checks._to_asset_check_result(
+        evaluate_power_freshness(coverage, _roster(list(range(1, n_late + 1))), _NOW, _THRESHOLD)
+    )
+
+    assert result.metadata["n_late"].value == n_late  # the true count survives truncation
+    assert result.metadata["n_late_listed"].value == cap
+    late_table = result.metadata["late_time_series"]
+    assert isinstance(late_table, TableMetadataValue)  # narrows before reading `.records`
+    assert len(late_table.records) == cap
+    # The `cap` most stale, not an arbitrary `cap` of them.
+    listed_ids = {r.data["time_series_id"] for r in late_table.records}
+    assert listed_ids == set(range(n_late - cap + 1, n_late + 1))
+
+
 # ---------------------------------------------------------------------------
 # End-to-end: the real asset check against a temp Delta table + metadata roster.
 # ---------------------------------------------------------------------------
@@ -209,6 +234,8 @@ def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPat
     assert isinstance(late_table, TableMetadataValue)
     late_ids = {r.data["time_series_id"] for r in late_table.records}
     assert late_ids == {2, 99}
+    # Under the cap nothing is truncated, so the listed count is the real one — not the cap.
+    assert result.metadata["n_late_listed"].value == 2
 
 
 def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
@@ -677,6 +704,27 @@ def test_missed_nwp_runs_make_an_otherwise_good_slot_unhealthy() -> None:
     assert result.nwp.n_missed == 3
 
 
+def test_missing_series_metadata_reports_how_many_ids_it_listed() -> None:
+    """A whole missing population spells out only the first ``_MAX_MISSING_SERIES_LISTED`` ids.
+
+    Same rule as the freshness check's late-series table: the list is capped, the count beside it
+    is not, and a third field says how many the list holds so the two can't be confused.
+    """
+    cap = checks._MAX_MISSING_SERIES_LISTED
+    n_missing = cap + 5
+    result = checks._to_live_forecast_check_result(
+        _evaluate(
+            replace(_HEALTHY_ROWS, time_series_ids=(1,)),
+            expected_ids=list(range(1, n_missing + 2)),  # series 1 landed; 2..n_missing+1 did not
+        )
+    )
+    assert result.metadata["n_time_series_missing"].value == n_missing
+    assert result.metadata["n_time_series_missing_listed"].value == cap
+    listed = str(result.metadata["missing_time_series_ids"].value)
+    assert f"{cap + 1}" in listed  # the last id that fits
+    assert f"{cap + 2}" not in listed  # the first one that does not
+
+
 def test_check_result_is_a_non_blocking_warning() -> None:
     """Severity is WARN whether the slot is healthy or not; there is no ERROR path."""
     for rows in (_HEALTHY_ROWS, replace(_HEALTHY_ROWS, n_rows=0)):
@@ -1013,6 +1061,8 @@ def test_live_forecasts_check_warns_on_a_missing_trained_series(env: Path) -> No
     assert result.passed is False
     assert result.metadata["n_time_series_missing"].value == 2
     assert "2, 3" in str(result.metadata["missing_time_series_ids"].value)
+    # Under the cap nothing is truncated, so the listed count is the real one — not the cap.
+    assert result.metadata["n_time_series_missing_listed"].value == 2
 
 
 def test_live_forecasts_check_reports_missed_nwp_runs_end_to_end(env: Path) -> None:

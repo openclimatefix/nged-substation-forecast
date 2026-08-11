@@ -95,6 +95,22 @@ _LATE_TABLE_SCHEMA: Final[TableSchema] = TableSchema(
 )
 """Fixed schema for the late-series metadata table (required so an empty table still renders)."""
 
+_MAX_LATE_SERIES_IN_TABLE: Final[int] = 50
+"""Cap on how many late series the check's metadata table lists.
+
+Unlike the other capped listings this one lands in Dagster's event log — Postgres in the AWS
+deployment, `pg_dump`ed to S3 nightly — so it is written to durable storage every hour for as long
+as a stall lasts. Uncapped, a whole-feed stall at V2 scale (~2,500 series) would write about 350 KB
+of `TableRecord`s per hourly evaluation; at 50 rows it writes about 7 KB. The rows are ordered
+worst-first, so the listed 50 are the 50 most worth reading.
+
+Matches ``_sentry.MAX_LATE_SERIES_IN_CONTEXT`` rather than the tighter caps on the one-line
+description and the Sentry message body, because a browsable table and the Sentry event context
+serve the same drill-down purpose and showing the same leading series in both is one less thing to
+reconcile. The true count is always carried by the uncapped ``n_late`` metadata field, and
+``n_late_listed`` records how many rows the table actually holds, so a truncated table never makes a
+large stall look small."""
+
 _LATE_STATUS_ORDER: Final[tuple[str, ...]] = ("never", "stale")
 """Runtime tuple — declared order for the ``status`` column's ``pl.Enum``, which is also the
 row order in the late-series table (never-reported series listed before merely-stale ones)."""
@@ -224,7 +240,11 @@ def _read_roster_ids(
 
 
 def _late_table_metadata(late: pl.DataFrame) -> MetadataValue:
-    """Render the late-series frame as a Dagster table for the check's UI metadata."""
+    """Render the late-series frame as a Dagster table for the check's UI metadata.
+
+    Renders every row it is given: the caller truncates to ``_MAX_LATE_SERIES_IN_TABLE`` first, so
+    that the row count reported as ``n_late_listed`` and the table itself cannot disagree.
+    """
     records = [
         TableRecord(
             {
@@ -254,6 +274,8 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
             f"{result.n_stale} stale (>{threshold_h:.0f}h since last data), "
             f"{result.n_never} never reported."
         )
+    # Truncate once, here, so the table and the count that describes it come from one slice.
+    listed = result.late.head(_MAX_LATE_SERIES_IN_TABLE)
     return AssetCheckResult(
         # A stalled feed is expected to self-heal via back-fill, so warn — never fail the run and
         # block downstream assets. Absent data is not "healthy" either, hence the count guard.
@@ -266,7 +288,8 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
             "n_never_reported": result.n_never,
             "n_series_total": result.n_series_total,
             "threshold_hours": threshold_h,
-            "late_time_series": _late_table_metadata(result.late),
+            "n_late_listed": listed.height,
+            "late_time_series": _late_table_metadata(listed),
         },
     )
 
@@ -377,11 +400,12 @@ Used only to work out which slot to report on when the check is invoked without 
 a partitioned run takes its slot from the partition itself."""
 
 _MAX_MISSING_SERIES_LISTED: Final[int] = 20
-"""Cap on how many missing ``time_series_id``s the description spells out.
+"""Cap on how many missing ``time_series_id``s the description and the metadata spell out.
 
 Keeps the one-line description readable at V2 scale (~2,500 series) when a whole population is
-missing; the true count is always carried by the ``n_time_series_missing`` metadata field, so a
-truncated list never makes a large gap look small."""
+missing; the true count is always carried by the ``n_time_series_missing`` metadata field and
+``n_time_series_missing_listed`` records how many the list holds, so a truncated list never makes a
+large gap look small."""
 
 _UNIX_EPOCH: Final[datetime] = datetime(1970, 1, 1, tzinfo=UTC)
 """Origin for ``_floor_to_interval``'s arithmetic. Both cadences we floor to (daily NWP runs at
@@ -809,10 +833,12 @@ def _live_forecast_check_metadata(result: LiveForecastHealthResult) -> dict[str,
         # Gated on the same condition as n_time_series_expected below: an unreadable meta.json
         # makes "how many are missing" as unknown as "how many are expected", so 0 must not be
         # reported here — it would be indistinguishable from a verified-complete population.
+        listed_ids = result.missing_time_series_ids[:_MAX_MISSING_SERIES_LISTED]
         metadata["n_time_series_missing"] = len(result.missing_time_series_ids)
-        metadata["missing_time_series_ids"] = str(
-            list(result.missing_time_series_ids[:_MAX_MISSING_SERIES_LISTED])
-        )
+        metadata["missing_time_series_ids"] = str(list(listed_ids))
+        # How many of them the field above actually spells out, so a capped list is never mistaken
+        # for the whole set. Same rule as `n_late_listed` on the freshness check.
+        metadata["n_time_series_missing_listed"] = len(listed_ids)
         metadata["n_time_series_expected"] = result.n_expected_time_series
     if result.horizon_hours is not None:
         metadata["forecast_horizon_hours"] = round(result.horizon_hours, 1)

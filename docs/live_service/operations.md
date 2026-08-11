@@ -166,6 +166,13 @@ series with `last_seen` and `hours_late`. A warning therefore never stops foreca
 produced; it tells you which feed to chase. A handful of persistently-late series is usually a
 decommissioned or renamed substation rather than an outage — check the roster before escalating.
 
+That table lists the worst 50 series — never-reported first, then most-stale first — because it is
+written to the event log every hour a stall lasts. **Read `n_late`, not the table's length**, to
+see how big the stall is: `n_late` is the true count, and `n_late_listed` tells you how many rows
+the table holds, so the two agreeing means you are looking at every late series and the two
+differing means the list is truncated. The same pair appears on the live-forecast check as
+`n_time_series_missing` and `n_time_series_missing_listed`.
+
 One description means something different from all the others. `Could not evaluate power-data
 freshness: …` is the check reporting that it could not read its own inputs — suspect the object
 store, or a `metadata.parquet` left half-written by a killed process — not that the feed has
