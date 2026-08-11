@@ -61,6 +61,7 @@ nav:
       - Overview: architecture/overview.md
       - Performance and Scale: architecture/performance.md
       - Forecast Delivery: architecture/forecast-delivery.md
+      - NWP Variable Conventions: architecture/nwp-variable-conventions.md
       - Known ECMWF ENS Data-Quality Issues: architecture/ecmwf-ens-known-issues.md
       - ML Orchestration Design: architecture/ml-orchestration.md
       - Production Deployment Design: architecture/production-deployment.md
