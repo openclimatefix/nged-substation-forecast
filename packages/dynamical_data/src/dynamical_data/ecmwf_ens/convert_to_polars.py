@@ -38,7 +38,8 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     # and the physical units feed Nwp.validate. The offline tests share those assumptions, so after
     # changing this function run the network-gated test manually:
     #     uv run pytest --run-network -m network
-    # See docs/architecture/testing.md ("Network-gated tests").
+    # See
+    # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#network-gated-tests>.
     # Precompute latitude and longitude grids
     lat_grid, lon_grid = np.meshgrid(
         ds.latitude.values.astype(np.float32),
@@ -138,39 +139,25 @@ def _aggregate_grid_points_to_h3_cells(
 ) -> pl.DataFrame:
     """Reduce one H3 cell's overlapping NWP grid points to a single row per cell.
 
-    An H3 cell's value is the area-weighted mean of the grid points that overlap it: `sum(v * p)`
-    over the cell, where the `proportion` weights `p` sum to 1 by construction (see
-    `geo.h3.compute_h3_grid_weights`). Each variable is renormalised over the points that actually
-    supplied a value — dividing by the *contributing* weight rather than by 1.0 — so a cell keeps a
-    usable value when only some of its points arrived, instead of losing every point because one
-    was corrupt. Without that division, a missing point is silently treated as contributing zero,
-    which biases the cell low; the production grid averages ~2.9 grid points per cell, so that is
-    not a corner case.
+    Guarantees, per cell:
 
-    A cell where *no* point contributed has a contributing weight of zero and yields null, never
-    `0.0`. Getting that wrong is subtle and consequential: Polars sums an all-null group to `0.0`,
-    which for weather is a physically plausible, in-bounds lie (0 degC, 0 Pa, 0 m s-1) that passes
-    every downstream check. Nulling it is what makes the failure visible — see
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
+    - A **numeric** variable is the area-weighted mean of the points that supplied a value —
+      `sum(v * p)` divided by the *contributing* weight rather than by 1.0, so a missing point
+      costs only its own share instead of biasing the cell low.
+    - A **categorical** variable is the category covering most of the cell's area, with an exact
+      tie resolved to the lowest category code. Points that supplied no category are excluded from
+      the ranking rather than competing in it.
+    - Either kind yields **null**, never `0.0` or a spurious category, when *no* point contributed.
 
-    A categorical variable cannot be averaged, so its cell takes the category covering the most of
-    the cell's area: the `proportion` weights are summed per category and the heaviest wins, with
-    the lowest category code breaking an exact tie. That tie-break is arbitrary but deterministic,
-    which matters because ties are reachable — two grid points in one cell can carry identical
-    `proportion` weights, which happens for 185 of the V1 grid's 1671 cells — and an
-    order-dependent answer would vary with Polars' internals. Note the direction of the bias it
-    introduces: **ties resolve to the lowest category code, and code 0 is "no precipitation", so an
-    evenly-split cell leans dry.** Points that supplied no category are excluded from the ranking
-    rather than competing in it, so the cell is null only when *no* point supplied one, matching
-    the numeric rule above.
+    Each variable is renormalised over its own denominator, which is what keeps one variable's
+    corruption from nulling the others. The cost a caller must know about: two variables in one
+    cell can end up averaged over different sub-areas of the hexagon, so if `wind_u_*` and
+    `wind_v_*` ever have different null footprints, the vector `_calc_wind_speed` and
+    `_calc_wind_direction` derive from them mixes two sub-areas.
 
-    Renormalising each variable over *its own* contributing weight is what makes a variable's
-    corruption cost only that variable, but it does mean two variables in one cell can end up
-    averaged over different sub-areas of the hexagon. That matters only for `wind_u_*`/`wind_v_*`,
-    where `_calc_wind_speed` and `_calc_wind_direction` later combine the pair: if `u` and `v` have
-    different null footprints, the derived vector mixes two sub-areas. Upstream corruption has
-    always been co-located across variables, so this is theoretical today, and a shared denominator
-    would be worse — it would let one variable's corruption null every other variable in the cell.
+    Why it is done this way, with the measurements, the tie-break's dry bias and the shared-
+    denominator alternative that was rejected:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#spatial-aggregation-is-where-a-grid-points-null-is-resolved>.
 
     Args:
         joined: The H3 grid weights left-joined onto one chunk's NWP grid values. NaN must already
@@ -216,6 +203,9 @@ def _aggregate_grid_points_to_h3_cells(
             *contributing_weights,
             *weighted_modes,
         )
+        # The `> 0` guard is load-bearing, not defensive: Polars sums an all-null group to `0.0`,
+        # so without it a cell that lost every point would divide 0.0 by 0.0. Keeping the null is
+        # what stops that cell reading as an in-bounds 0 degC / 0 Pa.
         .with_columns(
             **{
                 var: pl.when(pl.col(var + _CONTRIBUTING_WEIGHT_SUFFIX) > 0)

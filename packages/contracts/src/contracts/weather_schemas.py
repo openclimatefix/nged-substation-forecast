@@ -103,8 +103,9 @@ class Nwp(pt.Model):
     (nwp_model_id, init_time, valid_time, ensemble_member, h3_index).
 
     Stored on disk as plain Float32, rounded to a significand-bit budget by
-    `delta_store.nwp.write_nwp` — see `docs/architecture/overview.md` for the physical format
-    and measured numbers.
+    `delta_store.nwp.write_nwp` — see
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/> for the
+    physical format and measured numbers.
 
     `validate` is the fatal ingest gate; `assess_nwp_quality` reports the tolerated nulls in the
     de-accumulated variables (the known upstream ECMWF ENS corruption) and
@@ -280,15 +281,12 @@ class Nwp(pt.Model):
     )
     """The variables Dynamical.org de-accumulates from ECMWF's cumulative source fields to rates.
 
-    They share a de-accumulation step whose known upstream corruption leaves nulls beyond lead-0 —
-    usually scattered per-pixel, occasionally a whole (ensemble_member, valid_time) slice (and all
-    three are legitimately null at lead-0). The scattered case mostly does not survive the H3
-    spatial aggregation as a null, because a cell is renormalised over the grid points that did
-    arrive; what reaches a frame validated here is therefore the blocky remainder plus whatever
-    scatter took out every point of a cell. Both are tolerated at ingest and reported by
-    :func:`assess_nwp_quality`; only a variable that is null in *every* slice beyond lead-0 is
-    fatal. See
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
+    All three are legitimately null at lead-0, and they share a de-accumulation step whose known
+    upstream corruption leaves further nulls beyond it. Those are tolerated at ingest and reported
+    by :func:`assess_nwp_quality`; only a variable null in *every* slice beyond lead-0 is fatal.
+    Which corruption patterns arrive, what the H3 aggregation absorbs before they reach a validated
+    frame, and why the survivors are tolerated:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#nulls-in-the-de-accumulated-variables-tolerated>.
     """
 
     # Columns that aren't NWP variables:
@@ -343,43 +341,23 @@ class Nwp(pt.Model):
         That is, one that is null in *every* (ensemble_member, valid_time) slice beyond lead-0 of
         a run.
 
-        An all-null weather column is an absent input rather than a degraded one: it would train
-        and serve silently for the whole 15-day horizon, so a run 24 hours old but *complete* is
-        the better degradation. It is also one shape a half-published upstream run takes, which is
-        why :class:`NwpVariableWhollyMissing` is retried rather than failed outright.
-
         Every smaller null pattern is *tolerated* and reported by :func:`assess_nwp_quality`
-        instead, because the run it would otherwise discard is overwhelmingly good. That covers
-        both the occasional whole slice that arrives empty and the cells where the upstream
-        per-pixel corruption took out every contributing grid point — a run can carry 2 wholly-null
-        slices out of one variable's 4284 (51 members
-        × 84 steps beyond lead-0) and still be worth the other 4282, plus the twelve variables that
-        arrived complete.
+        instead, so this is a cliff rather than a slope: a run one slice short of empty lands with
+        a warning. There is no tunable fraction — the test is that *nothing* survives. Why an
+        absent column is the one case worth discarding a run over, and why every smaller pattern
+        is not:
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-and-instantaneous-nulls-fatal>.
 
-        Be precise about *why* that is survivable, because the obvious argument is wrong. It is
-        true that all three variables are legitimately null at lead-0 in every run, so every model
-        handles nulls in them — but those lead-0 nulls reach the model *as nulls* only because they
-        are leading, and `_upsample_nwp_to_half_hourly` leaves leading nulls alone. An
-        *interior* wholly-null slice does not survive that way: `interpolate()` fills it from the
-        neighbouring steps, so the model sees a fabricated value rather than a null. The real
-        argument is narrower — a tolerated slice is a small, isolated part of one member's
-        trajectory, and bridging it (6 hours in the 3-hourly part of the horizon, 12 in the
-        6-hourly part, since the fill spans the steps *either side* of the missing one) is a
-        tolerable approximation. Note that it is a poorer one than the *spatial* fill the H3
-        aggregation applies to the scattered corruption, which stays inside one hexagon at one
-        step.
+        Two things a caller must not assume:
 
-        The judgement is made per `init_time`, so a run whose column is empty is caught even inside
-        a frame holding other, healthy runs. There is no tunable fraction here — the test is that
-        *nothing* survives — though it is still a cliff rather than a slope: a run one slice short
-        of empty lands with a warning.
-
-        The one place this is sharper than it looks: a frame filtered down to nothing *but* a
-        wholly-null slice is indistinguishable from an empty column and does raise, even though
-        the same slice was deliberately landed when the whole run was validated. That is latent
-        rather than live — the only production caller validates one whole run, and reads go
-        through `scan_delta`/`set_model`, which do not validate. See
-        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
+        - The judgement is made per `init_time`, so a run whose column is empty is caught even
+          inside a frame holding other, healthy runs — but by the same token, a frame filtered down
+          to nothing *but* a wholly-null slice is indistinguishable from an empty column and does
+          raise, even though that same slice was deliberately landed when the whole run was
+          validated. Latent rather than live today: the only production caller validates one whole
+          run, and reads go through `scan_delta`/`set_model`, which do not validate.
+        - Raising is not the end of the partition. :class:`NwpVariableWhollyMissing` is a distinct
+          type because the `ecmwf_ens` asset retries it rather than failing outright.
         """
         slices_per_run = (
             dataframe.filter(pl.col("valid_time") > pl.col("init_time"))
