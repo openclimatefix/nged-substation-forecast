@@ -4,8 +4,10 @@ description: >-
   The checklist for creating a GitHub issue or PR in openclimatefix/nged-substation-forecast —
   the fields `gh issue create` / `gh pr create` cannot set (labels, org issue Type, OCF project 33
   and its Status/Project/Area fields, sub-issue attachment and ordering, the JackKelly assignee) —
-  plus the never-squash-merge rule and ship-time triage. Load before running `gh issue create`,
-  `gh pr create` or `gh pr merge`, or when a PR completes a roadmap item.
+  plus the never-hard-wrap rule for anything posted to GitHub, the never-squash-merge rule and
+  ship-time triage. Load before running `gh issue create`, `gh pr create`, `gh pr comment`,
+  `gh issue comment` or `gh pr merge`, before writing any issue/PR body or comment, or when a PR
+  completes a roadmap item.
 ---
 
 # Creating issues and PRs, and shipping them
@@ -43,6 +45,33 @@ Whenever you create a PR, also set:
 
 `gh pr create` can't set either: use `gh pr edit --add-label` and `gh pr edit --add-assignee
 JackKelly` right after creating the PR.
+
+## Never hard-wrap a GitHub body or comment
+
+**Write one line per paragraph. No hard wraps, at any width.** This applies to every issue body,
+PR body, issue comment, PR comment and review comment — everything posted to GitHub rather than
+committed to the repo. Blank lines still separate paragraphs, and list items still get their own
+line; it is only wrapping *within* a paragraph that is forbidden.
+
+GitHub renders comment-shaped content with hard line breaks turned on, so a single newline inside
+a paragraph becomes a literal `<br>`. Repo `.md` files are rendered without that setting, which is
+why the same wrapping is correct there and wrong here. GitHub's own API shows the two renderers
+disagreeing on identical input:
+
+```bash
+printf '{"text":"line one\nline two","mode":"gfm"}' | gh api /markdown --input -
+```
+
+`mode=gfm` (the issue/PR/comment renderer) returns `<p>line one<br>\nline two</p>`;
+`mode=markdown` (the repo-file renderer) returns `<p>line one\nline two</p>` with no `<br>`. A body
+wrapped at this repo's 100-character prose width therefore reaches a reviewer as a ragged block of
+forced breaks, one per source line.
+
+**The trap is the draft file, not the typing.** A long body wants to be written to a file and
+passed with `gh pr create --body-file`, and a draft written *inside the repo* gets reflowed to the
+house line length by the markdown linter or by habit — at which point the wrapping is baked in
+before the body is ever posted. Write the draft to the session scratchpad directory instead, where
+no linter touches it, and pass that path to `--body-file`. Never commit a body draft.
 
 ## Merging pull requests
 
