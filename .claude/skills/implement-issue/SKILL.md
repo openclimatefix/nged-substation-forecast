@@ -13,9 +13,10 @@ description: >-
 
 This routine starts from an **approved plan**. The `plan-issue` skill (invoked as
 `/plan-issue <N>`) is how you get one: it reads the issue, decides whether it is worth
-implementing at all, writes `plans/<branch-name>.md`, has a fresh sub-agent adversarially review
-the plan, and stops for Jack. It also does step 1 below, so when it hands over, the worktree and
-branch already exist and implementation resumes at step 2.
+implementing at all, writes `plans/<branch-name>.md`, has two fresh sub-agents adversarially
+review the plan — one for simplicity, one for correctness and testability — and stops for Jack. It
+also does step 1 below, so when it hands over, the worktree and branch already exist and
+implementation resumes at step 2.
 
 When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it these steps up
 front — a report back after step 1 is not finished work.
