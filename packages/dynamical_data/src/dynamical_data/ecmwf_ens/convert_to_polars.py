@@ -141,22 +141,23 @@ def _aggregate_grid_points_to_h3_cells(
 
     Guarantees, per cell:
 
-    - A **numeric** variable is the area-weighted mean of the points that supplied a value —
-      `sum(v * p)` divided by the *contributing* weight rather than by 1.0, so a missing point
-      costs only its own share instead of biasing the cell low.
+    - A **numeric** variable is the area-weighted mean of the points that supplied a value:
+      `sum(v * p)`, where the `proportion` weights `p` sum to 1 over the whole cell by construction
+      (see `geo.h3.compute_h3_grid_weights`), divided by the *contributing* weight rather than by
+      that 1.0, so a missing point costs only its own share instead of biasing the cell low.
     - A **categorical** variable is the category covering most of the cell's area, with an exact
       tie resolved to the lowest category code. Points that supplied no category are excluded from
       the ranking rather than competing in it.
     - Either kind yields **null**, never `0.0` or a spurious category, when *no* point contributed.
 
-    Each variable is renormalised over its own denominator, which is what keeps one variable's
+    Each variable is renormalised over its *own* denominator, which is what keeps one variable's
     corruption from nulling the others. The cost a caller must know about: two variables in one
-    cell can end up averaged over different sub-areas of the hexagon, so if `wind_u_*` and
+    cell can then be averaged over different sub-areas of the hexagon, so if `wind_u_*` and
     `wind_v_*` ever have different null footprints, the vector `_calc_wind_speed` and
-    `_calc_wind_direction` derive from them mixes two sub-areas.
+    `_calc_wind_direction` derive from them mixes two sub-areas. Upstream corruption has always
+    been co-located across variables, so that is theoretical today.
 
-    Why it is done this way, with the measurements, the tie-break's dry bias and the shared-
-    denominator alternative that was rejected:
+    Why it is done this way, with the measurements and the tie-break's dry bias:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#spatial-aggregation-is-where-a-grid-points-null-is-resolved>.
 
     Args:
@@ -204,8 +205,7 @@ def _aggregate_grid_points_to_h3_cells(
             *weighted_modes,
         )
         # The `> 0` guard is load-bearing, not defensive: Polars sums an all-null group to `0.0`,
-        # so without it a cell that lost every point would divide 0.0 by 0.0. Keeping the null is
-        # what stops that cell reading as an in-bounds 0 degC / 0 Pa.
+        # so without it a cell that lost every point would divide 0.0 by 0.0.
         .with_columns(
             **{
                 var: pl.when(pl.col(var + _CONTRIBUTING_WEIGHT_SUFFIX) > 0)

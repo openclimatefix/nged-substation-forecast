@@ -343,10 +343,13 @@ class Nwp(pt.Model):
 
         Every smaller null pattern is *tolerated* and reported by :func:`assess_nwp_quality`
         instead, so this is a cliff rather than a slope: a run one slice short of empty lands with
-        a warning. There is no tunable fraction — the test is that *nothing* survives. Why an
-        absent column is the one case worth discarding a run over, and why every smaller pattern
-        is not:
+        a warning. There is no tunable fraction — the test is that *nothing* survives.
+
+        Why an absent column is the one case worth discarding a run over:
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-and-instantaneous-nulls-fatal>.
+        Why every smaller pattern is not — the slice arithmetic, and the interpolation argument
+        that makes a tolerated slice survivable:
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#nulls-in-the-de-accumulated-variables-tolerated>.
 
         Two things a caller must not assume:
 

@@ -59,7 +59,7 @@ why the same wrapping is correct there and wrong here. GitHub's own API shows th
 disagreeing on identical input:
 
 ```bash
-printf '{"text":"line one\nline two","mode":"gfm"}' | gh api /markdown --input -
+printf '{"text":"line one\\nline two","mode":"gfm"}' | gh api /markdown --input -
 ```
 
 `mode=gfm` (the issue/PR/comment renderer) returns `<p>line one<br>\nline two</p>`;
