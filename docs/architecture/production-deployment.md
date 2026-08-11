@@ -358,11 +358,17 @@ materialisation, giving an audit trail and lineage for free. The download logic 
 (`ml_core._production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper, so
 nothing about this decision couples it to Dagster.
 
-**The Docker build reuses this same asset** (headlessly, via `dagster asset materialize`) — no
-separate fetch script was built, since a bare script would have duplicated the asset's audit
-trail for no benefit. The `docker build` step itself stays outside Dagster: it only ever runs on
-a laptop today, and image build/push becomes a CI-shaped concern once an MLflow tracking server
-and AWS infra exist — not something worth orchestrating through Dagster in the meantime.
+**The image build is hermetic and depends on the asset only through the filesystem.** A
+researcher materialises `promoted_model` on their laptop first — the candidate models live in
+the laptop's local MLflow file store — which populates `data/production_model/`; the Dockerfile
+then `COPY`s that directory straight out of the build context and never contacts MLflow itself.
+So the build needs no credentials and no network beyond pulling base images, and the model in
+the image is exactly the artifact set the promotion materialisation recorded. `docker build`
+stays outside Dagster too: it only ever runs on a laptop today, and image build/push becomes a
+CI-shaped concern once an MLflow tracking server and AWS infra exist — not something worth
+orchestrating through Dagster in the meantime. The runbook steps are
+[Step 3](../live_service/aws.md#step-3-pick-and-promote-a-champion-model) and
+[Step 4](../live_service/aws.md#step-4-build-and-verify-the-image).
 
 ## Considered but rejected designs
 
