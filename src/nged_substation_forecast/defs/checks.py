@@ -100,9 +100,15 @@ _MAX_LATE_SERIES_IN_TABLE: Final[int] = 50
 
 Unlike the other capped listings this one lands in Dagster's event log — Postgres in the AWS
 deployment, `pg_dump`ed to S3 nightly — so it is written to durable storage every hour for as long
-as a stall lasts. Uncapped, a whole-feed stall at V2 scale (~2,500 series) would write about 350 KB
-of `TableRecord`s per hourly evaluation; at 50 rows it writes about 7 KB. The rows are ordered
-worst-first, so the listed 50 are the 50 most worth reading.
+as a stall lasts. Uncapped, a whole-feed stall at V2 scale (~2,500 series) would serialise to about
+355 KB per hourly evaluation; at 50 rows it is about 8 KB.
+
+The rows follow ``_LATE_STATUS_ORDER``: every never-reported series outranks every stale one, and
+the stale ones are most-stale first. So the listing is "the head of that order", not "the 50 series
+in most trouble" — when never-reported series outnumber the cap, no stale series is listed at all,
+however stale it is. That is a real limit of the drill-down at V2 cutover, when the roster is
+populated before data flows; ``n_stale`` and ``n_never_reported`` stay exact throughout, which is
+what the operator should read first.
 
 Matches ``_sentry.MAX_LATE_SERIES_IN_CONTEXT`` rather than the tighter caps on the one-line
 description and the Sentry message body, because a browsable table and the Sentry event context

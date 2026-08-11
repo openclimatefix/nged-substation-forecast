@@ -41,6 +41,7 @@ from dagster import (
 )
 from deltalake import write_deltalake
 
+from nged_substation_forecast import _sentry
 from nged_substation_forecast.defs import checks
 from nged_substation_forecast.defs.checks import (
     LiveForecastHealthResult,
@@ -146,7 +147,7 @@ def test_result_threshold_hours_reflects_threshold() -> None:
 
 
 def test_late_series_table_is_capped_but_the_counts_are_not() -> None:
-    """A whole-feed stall lists only the worst ``_MAX_LATE_SERIES_IN_TABLE`` series.
+    """A whole-feed stall lists only ``_MAX_LATE_SERIES_IN_TABLE`` series, most-stale first.
 
     The table is written to Dagster's event log every hour for as long as a stall lasts, so it is
     capped; the counts beside it are not, which is what stops a truncated table making a large
@@ -168,6 +169,34 @@ def test_late_series_table_is_capped_but_the_counts_are_not() -> None:
     # The `cap` most stale, not an arbitrary `cap` of them.
     listed_ids = {r.data["time_series_id"] for r in late_table.records}
     assert listed_ids == set(range(n_late - cap + 1, n_late + 1))
+
+
+def test_the_table_never_holds_more_detail_than_the_sentry_event_context() -> None:
+    """The durable listing may not be more detailed than the transient one.
+
+    Both cap the same worst-first ordering, and the table is the one written to the event log every
+    hour a stall lasts, so it is the one that must not grow without a reason. Pinning the
+    relationship rather than the number leaves the cap free to be retuned downwards.
+    """
+    assert checks._MAX_LATE_SERIES_IN_TABLE <= _sentry.MAX_LATE_SERIES_IN_CONTEXT
+
+
+def test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table() -> None:
+    """Every never-reported series outranks every stale one, so at V2 cutover — a populated roster
+    before data flows — the table can hold no stale series at all. The counts stay exact, which is
+    why the operator is told to read those first."""
+    cap = checks._MAX_LATE_SERIES_IN_TABLE
+    coverage = _coverage({i: _NOW - timedelta(hours=1000) for i in range(1, 11)})  # 10 very stale
+    roster = _roster(list(range(1, 11)) + list(range(100, 100 + cap + 5)))  # + cap+5 never-reported
+    result = checks._to_asset_check_result(
+        evaluate_power_freshness(coverage, roster, _NOW, _THRESHOLD)
+    )
+
+    late_table = result.metadata["late_time_series"]
+    assert isinstance(late_table, TableMetadataValue)
+    assert {r.data["status"] for r in late_table.records} == {"never"}
+    assert result.metadata["n_stale"].value == 10  # exact, though none of them is listed
+    assert result.metadata["n_late"].value == cap + 15
 
 
 # ---------------------------------------------------------------------------
@@ -256,6 +285,8 @@ def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
     assert isinstance(result, AssetCheckResult)
     assert result.passed is True
     assert result.metadata["n_late"].value == 0
+    # Emitted even when nothing is late, so the key keeps one type across runs and stays plottable.
+    assert result.metadata["n_late_listed"].value == 0
 
 
 def test_power_data_is_fresh_no_data_yet_warns(env: Path) -> None:
@@ -1033,6 +1064,7 @@ def test_live_forecasts_check_degrades_when_meta_json_names_no_experiment(env: P
     assert result.passed is True
     assert "n_time_series_expected" not in result.metadata
     assert "n_time_series_missing" not in result.metadata
+    assert "n_time_series_missing_listed" not in result.metadata
 
 
 def test_live_forecasts_check_warns_on_hindcast_rows(env: Path) -> None:
@@ -1106,6 +1138,7 @@ def test_live_forecasts_check_does_not_raise_with_no_tables_at_all(env: Path) ->
     # An unreadable meta.json makes "how many are missing" as unknown as "how many are expected" —
     # 0 here would be indistinguishable from a verified-complete population.
     assert "n_time_series_missing" not in result.metadata
+    assert "n_time_series_missing_listed" not in result.metadata
     assert "missing_time_series_ids" not in result.metadata
     assert "forecast_horizon_hours" not in result.metadata
     assert "no NWP run is available" in str(result.description)
@@ -1133,6 +1166,7 @@ def test_live_forecasts_check_degrades_on_a_malformed_meta_json(env: Path) -> No
     assert result.passed is True  # the single time series written is not flagged as missing
     assert "n_time_series_expected" not in result.metadata
     assert "n_time_series_missing" not in result.metadata
+    assert "n_time_series_missing_listed" not in result.metadata
 
 
 def test_live_forecasts_check_degrades_on_invalid_json(env: Path) -> None:
