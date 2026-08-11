@@ -522,7 +522,10 @@ was not the better fix — no bespoke atomic-write machinery, and one storage id
 It is, and for a reason the first plan undersold: `MERGE` **deletes** the machinery rather than
 moving it. The read → validate → `hash_rows` diff → `concat` → `unique` → write dance collapses into
 one transactional upsert, which takes raisers 1 and 3 out by construction along with the
-read-modify-write race, and makes `_align_to_contract` unnecessary. Delta's version history also
+read-modify-write race. `_align_to_contract` survives the rewrite, but shrunken: the parquet plan
+needed it on *both* frames to stop the `concat` raising, whereas here it applies to the snapshot
+alone, and for a different reason — D1's "a field NGED stops sending is cleared" semantics, which
+Delta would otherwise silently reverse. Delta's version history also
 preserves metadata changes we currently overwrite and lose, which matters for reproducing past CV
 runs, and it subsumes the quarantine copy. Against that, the measured costs above and the corrupt-log
 case in D2. The conversion covers the roster and the H3 grid weights;
