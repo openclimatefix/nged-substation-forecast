@@ -74,9 +74,14 @@ The check is attached to `power_time_series_and_metadata`, so the existing hourl
 runs it every hour with no extra wiring. It reports two kinds of lateness: a series that once
 reported but has now gone **stale**, and a roster series (present in the `TimeSeriesMetadata`
 parquet) that has **never** sent data. The count of each, plus a table of the offending
-`time_series_id`s, lands in the check's Dagster metadata — Dagster's Checks view becomes the
-operator's at-a-glance "is the power data healthy?" status surface, showing a green tick when
-every series is current and a yellow warning naming the late count when the feed has stalled.
+`time_series_id`s, lands in the check's Dagster metadata. That table is **capped** at 50 rows, for
+the same reason the Sentry payloads below are — an uncapped listing writes thousands of rows into
+the event log every hour a whole-feed stall lasts, and the event log is durable storage that gets
+backed up. The counts beside it are uncapped, and an `n_late_listed` field records how many rows
+the table actually holds, so a truncated table can never make a large stall look small. Dagster's
+Checks view becomes the operator's at-a-glance "is the power data healthy?" status surface, showing
+a green tick when every series is current and a yellow warning naming the late count when the feed
+has stalled.
 The severity is a warning rather than a failure: a stalled feed is expected to self-heal once
 NGED recovers (the pipeline back-fills the gap automatically), so it must not block downstream
 assets.
