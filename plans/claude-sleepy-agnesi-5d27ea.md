@@ -7,10 +7,11 @@ Branch: `claude/sleepy-agnesi-5d27ea`
 
 **Worth implementing, roughly as described.** The mechanism the issue names (an asset tag) is the
 right one, and the payoff is real: an operator can type one selection string into the Dagster UI
-and see only the assets the live service runs. It is also the queryable form of the fail-fast /
-fail-operational asymmetry that
+and see only the assets the live service runs. It also makes the R&D side of the fail-fast /
+fail-operational asymmetry — argued in
 [inherent stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#rd-fails-the-other-way)
-already argues but currently leaves implicit.
+but nowhere expressed in code — enumerable in one query. It does not make the *posture* itself
+queryable; see [What the tag means](#what-the-tag-means), which the doc wording depends on.
 
 ### Departures from the issue
 
@@ -190,7 +191,7 @@ which is an evaluation concern, and its only consumer is `metrics`.
 ### Deliberately out of scope
 
 - **Asset checks** (`defs/checks.py`), **jobs** and **schedules** are not tagged. The issue is
-  about the asset graph, both existing checks are already production-only, and the Sentry hook
+  about the asset graph, all four asset checks already hang off production assets, and the Sentry hook
   already marks the three production jobs.
 - **No asset body is touched.** Issue #505 owns the `ecmwf_ens` body and issues #486 and #488 own
   bodies in `production_assets.py`, all in flight in parallel. This diff is decorator lines,
@@ -222,10 +223,13 @@ call**, and note that answering it the other way also changes how doc item 1 has
 
 This change adds no runtime code path, so it cannot fail open or closed. It adds no asset check.
 
-It is the queryable form of rule 9 in
+It names the two sides that rule 9 in
 [inherent stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
-— "fail in the direction where being wrong is cheapest to recover from" — whose *R&D fails the
-other way* section already names this issue as the missing mechanism. It serves
+— "fail in the direction where being wrong is cheapest to recover from" — is stated in terms of,
+and whose *R&D fails the other way* section names this issue as the missing mechanism for. It does
+not encode the postures themselves: `layer` says which side needs an asset, and an asset can be
+`production` and still fail fast where rule 1 permits it, which is the case for `promoted_model`.
+It serves
 [H1](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/)
 (a service that mostly runs itself) by making "what does production actually need" answerable in
 the UI rather than by reading three modules.
@@ -247,11 +251,20 @@ deselects it, so a plain `uv run pytest` collects all 24 of its tests.)
 |---|---|
 | `production \| rnd == asset_graph.executable_asset_keys` — every asset carries a legal `layer` | Both selections are empty on `main`, so the union misses all eleven assets |
 | `production & rnd == set()` — no asset carries both | (Holds trivially on `main`; it is the guard against a future second tag) |
-| `live_forecasts` and `ecmwf_ens` are in `production`; `trained_cv_model` and `metrics` are in `rnd` | Both sets are empty on `main` |
+| The four assets whose classification is contestable land where this plan puts them: `promoted_model`, `promotable_model_runs` and `h3_grid_weights` in `production`, `effective_capacity` in `rnd`. Plus `live_forecasts` and `trained_cv_model` as the two obvious anchors | Both sets are empty on `main` |
 
 The union assertion is the one with ongoing value: it fails the moment someone adds an asset
 without classifying it, and it is a property of every asset rather than a list of names, so it
 does not become a merge conflict when a parallel session adds one.
+
+**The spot-checks must name the contestable assets, not the obvious ones.** Union and disjointness
+are value-agnostic — they demand that every asset carry exactly one of the two tags, not *which*.
+So a spot-check list of `live_forecasts` / `ecmwf_ens` / `trained_cv_model` / `metrics` leaves the
+suite green if `promoted_model` flips to `rnd`, which is precisely the decision
+[open question 2](#risks-and-open-questions) escalates. Whatever Jack answers has to be pinned by
+an assertion, so that changing it later is a deliberate edit to a test rather than a silent
+one-word change. `h3_grid_weights` (production but unscheduled) and `effective_capacity` (the
+closest call on the R&D side) belong in the list for the same reason.
 
 **Compare against `executable_asset_keys`, not `get_all_asset_keys()`.** The two are identical
 today (eleven keys, no source assets), but a typo in any `deps=["…"]` string silently creates an
@@ -303,9 +316,23 @@ before collection, so the import-time `init_sentry` is a no-op.
    control-plane decision". A new top-level section there would be the wrong weight; the
    tag-versus-group reasoning goes in a one-line comment above the constants in `defs/_tags.py`,
    where an editor tempted to change it will be standing.
-3. **`docs/live_service/operations.md`** — one sentence under *Prerequisites*, giving the operator
+3. **`docs/live_service/operations.md`** — a sentence under *Prerequisites*, giving the operator
    `tag:layer=production` to paste into the Dagster UI. This is the issue's actual payoff, so it
    belongs on the page the operator reads.
+
+   **It must say what the selection includes, not just the string.** Six assets match, and two of
+   them — `promoted_model` and `promotable_model_runs` — only ever run on a laptop: the same page
+   already says at line 52 that "Promotion (this step and the next) always happens **on your
+   laptop**, whichever environment serves the forecasts", and
+   `docs/design-philosophy/design-principles.md:555` says the production box "has no MLflow and
+   never runs promotion". A bare selection string would tell an operator on the AWS box that six
+   assets are production when four of them are what that box runs. This is the same tension as
+   [open question 2](#risks-and-open-questions), surfacing in the docs.
+4. **`tests/test_asset_selection_parses.py`** — its module docstring says "nothing in the test
+   suite or the Dagster UI parses a selection string — only the CLI does". This change makes the
+   first half false (the new test parses one). The second half is *already* false: the webserver
+   bundle ships its own ANTLR asset-selection grammar with a `TagAttributeExpr` rule, which is what
+   makes the UI selection box work at all. One-line rewrite, in the same commit.
 
 No roadmap item completes here, so there is no ship-time triage.
 
@@ -330,7 +357,7 @@ Those two must between them list every asset, with nothing in both and nothing i
 end-to-end check that the tag does what the issue asked, through the real CLI parser rather than
 the test's in-process one. (`dagster asset list --select` is verified to work on this repo today.)
 
-`mkdocs build --strict` is on the list because all three doc edits add cross-page links; read the
+`mkdocs build --strict` is on the list because the doc edits add cross-page links; read the
 rendered HTML for the new `overview.md` bullet, since the repo's `mkdocs-authoring`
 skill documents several ways a page renders wrong while both linters pass.
 
@@ -414,7 +441,8 @@ substance:
 5. **Cut the "a future job or schedule could select by layer" rationale** — no such job is proposed
    here or in the issue.
 6. **`research` added to the vocabulary alternatives**, and the `production-deployment.md` section
-   cut down to a paragraph.
+   cut down to a paragraph. *(Superseded: the second simplicity pass moved the architecture record
+   to `docs/architecture/overview.md` instead.)*
 
 ### Rejected
 
@@ -499,7 +527,8 @@ and the 3 / 5 / 3 module split are right.
    use. Kept the assertion (it pins the fallback, which is what the comment is about) and recorded
    the gap.
 5. **The new architecture section must land before line 378**, ahead of *Considered but rejected
-   designs*.
+   designs*. *(Superseded: there is no longer a `production-deployment.md` section — the record
+   moved to `docs/architecture/overview.md`, which has no such heading.)*
 6. **"Sharing one dict across eleven decorators"** — it is two dicts, across six and five.
 
 ### Rejected
@@ -511,3 +540,41 @@ Nothing. The reviewer raised no finding I could not reproduce.
 `production_assets.py`'s module docstring is itself written as a history note ("New file
 (`defs/cv_assets.py` is already ~900 lines)"), which the repo's "write about the present" rule
 forbids. Out of scope for this issue — worth a separate one-line fix some time.
+
+## Review findings — correctness, second pass
+
+Re-run against the merged tree after the rescoped simplicity review, because the plan had changed
+substantially. Every empirical claim and every line citation re-verified and held; the reviewer
+also wrote the test, ran it red on the current tree, applied the eleven tags, and ran the full
+suite green (607 passed). Five real defects, all accepted.
+
+1. **Two accepted findings from the first correctness pass had gone stale** — they still described
+   a `production-deployment.md` section that the later simplicity pass moved to `overview.md`. Both
+   are now marked superseded, so an implementer reading the findings lists cannot edit the wrong
+   page.
+2. **The Verdict and the *Design-philosophy check* contradicted *What the tag means*.** Both said
+   the tag *is* the queryable form of the fail-fast asymmetry; the later section says it is not, and
+   the doc wording depends on that. All three now agree: the tag makes the two *sides* enumerable,
+   not the postures.
+3. **The test did not pin any of the contestable classifications.** Union and disjointness are
+   value-agnostic, and the spot-check list named only obvious assets — so flipping `promoted_model`
+   to `rnd`, the very decision escalated to Jack, left the suite green. The spot-checks now name
+   `promoted_model`, `promotable_model_runs`, `h3_grid_weights` and `effective_capacity`.
+4. **Doc edit 3 would have misled an operator on the AWS box**, telling them six assets are
+   production when two of them only ever run on a laptop — a tension the plan had already recorded
+   under *Ambiguous cases* and then failed to carry into the doc wording.
+5. **`tests/test_asset_selection_parses.py`'s docstring becomes false** ("nothing in the test suite
+   or the Dagster UI parses a selection string"). Added as doc edit 4. Its second clause is already
+   false — the webserver bundle ships its own ANTLR grammar with a `TagAttributeExpr` rule.
+
+### Rejected
+
+Nothing.
+
+### Noted
+
+"Both existing checks are already production-only" undercounts: there are four check keys, the two
+standalone ones plus `ecmwf_ens`'s two `check_specs`. All four hang off production assets, so the
+conclusion is unchanged and the sentence is merely imprecise. Separately, the reviewer saw one
+intermittent failure of `tests/test_metrics.py::test_metrics_no_filter_scores_every_group` that did
+not reproduce; this change adds no runtime code, so do not attribute a single red run to it.
