@@ -331,7 +331,12 @@ def test_upsert_metadata_does_not_rebuild_on_a_panic(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """A Rust panic is evidence about the process, not about the file, so it must propagate and
-    leave the stored roster alone — the asset's own guard degrades the run without rewriting."""
+    leave the stored roster alone — the asset's own guard degrades the run without rewriting.
+
+    Unlike its siblings this passes before the fix too, because there was no handler to be too wide.
+    It guards `_read_existing_roster` catching `Exception` and not `BaseException` — a one-word
+    difference with no other visible symptom.
+    """
     metadata_path = tmp_path / "metadata.parquet"
     _roster([1]).write_parquet(metadata_path)
     stored_before = metadata_path.read_bytes()

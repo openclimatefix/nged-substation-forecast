@@ -205,6 +205,16 @@ appear nowhere else.
     [coupling-through-data-at-rest
     principle](design-principles.md#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status),
     in imperative form.)*
+12. **A derived artifact we cannot read is absent, not fatal — rebuild it and keep going.** Anything
+    we wrote ourselves and can write again is recoverable by definition, so a corrupt or off-contract
+    copy must never stop the job that produces the data it was derived from. Rebuild it, report the
+    rebuild, and carry on. Two things make this more than a restatement of rule 3. The rebuild is
+    usually *lossy* — the incoming batch rarely covers everything the artifact held — so it needs the
+    loss stated in the runbook and a way for an operator to see it happened, not just a silent
+    recovery. And a rebuild must not be attempted on evidence that is not about the artifact: a Rust
+    panic says something about the process, so overwriting a file on the strength of one is worse
+    than leaving it alone. `upsert_metadata`'s roster rebuild is the worked example, and
+    [Missing versus wrong](#missing-versus-wrong) is where it is set out.
 
 ## Where complexity should live
 
@@ -247,6 +257,13 @@ staying cheap and promotion staying one command.
 - **Absent or stale input** → always produce a forecast. Degrade, widen, declare.
 - **Detectably wrong input** → do not consume it. Treat it as missing, which routes it back into the
   always-output path.
+
+The same distinction decides what to do with a *derived artifact* we wrote ourselves. The
+`TimeSeriesMetadata` roster is the worked example: one that will not parse, or that no longer
+satisfies its contract, is wrong rather than merely stale, so `upsert_metadata` treats it as absent
+and rewrites it from the incoming snapshot instead of raising. That routes it into the same branch a
+first-ever run takes — and it is why the roster's failure no longer costs the hourly ingest its power
+data. What it does cost is stated with rule 12 below.
 
 A stuck meter reporting 2.1 MW for 52 hours is not missing data; it is actively misleading, and a
 lag-feature model will propagate it happily. The incumbent has the identical vulnerability.

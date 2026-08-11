@@ -173,6 +173,74 @@ def test_power_time_series_and_metadata_ingests_and_writes(
     assert {"nged_s3_paths", "PowerTimeSeries"} <= metadata_keys
 
 
+def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fails(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The headline property of #508: the roster is derived, re-delivered data, so losing one
+    refresh of it must not cost the power stream an hour of telemetry.
+
+    Also asserts the degradation is *reported*. Not failing the step means
+    ``sentry_capture_failure`` no longer fires, and log-to-event capture is off, so without the
+    explicit send this would be a silent hole rather than a degraded run.
+    """
+    monkeypatch.setattr(
+        assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
+    )
+
+    def boom(*_: object, **__: object) -> None:
+        raise RuntimeError("roster upsert exploded")
+
+    monkeypatch.setattr(assets, "upsert_metadata", boom)
+    reported: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        assets, "report_asset_degradation", lambda name, detail: reported.append((name, detail))
+    )
+
+    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
+    assert result.success
+
+    power = pl.read_delta(str(env / "NGED" / "power_time_series.delta")).sort(
+        PowerTimeSeries.columns_to_sort_by
+    )
+    PowerTimeSeries.validate(power)
+    assert set(power["time_series_id"].unique().to_list()) == {10, 11}
+
+    materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
+    metadata_keys = set().union(*(mat.metadata.keys() for mat in materialisations))
+    assert "metadata_upsert_failed" in metadata_keys
+
+    assert [name for name, _ in reported] == ["power_time_series_and_metadata"]
+    assert isinstance(reported[0][1], RuntimeError)
+
+
+def test_power_time_series_and_metadata_reports_a_rebuilt_roster(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """A rebuilt roster can be thin, so it must reach Sentry rather than only the logs — the run
+    itself succeeds, which is exactly why nothing else would raise the alarm."""
+    monkeypatch.setattr(
+        assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
+    )
+    metadata_path = env / "NGED" / "metadata.parquet"
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.write_bytes(b"not a parquet file")
+
+    reported: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        assets, "report_asset_degradation", lambda name, detail: reported.append((name, detail))
+    )
+
+    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
+    assert result.success
+
+    TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
+    materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
+    metadata_keys = set().union(*(mat.metadata.keys() for mat in materialisations))
+    assert "metadata_roster_rebuilt_reason" in metadata_keys
+    assert [name for name, _ in reported] == ["power_time_series_and_metadata"]
+    assert "rebuilt" in str(reported[0][1])
+
+
 def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:

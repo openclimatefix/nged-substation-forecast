@@ -176,12 +176,37 @@ is configured — so laptops and CI stay silent by default.
   workload; because log capture is off, failures in a manual UI materialisation, a replay backfill,
   or an experiment job are watched by the operator at the Dagster UI, not routed to Sentry.
 
-    One production fault the hook cannot see is a standalone `@asset_check` that caught its own
-    exception instead of failing the run — which, by design, is both of them. (The two NWP checks
-    are computed inside the `ecmwf_ens` asset and have no catch-all, so a raise there does fail the
-    run and the hook does see it.) `report_check_degradation` covers exactly that gap: each check's
-    catch-all sends the same exception the hook would have sent, tagged `asset_check` with the
-    check's name. Since log capture is off, the handler's `ERROR` log alone would reach nobody.
+    The faults the hook cannot see are the ones something caught on purpose instead of failing the
+    run. There are two kinds. A standalone `@asset_check` that caught its own exception — which, by
+    design, is both of them; the two NWP checks are computed inside the `ecmwf_ens` asset and have no
+    catch-all, so a raise there does fail the run and the hook does see it.
+    `report_check_degradation` covers that gap: each check's catch-all sends the same exception the
+    hook would have sent, tagged `asset_check` with the check's name.
+
+    The other kind is an *asset* that degrades rather than failing.
+    `power_time_series_and_metadata` guards its `TimeSeriesMetadata` roster upsert so that a roster
+    fault cannot cost the run its power data, and `report_asset_degradation` sends that exception
+    tagged `degraded_asset` with the asset's name. It also accepts a reason string, because a roster
+    rebuilt inside `upsert_metadata` has no live exception left to capture at the asset boundary.
+    Since log capture is off, either handler's `ERROR` log alone would reach nobody.
+
+### The metadata roster degrades on its own
+
+The roster (`metadata.parquet`) is derived, re-delivered data; the `power_time_series` Delta table is
+neither. So `upsert_metadata` treats a stored roster it cannot read or validate as **absent** and
+rewrites it from the incoming snapshot, reporting `metadata_roster_rebuilt_reason`, and the asset
+wraps the whole call so that even an unexpected failure only costs `metadata_upsert_failed` in the
+run's metadata rather than the hour's telemetry.
+
+Two consequences an operator needs. A rebuild is **lossy**: the snapshot covers only the time series
+whose files were new that run, so the roster can come back thin, and because `select_new_rows` never
+re-reads a file the power table already covers, a series that has since stopped publishing does not
+return on its own. And the roster is a bare Parquet file, so on a *local* data root a killed writer
+can still tear it — the difference is that a torn roster now self-heals on the next run instead of
+wedging the job. Production's data root is S3, where a killed writer abandons its upload and leaves
+the previous object intact, so the torn write cannot happen there.
+[Operations](../live_service/operations.md#a-rebuilt-or-failed-metadata-roster) has the recovery
+steps.
 
 - **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
   `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron
