@@ -41,7 +41,9 @@ class RegisterExperimentConfig(Config):
         default_factory=dict,
         description=(
             "Key-value overrides applied to the base YAML's model_params, replacing whole values,"
-            " e.g. {'selected_features': ['lag_1h'], 'n_estimators': 300}."
+            " e.g. {'selected_features': ['lag_1h'], 'n_estimators': 300}. Every key must name a"
+            " field the config class declares; an unknown one is rejected, so a misspelling fails"
+            " here rather than training on the YAML's value."
         ),
     )
     run_mode: Literal["smoke_test", "full_cv", "register_only"] = Field(
@@ -64,10 +66,13 @@ _UNOVERRIDABLE_MODEL_PARAMS: Final[dict[str, str]] = {
 }
 """The ``model_params`` keys a run's ``config_overrides`` may not set, mapped to why not.
 
-Both are ordinary keys as far as the override merge is concerned, and both would be discarded
-without a word downstream of it: ``_target_`` by pydantic's ``extra="ignore"``, because the config
-class was already resolved from the file; ``experiment_name`` by the assignment that stamps the
-job's own value over it.
+Both are ordinary keys as far as the override merge is concerned, and each needs rejecting for its
+own reason. ``experiment_name`` is a *declared* field, so ``BaseForecasterConfig``'s
+``extra="forbid"`` cannot see it: an override of it validates cleanly and is then overwritten by
+the assignment that stamps the job's own value, discarding it without a word. ``_target_`` would be
+caught by ``extra="forbid"`` unaided, and is listed here only for the message — pydantic would say
+just "extra inputs are not permitted", where this names the key and points at ``base_model_config``
+as the way to change the config class.
 """
 
 
@@ -133,8 +138,9 @@ def _resolve_forecaster_config(
         config_overrides: Overrides applied to ``model_params`` as **whole-value replacement**: an
             override replaces the base value outright rather than merging into it. Lists are
             replaced, not extended, and a value that is itself a mapping is replaced whole, so
-            an override must restate every key of that mapping it wants to keep. Every
-            ``model_params`` key is overridable except those in ``_UNOVERRIDABLE_MODEL_PARAMS``.
+            an override must restate every key of that mapping it wants to keep. Every key must
+            name a field the config class declares, except those in
+            ``_UNOVERRIDABLE_MODEL_PARAMS``, which are the resolver's own to set.
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
@@ -143,6 +149,9 @@ def _resolve_forecaster_config(
     Raises:
         ValueError: ``config_overrides`` names an unoverridable key, or the YAML is not a usable
             model config.
+        ValidationError: ``config_overrides`` names a key the config class does not declare, or
+            gives a declared one a value of the wrong type. Both are raised by the config class's
+            own validation, before any fold is scheduled.
     """
     for key, reason in _UNOVERRIDABLE_MODEL_PARAMS.items():
         if key in config_overrides:

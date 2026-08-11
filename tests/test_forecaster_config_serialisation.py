@@ -1,14 +1,16 @@
-"""The canonical-serialisation invariant every ``BaseForecasterConfig`` subclass must satisfy.
+"""The invariants every ``BaseForecasterConfig`` subclass must satisfy, whatever it declares.
 
-A config is compared and stored as its *serialised* form: ``register_experiment`` stamps
-``model_dump_json()`` onto the MLflow experiment as the ``config`` tag and compares a
-re-registration against it, and logs ``flatten_config(...)`` as write-once MLflow params. Both
-therefore have to be a pure function of the config's values, and nothing else.
+Two of them, both stated on ``BaseForecasterConfig`` itself and neither enforceable by the type
+checker. **Serialisation must be canonical**: a config is compared and stored as its *serialised*
+form — ``register_experiment`` stamps ``model_dump_json()`` onto the MLflow experiment as the
+``config`` tag and compares a re-registration against it, and logs ``flatten_config(...)`` as
+write-once MLflow params — so the dump has to be a pure function of the config's values and
+nothing else. **Unknown keys must be rejected**: a subclass that re-opens ``extra`` would let a
+misspelled hyperparameter through registration silently.
 
-``BaseForecasterConfig`` states this as an invariant on its subclasses; this module is what makes
-it enforceable rather than merely documented. It lives in the app tier, not in
-``packages/ml_core``, because enforcing it means importing every concrete forecaster — a
-dependency ``ml_core`` itself must not take on.
+This module is what makes both enforceable rather than merely documented. It lives in the app
+tier, not in ``packages/ml_core``, because enforcing them means importing every concrete
+forecaster — a dependency ``ml_core`` itself must not take on.
 """
 
 from typing import get_origin
@@ -31,6 +33,17 @@ _CONFIG_CLASSES: list[type[BaseForecasterConfig]] = [
 def test_every_concrete_forecaster_config_is_covered() -> None:
     """Guard against the list silently emptying out if an import is dropped."""
     assert XGBoostConfig in _CONFIG_CLASSES
+
+
+@pytest.mark.parametrize("config_cls", _CONFIG_CLASSES, ids=lambda cls: cls.__name__)
+def test_every_config_class_forbids_extra_keys(config_cls: type[BaseForecasterConfig]) -> None:
+    """An unknown key must raise, so a misspelled hyperparameter cannot register silently.
+
+    Pydantic merges a parent's ``model_config`` into a subclass's, so a subclass declaring its own
+    ``model_config`` keeps the strictness. What this catches is one that re-opens ``extra``
+    explicitly.
+    """
+    assert config_cls.model_config.get("extra") == "forbid"
 
 
 def _set_valued_fields(config_cls: type[BaseForecasterConfig]) -> set[str]:

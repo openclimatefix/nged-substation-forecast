@@ -24,7 +24,8 @@ failure, not an ergonomics one.
 
 The fix was also verified rather than assumed. With `extra="forbid"` applied as a throwaway patch:
 
-- the whole test suite passes unchanged — **579 passed, 1 skipped**;
+- the whole test suite passes unchanged — **583 passed, 1 skipped** (re-measured on the tree
+  with `main` merged in);
 - `_resolve_forecaster_config("conf/model/xgboost.yaml", {"n_estimtors": 5000}, "exp")` raises
   `ValidationError: n_estimtors — Extra inputs are not permitted`.
 

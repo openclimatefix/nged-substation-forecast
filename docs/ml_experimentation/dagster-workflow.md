@@ -61,7 +61,7 @@ step before training.**
 |---|---|---|
 | `experiment_name` | `"xgboost_smoke_test"` | Unique; becomes the MLflow experiment name and partition-key prefix |
 | `base_model_config` | `"conf/model/xgboost.yaml"` | Path relative to `PROJECT_ROOT` |
-| `config_overrides` | `{"n_estimators": 100}` | Merged onto `model_params` in the YAML |
+| `config_overrides` | `{"n_estimators": 100}` | Merged onto `model_params` in the YAML; every key must name a declared config field |
 | `run_mode` | `"smoke_test"` | `smoke_test` adds the non-leaderboard dev folds (e.g. `smoke_test`); `full_cv` or `register_only` adds the leaderboard folds |
 | `description` | `"Quick sanity check"` | Stored as an MLflow tag — optional |
 
@@ -72,7 +72,8 @@ verify the full pipeline is wired up before committing to a potentially long `fu
 
 1. Loads `base_model_config` as plain YAML and applies `config_overrides` to `model_params`.
 2. Constructs the `BaseForecasterConfig` subclass named by `model_params._target_`, so pydantic
-   validates every hyperparameter before anything is registered.
+   validates the hyperparameters before anything is registered — their *values*, and also the set
+   of key *names*: an override naming a field the config class does not declare is rejected here.
 3. Creates the MLflow experiment (or resolves the existing one if the name already exists), and
    rejects the registration outright if that name is already registered under a *different*
    config — see "An experiment's identity is its config" below.

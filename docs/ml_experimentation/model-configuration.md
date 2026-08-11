@@ -174,10 +174,23 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 
 You never edit a YAML file per experiment. Instead, pass `config_overrides` to
 `register_experiment_job`. Each override is applied to `model_params` before the config object is
-constructed, so any `model_params` key can be overridden — except two, which are rejected rather
-than silently discarded. `_target_` names the config class itself: to use a different one, point
-`base_model_config` at a different YAML. `experiment_name` comes from the job's own
-`experiment_name` parameter.
+constructed.
+
+**Every key must name a field the config class declares** — the two tables above are that list.
+Write `n_estimtors` instead of `n_estimators` and registration fails with
+`ValidationError: n_estimtors — Extra inputs are not permitted`, before a single fold is
+scheduled. This matters more than a typo usually would, because the searches that drive most
+registrations are unattended: the LLM auto-research agent registers, materialises and reads the
+leaderboard with nobody in the loop, and the variant grid sweeps several dimensions at once. A key
+that was quietly dropped would give you a grid of *identical* runs, each scoring plausibly, each
+landing on the leaderboard, and nothing to distinguish that grid from a genuine null result. The
+scores would be real; the experiments would not be what they claim to be. That is
+[principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically)
+— what varies is the model, never the measurement.
+
+Two further keys are refused for their own reasons. `_target_` names the config class itself: to
+use a different one, point `base_model_config` at a different YAML. `experiment_name` comes from
+the job's own `experiment_name` parameter, which would overwrite an override of it.
 
 **Example — reduce tree depth and add a feature:**
 

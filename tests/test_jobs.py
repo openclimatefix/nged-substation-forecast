@@ -12,17 +12,20 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from contracts.config_schemas import CvConfig, CvFoldConfig
 from ml_core._cv_helpers import flatten_config
 from pydantic import ValidationError
 from xgboost_forecaster import XGBoostConfig, XGBoostForecaster
 
 from nged_substation_forecast.defs.jobs import (
+    PROJECT_ROOT,
     ExperimentIdentityChangedError,
     IdentityTagsType,
     _fold_ids_for_run_mode,
     _identity_tags,
     _reject_changed_identity,
+    _required_targets,
     _resolve_forecaster_config,
 )
 
@@ -62,6 +65,33 @@ def test_resolve_rejects_an_ill_typed_override() -> None:
         _resolve_forecaster_config(_BASE_CONFIG, {"max_depth": "high"}, "exp")
 
 
+def test_resolve_rejects_an_unknown_override_key() -> None:
+    """A misspelled hyperparameter must fail registration, not train on the YAML's value.
+
+    The searches that will drive most registrations — the LLM auto-research agent, the
+    training-history variant grid — are unattended, so nobody reads the resolved config. Left
+    ignored, one typo turns a whole grid into identical runs that all score plausibly and all reach
+    the leaderboard.
+    """
+    with pytest.raises(ValidationError, match="n_estimtors"):
+        _resolve_forecaster_config(_BASE_CONFIG, {"n_estimtors": 5000}, "exp")
+
+
+def test_every_base_yaml_model_param_is_a_declared_field() -> None:
+    """The base YAML itself must not carry a key the config class would now reject.
+
+    ``model_params`` is splatted into the config class, so a key no field declares fails every
+    registration against this YAML, not just one with an unlucky override. Read after
+    ``_required_targets`` has popped ``_target_``, which names the config class rather than
+    configuring it.
+    """
+    with (PROJECT_ROOT / _BASE_CONFIG).open(encoding="utf-8") as file:
+        raw = yaml.safe_load(file)
+    _, _, model_params = _required_targets(raw, PROJECT_ROOT / _BASE_CONFIG)
+
+    assert set(model_params) <= set(XGBoostConfig.model_fields)
+
+
 @pytest.mark.parametrize(
     "yaml_body",
     [
@@ -99,10 +129,10 @@ def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
 def test_resolve_rejects_an_override_of_a_key_it_would_discard(key: str) -> None:
     """Two ``model_params`` keys are the resolver's to set, and an override of either is refused.
 
-    Both arrive as ordinary keys and both would be thrown away downstream without a word —
-    ``_target_`` by pydantic's ``extra="ignore"``, since the config class was already resolved
-    from the file, and ``experiment_name`` by the assignment that stamps the job's own value over
-    it. An override that does nothing is worse than one that is rejected.
+    ``experiment_name`` is a declared field, so ``extra="forbid"`` cannot catch it: an override
+    validates cleanly and is then thrown away by the assignment that stamps the job's own value.
+    ``_target_`` would be caught unaided; the guard runs first so the error names the key. An
+    override that does nothing is worse than one that is rejected.
     """
     with pytest.raises(ValueError, match=f"may not override '{key}'"):
         _resolve_forecaster_config(_BASE_CONFIG, {key: "anything"}, "exp")
