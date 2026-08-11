@@ -77,7 +77,32 @@ contradictions in principle 15 (its *Decided* named an undecided decision, and i
 listed a spatial-averaging defect the architecture page says does not exist). It also found that
 `continuous_var_names()` has two callers beyond the resample, which materially changes #526's scope.
 
-Two of its findings were rejected after re-measurement: the per-column byte figures (it measured one
-partition, the doc quotes an archive-wide average; two independent archive samples agree) and a
-claim that the temperature compression was confounded across lead ranges (controlling for that gives
-11.9 %, not the 13.5 % it reported).
+One of its findings was rejected after re-measurement — the temperature compression was not
+confounded across lead ranges; controlling for that gives 11.9 %, not the 13.5 % it reported. The
+other rejection was wrong: I dismissed its per-column byte finding on the strength of two 40-file
+samples, and summing every column chunk in the table (1,726 files, 6.25 billion rows, 98.85 GB)
+gives **1.53 bytes/row**, not the 1.57 the page carried. The 19.3 % share and "most expensive
+weather column" were right; the per-row figure was not.
+
+## Third pass
+
+A second independent review, told only that a first round had happened, found the class of defect
+that revision introduces: a number corrected on one page and left stale on another. The roadmap
+still claimed the solar day "peaks at 18:00 UTC" after the architecture page had been corrected to
+call that framing dishonest; #525 pointed at a principle-15 anchor renamed on this branch; the
+opening sentence said "six hours" where the window is three or six, and "one angle" where there are
+two; the 11.9 % figure was labelled "beyond day 6" when it is a controlled emulation over days 1-6;
+and "a clear-sky index above 1 is physically impossible" is simply false, because cloud enhancement
+is real — it also sat in the same bullet as an instruction to clip at 1.2. It also found a third
+dependent of `continuous_var_names()` (the contract's partition test) and argued that defect (c) is
+a limit of ECMWF's 6-hourly output rather than a bug in our code, which is right and is now how both
+the roadmap and #526 describe it.
+
+## Left for Jack's judgement
+
+Principle 15's admission. The page's own test asks a principle to name a decision it actually
+decided, and principle 15's flagship decision (#525) is deliberately still open pending the storage
+experiment; the two decisions it does name (H3 aggregation, significand rounding) were already made
+and are already claimed by principles 6 and 12. The counter-argument is that it decides the
+*default* for every future ingest transform, and that it is what put the wind conversion up for
+review at all. Worth deciding whether that clears the bar.

@@ -577,12 +577,11 @@ and direction is the second kind: it destroys nothing, and it hands every later 
 wraps at 360°, which ordinary interpolation, averaging, quantiles and z-scores all get wrong.
 
 The saving has to be large, not merely positive. Converting wind to speed and direction does save
-storage — about 6% of the `nwp` table, measured — and that is still not enough to justify freezing a
-wrapped angle into the archive. Compare the H3 aggregation, which is what makes a year of 51-member
-weather fit on a laptop at all. So this principle trades against [principle 6 ("*the whole system
-must be exercisable on one
-laptop*")](#6-the-whole-system-must-be-exercisable-on-one-laptop), and the measurement is what tells
-you which way the trade goes.
+storage — about 6% of the `nwp` table, measured, or roughly 2.4 GB of the ~39 GB a year of ECMWF ENS
+takes — and that is not enough to justify freezing a wrapped angle into the archive. Compare the H3
+aggregation, which is what makes a year of 51-member weather fit on a laptop at all. That contrast
+is the principle: it is the *size* of the saving that decides, and the only way to know the size is
+to measure it.
 
 *Without it:* a transform nobody remembers choosing becomes impossible to revisit. Wind arrives as
 `u` and `v`, the ingest converts it to speed and direction and drops the components, and every later

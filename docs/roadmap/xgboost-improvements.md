@@ -25,9 +25,10 @@ day 7–10 the control member is an increasingly unrepresentative sample of the 
 Be careful with that middle point: the step change at 144 h is **not** only a loss of resolution.
 For the period-ending variables — the two radiation fluxes and precipitation — it also introduces a
 *phase* error, because a value that averages the preceding six hours is currently interpolated as
-though it described its own timestamp. Today the model is told the solar day peaks at 18:00 UTC
-beyond day 6. That, and two other defects in how the pipeline reads the `nwp` table, are
-[fixed before anything else on this page](#before-anything-else-fix-how-the-nwp-variables-are-interpreted).
+though it described its own timestamp. Beyond day 6 the modelled solar day is shifted about three
+hours late and its peak cut by a quarter. That, and two other defects in how the pipeline reads the
+`nwp` table, are [fixed before anything else on this
+page](#before-anything-else-fix-how-the-nwp-variables-are-interpreted).
 
 **Measure before optimising.** Land the
 [persistence/climatology baselines](metrics-and-leaderboard.md#baseline-forecasters) (without
@@ -58,9 +59,9 @@ ingest renormalises each H3 cell over the grid points that arrived.
 Issues: [#525](https://github.com/openclimatefix/nged-substation-forecast/issues/525) (storage),
 [#526](https://github.com/openclimatefix/nged-substation-forecast/issues/526) (resample)
 
-Three defects in how the feature pipeline reads the `nwp` table, plus the storage change that makes
-the first of them impossible to reintroduce. They are bugs, not experiments, and they sit in the
-inputs that every experiment below consumes.
+Two defects in how the feature pipeline reads the `nwp` table, one limitation of the input data,
+and the storage change that makes the first defect impossible to reintroduce. The two defects are
+bugs rather than experiments, and all four sit in the inputs that every experiment below consumes.
 [NWP variable conventions](../architecture/nwp-variable-conventions.md) describes the conventions
 they violate, the measurements, and the code paths; this section says what to change, in what order,
 and how to tell what each change bought.
@@ -85,28 +86,30 @@ generic paths then cannot silently swallow a variable class they do not handle.
 That matters beyond this item, because three later items on this page iterate over variable classes
 in exactly the same way, and each is wrong for a circular variable:
 [neighbouring-cell mean and gradient](#neighbouring-h3-cell-weather-context),
-[per-variable ensemble quantiles](#ensemble-statistics-as-features-instead-of-member-by-member-rows),
-and [climatology z-scores](#weather-abnormality-climatology-z-score-features). A gradient or a
-standardised anomaly of a wrapped angle is meaningless, and a p90 of one has no correct definition
-at all.
+[per-variable ensemble
+quantiles](#ensemble-statistics-as-features-instead-of-member-by-member-rows), and [climatology
+z-scores](#weather-abnormality-climatology-z-score-features). A gradient or a standardised anomaly
+of a wrapped angle is meaningless, and a p90 of one has no correct definition at all.
 
-**`continuous_var_names()` has two callers beyond the resample, and narrowing it changes both.**
-`delta_store.nwp.write_nwp` uses it to choose which columns get rounded to 13 significand bits, so
-dropping the directions from it silently stops rounding them on every future ingest — a storage
-change landing inside the very item that argues from a storage measurement. And
+**`continuous_var_names()` has three dependents beyond the resample, and narrowing it changes all
+three.** `delta_store.nwp.write_nwp` uses it to choose which columns get rounded to 13 significand
+bits, so dropping the directions from it silently stops rounding them on every future ingest — a
+storage change landing inside the very item that argues from a storage measurement.
 `packages/dashboard/tests/test_forecast_chart.py` asserts that the set equals the dashboard's
 `NWP_PLOT_VARIABLES`, so the change either fails that test or quietly drops wind direction from the
-dashboard's NWP panel. Decide both deliberately: the likely answer is a separate
-"round these on write" set, since rounding a direction is still correct even though interpolating
-one is not.
+dashboard's NWP panel. And `packages/contracts/tests/test_weather_schemas.py` asserts that
+continuous and categorical *partition* the weather variables, which a third class abolishes; that
+test has to become a three-way partition assertion. Decide the first deliberately: the likely answer
+is a separate "round these on write" set, since rounding a direction is correct even though
+interpolating one is not.
 
 **(a) Wind direction is interpolated across the 0°/360° wrap**, which affects 6.57% of interpolated
 `wind_direction_10m` rows with a mean circular error around 100°
 ([measurements](../architecture/nwp-variable-conventions.md#wind-direction-is-interpolated-across-the-0360-wrap)).
 Both direction columns are in `conf/model/xgboost.yaml`'s `selected_features` today. The fix is to
-interpolate the wind *vector* rather than the polar pair, which the
-[u/v storage change](#store-wind-as-uv-components-rather-than-speed-and-direction) below delivers as
-a side effect.
+interpolate the wind *vector* rather than the polar pair, which the [u/v storage
+change](#store-wind-as-uv-components-rather-than-speed-and-direction) below delivers as a side
+effect.
 
 **(b) Radiation and precipitation are interpolated as though they were instantaneous.** They are
 period-ending means over the preceding step, so interpolating between `valid_time` stamps treats a
@@ -126,16 +129,17 @@ disturb. Verify it on a partly-cloudy day when implementing.
    value at `valid_time`.
 2. Anchor the resulting index at the **window midpoint** before interpolating it.
 3. Restrict to windows containing real daylight and hold the index flat beyond them. Interpolating
-   into a zeroed night-window index instead cost 9% of the reconstructed day's energy (6.58 against
-   7.20 kWh m⁻²).
+   into a zeroed night-window index instead loses several percent of the reconstructed day's energy,
+   the exact figure depending on where the daylight threshold is set.
 4. Multiply back by the clear-sky **mean over each half-hour ending at `valid_time`**, not the
    instantaneous value, so the feature stays period-ending like `PowerTimeSeries.value` on the other
    side of the join.
 
-This is the item the [solar and wind physics features](#linearised-physics-features-for-solar-and-wind)
-depend on, and it is why that item's stage (b) is now a cross-reference rather than a design.
-`precipitation_surface` shares the convention but needs no clear-sky treatment: its accumulator
-features integrate over the window anyway, so only sub-window timing is lost.
+This is the item the [solar and wind physics
+features](#linearised-physics-features-for-solar-and-wind) depend on, and it is why that item's
+stage (b) is now a cross-reference rather than a design. `precipitation_surface` shares the
+convention but needs no clear-sky treatment: its accumulator features integrate over the window
+anyway, so only sub-window timing is lost.
 
 **(c) Instantaneous variables lose diurnal amplitude beyond day 6**, because the ~15:00 temperature
 maximum falls between the 12:00 and 18:00 samples: the mean daily temperature range falls from
@@ -154,26 +158,28 @@ The ingest computes speed and direction from ECMWF's native `u`/`v` components a
 components. That conversion loses no information — the round trip costs at most 6.8 × 10⁻³ ° of
 direction once the components are rounded the way the table rounds everything else — but it hands
 every downstream stage a wrapped angle, which is the root of defect (a) above and of the three later
-items named at the top of this section. Storing the components instead makes the whole class of defect
-structurally impossible rather than individually patched, which is the
-[principle 15](../design-philosophy/design-principles.md#15-transform-data-in-feature-engineering-not-in-the-ingest-unless-it-saves-a-lot-of-storage)
-argument in its original form.
+items named at the top of this section. Storing the components instead makes the whole class of
+defect structurally impossible rather than individually patched, which is what [principle
+15](../design-philosophy/design-principles.md#15-transform-data-in-feature-engineering-not-in-the-ingest-unless-it-saves-a-lot-of-storage)
+argues for.
 
 It costs storage rather than saving it. Measured through the production write path on two full runs,
 storing components rather than the polar pair is **+5.7% to +6.3% of the whole `nwp` table**. That
 is so even though direction, averaged over the archive, is the most expensive weather column we
 store, because the significand rounding collapses the polar values into repeats that Parquet's
 dictionary encoding captures better than it captures `u`/`v`. The numbers are on
-[NWP variable conventions](../architecture/nwp-variable-conventions.md#wind-is-stored-as-speed-and-direction-and-why).
+[NWP variable
+conventions](../architecture/nwp-variable-conventions.md#wind-is-stored-as-speed-and-direction-and-why).
 
 Two consequences to plan for. Wind speed becomes a **derived feature** — `sqrt(u² + v²)` computed at
 half-hourly resolution from the interpolated components, in the same `_parsed_features.py` slot as
-`windchill` — which is what the [wind power-curve proxy](#linearised-physics-features-for-solar-and-wind)
-consumes. The rule the roadmap already states for the power curve is unchanged, only refined:
-interpolate the vector, derive the speed, then apply the non-linear curve. And the derived speed
-will differ slightly from today's stored speed, because interpolating the components and taking the
-magnitude is not the same as interpolating the magnitude — so this is a behaviour change to a live
-feature, and it needs a leaderboard arm rather than a silent swap.
+`windchill` — which is what the [wind power-curve
+proxy](#linearised-physics-features-for-solar-and-wind) consumes. The rule the roadmap already
+states for the power curve is unchanged, only refined: interpolate the vector, derive the speed,
+then apply the non-linear curve. And the derived speed will differ slightly from today's stored
+speed, because interpolating the components and taking the magnitude is not the same as
+interpolating the magnitude — so this is a behaviour change to a live feature, and it needs a
+leaderboard arm rather than a silent swap.
 
 **The open question this item must answer: does a scalar-mean speed column earn its storage?**
 Today's stored speed is the magnitude of each cell's *vector* mean, not the mean of its grid points'
@@ -200,12 +206,15 @@ go in ahead of everything else regardless of what can yet be measured — but th
 need the [baselines](metrics-and-leaderboard.md#baseline-forecasters) and
 [horizon-sliced metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics) that the
 rest of this page waits on, and defects (b) and (c) are invisible in an aggregate that is not sliced
-by horizon. Expect to land the fixes, then score them once that machinery exists. Nothing is lost by that order, because there is
-no champion whose skill the fixes could be quietly degrading in the meantime.
+by horizon. Expect to land the fixes, then score them once that machinery exists. Nothing is lost by
+that order, because there is no champion whose skill the fixes could be quietly degrading in the
+meantime.
 
-**Establish the reference** by re-running today's pipeline unchanged. These fixes change the
-distribution of the model's weather inputs, so the reference has to be measured on the same
-evaluation machinery the arms below will use, rather than inherited from anything scored earlier.
+**Establish the reference** by checking out the pre-fix commit and running it on the finished
+evaluation machinery. These fixes change the distribution of the model's weather inputs, so the
+reference has to be measured on the same machinery the arms below use, rather than inherited from
+anything scored earlier — and by the time it is measured, "today's pipeline" is a commit rather than
+the working tree.
 
 Then each fix lands as its own leaderboard experiment, in this order, each scored against the arm
 before it — so the work ends with an attribution per change rather than one number for a bundle:
@@ -271,10 +280,10 @@ midnight wrap-around) and *add* raw ordinals (`half_hour_of_day`, `day_of_year`)
 
 The same axis-parallel argument as the item above, applied to wind. `wind_direction_*` is fed to the
 model in degrees, where a split at 350° separates two winds that are two degrees apart, and no
-single split can isolate "northerly" at all because the category straddles the wrap. `u` and `v` have
-no discontinuity, and each split is physically meaningful on its own — `u > 5` is "a westerly
-component of at least 5 m s⁻¹". Once the
-[storage change](#store-wind-as-uv-components-rather-than-speed-and-direction) lands, this costs a
+single split can isolate "northerly" at all because the category straddles the wrap. `u` and `v`
+have no discontinuity, and each split is physically meaningful on its own — `u > 5` is "a westerly
+component of at least 5 m s⁻¹". Once the [storage
+change](#store-wind-as-uv-components-rather-than-speed-and-direction) lands, this costs a
 feature-list edit.
 
 Keep these three decisions separate, because they are independent and only the first is settled:
@@ -529,11 +538,13 @@ the time stage (c) runs.
 
 - **Clear-sky index** $k_c = \mathrm{GHI} / \mathrm{GHI}_{\text{cs}}$ — the single most
   informative derived solar feature. Null it when solar elevation is below ~5–10° (the ratio
-  blows up near the horizon) and clip to roughly $[0, 1.2]$. **The denominator must be the
+  blows up near the horizon) and clip to roughly $[0, 1.2]$ — cloud enhancement genuinely lifts it a
+  little above 1, so the clip belongs above 1 rather than at it. **The denominator must be the
   clear-sky *mean over the same half-hour* that the numerator averages**, not the instantaneous
   clear-sky value at `valid_time` — the same requirement stage (b) carries, and it applies here
-  independently, because this is a feature rather than a resampling step. A clear-sky index above 1
-  is physically impossible, so the check that it was built correctly is free: plot its upper tail.
+  independently, because this is a feature rather than a resampling step. Plotting the upper tail is
+  a free check that it was built right: a few tens of percent above 1 is real cloud enhancement,
+  while values near 2 mean the denominator is wrong.
 - **Simplified PV power proxy** (PVWatts-style). Cell temperature from the Ross/NOCT model,
   then a linear temperature derate:
 
@@ -552,10 +563,10 @@ the time stage (c) runs.
     tilt/orientation modelling — embedded PV behind a substation is an unknown mix of
     orientations, and the booster can bend the proxy per series.
 
-    Note that this expression combines a period-ending GHI with an instantaneous temperature. Once
-    stage (b) has landed that is a half-hour offset and immaterial to a cell-temperature model;
-    before it, it is a three-hour offset beyond day 6. Worth stating so that nobody reintroduces the
-    larger version by deriving the proxy from un-resampled inputs.
+    This expression combines a period-ending GHI with an instantaneous temperature. Once stage (b)
+    has landed that is a quarter-hour offset and immaterial to a cell-temperature model; before it,
+    it is a three-hour offset beyond day 6. We state this so that nobody reintroduces the larger
+    version by deriving the proxy from un-resampled inputs.
 
 - **Wind power curve**: 100 m wind speed through a generic *farm-level* power curve — either
   a piecewise form (zero below cut-in ~3 m/s, normalised cubic ramp
