@@ -233,7 +233,7 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
     forecaster_cls = cast(type[BaseForecaster], import_class(model_class))
     # Before `load`, not after: `load` reads every serialised sub-model off disk, which is a lot of
     # IO to do on the way to rejecting the directory over one field already parsed above.
-    _check_meta_features_are_parseable(meta, str(path))
+    _check_meta_features_are_parseable(meta=meta, source=str(path))
     return forecaster_cls.load(path)
 
 
@@ -279,7 +279,9 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
                 f"The model archive on run {run_id} holds no meta.json, so it is not a model "
                 "BaseForecaster.save wrote. Re-materialise `trained_cv_model` for this fold."
             )
-        _check_meta_features_are_parseable(json.loads(meta_path.read_text()), f"run {run_id}")
+        _check_meta_features_are_parseable(
+            meta=json.loads(meta_path.read_text()), source=f"run {run_id}"
+        )
 
         promotion = {
             "mlflow_run_id": run_id,

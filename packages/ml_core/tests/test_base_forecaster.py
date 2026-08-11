@@ -270,14 +270,19 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unse
     keeps serving instead of the service breaking at its next tick.
     """
     dest = tmp_path / "production_model"
-    fetch_model_artifacts(saved_run, dest)
+    fetch_model_artifacts(run_id=saved_run, dest=dest)
 
     with mlflow.start_run(experiment_id=mlflow.create_experiment("stale_vocabulary")) as run:
         stale_run_id = run.info.run_id
-    _save(stale_run_id, "stale-model", series=[10], selected_features={"local_utc_offset"})
+    _save(
+        run_id=stale_run_id,
+        payload="stale-model",
+        series=[10],
+        selected_features={"local_utc_offset"},
+    )
 
     with pytest.raises(ValueError, match="local_utc_offset") as exc_info:
-        fetch_model_artifacts(stale_run_id, dest)
+        fetch_model_artifacts(run_id=stale_run_id, dest=dest)
 
     # Which run was refused, so an operator knows what to re-train rather than what to re-download.
     assert stale_run_id in str(exc_info.value)
@@ -296,16 +301,18 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_names_n
     to prevent.
     """
     dest = tmp_path / "production_model"
-    fetch_model_artifacts(saved_run, dest)
+    fetch_model_artifacts(run_id=saved_run, dest=dest)
 
     with mlflow.start_run(experiment_id=mlflow.create_experiment("no_features")) as run:
         featureless_run_id = run.info.run_id
     _MetaWithoutModelParams(
-        BaseForecasterConfig(selected_features=set()), payload="featureless", series=[10]
+        model_params=BaseForecasterConfig(selected_features=set()),
+        payload="featureless",
+        series=[10],
     ).save_to_mlflow(featureless_run_id)
 
     with pytest.raises(ValueError, match="selected_features"):
-        fetch_model_artifacts(featureless_run_id, dest)
+        fetch_model_artifacts(run_id=featureless_run_id, dest=dest)
 
     assert _FakeForecaster.load(dest).payload == "hello-model"
     assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run

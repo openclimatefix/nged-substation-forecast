@@ -155,7 +155,9 @@ def test_promoted_model_refuses_a_model_with_an_unparseable_feature(
     happens before the directory is replaced, so a first promotion writes nothing at all.
     """
     run_id = _save_trained_model_to_mlflow(
-        "stale_vocabulary", n_estimators=5, selected_features={"local_utc_offset"}
+        experiment_name="stale_vocabulary",
+        n_estimators=5,
+        selected_features={"local_utc_offset"},
     )
 
     with pytest.raises(ValueError, match="local_utc_offset"):
