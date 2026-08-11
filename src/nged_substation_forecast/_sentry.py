@@ -130,8 +130,10 @@ def sentry_capture_failure(context: HookContext) -> None:
         sentry_sdk.capture_exception(exception)
 
 
-def _capture_tagged(tag: str, value: str, detail: BaseException | str, failure_note: str) -> None:
-    """Send ``detail`` to Sentry on a scope forked for this one event, tagged ``tag=value``.
+def _capture_tagged(
+    tag: str, value: str, exc_or_reason: BaseException | str, failure_note: str
+) -> None:
+    """Send ``exc_or_reason`` to Sentry on a scope forked for this one event, tagged ``tag=value``.
 
     Shared by :func:`report_check_degradation` and :func:`report_asset_degradation`, which differ
     only in their tag and in whether they always hold a live exception. Forking the scope is what
@@ -143,24 +145,24 @@ def _capture_tagged(tag: str, value: str, detail: BaseException | str, failure_n
     Args:
         tag: Tag name to set on the forked scope.
         value: Tag value — the check or asset name.
-        detail: The exception to capture, or a message to send at ``error`` level when the caller
-            has only a reason string.
+        exc_or_reason: The exception to capture, or a message to send at ``error`` level when
+            the caller has only a reason string.
         failure_note: Logged with the traceback if Sentry itself fails.
     """
     try:
         with sentry_sdk.new_scope() as scope:
             scope.set_tag(tag, value)
-            if isinstance(detail, BaseException):
-                sentry_sdk.capture_exception(detail)
+            if isinstance(exc_or_reason, BaseException):
+                sentry_sdk.capture_exception(exc_or_reason)
             else:
-                sentry_sdk.capture_message(detail, level="error")
+                sentry_sdk.capture_message(exc_or_reason, level="error")
     except Exception:
         # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
         # with the traceback rather than swallowing.
         logger.exception(failure_note)
 
 
-def report_asset_degradation(asset_name: str, detail: BaseException | str) -> None:
+def report_asset_degradation(asset_name: str, exc_or_reason: BaseException | str) -> None:
     """Report an asset that degraded rather than failing, as a Sentry error event.
 
     ``power_time_series_and_metadata`` catches a failure of the ``TimeSeriesMetadata`` roster upsert
@@ -179,13 +181,13 @@ def report_asset_degradation(asset_name: str, detail: BaseException | str) -> No
     Args:
         asset_name: The Dagster asset name, attached as a ``degraded_asset`` tag so events can be
             filtered per asset. Set on an isolated scope so it cannot leak into later events.
-        detail: The exception the asset degraded on, or a one-line reason.
+        exc_or_reason: The exception the asset degraded on, or a one-line reason.
     """
     _capture_tagged(
-        "degraded_asset",
-        asset_name,
-        detail,
-        f"Failed to report the degraded {asset_name} asset to Sentry",
+        tag="degraded_asset",
+        value=asset_name,
+        exc_or_reason=exc_or_reason,
+        failure_note=f"Failed to report the degraded {asset_name} asset to Sentry",
     )
 
 
@@ -211,10 +213,10 @@ def report_check_degradation(check_name: str, exc: BaseException) -> None:
         exc: The exception the check degraded on.
     """
     _capture_tagged(
-        "asset_check",
-        check_name,
-        exc,
-        f"Failed to report the degraded {check_name} check to Sentry",
+        tag="asset_check",
+        value=check_name,
+        exc_or_reason=exc,
+        failure_note=f"Failed to report the degraded {check_name} check to Sentry",
     )
 
 

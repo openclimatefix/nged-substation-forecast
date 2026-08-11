@@ -428,7 +428,9 @@ def upsert_metadata(
 
     new_metadata = TimeSeriesMetadata.validate(new_metadata.sort("time_series_id"))
 
-    existing_metadata, unusable_reason = _read_existing_roster(metadata_path, storage_options)
+    existing_metadata, unusable_reason = _read_existing_roster(
+        metadata_path=metadata_path, storage_options=storage_options
+    )
 
     if existing_metadata is None:
         if unusable_reason is None:

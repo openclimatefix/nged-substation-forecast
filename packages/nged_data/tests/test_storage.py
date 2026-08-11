@@ -272,7 +272,7 @@ def test_upsert_metadata_rebuilds_when_the_stored_roster_will_not_parse(tmp_path
     metadata_path = tmp_path / "metadata.parquet"
     metadata_path.write_bytes(b"not a parquet file")
 
-    stats = upsert_metadata(_roster([1, 2]), str(metadata_path))
+    stats = upsert_metadata(new_metadata=_roster([1, 2]), metadata_path=str(metadata_path))
 
     assert "metadata_roster_rebuilt_reason" in stats
     assert "ComputeError" in stats["metadata_roster_rebuilt_reason"]
@@ -285,7 +285,7 @@ def test_upsert_metadata_rebuilds_when_the_stored_roster_fails_its_contract(tmp_
     metadata_path = tmp_path / "metadata.parquet"
     _roster([1]).drop("substation_type").write_parquet(metadata_path)
 
-    stats = upsert_metadata(_roster([2]), str(metadata_path))
+    stats = upsert_metadata(new_metadata=_roster([2]), metadata_path=str(metadata_path))
 
     assert "DataFrameValidationError" in stats["metadata_roster_rebuilt_reason"]
     # The rebuild is from this run's snapshot alone, so id 1 is gone: a rebuilt roster can be thin.
@@ -303,7 +303,7 @@ def test_upsert_metadata_merges_a_snapshot_missing_the_optional_columns(tmp_path
     # This run's snapshot covers id 2 only, and carries no `information` column at all.
     snapshot = _roster([2], name="Renamed")
     assert "information" not in snapshot.columns
-    upsert_metadata(snapshot, str(metadata_path))
+    upsert_metadata(new_metadata=snapshot, metadata_path=str(metadata_path))
 
     final = pl.read_parquet(metadata_path)
     assert final.filter(pl.col("time_series_id") == 2)["information"].item() is None
@@ -320,7 +320,7 @@ def test_upsert_metadata_ignores_the_stored_column_order(tmp_path: Path):
     roster.select(sorted(roster.columns)).write_parquet(metadata_path)
     mtime_before = metadata_path.stat().st_mtime_ns
 
-    stats = upsert_metadata(roster, str(metadata_path))
+    stats = upsert_metadata(new_metadata=roster, metadata_path=str(metadata_path))
 
     assert stats["metadata_n_new_TimeSeriesIDs"] == 0
     assert stats["metadata_n_updated_TimeSeriesIDs"] == 0
@@ -350,7 +350,7 @@ def test_upsert_metadata_does_not_rebuild_on_a_panic(
     monkeypatch.setattr(storage.pl, "read_parquet", boom)
 
     with pytest.raises(_Panic):
-        upsert_metadata(_roster([2]), str(metadata_path))
+        upsert_metadata(new_metadata=_roster([2]), metadata_path=str(metadata_path))
 
     assert metadata_path.read_bytes() == stored_before
 

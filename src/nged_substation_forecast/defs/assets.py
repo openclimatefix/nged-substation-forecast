@@ -140,7 +140,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         # Sentry is told explicitly because a step that no longer fails no longer fires
         # `sentry_capture_failure`, and log-to-event capture is deliberately off.
         context.log.exception(f"Could not upsert the TimeSeriesMetadata roster at {metadata_path}")
-        report_asset_degradation("power_time_series_and_metadata", exc)
+        report_asset_degradation(asset_name="power_time_series_and_metadata", exc_or_reason=exc)
         upsert_metadata_stats = UpsertMetadataStats(metadata_upsert_failed=repr(exc))
 
     rebuilt_reason = upsert_metadata_stats.get("metadata_roster_rebuilt_reason")
@@ -151,8 +151,8 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         # https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
         context.log.error(f"TimeSeriesMetadata roster was rebuilt: {rebuilt_reason}")
         report_asset_degradation(
-            "power_time_series_and_metadata",
-            f"TimeSeriesMetadata roster rebuilt: {rebuilt_reason}",
+            asset_name="power_time_series_and_metadata",
+            exc_or_reason=f"TimeSeriesMetadata roster rebuilt: {rebuilt_reason}",
         )
 
     context.add_output_metadata(upsert_metadata_stats)

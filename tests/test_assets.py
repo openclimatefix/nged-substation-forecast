@@ -193,7 +193,9 @@ def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fail
     monkeypatch.setattr(assets, "upsert_metadata", boom)
     reported: list[tuple[str, object]] = []
     monkeypatch.setattr(
-        assets, "report_asset_degradation", lambda name, detail: reported.append((name, detail))
+        assets,
+        "report_asset_degradation",
+        lambda asset_name, exc_or_reason: reported.append((asset_name, exc_or_reason)),
     )
 
     result = materialize([power_time_series_and_metadata], instance=dagster_instance)
@@ -227,7 +229,9 @@ def test_power_time_series_and_metadata_reports_a_rebuilt_roster(
 
     reported: list[tuple[str, object]] = []
     monkeypatch.setattr(
-        assets, "report_asset_degradation", lambda name, detail: reported.append((name, detail))
+        assets,
+        "report_asset_degradation",
+        lambda asset_name, exc_or_reason: reported.append((asset_name, exc_or_reason)),
     )
 
     result = materialize([power_time_series_and_metadata], instance=dagster_instance)
