@@ -30,7 +30,7 @@ There are **three** raisers on that code path, not one, and Delta only removes o
 |---|---|---|
 | 1 | Torn write from a kill or `ENOSPC` (`storage.py:438`) | **Yes** — a commit is atomic, and delta-rs does the temp-file-then-rename itself. On S3 it commits via conditional put (`docs/live_service/aws.md:84-86`), so concurrent writers are safe too |
 | 2 | `TimeSeriesMetadata.validate(existing_metadata)` (`storage.py:408`) raises `DataFrameValidationError` when the stored roster no longer satisfies the contract — verified with a roster missing `substation_type` | No. Delta adds its own schema-enforcement error alongside |
-| 3 | `pl.concat([new_metadata, existing_metadata])` (`storage.py:436`) raises `ShapeError` on a width or column-order mismatch | Only via `MERGE`, which this plan uses |
+| 3 | `pl.concat([new_metadata, existing_metadata])` (`storage.py:431`) raises `ShapeError` on a width or column-order mismatch | Only via `MERGE`, which this plan uses |
 
 Raiser 3 is live today rather than hypothetical. Four `TimeSeriesMetadata` fields are
 `allow_missing=True` (`information`, `area_wkt`, `area_center_lat`, `area_center_lon` —
@@ -96,26 +96,69 @@ The package already owns physical layout plus the write helpers that apply it
   `when_not_matched_insert_all()`, returning delta-rs' merge metrics. Everything about *how this
   table is written* lives here; the roster's *semantics* stay in `nged_data` (below).
 
-  Three verified facts belong in its docstring, because each is a trap:
+  Five verified facts belong in its docstring, because each is a trap:
 
-    1. The matched-clause predicate is a chain of `(source.<col> IS DISTINCT FROM target.<col>)`
+    1. **Every `pl.Enum` column must be cast to `pl.String` before any write.**
+       `TimeSeriesMetadata` has four (`time_series_type`, `units`, `licence_area`,
+       `substation_type` — `power_schemas.py:187,195,202,217`), and handing a validated,
+       Enum-typed roster to `write_delta` aborts a rust worker: `DeltaError: Generic DeltaTable
+       error: writer join error: task 28 panicked with message "internal error: entered
+       unreachable code: cannot downcast Utf8View dictionary value to byte array"` (reproduced).
+       This is the write-path gotcha the `polars-patito-gotchas` skill documents at
+       `SKILL.md:100-121`, and `_write_metrics_to_delta` already carries the fix
+       (`cv_assets.py:748-749`) — `enum_cols = [c for c, d in df.schema.items() if isinstance(d,
+       pl.Enum)]`, then cast each to `pl.String`. It must be applied on **all three** write paths
+       here (create, rebuild-overwrite, and the merge source), and doing it inside this module is
+       what stops every caller having to remember. Delta stores these as `String`, so reads must
+       cast back — see the `scan_delta` note below. `MERGE` alone happens to tolerate an
+       Enum-typed source, because datafusion casts to the target schema; that is exactly why a
+       test exercising only the merge path would pass while production's create path panics.
+    2. The matched-clause predicate is a chain of `(source.<col> IS DISTINCT FROM target.<col>)`
        over the non-key columns, and **each comparison must be parenthesised**. Without the
        parentheses delta-rs fails with `DeltaError: Generic DeltaTable error: type_coercion … Cannot
        infer common argument type for logical boolean operation Float32 OR Boolean`.
-    2. With that predicate, only genuinely-changed rows are rewritten (measured: `updated=1,
-       copied=2` for a three-row target with one changed row), and **a merge that changes nothing
-       commits no new version at all** (measured: history stayed at 2 versions). So the roster's
-       Delta history grows only when NGED's metadata actually changes — which is what keeps the
-       vacuum burden negligible for this table.
-    3. The predicate is built from the contract's non-key columns, which is safe **only because
+    3. With that predicate, **a merge that changes nothing commits no new version at all**
+       (measured: history stayed at 2 versions), and only changed rows are *reported* as updated
+       (measured on a ten-row target with two changed rows: `updated=2, copied=8`). So the
+       roster's Delta history grows only when NGED's metadata actually changes — which is what
+       keeps the vacuum burden negligible for this table. Note what this does *not* buy: the same
+       measurement shows `files_scanned=1, files_removed=1, files_added=1`, so any content change
+       rewrites the single file holding the whole table, exactly as today's `unique(keep="first")`
+       does. The win is the skipped commit, not fewer bytes.
+    4. The predicate is built from the contract's non-key columns, which is safe **only because
        the caller aligns the snapshot to the full schema first** (D1). Handed a snapshot that omits
-       an `allow_missing` column, the predicate would reference a column that does not exist — so
+       an `allow_missing` column, the predicate names a column that does not exist and delta-rs
+       raises `DeltaError: … Schema error: No field named source.information` (reproduced) — so
        the function asserts the source carries every contract column rather than silently building
        a narrower predicate.
+    5. **The same applies to the *target*, and it is not hypothetical.** A predicate naming
+       `target.<col>` for a column the stored table lacks raises the same catchable `DeltaError`.
+       Two ways in: a table migrated from a parquet file that never carried the four
+       `allow_missing` columns, and the day someone adds a field to `TimeSeriesMetadata`. Both
+       would otherwise be absorbed by the rebuild path — a routine schema addition would silently
+       thin the roster and trigger a full re-download. So the function compares the stored
+       schema against the contract *before* merging and reports a mismatch as its own condition:
+       a contract addition is a deliberate `schema_mode="merge"` migration, not a rebuild. This is
+       also why the migration below must write all 14 columns.
+
+  **Neither module declares a sort order, and that is a departure worth stating** rather than
+  leaving as an omission, because `delta_store`'s charter is "compression-friendly sort orders"
+  (`packages/delta_store/README.md:8`). Two reasons. At tens of KB there is no compression lever to
+  pull. And `MERGE` **destroys row order** and offers no way to restore it: measured on a table
+  stored as ids 1…10 with rows 3 and 7 changed, the stored order afterwards is
+  `[3, 7, 1, 2, 4, 5, 6, 8, 9, 10]` — updated rows are rewritten first, copied rows follow. Today
+  `upsert_metadata` sorts by `time_series_id` on every write (`storage.py:434`), so this is a real
+  behaviour change and not merely a storage swap. It is safe: `TimeSeriesMetadata` declares no
+  `columns_to_sort_by` and `validate` has no sortedness check (unlike `PowerTimeSeries.validate`
+  at `power_schemas.py:82-92`), and the dashboards sort for themselves
+  (`packages/dashboard/view_forecasts.py:73`). Both module docstrings should say the table is
+  unordered on disk so nobody later "fixes" it with a sort that a merge would immediately undo.
 
 - **`h3_grid_weights.py`** — `H3_GRID_WEIGHTS_WRITER_PROPERTIES` and
   `write_h3_grid_weights(weights, table_uri, storage_options)`, a plain `mode="overwrite"` commit.
-  The table is write-once-per-boundary-change and ~30 KB.
+  The table is write-once-per-boundary-change and ~30 KB. No Enum columns here, so fact 1 does not
+  bite — but `H3GridWeights.h3_index` is `pl.UInt64` (`geo_schemas.py:16`) and the Delta protocol
+  has no unsigned integer types, so it comes back `Int64`. Every read must cast; see below.
 
 ### `packages/contracts/src/contracts/`
 
@@ -123,6 +166,16 @@ The package already owns physical layout plus the write helpers that apply it
   pt.LazyFrame[Self]`, mirroring [`Nwp.scan_delta`](../packages/contracts/src/contracts/weather_schemas.py)
   (`weather_schemas.py:461`) so every roster reader gets a typed, cast scan from one place.
 - **`geo_schemas.py`** — the same for `H3GridWeights`.
+- **The `.cast()` in those classmethods is load-bearing, not decorative**, and this is the reason
+  the classmethods exist rather than each caller writing `pl.read_delta`. Delta stores the roster's
+  four Enums as `String` and `h3_res_5`/`h3_index` as `Int64`, so a bare
+  `TimeSeriesMetadata.validate(pl.read_delta(uri))` fails with five dtype errors, and
+  `H3GridWeights.validate` fails on `h3_index`. Both reproduced; both pass once the scan is
+  `pt.LazyFrame.from_existing(pl.scan_delta(...)).set_model(cls).cast()`, exactly as `Nwp.scan_delta`
+  does it. Per the `polars-patito-gotchas` skill (`SKILL.md:100-121`) the contracts keep their Enum
+  dtypes: that guidance only pushes a column to `String` when it is *filtered or partitioned* on in
+  Delta, which none of these are, so casting on read costs nothing and keeps the in-memory contract
+  expressive.
 - **`settings.py`** — the derived defaults become `metadata.delta` (`settings.py:394`) and
   `h3_grid_weights.delta` (`settings.py:378`), matching `power_time_series.delta`. The field *names*
   (`metadata_path`, `h3_grid_weights_path`) do not change — they are format-agnostic already.
@@ -139,7 +192,7 @@ layout. `packages/nged_data/pyproject.toml` gains a `delta_store` dependency, ex
 
 - **Deleted**: the `COMPRESSION` constant (`storage.py:384`), the `pl.read_parquet` +
   `TimeSeriesMetadata.validate(existing_metadata)` pair (405–408) as a *gate*, the `hash_rows` diff
-  as a *gate*, and the `concat` + `unique(keep="first")` merge (436). Raisers 1 and 3 go with them.
+  as a *gate*, and the `concat` + `unique(keep="first")` merge (431). Raisers 1 and 3 go with them.
 - **New `_align_to_contract(df) -> pt.DataFrame[TimeSeriesMetadata]`** — selects
   `TimeSeriesMetadata.columns` in declared order, supplying
   `pl.lit(None, dtype=TimeSeriesMetadata.dtypes[name])` for any column the snapshot lacks. Only the
@@ -148,33 +201,59 @@ layout. `packages/nged_data/pyproject.toml` gains a `delta_store` dependency, ex
   is what makes a field NGED stops sending get *cleared* rather than silently retained, which is
   today's behaviour, and it is what lets the merge predicate be a fixed list of columns.
 - **`upsert_metadata`'s new shape**: validate the snapshot, align it; if the table does not exist,
-  create it; otherwise compute the informational diff (below) and call
-  `merge_time_series_metadata`. If the read or the merge raises because the *stored table* is
-  unusable — our contract rejects it, or Delta rejects the schema — log at ERROR and rebuild it with
-  an overwrite commit (`schema_mode="overwrite"`), reporting the rebuild in the stats. The previous
-  version stays in the log, so nothing is destroyed and no file is copied aside.
+  create it; otherwise **read-and-validate the stored roster as a gate**, then merge. If that gated
+  read fails, or the merge raises, because the *stored table* is unusable — our contract rejects it,
+  Delta rejects the schema, or its columns do not match the contract — log at ERROR and rebuild it
+  with an overwrite commit (`schema_mode="overwrite"`), reporting the rebuild in the stats. The
+  previous version stays in the log, so nothing is destroyed and no file is copied aside.
+- **Two different things read the stored roster, and the plan must not conflate them** — an earlier
+  draft did, which is how "the read is a gate that triggers a rebuild" and "the read is a guarded
+  annotation that can fail harmlessly" both ended up in this section. They are separate steps with
+  opposite failure policies:
+    1. **`_read_existing_roster` is the gate.** It reads and validates. Failure means the stored
+       table is unusable, and the response is a rebuild. Without this, an off-contract roster would
+       sit there until some later merge happened to trip over it.
+    2. **`_changed_ids(stored, snapshot)` is the annotation.** It runs *only* on a roster the gate
+       already accepted, and computes the id list purely to label the materialisation. Its own guard
+       covers a bug in the diff itself (`hash_rows` on an unexpected shape, say) — not a bad table,
+       which the gate has already excluded. If it fails, the merge still happens and the stats omit
+       the id list.
 - **If the rebuild commit *itself* fails, degrade rather than trying harder** (D2): report and let
   the asset-level guard carry the run. This is the discrimination the corrupt-`_delta_log` case
   needs, and doing it by "did the recovery work?" rather than by inspecting exception types is what
   keeps it robust — there is no reliable taxonomy separating "delta-rs cannot open this table" from
   "our contract rejects its contents", and guessing wrong in either direction is worse than trying
   the cheap recovery and reporting when it does not take.
-- **The diff is demoted from a gate to an annotation.** `UpsertMetadataStats` currently publishes
+  The reason the diff cannot simply come from the merge is that `UpsertMetadataStats` publishes
   `metadata_updated_TimeSeriesIDs`, a *list* of ids, and delta-rs' merge metrics give counts only —
   verified: `num_target_rows_inserted`, `num_target_rows_updated`, `num_target_rows_copied`, no ids.
-  So the read stays, but only to name the changed ids for the Dagster UI, and it runs inside its own
-  guard: if it fails, the merge still happens and the stats simply omit the id list. That is a
-  strictly better structure than today's, where the same read is load-bearing for correctness.
+  Demoting it is still a strictly better structure than today's, where the same read is load-bearing
+  for correctness.
 - **`UpsertMetadataStats`** keeps its existing keys, sourced from the merge metrics
   (`metadata_n_new_TimeSeriesIDs` ← `num_target_rows_inserted`,
   `metadata_n_updated_TimeSeriesIDs` ← `num_target_rows_updated`), and gains two optional ones:
   `metadata_roster_rebuilt_reason: str` and `metadata_upsert_failed: str` (the latter set by the
   asset).
+- **The rebuild and create paths must not reuse those two count keys**, which is a trap the merge
+  sourcing walks straight into. A rebuild is an *overwrite*, so there are no merge metrics, and the
+  obvious fallback — "every row we wrote is new" — makes `metadata_n_new_TimeSeriesIDs` report the
+  whole snapshot height at precisely the moment the roster was *thinned*. The stat would be at its
+  most reassuring when the operator most needs alarm. So the rebuild and create paths report
+  `metadata_n_rows_written` alongside their reason and leave the merge counts unset; a key that means
+  "inserted by a merge" is only ever set by a merge. Relatedly, the repair pass calls
+  `upsert_metadata` a second time in the same run, so the asset must **merge the two stats dicts
+  under distinct keys** rather than calling `add_output_metadata` twice with the same ones — verified
+  that duplicate keys do not raise, the later value silently wins, which would hide the rebuild
+  behind the repair's own numbers.
 - **`_read_existing_roster`** — reads via `TimeSeriesMetadata.scan_delta` and validates, returning
   `None` plus a reason on `Exception` rather than raising. Catching `Exception` and **not**
   `BaseException` is deliberate, and differs from the `checks.py` guards: a pyo3 panic is not
   evidence about the *table*, and overwriting a table on that evidence is worse than skipping the
   update, so a panic falls through to the asset-level guard, which degrades without rebuilding.
+  It must also catch `OSError`: `delta_table_exists` does **not** return `False` for a plain file
+  sitting at the table path, it raises `OSError: Generic LocalFileSystem error ↳ Unable to walk dir`
+  (reproduced). That is exactly the state a deployment left mid-migration is in — see the migration
+  section, which is where the real fix for it lives.
 
 ### `src/nged_substation_forecast/defs/assets.py`
 
@@ -186,7 +265,7 @@ layout. `packages/nged_data/pyproject.toml` gains a `delta_store` dependency, ex
   `report_asset_degradation("power_time_series_and_metadata", exc)`, and substitutes
   `UpsertMetadataStats(metadata_upsert_failed=repr(exc))` so the power write below still runs. Needs
   a `DagsterExecutionInterruptedError` import.
-- **Repair a rebuilt roster in the same run.** Where the stats carry
+- **Repair a rebuilt *or newly created* roster in the same run.** Where the stats carry
   `metadata_roster_rebuilt_reason`, log at ERROR, call `report_asset_degradation` with the reason,
   then re-derive the full roster: take the newest JSON file per `time_series_id` from
   `list_of_large_json_files` (the *all-files* listing the asset already holds, before
@@ -197,27 +276,58 @@ layout. `packages/nged_data/pyproject.toml` gains a `delta_store` dependency, ex
   the run still succeeds, so the repair can only improve on the bare rebuild. Cost is one full pass
   over NGED's files (32 today, ~2,500 at V2 scale — the same work a first-ever backfill does) on a
   path that should fire once in the project's life.
+
+    **The create branch needs the same treatment, and this is the plan's own Q3 argument turned
+    against it.** A create is structurally identical to a rebuild: the table does not exist, so the
+    roster ends up holding only this run's snapshot. Since the create branch sets no rebuild reason,
+    the repair would never fire and nothing would be reported — an automatic repair for the rebuild
+    path and none for the path most likely to actually happen (a migration that was skipped, or an
+    env var still pointing at the old `.parquet`). The discriminator is not "created versus rebuilt"
+    but **"was this run's file listing narrowed?"**: fire the repair whenever the roster was created
+    or rebuilt *and* `list_of_new_json_files` is shorter than `list_of_large_json_files`. On a
+    genuine first-ever backfill the two are equal, so the repair correctly does not fire; on every
+    other create it does.
 - **The consequence worth a comment**, because it is a genuine trade that holds whichever order the
   two writes go in: the power Delta table is what `select_new_rows` uses to decide which JSON files
   are new, so once the power rows land, a *failed* roster update is not retried — that run's
   metadata change is lost until NGED republishes those series (~5 h). Losing one refresh of derived,
   re-delivered data is much cheaper than blocking the power stream, and it is the second reason the
   failure must reach Sentry rather than only the logs.
+- **On the rebuild path, though, "lost until NGED republishes" understates it: for a series that has
+  stopped publishing, the loss is permanent.** `select_new_rows` keeps only rows whose time exceeds
+  the stored `last_time` per series (`storage.py:339-347`), so files already represented in the power
+  table are never parsed again. If the roster is rebuilt thin *and* the repair pass fails (test 15
+  pins that as an acceptable outcome), a quiet series' metadata row does not come back on its own —
+  ever. Nothing re-reads its file, and the repair only runs in the same run as the rebuild. So the
+  runbook needs an explicit manual re-derivation step (re-run `download_and_parse_files` over the
+  full listing, or read the pre-rebuild row back by time travel), and it is not optional garnish:
+  it is the only route back.
 - **`h3_grid_weights`** — `weights.write_parquet(...)` (line 167) becomes
   `write_h3_grid_weights(...)`; `if_local_path_then_make_parent_dir` stays (a Delta write needs the
   parent too).
-- **`ecmwf_ens`** — the weights read at line 260 becomes `H3GridWeights.scan_delta(...)`.
+- **`ecmwf_ens`** — the weights read at line 259 becomes `H3GridWeights.scan_delta(...)`.
 
 ### Remaining read sites
 
-Mechanical, all from `pl.read_parquet` to the new `scan_delta` classmethods:
+All move from `pl.read_parquet` to the new `scan_delta` classmethods. **Not purely mechanical**,
+because three of them build an *eager* `pt.DataFrame` today and `scan_delta` returns a
+`pt.LazyFrame` — each needs a `.collect()` and a re-wrap, and two of them get their dtypes fixed as a
+side effect rather than by accident:
 
 - `src/nged_substation_forecast/defs/checks.py:216-223` — `_read_roster_ids`: `object_exists` →
   `delta_table_exists`, `scan_parquet` → `TimeSeriesMetadata.scan_delta`. Still inside the check's
   catch-all, so it cannot raise into the run.
 - `src/nged_substation_forecast/defs/cv_assets.py:322` (`_load_engineering_inputs`) and `:998`
-  (`forecast_metrics`).
-- `packages/dashboard/view_forecasts.py:63` and `packages/dashboard/map_and_timeseries.py:48-50`.
+  (`forecast_metrics`) — both eager.
+- `src/nged_substation_forecast/defs/assets.py:258-262` (`ecmwf_ens`, listed above) deserves its own
+  mention: it does `set_model(H3GridWeights)` with **no `.cast()`** today, which is harmless against
+  parquet and silently wrong against Delta — `h3_index` would arrive `Int64` where the contract says
+  `UInt64`, and it feeds the NWP spatial join. `H3GridWeights.scan_delta` casting is what fixes it.
+- `packages/dashboard/view_forecasts.py:63` and `packages/dashboard/map_and_timeseries.py:48-50`
+  both do `validate(read_parquet(...))`, which **fails outright** against a Delta table (verified:
+  five dtype errors on the roster's four Enums plus `h3_res_5`). They must go through `scan_delta`,
+  not merely swap the reader. Both are marimo notebooks, so the `marimo-notebooks` skill's import and
+  cell rules apply — load it before editing them.
 - `packages/notebooks/view_baseline_export.py:42`.
 
 ### `src/nged_substation_forecast/_sentry.py`
@@ -236,10 +346,50 @@ Mechanical, all from `pl.read_parquet` to the new `scan_delta` classmethods:
 ### Migrating the two existing files
 
 Both are re-derivable, and there is one deployment, so this is a documented manual step rather than
-code: for each table, `pl.read_parquet(<old>).write_delta(<new>)`, verify the row count, then delete
-the `.parquet`. The weights can equally be re-materialised from the asset, since they are
-deterministic. Put the exact commands in the PR body and in `docs/live_service/operations.md`; do not
-add a migration code path (CLAUDE.md: no backwards compatibility with data we can re-derive).
+code. **The naive one-liner does not work**, and an earlier draft of this plan specified it: run
+verbatim, `pl.read_parquet(<old>).write_delta(<new>)` fails on the roster with the Enum panic from
+fact 1, because parquet *preserves* the Enum dtype on round-trip where Delta cannot store it at all
+(reproduced end-to-end through a `metadata.parquet` written by today's `upsert_metadata`). Three
+requirements the migration therefore has:
+
+- **Go through the new writer, not `write_delta` directly.** `pl.read_parquet(<old>)` → align to the
+  contract → `delta_store.metadata.merge_time_series_metadata(<new>)`. That picks up the Enum cast and
+  the 14-column alignment for free, and alignment is not optional: a table migrated with only the
+  columns the live parquet happens to carry hits fact 5 on the very first merge afterwards.
+- **Verify with `validate`, not a row count.** The stated check ("verify the row count") would pass on
+  a table that no reader can use. `TimeSeriesMetadata.scan_delta(<new>).collect()` then `validate` is
+  the check that actually proves the migration, and for the weights it is the one that catches
+  `h3_index` coming back `Int64`.
+- **Update `METADATA_PATH` / `H3_GRID_WEIGHTS_PATH` if either is set explicitly**, and say so
+  loudly. Only the *derived defaults* change, and `docs/live_service/setup.md:64-72` invites setting
+  these by hand. Left pointing at the old `.parquet`, every run afterwards hits the `OSError` from
+  `delta_table_exists` walking a plain file as a directory. It does at least page rather than pass
+  silently — the asset-level guard sends a Sentry event, and the freshness check drops to `WARN` — but
+  nothing self-heals, so it stays broken until someone reads the alert. The runbook step is: migrate,
+  update the env var, delete the `.parquet` last.
+
+Put the exact commands in the PR body and in `docs/live_service/operations.md`; do not add a migration
+code path (CLAUDE.md: no backwards compatibility with data we can re-derive). The weights can equally
+be re-materialised from the asset, since they are deterministic — which is the simpler route for that
+table, and worth stating as the recommended one.
+
+**The test suite migrates too, and it is most of the mechanical work.** Five helpers write the roster
+as parquet, all needing the same treatment, and none were in the earlier draft's list:
+
+- `tests/test_checks.py:162` `_write_metadata_roster` (`write_parquet` at `:179`), called at `:197`,
+  `:226`, `:285`, plus the corrupt-roster test at `:330`
+- `tests/test_live_forecasts.py:119` `_write_metadata`, called at `:166`
+- `tests/test_cv_power_forecasts.py:94` `_write_metadata`, called at `:132`
+- `tests/test_metrics.py:133` `_write_metadata`, called at `:196`
+- `tests/test_trained_cv_model.py:101` `_write_metadata`, called at `:148`
+- `tests/test_assets.py:157` (`pl.read_parquet(env / "NGED" / "metadata.parquet")`), `:229`
+  (`assert not (...).exists()`) and `:250` (the weights read)
+
+The *source* read/write inventory in the sections above is complete: nothing else reads or writes
+either table, nothing globs for them by name, and `.env.example`, the `Dockerfile`, `.dockerignore`
+and `conf/` reference neither filename. `packages/contracts/tests/test_uri.py:27-28,48` mention
+`metadata.parquet` only as an arbitrary string for `uri_join`/`object_exists`, so they stay as they
+are.
 
 ## Design-philosophy check
 
@@ -248,7 +398,7 @@ This path is **production** — the hourly `power_time_series_and_metadata_job`,
 
 - **Principle 10** ("every write is atomic and idempotent",
   `docs/design-philosophy/design-principles.md:387`) is the one this change *delivers*. Its *Decided*
-  paragraph (`design-principles.md:411-419`) credits Delta Lake for atomicity; the roster and the
+  paragraph (`design-principles.md:410-419`) credits Delta Lake for atomicity; the roster and the
   weights were the two live exceptions, and after this change there are none.
 - **Rule 1** (never raise because an input is absent or stale): the ingest keeps running and records
   the degradation instead of stopping.
@@ -284,13 +434,18 @@ This path is **production** — the hourly `power_time_series_and_metadata_job`,
 
 ## Tests
 
-Every assertion below fails on `main` today.
+Most of these assert behaviour that does not exist on `main`. Where a test is new only because the
+module it exercises is new, that is said rather than dressed up as a bug being fixed — and **one item
+below already exists and passes on `main`** (item 6), which an earlier draft of this plan wrongly
+claimed as a new failing assertion.
 
-`packages/delta_store/tests/test_metadata.py` (new):
+`packages/delta_store/tests/test_metadata.py` (new module, so these are coverage for new code rather
+than regressions):
 
 1. `test_merge_updates_only_the_rows_that_changed` — three-row table, snapshot with one changed row.
-   Asserts `num_target_rows_updated == 1` and `num_target_rows_copied == 2`. On `main`: the function
-   does not exist, and today's `unique(keep="first")` rewrites the whole table.
+   Asserts `num_target_rows_updated == 1` and `num_target_rows_copied == 2`. Note what not to assert:
+   `files_added`/`files_removed` are both 1 either way, because the table is one file (measured), so
+   an assertion on bytes or files written would be testing a property this change does not deliver.
 2. `test_merge_commits_no_new_version_when_nothing_changed` — merge an identical snapshot; assert
    `DeltaTable(uri).history()` is unchanged in length. This is the property that keeps the vacuum
    burden negligible, and it is the one a careless `when_matched_update_all()` (no predicate) would
@@ -298,26 +453,44 @@ Every assertion below fails on `main` today.
 3. `test_merge_accepts_a_snapshot_missing_the_optional_columns` — a snapshot without
    `information`/`area_wkt`/`area_center_*` against a full-schema table. Asserts the insert succeeds
    and the new row's absent fields are null. On `main`: `ShapeError` from the `concat` (verified).
-4. `test_merge_creates_the_table_when_absent` — first-ever call against a non-existent URI.
+4. `test_merge_creates_the_table_when_absent` — first-ever call against a non-existent URI. **This is
+   the test that must be written against a fully Enum-typed roster**, because the create path is where
+   fact 1's rust panic lands, and a suite that only ever merges into a pre-existing table would pass
+   while production's first write aborts. Assert the round trip too: read back through
+   `TimeSeriesMetadata.scan_delta` and `validate`, which is what pins the `String → Enum` cast at the
+   other end.
+5. `test_merge_rejects_a_target_whose_schema_does_not_match_the_contract` — a stored table lacking the
+   four `allow_missing` columns (i.e. one migrated from a narrow parquet file). Assert a clear,
+   catchable error naming the mismatch, *not* a rebuild: fact 5's point is that a schema difference is
+   a migration to perform, not corruption to overwrite. Without this the failure surfaces as
+   `DeltaError: … Schema error: No field named target.information` (reproduced) from deep inside the
+   merge, and the rebuild path swallows it.
+6. `test_merge_does_not_preserve_row_order` — pin the *documented* behaviour, not an aspiration:
+   after a merge that changes two rows of ten, the stored order is no longer the id order (measured:
+   `[3, 7, 1, 2, 4, 5, 6, 8, 9, 10]`). This exists so the next person to notice the unsorted table
+   finds a test explaining why, rather than adding a `.sort()` the following merge silently undoes.
 
 `packages/nged_data/tests/test_storage.py` (rewritten for Delta):
 
-5. `test_upsert_metadata_rebuilds_when_the_stored_roster_fails_its_contract` — write a Delta table
+7. `test_upsert_metadata_rebuilds_when_the_stored_roster_fails_its_contract` — write a Delta table
    missing `substation_type` (a required field), then upsert. Asserts a rebuild rather than a
    `DataFrameValidationError`, that the stats carry `metadata_roster_rebuilt_reason`, and that the
    **pre-rebuild version is still readable via time travel** — the property that replaces the
    quarantine copy. On `main`: `DataFrameValidationError` (verified).
-6. `test_upsert_metadata_reports_the_changed_ids` — unchanged behaviour, pinned because the diff
-   moves from gate to annotation: assert `metadata_updated_TimeSeriesIDs` still names exactly the
-   changed ids. Fails on `main` only in that the table is parquet there; it is the guard against the
-   demotion quietly dropping the field.
-7. `test_upsert_metadata_still_merges_when_the_informational_diff_fails` — monkeypatch the diff read
+8. **`test_upsert_metadata_returns_diff` already exists and passes on `main`**
+   (`packages/nged_data/tests/test_storage.py:145-232`, asserting exactly
+   `metadata_n_new_TimeSeriesIDs == 1`, `metadata_n_updated_TimeSeriesIDs == 1` and
+   `set(metadata_updated_TimeSeriesIDs) == {2}` — confirmed by running it). So this is a **port, not a
+   new test**: change its writes and read-backs to Delta and leave the assertions alone. That is the
+   point — it is the regression guard that the diff's demotion from gate to annotation does not
+   quietly drop the field, and it is worth more for being untouched.
+9. `test_upsert_metadata_still_merges_when_the_informational_diff_fails` — monkeypatch the diff read
    to raise; assert the merge happened and the stats omit the id list without raising. On `main` the
    equivalent read is load-bearing, so a failure loses the write entirely.
-8. `test_upsert_metadata_merges_a_stored_roster_with_reordered_columns` — same data, different
+10. `test_upsert_metadata_merges_a_stored_roster_with_reordered_columns` — same data, different
    column order. Asserts a no-op merge and no new version. On `main`: `hash_rows` is order-sensitive
    (verified), so it reports a spurious update or raises `ShapeError` on the vstack.
-9. `test_upsert_metadata_clears_a_field_the_snapshot_no_longer_carries` — the D1 semantics, and the
+11. `test_upsert_metadata_clears_a_field_the_snapshot_no_longer_carries` — the D1 semantics, and the
    one test that would catch (B) being implemented by accident. A stored row has
    `information = "note"`; this run's snapshot omits the `information` column entirely. Asserts the
    stored value ends up **null**, not `"note"`. On `main`: `ShapeError` from the `concat` (verified).
@@ -327,46 +500,58 @@ Every assertion below fails on `main` today.
 `tests/test_s3_data_paths.py` (moto, `integration`-marked; the per-test reset fixture at
 `tests/test_s3_data_paths.py:85-101` handles moto's process-global backend):
 
-10. `test_metadata_delta_round_trip_over_s3` — replaces the existing
+12. `test_metadata_delta_round_trip_over_s3` — replaces the existing
    `test_metadata_parquet_round_trip_over_s3` (`:237`): create, merge, read back over S3, exercising
    delta-rs' conditional-put commit path against the object store.
 
 `tests/test_assets.py` (the existing `_FakeS3Store` + `env` harness):
 
-11. `test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fails` — monkeypatch
+13. `test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fails` — monkeypatch
     `assets.upsert_metadata` to raise `RuntimeError`; assert `result.success`, that the
     `power_time_series` Delta table holds the fixture rows, and that `metadata_upsert_failed` appears
     in the materialisation metadata. This is the issue's headline property. On `main`: the run fails.
-12. `test_power_time_series_and_metadata_repairs_a_rebuilt_roster` — with the fake store serving two
+14. `test_power_time_series_and_metadata_repairs_a_rebuilt_roster` — with the fake store serving two
     series, ingest once, then make the stored roster off-contract and arrange for only *one* series
     to have a new file. Asserts success and that the roster ends up holding **both** ids — the repair
     ran and the roster was not left thin — plus `metadata_roster_rebuilt_reason` in the metadata.
-13. `test_power_time_series_and_metadata_survives_a_failed_roster_repair` — as above with the
+15. `test_power_time_series_and_metadata_survives_a_failed_roster_repair` — as above with the
     repair's `download_and_parse_files` raising; assert the run still succeeds and the thin roster
     stands.
-14. `test_h3_grid_weights_materialises_and_writes_a_delta_table` — the existing
+16. `test_h3_grid_weights_materialises_and_writes_a_delta_table` — the existing
     `test_h3_grid_weights_materialises_and_writes_parquet` (`:236`) converted, asserting
     `delta_table_exists` and the row count. Its six sibling `_write_h3_grid_weights` fixture calls
     (`:275`–`:496`) move to the Delta writer.
 
 `tests/test_sentry.py`:
 
-15. Mirror the two existing `report_check_degradation` tests (`:176`, `:220`) for
+17. Mirror the two existing `report_check_degradation` tests (`:176`, `:220`) for
     `report_asset_degradation` — the built event carries `{"degraded_asset": …}`, no tag leaks into
     the current or isolation scope, and a raising `capture_*` is swallowed and logged. Add the
     message-shaped call as a third case. On `main`: the function does not exist.
 
 `tests/test_checks.py`:
 
-16. `test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet` — rename, and rewrite both the
-    corruption it sets up (a Delta table, not junk bytes at a file path) and its docstring, which
-    currently states that "`upsert_metadata` reads the same file first and fails the asset outright"
-    (line ~336) — no longer true.
+18. `test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet` (`:330`) — rename, and rewrite
+    both the corruption it sets up and its docstring, which currently states that "`upsert_metadata`
+    reads the same file first and fails the asset outright" (`:337-338`) — no longer true.
+    **Specify the replacement corruption, because two obvious candidates do not work.** Junk bytes at
+    the path (today's setup, `:344`) now make `delta_table_exists` raise `OSError` walking a file as a
+    directory — still caught by the check's catch-all, so the test would pass, but it would be
+    asserting on a filesystem-shape error rather than on a corrupt roster, which is not the state the
+    docstring describes. And a merely *off-contract* Delta table does not degrade this check at all:
+    `_read_roster_ids` (`checks.py:212-223`) only does `.select("time_series_id")` and never validates.
+    The state that genuinely reproduces it is **a Delta table with a corrupt `_delta_log`** — truncate
+    `_delta_log/00000000000000000000.json` — where `delta_table_exists` returns `True` and the scan
+    raises. That is also the D2 fault, so the test doubles as the check's half of it.
 
 `packages/contracts/tests/test_settings.py`:
 
-17. `:49` asserts the derived `h3_grid_weights_path` ends in `.parquet`; update, along with the
-    path-suffix set at `:82`.
+19. `:48` asserts `settings.metadata_path == "/srv/data/NGED/metadata.parquet"` and `:49` the same for
+    `h3_grid_weights_path` — **both** need updating; an earlier draft cited only `:49`. The set at
+    `:82` needs **no** change: it is a set of *field names*
+    (`{"metadata_path", "h3_grid_weights_path"}`) used to decide which paths derive from the internal
+    versus delivery root, not a set of path suffixes, and this plan deliberately keeps those field
+    names.
 
 ## Docs to update
 
@@ -375,7 +560,7 @@ Written to describe how the code works now, per CLAUDE.md's "write about the pre
 - **`CLAUDE.md:194`** — the asset "upserts metadata parquet" becomes a Delta upsert. Check the
   package table at `:179` still reads correctly for `delta_store` (it will, but it now owns four
   tables).
-- **`docs/design-philosophy/design-principles.md:411-419`** — principle 10's *Decided* paragraph:
+- **`docs/design-philosophy/design-principles.md:410-419`** — principle 10's *Decided* paragraph:
   every managed table is now Delta, so the property holds project-wide with no exception.
 - **`docs/design-philosophy/inherent-stability.md`** — a sentence in "Missing versus wrong" giving
   the roster as the second worked example of rule 3, and a new **rule 12**: *a derived artifact we
@@ -403,6 +588,17 @@ Written to describe how the code works now, per CLAUDE.md's "write about the pre
 - **`packages/nged_data/README.md`** — the `upsert_metadata` line gains the Delta merge and the
   rebuild.
 - **`packages/delta_store/README.md`** — two new modules in the charter and the table list.
+- **`docs/architecture/performance.md:16-37`** — "Storage formats: measured, not assumed" is the page
+  that records each table's writer-properties choice *and why it was chosen*, currently for `nwp` and
+  `power_forecasts`. Two new `*_WRITER_PROPERTIES` constants belong there, with the honest
+  justification: plain ZSTD-3, no per-column encodings, because at tens of KB there is nothing to
+  measure. Saying that explicitly is what stops the page implying the omission was an oversight.
+- **`packages/contracts/src/contracts/settings.py:278`** — the `nged_data_path` docstring says
+  "Directory holding the NGED power_time_series Delta table and metadata parquet."
+- **`docs/architecture/production-deployment.md:76`** — "a roster series (present in the
+  `TimeSeriesMetadata` parquet)". A fourth spot in the same file, on top of the three above.
+- **`docs/architecture/ecmwf-ens-known-issues.md:261`** — "the `h3_grid_weights` parquet it has
+  already loaded".
 - **`packages/contracts/README.md`** — if it lists the schemas' helpers, the two new `scan_delta`
   classmethods belong there.
 - No roadmap page completes here, so there is no "Implementation details" section to delete and no
@@ -504,10 +700,22 @@ local SSD, and S3 request counts against a moto server:
 Absolute latencies are trivial; what matters is that request count grows with commit history, which
 is what #357 exists to bound. The two dashboards pay +3 requests per interactive read.
 
-**Delta is stricter about dtypes than parquet**: `write_delta` refuses a `Null`-dtype column outright
-(verified — it raised on the first attempt at the benchmark above), where parquet stores one happily.
-Any all-null column must carry a concrete dtype, which Patito's `.cast()` already ensures on every
-path that goes through the contract.
+**Delta is stricter about dtypes than parquet, and this is the conversion's largest hidden cost** —
+three separate ways, all verified, and the reason the write and read paths both belong behind helpers
+rather than being open-coded per caller:
+
+- **`pl.Enum` cannot be written at all.** Not a rejection but a rust panic surfaced as a `DeltaError`
+  (fact 1). Parquet round-trips Enums perfectly, so this bites only on conversion, and it bites the
+  create path hardest.
+- **A `Null`-dtype column is refused outright** (it raised on the first attempt at the benchmark
+  above), where parquet stores one happily. Any all-null column must carry a concrete dtype, which
+  Patito's `.cast()` already ensures on every path that goes through the contract.
+- **Unsigned integers do not exist in the Delta protocol.** `UInt64` comes back `Int64`, silently, so
+  `H3GridWeights` and `TimeSeriesMetadata.h3_res_5` need a cast on every read.
+
+The pattern across all three: the round trip is lossy in the *type* domain while being exact in the
+value domain, so nothing fails loudly at the boundary unless a contract validates there. Which is the
+argument for `scan_delta` classmethods over `pl.read_delta` at each call site.
 
 ## History of this plan
 
@@ -568,3 +776,55 @@ swallowing the strict-contract boundary on *incoming* metadata. Rejected as stat
 `_extract_time_series_metadata` validates and raises at `read_nged_json.py:58`, outside the guard, so
 an NGED contract break still fails the run. The narrower point (a bug in our own upsert code is now
 degraded rather than raised) is real and is stated in the design-philosophy check above.
+
+### What the adversarial review of the Delta version found
+
+A second fresh sub-agent reviewed the rewrite, again with no knowledge of the reasoning behind it, and
+was asked specifically to re-run the Delta measurements rather than trust them. **Every one of its 16
+findings was verified as real** and is folded in above; the load-bearing ones were reproduced
+independently before being accepted. It also re-ran every empirical claim the plan makes — the
+parenthesised predicate, the no-op-commits-nothing property, the narrow-source insert, the
+counts-not-ids metrics, the `Null`-dtype refusal, D1's "(B) happens by accident" — and all of them
+held, along with four the plan depended on without stating: `merge` does respect `writer_properties`,
+`IS DISTINCT FROM` is correct in both null directions, a `UInt64`-vs-`Int64` predicate comparison is
+safe, and time travel does survive `schema_mode="overwrite"`.
+
+The findings that changed the design rather than the prose:
+
+1. **`write_delta` cannot store the roster at all.** `TimeSeriesMetadata` has four `pl.Enum` columns,
+   and delta-rs aborts a rust worker on them. Blocking, and the plan had no mention of it despite the
+   repo already carrying both the workaround (`cv_assets.py:748-749`) and a skill documenting the trap.
+   Now fact 1 of `metadata.py`'s docstring, and the reason test 4 must use a fully-typed roster:
+   `MERGE` tolerates an Enum source, so a suite that only merges would have passed while the create
+   path panicked in production. Reproduced independently.
+2. **The documented migration one-liner fails**, for that reason — parquet preserves the Enum dtype on
+   round-trip. The migration section is rewritten to go through the new writer, to verify with
+   `validate` rather than a row count, and to update the env vars.
+3. **`MERGE` destroys row order**, and the plan had silently dropped today's `.sort("time_series_id")`
+   while presenting the change as a pure storage conversion. Reproduced. Now stated, documented in both
+   module docstrings, and pinned by test 6.
+4. **The create branch had no repair pass**, though it is structurally identical to the rebuild and far
+   more likely to fire (a skipped migration). Fixed with a sharper discriminator than "created or
+   rebuilt": whether the run's file listing was narrowed.
+5. **A predicate naming a column the *target* lacks raises**, which would have turned a routine
+   contract addition — or a migration from a narrow parquet file — into a silent roster rebuild plus a
+   full re-download. Now fact 5 and test 5. Reproduced by accident while checking finding 3.
+6. **"Every assertion below fails on `main` today" was false**: `test_upsert_metadata_returns_diff`
+   already exists and passes. Item 8 is now honestly labelled a port.
+7. **The rebuild path's data loss is permanent, not "~5 h"** — `select_new_rows` never re-reads a file
+   already represented in the power table, so a quiet series' metadata row cannot come back on its own.
+   The runbook needs a manual re-derivation step, which is now stated as the only route back.
+8. **`metadata_n_new_TimeSeriesIDs` would have lied on exactly the paths that matter**, reporting the
+   whole snapshot as "new" at the moment the roster was thinned. The rebuild and create paths now report
+   their own key.
+9. **The roster read had two incompatible jobs** — gate and annotation — in adjacent bullets. Separated
+   explicitly, since an implementer would otherwise have picked one at random.
+10. **Missed sites**: five roster-writing test helpers, four documentation spots (including
+    `performance.md`, the page that exists to record writer-properties rationale), and three read sites
+    that are eager and so not the mechanical swap the plan claimed. All added.
+
+Two sub-claims were **narrowed rather than accepted as stated**. The review called the stale-env-var
+failure "silent and permanent" — it is permanent, but not silent: the asset guard sends a Sentry event
+and the freshness check drops to `WARN`, so it pages, and the migration runbook is the fix. And it
+listed items 4, 9 and 14 as further instances of the false "fails on `main`" claim; they are new tests
+for new modules, which the Tests section now says plainly rather than implying a regression.
