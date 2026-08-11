@@ -62,7 +62,7 @@ from nged_data.storage import (
 )
 from pydantic import BaseModel, computed_field, field_validator
 
-from nged_substation_forecast._sentry import report_check_degradation
+from nged_substation_forecast._sentry import report_asset_degradation, report_check_degradation
 
 
 @asset
@@ -124,8 +124,21 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         {"n_implausible_power_rows_dropped": downloaded.n_implausible_power_rows_dropped}
     )
 
-    # Save TimeSeriesMetadata:
-    upsert_metadata_stats = upsert_metadata(new_metadata, metadata_path, storage_options)
+    # Save TimeSeriesMetadata. A roster failure must not stop the power write below; what that costs
+    # is in https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
+    try:
+        upsert_metadata_stats = upsert_metadata(
+            new_metadata=new_metadata, metadata_path=metadata_path, storage_options=storage_options
+        )
+    except BaseException as exc:
+        # The same guard as the asset checks, for the same reason — see the comment in
+        # `checks.py::power_data_is_fresh` for why `BaseException` and what it costs in tests.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        context.log.exception(f"Could not upsert the TimeSeriesMetadata roster at {metadata_path}")
+        report_asset_degradation(asset_name="power_time_series_and_metadata", exc=exc)
+        upsert_metadata_stats = UpsertMetadataStats(metadata_upsert_failed=repr(exc))
+
     context.add_output_metadata(upsert_metadata_stats)
 
     # Save PowerTimeSeries:

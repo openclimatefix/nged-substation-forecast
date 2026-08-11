@@ -198,6 +198,17 @@ you without your watching the Checks view. The check degrades this way on purpos
 raising, so the hourly ingest keeps running; nothing is known about staleness while it persists, so
 treat it as "unknown", not "healthy".
 
+**Reading a failed roster upsert.** `metadata_upsert_failed` in
+`power_time_series_and_metadata`'s run metadata means the `TimeSeriesMetadata` roster upsert raised
+and was swallowed so the power write could go ahead, and it also reaches Sentry tagged
+`degraded_asset:power_time_series_and_metadata`. The run **succeeds** by design: the roster is
+derived data that NGED re-delivers, and the power time series is not, so a roster fault must not
+stall the ingest until an operator intervenes. The roster is left unchanged and the next run that
+finds new files retries it, but *that run's* metadata change is lost, because the power rows have
+landed and `select_new_rows` will not offer those files again. Read the traceback in the run's logs —
+an off-contract roster after a schema change and a bug in our own code both land here, and both want
+a fix rather than a re-run.
+
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from
 the frame already in memory, and is likewise non-blocking WARN. Nulls in the three de-accumulated
 variables are *expected* and are not a fault — see
