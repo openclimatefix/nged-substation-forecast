@@ -47,16 +47,14 @@ falsifiable [engineering hypotheses](design-philosophy/engineering-hypotheses.md
 pre-registered number we then miss is a transferable finding, whereas an aspiration we quietly fall
 short of is not.
 
-A further aim runs alongside the forecasting itself. Flexpectation is a greenfield project, which
-is a rare chance to **research industry best practice, test-drive it against real data and a real
-production service, and report what we find** — and deliberately not only best practice from the
-energy-forecasting industry: the
+Flexpectation is a greenfield project, which is a rare chance to **research industry best practice,
+test-drive it against real data and a real production service, and report what we find**. The ideas
+worth borrowing are not all from energy forecasting: the
 [inherent stability](design-philosophy/inherent-stability.md) that shapes how the service behaves
-when its inputs degrade is borrowed from vehicle dynamics, and it has company. The
-[design principles](design-philosophy/design-principles.md) list collects the results — what each
-principle actually decided, which practices we considered and declined, and which we have not yet
-absorbed. The intended output is a list of principles that any energy-forecasting project might
-find useful to consider — reported with results, not asserted.
+when its inputs degrade comes from vehicle dynamics, and other principles come from avionics,
+manufacturing and site reliability engineering. The
+[design principles](design-philosophy/design-principles.md) page records what each principle
+actually decided, which practices we considered and declined, and which we have not yet absorbed.
 
 ## Documentation
 

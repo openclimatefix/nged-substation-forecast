@@ -1541,8 +1541,8 @@ detector](../roadmap/switching-events.md#stage-1-changepoint-detection-on-the-ba
 is designed to find — changepoint detection on a baseline residual that has first been
 **normalised** (per-substation,
 per-time-of-day, so one threshold works fleet-wide) and **whitened** (a low-order autoregressive
-fit, so slow NWP-error waves are not read as steps). That preparation is the hard-won part of the
-design and it transfers unchanged. What differs is the operating point, and it differs favourably:
+fit, so slow NWP-error waves are not read as steps). That preparation is the difficult part of the
+design, and it transfers unchanged. What differs is the operating point, and it differs favourably:
 the [background on switching events](../background/switching-events.md) notes that the common,
 difficult case is a *partial* transfer whose magnitude "shade[s] continuously down into the
 measurement noise", so detection difficulty scales inversely with how much load moved. A shed feeder
@@ -1663,8 +1663,8 @@ the single most expensive mistake available here. Instead, promote geography to 
 
 - A **`RegionProfile`** in `contracts` carrying the latitude/longitude bounds, the four enums, the
   sampling interval, the timezone, the H3 resolution, and the power thresholds — injected rather
-  than hard-coded. This is the largest single edit, and it pays for itself by making the British
-  assumptions *visible* rather than implicit.
+  than hard-coded. This is the largest single edit, and it is worth the effort because it makes the
+  British assumptions *visible* rather than implicit.
 - `nged_data` becomes one of several ingest packages behind a small **`PowerIngest`** protocol whose
   contract is "emit `PowerTimeSeries` and `TimeSeriesMetadata`". Only three modules import
   `nged_data` today, so the boundary is nearly clean already — with one wrinkle worth fixing on its

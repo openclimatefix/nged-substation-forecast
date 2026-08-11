@@ -509,7 +509,7 @@ are otherwise bad at. A per-series booster could in principle learn "hot for Jun
 will not, so handing it the precomputed anomaly is legitimate inductive bias rather than
 information it already holds. It sits at the end of Tier 3 because its expected win is modest
 (see below) yet it carries a new data-ingestion dependency — more effort per unit skill than the
-residual-lag features above it, which are expected to offer far more bang for the buck.
+residual-lag features above it, which are expected to offer far more skill per unit of effort.
 
 **Is the anomaly the signal, or is the raw value?** For GB demand the first-order response is to
 *actual* (effective) temperature, which the Tier-2

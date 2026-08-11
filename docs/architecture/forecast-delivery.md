@@ -78,7 +78,7 @@ being just as important to NGED as the power forecasts.
 
 ## How big is Flexpectation's power forecast data?
 
-In short: At v2 scale, we will be storing multiple _trillions_ of rows of data. As discussed below,
+At v2 scale, we will be storing multiple _trillions_ of rows of data. As discussed below,
 that is far too much to be practical for storing in Postgres, or for delivering over a REST API.
 
 Each 6-hourly forecast run produces one row per time series, ensemble member, and half-hour of the
@@ -189,7 +189,7 @@ our colleagues at [NESO](https://www.neso.energy/) tell us NESO uses Delta Lake 
 More broadly, the open-table-format family it
 belongs to (Delta Lake; [Apache Iceberg](https://iceberg.apache.org/), created at Netflix; [Apache
 Hudi](https://hudi.apache.org/), created at Uber) is now the standard way large companies store and
-share analytical data. In other words: Delta Lake is the boring, battle-tested option.
+share analytical data. Delta Lake is therefore the conventional, low-risk choice.
 
 ## Could Postgres store this data?
 
@@ -469,7 +469,7 @@ that DataFrame in the function's type hints).
 ## And it's excellent for our internal storage too
 
 Choosing Delta Lake for delivery is also a vote for our own infrastructure, because it's the same
-format we already rely on internally — and it earns its keep there on its own merits:
+format we already rely on internally — and it justifies that internal use on its own merits:
 
 - **It's remarkably compact.** The same `delta_store` write policy that packs `power_forecasts`
   to ~1.8 bytes/row ([above](#what-delta-lake-is-and-who-else-uses-it)) works just as well on

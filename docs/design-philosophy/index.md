@@ -1,6 +1,7 @@
 # Design Philosophy
 
-**The one-minute description:** We believe that five things can be true at once:
+**The one-minute description:** we are building a service for which all five of these claims hold
+at the same time:
 
 - **A service that mostly runs itself** — manual attention needed only when an upstream data format
   changes, with the forecast degrading gracefully rather than stopping when an input goes missing.
@@ -10,11 +11,11 @@
   to day from the runbooks alone, without knowledge of the implementation details.
 - **A hundred experiments per person in a peak month** — most research ideas fail, so the number of
   good ones a project finds is set by how many it can attempt.
-- **Safe one-click promotion, and one-click rollback** — one *command*, not one leap of faith. By
-  the time that command is available, the candidate has been scored against every other model on
-  identical folds, has run on the very same code that will serve it, and can be reverted just as
-  cheaply if it disappoints.
-- **It runs for pocket money** — under £50/month at v1 scale, under £200/month at v2.
+- **Safe one-click promotion, and one-click rollback** — promoting a model is a single *command*,
+  and it is safe because by the time that command is available the candidate has been scored
+  against every other model on identical folds, has run on the very same code that will serve it,
+  and can be reverted just as cheaply if it disappoints.
+- **It runs cheaply** — under £50/month at v1 scale, under £200/month at v2.
 - **Scale without redesign** — 32 time series to ~2,500, with no structural change.
 
 These are written down as [hypotheses with numbers and deadlines](engineering-hypotheses.md) rather
@@ -38,9 +39,10 @@ of several industries, test-drive them against real data and a real production s
 what we find. Those industries are not only energy forecasting: some of the most useful ideas here
 are borrowed from vehicle dynamics, avionics, manufacturing and site reliability engineering. The
 intended output is a field report, not a rulebook: a list of principles that any energy-forecasting
-project might find useful *to consider*, together with honest results about which practices earned
-their keep here, which we declined, which we have not yet absorbed — and, in time, which failed. A
-practice that did not survive contact with our data is as useful a finding as one that did.
+project might find useful *to consider*, together with honest results about which practices were
+worth their cost here, which we declined, which we have not yet absorbed — and, in time, which
+failed. A practice that did not survive contact with our data is as useful a finding as one that
+did.
 
 Three pages, in reading order:
 
@@ -50,7 +52,7 @@ Three pages, in reading order:
   absorbed.
 - **[Engineering Hypotheses](engineering-hypotheses.md)** — the falsifiable claims the engineering
   is meant to deliver, each with a numeric threshold and the window in which it resolves. The
-  principles are the bets; this page is the scoreboard.
+  principles say what we intend to achieve; this page records whether we achieved it.
 - **[Inherent Stability](inherent-stability.md)** — the largest principle argued in full: how the
   service behaves as its inputs degrade, the degradation ladder, and the rules to follow when
   changing production code.
