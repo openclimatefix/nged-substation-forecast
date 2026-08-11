@@ -139,9 +139,9 @@ def _resolve_forecaster_config(
             override replaces the base value outright rather than merging into it. Lists are
             replaced, not extended, and a value that is itself a mapping is replaced whole, so
             an override must restate every key of that mapping it wants to keep. Every key must
-            name a field the config class declares; an unknown one is rejected. The keys in
-            ``_UNOVERRIDABLE_MODEL_PARAMS`` are rejected too, declared or not — they are the
-            resolver's own to set.
+            name a field the config class declares, and the keys in
+            ``_UNOVERRIDABLE_MODEL_PARAMS`` are refused on top of that — they are the resolver's
+            own to set.
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
@@ -150,10 +150,9 @@ def _resolve_forecaster_config(
     Raises:
         ValueError: ``config_overrides`` names an unoverridable key, or the YAML is not a usable
             model config.
-        ValidationError: ``config_overrides`` names a key the config class does not declare, or
-            gives a declared one a value of the wrong type. Both come from the config class's own
-            validation, before any fold is scheduled. A subclass of ``ValueError``, so a caller
-            that wants "the config is unusable" catches ``ValueError`` alone.
+        ValidationError: An override names an undeclared key, or gives a declared one a value of
+            the wrong type. Raised by the config class before any fold is scheduled. A subclass of
+            ``ValueError``, so a caller that wants "the config is unusable" catches that alone.
     """
     for key, reason in _UNOVERRIDABLE_MODEL_PARAMS.items():
         if key in config_overrides:
@@ -284,9 +283,9 @@ def _reject_changed_identity(
         for tag in IDENTITY_TAGS
         if tag in stored_tags
         for line in (
-            _config_differences(stored_tags[tag], requested_tags[tag])
+            _config_differences(stored_json=stored_tags[tag], requested_json=requested_tags[tag])
             if tag == "config"
-            else _target_difference(tag, stored_tags[tag], requested_tags[tag])
+            else _target_difference(tag=tag, stored=stored_tags[tag], requested=requested_tags[tag])
         )
     ]
     if not differences:
@@ -376,15 +375,19 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     # lacks, so assets can reconstruct the exact forecaster + config subclass from MLflow alone.
     # See load_experiment_forecaster.
     for tag_name, tag_value in identity_tags.items():
-        client.set_experiment_tag(experiment_id, tag_name, tag_value)
-    client.set_experiment_tag(experiment_id, "description", config.description)
+        client.set_experiment_tag(experiment_id=experiment_id, key=tag_name, value=tag_value)
+    client.set_experiment_tag(
+        experiment_id=experiment_id, key="description", value=config.description
+    )
 
     cv_config = load_cv_config(settings.cv_config_path)
     fold_ids = _fold_ids_for_run_mode(run_mode=config.run_mode, cv_config=cv_config)
     partition_keys = [
         f"{config.experiment_name}{CV_PARTITION_KEY_SEPARATOR}{fold_id}" for fold_id in fold_ids
     ]
-    context.instance.add_dynamic_partitions(CV_EXPERIMENT_FOLDS_NAME, partition_keys)
+    context.instance.add_dynamic_partitions(
+        partitions_def_name=CV_EXPERIMENT_FOLDS_NAME, partition_keys=partition_keys
+    )
 
     context.add_output_metadata(
         {

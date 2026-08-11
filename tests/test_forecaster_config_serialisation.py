@@ -1,19 +1,13 @@
 """The invariants every ``BaseForecasterConfig`` subclass must satisfy, whatever it declares.
 
-Two of them, both stated on ``BaseForecasterConfig`` itself and neither enforceable by the type
-checker. **Serialisation must be canonical**: a config is compared and stored as its *serialised*
-form — ``register_experiment`` stamps ``model_dump_json()`` onto the MLflow experiment as the
-``config`` tag and compares a re-registration against it, and logs ``flatten_config(...)`` as
-write-once MLflow params — so the dump has to be a pure function of the config's values and
-nothing else. **Unknown keys must be rejected**: a subclass that re-opens ``extra`` would let a
-misspelled hyperparameter through registration silently.
-
-This module is what makes both enforceable rather than merely documented. It lives in the app
-tier, not in ``packages/ml_core``, because enforcing them means importing every concrete
-forecaster — a dependency ``ml_core`` itself must not take on.
+Both are stated on ``BaseForecasterConfig`` and neither is enforceable by the type checker:
+serialisation must be canonical, and unknown keys must be rejected. This module is what makes them
+enforceable rather than merely documented. It lives in the app tier, not in ``packages/ml_core``,
+because enforcing them means importing every concrete forecaster — a dependency ``ml_core`` itself
+must not take on.
 """
 
-from typing import Any, get_origin
+from typing import get_origin
 
 import pytest
 from ml_core.base_forecaster import BaseForecasterConfig
@@ -21,28 +15,18 @@ from pydantic import ValidationError
 from xgboost_forecaster import XGBoostConfig
 
 
-def _descendants(config_cls: type[BaseForecasterConfig]) -> set[type[BaseForecasterConfig]]:
-    """Every class below ``config_cls``, at any depth.
-
-    ``__subclasses__()`` is one level deep, so recursing is what reaches a config that extends a
-    *concrete* forecaster's config rather than the base — the shape a variant of an existing model
-    would naturally take, and one that would otherwise sit outside these invariants unnoticed.
-    """
-    return {
-        descendant
-        for subclass in config_cls.__subclasses__()
-        for descendant in (subclass, *_descendants(subclass))
-    }
+def _config_classes(cls: type[BaseForecasterConfig]) -> set[type[BaseForecasterConfig]]:
+    """``cls`` and every class below it — ``__subclasses__()`` sees only one level."""
+    return {cls}.union(*map(_config_classes, cls.__subclasses__()))
 
 
 _CONFIG_CLASSES: list[type[BaseForecasterConfig]] = sorted(
-    {BaseForecasterConfig, *_descendants(BaseForecasterConfig)}, key=lambda cls: cls.__name__
+    _config_classes(BaseForecasterConfig), key=lambda cls: cls.__name__
 )
 """Every config class to hold to the invariants.
 
 Only classes that have been *imported* are visible, hence the explicit ``XGBoostConfig`` import
-above; the recursion is what picks up a future forecaster's config automatically, wherever it
-sits in the hierarchy. Sorted so the parametrised ids stay in a stable order.
+above. Sorted so the parametrised ids stay in a stable order.
 """
 
 
@@ -55,20 +39,15 @@ def test_every_concrete_forecaster_config_is_covered() -> None:
 def test_every_config_class_forbids_extra_keys(config_cls: type[BaseForecasterConfig]) -> None:
     """An unknown key must raise, so a misspelled hyperparameter cannot register silently.
 
-    Pydantic merges a parent's ``model_config`` into a subclass's, so a subclass declaring its own
-    ``model_config`` keeps the strictness. What this catches is one that re-opens ``extra``
-    explicitly. Asserted on the behaviour rather than on the flag, so that a subclass which keeps
+    Asserted on the behaviour rather than on the ``model_config`` flag, so a subclass that keeps
     ``extra="forbid"`` but strips unknown keys in a ``model_validator(mode="before")`` fails too.
-
-    Splatted from a dict rather than passed as a keyword, because that is how an unknown key
-    genuinely arrives — ``_resolve_forecaster_config`` merges ``config_overrides`` into the YAML's
-    ``model_params`` and splats the result — and because a literal keyword no parameter matches is
-    a static error, which is not what this test is about.
     """
-    unknown_key: dict[str, Any] = {"selected_features": set(), "definitely_not_a_declared_field": 1}
+    # Splatted from a named mapping: a literal keyword is a static error (no such parameter), and
+    # a literal dict trips PIE804. This is the one spelling both linters accept.
+    unknown_key = {"not_a_declared_field": "x"}
 
-    with pytest.raises(ValidationError, match="definitely_not_a_declared_field"):
-        config_cls(**unknown_key)
+    with pytest.raises(ValidationError, match="not_a_declared_field"):
+        config_cls(selected_features=set(), **unknown_key)
 
 
 def _set_valued_fields(config_cls: type[BaseForecasterConfig]) -> set[str]:

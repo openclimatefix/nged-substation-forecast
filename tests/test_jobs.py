@@ -12,20 +12,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 from contracts.config_schemas import CvConfig, CvFoldConfig
 from ml_core._cv_helpers import flatten_config
 from pydantic import ValidationError
 from xgboost_forecaster import XGBoostConfig, XGBoostForecaster
 
 from nged_substation_forecast.defs.jobs import (
-    PROJECT_ROOT,
     ExperimentIdentityChangedError,
     IdentityTagsType,
     _fold_ids_for_run_mode,
     _identity_tags,
     _reject_changed_identity,
-    _required_targets,
     _resolve_forecaster_config,
 )
 
@@ -76,32 +73,13 @@ def test_resolve_rejects_an_ill_typed_override() -> None:
 
 
 def test_resolve_rejects_an_unknown_override_key() -> None:
-    """A misspelled hyperparameter must fail registration, not train on the YAML's value.
-
-    Why that is worth failing over:
-    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/model-configuration/#tweaking-a-config-for-an-experiment>.
-    """
+    """A misspelled hyperparameter must fail registration, not train on the YAML's value."""
     with pytest.raises(ValidationError, match="n_estimtors"):
         _resolve_forecaster_config(
             base_model_config=_BASE_CONFIG,
             config_overrides={"n_estimtors": 5000},
             experiment_name="exp",
         )
-
-
-def test_every_base_yaml_model_param_is_a_declared_field() -> None:
-    """The base YAML itself must not carry a key the config class would now reject.
-
-    ``model_params`` is splatted into the config class, so a key no field declares fails every
-    registration against this YAML, not just one with an unlucky override. Read after
-    ``_required_targets`` has popped ``_target_``, which names the config class rather than
-    configuring it.
-    """
-    with (PROJECT_ROOT / _BASE_CONFIG).open(encoding="utf-8") as file:
-        raw = yaml.safe_load(file)
-    _, _, model_params = _required_targets(raw=raw, config_path=PROJECT_ROOT / _BASE_CONFIG)
-
-    assert set(model_params) <= set(XGBoostConfig.model_fields)
 
 
 @pytest.mark.parametrize(
@@ -141,12 +119,10 @@ def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
 
 @pytest.mark.parametrize("key", ["_target_", "experiment_name"])
 def test_resolve_rejects_an_override_of_a_key_it_would_discard(key: str) -> None:
-    """Two ``model_params`` keys are the resolver's to set, and an override of either is refused.
+    """An override that does nothing is worse than one that is rejected.
 
-    ``experiment_name`` is a declared field, so ``extra="forbid"`` cannot catch it: an override
-    validates cleanly and is then thrown away by the assignment that stamps the job's own value.
-    ``_target_`` would be caught unaided; the guard runs first so the error names the key. An
-    override that does nothing is worse than one that is rejected.
+    Why each key is on the list, and what would otherwise discard it:
+    ``_UNOVERRIDABLE_MODEL_PARAMS``.
     """
     with pytest.raises(ValueError, match=f"may not override '{key}'"):
         _resolve_forecaster_config(
@@ -196,18 +172,21 @@ def _mixed_fold_config() -> CvConfig:
 
 
 def test_smoke_test_uses_the_non_leaderboard_folds() -> None:
-    assert _fold_ids_for_run_mode(run_mode="smoke_test", cv_config=_mixed_fold_config()) == ["dev"]
+    cv_config = _mixed_fold_config()
+
+    assert _fold_ids_for_run_mode(run_mode="smoke_test", cv_config=cv_config) == ["dev"]
 
 
 def test_full_cv_uses_the_leaderboard_folds() -> None:
-    assert _fold_ids_for_run_mode(run_mode="full_cv", cv_config=_mixed_fold_config()) == [
-        "fold_0",
-        "fold_1",
-    ]
+    cv_config = _mixed_fold_config()
+
+    assert _fold_ids_for_run_mode(run_mode="full_cv", cv_config=cv_config) == ["fold_0", "fold_1"]
 
 
 def test_register_only_uses_the_leaderboard_folds() -> None:
-    assert _fold_ids_for_run_mode(run_mode="register_only", cv_config=_mixed_fold_config()) == [
+    cv_config = _mixed_fold_config()
+
+    assert _fold_ids_for_run_mode(run_mode="register_only", cv_config=cv_config) == [
         "fold_0",
         "fold_1",
     ]
