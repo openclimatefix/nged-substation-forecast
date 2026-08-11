@@ -38,27 +38,34 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     return {"production_model_path": str(tmp_path / "production_model")}
 
 
-def _save_trained_model_to_mlflow(experiment_name: str, n_estimators: int) -> str:
+def _save_trained_model_to_mlflow(
+    experiment_name: str,
+    n_estimators: int,
+    selected_features: set[str] | None = None,
+) -> str:
     """Train a tiny real ``XGBoostForecaster`` on synthetic data and save it to a new MLflow run.
 
     Bypasses the full CV/feature-engineering pipeline (tested elsewhere) — the point here is a
     genuine trained booster + a real ``meta.json`` with ``model_class``, exercised through the
     same ``save_to_mlflow`` mechanism ``trained_cv_model`` uses.
+
+    Every requested feature gets a synthetic column to train against, so a caller can save a model
+    whose feature vocabulary the current code does not recognise.
     """
+    features = selected_features or {"temperature_2m"}
     times = [datetime(2025, 1, 1, hour, tzinfo=UTC) for hour in (0, 1, 2)]
-    train_df = pl.DataFrame(
-        {
-            "time_series_id": [1, 1, 1],
-            "valid_time": times,
-            "time_series_type": ["Primary"] * 3,
-            "power_fcst_init_time": times,
-            "power": [10.0, 12.0, 11.0],
-            "temperature_2m": [5.0, 6.0, 7.0],
-        }
-    )
+    spine = {
+        "time_series_id": [1, 1, 1],
+        "valid_time": times,
+        "time_series_type": ["Primary"] * 3,
+        "power_fcst_init_time": times,
+        "power": [10.0, 12.0, 11.0],
+    }
+    # Spine last, so a feature sharing a spine column's name cannot overwrite it with floats.
+    train_df = pl.DataFrame({name: [5.0, 6.0, 7.0] for name in features} | spine)
     train_data = pt.LazyFrame.from_existing(train_df.lazy()).set_model(AllFeatures)
     config = XGBoostConfig(
-        selected_features={"temperature_2m"},
+        selected_features=features,
         experiment_name=experiment_name,
         n_estimators=n_estimators,
     )
@@ -134,6 +141,30 @@ def test_re_promotion_replaces_the_model(
 
     promotion = json.loads((model_dir / "promotion.json").read_text())
     assert promotion["mlflow_run_id"] == second_run_id
+
+
+def test_promoted_model_refuses_a_model_with_an_unparseable_feature(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
+    """Promoting a model trained before a feature rename fails, leaving nothing behind on disk.
+
+    ``promotable_model_runs`` lists every fold run ever trained, so an operator picking by eye off
+    that table can reach a run this code no longer parses.
+    """
+    run_id = _save_trained_model_to_mlflow(
+        experiment_name="stale_vocabulary",
+        n_estimators=5,
+        selected_features={"local_utc_offset"},
+    )
+
+    with pytest.raises(ValueError, match="local_utc_offset"):
+        materialize(
+            [promoted_model],
+            run_config=RunConfig(ops={"promoted_model": PromotedModelConfig(mlflow_run_id=run_id)}),
+            instance=dagster_instance,
+        )
+
+    assert not Path(env["production_model_path"]).exists()
 
 
 def test_promotable_model_runs_lists_fold_run_candidates(

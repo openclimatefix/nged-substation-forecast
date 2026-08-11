@@ -11,7 +11,7 @@ what makes a *shrinking* population observable as files that must vanish from th
 """
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Self
 
@@ -52,7 +52,13 @@ class _FakeForecaster(BaseForecaster):
         path.mkdir(parents=True, exist_ok=True)
         (path / "payload.txt").write_text(self.payload)
         (path / "meta.json").write_text(
-            json.dumps({"trained_time_series_ids": self._series, "model_class": "fake"})
+            json.dumps(
+                {
+                    "model_params": self.model_params.model_dump(mode="json"),
+                    "trained_time_series_ids": self._series,
+                    "model_class": "fake",
+                }
+            )
         )
         for ts_id in self._series:
             (path / f"{ts_id}.part").write_text(f"model for {ts_id}")
@@ -61,7 +67,7 @@ class _FakeForecaster(BaseForecaster):
     def load(cls, path: Path) -> Self:
         meta = json.loads((path / "meta.json").read_text())
         return cls(
-            BaseForecasterConfig(selected_features=set()),
+            BaseForecasterConfig.model_validate(meta["model_params"]),
             payload=(path / "payload.txt").read_text(),
             series=meta["trained_time_series_ids"],
         )
@@ -75,6 +81,16 @@ class _FakeForecaster(BaseForecaster):
         self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
     ) -> pt.DataFrame[PowerForecast]:
         raise NotImplementedError  # pragma: no cover - unused
+
+
+class _MetaWithoutModelParams(_FakeForecaster):
+    """A forecaster whose saved record omits ``model_params`` altogether."""
+
+    def save(self, path: Path) -> None:
+        super().save(path)
+        meta = json.loads((path / "meta.json").read_text())
+        del meta["model_params"]
+        (path / "meta.json").write_text(json.dumps(meta))
 
 
 def test_trained_time_series_ids_is_abstract() -> None:
@@ -101,10 +117,21 @@ def test_trained_time_series_ids_is_abstract() -> None:
         _MissingPopulation(BaseForecasterConfig(selected_features=set()))
 
 
-def _save(run_id: str, payload: str, series: Sequence[int] = ()) -> None:
-    """Save a ``_FakeForecaster`` carrying ``payload`` and ``series`` into an existing run."""
+def _save(
+    run_id: str,
+    payload: str,
+    series: Sequence[int] = (),
+    selected_features: set[str] | None = None,
+) -> None:
+    """Save a ``_FakeForecaster`` carrying ``payload``, ``series`` and ``selected_features``.
+
+    ``selected_features`` defaults to empty, which every version of the code parses; pass a
+    retired feature name to build a run this code can no longer serve.
+    """
     forecaster = _FakeForecaster(
-        BaseForecasterConfig(selected_features=set()), payload=payload, series=series
+        BaseForecasterConfig(selected_features=selected_features or set()),
+        payload=payload,
+        series=series,
     )
     forecaster.save_to_mlflow(run_id)
 
@@ -225,5 +252,53 @@ def test_fetch_model_artifacts_unpacks_the_archive_into_dest(
     fetch_model_artifacts(saved_run, dest)
 
     assert not (dest / "model.tar.gz").exists()
+    assert _FakeForecaster.load(dest).payload == "hello-model"
+    assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run
+
+
+def _save_stale_vocabulary(run_id: str) -> None:
+    """Save a model naming a feature a rename retired."""
+    _save(run_id=run_id, payload="stale", series=[10], selected_features={"local_utc_offset"})
+
+
+def _save_without_model_params(run_id: str) -> None:
+    """Save a record with no ``model_params``, which no forecaster here can build a config from."""
+    _MetaWithoutModelParams(
+        model_params=BaseForecasterConfig(selected_features=set()),
+        payload="featureless",
+        series=[10],
+    ).save_to_mlflow(run_id)
+
+
+@pytest.mark.parametrize(
+    ("save_unservable", "expected"),
+    [
+        (_save_stale_vocabulary, "local_utc_offset"),
+        (_save_without_model_params, "model_params"),
+    ],
+)
+def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable(
+    saved_run: str,
+    tmp_path: Path,
+    save_unservable: Callable[[str], None],
+    expected: str,
+) -> None:
+    """A promotion this code could not serve must not displace the champion already in place.
+
+    The check runs before the atomic swap, so ``dest`` is untouched and the outgoing champion keeps
+    serving instead of the service breaking at its next tick.
+    """
+    dest = tmp_path / "production_model"
+    fetch_model_artifacts(run_id=saved_run, dest=dest)
+
+    with mlflow.start_run(experiment_id=mlflow.create_experiment(f"unservable_{expected}")) as run:
+        unservable_run_id = run.info.run_id
+    save_unservable(unservable_run_id)
+
+    with pytest.raises(ValueError, match=expected) as exc_info:
+        fetch_model_artifacts(run_id=unservable_run_id, dest=dest)
+
+    # Which run was refused, so an operator knows what to re-train rather than what to re-download.
+    assert unservable_run_id in str(exc_info.value)
     assert _FakeForecaster.load(dest).payload == "hello-model"
     assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run
