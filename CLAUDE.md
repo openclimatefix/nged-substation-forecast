@@ -148,10 +148,11 @@ Two skills, in order, and they are deliberately separate so that Jack approves a
 any code moves:
 
 1. **`plan-issue`** (`/plan-issue <N>`) reads the issue, decides whether it is worth implementing
-   at all, writes `plans/<branch-name>.md`, has a fresh sub-agent adversarially review that plan,
-   and stops for Jack. It writes no code.
+   at all, writes `plans/<branch-name>.md`, has two fresh sub-agents adversarially review that
+   plan in turn — the first hunting for a simpler approach, the second checking correctness and
+   testability — and stops for Jack. It writes no code.
 2. **`implement-issue`** picks up an approved plan: worktree, implement, the green-before-push
-   verification set, PR with labels and assignee, a *second and independent* adversarial review
+   verification set, PR with labels and assignee, a *further independent* adversarial review
    of the diff, triage, stop. **Never merge.**
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
@@ -160,7 +161,9 @@ Stay inside the issue's scope; report unrelated design mistakes rather than fixi
 adversarial pass by the time he looks at it, so his review is the last line of defence rather
 than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by the
 implementer's rationale; the triage step exists because reviewer findings are often wrong and
-must not be applied uncritically.
+must not be applied uncritically. Simplicity gets its own reviewer, and gets it first, because a
+plan that is more complicated than the issue requires is the failure mode that survives a
+correctness review intact.
 
 ## Architecture
 

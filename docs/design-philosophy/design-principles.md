@@ -560,6 +560,48 @@ parent it rendered on the production box, which has no MLflow and never runs pro
 *Detail:* [Inherent Stability](inherent-stability.md#the-rules) — "*never make one production
 job's run status a precondition for another's*".
 
+### 15 — Transform data in feature engineering, not in the ingest, unless it saves a lot of storage
+
+Changing a transform that runs at ingest means re-downloading and re-writing the whole archive.
+Changing a transform that runs in feature engineering means editing a function and re-running an
+experiment. Feature engineering is therefore the default home for a transform, and one earns a place
+in the ingest only when a measurement says it should be there — almost always a storage measurement,
+written down next to the decision.
+
+The test is what the transform destroys. A transform that throws information away has to show what
+it buys: the H3 spatial aggregation and the 13-bit significand rounding both did, and both are a
+large part of why the archive fits on a laptop. A transform that merely rewrites the same
+information in a different form has nothing to show, because feature engineering can produce that
+form on demand, differently for each experiment. Converting wind's `u` and `v` components into speed
+and direction is the second kind: it destroys nothing, and it hands every later stage an angle that
+wraps at 360°, which ordinary interpolation, averaging, quantiles and z-scores all get wrong.
+
+The saving has to be large, not merely positive. Converting wind to speed and direction does save
+storage — about 6% of the `nwp` table, measured, or roughly 2.4 GB of the ~39 GB a year of ECMWF ENS
+takes — and that is not enough to justify freezing a wrapped angle into the archive. Compare the H3
+aggregation, which is what makes a year of 51-member weather fit on a laptop at all. That contrast
+is the principle: it is the *size* of the saving that decides, and the only way to know the size is
+to measure it.
+
+*Without it:* a transform nobody remembers choosing becomes impossible to revisit. Wind arrives as
+`u` and `v`, the ingest converts it to speed and direction and drops the components, and every later
+stage that interpolates, takes an ensemble quantile of, or standardises a direction is quietly wrong
+— with the fix costing an overnight re-download rather than a config change.
+
+*Decided:* the `nwp` table's H3 spatial aggregation and 13-bit significand rounding both stay in the
+ingest, because each was measured and each buys a large saving. This principle is also what puts
+wind's polar conversion up for review in v0.5
+([#525](https://github.com/openclimatefix/nged-substation-forecast/issues/525)): the conversion
+saves ~6%, which the principle says is too little to freeze a wrapped angle into the archive for,
+and the storage experiment there is sized to confirm the number before the change is made.
+
+*Serves:* [Hypothesis 2: a hundred experiments per person in a peak
+month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month) — a transform
+frozen into the archive cannot be varied by an experiment.
+
+*Detail:* [NWP variable conventions](../architecture/nwp-variable-conventions.md),
+[Storage formats](../architecture/performance.md#storage-formats-measured-not-assumed).
+
 ## Deliberately absent
 
 We have **no availability service-level objective (SLO) and no error
@@ -688,6 +730,13 @@ a
 system where a wrong-but-confident forecast costs real money — a trading desk, a control-room feed —
 should invert it and fail closed. And the push-work-to-the-engine and new-technology principles are
 general.
+
+[Principle 15 ("*transform data in feature engineering, not in the ingest, unless it saves a lot of
+storage*")](#15-transform-data-in-feature-engineering-not-in-the-ingest-unless-it-saves-a-lot-of-storage)
+is general in its reasoning but contingent in its arithmetic: it assumes re-downloading the archive
+is merely inconvenient rather than impossible, and that the storage a faithful representation costs
+is affordable. A project ingesting a feed it cannot replay, or one whose storage bill dominates,
+should expect the balance to come out differently.
 
 For the finer-grained rules that sit underneath these — how to write the code rather than how to
 shape the system — see [Code Style](../architecture/code-style.md) and
