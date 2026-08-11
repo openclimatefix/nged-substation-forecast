@@ -358,7 +358,9 @@ _NWP_RUN_EXPECTED_ON_DISK_BY: Final[timedelta] = timedelta(hours=14)
 minutes, up to 8 times. The delays alone put the last healthy landing at about 12:30 UTC, but one
 of the two retryable failures (``NwpVariableWhollyMissing``) is raised *after* the download, so
 the worst case pays a download and convert on every attempt too — about 12:40 UTC at the ~1
-min/run measured in ``docs/architecture/performance.md``. That leaves 81 minutes of margin to
+min/run measured in
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/>. That leaves
+81 minutes of margin to
 14:00 UTC, spread over 9 attempts: the deadline is breached only if download-and-convert
 *averages* about 10 minutes across all of them, not if one attempt is slow. So the 645 s download
 recorded in ``dynamical_data.ecmwf_ens.download`` would cost only ~10 of those 81 minutes on its
@@ -639,8 +641,9 @@ def _read_live_forecast_rows(
     The scan is pruned to the matching ``(experiment_name, fold_id="live")`` Delta partitions and
     then to the one ``power_fcst_init_time``, and every column is reduced to a scalar inside
     Polars, so only the aggregates cross back into Python. The ``pl.len()`` is safe from the
-    32-bit row-count wraparound documented in ``docs/architecture/code-style.md``: it counts one
-    slot's rows (~1M at V1 scale, ~86M at V2), not the whole table.
+    32-bit row-count wraparound documented in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/#data-handling>:
+    it counts one slot's rows (~1M at V1 scale, ~86M at V2), not the whole table.
     """
     if not delta_table_exists(power_forecasts_path, storage_options):
         return _EMPTY_LIVE_FORECAST_ROWS
