@@ -74,9 +74,14 @@ The check is attached to `power_time_series_and_metadata`, so the existing hourl
 runs it every hour with no extra wiring. It reports two kinds of lateness: a series that once
 reported but has now gone **stale**, and a roster series (present in the `TimeSeriesMetadata`
 parquet) that has **never** sent data. The count of each, plus a table of the offending
-`time_series_id`s, lands in the check's Dagster metadata — Dagster's Checks view becomes the
-operator's at-a-glance "is the power data healthy?" status surface, showing a green tick when
-every series is current and a yellow warning naming the late count when the feed has stalled.
+`time_series_id`s, lands in the check's Dagster metadata. That table is **capped** at 50 rows, for
+the same reason the Sentry payloads below are — an uncapped listing writes thousands of rows into
+the event log every hour a whole-feed stall lasts, and the event log is durable storage that gets
+backed up. The counts beside it are uncapped, and an `n_late_listed` field records how many rows
+the table actually holds, so a truncated table can never make a large stall look small. Dagster's
+Checks view becomes the operator's at-a-glance "is the power data healthy?" status surface, showing
+a green tick when every series is current and a yellow warning naming the late count when the feed
+has stalled.
 The severity is a warning rather than a failure: a stalled feed is expected to self-heal once
 NGED recovers (the pipeline back-fills the gap automatically), so it must not block downstream
 assets.
@@ -294,16 +299,18 @@ installed `settings.py` to the nearest ancestor directory holding `uv.lock` (the
 exists only at the uv workspace root), falling back to the current working directory when no
 ancestor qualifies.
 
-We resolve via a marker rather than a hard-coded directory depth (the previous
-`Path(__file__).parents[4]`) because the depth only held for an editable install. Under the
-production image's `uv sync --no-editable`, the installed file sits at
-`<venv>/lib/python3.14/site-packages/contracts/settings.py`, where the same depth silently
-resolved to the venv root and every default broke with `FileNotFoundError`
-([#287](https://github.com/openclimatefix/nged-substation-forecast/issues/287)). The marker
-walk handles both layouts: a dev checkout resolves to the repo root, and the production image
-resolves to `/app` because the Dockerfile copies `uv.lock` there alongside `conf/` and
-`metadata/` — so the image needs no per-path env-var overrides, and `conf/model/` stays
-available for running training jobs in-container.
+We resolve via a marker rather than a hard-coded directory depth because `settings.py` sits at a
+different depth in each of the two layouts we deploy. An editable dev install has it at
+`packages/contracts/src/contracts/settings.py` below the repo root; the production image's `uv
+sync --no-editable` installs it at `<venv>/lib/python3.14/site-packages/contracts/settings.py`
+instead. Any fixed number of `Path.parents` hops that lands on the repo root in one layout lands
+somewhere arbitrary in the other — the venv root, in the image's case — and every repo-relative
+default then fails with `FileNotFoundError`
+([#287](https://github.com/openclimatefix/nged-substation-forecast/issues/287)). The marker walk
+handles both layouts: a dev checkout resolves to the repo root, and the production image resolves
+to `/app` because the Dockerfile copies `uv.lock` there alongside `conf/` and `metadata/` — so the
+image needs no per-path env-var overrides, and `conf/model/` stays available for running training
+jobs in-container.
 
 The fallback case — a wheel installed into a venv outside any workspace checkout — is a
 deployment shape we don't currently have. If one appears, it must either run with its working
@@ -353,11 +360,18 @@ materialisation, giving an audit trail and lineage for free. The download logic 
 (`ml_core._production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper, so
 nothing about this decision couples it to Dagster.
 
-**The Docker build reuses this same asset** (headlessly, via `dagster asset materialize`) — no
-separate fetch script was built, since a bare script would have duplicated the asset's audit
-trail for no benefit. The `docker build` step itself stays outside Dagster: it only ever runs on
-a laptop today, and image build/push becomes a CI-shaped concern once an MLflow tracking server
-and AWS infra exist — not something worth orchestrating through Dagster in the meantime.
+**The image build is hermetic and depends on the asset only through the filesystem.** A
+researcher materialises `promoted_model` on their laptop first — the candidate models live in
+the laptop's local MLflow file store — which populates `data/production_model/`; the Dockerfile
+then `COPY`s that directory straight out of the build context and never contacts MLflow itself.
+So the build needs no MLflow credentials and no reachable tracking server — only the base images
+and the package index `uv sync` resolves against — and the model in the image is exactly the
+artifact set the promotion materialisation recorded. `docker build`
+stays outside Dagster too: it only ever runs on a laptop today, and image build/push becomes a
+CI-shaped concern once an MLflow tracking server and AWS infra exist — not something worth
+orchestrating through Dagster in the meantime. The runbook steps are
+[Step 3](../live_service/aws.md#step-3-pick-and-promote-a-champion-model) and
+[Step 4](../live_service/aws.md#step-4-build-and-verify-the-image).
 
 ## Considered but rejected designs
 
@@ -382,9 +396,8 @@ be inspected by pointing an on-demand `dagster-webserver` at shared Postgres run
 
 2. **Handover to NGED is simpler without AWS coupling.** A Dagster deployment NGED can run
    anywhere is an easier handover than an EventBridge + Step Functions + ECS arrangement they
-   would have to recreate inside their own AWS account. (This reverses an earlier assumption
-   that "a cron and a container" would be the easier handover — that only holds if the
-   receiving organisation is committed to AWS.) See
+   would have to recreate inside their own AWS account. ("A cron and a container" is the easier
+   handover only if the receiving organisation is committed to AWS.) See
    [Handover to NGED](../roadmap/handover.md) for the full handover plan.
 
 3. **The cost saving is not real for this workload.** EventBridge's pay-per-run economics

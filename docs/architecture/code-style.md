@@ -98,6 +98,24 @@ stricter type exists — a genuinely heterogeneous or open-ended dict stays `dic
   when the work lands, so the reference rots. (Docs-to-docs links into `docs/roadmap/` are fine;
   retargeting them is part of ship-time triage.) Linking from a docstring to a durable page — e.g.
   `docs/architecture/` — is encouraged.
+- **Spell a docs link as its rendered URL**, never as a repo path. Write
+  `<https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>`, not
+  `docs/architecture/overview.md` — the same URL `CLAUDE.md` already mandates for issue and PR
+  bodies. Two reasons, neither of which is that a bare path is currently broken. A public docstring
+  is rendered by mkdocstrings onto an API page, where a repo path is dead text to a reader who has
+  the site open and not the repo checked out, and where writing it as a markdown link *would* 404,
+  because the path resolves against the rendered site tree. And a URL survives the file being moved
+  or renamed, which a path does not. Use it in `#` comments too: those are never rendered, so a
+  path would do, but one spelling everywhere is one fewer thing to get right.
+- **One home per argument** — a design decision's *rationale* lives on one docs page, and the
+  docstring links to it. The docstring's own job is to say what the function guarantees and what a
+  caller must not assume. A sentence of "because" is fine; a paragraph of it means the paragraph
+  belongs on the page. Two copies of an argument drift, and the drift is silent — a later change
+  updates the page, the docstring goes on asserting the superseded reasoning, and no linter, type
+  checker or test can tell. This is the same trade the durable-docs rule above makes: a link that
+  might rot is cheaper than a copy that rots invisibly. It cuts the other way too — rationale
+  worth a paragraph does not belong *only* in a docstring, where no reader browsing the docs will
+  find it.
 - **MkDocs-compatible constant docs** — document module-level constants with a string literal
   immediately after the assignment, not with Sphinx-style `#:` comments. This is correct:
 
