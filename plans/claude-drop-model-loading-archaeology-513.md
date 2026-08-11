@@ -18,9 +18,11 @@ and holds no trained model predating either contract. That is the
 rule applied to code comments, and `code-style.md` sanctions the removal directly: comments may be
 removed when they are "misleading or out of date".
 
-**The change is five hunks, all deletions, in three files.** No line is added anywhere. It is worth
-doing now because both messages are read while something is broken, and a sentence about a code
-version that never existed is the worst thing to read at that moment.
+**The change is five hunks in three files, and the diff is net shorter.** Three hunks are pure
+deletions; two replace a sentence with a shorter one, so the diff does contain some new prose —
+read those two hunks as rewrites, not deletions. It is worth doing now because both messages are
+read while something is broken, and a sentence about a code version that never existed is the worst
+thing to read at that moment.
 
 ### Departures from the issue body
 
@@ -105,12 +107,22 @@ at `cv_assets.py:525`.
 
 ### `packages/ml_core/src/ml_core/_production_helpers.py`
 
-- `load_forecaster_from_dir`, `Raises:` entry for `ValueError` (lines 212-215): drop "it was saved
-  by a code version predating this contract; re-promote with a version that stamps `model_class`".
-  **#486 appended a second, unrelated cause to this same entry** ("Or the model's
-  `selected_features` name a feature this code cannot parse…") — it must survive intact.
-- The `ValueError` message (lines 226-230): drop "with a code version that stamps model_class", per
-  the draft above.
+- `load_forecaster_from_dir`, `Raises:` entry for `ValueError` (lines 212-215). **#486 appended a
+  second, unrelated cause to this same entry**, so this is a partial rewrite, not a substring
+  deletion — dropping the archaeology alone would leave a dangling em dash and strip the entry's
+  remedy, making it the only one of the three without one. Target text, with #486's clause intact:
+
+  ```text
+  ValueError: ``meta.json`` has no ``model_class`` field, so the forecaster class cannot be
+      reconstructed — re-promote ``promoted_model`` from a different run. Or the model's
+      ``selected_features`` name a feature this code cannot parse, in which case re-train
+      and promote the new run.
+  ```
+
+- The `ValueError` message (lines 226-230): rewrite to the draft above. This is a rewrite of the
+  second sentence, not a substring deletion — "Re-promote the model with a code version that stamps
+  model_class" becomes "Re-promote `promoted_model` from a different run", and "the *concrete*
+  forecaster class" loses "concrete". `(see BaseForecaster.save)` stays.
 
 No change to control flow, exception type, or the `meta.get(...)` call.
 
@@ -201,8 +213,9 @@ prevents explains why the test is worth keeping — information not derivable fr
 - `packages/contracts/tests/test_project_root.py:3-7` — "PROJECT_ROOT used to be
   `Path(__file__).parents[4]` … (issue #287)". Without it, a future reader may "simplify" it back.
 - `tests/test_trained_cv_model.py:272` — "the exact input change that used to be rejected".
-- `tests/test_assets.py:365` — "What fails on `main` is the count", this repo's own test-writing
-  convention rather than archaeology.
+- `tests/test_assets.py:444` and `:446` — "that it no longer rejects such a slice is pinned by …"
+  and "What fails on `main` is the count", this repo's own test-writing convention rather than
+  archaeology.
 
 ## Verification commands
 
@@ -291,9 +304,8 @@ assertion entirely, trimmed the sweep, and caught that the plan's markdown-lint 
 `docs/` rather than docstrings.
 
 **Review 2 (correctness)** found the fold-run causal story backwards (`trained_cv_model` creates the
-run *after* training) and the remedy decision wrong — both rewritten above. Its clean checks are
-worth recording: every line number and quoted string the plan attributed to source was correct, the
-three `pytest.raises` sites were the only ones repo-wide, and no doc page quotes either message.
+run *after* training) and the remedy decision wrong — both rewritten above. Its clean checks:
+the three `pytest.raises` sites were the only ones repo-wide, and no doc page quotes either message.
 
 **Review 3 (simplicity, post-merge)** turned two of the plan's own fixes into deletions: the
 `base_forecaster` message loses a whole redundant sentence rather than a repaired clause, and the
@@ -302,6 +314,14 @@ argument across a package boundary, and was itself imprecise about `cv_metrics`.
 that "re-promote or roll back" were one action written as two, that the plan's claim to track the
 `operations.md` runbook was wrong (that passage is about a *different* raise — no trained time
 series), and it raised open questions 2, 3 and 4.
+
+**Review 4 (correctness, post-merge)** confirmed the substantive reasoning against merged main —
+the redundant-sentence deletion (nothing but `save_to_mlflow` logs an artifact to a fold run, so the
+two clauses really are one statement), the test-match survival, the hermeticity constraint traced
+end to end, and open question 3's asymmetry. It found three precision defects, all fixed above: a
+summary claiming "all deletions, no line added" when two hunks are rewrites; a `Raises:`-entry
+instruction that would have left a dangling em dash and stripped the entry's only remedy, now given
+as target text; and one stale sweep citation (`test_assets.py` moved +243 lines in the merge).
 
 ### Findings rejected
 
