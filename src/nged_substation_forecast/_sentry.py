@@ -95,10 +95,10 @@ def init_sentry(settings: Settings) -> None:
     ``ERROR``), so ``ERROR``-level log records no longer become Sentry events. Without this, every
     ``ERROR`` log anywhere in the process — Dagster's startup/step logs, ad-hoc materialisations,
     even the swallowed telemetry error in :func:`report_power_freshness` — would be shipped as an
-    event, defeating the design where *only* the three explicit senders reach Sentry: the failure
-    hook, the freshness ``capture_message``, and :func:`report_check_degradation`. Breadcrumbs (the
-    integration's default ``level=INFO``) are kept, so log context still rides along with the
-    events those senders do send.
+    event, defeating the design where *only* the four explicit senders reach Sentry: the failure
+    hook, the freshness ``capture_message``, :func:`report_check_degradation` and
+    :func:`report_asset_degradation`. Breadcrumbs (the integration's default ``level=INFO``) are
+    kept, so log context still rides along with the events those senders do send.
 
     Args:
         settings: The project settings carrying the Sentry DSN, environment, and sample rate.
@@ -130,6 +130,65 @@ def sentry_capture_failure(context: HookContext) -> None:
         sentry_sdk.capture_exception(exception)
 
 
+def _capture_tagged(tag: str, value: str, detail: BaseException | str, failure_note: str) -> None:
+    """Send ``detail`` to Sentry on a scope forked for this one event, tagged ``tag=value``.
+
+    Shared by :func:`report_check_degradation` and :func:`report_asset_degradation`, which differ
+    only in their tag and in whether they always hold a live exception. Forking the scope is what
+    keeps the tag from leaking into later unrelated events.
+
+    Never raises: both callers run inside an ``except`` handler whose whole purpose is to keep the
+    run alive, so an exception escaping here would undo that.
+
+    Args:
+        tag: Tag name to set on the forked scope.
+        value: Tag value — the check or asset name.
+        detail: The exception to capture, or a message to send at ``error`` level when the caller
+            has only a reason string.
+        failure_note: Logged with the traceback if Sentry itself fails.
+    """
+    try:
+        with sentry_sdk.new_scope() as scope:
+            scope.set_tag(tag, value)
+            if isinstance(detail, BaseException):
+                sentry_sdk.capture_exception(detail)
+            else:
+                sentry_sdk.capture_message(detail, level="error")
+    except Exception:
+        # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
+        # with the traceback rather than swallowing.
+        logger.exception(failure_note)
+
+
+def report_asset_degradation(asset_name: str, detail: BaseException | str) -> None:
+    """Report an asset that degraded rather than failing, as a Sentry error event.
+
+    ``power_time_series_and_metadata`` catches a failure of the ``TimeSeriesMetadata`` roster upsert
+    so that the power write still happens (rule 1 of
+    [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+    Not failing the step means :data:`sentry_capture_failure` no longer fires, and log-to-event
+    capture is disabled, so without this the degradation would reach nobody.
+
+    Accepts a reason string as well as an exception because the two call sites differ: the asset's
+    own guard holds a live exception, while a roster rebuilt inside ``upsert_metadata`` is reported
+    by reason, the exception having been handled in ``nged_data`` — which must not depend on Sentry
+    or Dagster.
+
+    A no-op when Sentry is uninitialised (empty DSN), and never raises.
+
+    Args:
+        asset_name: The Dagster asset name, attached as a ``degraded_asset`` tag so events can be
+            filtered per asset. Set on an isolated scope so it cannot leak into later events.
+        detail: The exception the asset degraded on, or a one-line reason.
+    """
+    _capture_tagged(
+        "degraded_asset",
+        asset_name,
+        detail,
+        f"Failed to report the degraded {asset_name} asset to Sentry",
+    )
+
+
 def report_check_degradation(check_name: str, exc: BaseException) -> None:
     """Report an asset check that could not evaluate its own inputs, as a Sentry error event.
 
@@ -151,14 +210,12 @@ def report_check_degradation(check_name: str, exc: BaseException) -> None:
             check. Set on an isolated scope so it cannot leak into later unrelated events.
         exc: The exception the check degraded on.
     """
-    try:
-        with sentry_sdk.new_scope() as scope:
-            scope.set_tag("asset_check", check_name)
-            sentry_sdk.capture_exception(exc)
-    except Exception:
-        # Same reasoning as report_power_freshness: telemetry is best-effort, but a genuine bug in
-        # here must still be visible, so log at ERROR with the traceback rather than swallowing.
-        logger.exception(f"Failed to report the degraded {check_name} check to Sentry")
+    _capture_tagged(
+        "asset_check",
+        check_name,
+        exc,
+        f"Failed to report the degraded {check_name} check to Sentry",
+    )
 
 
 def send_forecast_checkin(

@@ -6,6 +6,7 @@ import polars as pl
 import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from nged_data import storage
 from nged_data.storage import (
     _process_file_listing,
     _ProcessedFileListing,
@@ -242,6 +243,111 @@ def test_upsert_metadata_returns_diff(tmp_path: Path):
         final_metadata.filter(pl.col("time_series_id") == 3)["time_series_name"].item()
         == "ID 3 - New"
     )
+
+
+def _roster(ids: list[int], name: str = "ID", **extra: object) -> pt.DataFrame[TimeSeriesMetadata]:
+    """A valid roster covering ``ids``, plus any ``extra`` columns applied to every row."""
+    rows = [
+        {
+            "time_series_id": i,
+            "time_series_name": f"{name} {i}",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": i,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+            **extra,
+        }
+        for i in ids
+    ]
+    return pt.DataFrame(rows).set_model(TimeSeriesMetadata).cast().validate()
+
+
+def test_upsert_metadata_rebuilds_when_the_stored_roster_will_not_parse(tmp_path: Path):
+    """The reported bug: a roster left half-written by a killed process, or truncated by a full
+    disk, no longer wedges the ingest. It is detected, reported and rewritten."""
+    metadata_path = tmp_path / "metadata.parquet"
+    metadata_path.write_bytes(b"not a parquet file")
+
+    stats = upsert_metadata(_roster([1, 2]), str(metadata_path))
+
+    assert "metadata_roster_rebuilt_reason" in stats
+    assert "ComputeError" in stats["metadata_roster_rebuilt_reason"]
+    assert set(pl.read_parquet(metadata_path)["time_series_id"]) == {1, 2}
+
+
+def test_upsert_metadata_rebuilds_when_the_stored_roster_fails_its_contract(tmp_path: Path):
+    """A stored roster missing a required column is *wrong*, not merely stale, so it is treated as
+    absent rather than raising `DataFrameValidationError` out of the asset."""
+    metadata_path = tmp_path / "metadata.parquet"
+    _roster([1]).drop("substation_type").write_parquet(metadata_path)
+
+    stats = upsert_metadata(_roster([2]), str(metadata_path))
+
+    assert "DataFrameValidationError" in stats["metadata_roster_rebuilt_reason"]
+    # The rebuild is from this run's snapshot alone, so id 1 is gone: a rebuilt roster can be thin.
+    assert set(pl.read_parquet(metadata_path)["time_series_id"]) == {2}
+
+
+def test_upsert_metadata_merges_a_snapshot_missing_the_optional_columns(tmp_path: Path):
+    """`TimeSeriesMetadata` has four `allow_missing` fields, so a snapshot can be narrower than the
+    stored roster and still validate. Merging the two must not raise, and a field the snapshot no
+    longer carries must be *cleared*, so the roster keeps meaning "the latest snapshot of what NGED
+    published"."""
+    metadata_path = tmp_path / "metadata.parquet"
+    _roster([1, 2], information="note").write_parquet(metadata_path)
+
+    # This run's snapshot covers id 2 only, and carries no `information` column at all.
+    snapshot = _roster([2], name="Renamed")
+    assert "information" not in snapshot.columns
+    upsert_metadata(snapshot, str(metadata_path))
+
+    final = pl.read_parquet(metadata_path)
+    assert final.filter(pl.col("time_series_id") == 2)["information"].item() is None
+    assert final.filter(pl.col("time_series_id") == 1)["information"].item() == "note"
+    assert final.filter(pl.col("time_series_id") == 2)["time_series_name"].item() == "Renamed 2"
+    TimeSeriesMetadata.validate(final)
+
+
+def test_upsert_metadata_ignores_the_stored_column_order(tmp_path: Path):
+    """`hash_rows` is column-order sensitive, so a stored roster whose columns happen to sit in a
+    different order must not be reported as wholly changed and rewritten every run."""
+    metadata_path = tmp_path / "metadata.parquet"
+    roster = _roster([1, 2])
+    roster.select(sorted(roster.columns)).write_parquet(metadata_path)
+    mtime_before = metadata_path.stat().st_mtime_ns
+
+    stats = upsert_metadata(roster, str(metadata_path))
+
+    assert stats["metadata_n_new_TimeSeriesIDs"] == 0
+    assert stats["metadata_n_updated_TimeSeriesIDs"] == 0
+    assert metadata_path.stat().st_mtime_ns == mtime_before  # not rewritten at all
+
+
+def test_upsert_metadata_does_not_rebuild_on_a_panic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A Rust panic is evidence about the process, not about the file, so it must propagate and
+    leave the stored roster alone — the asset's own guard degrades the run without rewriting."""
+    metadata_path = tmp_path / "metadata.parquet"
+    _roster([1]).write_parquet(metadata_path)
+    stored_before = metadata_path.read_bytes()
+
+    class _Panic(BaseException):
+        """Stands in for a pyo3 `PanicException`, which derives from `BaseException`."""
+
+    def boom(*_: object, **__: object) -> pl.DataFrame:
+        raise _Panic("rust panicked")
+
+    monkeypatch.setattr(storage.pl, "read_parquet", boom)
+
+    with pytest.raises(_Panic):
+        upsert_metadata(_roster([2]), str(metadata_path))
+
+    assert metadata_path.read_bytes() == stored_before
 
 
 _EXAMPLE_OBJECT_KEY = (

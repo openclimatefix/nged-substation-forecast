@@ -28,6 +28,7 @@ from dagster import (
     AssetCheckSeverity,
     AssetCheckSpec,
     AssetExecutionContext,
+    DagsterExecutionInterruptedError,
     DailyPartitionsDefinition,
     MaterializeResult,
     MetadataValue,
@@ -60,6 +61,8 @@ from nged_data.storage import (
     upsert_metadata,
 )
 from pydantic import BaseModel, computed_field, field_validator
+
+from nged_substation_forecast._sentry import report_asset_degradation
 
 
 @asset
@@ -121,8 +124,37 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         {"n_implausible_power_rows_dropped": downloaded.n_implausible_power_rows_dropped}
     )
 
-    # Save TimeSeriesMetadata:
-    upsert_metadata_stats = upsert_metadata(new_metadata, metadata_path, storage_options)
+    # Save TimeSeriesMetadata. The roster is derived, re-delivered data; the power time series is
+    # not, so a roster failure must not stop the power write below. What that costs, and why it is
+    # still the right trade, is in the operations runbook:
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
+    try:
+        upsert_metadata_stats = upsert_metadata(new_metadata, metadata_path, storage_options)
+    except BaseException as exc:
+        # `BaseException` for the same reason as the asset checks: a Rust panic from polars or
+        # obstore surfaces as a pyo3 `PanicException`, which does not derive from `Exception`, and
+        # each compiled extension defines its own class — so naming what must propagate is the only
+        # version that stays true as dependencies change.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        # Sentry is told explicitly because a step that no longer fails no longer fires
+        # `sentry_capture_failure`, and log-to-event capture is deliberately off.
+        context.log.exception(f"Could not upsert the TimeSeriesMetadata roster at {metadata_path}")
+        report_asset_degradation("power_time_series_and_metadata", exc)
+        upsert_metadata_stats = UpsertMetadataStats(metadata_upsert_failed=repr(exc))
+
+    rebuilt_reason = upsert_metadata_stats.get("metadata_roster_rebuilt_reason")
+    if rebuilt_reason is not None:
+        # A rebuilt roster holds only the time series whose files were new this run, so it can be
+        # thin. Nothing here repairs that: `select_new_rows` never re-reads a file the power table
+        # already covers, so a series that has stopped publishing needs the manual re-derivation in
+        # https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
+        context.log.error(f"TimeSeriesMetadata roster was rebuilt: {rebuilt_reason}")
+        report_asset_degradation(
+            "power_time_series_and_metadata",
+            f"TimeSeriesMetadata roster rebuilt: {rebuilt_reason}",
+        )
+
     context.add_output_metadata(upsert_metadata_stats)
 
     # Save PowerTimeSeries:
