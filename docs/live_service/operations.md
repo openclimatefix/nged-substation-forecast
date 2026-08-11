@@ -186,40 +186,15 @@ you without your watching the Checks view. The check degrades this way on purpos
 raising, so the hourly ingest keeps running; nothing is known about staleness while it persists, so
 treat it as "unknown", not "healthy".
 
-### A rebuilt or failed metadata roster
-
-Two keys in `power_time_series_and_metadata`'s run metadata report that the `TimeSeriesMetadata`
-roster did not update normally. Both also reach Sentry tagged
-`degraded_asset:power_time_series_and_metadata`, so neither depends on your reading the Dagster UI.
-The run **succeeds** in both cases, by design: the roster is derived data that NGED re-delivers, and
-the power time series is not, so a roster fault must not cost an hour of telemetry.
-
-`metadata_roster_rebuilt_reason` means the stored roster could not be read or no longer satisfied its
-contract, so it was rewritten from the snapshot that run downloaded. **This is lossy.** That snapshot
-covers only the time series whose files were new that run, so the roster can come back thin — and a
-thin roster costs forecasts, because the live path derives its NWP cell filter from it. It does not
-refill on its own: `select_new_rows` only re-reads files newer than what the power table already
-holds, so a series that has stopped publishing never gets re-parsed. Re-derive it by hand:
-
-```bash
-uv run python -c "
-from contracts.settings import Settings
-from nged_data.storage import download_and_parse_files, list_timeseries_json_files, remove_small_files_from_listing, upsert_metadata
-s = Settings()
-store = s.get_nged_s3_store()
-listing = remove_small_files_from_listing(list_timeseries_json_files(store))
-print(upsert_metadata(download_and_parse_files(store, listing).metadata, s.metadata_path, s.storage_options))
-"
-```
-
-That re-reads every NGED file rather than only the new ones, so it restores every id NGED still
-publishes. Check the roster covers what you expect afterwards, and append to the intervention log.
-
-`metadata_upsert_failed` means the upsert raised outright and was swallowed so the power write could
-proceed. The roster is unchanged, and the next hourly run retries it — but *that run's* metadata
-change is lost, because the power rows have landed and `select_new_rows` will not offer those files
-again. Read the traceback in the run's logs: unlike a rebuild, this one means a bug in our own code
-rather than a damaged file, so it wants a fix, not a re-run.
+**Reading a failed roster upsert.** `metadata_upsert_failed` in
+`power_time_series_and_metadata`'s run metadata means the `TimeSeriesMetadata` roster upsert raised
+and was swallowed so the power write could go ahead, and it also reaches Sentry tagged
+`degraded_asset:power_time_series_and_metadata`. The run **succeeds** by design: the roster is
+derived data that NGED re-delivers, and the power time series is not, so a roster fault must not cost
+an hour of telemetry. The roster is left unchanged and the next hourly run retries it, but *that
+run's* metadata change is lost, because the power rows have landed and `select_new_rows` will not
+offer those files again. Read the traceback in the run's logs — a damaged roster file and a bug in our
+own code both land here, and both want a fix rather than a re-run.
 
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from
 the frame already in memory, and is likewise non-blocking WARN. Nulls in the three de-accumulated

@@ -7,7 +7,7 @@ This package handles the ingestion and processing of NGED's new JSON data format
 - `load_nged_json`: Loads and parses NGED JSON files.
 - `clean_power_time_series`: Cleans power data, including filtering out "stuck" sensors based on daily variance and insane values.
 - `append_to_delta`: Appends cleaned data to a Delta table, ensuring no duplicates.
-- `upsert_metadata`: Upserts metadata to a Parquet file, keeping the newest version of each time series. A stored roster it cannot read or validate is treated as absent and rewritten from the incoming snapshot, with the reason reported in the returned stats rather than raised.
+- `upsert_metadata`: Upserts metadata to a Parquet file.
 
 ## Data Quality
 

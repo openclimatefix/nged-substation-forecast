@@ -355,45 +355,8 @@ class UpsertMetadataStats(TypedDict, total=False):
     metadata_n_new_TimeSeriesIDs: int
     metadata_n_updated_TimeSeriesIDs: int
     metadata_updated_TimeSeriesIDs: Sequence[int]
-    metadata_roster_rebuilt_reason: str
-    """Set when the stored roster could not be used and was rewritten from this run's snapshot.
-
-    Present only on that path, so its absence means the roster was read and merged normally. When it
-    is set, ``metadata_n_new_TimeSeriesIDs`` counts the whole snapshot, because the roster was
-    written from scratch rather than added to.
-    """
     metadata_upsert_failed: str
     """Set by the asset when the whole upsert raised, so the power write went ahead without it."""
-
-
-def _read_existing_roster(
-    metadata_path: str, storage_options: ObjectStoreOptions | None
-) -> tuple[pt.DataFrame[TimeSeriesMetadata] | None, str | None]:
-    """Read the stored metadata roster, reporting an unusable one as absent rather than raising.
-
-    Treating a roster we cannot read as *missing* routes it into the same branch a first-ever run
-    takes, which is rule 3 of
-    [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules).
-
-    Args:
-        metadata_path: Local path or remote URI of the metadata Parquet file.
-        storage_options: Object-store credentials/endpoint for a remote ``metadata_path``;
-            ``None``/empty for a local path.
-
-    Returns:
-        The validated roster and ``None``; or ``None`` and a one-line reason it cannot be used. An
-        absent file is not a fault, so it gives ``(None, None)``.
-    """
-    if not object_exists(metadata_path, storage_options):
-        return None, None
-    try:
-        stored = pl.read_parquet(metadata_path, storage_options=typeddict_to_dict(storage_options))
-        return TimeSeriesMetadata.validate(stored), None
-    except Exception as exc:  # noqa: BLE001 — any unreadable roster is treated as absent.
-        # `Exception`, not `BaseException`: a Rust panic is evidence about the process, not about
-        # this file, and rewriting the roster on that evidence is worse than leaving it alone. A
-        # panic therefore propagates to the asset's own guard, which degrades without rewriting.
-        return None, repr(exc)
 
 
 def upsert_metadata(
@@ -406,14 +369,10 @@ def upsert_metadata(
     This function assumes it is called by one thread at a time so no
     explicit locking is required.
 
-    If the Parquet file does not exist, or exists but cannot be read or validated, it is written
-    from ``new_metadata`` alone and the reason is reported in the returned stats. Otherwise
-    ``new_metadata`` is merged into it, and the file is rewritten only if something changed. A field
-    that ``new_metadata`` no longer carries is **cleared**, so the roster always means "the latest
-    snapshot of what NGED published".
-
-    Never raises because of the *stored* file's state: a roster we cannot use is treated as
-    missing. A malformed ``new_metadata`` still raises, being our own bug.
+    If the Parquet file does not exist, it saves the new_metadata. If it exists, it merges the
+    new_metadata into it and rewrites the file only if something changed. The snapshot and the
+    stored roster need not share a schema, and a field that ``new_metadata`` no longer carries is
+    **cleared**, so the roster always means "the latest snapshot of what NGED published".
 
     Args:
         new_metadata: The new metadata DataFrame.
@@ -428,19 +387,8 @@ def upsert_metadata(
 
     new_metadata = TimeSeriesMetadata.validate(new_metadata.sort("time_series_id"))
 
-    existing_metadata, unusable_reason = _read_existing_roster(
-        metadata_path=metadata_path, storage_options=storage_options
-    )
-
-    if existing_metadata is None:
-        if unusable_reason is None:
-            log.info(f"Metadata file not found at {metadata_path}. Creating new file.")
-        else:
-            log.error(
-                f"Stored TimeSeriesMetadata at {metadata_path} cannot be used"
-                f" ({unusable_reason}). Rewriting it from this run's snapshot, which covers"
-                " only the time series whose files were new this run."
-            )
+    if not object_exists(metadata_path, storage_options):
+        log.info(f"Metadata file not found at {metadata_path}. Creating new file.")
         # write_parquet doesn't create missing parent directories, so a first-ever run against a
         # fresh local data root would fail here (this create branch runs before any Delta write
         # that would otherwise create the dir). Create the parent for a local metadata_path.
@@ -450,13 +398,15 @@ def upsert_metadata(
             compression=COMPRESSION,
             storage_options=typeddict_to_dict(storage_options),
         )
-        stats = UpsertMetadataStats(
+        return UpsertMetadataStats(
             metadata_n_new_TimeSeriesIDs=new_metadata.height,
             metadata_n_updated_TimeSeriesIDs=0,
         )
-        if unusable_reason is not None:
-            stats["metadata_roster_rebuilt_reason"] = unusable_reason
-        return stats
+
+    existing_metadata = pl.read_parquet(
+        metadata_path, storage_options=typeddict_to_dict(storage_options)
+    )
+    TimeSeriesMetadata.validate(existing_metadata)
 
     # `how="diagonal"` because the snapshot and the stored roster can differ in both width and
     # column order: four TimeSeriesMetadata fields are `allow_missing`, and
@@ -465,7 +415,7 @@ def upsert_metadata(
     # order, which hashing the two frames separately is not.
     combined = pl.concat([new_metadata, existing_metadata], how="diagonal")
     new_rows = combined.head(new_metadata.height)
-    stored_rows = combined.tail(existing_metadata.height)
+    stored_rows = combined.slice(new_metadata.height)
 
     # Compare metadata. `metadata_diff` contains all rows in `new_metadata` that do not have an
     # exact match in `existing_metadata`. Adapted from https://stackoverflow.com/a/79888719

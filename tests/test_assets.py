@@ -23,6 +23,7 @@ from contracts.weather_schemas import Nwp
 from dagster import (
     AssetCheckEvaluation,
     AssetCheckSeverity,
+    DagsterExecutionInterruptedError,
     DagsterInstance,
     ExecuteInProcessResult,
     build_asset_context,
@@ -195,7 +196,7 @@ def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fail
     monkeypatch.setattr(
         assets,
         "report_asset_degradation",
-        lambda asset_name, exc_or_reason: reported.append((asset_name, exc_or_reason)),
+        lambda asset_name, exc: reported.append((asset_name, exc)),
     )
 
     result = materialize([power_time_series_and_metadata], instance=dagster_instance)
@@ -215,34 +216,70 @@ def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fail
     assert isinstance(reported[0][1], RuntimeError)
 
 
-def test_power_time_series_and_metadata_reports_a_rebuilt_roster(
+def test_power_time_series_and_metadata_degrades_on_a_rust_panic_in_the_upsert(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """A rebuilt roster can be thin, so it must reach Sentry rather than only the logs — the run
-    itself succeeds, which is exactly why nothing else would raise the alarm."""
+    """The reason the guard catches ``BaseException`` rather than ``Exception``.
+
+    A panic in any of the pyo3 extensions ``upsert_metadata`` reads through — Polars or obstore (via
+    ``object_exists``) — is not an ``Exception``, so a narrower guard would let it through and fail
+    the hourly run, which is the exact failure this guard exists to prevent. The cancellation test
+    below cannot catch that regression, because ``DagsterExecutionInterruptedError`` is not an
+    ``Exception`` either and so propagates out of a narrow guard on its own.
+    """
     monkeypatch.setattr(
         assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
     )
-    metadata_path = env / "NGED" / "metadata.parquet"
-    metadata_path.parent.mkdir(parents=True, exist_ok=True)
-    metadata_path.write_bytes(b"not a parquet file")
 
-    reported: list[tuple[str, object]] = []
+    class _Panic(BaseException):
+        """Stands in for a pyo3 `PanicException`, which derives from `BaseException`."""
+
+    def _panic(*_: object, **__: object) -> None:
+        raise _Panic("simulated rust panic inside the upsert")
+
+    monkeypatch.setattr(assets, "upsert_metadata", _panic)
+    reported: list[tuple[str, BaseException]] = []
     monkeypatch.setattr(
         assets,
         "report_asset_degradation",
-        lambda asset_name, exc_or_reason: reported.append((asset_name, exc_or_reason)),
+        lambda asset_name, exc: reported.append((asset_name, exc)),
     )
 
     result = materialize([power_time_series_and_metadata], instance=dagster_instance)
     assert result.success
-
-    TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
-    materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
-    metadata_keys = set().union(*(mat.metadata.keys() for mat in materialisations))
-    assert "metadata_roster_rebuilt_reason" in metadata_keys
+    assert set(pl.read_delta(str(env / "NGED" / "power_time_series.delta"))["time_series_id"]) == {
+        10,
+        11,
+    }
     assert [name for name, _ in reported] == ["power_time_series_and_metadata"]
-    assert "rebuilt" in str(reported[0][1])
+    assert isinstance(reported[0][1], _Panic)
+
+
+def test_power_time_series_and_metadata_re_raises_a_cancelled_run(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The one thing the guard must *not* swallow. Cancellation lands in the same ``BaseException``
+    net as a panic, so the handler re-raises it explicitly: a run the operator cancelled has to
+    stop, not finish green having quietly skipped the roster."""
+    monkeypatch.setattr(
+        assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
+    )
+
+    def _cancel(*_: object, **__: object) -> None:
+        raise DagsterExecutionInterruptedError
+
+    monkeypatch.setattr(assets, "upsert_metadata", _cancel)
+    reported: list[str] = []
+    monkeypatch.setattr(
+        assets, "report_asset_degradation", lambda asset_name, exc: reported.append(asset_name)
+    )
+
+    result = materialize(
+        [power_time_series_and_metadata], instance=dagster_instance, raise_on_error=False
+    )
+    assert not result.success
+    # Not merely "it failed": dropping the re-raise also fails the run, via the degradation path.
+    assert reported == []
 
 
 def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(

@@ -6,7 +6,6 @@ import polars as pl
 import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from nged_data import storage
 from nged_data.storage import (
     _process_file_listing,
     _ProcessedFileListing,
@@ -266,30 +265,19 @@ def _roster(ids: list[int], name: str = "ID", **extra: object) -> pt.DataFrame[T
     return pt.DataFrame(rows).set_model(TimeSeriesMetadata).cast().validate()
 
 
-def test_upsert_metadata_rebuilds_when_the_stored_roster_will_not_parse(tmp_path: Path):
-    """The reported bug: a roster left half-written by a killed process, or truncated by a full
-    disk, no longer wedges the ingest. It is detected, reported and rewritten."""
+def test_upsert_metadata_adds_a_new_id_when_the_stored_roster_is_thinner(tmp_path: Path):
+    """The diff is derived by slicing the concatenated frame, so it must split back into exactly the
+    snapshot's rows and the stored roster's rows. Getting that boundary wrong loses a whole time
+    series silently: it never enters the roster, the stats claim nothing was new, and
+    `select_new_rows` never re-offers the file, so it never arrives at all."""
     metadata_path = tmp_path / "metadata.parquet"
-    metadata_path.write_bytes(b"not a parquet file")
+    _roster([1]).write_parquet(metadata_path)
 
     stats = upsert_metadata(new_metadata=_roster([1, 2]), metadata_path=str(metadata_path))
 
-    assert "metadata_roster_rebuilt_reason" in stats
-    assert "ComputeError" in stats["metadata_roster_rebuilt_reason"]
+    assert stats["metadata_n_new_TimeSeriesIDs"] == 1
+    assert stats["metadata_n_updated_TimeSeriesIDs"] == 0
     assert set(pl.read_parquet(metadata_path)["time_series_id"]) == {1, 2}
-
-
-def test_upsert_metadata_rebuilds_when_the_stored_roster_fails_its_contract(tmp_path: Path):
-    """A stored roster missing a required column is *wrong*, not merely stale, so it is treated as
-    absent rather than raising `DataFrameValidationError` out of the asset."""
-    metadata_path = tmp_path / "metadata.parquet"
-    _roster([1]).drop("substation_type").write_parquet(metadata_path)
-
-    stats = upsert_metadata(new_metadata=_roster([2]), metadata_path=str(metadata_path))
-
-    assert "DataFrameValidationError" in stats["metadata_roster_rebuilt_reason"]
-    # The rebuild is from this run's snapshot alone, so id 1 is gone: a rebuilt roster can be thin.
-    assert set(pl.read_parquet(metadata_path)["time_series_id"]) == {2}
 
 
 def test_upsert_metadata_merges_a_snapshot_missing_the_optional_columns(tmp_path: Path):
@@ -325,34 +313,6 @@ def test_upsert_metadata_ignores_the_stored_column_order(tmp_path: Path):
     assert stats["metadata_n_new_TimeSeriesIDs"] == 0
     assert stats["metadata_n_updated_TimeSeriesIDs"] == 0
     assert metadata_path.stat().st_mtime_ns == mtime_before  # not rewritten at all
-
-
-def test_upsert_metadata_does_not_rebuild_on_a_panic(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    """A Rust panic is evidence about the process, not about the file, so it must propagate and
-    leave the stored roster alone — the asset's own guard degrades the run without rewriting.
-
-    Unlike its siblings this passes before the fix too, because there was no handler to be too wide.
-    It guards `_read_existing_roster` catching `Exception` and not `BaseException` — a one-word
-    difference with no other visible symptom.
-    """
-    metadata_path = tmp_path / "metadata.parquet"
-    _roster([1]).write_parquet(metadata_path)
-    stored_before = metadata_path.read_bytes()
-
-    class _Panic(BaseException):
-        """Stands in for a pyo3 `PanicException`, which derives from `BaseException`."""
-
-    def boom(*_: object, **__: object) -> pl.DataFrame:
-        raise _Panic("rust panicked")
-
-    monkeypatch.setattr(storage.pl, "read_parquet", boom)
-
-    with pytest.raises(_Panic):
-        upsert_metadata(new_metadata=_roster([2]), metadata_path=str(metadata_path))
-
-    assert metadata_path.read_bytes() == stored_before
 
 
 _EXAMPLE_OBJECT_KEY = (

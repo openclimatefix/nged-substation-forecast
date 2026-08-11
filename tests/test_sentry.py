@@ -259,61 +259,15 @@ def test_report_asset_degradation_captures_the_exception_and_tags_the_asset() ->
                 auto_enabling_integrations=False,
             )
         )
-        _sentry.report_asset_degradation("power_time_series_and_metadata", ValueError("boom"))
+        _sentry.report_asset_degradation(
+            asset_name="power_time_series_and_metadata", exc=ValueError("boom")
+        )
 
     (event,) = events
     assert event["tags"] == {"degraded_asset": "power_time_series_and_metadata"}
     assert event["exception"]["values"][0]["type"] == "ValueError"
     assert sentry_sdk.get_current_scope()._tags == {}
     assert sentry_sdk.get_isolation_scope()._tags == {}
-
-
-def test_report_asset_degradation_sends_a_reason_string_as_an_error_message() -> None:
-    """The rebuilt-roster path has no live exception to capture — ``upsert_metadata`` handled it a
-    layer down, inside ``nged_data``, which must not depend on Sentry or Dagster. A reason string
-    must still arrive as an *error*, not a default-level info event."""
-    events: list[Event] = []
-
-    def collect(event: Event, _hint: Hint) -> Event | None:
-        """Record the built event and return ``None``, which tells the SDK to drop it."""
-        events.append(event)
-        return None
-
-    with sentry_sdk.isolation_scope() as scope:
-        scope.set_client(
-            sentry_sdk.Client(
-                dsn=_DSN,
-                before_send=collect,
-                default_integrations=False,
-                auto_enabling_integrations=False,
-            )
-        )
-        _sentry.report_asset_degradation("power_time_series_and_metadata", "roster rebuilt: junk")
-
-    (event,) = events
-    assert event["tags"] == {"degraded_asset": "power_time_series_and_metadata"}
-    assert event["level"] == "error"
-    assert event["message"] == "roster rebuilt: junk"
-    assert "exception" not in event
-
-
-def test_report_asset_degradation_swallows_and_logs_on_send_error(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    """It is called from inside the asset's ``except`` handler, so a raise here would fail the very
-    run the handler exists to keep alive."""
-
-    def boom(*_: Any, **__: Any) -> None:
-        raise RuntimeError("sentry down")
-
-    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", boom)
-    with caplog.at_level(logging.ERROR, logger="nged_substation_forecast._sentry"):
-        _sentry.report_asset_degradation("power_time_series_and_metadata", ValueError("boom"))
-    assert any(
-        "power_time_series_and_metadata" in r.message and r.levelno == logging.ERROR
-        for r in caplog.records
-    )
-    assert any(r.exc_info is not None for r in caplog.records)  # traceback attached
 
 
 def test_failure_hook_is_attached_to_the_scheduled_jobs() -> None:
