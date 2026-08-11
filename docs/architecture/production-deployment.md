@@ -176,10 +176,10 @@ is configured — so laptops and CI stay silent by default.
   workload; because log capture is off, failures in a manual UI materialisation, a replay backfill,
   or an experiment job are watched by the operator at the Dagster UI, not routed to Sentry.
 
-    One production fault the hook cannot see is a standalone `@asset_check` that caught its own
-    exception instead of failing the run — which, by design, is both of them. (The two NWP checks
-    are computed inside the `ecmwf_ens` asset and have no catch-all, so a raise there does fail the
-    run and the hook does see it.) `report_check_degradation` covers exactly that gap: each check's
+    One production fault the hook cannot see is an asset check that caught its own exception
+    instead of failing the run — which, by design, is every one of them: the two standalone
+    `@asset_check`s, and the two per-run checks computed inside the `ecmwf_ens` asset.
+    `report_check_degradation` covers exactly that gap: each check's
     catch-all sends the same exception the hook would have sent, tagged `asset_check` with the
     check's name. `report_asset_degradation` does the same for an *asset* that degrades rather than
     failing: `power_time_series_and_metadata` guards its `TimeSeriesMetadata` roster upsert, tagged

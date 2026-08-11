@@ -180,6 +180,26 @@ Name the attacks that apply to this issue:
 Ask for each simplification as a concrete alternative — what to do instead, which files it
 touches, and what capability is given up by taking it.
 
+**The reviewer is not confined to the plan's own scope.** Say so explicitly in the brief: if the
+simplest way to satisfy the issue is a different architecture — collapsing two packages into one,
+replacing an abstraction with a different one, moving a responsibility from the serving path into
+the training loop, changing how something is stored — it should propose that, even though it is far
+larger than the issue. Nobody else depends on this code yet, so a sweeping change costs a rewrite
+rather than a migration path, and the goal is code that ends up elegant rather than code that
+accreted around whatever was there first.
+
+A proposal that big has to arrive with its case made, not as a suggestion:
+
+- **What it buys** — which specific complexity disappears, and where the code gets shorter or the
+  concepts get fewer.
+- **What it costs** — which packages, assets, saved models, Delta tables or docs pages have to
+  change, and roughly how much work that is.
+- **What it gives up** — what the current design does that the new one cannot, and which principle
+  in `docs/design-philosophy/design-principles.md` is being traded away.
+- **Whether it has to happen now** — can the issue ship under the current architecture, with the
+  rearchitecture as its own issue afterwards? That is usually the answer, and saying so is not a
+  weaker recommendation.
+
 ## 5. Triage and revise
 
 Verify each proposed simplification against the code rather than accepting it — **reviewer
@@ -189,6 +209,12 @@ for, or trades away a rule in `docs/design-philosophy/` — and say which, in on
 
 For each finding you reject, record the finding and the one-line reason in the plan file, so Jack
 can see what was considered and dismissed. Commit the revised plan.
+
+**A proposed rearchitecture is Jack's call, not yours** — it is bigger than the issue, so neither
+adopting it nor dropping it silently is right. Put it in the plan's "Risks and open questions" with
+the reviewer's pros and cons, your view of whether it is genuinely simpler, and a recommendation on
+whether it should become its own issue. Then plan the issue under the current architecture unless
+Jack says otherwise.
 
 ## 6. Second adversarial review: correctness and testability
 

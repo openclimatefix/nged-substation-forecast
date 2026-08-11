@@ -7,14 +7,15 @@ Sentry configuration:
   ``Settings.sentry_dsn`` is set), and the :data:`sentry_capture_failure` Dagster failure hook
   reports the real exception (with traceback) from inside the run worker.
   :func:`report_check_degradation` covers a production fault the hook cannot see, because it never
-  fails a run: a standalone ``@asset_check`` that caught its own exception. The hook is used rather
-  than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry` explicitly
-  disables — because Dagster logs a step failure without ``exc_info``, so the log-based path would
-  yield a message-only event with no stack trace, *and* would fire for every ``ERROR`` log anywhere
-  in the process (Dagster's own startup/step logs, ad-hoc materialisations, even a swallowed
-  telemetry error), swamping Sentry with events the design never intended to send. The hook is
-  attached to the *scheduled* asset jobs only, so it covers the unattended production workload;
-  manual/backfill/experiment runs are watched by the operator at the Dagster UI, not Sentry.
+  fails a run: an asset check that caught its own exception instead of raising. The hook is used
+  rather than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry`
+  explicitly disables — because Dagster logs a step failure without ``exc_info``, so the log-based
+  path would yield a message-only event with no stack trace, *and* would fire for every ``ERROR``
+  log anywhere in the process (Dagster's own startup/step logs, ad-hoc materialisations, even a
+  swallowed telemetry error), swamping Sentry with events the design never intended to send. The
+  hook is attached to the *scheduled* asset jobs only, so it covers the unattended production
+  workload; manual/backfill/experiment runs are watched by the operator at the Dagster UI, not
+  Sentry.
 - **The missed-check-in alarm** — :func:`send_forecast_checkin` sends a *success-only* heartbeat to
   a Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
   ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error testing
@@ -183,8 +184,7 @@ def report_asset_degradation(asset_name: str, exc: BaseException) -> None:
 def report_check_degradation(check_name: str, exc: BaseException) -> None:
     """Report an asset check that could not evaluate its own inputs, as a Sentry error event.
 
-    Both of this function's callers — the standalone ``@asset_check``s ``power_data_is_fresh`` and
-    ``live_forecasts_are_healthy`` — catch everything rather than raising (rule 7 of
+    Every caller catches everything rather than raising (rule 7 of
     [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)),
     so the run no longer fails and :data:`sentry_capture_failure` no longer fires. Without this,
     a check that cannot read its own inputs would show up only as a yellow tick in Dagster's Checks
