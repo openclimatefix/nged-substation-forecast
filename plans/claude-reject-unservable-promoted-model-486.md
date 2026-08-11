@@ -174,7 +174,7 @@ two existing `fetch_model_artifacts` tests keep passing: the fake's default conf
   `selected_features` key is missing rather than malformed, which is why it passes.
 - **Rules 6 and 7** are untouched: this adds **no asset check**, so nothing warns and no warning
   path gains a way to raise. Confirmed by tracing the one check that reads the promoted model,
-  `_read_promoted_model_facts` (`defs/checks.py:706-742`) — it parses `meta.json` by hand, degrades
+  `_read_promoted_model_facts` (`defs/checks.py:739-775`) — it parses `meta.json` by hand, degrades
   to `_UNKNOWN_PROMOTED_MODEL`, never touches `ParsedFeatures`, and `live_forecasts_are_healthy`
   runs its whole body under a `BaseException` catch-all regardless.
 - **Rule 8** (capability in the training loop, not the serving path): partially in tension, and
@@ -275,13 +275,17 @@ test a spellchecker.
   be, and stronger; change it only if the new failure mode makes the sentence read as exhaustive.
 - **`docs/architecture/production-deployment.md`** and **`docs/architecture/ml-orchestration.md`**
   — both name `fetch_model_artifacts`. Re-read the surrounding paragraphs and adjust only where the
-  added validation makes a sentence untrue. See "Out of scope" below before editing
-  `production-deployment.md`.
+  added validation makes a sentence untrue.
 - **Not a roadmap-completing change**: no "Implementation details" deletion, no status-banner edit.
   Confirm against `docs/roadmap/live-service.md` during implementation.
 
 All doc prose in the present tense, describing the code as it then stands — no "used to", no issue
-numbers in the prose (CLAUDE.md, "Write about the present, not the past").
+numbers in the prose (CLAUDE.md, "Write about the present, not the past"). Two conventions that
+landed on `main` after this plan was first written and apply to the docstring edits above: prose
+must be concrete and plain, cut by whole sentences rather than by clipping words (CLAUDE.md, "Prose
+style"), and any link from code to a docs page is spelled as its rendered site URL, never as a
+`docs/...` path — `base_forecaster.py` and `forecaster.py` were converted wholesale, so match what
+is now around you.
 
 ## Verification commands
 
@@ -308,15 +312,6 @@ uv run pytest tests/test_promoted_model.py packages/ml_core/tests/test_productio
 
 No `--run-network` tests are involved. **Do not run a real promotion against
 `data/production_model/` while verifying** — the model there is the current champion.
-
-## Out of scope — report, do not fix
-
-`docs/architecture/production-deployment.md` states "**The Docker build reuses this same asset**
-(headlessly, via `dagster asset materialize`)". It does not: `Dockerfile:61` is
-`COPY data/production_model/ data/production_model/`, and the build never talks to Dagster or
-MLflow. Pre-existing staleness, unrelated to this change, but the implementer is sent to read that
-paragraph and will land on it. Flag it to Jack; do not fix it here (CLAUDE.md: discuss out-of-scope
-changes first).
 
 ## Open questions
 
@@ -359,8 +354,9 @@ and folded in above:
   the image. Genuinely non-obvious; now recorded as a constraint on the message.
 - **The rule-8 justification was wrong** — the check does run on the serving path, every tick.
   Rewritten to say so and defend it, rather than deny it.
-- **`docs/architecture/production-deployment.md`'s "the Docker build reuses this same asset" is
-  stale.** Recorded under "Out of scope — report, do not fix".
+- **`docs/architecture/production-deployment.md`'s "the Docker build reuses this same asset" was
+  stale.** Out of scope here, so it was raised separately and has since landed on `main` in
+  `64dde4aa`. Nothing left to do.
 
 Findings noted but **not** acted on:
 
