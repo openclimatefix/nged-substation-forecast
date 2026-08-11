@@ -41,34 +41,37 @@ throwaway Dagster project run against this repo's pinned Dagster 1.13.17, with t
 
 **`tags` — chosen.** Verified:
 
-- `AssetSelection.from_string('tag:"layer"="production"')` parses and resolves to exactly the
-  tagged assets. The same string is what the Dagster UI's asset-selection box accepts, what the
-  catalog page takes as its `?asset-selection=` query parameter, and what
-  `dg launch --assets` / `dagster asset materialize --select` take on the command line.
+- `AssetSelection.from_string("tag:layer=production")` parses and resolves to exactly the tagged
+  assets. The same string is what the Dagster UI's asset-selection box accepts, what the catalog
+  page takes as its `?asset-selection=` query parameter, and what `dg launch --assets` /
+  `dagster asset list --select` take on the command line.
 - The asset detail page renders a **Definition → Tags** panel showing `layer: production`.
 - The GraphQL API exposes `tags { key value }` per asset node, so anything built on the UI's API
   can filter on it too.
-- `AssetSelection.tag("layer", "production")` exists as the Python API, so a future job or
-  schedule can select by layer without restating a list of asset names.
-
-**`group_name` — rejected.** A group is one-per-asset and exclusive, which suits a partition, but
-it is Dagster's *primary* structural axis: it lays out the global lineage graph into labelled
-boxes and appears as a column in the asset catalog. Spending it on the R&D/production split gives
-up the ability to group by anything else later (ingest / features / CV / serving), and this repo
-has not yet spent it — every asset is in `default` today. Groups also cannot express an asset that
-is legitimately both, whereas a second tag key could.
+- `AssetSelection.tag("layer", "production")` is the Python API equivalent, which the test uses.
 
 **`kinds` — rejected.** Dagster implements kinds as reserved `dagster/kind/<name>` tags (confirmed
 in the GraphQL output) and renders them as technology badges on the graph node. They are for
 naming the tool an asset uses — `python`, `s3`, `xgboost` — and there is a hard limit of three per
 asset. Using one for a lifecycle classification would misuse a namespace Dagster owns.
 
+**`group_name` — rejected, but see [open question 2](#risks-and-open-questions).** A group is
+one-per-asset and exclusive, and it is Dagster's *primary* structural axis: it lays out the global
+lineage graph into labelled boxes and is a column in the asset catalog table (verified — the
+catalog's column header reads "Code location / Asset group"; there is no tag column). That makes
+groups genuinely better on one axis: the operator sees the split with nothing to type. Tags win on
+three others — the issue asks for a tag; tags are additive, so grouping by pipeline stage stays
+available later, whereas a group spent on this is spent; and a tag can later be applied to an
+asset that is legitimately needed by both layers. The repo uses `group_name` nowhere today.
+
 **Bulk application in `definitions.py` — rejected.** `load_assets_from_modules` accepts
-`group_name` but **not** `tags` (verified: `TypeError: got an unexpected keyword argument 'tags'`),
-so the group-per-module trick has no tag equivalent. `dagster.map_asset_specs` could do it, but it
-is more machinery than eleven decorator arguments, and it would tie an asset's classification to
-which file it happens to live in — exactly the coupling that breaks for the two ambiguous assets
-in `production_assets.py`.
+`group_name` but not `tags` (verified: `TypeError: got an unexpected keyword argument 'tags'`);
+`dagster.map_asset_specs` would do it in about eight lines, applying one layer per source module.
+Rejected because the module boundary is not the classification: `defs/production_assets.py`'s own
+docstring says it exists because "`defs/cv_assets.py` is already ~900 lines". Deriving an asset's
+layer from which file it happens to sit in means the next split-a-long-file refactor silently
+re-classifies assets, and no test can catch it — whereas with per-asset tags a new untagged asset
+fails the test in [Tests](#tests). The classification is also worth reading at the asset itself.
 
 ### Vocabulary
 
@@ -78,29 +81,40 @@ in `production_assets.py`.
 | Production value | `production` |
 | R&D value | `rnd` |
 
-`rnd` is the ASCII spelling of R&D that Dagster's character set permits; `r-and-d` and `research`
-are the alternatives, and `env` was rejected as a key because both layers run inside the same
-Dagster deployment, so `env` would read as the deployment environment.
+`rnd` is the ASCII spelling of R&D that Dagster's character set permits; `research` and `r-and-d`
+are the alternatives. `env` was rejected as a key because both layers run inside the same Dagster
+deployment, so `env` would read as the deployment environment.
+
+**Write the selection string unquoted — `tag:layer=production`, not `tag:"layer"="production"`.**
+Both parse to the same selection normally, but the quoted form is silently broken whenever Python
+warnings are errors, which includes this repo's own pytest run (`filterwarnings = ["error", …]`,
+`pyproject.toml:339`). Verified: under `pytest`, `AssetSelection.from_string('tag:"layer"="production"')`
+returns `tag:""layer""=""production""` — quotes retained, resolving to **zero** assets — because a
+`BetaWarning` raised inside Dagster's ANTLR parse path drops it into a fallback parser that does
+not strip quotes. `key:"…"` is unaffected (which is why `tests/test_asset_selection_parses.py`
+passes today) and `group:"…"` raises outright. The unquoted form works everywhere.
 
 ## What changes, file by file
 
-### New: `src/nged_substation_forecast/_asset_tags.py`
+### New: `src/nged_substation_forecast/defs/_tags.py`
 
-A small module beside the existing `_sentry.py`, holding the vocabulary once so the strings never
-appear at a decorator:
+A small private module holding the vocabulary once, so the strings never appear at a decorator:
 
 - `LAYER_TAG_KEY: Final[str] = "layer"`
-- `PRODUCTION_LAYER_TAGS` and `RND_LAYER_TAGS` — ready-to-splat mappings, so a decorator reads
-  `@asset(tags=PRODUCTION_LAYER_TAGS)`.
+- `PRODUCTION_LAYER_TAGS` and `RND_LAYER_TAGS` — plain `Final[dict[str, str]]`, ready to splat, so
+  a decorator reads `@asset(tags=PRODUCTION_LAYER_TAGS)`.
 
-The two mappings are `MappingProxyType`, not plain `dict`. This is not cosmetic: Dagster stores
-the mapping it is handed **by reference**, so one shared `Final[dict]` used by eleven decorators
-would let a mutation anywhere change every asset's tags. Verified — mutating the source dict after
-definition changed the resulting asset's tags; `MappingProxyType` is accepted by `@asset` and
-makes that impossible.
+Sharing one dict across eleven decorators is safe: Dagster normalises the mapping into a fresh
+`dict` at definition time (verified — `spec.tags is shared` is `False`, and mutating the source
+dict afterwards does not change the asset's tags), so no defensive copy or `MappingProxyType` is
+needed.
 
-Placed at the package root rather than inside `defs/` because `_sentry.py` sets that precedent for
-a small shared module, and because `defs/` is the directory `dg` treats specially.
+Its own module rather than a home in one of the three asset modules, because all three import it
+and `production_assets.py` already imports `cv_assets.py` — adding more cross-imports between the
+asset modules to share two strings is the worse trade. Inside `defs/` rather than beside
+`_sentry.py` at the package root, because only `defs/*` consumes it; `dg` does not scan `defs/`
+for components here (`[tool.dagster] module_name = "nged_substation_forecast.definitions"` names
+the entry point explicitly, and `definitions.py` lists the asset modules by hand).
 
 ### `src/nged_substation_forecast/defs/assets.py` — decorator lines only
 
@@ -188,41 +202,48 @@ No design principle is traded away.
 
 ## Tests
 
-New file `tests/test_asset_layer_tags.py` — new rather than added to `tests/test_assets.py`,
-because that module is `pytest.mark.integration` and materialises assets, while these are fast
-definition-time assertions, and because a new file cannot collide with the parallel sessions
-editing the existing test modules.
+One new test in a new file `tests/test_asset_layer_tags.py` — new rather than added to
+`tests/test_assets.py`, because that module is `pytest.mark.integration` and materialises assets
+while this is a fast definition-time assertion, and because a new file cannot collide with the
+parallel sessions editing the existing test modules.
 
-| Test | Assertion | Why it fails on `main` today |
-|---|---|---|
-| `test_every_asset_declares_its_layer` | Every asset key in `defs.get_repository_def().asset_graph` has a `layer` tag whose value is `production` or `rnd` | No asset carries any tag on `main`, so this fails on the first asset |
-| `test_assets_are_classified_by_layer` | `live_forecasts`, `ecmwf_ens` and `power_time_series_and_metadata` resolve under `AssetSelection.from_string('tag:"layer"="production"')`, and `trained_cv_model` and `metrics` under the `rnd` equivalent | Both selections resolve to the empty set on `main` |
+`test_every_asset_is_classified_as_production_or_rnd` resolves both selections against
+`defs.get_repository_def().asset_graph` and asserts:
 
-The first is the one with ongoing value: it fails the moment someone adds an asset without
-classifying it. It asserts a property of every asset rather than an exact list of names, so it does
-not become a merge conflict when a parallel session adds an asset.
+| Assertion | Why it fails on `main` today |
+|---|---|
+| `production \| rnd == all asset keys` — every asset carries a legal `layer` | Both selections are empty on `main`, so the union misses all eleven assets |
+| `production & rnd == set()` — no asset carries both | (Holds trivially on `main`; it is the guard against a future second tag) |
+| `live_forecasts` and `ecmwf_ens` are in `production`; `trained_cv_model` and `metrics` are in `rnd` | Both sets are empty on `main` |
 
-Resolving through `AssetSelection.from_string` rather than reading `.tags` directly means the test
-exercises the same parser the UI and the CLI use, which is what the issue actually promises.
+The union assertion is the one with ongoing value: it fails the moment someone adds an asset
+without classifying it, and it is a property of every asset rather than a list of names, so it
+does not become a merge conflict when a parallel session adds one.
 
-Neither test needs network, a trained model, or wall-clock time — they construct `Definitions` and
-resolve selections. `test_definitions_resolve` in `tests/test_assets.py` shows the existing pattern
-for loading the repository definition in a test (including the `env` fixture it takes).
+Resolve through `AssetSelection.tag(LAYER_TAG_KEY, …)` rather than `AssetSelection.from_string`,
+and add one assertion that the operator-facing string `tag:layer=production` parses to the same
+selection — with a comment recording the quoted-form breakage under `filterwarnings = ["error"]`
+documented above, so nobody "tidies" the string back into the quoted form.
+
+The test needs no network, no trained model and no wall-clock time. `test_definitions_resolve` in
+`tests/test_assets.py` shows the existing pattern for loading the repository definition in a test,
+including the `env` fixture it takes.
 
 ## Docs to update
 
-1. **`docs/architecture/production-deployment.md`** — a short new section (working title: "Mark
-   which assets production needs with a `layer` tag") recording the classification, the selection
-   string, and why a tag rather than a group or a kind. This page is where production-side design
-   decisions live, and the classification is a statement about the architecture.
-2. **`docs/design-philosophy/inherent-stability.md`**, the *R&D fails the other way* section
+1. **`docs/design-philosophy/inherent-stability.md`**, the *R&D fails the other way* section
    (around line 487). It currently forward-references this issue: "the natural mechanism is a
    strict-mode flag on the feature and validation layer, plus asset tagging ([#423])". Rewrite in
    the present tense to say the tag exists and what it is — per CLAUDE.md's "write about the
    present, not the past", the issue reference goes away rather than becoming a history note. The
    strict-mode-flag half of that sentence stays forward-looking, since it is still unbuilt.
+2. **`docs/architecture/production-deployment.md`** — a short new section (working title: "Mark
+   which assets production needs with a `layer` tag") recording the classification, the two
+   selection strings, and one clause on why a tag rather than a group. Keep it to a paragraph plus
+   the two lists; this is a decorator-level change, not a control-plane decision, so it does not
+   warrant the treatment the longer sections on that page get.
 3. **`docs/live_service/operations.md`** — one sentence under *Prerequisites*, giving the operator
-   the selection string to paste into the Dagster UI. This is the issue's actual payoff, so it
+   `tag:layer=production` to paste into the Dagster UI. This is the issue's actual payoff, so it
    belongs on the page the operator reads.
 
 No roadmap item completes here, so there is no ship-time triage.
@@ -240,33 +261,73 @@ uv run mkdocs build --strict
 Plus, specific to this change:
 
 ```bash
-uv run dagster asset list -m nged_substation_forecast.definitions --select 'tag:"layer"="production"'
-uv run dagster asset list -m nged_substation_forecast.definitions --select 'tag:"layer"="rnd"'
+uv run dagster asset list -m nged_substation_forecast.definitions --select tag:layer=production
+uv run dagster asset list -m nged_substation_forecast.definitions --select tag:layer=rnd
 ```
 
 Those two must between them list every asset, with nothing in both and nothing in neither — the
 end-to-end check that the tag does what the issue asked, through the real CLI parser rather than
-the test's in-process one.
+the test's in-process one. (`dagster asset list --select` is verified to work on this repo today.)
 
 `mkdocs build --strict` is on the list because all three doc edits add cross-page links; read the
-rendered HTML for the new `production-deployment.md` section, since the repo's
-`mkdocs-authoring` skill documents several ways a page renders wrong while both linters pass.
+rendered HTML for the new `production-deployment.md` section, since the repo's `mkdocs-authoring`
+skill documents several ways a page renders wrong while both linters pass.
 
 ## Risks and open questions
 
 1. **Is `promoted_model` / `promotable_model_runs` production or R&D?** Recommendation:
    `production`, reasoning above. This is the only judgement call in the change and it is a
    one-word edit either way.
-2. **Is `layer` / `production` / `rnd` the right vocabulary?** Recommendation: yes.
-   `rnd` is the least-bad spelling Dagster's character set allows; `r-and-d` is the alternative if
-   `rnd` reads badly on a UI chip.
-3. **Merge collisions.** Low but real: #505 touches `ecmwf_ens` and #486/#488 touch
+2. **Tag or group?** Recommendation: tag. A group would show the split in the catalog's "Asset
+   group" column and as labelled boxes in the lineage graph, with nothing for the operator to
+   type — a real advantage. It is rejected because the issue asks for a tag, because a group is
+   exclusive and would spend Dagster's one structural axis on this rather than on pipeline stage,
+   and because a tag can later be added to an asset both layers need. Both could be applied
+   together for about eight extra lines if Jack wants the visual split as well.
+3. **Is `layer` / `production` / `rnd` the right vocabulary?** Recommendation: yes. `rnd` is the
+   shortest spelling Dagster's character set allows; `research` and `r-and-d` are the alternatives
+   if `rnd` reads badly on a UI chip.
+4. **Merge collisions.** Low but real: #505 touches `ecmwf_ens` and #486/#488 touch
    `production_assets.py`. Adding one argument to a decorator conflicts only if another session
    edits the same decorator. Worth rebasing on `main` immediately before opening the PR.
 
 ## Review findings — first pass (simplicity)
 
-*To be filled in.*
+### Accepted
+
+1. **The `MappingProxyType` justification was factually wrong.** The plan claimed Dagster stores
+   the tags mapping by reference and cited a probe as evidence; re-running the probe shows Dagster
+   copies it (`spec.tags is shared` → `False`). I had misread my own output. Plain `Final` dicts
+   now, and the false claim is gone.
+2. **Two tests collapsed into one.** A `production | rnd == all keys` assertion subsumes both the
+   "every asset has the tag" test and the "these five are classified correctly" test, while staying
+   a property of every asset rather than a name list.
+3. **Use the unquoted `tag:layer=production` in docs, tests and verification commands.** The
+   reviewer offered this as ergonomics; checking it turned up something worse than that — the
+   quoted form silently resolves to zero assets under this repo's own pytest `filterwarnings`
+   setting. Written up under [Vocabulary](#vocabulary), with a test comment to stop it regressing.
+4. **The constants module moves from `src/nged_substation_forecast/_asset_tags.py` to
+   `defs/_tags.py`,** since only `defs/*` consumes it. Kept as its own module rather than inlined,
+   because all three asset modules import it.
+5. **Cut the "a future job or schedule could select by layer" rationale** — no such job is proposed
+   here or in the issue.
+6. **`research` added to the vocabulary alternatives**, and the `production-deployment.md` section
+   cut down to a paragraph.
+
+### Rejected
+
+1. **Apply the tags in bulk in `definitions.py` via `map_asset_specs`, one layer per source
+   module.** Genuinely fewer lines and it would sidestep the merge-collision risk, but it makes an
+   asset's layer a function of which file it sits in — and `production_assets.py` exists because
+   `cv_assets.py` grew past ~900 lines, not because of the layer split, so the next long-file split
+   would silently re-classify assets with no test able to catch it.
+2. **Cut the `docs/architecture/` section entirely.** Whether the architecture docs should record
+   the classification is a question Jack explicitly asked to be answered; the answer is yes, but
+   short. Shrunk rather than cut.
+3. **Use `group_name` instead of `tags`.** The reviewer's evidence is good and the point is real,
+   so this is promoted to open question 2 for Jack rather than silently dismissed — but the
+   recommendation stands, for the reasons recorded there.
+4. **Drop `LAYER_TAG_KEY`.** Rejected: the test imports it, so it has a consumer.
 
 ## Review findings — second pass (correctness and testability)
 
