@@ -66,7 +66,7 @@ The patch was reverted; this branch carries no code.
    (`scripts/run_baseline_experiment.py:78-97` goes through `RegisterExperimentConfig` and the
    resolver; `cv_assets.py:400` passes an already-built config object). What it would not cover is
    **deserialisation**: `XGBoostForecaster.load`
-   (`packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py:238`) and
+   (`packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py:240`) and
    `load_experiment_forecaster` (`packages/ml_core/src/ml_core/_mlflow_runs.py:56`) would both
    stay lenient, so a stale `meta.json` or a stale MLflow `config` tag would keep silently falling
    back to defaults. That is the decisive argument for putting the rule on the class — one
@@ -82,14 +82,17 @@ The patch was reverted; this branch carries no code.
 - On `BaseForecasterConfig`, add `model_config = ConfigDict(extra="forbid")` above the field
   declarations. Inherited by every subclass (`XGBoostConfig` today), so a future forecaster config
   gets the strictness without opting in.
-- Extend the class docstring with a short paragraph on *why* — an unknown key is almost always a
-  misspelled hyperparameter, and an unattended search would otherwise register a grid of identical
-  runs that all score plausibly. Note that this also makes the round-trip strict in both
-  directions: `model_dump(mode="json")` emits exactly the declared fields, so
-  `model_validate` / `model_validate_json` of a config dumped by the *same* class version always
-  succeeds, and a stored config that no longer matches the code is refused rather than silently
-  losing a field. `Settings` in `packages/contracts/src/contracts/settings.py:404` already sets
-  `extra="forbid"`, so this follows existing repo precedent.
+- Add **two or three sentences** to the class docstring — not a paragraph of rationale. State what
+  the setting guarantees (an unknown key raises at construction instead of being dropped, so a
+  misspelled hyperparameter cannot register), state the consequence a caller must not assume away
+  (the round-trip is now strict in both directions: `model_dump(mode="json")` emits exactly the
+  declared fields, so re-validating a config dumped by the *same* class version always succeeds,
+  while a *stored* config the current code no longer declares is refused rather than silently
+  losing a field), and link to the rendered
+  `ml_experimentation/model-configuration/` page for the *why*. The reasoning belongs on that page
+  and nowhere else — see "Compliance with the code-style rules main just added" below.
+  `Settings` in `packages/contracts/src/contracts/settings.py:405` already sets `extra="forbid"`,
+  so this follows existing repo precedent.
 
 ### `src/nged_substation_forecast/defs/jobs.py`
 
@@ -110,7 +113,7 @@ The patch was reverted; this branch carries no code.
   an override must name a field the config class declares.
 
 No other production code changes. The two deserialisation sites — `XGBoostForecaster.load`
-(`packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py:238`) and
+(`packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py:240`) and
 `load_experiment_forecaster` (`packages/ml_core/src/ml_core/_mlflow_runs.py:56`) — read state that
 was *persisted* by an earlier version of the class, so "same class, so the round-trip is safe" is
 not an argument the test suite can make (it only ever exercises same-process round-trips). Checked
@@ -120,6 +123,33 @@ both `config` experiment tags in `mlflow.db` (experiment ids 5 and 7) contain **
 that fields *have* been removed from `BaseForecasterConfig` in the past (`model_family`,
 `power_fcst_model_name`, `power_fcst_model_version`, `task`), which is exactly how a stale key
 would arise in future; see the design-philosophy check for why raising is then the right answer.
+
+## Compliance with the code-style rules main just added
+
+`main` was merged into this branch after the plan was first written and reviewed, bringing two new
+rules in `docs/architecture/code-style.md` and a prose-style section in `CLAUDE.md`. All three bear
+directly on this change, because most of its diff is docstrings and docs.
+
+- **Spell a docs link as its rendered URL, never a repo path.** Every link this change adds to a
+  docstring or a `#` comment must be written as
+  `<https://openclimatefix.github.io/nged-substation-forecast/...>`. That covers the
+  `BaseForecasterConfig` docstring link above and anything the `jobs.py` docstring rewrites add.
+- **One home per argument.** A design decision's rationale lives on one docs page and the docstring
+  links to it. The rationale for `extra="forbid"` — the unattended-search failure mode, the
+  principle-8 argument — has exactly one home: the "Tweaking a config for an experiment" section of
+  `docs/ml_experimentation/model-configuration.md`. The three docstrings (`BaseForecasterConfig`,
+  `_UNOVERRIDABLE_MODEL_PARAMS`, `_resolve_forecaster_config`) state the rule and link there; none
+  of them restates the argument. This is a change from the plan's first draft, which had the
+  `BaseForecasterConfig` docstring carrying a paragraph of *why*.
+- **Prose style.** The docs edits are the visible half of this change, so they answer to the new
+  `CLAUDE.md` rules: name the actual thing (`n_estimtors` misspelled as a concrete example beats
+  "an invalid key"), and cut whole sentences rather than clipping words.
+
+Nothing else main brought in disturbs the plan. `checks.py` grew a late-series table cap and
+`docs/live_service/operations.md` grew a section about reading `n_late` — neither touches config
+validation, and `_read_promoted_model_facts` still reads `meta.json` as raw JSON inside its degrade
+handler, so the "no warning path can now raise" finding still holds. Line references cited
+throughout this plan were re-checked against the merged tree.
 
 ## Design-philosophy check
 
@@ -208,7 +238,7 @@ Add to `tests/test_forecaster_config_serialisation.py`:
   that an override naming a key the config class does not declare is rejected — this file is where
   someone reads the key names, so it is where the rule is cheapest to learn.
 - **`docs/live_service/operations.md`**, item 1 of the `live_forecasts` "What the asset does" list
-  (around line 108), which currently says the asset "Raises if the model has no trained time
+  (line 109), which currently says the asset "Raises if the model has no trained time
   series (re-promote first)". That list is where the asset's raise conditions are documented for
   an operator, so the new one — a saved config the current code no longer declares — belongs
   there. Risk 1 below calls this behaviour change "invisible in the diff"; this page is where it
@@ -313,10 +343,10 @@ The reviewer also noted that risk 1 understates its own case, because the Docker
 and the promoted model from the same tree. Verified and folded into risk 1.
 
 Findings the reviewer investigated and cleared, recorded so they are not re-litigated: the
-blast-radius list is exhaustive (`jobs.py:157`, `forecaster.py:238`, `_mlflow_runs.py:56` are the
+blast-radius list is exhaustive (`jobs.py:157`, `forecaster.py:240`, `_mlflow_runs.py:56` are the
 only places a superset dict can reach a forecaster config; `XGBoostConfig` is the only subclass;
 nothing in `scripts/`, `packages/dashboard/`, `packages/notebooks/` or `src/dashboard/` constructs
 one); `conf/model/xgboost.yaml` is the only model YAML; tests 1 and 4 do fail on `main`; no
-asset check validates a config (`checks.py:706-742` reads `meta.json` as raw JSON inside a
+asset check validates a config (`checks.py:739-778` reads `meta.json` as raw JSON inside a
 degrade handler, so no warning path can now raise); and the fail-closed argument survives
 `inherent-stability.md`'s rules 1 and 2 and its "missing versus wrong" distinction.
