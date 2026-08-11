@@ -134,7 +134,11 @@ class Nwp(pt.Model):
             "downward_short_wave_radiation_flux_surface, precipitation_surface) are period-ending "
             "rates: each value represents the average rate over the period that ends at valid_time "
             "(i.e. the preceding forecast step interval). Dynamical.org de-accumulates these from "
-            "ECMWF's raw cumulative fields before we receive them."
+            "ECMWF's raw cumulative fields before we receive them. Resampling must honour that "
+            "distinction — the step interval is 3 h out to lead 144 h and 6 h beyond it, so "
+            "treating a period-ending value as instantaneous shifts it by up to 3 h. Conventions "
+            "for every variable, and what the shift costs: "
+            "<https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>"
         ),
     )
 
@@ -166,7 +170,14 @@ class Nwp(pt.Model):
 
     wind_speed_10m: float = pt.Field(
         dtype=pl.Float32,
-        description="Wind speed at 10 m. Unit: meters per second.",
+        description=(
+            "Wind speed at 10 m. Unit: meters per second. This is the magnitude of the cell's"
+            " *vector* mean wind, not the mean of its grid points' scalar speeds — the H3"
+            " aggregation averages the u/v components and speed is derived afterwards. The two"
+            " differ wherever direction varies across a cell, and a turbine power curve wants the"
+            " scalar mean. See"
+            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>"
+        ),
         ge=0,
         le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
     )
@@ -175,7 +186,11 @@ class Nwp(pt.Model):
         dtype=pl.Float32,
         description=(
             "Wind direction at 10 m. The angle where the wind is coming from. Degrees."
-            " 0° is North; 90° is East."
+            " 0° is North; 90° is East. This is a *circular* quantity: 359° and 1° are two degrees"
+            " apart, so interpolating, averaging, differencing or taking a quantile of it as if it"
+            " were an ordinary number is wrong wherever the values straddle North. Convert to"
+            " components first. See"
+            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>"
         ),
         ge=0,
         le=360,
@@ -183,7 +198,11 @@ class Nwp(pt.Model):
 
     wind_speed_100m: float = pt.Field(
         dtype=pl.Float32,
-        description="Wind speed at 100 m. Unit: meters per second.",
+        description=(
+            "Wind speed at 100 m. Unit: meters per second. This is a vector mean, with the same"
+            " caveat as `wind_speed_10m`. It is the one that matters most for wind generation,"
+            " because a turbine power curve responds to the scalar speed at each grid point."
+        ),
         ge=0,
         le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
     )
@@ -192,7 +211,8 @@ class Nwp(pt.Model):
         dtype=pl.Float32,
         description=(
             "Wind direction at 100 m. The angle where the wind is coming from. Degrees. 0° is "
-            "North; 90° is East."
+            "North; 90° is East. This is circular, with the same handling requirement as "
+            "`wind_direction_10m`."
         ),
         ge=0,
         le=360,
