@@ -3,8 +3,9 @@ name: plan-issue
 description: >-
   Turn a GitHub issue in openclimatefix/nged-substation-forecast into a reviewed implementation
   plan, writing no code: read the issue and its comments, decide whether it is worth implementing
-  at all, write a plan that may overrule a stale issue body, have a fresh sub-agent adversarially
-  review it, triage the findings, stop for Jack. Load whenever Jack asks for a plan for an issue,
+  at all, write a plan that may overrule a stale issue body, put it through two fresh adversarial
+  sub-agent reviews — one hunting for a simpler approach, then one checking correctness and
+  testability — triage the findings, stop for Jack. Load whenever Jack asks for a plan for an issue,
   says "plan issue N" or "/plan-issue N", asks whether an issue is worth doing, or asks you to
   think through an implementation before touching code. To implement an approved plan, use
   `implement-issue` instead.
@@ -143,16 +144,60 @@ The plan covers:
 
 Do not paste large code blocks into the plan. Name the change; the implementer writes the code.
 
-## 4. Adversarial review by a fresh sub-agent
+## 4. First adversarial review: is there a simpler way?
 
-Launch a **new** sub-agent. Give it the issue number and the path to the plan file, and **nothing
-about your reasoning** — it must not be anchored by the argument that produced the plan.
+The plan now goes through **two** reviews, by two separate fresh sub-agents, in this order:
+simplicity first, then correctness. Simplifying a plan can break it, so the correctness reviewer
+has to see the plan that simplification left behind, not the one that went in.
+
+Launch a **new** sub-agent for this first pass. Give it the issue number and the path to the plan
+file, and **nothing about your reasoning** — it must not be anchored by the argument that produced
+the plan. Its single job is to find a simpler way to satisfy the issue, and its default assumption
+is that one exists.
+
+Name the attacks that apply to this issue:
+
+- Which parts of the plan solve a problem the issue did not ask about? Cut them and say what
+  breaks.
+- Is there an existing function, package or Patito model that already does what a proposed new
+  one would? (`packages/` is small enough to check.)
+- Would a plain function do what a new class, abstract base class, config object or strategy
+  object is proposed for?
+- Is a new column, table, asset or config field earning its place, or is the value already
+  derivable from what is stored?
+- Is the plan generalising for a second caller that does not exist? This project is young; a
+  breaking change later is cheap.
+- What is the smallest change to the existing code that a user of the system could not tell apart
+  from the plan's version?
+
+Ask for each simplification as a concrete alternative — what to do instead, which files it
+touches, and what capability is given up by taking it.
+
+## 5. Triage and revise
+
+Verify each proposed simplification against the code rather than accepting it — **reviewer
+findings are often wrong, and applying them uncritically makes the plan worse**. Take the genuine
+ones into the plan file. Reject a simplification when it drops something the issue actually asked
+for, or trades away a rule in `docs/design-philosophy/` — and say which, in one line.
+
+For each finding you reject, record the finding and the one-line reason in the plan file, so Jack
+can see what was considered and dismissed. Commit the revised plan.
+
+## 6. Second adversarial review: correctness and testability
+
+Launch **another** new sub-agent — not the one from step 4, and again with no account of your
+reasoning or of what the first review changed. Give it the issue number and the path to the
+revised plan file. Its job is to establish whether the plan, as now written, is correct and whether
+its tests would actually catch it being wrong.
 
 Tailor the brief to this issue's specific failure modes rather than asking for a generic review.
 The attacks worth naming, when they apply:
 
 - Does the plan's description of *current* behaviour actually match the code on `main`?
-- Would each proposed test really have failed before the change?
+- Would each proposed test really have failed before the change? A test that passes on `main`
+  today tests nothing about this change.
+- Is any part of the plan untestable as written — needing network, wall-clock time, or a whole
+  trained model to exercise one branch? Say what would have to change to make it testable.
 - Does the change fail closed anywhere production is supposed to degrade — in particular, can any
   warning path now raise?
 - Is a refactor hiding a behaviour change inside it?
@@ -162,20 +207,19 @@ The attacks worth naming, when they apply:
 Ask the reviewer for findings with file/line evidence, and for an explicit verdict on each: real
 defect, or not.
 
-## 5. Triage the findings
+## 7. Triage the findings
 
-Verify each finding against the code rather than accepting it — **reviewer findings are often
-wrong, and applying them uncritically makes the plan worse**. Fix the genuine ones in the plan
-file. For each finding you reject, record the finding and the one-line reason it was rejected, in
-the plan file, so Jack can see what was considered and dismissed. Commit the updated plan, so the
-branch carries both the original plan and what the review did to it.
+Verify each finding against the code, on the same terms as step 5: fix the genuine ones in the
+plan file, and record each rejected finding with its one-line reason. Commit the updated plan, so
+the branch carries the original plan and what both reviews did to it.
 
-## 6. Stop
+## 8. Stop
 
-Report to Jack: the verdict from step 2, a short summary of the plan, what the review changed, and
-what it found that you rejected. Give the branch name and the path to the plan file.
+Report to Jack: the verdict from step 2, a short summary of the plan, what each of the two reviews
+changed, and what each found that you rejected. Give the branch name and the path to the plan
+file.
 
 **Do not write any code, and do not open a PR.** Once Jack approves the plan, implementation runs
 under the `implement-issue` skill, resuming at its step 2 in the worktree this skill already
-created — implement, verify, PR, a second and independent adversarial review of the *diff*,
-triage, stop.
+created — implement, verify, PR, a further independent adversarial review of the *diff*, triage,
+stop.
