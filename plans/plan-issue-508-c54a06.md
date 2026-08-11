@@ -52,7 +52,7 @@ contract boundary and our merge, not the file format. What the conversion buys i
 `_load_engineering_inputs` reads the roster unguarded
 (`src/nged_substation_forecast/defs/cv_assets.py:322`), so an unusable roster takes the forecast off
 the degradation ladder entirely — not even rung 4. Fixing that means separating the production caller
-from the fail-fast CV caller, which is a different change. **See Q4.**
+from the fail-fast CV caller, which is a different change. **Filed separately as [#528](https://github.com/openclimatefix/nged-substation-forecast/issues/528); see D4.**
 
 This is an [H1](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h1-a-service-that-mostly-runs-itself)
 bug in the most direct sense. Today's recovery is "someone deletes the file by hand" — a **T1.1**
@@ -68,12 +68,12 @@ roster.
   likely faults — a stored roster that fails our Patito contract, or a Delta schema mismatch —
   recovery is a single overwrite commit, and the previous version stays in the log, readable by time
   travel. Nothing needs copying aside. The one fault that would still need a copy-aside is a
-  genuinely corrupt `_delta_log`, and there the recovery is **not** automatic: see Q2.
+  genuinely corrupt `_delta_log`, and there the recovery is **not** automatic: see D2.
 - **The issue says "every id NGED is currently publishing is in `new_metadata`", so "the only loss
   is ids that have gone quiet". That is wrong.** `download_and_parse_files` is fed
   `list_of_new_json_files`, so the snapshot covers only ids whose files were new *this run*. A
   rebuild from it can thin the roster, and a thin roster is not merely lossy — it can make
-  `live_forecasts` **fail** (Q3). Hence the repair pass below.
+  `live_forecasts` **fail** (D3). Hence the repair pass below.
 - **The asset keeps its current order** (roster upsert, then the power write). A guard around the
   upsert delivers what the issue asks for without reordering.
 
@@ -107,9 +107,11 @@ The package already owns physical layout plus the write helpers that apply it
        commits no new version at all** (measured: history stayed at 2 versions). So the roster's
        Delta history grows only when NGED's metadata actually changes — which is what keeps the
        vacuum burden negligible for this table.
-    3. The predicate must be built from the **snapshot's** columns, not the contract's, or a
-       snapshot omitting an `allow_missing` column produces a predicate referencing a column that
-       does not exist. Which columns the snapshot carries is also what decides the semantics in Q1.
+    3. The predicate is built from the contract's non-key columns, which is safe **only because
+       the caller aligns the snapshot to the full schema first** (D1). Handed a snapshot that omits
+       an `allow_missing` column, the predicate would reference a column that does not exist — so
+       the function asserts the source carries every contract column rather than silently building
+       a narrower predicate.
 
 - **`h3_grid_weights.py`** — `H3_GRID_WEIGHTS_WRITER_PROPERTIES` and
   `write_h3_grid_weights(weights, table_uri, storage_options)`, a plain `mode="overwrite"` commit.
@@ -138,12 +140,25 @@ layout. `packages/nged_data/pyproject.toml` gains a `delta_store` dependency, ex
 - **Deleted**: the `COMPRESSION` constant (`storage.py:384`), the `pl.read_parquet` +
   `TimeSeriesMetadata.validate(existing_metadata)` pair (405–408) as a *gate*, the `hash_rows` diff
   as a *gate*, and the `concat` + `unique(keep="first")` merge (436). Raisers 1 and 3 go with them.
-- **`upsert_metadata`'s new shape**: validate the snapshot; if the table does not exist, create it;
-  otherwise compute the informational diff (below) and call `merge_time_series_metadata`. If the
-  merge or the read raises because the *stored table* is unusable — our contract rejects it, or
-  Delta rejects the schema — log at ERROR, rebuild it with an overwrite commit
-  (`schema_mode="overwrite"`), and report the rebuild in the stats. The previous version stays in
-  the log, so nothing is destroyed and no file is copied aside.
+- **New `_align_to_contract(df) -> pt.DataFrame[TimeSeriesMetadata]`** — selects
+  `TimeSeriesMetadata.columns` in declared order, supplying
+  `pl.lit(None, dtype=TimeSeriesMetadata.dtypes[name])` for any column the snapshot lacks. Only the
+  four `allow_missing=True` fields can be absent from a frame that validated, and all four are
+  declared `| None`, so the filled nulls are contract-legal (verified). This is D1's mechanism: it
+  is what makes a field NGED stops sending get *cleared* rather than silently retained, which is
+  today's behaviour, and it is what lets the merge predicate be a fixed list of columns.
+- **`upsert_metadata`'s new shape**: validate the snapshot, align it; if the table does not exist,
+  create it; otherwise compute the informational diff (below) and call
+  `merge_time_series_metadata`. If the read or the merge raises because the *stored table* is
+  unusable — our contract rejects it, or Delta rejects the schema — log at ERROR and rebuild it with
+  an overwrite commit (`schema_mode="overwrite"`), reporting the rebuild in the stats. The previous
+  version stays in the log, so nothing is destroyed and no file is copied aside.
+- **If the rebuild commit *itself* fails, degrade rather than trying harder** (D2): report and let
+  the asset-level guard carry the run. This is the discrimination the corrupt-`_delta_log` case
+  needs, and doing it by "did the recovery work?" rather than by inspecting exception types is what
+  keeps it robust — there is no reliable taxonomy separating "delta-rs cannot open this table" from
+  "our contract rejects its contents", and guessing wrong in either direction is worse than trying
+  the cheap recovery and reporting when it does not take.
 - **The diff is demoted from a gate to an annotation.** `UpsertMetadataStats` currently publishes
   `metadata_updated_TimeSeriesIDs`, a *list* of ids, and delta-rs' merge metrics give counts only —
   verified: `num_target_rows_inserted`, `num_target_rows_updated`, `num_target_rows_copied`, no ids.
@@ -214,7 +229,7 @@ Mechanical, all from `pl.read_parquet` to the new `scan_delta` classmethods:
   call sites: the asset-level guard has a live exception; the rebuild path has only a reason, because
   the exception was handled a layer down inside `nged_data`, which must not depend on Sentry or
   Dagster. The shared `new_scope`/`try` body is extracted into a module-private helper so there are
-  not two copies; `report_check_degradation`'s signature and behaviour are unchanged. See Q5.
+  not two copies; `report_check_degradation`'s signature and behaviour are unchanged. See D5.
 - `init_sentry`'s docstring enumerates "the three explicit senders" (`_sentry.py:98-99`); it becomes
   four.
 
@@ -265,7 +280,7 @@ This path is **production** — the hourly `power_time_series_and_metadata_job`,
   aside on S3 is a list-copy-delete loop — bespoke machinery of exactly the kind this conversion is
   meant to avoid. So that case degrades and pages, with a documented manual step, and Delta makes it
   much less likely than the parquet failure it replaces (atomic commits; data files written before
-  the commit that references them). Q2 puts this to Jack explicitly.
+  the commit that references them). D2 records that as a deliberate choice.
 
 ## Tests
 
@@ -302,49 +317,55 @@ Every assertion below fails on `main` today.
 8. `test_upsert_metadata_merges_a_stored_roster_with_reordered_columns` — same data, different
    column order. Asserts a no-op merge and no new version. On `main`: `hash_rows` is order-sensitive
    (verified), so it reports a spurious update or raises `ShapeError` on the vstack.
+9. `test_upsert_metadata_clears_a_field_the_snapshot_no_longer_carries` — the D1 semantics, and the
+   one test that would catch (B) being implemented by accident. A stored row has
+   `information = "note"`; this run's snapshot omits the `information` column entirely. Asserts the
+   stored value ends up **null**, not `"note"`. On `main`: `ShapeError` from the `concat` (verified).
+   Without `_align_to_contract`, `when_matched_update_all` leaves the old value in place — verified,
+   and it is silent.
 
 `tests/test_s3_data_paths.py` (moto, `integration`-marked; the per-test reset fixture at
 `tests/test_s3_data_paths.py:85-101` handles moto's process-global backend):
 
-9. `test_metadata_delta_round_trip_over_s3` — replaces the existing
+10. `test_metadata_delta_round_trip_over_s3` — replaces the existing
    `test_metadata_parquet_round_trip_over_s3` (`:237`): create, merge, read back over S3, exercising
    delta-rs' conditional-put commit path against the object store.
 
 `tests/test_assets.py` (the existing `_FakeS3Store` + `env` harness):
 
-10. `test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fails` — monkeypatch
+11. `test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fails` — monkeypatch
     `assets.upsert_metadata` to raise `RuntimeError`; assert `result.success`, that the
     `power_time_series` Delta table holds the fixture rows, and that `metadata_upsert_failed` appears
     in the materialisation metadata. This is the issue's headline property. On `main`: the run fails.
-11. `test_power_time_series_and_metadata_repairs_a_rebuilt_roster` — with the fake store serving two
+12. `test_power_time_series_and_metadata_repairs_a_rebuilt_roster` — with the fake store serving two
     series, ingest once, then make the stored roster off-contract and arrange for only *one* series
     to have a new file. Asserts success and that the roster ends up holding **both** ids — the repair
     ran and the roster was not left thin — plus `metadata_roster_rebuilt_reason` in the metadata.
-12. `test_power_time_series_and_metadata_survives_a_failed_roster_repair` — as above with the
+13. `test_power_time_series_and_metadata_survives_a_failed_roster_repair` — as above with the
     repair's `download_and_parse_files` raising; assert the run still succeeds and the thin roster
     stands.
-13. `test_h3_grid_weights_materialises_and_writes_a_delta_table` — the existing
+14. `test_h3_grid_weights_materialises_and_writes_a_delta_table` — the existing
     `test_h3_grid_weights_materialises_and_writes_parquet` (`:236`) converted, asserting
     `delta_table_exists` and the row count. Its six sibling `_write_h3_grid_weights` fixture calls
     (`:275`–`:496`) move to the Delta writer.
 
 `tests/test_sentry.py`:
 
-14. Mirror the two existing `report_check_degradation` tests (`:176`, `:220`) for
+15. Mirror the two existing `report_check_degradation` tests (`:176`, `:220`) for
     `report_asset_degradation` — the built event carries `{"degraded_asset": …}`, no tag leaks into
     the current or isolation scope, and a raising `capture_*` is swallowed and logged. Add the
     message-shaped call as a third case. On `main`: the function does not exist.
 
 `tests/test_checks.py`:
 
-15. `test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet` — rename, and rewrite both the
+16. `test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet` — rename, and rewrite both the
     corruption it sets up (a Delta table, not junk bytes at a file path) and its docstring, which
     currently states that "`upsert_metadata` reads the same file first and fails the asset outright"
     (line ~336) — no longer true.
 
 `packages/contracts/tests/test_settings.py`:
 
-16. `:49` asserts the derived `h3_grid_weights_path` ends in `.parquet`; update, along with the
+17. `:49` asserts the derived `h3_grid_weights_path` ends in `.parquet`; update, along with the
     path-suffix set at `:82`.
 
 ## Docs to update
@@ -418,49 +439,50 @@ for the edited sections, since the nested-list and wrapped-link traps pass both 
 (`mkdocs-authoring` skill). No `--run-network` run is needed: nothing touches the Dynamical catalog
 or NWP conversion conventions.
 
-## Risks and open questions
+## Decisions, and remaining risks
 
-**Q1 — When this run's snapshot omits an `allow_missing` column, should the stored value be nulled
-or kept?** The two options differ only in which columns the merge source carries. **(A) Align the
-snapshot to all 14 columns** (typed nulls for absent ones): a field NGED stops sending is cleared,
-which is exactly today's `unique(keep="first")` semantics. **(B) Merge only the columns the snapshot
-has**: the stored value survives, so the roster can mix current and stale field values in one row,
-and a field NGED genuinely *clears* sticks around forever.
-*Recommendation: (A)* — it preserves current behaviour, so the conversion stays a storage change
-rather than a semantics change, and the roster keeps meaning "the latest snapshot of what NGED
-published". Worth a deliberate decision, because Delta makes (B) the easier thing to write by
-accident (`when_matched_update_all` on a narrow source does (B) silently — verified).
+Jack approved all five recommendations below; they are recorded as decisions rather than questions so
+the implementer does not have to re-derive them, and so a reviewer can see what was weighed.
 
-**Q2 — Should a corrupt `_delta_log` self-heal, or degrade and page?** Recovering it means moving the
-whole table prefix aside (on S3, a list-copy-delete loop) before creating a fresh table — bespoke IO
-machinery of the kind this conversion removes.
-*Recommendation: degrade and page*, with the move-aside written into the operations runbook as a
-manual step. The case Delta cannot self-heal is also the case Delta makes very unlikely, and the two
-faults that *are* likely — off-contract and schema mismatch — self-heal in place with the old version
-retained by the log. Accepting this is the one property the conversion gives up, so it should be a
-conscious choice.
+**D1 — A field the snapshot no longer carries is cleared, not retained.** The two options differed
+only in which columns the merge source carries. **(A, chosen) Align the snapshot to all 14 columns**,
+typed nulls for absent ones: a field NGED stops sending is cleared, which is exactly today's
+`unique(keep="first")` semantics, so the conversion stays a storage change rather than a semantics
+change and the roster keeps meaning "the latest snapshot of what NGED published". **(B, rejected)
+Merge only the columns the snapshot has**: the stored value survives, so the roster mixes current and
+stale field values in one row and a field NGED genuinely clears sticks around forever. The mechanism
+is `_align_to_contract`, and it needs a *test* rather than a comment, because (B) is what Delta does
+by default — `when_matched_update_all` on a narrow source silently implements it (verified). Test 9
+is that test.
 
-**Q3 — Is the roster-repair pass worth its complexity?** A thin roster is not benignly lossy.
+**D2 — A corrupt `_delta_log` degrades and pages; it does not self-heal.** Recovering it would mean
+moving the whole table prefix aside (on S3, a list-copy-delete loop) before creating a fresh table —
+bespoke IO machinery of exactly the kind this conversion removes. The manual move-aside goes into the
+operations runbook instead. This is the one property the conversion gives up versus the parquet plan,
+and it is the case Delta makes very unlikely; the two faults that *are* likely — off-contract and
+schema mismatch — self-heal in place with the old version retained by the log. Implemented as "try
+the cheap recovery, report if it does not take", not by inspecting exception types.
+
+**D3 — Keep the roster-repair pass.** A thin roster is not benignly lossy.
 `_load_engineering_inputs` derives the NWP cell filter from the roster (`cv_assets.py:328`, feeding
 `h3_index.is_in(cells)` at `:336-342`) while the population comes from the promoted model's
 `trained_ids` (`production_assets.py:238`), and `live_forecasts` raises outright on an empty result
 (`production_assets.py:285-290`) — so a thin roster costs, at best, forecasts for the missing series
 and, at worst, the whole slot. `forecast_metrics` (`cv_assets.py:997-1000`) and `cv_power_forecasts`
 read the roster too, where thinning would silently shrink a training or scoring population, the
-opposite of the fail-fast posture R&D is meant to have.
-*Recommendation: keep it* — ~5 lines over existing functions, guarded so it cannot make things worse,
-and it turns "degrade and wait ~5 h" into an actual repair.
+opposite of the fail-fast posture R&D is meant to have. The pass is ~5 lines over existing functions,
+guarded so it cannot make things worse, and it turns "degrade and wait ~5 h" into an actual repair.
 
-**Q4 — Follow-up issue for `_load_engineering_inputs`?** Its unguarded roster read means an unusable
-roster fails `live_forecasts` outright — off the ladder entirely — for as long as the fault lasts.
-This change shortens that window to at most one hourly ingest but does not close it; closing it means
-splitting the production caller from the fail-fast CV caller.
-*Recommendation: file a separate issue.* Say the word and I will.
+**D4 — The `_load_engineering_inputs` hazard is filed separately, as
+[#528](https://github.com/openclimatefix/nged-substation-forecast/issues/528).** Its unguarded roster
+read means an unusable *or thin* roster fails `live_forecasts` outright — off the ladder entirely —
+for as long as the fault lasts. This change shortens that window to at most one hourly ingest but
+does not remove it, and the real fix is a design question (the issue argues the live path should not
+depend on the roster at all for a series whose model it already holds), so it does not belong here.
 
-**Q5 — `report_asset_degradation(name, detail: BaseException | str)`, or two functions?** The union
-exists only because the rebuild path has no live exception at the asset boundary.
-*Recommendation: keep the union* — one function, one tag, one docstring covering both shapes, versus
-two near-identical six-line functions.
+**D5 — `report_asset_degradation(name, detail: BaseException | str)` keeps the union signature.** One
+function, one tag, one docstring covering both shapes, versus two near-identical six-line functions.
+The union exists only because the rebuild path has no live exception at the asset boundary.
 
 **Vacuum and checkpoints — already tracked.**
 [#357 "Implement auto vacuuming for Delta Lake"](https://github.com/openclimatefix/nged-substation-forecast/issues/357)
@@ -521,7 +543,7 @@ findings that still apply are folded in above; recorded here so nothing is silen
    roster (`checks.py:167-173`), so a dropped id keeps being flagged stale. What a thin roster really
    does is stop never-seen ids being reported at all (`checks.py:180-183`) and shrink
    `n_series_total` (`:198-201`).
-3. **A thin roster can fail `live_forecasts` outright**, not merely thin it — now Q3, and the reason
+3. **A thin roster can fail `live_forecasts` outright**, not merely thin it — now D3, and the reason
    the repair pass exists.
 4. **Rule 12 restated principle 10**, which `inherent-stability.md:155-159` requires to be marked and
    paired. Resolved differently here: rule 12 now drops the atomicity clause entirely, because the
