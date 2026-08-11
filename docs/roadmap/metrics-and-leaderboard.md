@@ -299,7 +299,7 @@ only skill floor the NWP ensemble must clear at long horizons.
   cell's power samples. Cell keys derive from **local** (Europe/London) time computed inside the
   forecaster from `valid_time`, aligning with the demand rhythm (and matching the `local_*` time
   features). `save()` writes the lookup as one parquet + `meta.json`.
-- **Member emission — deliberate deviation from an earlier draft.** Emit members at *equiprobable*
+- **Member emission — equiprobable levels, not the delivery levels.** Emit members at *equiprobable*
   quantile levels `(i − 0.5)/m`, **not** at the tail-heavy `DELIVERY_QUANTILES` levels. Fair CRPS and
   the per-run empirical delivery quantiles the metrics layer derives from members treat members as an
   equiprobable sample; feeding 13 members at the delivery levels in with equal weight would put 7.7 %

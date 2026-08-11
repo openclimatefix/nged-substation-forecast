@@ -317,8 +317,8 @@ rest of this document:
   absorbed by a subset of neighbours whose pickups sum to it), *not* a pairwise
   equal-and-opposite transfer.
 
-An earlier sketch proposed a discrete "switching state-space model" over per-feeder *load
-blocks*. That formulation is **retired**: NGED's network is meshed and run radially with movable
+The alternative formulation — a discrete "switching state-space model" over per-feeder *load
+blocks* — is **rejected**: NGED's network is meshed and run radially with movable
 cut points, so there is no stable, re-identifiable feeder unit to discover and route (see
 [switching-events.md, Part 4](switching-events.md)). The output — topology-normalised latent
 demand — remains the [NGED-required target variable](#the-problem-net-power-is-not-demand).
