@@ -42,7 +42,7 @@ has.** The distinction matters because the issue contains both framings: the bod
 the fail-fast / fail-operational asymmetry". The two are correlated but not congruent, and they
 disagree on exactly the two assets flagged under [Ambiguous cases](#ambiguous-cases):
 `promoted_model` and `promotable_model_runs` are needed to operate the service, yet both fail fast
-(unguarded `mlflow` calls, an unguarded `read_text` at `production_assets.py:136-139`).
+(unguarded `mlflow` calls, an unguarded `read_text` at `production_assets.py:142`).
 
 The "needed by" reading is the one to implement, because it is what the issue body asks for and
 what an operator filtering the UI wants. The posture asymmetry stays a *property* of the layers
@@ -66,7 +66,8 @@ throwaway Dagster project run against this repo's pinned Dagster 1.13.17, with t
 - The asset detail page renders a **Definition → Tags** panel showing `layer: production`.
 - The GraphQL API exposes `tags { key value }` per asset node, so anything built on the UI's API
   can filter on it too.
-- `AssetSelection.tag("layer", "production")` is the Python API equivalent, which the test uses.
+- `AssetSelection.tag(key="layer", value="production")` is the Python API equivalent, which the
+  test uses.
 
 **`kinds` — rejected.** Dagster implements kinds as reserved `dagster/kind/<name>` tags (confirmed
 in the GraphQL output) and renders them as technology badges on the graph node. They are for
@@ -247,7 +248,9 @@ external asset key, which lands in `get_all_asset_keys()` and can never carry a 
 message about layer tags — the exact false attribution `test_definitions_resolve`'s docstring
 already warns about, and which that test is the right place to catch.
 
-Resolve through `AssetSelection.tag(LAYER_TAG_KEY, …)` rather than `AssetSelection.from_string`,
+Resolve through `AssetSelection.tag(key=LAYER_TAG_KEY, value=…)` rather than
+`AssetSelection.from_string` — by keyword, per the *Calling functions* rule that landed in
+`docs/architecture/code-style.md` on 2026-08-11 —
 and add one assertion that the operator-facing string `tag:layer=production` parses to the same
 selection — with a comment recording the quoted-form breakage under `filterwarnings = ["error"]`
 documented above, so nobody "tidies" the string back into the quoted form. That comment should say
@@ -257,7 +260,7 @@ the two `dagster asset list` commands below are the only check of it, and they a
 
 The test needs no network, no trained model, no wall-clock time and **no fixture**. It does not
 need the `env` fixture that `test_definitions_resolve` takes: that fixture is module-local to
-`tests/test_assets.py:133` and would be `fixture 'env' not found` in a new file, and building
+`tests/test_assets.py:135` and would be `fixture 'env' not found` in a new file, and building
 `Definitions` never touches a data path anyway. Importing `nged_substation_forecast.definitions`
 at test time is safe because the root `conftest.py`'s `pytest_configure` forces `SENTRY_DSN=""`
 before collection, so the import-time `init_sentry` is a no-op.
@@ -265,7 +268,7 @@ before collection, so the import-time `init_sentry` is a no-op.
 ## Docs to update
 
 1. **`docs/design-philosophy/inherent-stability.md`**, the *R&D fails the other way* section
-   (around line 487). It currently forward-references this issue: "the natural mechanism is a
+   (around line 496). It currently forward-references this issue: "the natural mechanism is a
    strict-mode flag on the feature and validation layer, plus asset tagging ([#423])". Rewrite in
    the present tense to say the tag exists and what it is — per CLAUDE.md's "write about the
    present, not the past", the issue reference goes away rather than becoming a history note. The
@@ -280,7 +283,7 @@ before collection, so the import-time `init_sentry` is a no-op.
    selection strings, and one clause on why a tag rather than a group. Keep it to a paragraph plus
    the two lists; this is a decorator-level change, not a control-plane decision, so it does not
    warrant the treatment the longer sections on that page get. It must land **before** the
-   `## Considered but rejected designs` heading at line 376, not appended after `## See also`.
+   `## Considered but rejected designs` heading at line 378, not appended after `## See also`.
 3. **`docs/live_service/operations.md`** — one sentence under *Prerequisites*, giving the operator
    `tag:layer=production` to paste into the Dagster UI. This is the issue's actual payoff, so it
    belongs on the page the operator reads.
@@ -330,6 +333,24 @@ skill documents several ways a page renders wrong while both linters pass.
    `production_assets.py`. Adding one argument to a decorator conflicts only if another session
    edits the same decorator. Worth rebasing on `main` immediately before opening the PR.
 
+## Re-checked against `main` at 088d21b4
+
+The branch was 65 commits behind and has been merged up. Nothing in that range changes the plan's
+substance:
+
+- **Still exactly eleven assets**, same names, same three modules, and `get_all_asset_keys()` still
+  equals `executable_asset_keys`. Only line numbers moved, and the plan's citations now match.
+- **Every empirical claim re-verified on the merged tree** against the same Dagster 1.13.17,
+  including the quoted-selection-string breakage under `pytest`.
+- **#486 landed** (`promoted_model` now refuses a model whose `selected_features` it cannot parse,
+  before replacing the directory, so the previous champion keeps serving). It does not change the
+  classification, and it slightly strengthens the `production` reading: refusing a bad promotion
+  while the incumbent model keeps forecasting is production behaviour, not R&D fail-fast.
+- **A new house rule landed** — *Calling functions* in `docs/architecture/code-style.md`: pass
+  arguments by keyword wherever the callee allows. The test spec above now says
+  `AssetSelection.tag(key=…, value=…)`. The decorator change is unaffected: `tags=` is already a
+  keyword.
+
 ## Review findings — first pass (simplicity)
 
 ### Accepted
@@ -378,7 +399,7 @@ and the 3 / 5 / 3 module split are right.
 ### Accepted
 
 1. **The test must not take the `env` fixture.** That fixture is module-local to
-   `tests/test_assets.py:133`, so a new file asking for it errors with `fixture 'env' not found`.
+   `tests/test_assets.py:135`, so a new file asking for it errors with `fixture 'env' not found`.
    It is also unnecessary — building `Definitions` touches no data path, and the root
    `conftest.py` already forces `SENTRY_DSN=""` before collection.
 2. **Compare the union against `executable_asset_keys`, not `get_all_asset_keys()`.** A typo in any
@@ -395,7 +416,7 @@ and the 3 / 5 / 3 module split are right.
    `tag:` string takes the fallback parser, so CI never exercises the ANTLR parser the UI and CLI
    use. Kept the assertion (it pins the fallback, which is what the comment is about) and recorded
    the gap.
-5. **The new architecture section must land before line 376**, ahead of *Considered but rejected
+5. **The new architecture section must land before line 378**, ahead of *Considered but rejected
    designs*.
 6. **"Sharing one dict across eleven decorators"** — it is two dicts, across six and five.
 
