@@ -149,8 +149,8 @@ def _check_meta_features_are_parseable(meta: dict[str, Any], source: str) -> Non
             an operator knows which model to re-train.
 
     Raises:
-        ValueError: ``model_params`` is not a config this code can build, or ``selected_features``
-            names a feature it cannot parse.
+        ValueError: ``model_params`` carries no usable ``selected_features``, or one of those
+            features is a name this code cannot parse.
     """
     # Both messages can reach the container log that scripts/build_and_verify_image.sh greps
     # case-insensitively for "mlflow" to prove the runtime is hermetic, so neither may contain that
@@ -159,11 +159,20 @@ def _check_meta_features_are_parseable(meta: dict[str, Any], source: str) -> Non
         "Re-train against the current feature vocabulary and promote that run; never hand-edit "
         "meta.json, which leaves the trained model carrying the old names."
     )
+    # Validate only the field this function reads. A saved config is always a *subclass* instance,
+    # so handing the whole mapping to the base class would reject every real model on the subclass's
+    # own hyper-parameters — ``BaseForecasterConfig`` forbids unknown keys. Whether the full config
+    # still builds is the concrete subclass's ``load`` to decide, and it does.
+    model_params = meta.get("model_params")
     try:
-        config = BaseForecasterConfig.model_validate(meta.get("model_params"))
-    except ValidationError as error:
+        config = BaseForecasterConfig.model_validate(
+            {"selected_features": model_params.get("selected_features")}
+            if isinstance(model_params, dict)
+            else model_params
+        )
+    except (ValidationError, AttributeError) as error:
         raise ValueError(
-            f"The model at {source} has model_params this code cannot build a config from, so no "
+            f"The model at {source} has model_params with no usable selected_features, so no "
             f"forecaster here can load it. {remedy}"
         ) from error
 
