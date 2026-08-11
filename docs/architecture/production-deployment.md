@@ -395,9 +395,8 @@ be inspected by pointing an on-demand `dagster-webserver` at shared Postgres run
 
 2. **Handover to NGED is simpler without AWS coupling.** A Dagster deployment NGED can run
    anywhere is an easier handover than an EventBridge + Step Functions + ECS arrangement they
-   would have to recreate inside their own AWS account. (This reverses an earlier assumption
-   that "a cron and a container" would be the easier handover — that only holds if the
-   receiving organisation is committed to AWS.) See
+   would have to recreate inside their own AWS account. ("A cron and a container" is the easier
+   handover only if the receiving organisation is committed to AWS.) See
    [Handover to NGED](../roadmap/handover.md) for the full handover plan.
 
 3. **The cost saving is not real for this workload.** EventBridge's pay-per-run economics

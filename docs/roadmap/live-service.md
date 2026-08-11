@@ -539,11 +539,11 @@ Still 🚧 after v0.1:
   ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) once there's
   enough to justify it — per the
   [Access phasing sequencing note](#access-phasing), that point is Stage 2, not Stage 1.
-  **Open question, not yet decided:** this section originally specified a small Terraform
-  module (one file), but a later conversation argued for **AWS CDK (Python)** instead —
-  specifically for this project, since it's single-cloud (AWS-only), so there's no cross-cloud
-  benefit from HCL, and CDK lets the infra be written in Python rather than learning a new
-  language for it. Terraform vs CDK is Jack's call to make when Stage 2 work starts; this page
+  **Open question, not yet decided:** a small Terraform module (one file) versus **AWS CDK
+  (Python)**. The case for CDK is specific to this project: it's single-cloud (AWS-only), so
+  there's no cross-cloud benefit from HCL, and CDK lets the infra be written in Python rather
+  than learning a new language for it. Terraform vs CDK is Jack's call to make when Stage 2
+  work starts; this page
   does not pick one. The post-NIA operating model (NGED runs the service on NGED's AWS — see
   [Handover to NGED](handover.md#4-infrastructure-as-code-portable-to-ngeds-account)) adds two
   inputs to that call: the infra-as-code must be **account-portable** (no OCF-specific names or

@@ -378,8 +378,8 @@ model either: `_upsample_nwp_to_half_hourly` interpolates interior nulls away wh
 the half-hourly grid, so they arrive as bridged values. The exception is a slice at the very end of
 the horizon, because `interpolate()` leaves trailing nulls alone just as it leaves leading ones —
 those do reach the model as nulls. That third mechanism is imputation, already happening, chosen by
-nobody — which turns the old worry here, that someone would later "fix" this by imputing, into
-something closer to its opposite: the fill exists and is unbounded, unflagged and unmeasured.
+nobody — which inverts the obvious worry. The risk is not that someone might later "fix" this by
+imputing; it is that the fill already exists, and is unbounded, unflagged and unmeasured.
 Making it deliberate is
 [a planned experiment](../roadmap/xgboost-improvements.md#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible).
 Note the contrast between the first mechanism and the third, because it is the argument for
