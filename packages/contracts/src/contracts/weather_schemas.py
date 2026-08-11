@@ -198,7 +198,11 @@ class Nwp(pt.Model):
 
     wind_speed_100m: float = pt.Field(
         dtype=pl.Float32,
-        description="Wind speed at 100 m. Unit: meters per second.",
+        description=(
+            "Wind speed at 100 m. Unit: meters per second. A vector mean with the same caveat as"
+            " `wind_speed_10m`, and the one that matters most for wind generation, since a turbine"
+            " power curve responds to the scalar speed at each grid point."
+        ),
         ge=0,
         le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
     )

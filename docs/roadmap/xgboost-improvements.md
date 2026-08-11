@@ -58,12 +58,12 @@ ingest renormalises each H3 cell over the grid points that arrived.
 Issues: [#525](https://github.com/openclimatefix/nged-substation-forecast/issues/525) (storage),
 [#526](https://github.com/openclimatefix/nged-substation-forecast/issues/526) (resample)
 
-Four defects in how the feature pipeline reads the `nwp` table. They are not experiments in the
-sense the rest of this page uses the word: they are wrong answers to questions that have right
-answers, and they sit in the inputs that every experiment below consumes. The conventions they
-violate, the measurements quoted here, and the code paths involved are all described on
-[NWP variable conventions](../architecture/nwp-variable-conventions.md) — this section says what to
-change, in what order, and how to tell what each change bought.
+Three defects in how the feature pipeline reads the `nwp` table, plus the storage change that makes
+the first of them impossible to reintroduce. They are bugs, not experiments, and they sit in the
+inputs that every experiment below consumes.
+[NWP variable conventions](../architecture/nwp-variable-conventions.md) describes the conventions
+they violate, the measurements, and the code paths; this section says what to change, in what order,
+and how to tell what each change bought.
 
 **Why these come first.** No real ML experiment has run yet — only a dummy model — so there is
 nothing on the leaderboard to invalidate. That is precisely the argument for doing this now rather
@@ -90,34 +90,44 @@ and [climatology z-scores](#weather-abnormality-climatology-z-score-features). A
 standardised anomaly of a wrapped angle is meaningless, and a p90 of one has no correct definition
 at all.
 
-**(a) Wind direction is interpolated across the 0°/360° wrap.** Interpolating 350° → 10° yields
-180°. Whenever two consecutive native steps straddle north the interpolated midpoint is wrong by
-exactly 180°, which leaves **6.57%** of half-hourly `wind_direction_10m` rows and **6.32%** of
-`wind_direction_100m` rows pointing the wrong way — systematically, northerlies recorded as
-southerlies. Both columns are in `conf/model/xgboost.yaml`'s `selected_features` today. The fix is
-to interpolate the wind *vector* rather than the polar pair; it is subsumed entirely by the
-[u/v storage change](#store-wind-as-uv-components-rather-than-speed-and-direction) below, which is
-why that item is sequenced first.
+**`continuous_var_names()` has two callers beyond the resample, and narrowing it changes both.**
+`delta_store.nwp.write_nwp` uses it to choose which columns get rounded to 13 significand bits, so
+dropping the directions from it silently stops rounding them on every future ingest — a storage
+change landing inside the very item that argues from a storage measurement. And
+`packages/dashboard/tests/test_forecast_chart.py` asserts that the set equals the dashboard's
+`NWP_PLOT_VARIABLES`, so the change either fails that test or quietly drops wind direction from the
+dashboard's NWP panel. Decide both deliberately: the likely answer is a separate
+"round these on write" set, since rounding a direction is still correct even though interpolating
+one is not.
+
+**(a) Wind direction is interpolated across the 0°/360° wrap**, which affects 6.57% of interpolated
+`wind_direction_10m` rows with a mean circular error around 100°
+([measurements](../architecture/nwp-variable-conventions.md#wind-direction-is-interpolated-across-the-0360-wrap)).
+Both direction columns are in `conf/model/xgboost.yaml`'s `selected_features` today. The fix is to
+interpolate the wind *vector* rather than the polar pair, which the
+[u/v storage change](#store-wind-as-uv-components-rather-than-speed-and-direction) below delivers as
+a side effect.
 
 **(b) Radiation and precipitation are interpolated as though they were instantaneous.** They are
 period-ending means over the preceding step, so interpolating between `valid_time` stamps treats a
-backward-looking average as a reading at the end of its window. On a clear-sky day at 52.5° N in
-mid-August the reconstructed diurnal peak is 756 W m⁻² at 15:00 in the 3-hourly part of the horizon
-and **590 W m⁻² at 18:00** in the 6-hourly part, against a truth of 816 W m⁻² at 12:00. Beyond day 6
-the model is told the solar day peaks at 18:00 UTC. Shortwave radiation is the worst-affected
-variable in the table by a factor of three (MAE/SD 0.44 at 6-hourly).
+backward-looking average as a reading at the end of its window. That shifts the modelled solar day
+late by half the step width — three hours beyond day 6 — and cuts its peak by a quarter, from
+816 W m⁻² to 590. Shortwave radiation is the worst-affected numeric variable, at half again the
+next-worst (MAE/SD 0.44 against 0.30).
 
-The fix is the clear-sky-index resample, and it has **four requirements** — all four verified to
-reconstruct the truth exactly at both 3-hourly and 6-hourly spacing. Getting any of them wrong makes
-the result worse than doing nothing: normalising by the instantaneous clear-sky value at
+The fix is the clear-sky-index resample, and it has **four requirements**. Getting the first wrong
+makes the result worse than doing nothing: normalising by the instantaneous clear-sky value at
 `valid_time`, the most natural reading, produces a physically impossible **1221 W m⁻²** peak on a
-clear day.
+clear day. Requirements 1, 3 and 4 were each verified on a reconstructed clear-sky day; requirement
+2 was not, because a clear-sky day has a constant clear-sky index, which no anchoring choice can
+disturb. Verify it on a partly-cloudy day when implementing.
 
 1. Normalise against the clear-sky **mean over the same window**, not the instantaneous clear-sky
    value at `valid_time`.
 2. Anchor the resulting index at the **window midpoint** before interpolating it.
-3. Restrict to windows containing real daylight and hold the index flat beyond them, or a zeroed
-   night-window index bleeds into dawn and dusk — worth 9% of daily energy in testing.
+3. Restrict to windows containing real daylight and hold the index flat beyond them. Interpolating
+   into a zeroed night-window index instead cost 9% of the reconstructed day's energy (6.58 against
+   7.20 kWh m⁻²).
 4. Multiply back by the clear-sky **mean over each half-hour ending at `valid_time`**, not the
    instantaneous value, so the feature stays period-ending like `PowerTimeSeries.value` on the other
    side of the join.
@@ -127,34 +137,33 @@ depend on, and it is why that item's stage (b) is now a cross-reference rather t
 `precipitation_surface` shares the convention but needs no clear-sky treatment: its accumulator
 features integrate over the window anyway, so only sub-window timing is lost.
 
-**(c) Instantaneous variables lose diurnal amplitude beyond day 6.** Linear interpolation between
-6-hourly samples cuts the corner off the diurnal cycle, because the ~15:00 temperature maximum falls
-between the 12:00 and 18:00 samples: the mean daily temperature range falls from 5.01 °C to 4.43 °C,
-an **11.6% compression**. This one has no exact fix — four samples a day of a once-a-day cycle is at
-the Nyquist limit — but linear is the worst reasonable choice, and a shape-preserving cubic or a
-diurnal-harmonic fit recovers part of the amplitude. It feeds the effective-temperature, degree-day
-and `windchill` features. Treat it as a bounded experiment rather than a correctness fix, and expect
-a smaller win than (a) or (b).
+**(c) Instantaneous variables lose diurnal amplitude beyond day 6**, because the ~15:00 temperature
+maximum falls between the 12:00 and 18:00 samples: the mean daily temperature range falls from
+6.09 °C to 5.37 °C, an **11.9% compression**. This one has no exact fix, since the asymmetric
+afternoon peak needs the second harmonic and four samples a day is at the Nyquist limit for it. A
+shape-preserving cubic or a diurnal-harmonic fit should recover part of the amplitude; how much has
+not been measured. It feeds the effective-temperature, degree-day and `windchill` features. Treat it
+as a bounded experiment rather than a correctness fix, and expect a smaller win than (a) or (b).
 
-Note what needs *no* fix: `pressure_surface`, `pressure_reduced_to_mean_sea_level` and
-`geopotential_height_500hpa` lose almost nothing at 6-hourly spacing (MAE/SD 0.02–0.09). They are
-synoptic-scale and slowly varying, and there is no reason to spend effort on them.
+The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mean_sea_level` and
+`geopotential_height_500hpa` lose almost nothing at 6-hourly spacing (MAE/SD 0.02–0.09).
 
 ### Store wind as u/v components rather than speed and direction
 
 The ingest computes speed and direction from ECMWF's native `u`/`v` components and discards the
-components. That conversion destroys nothing — the round trip is exact — but it hands every
-downstream stage a wrapped angle, which is the root of defect (a) above and of the three later items
-named at the top of this section. Storing the components instead makes the whole class of defect
+components. That conversion loses no information — the round trip costs at most 6.8 × 10⁻³ ° of
+direction once the components are rounded the way the table rounds everything else — but it hands
+every downstream stage a wrapped angle, which is the root of defect (a) above and of the three later
+items named at the top of this section. Storing the components instead makes the whole class of defect
 structurally impossible rather than individually patched, which is the
-[principle 15](../design-philosophy/design-principles.md#15-a-transform-belongs-in-feature-engineering-unless-a-measurement-puts-it-in-the-ingest)
+[principle 15](../design-philosophy/design-principles.md#15-transform-data-in-feature-engineering-not-in-the-ingest-unless-it-saves-a-lot-of-storage)
 argument in its original form.
 
 It costs storage rather than saving it. Measured through the production write path on two full runs,
-storing components rather than the polar pair is **+5.7% to +6.3% of the whole `nwp` table** —
-counter-intuitive, because direction is the most expensive column in the table, but the significand
-rounding collapses the polar values into repeats that Parquet's dictionary encoding captures better
-than it captures `u`/`v`. The numbers, and why the intuition fails, are on
+storing components rather than the polar pair is **+5.7% to +6.3% of the whole `nwp` table**. That
+is so even though direction, averaged over the archive, is the most expensive weather column we
+store, because the significand rounding collapses the polar values into repeats that Parquet's
+dictionary encoding captures better than it captures `u`/`v`. The numbers are on
 [NWP variable conventions](../architecture/nwp-variable-conventions.md#wind-is-stored-as-speed-and-direction-and-why).
 
 Two consequences to plan for. Wind speed becomes a **derived feature** — `sqrt(u² + v²)` computed at
@@ -175,6 +184,15 @@ requires re-ingesting, and it costs a third wind column per height. The preferen
 and `v` only and derive speed on the fly, so this needs the gap measured before it is accepted or
 rejected rather than assumed small.
 
+**If this item is rejected, the resample item grows back its wind arm.** The sequencing below
+assumes the components land, which removes the wrapped angle from the table entirely. Should the
+storage experiment come out against them, the resample has to convert to components and back
+internally instead, and defect (a) returns to
+[#526](https://github.com/openclimatefix/nged-substation-forecast/issues/526)'s scope. The
+[feature-representation experiment](#raw-uv-components-as-features-instead-of-speed-and-direction)
+also keeps arms that need a direction column, which after this change is derived rather than
+stored.
+
 ### How each fix is measured
 
 **Implementing these first does not mean scoring them first.** They are correctness fixes, so they
@@ -182,8 +200,7 @@ go in ahead of everything else regardless of what can yet be measured — but th
 need the [baselines](metrics-and-leaderboard.md#baseline-forecasters) and
 [horizon-sliced metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics) that the
 rest of this page waits on, and defects (b) and (c) are invisible in an aggregate that is not sliced
-by horizon. Expect to land the
-fixes, then score them once that machinery exists. Nothing is lost by that order, because there is
+by horizon. Expect to land the fixes, then score them once that machinery exists. Nothing is lost by that order, because there is
 no champion whose skill the fixes could be quietly degrading in the meantime.
 
 **Establish the reference** by re-running today's pipeline unchanged. These fixes change the
