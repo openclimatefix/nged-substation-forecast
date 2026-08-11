@@ -14,8 +14,8 @@
 > two v2-scale mixture models are later research. The post-v2.0 roadmap is
 > not yet fully specified, so read those two as "some time after v2.0". See the
 > [roadmap index](index.md) for status conventions and where this fits the overall plan. This is the
-> **canonical** treatment of switching events — it supersedes an earlier "switching state-space
-> model" sketch (see the retirement note in
+> **canonical** treatment of switching events; the "switching state-space model" formulation is
+> rejected in its favour (see the note in
 > [Net-demand disaggregation](disaggregation.md#handling-abnormal-running-arrangements)).
 
 ---
@@ -1196,7 +1196,7 @@ PyTorch, is in the mixture-model tooling note above.
 **Prior structure.**
 
 1. **Coupled switching, separate composition.** A reconfiguration is one electrical action — the types do not switch at unrelated times. Introduce one latent **switching indicator per ordered pair**, $s_{ij}(t) \in \{0, 1\}$, piecewise-constant and sparse, governing *whether* the i→j boundary is active; the **type composition** (what fraction of demand/PV/wind rides along) applies only when $s_{ij}(t) = 1$. Types switch *together*; the moved slice can still be disproportionately one type.
-2. **Per-pair composition prior — DOWNGRADED.** An earlier design proposed a *learnable per-boundary* prior $\theta_{ij}$ ("the i→j boundary is usually 90% PV"), treating it as a stable feeder fingerprint. **This is downgraded to at most a weak, shared empirical prior, or dropped entirely.** Reason: movable cut points mean a boundary has *no stable composition* — what crosses depends on where the switch was opened this time — and $\theta_{ij}$ could not be fitted at scale anyway, since that requires labels we won't have. Do **not** rely on per-boundary learned composition.
+2. **Per-pair composition prior — DOWNGRADED.** The tempting design here is a *learnable per-boundary* prior $\theta_{ij}$ ("the i→j boundary is usually 90% PV"), treating it as a stable feeder fingerprint. **Use at most a weak, shared empirical prior, or drop it entirely.** Reason: movable cut points mean a boundary has *no stable composition* — what crosses depends on where the switch was opened this time — and $\theta_{ij}$ could not be fitted at scale anyway, since that requires labels we won't have. Do **not** rely on per-boundary learned composition.
 3. **Multi-donor (one-to-many).** As in the mixture model, several $s_{ij}(t)$ may be active for one source at once; conservation is node-level flow balance across the donor set, not pairwise.
 
 **What it adds over the mixture model.**
@@ -1220,7 +1220,7 @@ PyTorch, is in the mixture-model tooling note above.
 
 ## Considered but rejected: the feeder-block model
 
-An earlier plan included a further stage that modelled the **actual switchable physical units (feeders / load blocks)** explicitly — decomposing each substation into discrete blocks, each routed as a unit. **This stage is retired**, for two independent and decisive reasons:
+The obvious further stage models the **actual switchable physical units (feeders / load blocks)** explicitly — decomposing each substation into discrete blocks, each routed as a unit. **That stage is rejected, and is not on the plan**, for two independent and decisive reasons:
 
 1. **The unit does not exist.** NGED have been explicit that the network is meshed and run radially with movable cut points; load is a near-continuous distribution splittable almost anywhere. There is no stable, re-identifiable feeder with a persistent identity or composition to discover and route. The model would be trying to recover units that do not persist.
 2. **It lives in the unlabelled regime.** This stage is precisely what would run at full scale (~1,161 primary substations), where **no switching labels exist.** Any block model that needed supervision to identify blocks is doomed there twice over.
