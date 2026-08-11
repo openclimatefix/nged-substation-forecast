@@ -299,16 +299,18 @@ installed `settings.py` to the nearest ancestor directory holding `uv.lock` (the
 exists only at the uv workspace root), falling back to the current working directory when no
 ancestor qualifies.
 
-We resolve via a marker rather than a hard-coded directory depth (the previous
-`Path(__file__).parents[4]`) because the depth only held for an editable install. Under the
-production image's `uv sync --no-editable`, the installed file sits at
-`<venv>/lib/python3.14/site-packages/contracts/settings.py`, where the same depth silently
-resolved to the venv root and every default broke with `FileNotFoundError`
-([#287](https://github.com/openclimatefix/nged-substation-forecast/issues/287)). The marker
-walk handles both layouts: a dev checkout resolves to the repo root, and the production image
-resolves to `/app` because the Dockerfile copies `uv.lock` there alongside `conf/` and
-`metadata/` — so the image needs no per-path env-var overrides, and `conf/model/` stays
-available for running training jobs in-container.
+We resolve via a marker rather than a hard-coded directory depth because `settings.py` sits at a
+different depth in each of the two layouts we deploy. An editable dev install has it at
+`packages/contracts/src/contracts/settings.py` below the repo root; the production image's `uv
+sync --no-editable` installs it at `<venv>/lib/python3.14/site-packages/contracts/settings.py`
+instead. Any fixed number of `Path.parents` hops that lands on the repo root in one layout lands
+somewhere arbitrary in the other — the venv root, in the image's case — and every repo-relative
+default then fails with `FileNotFoundError`
+([#287](https://github.com/openclimatefix/nged-substation-forecast/issues/287)). The marker walk
+handles both layouts: a dev checkout resolves to the repo root, and the production image resolves
+to `/app` because the Dockerfile copies `uv.lock` there alongside `conf/` and `metadata/` — so the
+image needs no per-path env-var overrides, and `conf/model/` stays available for running training
+jobs in-container.
 
 The fallback case — a wheel installed into a venv outside any workspace checkout — is a
 deployment shape we don't currently have. If one appears, it must either run with its working
