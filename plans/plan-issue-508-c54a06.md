@@ -34,7 +34,7 @@ There are **three** raisers on that code path, not one, and Delta only removes o
 
 Raiser 3 is live today rather than hypothetical. Four `TimeSeriesMetadata` fields are
 `allow_missing=True` (`information`, `area_wkt`, `area_center_lat`, `area_center_lon` —
-`packages/contracts/src/contracts/power_schemas.py:245-279`), so a narrower frame validates cleanly
+`packages/contracts/src/contracts/power_schemas.py:247-283`), so a narrower frame validates cleanly
 and then `pl.concat` raises `ShapeError: unable to append to a DataFrame of width 14 with a
 DataFrame of width 12`; with the same columns reordered it raises `unable to vstack, column names
 don't match`. It is reachable because `_extract_time_series_metadata` derives its columns from each
@@ -50,7 +50,7 @@ contract boundary and our merge, not the file format. What the conversion buys i
 ### An unusable roster also breaks `live_forecasts` — out of scope
 
 `_load_engineering_inputs` reads the roster unguarded
-(`src/nged_substation_forecast/defs/cv_assets.py:322`), so an unusable roster takes the forecast off
+(`src/nged_substation_forecast/defs/cv_assets.py:324`), so an unusable roster takes the forecast off
 the degradation ladder entirely — not even rung 4. Fixing that means separating the production caller
 from the fail-fast CV caller, which is a different change. **Filed separately as [#528](https://github.com/openclimatefix/nged-substation-forecast/issues/528); see D4.**
 
@@ -96,17 +96,24 @@ The package already owns physical layout plus the write helpers that apply it
   `when_not_matched_insert_all()`, returning delta-rs' merge metrics. Everything about *how this
   table is written* lives here; the roster's *semantics* stay in `nged_data` (below).
 
-  Five verified facts belong in its docstring, because each is a trap:
+  Five verified facts have to be written down, because each is a trap. **Where they go is now
+  constrained by `main`'s "one home per argument" rule** (`docs/architecture/code-style.md`): a
+  sentence of "because" may sit in a docstring, but a paragraph of it belongs on a docs page with the
+  docstring linking to it. These five are paragraphs. So they go in a new subsection of
+  `docs/architecture/performance.md` — the page that already exists to record *why* each table is
+  written the way it is — and `merge_time_series_metadata`'s docstring states the guarantees and the
+  one-line prohibitions, linking to that subsection as a rendered URL. The five facts, wherever they
+  land:
 
     1. **Every `pl.Enum` column must be cast to `pl.String` before any write.**
        `TimeSeriesMetadata` has four (`time_series_type`, `units`, `licence_area`,
-       `substation_type` — `power_schemas.py:187,195,202,217`), and handing a validated,
+       `substation_type` — `power_schemas.py:188,196,203,218`), and handing a validated,
        Enum-typed roster to `write_delta` aborts a rust worker: `DeltaError: Generic DeltaTable
        error: writer join error: task 28 panicked with message "internal error: entered
        unreachable code: cannot downcast Utf8View dictionary value to byte array"` (reproduced).
        This is the write-path gotcha the `polars-patito-gotchas` skill documents at
        `SKILL.md:100-121`, and `_write_metrics_to_delta` already carries the fix
-       (`cv_assets.py:748-749`) — `enum_cols = [c for c, d in df.schema.items() if isinstance(d,
+       (`cv_assets.py:750`) — `enum_cols = [c for c, d in df.schema.items() if isinstance(d,
        pl.Enum)]`, then cast each to `pl.String`. It must be applied on **all three** write paths
        here (create, rebuild-overwrite, and the merge source), and doing it inside this module is
        what stops every caller having to remember. Delta stores these as `String`, so reads must
@@ -147,10 +154,10 @@ The package already owns physical layout plus the write helpers that apply it
   pull. And `MERGE` **destroys row order** and offers no way to restore it: measured on a table
   stored as ids 1…10 with rows 3 and 7 changed, the stored order afterwards is
   `[3, 7, 1, 2, 4, 5, 6, 8, 9, 10]` — updated rows are rewritten first, copied rows follow. Today
-  `upsert_metadata` sorts by `time_series_id` on every write (`storage.py:434`), so this is a real
+  `upsert_metadata` sorts by `time_series_id` on every write (`storage.py:433`), so this is a real
   behaviour change and not merely a storage swap. It is safe: `TimeSeriesMetadata` declares no
   `columns_to_sort_by` and `validate` has no sortedness check (unlike `PowerTimeSeries.validate`
-  at `power_schemas.py:82-92`), and the dashboards sort for themselves
+  at `power_schemas.py:83-92`), and the dashboards sort for themselves
   (`packages/dashboard/view_forecasts.py:73`). Both module docstrings should say the table is
   unordered on disk so nobody later "fixes" it with a sort that a merge would immediately undo.
 
@@ -164,7 +171,7 @@ The package already owns physical layout plus the write helpers that apply it
 
 - **`power_schemas.py`** — add `TimeSeriesMetadata.scan_delta(path, storage_options) ->
   pt.LazyFrame[Self]`, mirroring [`Nwp.scan_delta`](../packages/contracts/src/contracts/weather_schemas.py)
-  (`weather_schemas.py:461`) so every roster reader gets a typed, cast scan from one place.
+  (`weather_schemas.py:442`) so every roster reader gets a typed, cast scan from one place.
 - **`geo_schemas.py`** — the same for `H3GridWeights`.
 - **The `.cast()` in those classmethods is load-bearing, not decorative**, and this is the reason
   the classmethods exist rather than each caller writing `pl.read_delta`. Delta stores the roster's
@@ -176,8 +183,8 @@ The package already owns physical layout plus the write helpers that apply it
   dtypes: that guidance only pushes a column to `String` when it is *filtered or partitioned* on in
   Delta, which none of these are, so casting on read costs nothing and keeps the in-memory contract
   expressive.
-- **`settings.py`** — the derived defaults become `metadata.delta` (`settings.py:394`) and
-  `h3_grid_weights.delta` (`settings.py:378`), matching `power_time_series.delta`. The field *names*
+- **`settings.py`** — the derived defaults become `metadata.delta` (`settings.py:395`) and
+  `h3_grid_weights.delta` (`settings.py:379`), matching `power_time_series.delta`. The field *names*
   (`metadata_path`, `h3_grid_weights_path`) do not change — they are format-agnostic already.
 - **`_uri.py` gains nothing.** This is the point of the conversion: no `write_parquet_atomically`, no
   `copy_object`, no bespoke IO helpers. `object_exists` gives way to the existing
@@ -259,7 +266,7 @@ layout. `packages/nged_data/pyproject.toml` gains a `delta_store` dependency, ex
 
 - **`power_time_series_and_metadata`** — the `upsert_metadata` call (line 125) goes under a
   `try`/`except BaseException` that re-raises `KeyboardInterrupt | SystemExit |
-  DagsterExecutionInterruptedError` (the `checks.py:318-337` idiom, and the same reasoning: a pyo3
+  DagsterExecutionInterruptedError` (the `checks.py:347-361` idiom, and the same reasoning: a pyo3
   `PanicException` from polars/delta-rs/obstore does not derive from `Exception`, and each compiled
   extension defines its own class). The handler logs the traceback, calls
   `report_asset_degradation("power_time_series_and_metadata", exc)`, and substitutes
@@ -295,7 +302,7 @@ layout. `packages/nged_data/pyproject.toml` gains a `delta_store` dependency, ex
   failure must reach Sentry rather than only the logs.
 - **On the rebuild path, though, "lost until NGED republishes" understates it: for a series that has
   stopped publishing, the loss is permanent.** `select_new_rows` keeps only rows whose time exceeds
-  the stored `last_time` per series (`storage.py:339-347`), so files already represented in the power
+  the stored `last_time` per series (`storage.py:343`), so files already represented in the power
   table are never parsed again. If the roster is rebuilt thin *and* the repair pass fails (test 15
   pins that as an acceptable outcome), a quiet series' metadata row does not come back on its own —
   ever. Nothing re-reads its file, and the repair only runs in the same run as the rebuild. So the
@@ -314,10 +321,10 @@ because three of them build an *eager* `pt.DataFrame` today and `scan_delta` ret
 `pt.LazyFrame` — each needs a `.collect()` and a re-wrap, and two of them get their dtypes fixed as a
 side effect rather than by accident:
 
-- `src/nged_substation_forecast/defs/checks.py:216-223` — `_read_roster_ids`: `object_exists` →
+- `src/nged_substation_forecast/defs/checks.py:234-243` — `_read_roster_ids`: `object_exists` →
   `delta_table_exists`, `scan_parquet` → `TimeSeriesMetadata.scan_delta`. Still inside the check's
   catch-all, so it cannot raise into the run.
-- `src/nged_substation_forecast/defs/cv_assets.py:322` (`_load_engineering_inputs`) and `:998`
+- `src/nged_substation_forecast/defs/cv_assets.py:324` (`_load_engineering_inputs`) and `:1000`
   (`forecast_metrics`) — both eager.
 - `src/nged_substation_forecast/defs/assets.py:258-262` (`ecmwf_ens`, listed above) deserves its own
   mention: it does `set_model(H3GridWeights)` with **no `.cast()`** today, which is harmless against
@@ -376,8 +383,8 @@ table, and worth stating as the recommended one.
 **The test suite migrates too, and it is most of the mechanical work.** Five helpers write the roster
 as parquet, all needing the same treatment, and none were in the earlier draft's list:
 
-- `tests/test_checks.py:162` `_write_metadata_roster` (`write_parquet` at `:179`), called at `:197`,
-  `:226`, `:285`, plus the corrupt-roster test at `:330`
+- `tests/test_checks.py:216` `_write_metadata_roster` (`write_parquet` at `:233`), called at `:251`,
+  `:282`, `:343`, plus the corrupt-roster test at `:388`
 - `tests/test_live_forecasts.py:119` `_write_metadata`, called at `:166`
 - `tests/test_cv_power_forecasts.py:94` `_write_metadata`, called at `:132`
 - `tests/test_metrics.py:133` `_write_metadata`, called at `:196`
@@ -398,7 +405,7 @@ This path is **production** — the hourly `power_time_series_and_metadata_job`,
 
 - **Principle 10** ("every write is atomic and idempotent",
   `docs/design-philosophy/design-principles.md:387`) is the one this change *delivers*. Its *Decided*
-  paragraph (`design-principles.md:410-419`) credits Delta Lake for atomicity; the roster and the
+  paragraph (`design-principles.md:410-416`) credits Delta Lake for atomicity; the roster and the
   weights were the two live exceptions, and after this change there are none.
 - **Rule 1** (never raise because an input is absent or stale): the ingest keeps running and records
   the degradation instead of stopping.
@@ -520,7 +527,7 @@ than regressions):
 16. `test_h3_grid_weights_materialises_and_writes_a_delta_table` — the existing
     `test_h3_grid_weights_materialises_and_writes_parquet` (`:236`) converted, asserting
     `delta_table_exists` and the row count. Its six sibling `_write_h3_grid_weights` fixture calls
-    (`:275`–`:496`) move to the Delta writer.
+    (`:275`–`:502`) move to the Delta writer.
 
 `tests/test_sentry.py`:
 
@@ -531,24 +538,24 @@ than regressions):
 
 `tests/test_checks.py`:
 
-18. `test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet` (`:330`) — rename, and rewrite
+18. `test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet` (`:388`) — rename, and rewrite
     both the corruption it sets up and its docstring, which currently states that "`upsert_metadata`
-    reads the same file first and fails the asset outright" (`:337-338`) — no longer true.
+    reads the same file first and fails the asset outright" (`:395`) — no longer true.
     **Specify the replacement corruption, because two obvious candidates do not work.** Junk bytes at
-    the path (today's setup, `:344`) now make `delta_table_exists` raise `OSError` walking a file as a
+    the path (today's setup, `:402`) now make `delta_table_exists` raise `OSError` walking a file as a
     directory — still caught by the check's catch-all, so the test would pass, but it would be
     asserting on a filesystem-shape error rather than on a corrupt roster, which is not the state the
     docstring describes. And a merely *off-contract* Delta table does not degrade this check at all:
-    `_read_roster_ids` (`checks.py:212-223`) only does `.select("time_series_id")` and never validates.
+    `_read_roster_ids` (`checks.py:234-243`) only does `.select("time_series_id")` and never validates.
     The state that genuinely reproduces it is **a Delta table with a corrupt `_delta_log`** — truncate
     `_delta_log/00000000000000000000.json` — where `delta_table_exists` returns `True` and the scan
     raises. That is also the D2 fault, so the test doubles as the check's half of it.
 
 `packages/contracts/tests/test_settings.py`:
 
-19. `:48` asserts `settings.metadata_path == "/srv/data/NGED/metadata.parquet"` and `:49` the same for
-    `h3_grid_weights_path` — **both** need updating; an earlier draft cited only `:49`. The set at
-    `:82` needs **no** change: it is a set of *field names*
+19. `:49` asserts `settings.metadata_path == "/srv/data/NGED/metadata.parquet"` and `:49` the same for
+    `h3_grid_weights_path` — **both** need updating; an earlier draft cited only one of them. The set at
+    `:84` needs **no** change: it is a set of *field names*
     (`{"metadata_path", "h3_grid_weights_path"}`) used to decide which paths derive from the internal
     versus delivery root, not a set of path suffixes, and this plan deliberately keeps those field
     names.
@@ -557,10 +564,10 @@ than regressions):
 
 Written to describe how the code works now, per CLAUDE.md's "write about the present".
 
-- **`CLAUDE.md:194`** — the asset "upserts metadata parquet" becomes a Delta upsert. Check the
-  package table at `:179` still reads correctly for `delta_store` (it will, but it now owns four
+- **`CLAUDE.md:219`** — the asset "upserts metadata parquet" becomes a Delta upsert. Check the
+  package table at `:204` still reads correctly for `delta_store` (it will, but it now owns four
   tables).
-- **`docs/design-philosophy/design-principles.md:410-419`** — principle 10's *Decided* paragraph:
+- **`docs/design-philosophy/design-principles.md:410-416`** — principle 10's *Decided* paragraph:
   every managed table is now Delta, so the property holds project-wide with no exception.
 - **`docs/design-philosophy/inherent-stability.md`** — a sentence in "Missing versus wrong" giving
   the roster as the second worked example of rule 3, and a new **rule 12**: *a derived artifact we
@@ -569,15 +576,15 @@ Written to describe how the code works now, per CLAUDE.md's "write about the pre
   now delivered by the store, so rule 12 carries only the part rules 1–11 do not imply and needs no
   "restates a principle" marking.
 - **`docs/architecture/production-deployment.md`** — three places: the "half-written
-  `metadata.parquet`" example at `:86` (a state that no longer exists), the Sentry section at
-  `:174-179` whose "the only fault the hook cannot see is a standalone `@asset_check` … which, by
+  `metadata.parquet`" example at `:91` (a state that no longer exists), the Sentry section at
+  `:179` whose "the only fault the hook cannot see is a standalone `@asset_check` … which, by
   design, is both of them" is falsified by an *asset* now catching its own exception (and by the new
   `degraded_asset` tag), and a short new subsection for the roster's policy: a Delta table, merged
   rather than rewritten, rebuilt in place if it fails our contract, with the power write no longer
   coupled to any of it.
-- **`src/nged_substation_forecast/defs/checks.py:311-313`** — `power_data_is_fresh`'s own docstring
+- **`src/nged_substation_forecast/defs/checks.py:340-341`** — `power_data_is_fresh`'s own docstring
   repeats the "half-written `metadata.parquet`" example; fix it with the other two.
-- **`docs/live_service/operations.md`** — the same phrase at `:171`, plus a new operator paragraph:
+- **`docs/live_service/operations.md`** — the same phrase at `:182`, plus a new operator paragraph:
   what `metadata_roster_rebuilt_reason` / `metadata_upsert_failed` mean, the
   `degraded_asset:power_time_series_and_metadata` Sentry filter, how to read the pre-rebuild roster
   back with time travel, the manual step for a corrupt `_delta_log` (D2), and the two migration
@@ -595,14 +602,34 @@ Written to describe how the code works now, per CLAUDE.md's "write about the pre
   measure. Saying that explicitly is what stops the page implying the omission was an oversight.
 - **`packages/contracts/src/contracts/settings.py:278`** — the `nged_data_path` docstring says
   "Directory holding the NGED power_time_series Delta table and metadata parquet."
-- **`docs/architecture/production-deployment.md:76`** — "a roster series (present in the
+- **`docs/architecture/production-deployment.md:75`** — "a roster series (present in the
   `TimeSeriesMetadata` parquet)". A fourth spot in the same file, on top of the three above.
-- **`docs/architecture/ecmwf-ens-known-issues.md:261`** — "the `h3_grid_weights` parquet it has
+- **`docs/architecture/ecmwf-ens-known-issues.md:269`** — "the `h3_grid_weights` parquet it has
   already loaded".
 - **`packages/contracts/README.md`** — if it lists the schemas' helpers, the two new `scan_delta`
   classmethods belong there.
 - No roadmap page completes here, so there is no "Implementation details" section to delete and no
   status banner to move. `#508` is referenced from no `docs/` page.
+
+## House rules `main` added after this plan was written
+
+`main` moved 30 commits while this plan sat on the branch, and two of the rules it landed change what
+the implementation must do — not just where the line numbers point:
+
+- **A docs link in code is spelled as its rendered URL, never a repo path**
+  (`docs/architecture/code-style.md`). Every docstring and `#` comment this change adds must follow it,
+  and `storage.py`'s own doc link was converted on `main` for the same reason.
+- **"One home per argument"** — rationale worth a paragraph lives on one docs page, and the docstring
+  links to it. This plan was written with five paragraph-length traps in a module docstring, which the
+  rule forbids; they move to `docs/architecture/performance.md`, as noted above. The rule cuts both
+  ways, and the second half matters here too: rationale worth a paragraph must not live *only* in a
+  docstring, where nobody browsing the docs will find it.
+- **The prose rules in `CLAUDE.md`** (concrete and skim-readable; concise by cutting whole sentences
+  rather than clipping words; full sentences with subjects; present tense only) now apply to all
+  fourteen documentation edits and to the PR body. Note the last one especially: several of the
+  passages this change rewrites are exactly the "what it used to do" shape the rule bans.
+- **Never hard-wrap a GitHub issue or PR body.** Relevant because the migration commands and the
+  stats-key explanation go in the PR body.
 
 ## Verification commands
 
@@ -660,11 +687,11 @@ schema mismatch — self-heal in place with the old version retained by the log.
 the cheap recovery, report if it does not take", not by inspecting exception types.
 
 **D3 — Keep the roster-repair pass.** A thin roster is not benignly lossy.
-`_load_engineering_inputs` derives the NWP cell filter from the roster (`cv_assets.py:328`, feeding
-`h3_index.is_in(cells)` at `:336-342`) while the population comes from the promoted model's
+`_load_engineering_inputs` derives the NWP cell filter from the roster (`cv_assets.py:330`, feeding
+`h3_index.is_in(cells)` at `:338-344`) while the population comes from the promoted model's
 `trained_ids` (`production_assets.py:238`), and `live_forecasts` raises outright on an empty result
 (`production_assets.py:285-290`) — so a thin roster costs, at best, forecasts for the missing series
-and, at worst, the whole slot. `forecast_metrics` (`cv_assets.py:997-1000`) and `cv_power_forecasts`
+and, at worst, the whole slot. `forecast_metrics` (`cv_assets.py:1000`) and `cv_power_forecasts`
 read the roster too, where thinning would silently shrink a training or scoring population, the
 opposite of the fail-fast posture R&D is meant to have. The pass is ~5 lines over existing functions,
 guarded so it cannot make things worse, and it turns "degrade and wait ~5 h" into an actual repair.
@@ -751,21 +778,21 @@ findings that still apply are folded in above; recorded here so nothing is silen
    of it.
 2. **The freshness-check consequence was backwards**, inherited from the issue body and destined for
    the operator runbook: `stale` is computed from coverage and deliberately *not* restricted to the
-   roster (`checks.py:167-173`), so a dropped id keeps being flagged stale. What a thin roster really
-   does is stop never-seen ids being reported at all (`checks.py:180-183`) and shrink
-   `n_series_total` (`:198-201`).
+   roster (`checks.py:196-204`), so a dropped id keeps being flagged stale. What a thin roster really
+   does is stop never-seen ids being reported at all (`checks.py:205-208`) and shrink
+   `n_series_total` (`:221-226`).
 3. **A thin roster can fail `live_forecasts` outright**, not merely thin it — now D3, and the reason
    the repair pass exists.
-4. **Rule 12 restated principle 10**, which `inherent-stability.md:155-159` requires to be marked and
+4. **Rule 12 restated principle 10**, which `inherent-stability.md:153-159` requires to be marked and
    paired. Resolved differently here: rule 12 now drops the atomicity clause entirely, because the
    store delivers it.
 5. **A fixed `.tmp` suffix was unsafe for two writers** (nothing serialises this asset: no `pool=`,
    and `default_limit: 1` governs pooled ops only). Moot now — delta-rs commits via conditional put
    on S3 and an atomic rename locally, so concurrency safety comes from the store.
-6. **Docstrings and pages the change falsifies** — `_sentry.py:98-99`, `production-deployment.md:174-179`,
-   `checks.py:311-313`, and `_uri.py:7-11`. The first three are in the docs list above; the `_uri.py`
+6. **Docstrings and pages the change falsifies** — `_sentry.py:98-99`, `production-deployment.md:179`,
+   `checks.py:340-341`, and `_uri.py:7-11`. The first three are in the docs list above; the `_uri.py`
    one is moot, since the conversion adds nothing to that module.
-7. **The R&D readers of the roster** (`cv_assets.py:997-1000`, `cv_power_forecasts`) were missing from
+7. **The R&D readers of the roster** (`cv_assets.py:1000`, `cv_power_forecasts`) were missing from
    the impact list. Folded into D3.
 8. **Line-reference drift** — `validate(existing_metadata)` is at 408, not 407. Corrected.
 9. **`os.replace` changes the inode**, so a symlinked roster path would be replaced by a plain file.
@@ -793,7 +820,7 @@ The findings that changed the design rather than the prose:
 
 1. **`write_delta` cannot store the roster at all.** `TimeSeriesMetadata` has four `pl.Enum` columns,
    and delta-rs aborts a rust worker on them. Blocking, and the plan had no mention of it despite the
-   repo already carrying both the workaround (`cv_assets.py:748-749`) and a skill documenting the trap.
+   repo already carrying both the workaround (`cv_assets.py:750`) and a skill documenting the trap.
    Now fact 1 of `metadata.py`'s docstring, and the reason test 4 must use a fully-typed roster:
    `MERGE` tolerates an Enum source, so a suite that only merges would have passed while the create
    path panicked in production. Reproduced independently.
