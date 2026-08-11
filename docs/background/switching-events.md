@@ -12,7 +12,7 @@ _clear_ example of a switching events - most events are buried in much more nois
 
 NGED's 11 kV / 6.6 kV high-voltage (HV) distribution network is **physically meshed**: there are many parallel electrical paths between substations. However, it is **operated radially** — at any given moment, a set of switches is held *open* to break the parallel paths, so that power flows in a tree (each load fed from exactly one source, no loops). The radial tree you observe at any instant is just *one configuration* of an underlying mesh.
 
-This matters enormously, and it is the crux of everything below:
+This matters enormously, and the bullets below all follow from it:
 
 - **Almost any switch can be opened or closed.** The network can be reconfigured into an enormous number of valid radial trees by choosing which switches are open. The configuration is not fixed.
 - **There is no stable, re-identifiable "feeder."** Intuitively one might imagine a substation's load is divided into a handful of fixed "feeders," each a chunk that moves as a unit. NGED have been explicit that this is *not* how it works: because a switch can be opened essentially anywhere along a meshed path, the cut points themselves move. There is no persistent sub-unit with a stable identity or a stable composition.
@@ -101,4 +101,4 @@ NGED's stated requirement is to forecast each substation **as if it were always 
 
 ## Why power alone — there is no voltage to lean on
 
-Classical topology- and switch-state identification leans almost entirely on **voltage** measurements. We cannot. NGED does not meter voltage at primary-substation level, and even where it might, two facts defeat the approach: transformer **tap-changes** move voltage independently of load, and our **half-hourly** sampling blurs the sub-second transients that voltage-based methods rely on. So switching must be inferred from **real-power balance alone** — the conservation fingerprint at the heart of the [staged approaches](../roadmap/switching-events.md). Far from a regrettable data gap, this is a deliberate design stance: a method that works from power alone is the only method that can run at scale, where neither voltage nor switching labels exist.
+Classical topology- and switch-state identification leans almost entirely on **voltage** measurements. We cannot. NGED does not meter voltage at primary-substation level, and even where it might, two facts defeat the approach: transformer **tap-changes** move voltage independently of load, and our **half-hourly** sampling blurs the sub-second transients that voltage-based methods rely on. So switching must be inferred from **real-power balance alone** — the conservation fingerprint that the [staged approaches](../roadmap/switching-events.md) are built on. Far from a regrettable data gap, this is a deliberate design stance: a method that works from power alone is the only method that can run at scale, where neither voltage nor switching labels exist.

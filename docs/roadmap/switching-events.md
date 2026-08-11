@@ -345,13 +345,13 @@ predicting the delta is fine and arguably more transparent. That equivalence is 
 squared error — it holds for *any* identity-link loss that is a function of the residual alone,
 including the pinball/quantile objective this project wants, because pinball loss is
 translation-invariant (`ρ_τ(actual − draft − correction) = ρ_τ((actual − draft) − correction)`): same
-gradients, same trees, and an identical early-stopping metric either way. The margin earns its keep
-once the *link* is not the identity — a Poisson/Tweedie link (natural for a non-negative quantity),
-where the margin lives in log-space so the correction becomes *multiplicative*, the loss is no longer
-a function of `actual − prediction`, and the output cannot go negative. There the delta trick has no
-clean analogue and the margin is doing real work. The operational footgun is that the margin must be
-passed at *both* train and predict time; forgetting it at inference silently falls back to the
-default base score.
+gradients, same trees, and an identical early-stopping metric either way. The margin is only worth
+its cost once the *link* is not the identity — a Poisson/Tweedie link (natural for a non-negative
+quantity), where the margin lives in log-space so the correction becomes *multiplicative*, the
+loss is no longer a function of `actual − prediction`, and the output cannot go negative. There the
+delta trick has no clean analogue and the margin is doing real work. The operational footgun is
+that the margin must be passed at *both* train and predict time; forgetting it at inference
+silently falls back to the default base score.
 
 **Costs of the hard corrector, and the hedge.** Because stage 2 starts from the draft, any stage-1
 *bias at the target time* flows straight into the output unless stage 2 can see the raw inputs

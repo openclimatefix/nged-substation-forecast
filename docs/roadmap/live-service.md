@@ -116,7 +116,7 @@ The Level 1 ("nothing always-on") design proposed in issue #206 is rejected: its
 not hold, and there are two requirements it cannot serve. The cost case rests on pricing the
 always-on control plane at ~£70–105/month, which is a 16 GB box big enough to run the
 *compute*; a small control-plane box costs ~£10–20/month (costed 2026-07-02). Its RDS
-prerequisite dissolves on a single machine too (Postgres-in-Docker, or SQLite on a real local
+prerequisite goes away on a single machine too (Postgres-in-Docker, or SQLite on a real local
 filesystem). The two requirements Level 1 does not serve:
 
 1. **Use Dagster "properly"** — persistent run history, one-click UI backfills of missed

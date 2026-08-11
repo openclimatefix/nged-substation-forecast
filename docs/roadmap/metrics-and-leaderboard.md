@@ -57,11 +57,10 @@ view are in the background page): for each target half-hour it takes the observe
 **same weekday & time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13
 analogues** — which NGED plot and read by eye (taking the 95th percentile if they need a single
 number). Reproducing it matters because it is *the bar we have to clear to justify the project* —
-"XGBoost beats persistence" is table stakes; "XGBoost beats the incumbent" is the deliverable. It is
-the first baseline we implement; if we implement only one, it is this one.
+"XGBoost beats persistence" is the least we must do; "XGBoost beats the incumbent" is the
+deliverable. It is the first baseline we implement; if we implement only one, it is this one.
 
-It slots into our machinery beautifully, because every one of its 13 members is just a **power
-lag**:
+It fits our existing machinery, because every one of its 13 members is just a **power lag**:
 
 - Weekly group (last 6 weeks, same weekday & time): `power_lag_168h, 336h, 504h, 672h, 840h, 1008h`
 - Annual group (49–55 weeks ago, same weekday & time): `power_lag_8232h, 8400h, 8568h, 8736h,
@@ -495,7 +494,7 @@ is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
 #### Mean versus median — the trade-off
 
 The instinct is to "pick one central statistic and apply it everywhere". But mean and median are not
-interchangeable, and the reason is the crux of the decision:
+interchangeable, and the difference between them decides which one to use where:
 
 - The **mean** is the point forecast that minimises **squared error** — so RMSE (and MBE, which is
   a mean-of-errors and inherits the mean's clean energy-balance / expectations-aggregate reading)
