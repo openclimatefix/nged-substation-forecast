@@ -154,6 +154,8 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 | `weather_source` | `""` | Leaderboard tag, e.g. `"ecmwf_control"` or `"ecmwf_ens"`. |
 | `training_strategy` | `""` | Leaderboard tag, e.g. `"horizon_as_feature"`. |
 | `random_seed` | `0` | Passed to XGBoost's `seed` param; makes re-training a fold reproduce the same model. |
+| `experiment_name` | `""` | Set from the job's own `experiment_name`; cannot be overridden. |
+| `ml_flow_experiment_id` | `None` | Stamped onto every `PowerForecast` row. Nothing sets it automatically. |
 
 ### XGBoost-specific fields
 
@@ -174,10 +176,20 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 
 You never edit a YAML file per experiment. Instead, pass `config_overrides` to
 `register_experiment_job`. Each override is applied to `model_params` before the config object is
-constructed, so any `model_params` key can be overridden — except two, which are rejected rather
-than silently discarded. `_target_` names the config class itself: to use a different one, point
-`base_model_config` at a different YAML. `experiment_name` comes from the job's own
-`experiment_name` parameter.
+constructed.
+
+**Every key must name a field the config class declares** — the two tables above. Write
+`n_estimtors` instead of `n_estimators` and registration fails, before a single fold is scheduled,
+with a `ValidationError` naming the key. This matters more than a typo usually would, because the searches that drive most
+registrations are unattended: the LLM auto-research agent registers, materialises and reads the
+leaderboard with nobody in the loop, and the variant grid sweeps several dimensions at once. A key
+that was quietly dropped would give you a grid of *identical* runs, each scoring plausibly, each
+landing on the leaderboard, and nothing to distinguish that grid from a genuine null result. That
+is [principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically).
+
+Two further keys are refused for their own reasons. `_target_` names the config class itself: to
+use a different one, point `base_model_config` at a different YAML. `experiment_name` comes from
+the job's own `experiment_name` parameter, which would overwrite an override of it.
 
 **Example — reduce tree depth and add a feature:**
 

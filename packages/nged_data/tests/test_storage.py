@@ -244,6 +244,77 @@ def test_upsert_metadata_returns_diff(tmp_path: Path):
     )
 
 
+def _roster(ids: list[int], name: str = "ID", **extra: object) -> pt.DataFrame[TimeSeriesMetadata]:
+    """A valid roster covering ``ids``, plus any ``extra`` columns applied to every row."""
+    rows = [
+        {
+            "time_series_id": i,
+            "time_series_name": f"{name} {i}",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": i,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+            **extra,
+        }
+        for i in ids
+    ]
+    return pt.DataFrame(rows).set_model(TimeSeriesMetadata).cast().validate()
+
+
+def test_upsert_metadata_adds_a_new_id_when_the_stored_roster_is_thinner(tmp_path: Path):
+    """The diff is derived by slicing the concatenated frame, so it must split back into exactly the
+    snapshot's rows and the stored roster's rows. Getting that boundary wrong loses a whole time
+    series silently: it never enters the roster, the stats claim nothing was new, and
+    `select_new_rows` never re-offers the file, so it never arrives at all."""
+    metadata_path = tmp_path / "metadata.parquet"
+    _roster([1]).write_parquet(metadata_path)
+
+    stats = upsert_metadata(new_metadata=_roster([1, 2]), metadata_path=str(metadata_path))
+
+    assert stats["metadata_n_new_TimeSeriesIDs"] == 1
+    assert stats["metadata_n_updated_TimeSeriesIDs"] == 0
+    assert set(pl.read_parquet(metadata_path)["time_series_id"]) == {1, 2}
+
+
+def test_upsert_metadata_merges_a_snapshot_missing_the_optional_columns(tmp_path: Path):
+    """`TimeSeriesMetadata` has four `allow_missing` fields, so a snapshot can be narrower than the
+    stored roster and still validate. Merging the two must not raise, and a field the snapshot no
+    longer carries must be *cleared*, so the roster keeps meaning "the latest snapshot of what NGED
+    published"."""
+    metadata_path = tmp_path / "metadata.parquet"
+    _roster([1, 2], information="note").write_parquet(metadata_path)
+
+    # This run's snapshot covers id 2 only, and carries no `information` column at all.
+    snapshot = _roster([2], name="Renamed")
+    assert "information" not in snapshot.columns
+    upsert_metadata(new_metadata=snapshot, metadata_path=str(metadata_path))
+
+    final = pl.read_parquet(metadata_path)
+    assert final.filter(pl.col("time_series_id") == 2)["information"].item() is None
+    assert final.filter(pl.col("time_series_id") == 1)["information"].item() == "note"
+    assert final.filter(pl.col("time_series_id") == 2)["time_series_name"].item() == "Renamed 2"
+    TimeSeriesMetadata.validate(final)
+
+
+def test_upsert_metadata_ignores_the_stored_column_order(tmp_path: Path):
+    """`hash_rows` is column-order sensitive, so a stored roster whose columns happen to sit in a
+    different order must not be reported as wholly changed and rewritten every run."""
+    metadata_path = tmp_path / "metadata.parquet"
+    roster = _roster([1, 2])
+    roster.select(sorted(roster.columns)).write_parquet(metadata_path)
+    mtime_before = metadata_path.stat().st_mtime_ns
+
+    stats = upsert_metadata(new_metadata=roster, metadata_path=str(metadata_path))
+
+    assert stats["metadata_n_new_TimeSeriesIDs"] == 0
+    assert stats["metadata_n_updated_TimeSeriesIDs"] == 0
+    assert metadata_path.stat().st_mtime_ns == mtime_before  # not rewritten at all
+
+
 _EXAMPLE_OBJECT_KEY = (
     "timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json"
 )

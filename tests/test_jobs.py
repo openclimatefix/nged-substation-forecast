@@ -30,7 +30,9 @@ _BASE_CONFIG = "conf/model/xgboost.yaml"
 
 
 def test_resolve_applies_scalar_override() -> None:
-    forecaster_cls, config = _resolve_forecaster_config(_BASE_CONFIG, {"n_estimators": 7}, "exp")
+    forecaster_cls, config = _resolve_forecaster_config(
+        base_model_config=_BASE_CONFIG, config_overrides={"n_estimators": 7}, experiment_name="exp"
+    )
 
     assert forecaster_cls is XGBoostForecaster
     assert forecaster_cls.MODEL_NAME == "xgboost"
@@ -42,14 +44,18 @@ def test_resolve_applies_scalar_override() -> None:
 def test_resolve_replaces_list_override() -> None:
     """A list override swaps the whole list (merge replaces, not extends), then coerces to a set."""
     _, config = _resolve_forecaster_config(
-        _BASE_CONFIG, {"selected_features": ["power_lag_24h"]}, "exp"
+        base_model_config=_BASE_CONFIG,
+        config_overrides={"selected_features": ["power_lag_24h"]},
+        experiment_name="exp",
     )
 
     assert config.selected_features == {"power_lag_24h"}
 
 
 def test_resolve_no_overrides_uses_yaml_defaults() -> None:
-    _, config = _resolve_forecaster_config(_BASE_CONFIG, {}, "exp")
+    _, config = _resolve_forecaster_config(
+        base_model_config=_BASE_CONFIG, config_overrides={}, experiment_name="exp"
+    )
 
     assert isinstance(config, XGBoostConfig)
     assert config.n_estimators == 500
@@ -59,7 +65,21 @@ def test_resolve_no_overrides_uses_yaml_defaults() -> None:
 def test_resolve_rejects_an_ill_typed_override() -> None:
     """Pydantic validates every hyperparameter at registration, before any fold is trained."""
     with pytest.raises(ValidationError, match="max_depth"):
-        _resolve_forecaster_config(_BASE_CONFIG, {"max_depth": "high"}, "exp")
+        _resolve_forecaster_config(
+            base_model_config=_BASE_CONFIG,
+            config_overrides={"max_depth": "high"},
+            experiment_name="exp",
+        )
+
+
+def test_resolve_rejects_an_unknown_override_key() -> None:
+    """A misspelled hyperparameter must fail registration, not train on the YAML's value."""
+    with pytest.raises(ValidationError, match="n_estimtors"):
+        _resolve_forecaster_config(
+            base_model_config=_BASE_CONFIG,
+            config_overrides={"n_estimtors": 5000},
+            experiment_name="exp",
+        )
 
 
 @pytest.mark.parametrize(
@@ -90,29 +110,37 @@ def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
     monkeypatch.setattr("nged_substation_forecast.defs.jobs.PROJECT_ROOT", tmp_path)
 
     with pytest.raises(ValueError, match="is not a usable model config") as excinfo:
-        _resolve_forecaster_config("bad.yaml", {}, "exp")
+        _resolve_forecaster_config(
+            base_model_config="bad.yaml", config_overrides={}, experiment_name="exp"
+        )
 
     assert "bad.yaml" in str(excinfo.value)
 
 
 @pytest.mark.parametrize("key", ["_target_", "experiment_name"])
 def test_resolve_rejects_an_override_of_a_key_it_would_discard(key: str) -> None:
-    """Two ``model_params`` keys are the resolver's to set, and an override of either is refused.
+    """An override that does nothing is worse than one that is rejected.
 
-    Both arrive as ordinary keys and both would be thrown away downstream without a word —
-    ``_target_`` by pydantic's ``extra="ignore"``, since the config class was already resolved
-    from the file, and ``experiment_name`` by the assignment that stamps the job's own value over
-    it. An override that does nothing is worse than one that is rejected.
+    Why each key is on the list, and what would otherwise discard it:
+    ``_UNOVERRIDABLE_MODEL_PARAMS``.
     """
     with pytest.raises(ValueError, match=f"may not override '{key}'"):
-        _resolve_forecaster_config(_BASE_CONFIG, {key: "anything"}, "exp")
+        _resolve_forecaster_config(
+            base_model_config=_BASE_CONFIG,
+            config_overrides={key: "anything"},
+            experiment_name="exp",
+        )
 
 
 def test_overrides_do_not_leak_between_calls() -> None:
     """Overrides are applied to a freshly-parsed copy, so one call cannot leak into the next."""
-    _resolve_forecaster_config(_BASE_CONFIG, {"n_estimators": 7}, "exp")
+    _resolve_forecaster_config(
+        base_model_config=_BASE_CONFIG, config_overrides={"n_estimators": 7}, experiment_name="exp"
+    )
 
-    _, config = _resolve_forecaster_config(_BASE_CONFIG, {}, "exp")
+    _, config = _resolve_forecaster_config(
+        base_model_config=_BASE_CONFIG, config_overrides={}, experiment_name="exp"
+    )
 
     assert isinstance(config, XGBoostConfig)
     assert config.n_estimators == 500
@@ -144,21 +172,32 @@ def _mixed_fold_config() -> CvConfig:
 
 
 def test_smoke_test_uses_the_non_leaderboard_folds() -> None:
-    assert _fold_ids_for_run_mode("smoke_test", _mixed_fold_config()) == ["dev"]
+    cv_config = _mixed_fold_config()
+
+    assert _fold_ids_for_run_mode(run_mode="smoke_test", cv_config=cv_config) == ["dev"]
 
 
 def test_full_cv_uses_the_leaderboard_folds() -> None:
-    assert _fold_ids_for_run_mode("full_cv", _mixed_fold_config()) == ["fold_0", "fold_1"]
+    cv_config = _mixed_fold_config()
+
+    assert _fold_ids_for_run_mode(run_mode="full_cv", cv_config=cv_config) == ["fold_0", "fold_1"]
 
 
 def test_register_only_uses_the_leaderboard_folds() -> None:
-    assert _fold_ids_for_run_mode("register_only", _mixed_fold_config()) == ["fold_0", "fold_1"]
+    cv_config = _mixed_fold_config()
+
+    assert _fold_ids_for_run_mode(run_mode="register_only", cv_config=cv_config) == [
+        "fold_0",
+        "fold_1",
+    ]
 
 
 def _identity_of(**overrides: Any) -> IdentityTagsType:
     """The identity tags a registration of ``conf/model/xgboost.yaml`` would ask for."""
-    forecaster_cls, config = _resolve_forecaster_config(_BASE_CONFIG, overrides, "exp")
-    return _identity_tags(forecaster_cls, config)
+    forecaster_cls, config = _resolve_forecaster_config(
+        base_model_config=_BASE_CONFIG, config_overrides=overrides, experiment_name="exp"
+    )
+    return _identity_tags(forecaster_cls=forecaster_cls, forecaster_config=config)
 
 
 def _as_stored(tags: IdentityTagsType, **extra: str) -> dict[str, str]:
@@ -177,9 +216,13 @@ def test_identity_tags_serialise_the_feature_set_sorted() -> None:
     YAML's whole feature set (two dozen features), so the assertion cannot pass by an accident of
     hash ordering.
     """
-    _, config = _resolve_forecaster_config(_BASE_CONFIG, {}, "exp")
+    _, config = _resolve_forecaster_config(
+        base_model_config=_BASE_CONFIG, config_overrides={}, experiment_name="exp"
+    )
 
-    dumped = json.loads(_identity_tags(XGBoostForecaster, config)["config"])
+    dumped = json.loads(
+        _identity_tags(forecaster_cls=XGBoostForecaster, forecaster_config=config)["config"]
+    )
 
     assert dumped["selected_features"] == sorted(config.selected_features)
 
@@ -196,18 +239,24 @@ def test_unchanged_identity_is_accepted() -> None:
     """A re-registration of the same config passes — and the description is free to differ."""
     tags = _identity_of(n_estimators=7)
 
-    _reject_changed_identity("exp", _as_stored(tags, description="unrelated"), tags)
+    _reject_changed_identity(
+        experiment_name="exp",
+        stored_tags=_as_stored(tags, description="unrelated"),
+        requested_tags=tags,
+    )
 
 
 def test_absent_identity_tags_are_accepted() -> None:
     """An untagged experiment (get_or_create_experiment's fallback) is completable, not a clash."""
-    _reject_changed_identity("exp", {}, _identity_of())
+    _reject_changed_identity(experiment_name="exp", stored_tags={}, requested_tags=_identity_of())
 
 
 def test_changed_config_is_rejected_and_names_the_changed_field() -> None:
     with pytest.raises(ExperimentIdentityChangedError) as excinfo:
         _reject_changed_identity(
-            "exp", _as_stored(_identity_of(n_estimators=7)), _identity_of(n_estimators=300)
+            experiment_name="exp",
+            stored_tags=_as_stored(_identity_of(n_estimators=7)),
+            requested_tags=_identity_of(n_estimators=300),
         )
 
     message = str(excinfo.value)
@@ -221,7 +270,9 @@ def test_changed_forecaster_class_is_rejected() -> None:
     stored = _as_stored(_identity_of(), forecaster_target="some.other.Forecaster")
 
     with pytest.raises(ExperimentIdentityChangedError, match="forecaster_target"):
-        _reject_changed_identity("exp", stored, _identity_of())
+        _reject_changed_identity(
+            experiment_name="exp", stored_tags=stored, requested_tags=_identity_of()
+        )
 
 
 def test_a_reserialised_config_is_not_a_change() -> None:
@@ -234,7 +285,11 @@ def test_a_reserialised_config_is_not_a_change() -> None:
     requested = _identity_of(n_estimators=7)
     reserialised = json.dumps(dict(reversed(list(json.loads(requested["config"]).items()))))
 
-    _reject_changed_identity("exp", _as_stored({**requested, "config": reserialised}), requested)
+    _reject_changed_identity(
+        experiment_name="exp",
+        stored_tags=_as_stored({**requested, "config": reserialised}),
+        requested_tags=requested,
+    )
 
 
 def test_a_field_absent_on_one_side_is_reported_not_swallowed() -> None:
@@ -245,13 +300,17 @@ def test_a_field_absent_on_one_side_is_reported_not_swallowed() -> None:
     stored = _as_stored({**requested, "config": json.dumps(stored_config)})
 
     with pytest.raises(ExperimentIdentityChangedError) as excinfo:
-        _reject_changed_identity("exp", stored, requested)
+        _reject_changed_identity(
+            experiment_name="exp", stored_tags=stored, requested_tags=requested
+        )
 
     assert "config.ml_flow_experiment_id: <absent> -> None" in str(excinfo.value)
 
 
 def test_flattened_config_params_are_order_stable() -> None:
     """The write-once MLflow params must not vary with feature-set iteration order either."""
-    _, config = _resolve_forecaster_config(_BASE_CONFIG, {}, "exp")
+    _, config = _resolve_forecaster_config(
+        base_model_config=_BASE_CONFIG, config_overrides={}, experiment_name="exp"
+    )
 
     assert flatten_config(config)["selected_features"] == str(sorted(config.selected_features))

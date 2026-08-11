@@ -42,6 +42,9 @@ leaderboard in the MLflow UI (`uv run mlflow ui --gunicorn-opts "--workers 1"` �
 `http://localhost:5000`; see
 [ML Experimentation: Viewing results in the MLflow UI](../ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)).
 
+A run trained before a feature was renamed in the code cannot be served, and nothing in the table
+marks it — Step 2 refuses it rather than letting you discover that at the next 6-hourly tick.
+
 Copy the `run_id` of the fold you want to promote.
 
 Promotion (this step and the next) always happens **on your laptop**, whichever environment
@@ -57,10 +60,16 @@ deployment bakes into its container image at build time.
 **What the asset does:**
 
 1. Downloads that run's saved model artifacts from MLflow
-   (`ml_core._production_helpers.fetch_model_artifacts`), stamps a `promotion.json`
-   (`mlflow_run_id`, `promoted_at`), and atomically replaces the directory at
-   `Settings.production_model_path` (`data/production_model/` by default) with the new artifacts.
-2. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, and
+   (`ml_core._production_helpers.fetch_model_artifacts`) into a temporary directory.
+2. Checks the downloaded model's `selected_features` against the running code, and **fails the
+   materialisation if any feature name no longer parses** — naming the offending feature. The check
+   runs before anything is written, so a refused promotion leaves the previous champion in place and
+   still serving. Re-train the model against the current feature vocabulary and promote that run;
+   never hand-edit `meta.json` to rename a feature, because the trained boosters carry the old
+   names too.
+3. Stamps a `promotion.json` (`mlflow_run_id`, `promoted_at`) and atomically replaces the directory
+   at `Settings.production_model_path` (`data/production_model/` by default) with the new artifacts.
+4. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, and
    `n_trained_time_series` as output metadata, so you can confirm the right model landed.
 
 Promotion is a Dagster materialisation rather than a bare script, so every promotion is recorded
@@ -108,7 +117,10 @@ partition's `power_fcst_init_time` is 2026-07-04 06:00 UTC — not at the midnig
 
 1. Loads the production model from `Settings.production_model_path` via a plain disk `load` —
    the concrete forecaster class is reconstructed from `meta.json`'s `model_class` field. Raises
-   if the model has no trained time series (re-promote first).
+   if the model has no trained time series, if its `selected_features` name a feature this code
+   cannot parse, or if its saved `model_params` carry a key this code no longer declares. The last
+   two both mean the promoted model predates the code now serving it: re-promote from a run
+   trained against the current vocabulary, rather than hand-editing what is on disk.
 2. Resolves which NWP `init_time` to join against via `select_nwp_init_time` and
    `availability_mode` (table above).
 3. Builds the power spine (`build_live_power_frame`), covering 15 days of history (long enough
@@ -186,6 +198,17 @@ you without your watching the Checks view. The check degrades this way on purpos
 raising, so the hourly ingest keeps running; nothing is known about staleness while it persists, so
 treat it as "unknown", not "healthy".
 
+**Reading a failed roster upsert.** `metadata_upsert_failed` in
+`power_time_series_and_metadata`'s run metadata means the `TimeSeriesMetadata` roster upsert raised
+and was swallowed so the power write could go ahead, and it also reaches Sentry tagged
+`degraded_asset:power_time_series_and_metadata`. The run **succeeds** by design: the roster is
+derived data that NGED re-delivers, and the power time series is not, so a roster fault must not
+stall the ingest until an operator intervenes. The roster is left unchanged and the next run that
+finds new files retries it, but *that run's* metadata change is lost, because the power rows have
+landed and `select_new_rows` will not offer those files again. Read the traceback in the run's logs —
+an off-contract roster after a schema change and a bug in our own code both land here, and both want
+a fix rather than a re-run.
+
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from
 the frame already in memory, and is likewise non-blocking WARN. Nulls in the three de-accumulated
 variables are *expected* and are not a fault — see
@@ -220,6 +243,13 @@ observed-versus-expected member, step, cell and row counts. **The run has alread
 warns** — a short run is kept, because partial NWP forecasts better than falling back on
 yesterday's run. The action is to chase Dynamical.org, not to touch the table.
 
+**Both NWP checks share one description that means something different from all the others**, just
+as `power_data_is_fresh` does above. `Could not assess the ingested NWP run: …` says the assessment
+itself failed, not that the run is degraded — so it appears on *both* checks at once, and the shape
+metadata (`n_ensemble_members` and the rest) is absent from that materialisation. The run still
+lands. One Sentry event is sent, tagged `asset_check:nwp_has_no_unexpected_nulls` whichever
+assessment raised.
+
 **Do not re-materialise a partition that has already landed.** `write_nwp` is append-only, so
 re-running the partition after Dynamical republishes the run would append a *second* copy of it
 alongside the short one. `Nwp.validate` checks uniqueness only within the in-memory frame, so the
@@ -229,9 +259,16 @@ which does not exist today — tracked in
 [issue #476](https://github.com/openclimatefix/nged-substation-forecast/issues/476). (Materialising
 a *missed* partition, below, is a different case and is safe: nothing landed for it.)
 
-Every materialisation also publishes `n_ensemble_members`, `n_valid_times`, `n_h3_cells` and the
-`valid_time` range as metadata, so the Dagster UI timeline shows slow drift in the upstream dataset
-before it becomes a warning.
+**A partition whose run *failed* is safe to re-materialise**, because the work that can raise —
+validation and both quality assessments alike — runs before the Delta append, so a failed
+`ecmwf_ens` run wrote nothing. Two things sit after the append and both leave a red partition with
+rows on disk: Dagster's validation of the returned check results, and the process being killed
+between the Delta commit and Dagster recording success. So for a partition that failed for an
+infrastructure reason rather than a raised exception, check the table before re-running it.
+
+Every materialisation whose completeness assessment succeeded also publishes `n_ensemble_members`,
+`n_valid_times`, `n_h3_cells` and the `valid_time` range as metadata, so the Dagster UI timeline
+shows slow drift in the upstream dataset before it becomes a warning.
 
 **Reading the live-forecast check.** `live_forecasts_are_healthy` runs against `live_forecasts`
 after each 6-hourly materialisation, is likewise non-blocking WARN, and reads the forecasts back

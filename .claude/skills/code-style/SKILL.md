@@ -3,8 +3,8 @@ name: code-style
 description: >-
   This repo's code conventions, which Jack cares about and expects to be followed: Python 3.14+,
   Polars only (pandas banned), Patito schemas, ruff configuration and its traps, naming, how
-  expressive a type hint has to be, `Final` on constants, comment and doc-link rules, and Polars
-  style. Load before writing or editing any Python in this repo — a new module, a new function, a
+  expressive a type hint has to be, `Final` on constants, calling functions with keyword arguments,
+  comment and doc-link rules, and Polars style. Load before writing or editing any Python in this repo — a new module, a new function, a
   refactor, a test — and before reviewing Python for style, or answering a question about what the
   house style is.
 ---
@@ -23,6 +23,7 @@ What is in there, so you know what you are getting:
 | General Principles | Python 3.14+, modularity, small functions (and when extra parameters are fine), re-using existing tools, tests |
 | Formatting & Linting (Ruff) | line length, quotes, docstring convention, import rules, how `select`/`ignore` are maintained, two `per-file-ignores` traps |
 | Type hints and signatures | how expressive a signature must be — `Literal` aliases, `TypedDict`, named aliases — and `Final` on every constant |
+| Calling functions | keyword arguments at every call site the callee allows, and the three positional exceptions |
 | Comments, docstrings and links | current-state-only rule, which docs code may link to, MkDocs-compatible constant docstrings |
 | Data Handling | Polars/Patito/Xarray choices, lazy-evaluation contract, Patito friction budget, the 2³² row-count rule |
 | Polars style | `.cast` vs `.with_columns`, keyword-argument column naming, `Type`-suffixed `Literal` aliases |

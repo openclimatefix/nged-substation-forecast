@@ -350,11 +350,13 @@ def select_new_rows(
 
 
 class UpsertMetadataStats(TypedDict, total=False):
-    """What ``upsert_metadata`` changed, published as Dagster output metadata."""
+    """What the ``TimeSeriesMetadata`` upsert did, published as Dagster output metadata."""
 
     metadata_n_new_TimeSeriesIDs: int
     metadata_n_updated_TimeSeriesIDs: int
     metadata_updated_TimeSeriesIDs: Sequence[int]
+    metadata_upsert_failed: str
+    """Set by the asset when the whole upsert raised, so the power write went ahead without it."""
 
 
 def upsert_metadata(
@@ -362,15 +364,15 @@ def upsert_metadata(
     metadata_path: str,
     storage_options: ObjectStoreOptions | None = None,
 ) -> UpsertMetadataStats:
-    """Upserts metadata to a Parquet file.
+    """Upserts metadata to a Parquet file, keeping the newest version of each time series.
 
     This function assumes it is called by one thread at a time so no
     explicit locking is required.
 
-    If the local Parquet file does not exist, it saves the new_metadata.
-    If it exists, it merges the new_metadata with the existing metadata,
-    keeping the latest version for each time_series_id, and updates the
-    Parquet file if there are differences.
+    If the Parquet file does not exist, it saves the new_metadata. If it exists, it merges the
+    new_metadata into it and rewrites the file only if something changed. The snapshot and the
+    stored roster need not share a schema, and a field that ``new_metadata`` no longer carries is
+    **cleared**, so the roster always means "the latest snapshot of what NGED published".
 
     Args:
         new_metadata: The new metadata DataFrame.
@@ -401,17 +403,22 @@ def upsert_metadata(
             metadata_n_updated_TimeSeriesIDs=0,
         )
 
-    # Read existing metadata
     existing_metadata = pl.read_parquet(
         metadata_path, storage_options=typeddict_to_dict(storage_options)
     )
     TimeSeriesMetadata.validate(existing_metadata)
 
+    # `how="diagonal"` because the snapshot and the stored roster can differ in both width and
+    # column order, four TimeSeriesMetadata fields being `allow_missing`. Aligning them into one
+    # frame also makes the `hash_rows` diff below insensitive to the stored column order, which
+    # hashing the two frames separately is not.
+    combined = pl.concat([new_metadata, existing_metadata], how="diagonal")
+    new_rows = combined.head(new_metadata.height)
+    stored_rows = combined.slice(new_metadata.height)
+
     # Compare metadata. `metadata_diff` contains all rows in `new_metadata` that do not have an
     # exact match in `existing_metadata`. Adapted from https://stackoverflow.com/a/79888719
-    metadata_diff = new_metadata.filter(
-        ~new_metadata.hash_rows().is_in(existing_metadata.hash_rows().implode())
-    )
+    metadata_diff = new_rows.filter(~new_rows.hash_rows().is_in(stored_rows.hash_rows().implode()))
     TimeSeriesMetadata.validate(metadata_diff)
 
     if metadata_diff.is_empty():
@@ -427,11 +434,7 @@ def upsert_metadata(
     )
 
     # Merge metadata. Put new_metadata first so that unique(keep="first") keeps the new version
-    merged_metadata = (
-        pl.concat([new_metadata, existing_metadata])
-        .unique(subset="time_series_id", keep="first")
-        .sort("time_series_id")
-    )
+    merged_metadata = combined.unique(subset="time_series_id", keep="first").sort("time_series_id")
 
     TimeSeriesMetadata.validate(merged_metadata)
 
