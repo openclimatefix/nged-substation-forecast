@@ -161,7 +161,9 @@ def _resolve_forecaster_config(
     config_path = PROJECT_ROOT / base_model_config
     with config_path.open(encoding="utf-8") as file:
         raw = yaml.safe_load(file)
-    forecaster_target, config_target, model_params = _required_targets(raw, config_path)
+    forecaster_target, config_target, model_params = _required_targets(
+        raw=raw, config_path=config_path
+    )
     model_params.update(config_overrides)
     forecaster_cls = cast(type[BaseForecaster], import_class(forecaster_target))
     config_cls = cast(type[BaseForecasterConfig], import_class(config_target))
@@ -329,9 +331,13 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
     forecaster_cls, forecaster_config = _resolve_forecaster_config(
-        config.base_model_config, config.config_overrides, config.experiment_name
+        base_model_config=config.base_model_config,
+        config_overrides=config.config_overrides,
+        experiment_name=config.experiment_name,
     )
-    identity_tags = _identity_tags(forecaster_cls, forecaster_config)
+    identity_tags = _identity_tags(
+        forecaster_cls=forecaster_cls, forecaster_config=forecaster_config
+    )
 
     # get_or_create_experiment writes nothing when the name already exists, so the check below
     # still runs before this registration's first write. On a brand-new name it creates the
@@ -339,7 +345,9 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     experiment_id = get_or_create_experiment(config.experiment_name)
     client = MlflowClient()
     _reject_changed_identity(
-        config.experiment_name, mlflow.get_experiment(experiment_id).tags, identity_tags
+        experiment_name=config.experiment_name,
+        stored_tags=mlflow.get_experiment(experiment_id).tags,
+        requested_tags=identity_tags,
     )
 
     # Log the params before the experiment tags. MLflow params are write-once, so this is the one
@@ -372,7 +380,7 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     client.set_experiment_tag(experiment_id, "description", config.description)
 
     cv_config = load_cv_config(settings.cv_config_path)
-    fold_ids = _fold_ids_for_run_mode(config.run_mode, cv_config)
+    fold_ids = _fold_ids_for_run_mode(run_mode=config.run_mode, cv_config=cv_config)
     partition_keys = [
         f"{config.experiment_name}{CV_PARTITION_KEY_SEPARATOR}{fold_id}" for fold_id in fold_ids
     ]
