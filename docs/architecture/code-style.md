@@ -83,6 +83,27 @@ stricter type exists — a genuinely heterogeneous or open-ended dict stays `dic
 **All constants must be marked with the maximally "constant" type**, e.g.
 `CONST_SEQ: Final[tuple[str, ...]] = ("a", "b")` or `FOO: Final[str] = "bar"`.
 
+## Calling functions
+
+**Pass arguments by keyword wherever the callee allows it.** Write
+`write_nwp(nwp=nwp, table_uri=uri, storage_options=options)`, not
+`write_nwp(nwp, uri, options)`. The keyword names what each value is for, so the reader learns it
+from the call site instead of opening the callee; and if a parameter is later reordered, renamed or
+removed, the call fails loudly rather than binding the wrong value in silence. The payoff is
+biggest for bare strings, numbers and booleans, whose meaning is invisible without the keyword.
+
+Three places where a positional argument is right:
+
+- **Positional-only parameters** — those before a `/` in the signature, and most of what C
+  implements: `len(df)`, `isinstance(value, str)`, `Path("data")`. A keyword is a `TypeError`
+  there.
+- **A variadic `*args` position** — `pl.col("power_mw", "power_mva")`, and the expressions in
+  `df.select(...)` and `df.with_columns(...)`.
+  Every keyword parameter that follows one still takes its name, as the
+  [Polars style](#polars-style) rules below assume.
+- **One argument whose role the function name already states** — `forecaster.save(path)`,
+  `json.loads(text)`. There is nothing for it to be confused with.
+
 ## Comments, docstrings and links
 
 - **Do not remove existing comments** unless they are misleading or out of date. Only add new
