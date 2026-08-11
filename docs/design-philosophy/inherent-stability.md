@@ -181,11 +181,16 @@ appear nowhere else.
    house pattern, and there is deliberately no `ERROR`-severity check anywhere in the repo.
 7. **Never let the warning path be able to fail the thing it is warning about.** A bug in a warning
    function that raises would convert fail-open into fail-closed at exactly the wrong moment, which
-   is why `report_power_freshness` never raises and why both asset checks
-   (`power_data_is_fresh`, `live_forecasts_are_healthy`) run their whole body under a catch-all.
-   Non-blocking is not enough on its own: Dagster fails a run whose check step *errors*, whatever
-   its `blocking` setting, and the scheduled jobs carry a Sentry failure hook — so an unguarded
-   warning path both fails the run and pages.
+   is why `report_power_freshness` never raises and why every asset check — the standalone
+   `power_data_is_fresh` and `live_forecasts_are_healthy`, and the two per-run checks computed
+   inside `ecmwf_ens` — runs its whole body under a catch-all. Non-blocking is not enough on its
+   own: Dagster fails a run whose check step *errors*, whatever its `blocking` setting, and the
+   scheduled jobs carry a Sentry failure hook — so an unguarded warning path both fails the run and
+   pages. A warning path computed *inside* an asset must also run **before** that asset's
+   non-idempotent write, not merely under a guard: `ecmwf_ens` appends its NWP run with no dedup, so
+   a bug that raised after the append would leave the rows committed on a failed run and duplicate
+   them when the partition was re-materialised. Ordering decides whether such a bug can corrupt the
+   data; the guard only decides whether it costs a run.
 8. **When a capability could live in the training loop or in the production service, put it in the
    training loop.** See [Where complexity should live](#where-complexity-should-live). *(The
    [complexity-offline

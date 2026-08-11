@@ -19,7 +19,7 @@ import shapely
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
-from contracts.weather_schemas import Nwp
+from contracts.weather_schemas import Nwp, NwpQualityReport
 from dagster import (
     AssetCheckEvaluation,
     AssetCheckSeverity,
@@ -490,6 +490,87 @@ def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
     assert evaluation.metadata["n_h3_cells"].value == 4
     # The stub frame carries members 0-3, so 4-50 of the 51 ECMWF ENS members are named as absent.
     assert evaluation.metadata["missing_ensemble_members"].value == list(range(4, 51))
+
+
+def _stub_ecmwf_download(monkeypatch: pytest.MonkeyPatch, init_time: datetime) -> None:
+    """Stub out the download/convert pipeline so it yields ``_make_nwp(init_time)``.
+
+    ``open_ecmwf_ens_run`` is called with keyword arguments, which a bare ``object()`` rejects.
+    """
+    monkeypatch.setattr(
+        assets,
+        "open_ecmwf_ens_run",
+        lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
+    )
+    monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
+    monkeypatch.setattr(
+        assets,
+        "convert_nwp_xarray_dataset_to_polars_dataframe",
+        lambda ds, h3_grid: _make_nwp(init_time),
+    )
+
+
+def test_ecmwf_ens_assesses_before_writing(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The two per-run checks are computed *before* the Delta append, never after.
+
+    ``write_nwp`` appends with no dedup, so an exception raised after it would fail the run with
+    the rows already committed — and re-materialising the failed partition would append the run a
+    second time. Asserting the ordering directly (rather than the guard's behaviour) is what stops
+    a later refactor quietly moving the assessments back below the write.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    _stub_ecmwf_download(monkeypatch, init_time)
+
+    table_existed_during_assessment: list[bool] = []
+    real_assess = assets.assess_nwp_quality
+
+    def _record_then_assess(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
+        table_existed_during_assessment.append(Path(Settings().nwp_data_path).exists())
+        return real_assess(nwp)
+
+    monkeypatch.setattr(assets, "assess_nwp_quality", _record_then_assess)
+
+    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
+    assert result.success
+    assert table_existed_during_assessment == [False]
+
+
+def test_ecmwf_ens_lands_the_run_when_an_assessment_raises(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """A bug in either per-run check degrades to a failed WARN result; the run still lands.
+
+    Rule 7: a warning path may never fail the thing it is warning about. Both declared checks must
+    still be emitted — Dagster fails the step for a missing result *or* for one carrying no
+    ``check_name``, which would reinstate the failure the guard exists to prevent.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    _stub_ecmwf_download(monkeypatch, init_time)
+
+    def _raise(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
+        raise RuntimeError("assessment is broken")
+
+    monkeypatch.setattr(assets, "assess_nwp_quality", _raise)
+
+    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
+    assert result.success  # the ingest is not failed by a bug in a *reporting* function
+    assert pl.read_delta(Settings().nwp_data_path).height == 4  # written exactly once
+
+    evaluations = _check_evaluations(result)
+    assert set(evaluations) == {"nwp_has_no_unexpected_nulls", "nwp_run_is_complete"}
+    for evaluation in evaluations.values():
+        assert not evaluation.passed
+        assert evaluation.severity == AssetCheckSeverity.WARN
+        assert "assessment is broken" in str(evaluation.description)
+
+    # The shape keys come from the completeness report, which never got built.
+    (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
+    assert materialisation.metadata["n_rows"].value == 4
+    assert "n_ensemble_members" not in materialisation.metadata
 
 
 def test_ecmwf_ens_retries_when_run_not_yet_available(
