@@ -44,89 +44,93 @@ below as notes for that issue.
 
 ## What changes, file by file
 
-### `packages/contracts/src/contracts/config_schemas.py` — the list and its loader
+### `conf/known_dead_time_series.yaml` — new file
 
-Add a `KnownDeadTimeSeries` pydantic model beside `CvConfig`, with one field:
+A bare YAML list of `time_series_id`s, with the reason for each as a comment:
 
 ```yaml
-known_dead:
-  23: "PV site off since 2026-07-04 (James, NGED)."
-  33: "Site monitor broken (James, NGED)."
+# Time series the power_data_is_fresh check ignores, because we know they are dead.
+# Delete a line to start warning about that series again.
+- 23  # PV site off since 2026-07-04 (James, NGED).
+- 33  # Site monitor broken (James, NGED).
 ```
 
-`known_dead: dict[int, str]` — id to the reason it is silenced. The reason is for the human who
-later has to decide whether the entry is still true; it is not surfaced in the Dagster UI (see
-*Rejected*). `extra="forbid"` so a typo'd top-level key is rejected rather than ignored, matching
-#512's direction of travel.
+The config is a list of integers, so it gets a list of integers: no pydantic model, no wrapper key,
+no id-to-reason mapping. The reason a series is silenced matters to the human deciding whether the
+entry is still true, and that human is reading this file — so a YAML comment is the right home for
+it, and nothing has to carry reason strings into the evaluator or the UI.
 
-Add `load_known_dead_time_series(path: Path) -> KnownDeadTimeSeries`, mirroring `load_cv_config`:
-`yaml.safe_load` then `model_validate`, with `or {}` so an empty file loads as an empty mapping
-rather than validating `None`. It **raises** on a malformed file — this is a config boundary, and
-rule 2 is strict about malformed input. The degradation happens one level up, in the check.
+`Dockerfile` already does `COPY conf/ conf/`, so the deployment picks the file up with no change.
 
 ### `packages/contracts/src/contracts/settings.py` — where to find it
 
 Add `known_dead_time_series_path: Path`, defaulting to
-`PROJECT_ROOT / "conf" / "known_dead_time_series.yaml"`, exactly like `cv_config_path`. The env var
-`KNOWN_DEAD_TIME_SERIES_PATH` follows from `env_prefix=""`, which is what the tests use to point at
-a `tmp_path` file.
-
-### `conf/known_dead_time_series.yaml` — new file
-
-Ships with 23 and 33 and their reasons, plus a header comment saying what the file does, that
-removing a line un-silences the series, and that the freshness check turns yellow when a listed
-series reports again. `Dockerfile` already does `COPY conf/ conf/`, so the deployment picks it up
-with no change.
+`PROJECT_ROOT / "conf" / "known_dead_time_series.yaml"`, exactly like `cv_config_path`. Every other
+`conf/` path is a `Settings` field, and the `KNOWN_DEAD_TIME_SERIES_PATH` env var that follows from
+`env_prefix=""` is the lever the existing `env` test fixture already uses for every other path.
 
 ### `src/nged_substation_forecast/defs/checks.py` — the behaviour
 
+- **`_read_known_dead_ids(settings)`** — new, returning `tuple[int, ...]`. An absent file is an
+  empty list, not an error. `yaml.safe_load(...) or ()` then `int()` each entry. It catches
+  `OSError`, `ValueError`, `TypeError` and `yaml.YAMLError`, logs the traceback, and degrades to
+  silencing nothing.
+
+  That handler is the one piece of machinery this feature adds purely for robustness, and it earns
+  its place: silencing is an optional convenience, and an optional convenience must not be able to
+  blind the check's primary signal. Without it, a malformed file costs the whole freshness report —
+  every late series, in the hour they went late — because the catch-all above returns "could not
+  evaluate". `_read_promoted_model_facts` degrades an unreadable `meta.json` for exactly this
+  reason. The degradation needs no vocabulary of its own: with nothing silenced, the dead series
+  reappear in `late` and the check goes yellow about them, so a broken list announces itself
+  through the very noise it was suppressing.
+
 - **`evaluate_power_freshness`** gains `silenced_ids: Collection[int] = ()`. It stays pure. After
-  `late` is built as it is today, split it: rows whose `time_series_id` is in `silenced_ids` move to
-  a new `silenced` frame, the rest stay in `late`. `n_stale` and `n_never` count the rows that
-  survive the split, so the description, the metadata counts and the Sentry tags all describe what
-  we are actually watching. `n_series_total` keeps its present meaning — every id we know of — so a
-  number that Sentry already reports does not quietly change definition.
+  `late` is built as it is today, drop the rows whose `time_series_id` is in `silenced_ids`, and
+  count `n_stale` and `n_never` from what survives — so the description, the metadata counts and the
+  Sentry tags all describe what we are actually watching. `n_series_total` keeps its present
+  meaning, every id we know of, so a number Sentry already reports does not quietly change
+  definition.
 
   Doing the filtering *here*, rather than in `_to_asset_check_result`, is the whole point:
   `report_power_freshness` is handed this same result, so Sentry inherits the silencing for free and
   a fully-silenced feed produces `is_healthy == True`, which is the existing no-op gate. Filtering
   later would leave the hourly Sentry warning firing about the dead series forever.
 
-  Resurrection is computed here too: a silenced id whose `last_time` is at or after the cutoff is
-  alive again.
+  Resurrection is computed here too, from the cutoff the function already has: a silenced id whose
+  `last_time` is at or after the cutoff is alive again. One expression —
+  `sorted(set(silenced_ids) & set(coverage.filter(pl.col("last_time") >= cutoff)["time_series_id"]))`
+  — not a new concept. It is deliberately not "a silenced id that is absent from `late`", because
+  that would also match an id that has been dropped from the roster and has no rows on disk.
 
-- **`PowerFreshnessResult`** gains three fields: `silenced: pl.DataFrame` (the withheld rows, same
-  four columns as `late`), `resurrected_ids: tuple[int, ...]`, and `known_dead_unreadable: bool`.
-  Plus an `n_silenced` property. `is_healthy` keeps its exact present meaning — "no series is
-  late" — because it is the gate `report_power_freshness` reads, and a resurrection is not a stale
-  series. Its docstring says so.
+- **`PowerFreshnessResult`** gains exactly two fields, both plain tuples: `silenced_ids` (the
+  configured list, echoed verbatim) and `resurrected_ids`. No frame of silenced rows: `hours_late`
+  for a series everyone already knows is dead is the one number about it that carries no
+  information, and the issue asks which ids are ignored, not how dead each one is. Echoing the
+  configured list rather than the rows actually withheld also makes a typo'd id visible — it is
+  reported as ignored while silencing nothing.
 
-- **`_late_table_metadata`** is unchanged and gains a second caller: the silenced frame has the same
-  four columns, so it renders through the same function and the same `_LATE_TABLE_SCHEMA`. Its
-  docstring is updated to name both callers.
+  `is_healthy` keeps its exact present meaning, "no series is late", because it is the gate
+  `report_power_freshness` reads and a resurrection is not a stale series. Its docstring says so.
 
-- **`_to_asset_check_result`** does four things more than it does today:
+- **`_to_asset_check_result`** does three things more than it does today:
   - `passed = result.is_healthy and result.n_series_total > 0 and not result.resurrected_ids` — a
     resurrection makes the check yellow, which is the "alert me when they come back" requirement.
-  - Appends `Ignoring N known-dead time series: 23, 33.` to the description whenever anything is
-    silenced, capped at a new `_MAX_SILENCED_SERIES_LISTED` (20, for the same reason the other
-    listings are capped: V2 is ~2,500 series and this lands in the event log hourly).
+  - Appends `Ignoring 2 known-dead time series: 23, 33.` to the description whenever anything is
+    silenced. Uncapped, unlike every other listing in this module: the other caps guard against a
+    machine-generated explosion (a whole-feed stall puts 2,500 rows in `late` with no human
+    involved), while this list is bounded by what somebody typed into a git-tracked file.
   - Appends `Series 23 has reported again — remove it from conf/known_dead_time_series.yaml.` when
     `resurrected_ids` is non-empty.
-  - Appends `The known-dead list could not be read, so nothing is silenced.` when
-    `known_dead_unreadable`.
 
-  New metadata keys: `n_silenced`, `n_silenced_listed`, `silenced_time_series` (the table),
-  `n_resurrected`, `resurrected_time_series_ids`. The last two follow the `missing_time_series_ids`
-  precedent: a string of the list, capped, with its own count.
+  Two new metadata keys: `n_silenced`, and `silenced_time_series_ids` as a string of the list,
+  following the `missing_time_series_ids` precedent. Resurrections get no metadata key of their own:
+  they already flip `passed` and are named in the description, and the count is zero in every run
+  but the rare one.
 
-- **`_check_power_data_freshness`** reads the list through a new `_read_known_dead_ids(settings)`
-  which returns `dict[int, str] | None`. `None` means "could not read": an absent file is *not*
-  unreadable, it is an empty list. It catches `OSError`, `ValueError` (pydantic's
-  `ValidationError` derives from it) and `yaml.YAMLError`, logs the traceback, and degrades to
-  silencing nothing — mirroring `_read_promoted_model_facts`.
+- **`_check_power_data_freshness`** passes `_read_known_dead_ids(settings)` into the evaluator.
 
-- **`power_data_is_fresh`** itself is unchanged: same catch-all, same WARN, same `blocking=False`.
+- **`power_data_is_fresh`** and **`_late_table_metadata`** are unchanged.
 
 ## Design-philosophy check
 
@@ -134,13 +138,11 @@ This is production code, so it degrades rather than raises.
 
 - **Rules 6 and 7 hold.** The check stays `AssetCheckSeverity.WARN` with `blocking=False`, and its
   whole body stays under the existing `BaseException` catch-all. Nothing added can raise past that
-  guard: the only new I/O is one small local file read, and it has its own handler above the
+  guard: the only new I/O is one small local file read, and it has its own handler inside the
   catch-all.
 - **A malformed dead-list cannot silence anything.** This is the hazard the issue's mechanism
-  introduces, and the fallback is chosen so that it fails *towards* warning: an unreadable list
-  silences nothing, so every dead series reappears in `late` and the check goes yellow and says
-  why. A broken list is therefore self-announcing — it cannot fail closed like #480, and it cannot
-  fail silent either.
+  introduces, and the fallback is chosen so that it fails *towards* warning. It cannot fail closed
+  like #480, and it cannot fail silent either.
 - **This is the one per-read fallback `power_data_is_fresh` gets**, against a module docstring that
   says it salvages nothing below the catch-all. The reason that rule exists is that its only other
   candidate fallback — "roster unknown" — would render a corrupt roster as a green tick. The
@@ -148,9 +150,9 @@ This is production code, so it degrades rather than raises.
   remove them. The module docstring and
   [Production deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/)
   both say this explicitly rather than leaving the exception looking like drift.
-- **Rule 2 (strict about malformed) is honoured where it belongs.** The loader raises; the
-  production caller degrades. Being strict at the boundary and liberal at the point of use is the
-  same split `_read_promoted_model_facts` already makes.
+- **Rule 2 (strict about malformed) is honoured where it belongs.** The shipped file is parsed by a
+  test in CI, so a malformed list is rejected before it can ship; the production caller degrades
+  because by then rejecting costs more than it buys.
 - **H1 / T1.1.** A silenced dead series is a series that no longer demands a human glance every day,
   which is the claim
   [H1](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h1-a-service-that-mostly-runs-itself)
@@ -160,30 +162,28 @@ This is production code, so it degrades rather than raises.
 
 ## Tests
 
-Every assertion below fails on `main` today, because `main` has no silencing at all.
+All in `tests/test_checks.py`. Every assertion fails on `main` today, because `main` has no
+silencing at all.
 
-**`tests/test_checks.py`**, a new section beside the existing freshness tests:
+**First, a hazard to fix before adding anything.** `Settings.known_dead_time_series_path` defaults
+to the real repo file, so without this the existing end-to-end tests would silently start silencing
+23 and 33. The `env` fixture must point `KNOWN_DEAD_TIME_SERIES_PATH` at an absent path under
+`tmp_path`, making silencing opt-in per test. Nothing collides today (the existing tests use ids 1,
+2 and 99), which is exactly why this would go unnoticed.
 
 | Test | Assertion that fails on `main` |
 |---|---|
-| `test_a_silenced_stale_series_is_withheld` | id 23 stale, silenced → `n_late == 0`, `is_healthy`, `silenced.height == 1` |
-| `test_a_silenced_never_reported_series_is_withheld` | 33 in the roster with no data, silenced → `n_never == 0` |
-| `test_an_unsilenced_series_still_warns_beside_a_silenced_one` | 23 silenced, 7 stale → `n_stale == 1` and `late` holds only 7 |
-| `test_a_silenced_series_that_reports_again_is_resurrected` | 23 fresh and silenced → `resurrected_ids == (23,)` |
-| `test_a_resurrection_makes_the_check_fail_and_names_the_id` | `_to_asset_check_result(...).passed is False`, description names 23 and the YAML path |
-| `test_the_check_names_the_silenced_ids_when_everything_is_fresh` | green result whose description still says `Ignoring 2` and whose metadata carries `n_silenced == 2` and the `silenced_time_series` table |
-| `test_silencing_does_not_change_n_series_total` | `n_series_total` counts the silenced ids too |
-| `test_power_data_is_fresh_silences_the_configured_dead_series` | end-to-end through `Settings`: YAML in `tmp_path` via `KNOWN_DEAD_TIME_SERIES_PATH`, real Delta + roster, check passes |
-| `test_power_data_is_fresh_warns_loudly_when_the_dead_list_is_malformed` | garbage YAML → the check does not raise, `n_silenced == 0`, the dead series is in `late`, the description says the list could not be read |
-| `test_power_data_is_fresh_with_no_dead_list_behaves_as_before` | absent file → identical result to today, and no "could not be read" text |
+| `test_silenced_series_are_withheld_and_others_still_warn` | one fixture: 23 stale and silenced, 33 never-reported and silenced, 7 stale and not silenced → `n_stale == 1`, `n_never == 0`, `late` holds only 7, `n_series_total == 3` |
+| `test_a_silenced_series_that_reports_again_fails_the_check` | 23 fresh and silenced → `resurrected_ids == (23,)`, `_to_asset_check_result(...).passed is False`, description names 23 and the YAML path |
+| `test_the_check_names_the_silenced_ids_when_everything_is_fresh` | a green result whose description still says `Ignoring 2` and whose metadata carries `n_silenced == 2` and `silenced_time_series_ids` |
 | `test_a_fully_silenced_feed_hands_sentry_a_healthy_result` | extends the existing `report_power_freshness` monkeypatch test: the captured `PowerFreshnessResult.is_healthy is True`, so no Sentry warning is sent |
+| `test_power_data_is_fresh_silences_the_configured_dead_series` | end-to-end through `Settings`: YAML in `tmp_path` via `KNOWN_DEAD_TIME_SERIES_PATH`, real Delta table and roster, check passes and names the ignored ids |
+| `test_power_data_is_fresh_warns_loudly_when_the_dead_list_is_malformed` | garbage YAML → the check does not raise, nothing is silenced, and the dead series is reported in `late` |
+| `test_the_shipped_known_dead_list_parses` | `_read_known_dead_ids` over the real `conf/known_dead_time_series.yaml` returns a non-empty tuple of ints, so a hand-edit that breaks the file fails CI rather than reaching production. Precedent: `test_load_cv_config_reads_canonical_yaml` |
 
-The last one is the requirement "stop telling me about 23 every day", asserted at the point where it
-is actually delivered. It lives in `tests/test_checks.py` rather than `tests/test_sentry.py` so it
-does not collide with #488's session.
-
-**`packages/contracts/tests/test_config_schemas.py`**: the loader round-trips a valid file; an
-empty file loads as an empty mapping; an unknown top-level key raises; a non-integer id raises.
+The fourth test is the requirement "stop telling me about 23 every day", asserted at the point where
+it is actually delivered. It lives here rather than in `tests/test_sentry.py` so it does not collide
+with #488's session.
 
 Note for whoever writes these: the check's catch-all swallows `pytest.fail`, so a "must not be
 called" sentinel inside the check body is useless — assert after the call. The existing tests say
@@ -191,16 +191,18 @@ the same thing.
 
 ## Docs to update
 
-- **`src/nged_substation_forecast/defs/checks.py` module docstring** — a paragraph on silencing, and
-  an amendment to the "salvages nothing below the catch-all" paragraph naming the one fallback and
-  why its direction is safe.
+- **`src/nged_substation_forecast/defs/checks.py` module docstring** — a short paragraph on
+  silencing, and a clause on the "salvages nothing below the catch-all" sentence naming the one
+  fallback and why its direction is safe.
 - **`docs/live_service/operations.md`**, "Reading the freshness check" — how to silence a series
-  (edit the YAML, commit, redeploy), how to un-silence one, what `Ignoring N known-dead…`,
-  `has reported again` and `could not be read` each mean, and that a resurrection stays yellow until
-  the file is edited. Also that the edit is an intervention worth logging.
-- **`docs/architecture/production-deployment.md`**, the `power_data_is_fresh` section — why the list
-  is a git-tracked file rather than mutable state, why the filtering sits in the pure evaluator so
-  Sentry inherits it, and why an unreadable list un-silences everything.
+  (edit the YAML, commit, redeploy), how to un-silence one, what `Ignoring N known-dead…` and
+  `has reported again` mean, and that a resurrection stays yellow until the file is edited. Also
+  that the edit is an intervention worth logging. This paragraph is the real deliverable for an
+  operator, and the page already has the hook for it: "A handful of persistently-late series is
+  usually a decommissioned or renamed substation".
+- **`docs/architecture/production-deployment.md`**, the `power_data_is_fresh` section — why the
+  list is a git-tracked file rather than mutable state, why the filtering sits in the pure evaluator
+  so Sentry inherits it, and the one-clause correction to "salvages nothing".
 - **`README.md` / `CLAUDE.md`** — no change; neither enumerates `conf/`.
 
 This issue does not complete a roadmap item, so there is no ship-time triage of an "Implementation
@@ -210,7 +212,7 @@ details" section.
 
 ```bash
 uv run ruff format . && uv run ruff check . && uv run --all-packages ty check
-uv run pytest tests/test_checks.py packages/contracts/tests/test_config_schemas.py
+uv run pytest tests/test_checks.py
 uv run pytest
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 uv run mkdocs build --strict
@@ -239,11 +241,44 @@ No network-gated tests are involved.
 2. **Do you want the follow-up issue for the UI-editable version?** *Recommendation:* yes, opened
    after this merges, blocked by #439/#441/#442, describing the operator-writable list plus
    auto-removal on resurrection. I can draft it once you have approved this plan.
-3. **Should `live_forecasts_are_healthy` also ignore dead series?** Its
-   `missing_time_series_ids` compares the promoted model's trained population against what the slot
-   forecast, and a dead series is still forecast from its other features, so it does not go missing.
-   *Recommendation:* leave it alone; revisit if a dead series does start dropping out of slots.
+3. **Should `live_forecasts_are_healthy` also ignore dead series?** Its `missing_time_series_ids`
+   compares the promoted model's trained population against what the slot forecast, and a dead
+   series is still forecast from its other features, so it does not go missing. *Recommendation:*
+   leave it alone; revisit if a dead series does start dropping out of slots.
 
 ## Findings from review, and what happened to each
 
-*(filled in by the two adversarial review passes)*
+### First pass — is there a simpler way? (accepted)
+
+- **No pydantic model and no `contracts` change.** The config is a list of integers, so `CvConfig`'s
+  precedent does not carry: a bare YAML list parsed in `checks.py` does the same job, and the
+  id-to-reason mapping the first draft proposed carried strings that were never surfaced anywhere.
+  Two files and four loader tests removed.
+- **`silenced` is a tuple of ids, not a DataFrame.** Dropped the silenced-series metadata table,
+  its `n_silenced_listed` count, and the second caller for `_late_table_metadata`.
+- **Dropped `_MAX_SILENCED_SERIES_LISTED`.** Every other cap here guards a machine-generated
+  listing; this one is bounded by a human commit.
+- **Metadata down from five new keys to two.** Both resurrection keys go: the description names the
+  ids and `passed` already flips.
+- **Dropped `known_dead_unreadable` from the result and its description branch.** An unreadable
+  list announces itself by the dead series reappearing as late, so the flag bought a fourth branch
+  and no new information.
+- **Tests merged from eleven to seven**, and the reviewer's `env`-fixture hazard — the default path
+  resolving to the real repo file during tests — is now fixed explicitly rather than by luck.
+- **Added a CI test that parses the shipped file**, on the `test_load_cv_config_reads_canonical_yaml`
+  precedent.
+
+### First pass — rejected
+
+- **"Drop the runtime fallback entirely; let a malformed list hit the catch-all, since CI parses the
+  shipped file."** Rejected: an optional convenience must not be able to blind the check's primary
+  signal, and `_read_promoted_model_facts` sets the precedent for degrading a small file read
+  in-place. The CI test is worth having and has been added, but it guards the file we ship, not the
+  file that is there at runtime. The reviewer's supporting point — that the catch-all route would
+  reach Sentry via `report_check_degradation` while the fallback does not — is real, and is now
+  covered by note 2 for #488.
+- **"Make the path a module constant instead of a `Settings` field."** Rejected: every other `conf/`
+  path is a `Settings` field, and the env-var lever is how the existing `env` test fixture redirects
+  every other path. A module constant would need attribute monkeypatching instead.
+- **"Compute resurrection as `silenced_ids` minus `late` instead of against the cutoff."** Rejected
+  by the reviewer's own analysis, and the plan now says why in the code description.
