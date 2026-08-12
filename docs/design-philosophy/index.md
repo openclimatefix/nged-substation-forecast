@@ -43,7 +43,7 @@ worth their cost here, which we declined, which we have not yet absorbed — and
 failed. A practice that did not survive contact with our data is as useful a finding as one that
 did.
 
-Three pages, in reading order:
+Four pages, in reading order:
 
 - **[Design Principles](design-principles.md)** — the constraints we impose on our own decisions,
   each with the failure it prevents, a real decision it made, and the hypothesis it serves. Includes
@@ -55,6 +55,9 @@ Three pages, in reading order:
 - **[Inherent Stability](inherent-stability.md)** — the largest principle argued in full: how the
   service behaves as its inputs degrade, the degradation ladder, and the rules to follow when
   changing production code.
+- **[Common Incident Classes](common-incident-classes.md)** — the recurring failure shapes
+  production forecasting services see in practice, and which mechanism above (if any) targets
+  each one.
 
 The boundary with the [Architecture](../architecture/overview.md) section is deliberate: this
 section holds the transferable argument, while `architecture/` describes what we actually built,
