@@ -97,9 +97,20 @@ Only `src/nged_substation_forecast/defs/checks.py`, its tests, and three docs pa
   in `_to_asset_check_result` instead would leave the hourly Sentry warning firing about the dead
   series forever.
 
-  Resurrection is deliberately *not* "a silenced id absent from `late`", because that would also
-  match an id dropped from the roster with no rows on disk. `stale` uses `last_time < cutoff` and
-  resurrection uses `>= cutoff`, so the two are complementary over `coverage`.
+  Resurrection is deliberately *not* "a silenced id absent from `late`", for two reasons. Under
+  this design there is no unfiltered `late` to subtract from: the silenced ids are gone before
+  `stale` and `never` are built, so *every* silenced id is absent from `late` and the subtraction
+  would report them all as resurrected. Restoring an unfiltered `late` to subtract from would mean
+  going back to filtering at the bottom of the function, which is the structure this design
+  replaced. And even in that structure the subtraction is wrong for a silenced id that was never in
+  the roster and has no rows on disk — a typo in the constant, or an id NGED has never published. It
+  is in neither `coverage` nor `roster_ids`, so it is neither stale nor never-reported, so it is
+  absent from `late`, so subtraction calls it resurrected. A mistyped `int` is valid Python that
+  `ty` cannot catch, so that case is reachable in a way a malformed config file is not.
+
+  `stale` uses `last_time < cutoff` and resurrection uses `>= cutoff`, so the two are complementary
+  over `coverage` — a series is stale, fresh, or has no rows at all, and only the middle one is a
+  resurrection.
 
 - **`PowerFreshnessResult`** gains two fields, both defaulted so the three existing construction
   sites keep working untouched (`tests/test_checks.py`, `tests/test_sentry.py`, and the operator's
@@ -181,7 +192,7 @@ All in `tests/test_checks.py`. Seven tests and one added assertion; every one fa
 
 | Test | What fails on `main` |
 |---|---|
-| `test_silenced_series_are_withheld_and_others_still_warn` | one fixture, stated in full: 7 stale and not silenced, 1 fresh and not silenced, 23 stale and silenced, 33 never-reported (roster-only) and silenced, 404 silenced but in neither roster nor coverage. Asserts `n_stale == 1`, `n_never == 0`, `late` holds only 7, `resurrected_ids == ()` and **`n_series_total == 2`** — the watched population `{1, 7}`. That last number is the assertion that tells filtering the *inputs* apart from filtering `late`, which answers 4. Id 404 is the mistyped-or-deregistered case; id 23 pins that a silenced series which is still stale is not reported as resurrected |
+| `test_silenced_series_are_withheld_and_others_still_warn` | one fixture, stated in full: 7 stale and not silenced, 1 fresh and not silenced, 23 stale and silenced, 33 never-reported (roster-only) and silenced, 404 silenced but in neither roster nor coverage. Asserts `n_stale == 1`, `n_never == 0`, `late` holds only 7, `resurrected_ids == ()` and **`n_series_total == 2`** — the watched population `{1, 7}`. That last number is the assertion that tells filtering the *inputs* apart from filtering `late`, which answers 4. Id 404 is a silenced id that was never in the roster — a typo in the constant, or an id NGED has never published — and asserting it is not in `resurrected_ids` is what rules out computing resurrection as `silenced_ids` minus `late`; id 23 pins that a silenced series which is still stale is not reported as resurrected |
 | `test_a_feed_whose_only_late_series_are_silenced_is_healthy` | `is_healthy is True` with every late series silenced. This is the load-bearing fact behind the issue's actual request — `report_power_freshness` returns early on a healthy result, so the daily Sentry warning about 23 stops |
 | `test_a_silenced_series_that_reports_again_is_resurrected` | 23 fresh and silenced → `resurrected_ids == (23,)` and `is_healthy is True`, which is why note 1 for #488 is true. Parametrised over the cutoff boundary: `last_time` exactly at the cutoff is resurrected, a second earlier is not — the exact complement of `stale`'s `<` |
 | `test_silencing_works_without_a_roster` | `roster_ids=None` plus silenced ids: the counts describe the survivors and nothing raises. A missing `if roster_ids is not None` guard would `AttributeError` into the catch-all and leave the check permanently "Could not evaluate", and no existing test pins that combination |
@@ -207,12 +218,20 @@ called" sentinel inside the check body is useless; assert after the call.
     happens in the pure evaluator so the Sentry warning inherits it, and that a returning series
     turns the check yellow for as long as it keeps reporting rather than being removed
     automatically.
-  - `_MAX_LATE_SERIES_IN_TABLE`'s docstring says "`n_stale` and `n_never_reported` stay exact
-    throughout". They now count the watched population; same rewrite as the operations page below.
-  - The `NOTE` above the `stale` filter proposes intersecting stale ids with `roster_ids` as the
-    remedy for "a permanently-yellow check for a genuinely retired series". That nuisance is now
-    solved three lines above it, by a different mechanism. Rewrite the `NOTE` to say so, or a later
-    reader builds the second mechanism.
+  - `_MAX_LATE_SERIES_IN_TABLE`'s docstring claims `n_stale` and `n_never_reported` are exact.
+    They now count the watched population, so say that — the same rewrite as the operations page
+    below. Do not match on the current wording: open PR #544 cuts this docstring from 18 lines to
+    5, moving the "why" to `production-deployment.md`, and the claim survives as "``n_stale`` and
+    ``n_never_reported`` stay exact regardless". Two test docstrings in `tests/test_checks.py`
+    (`test_late_series_table_is_capped_but_the_counts_are_not` and
+    `test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table`) make the same claim and
+    are reworded by that PR too.
+  - The `NOTE` above the `stale` filter now ends "Silencing one needs an explicit record of which
+    ids we have retired" — PR #540 rewrote it, so the earlier draft's item about intersecting stale
+    ids with `roster_ids` no longer applies. That explicit record is what this change adds, three
+    lines above the `NOTE`, so point the sentence at `_KNOWN_DEAD_TIME_SERIES_IDS`. The two are not
+    quite the same population — the `NOTE` is about series NGED has retired, the constant is about
+    series whose sensors are broken — and the sentence should say that one mechanism serves both.
 - **`docs/live_service/operations.md`**, "Reading the freshness check" — two edits:
   - The new paragraph: how to silence a series and how to un-silence one (edit the constant, commit,
     redeploy), what `Ignoring N known-dead…` and `has reported again` mean, that the yellow lasts
@@ -326,9 +345,15 @@ mechanism, a second correctness pass over what it left behind.
 - **Three untested behaviours and three missed doc passages** (fourth pass): silencing with no
   roster (a missing `if roster_ids is not None` would turn the check permanently "Could not
   evaluate"), the resurrection cutoff boundary, and the wholly-silenced branch; plus
-  `_MAX_LATE_SERIES_IN_TABLE`'s "stay exact throughout" docstring, the `NOTE` that proposes the
-  roster-intersection remedy this change supersedes, and `production-deployment.md`'s "green tick …
-  yellow warning" sentence, which now has a third cause.
+  `_MAX_LATE_SERIES_IN_TABLE`'s exactness claim, the `NOTE` above the `stale` filter, and
+  `production-deployment.md`'s "green tick … yellow warning" sentence, which now has a third cause.
+- **The rejection of `silenced_ids` minus `late` rested on a state that cannot arise** (fifth pass,
+  from a parallel session): a series dropped from the roster. `upsert_metadata` never drops one.
+  The conclusion survives by two other routes — there is no unfiltered `late` under this design, and
+  a silenced id that was never in the roster would be misreported as resurrected — and the stated
+  reason is corrected in both places it appeared. The same pass caught that PR #540 has already
+  rewritten the `NOTE`, and that open PR #544 rewords the exactness claim in three places, so both
+  doc items now say what to look for rather than quoting text that has moved.
 - **A departure from Jack's comment went unlisted** (fourth pass): his first comment sequences this
   issue after #439, #441 and #442, all still open. Now listed, with the reason it does not apply to
   this version.
@@ -380,8 +405,17 @@ mechanism, a second correctness pass over what it left behind.
   time because the env var is how the existing `env` fixture redirects paths. The third pass showed
   the premise was wrong — `tests/test_checks.py` already monkeypatches attributes on `checks` five
   times — and the finding is accepted in its stronger form: no path at all.
-- **"Compute resurrection as `silenced_ids` minus `late`"** (first pass). Rejected: it would also
-  match an id dropped from the roster with no rows on disk.
+- **"Compute resurrection as `silenced_ids` minus `late`"** (first pass). Still rejected, but the
+  original reason was wrong and is corrected above. It said the subtraction would misreport "an id
+  dropped from the roster with no rows on disk" — that state cannot arise. `upsert_metadata` merges
+  each snapshot into the stored roster on `time_series_id` and never drops a series, so the roster
+  holds every series we have ever seen and a series NGED stops publishing keeps its last stored
+  values indefinitely (documented in PR #540, which rewrote the `NOTE` above the `stale` filter for
+  the same reason). The rejection survives by two other routes: under this design there is no
+  unfiltered `late` left to subtract from, and even in the structure where there is, a silenced id
+  that was *never* in the roster — a typo in the constant, or an id NGED has never published — is
+  absent from `late` and would be called resurrected. `test_silenced_series_are_withheld_and_others_still_warn`
+  pins that case with id 404.
 - **"Drop the `n_silenced` metadata key; the description says it in words"** (third pass, marginal).
   Rejected: every listing in this module is emitted beside a count (`n_late_listed`,
   `n_time_series_missing_listed`), and a string of ids is the one thing Dagster cannot plot or sort.
@@ -401,11 +435,13 @@ mechanism, a second correctness pass over what it left behind.
 
 ### Fourth pass — confirmed sound
 
-The reviewer walked filtering-the-inputs against filtering-`late` through all five cases — silenced
-and stale, silenced and never-reported, silenced and fresh, silenced and present nowhere, and
-silenced but present in `coverage` while absent from the roster (the case the code's own `NOTE`
-singles out) — and found `late`, `n_stale` and `n_never` identical in every one, with
-`n_series_total` the sole deliberate divergence. It also confirmed on the installed Polars that an
-emptied `coverage` still yields "every roster id is never", that the `last_time` dtype lookup is
-unaffected, and that the ordering matters and the plan has it right: `resurrected_ids` is computed
-before the `coverage` filter.
+The reviewer walked filtering-the-inputs against filtering-`late` through every case — silenced and
+stale, silenced and never-reported, silenced and fresh, silenced and present nowhere — and found
+`late`, `n_stale` and `n_never` identical in each, with `n_series_total` the sole deliberate
+divergence. It also confirmed on the installed Polars that an emptied `coverage` still yields "every
+roster id is never", that the `last_time` dtype lookup is unaffected, and that the ordering matters
+and the plan has it right: `resurrected_ids` is computed before the `coverage` filter.
+
+(It walked a fifth case too — silenced, present in `coverage`, absent from the roster — which the
+fifth pass then established cannot arise, because `upsert_metadata` never drops a series. Nothing
+in the plan depends on it either way.)
