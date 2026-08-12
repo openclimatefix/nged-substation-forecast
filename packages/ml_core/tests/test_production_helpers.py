@@ -231,15 +231,13 @@ def test_load_forecaster_from_dir_accepts_the_current_vocabulary(tmp_path: Path)
     )
 
 
-def test_the_feature_guard_ignores_a_subclass_own_hyperparameters(tmp_path: Path) -> None:
-    """The guard reads ``selected_features`` and nothing else out of a saved config.
+def test_the_guard_accepts_a_subclass_own_hyperparameters(tmp_path: Path) -> None:
+    """A saved ``model_params`` is a *subclass* instance, so it is validated as one.
 
-    A saved ``model_params`` is always a *subclass* instance, so it carries hyper-parameters the
-    base class never declares. ``BaseForecasterConfig`` forbids unknown keys, so validating the
-    whole mapping against the base class would reject every real model on its own
-    ``n_estimators`` — with a message blaming the feature vocabulary.
+    The negative control for the test below: validating against ``BaseForecasterConfig``, which
+    forbids unknown keys, would reject every real model on its own ``n_estimators``.
     """
-    config = XGBoostConfig(selected_features={"temperature_2m"}, n_estimators=17, device="cpu")
+    config = XGBoostConfig(selected_features={"temperature_2m"}, n_estimators=17)
     XGBoostForecaster(config).save(tmp_path)
     saved = json.loads((tmp_path / "meta.json").read_text())
     assert "n_estimators" in saved["model_params"], "this test is pointless if none are saved"
@@ -248,3 +246,23 @@ def test_the_feature_guard_ignores_a_subclass_own_hyperparameters(tmp_path: Path
 
     assert isinstance(loaded, XGBoostForecaster)
     assert loaded.model_params.n_estimators == 17
+
+
+def test_the_guard_rejects_a_hyperparameter_this_code_no_longer_declares(tmp_path: Path) -> None:
+    """A removed or renamed hyper-parameter is refused, exactly as a retired feature name is.
+
+    ``XGBoostConfig`` forbids unknown keys, so a model saved while the code still declared
+    ``gpu_id`` cannot be loaded once it is gone. The guard must say so, rather than let the
+    ``ValidationError`` surface from ``load`` — which in production means after promotion has
+    already replaced the champion.
+    """
+    XGBoostForecaster(XGBoostConfig(selected_features={"temperature_2m"})).save(tmp_path)
+    meta_path = tmp_path / "meta.json"
+    meta = json.loads(meta_path.read_text())
+    meta["model_params"]["gpu_id"] = 0
+    meta_path.write_text(json.dumps(meta))
+
+    with pytest.raises(ValueError, match="model_params") as exc_info:
+        load_forecaster_from_dir(tmp_path)
+
+    assert str(tmp_path) in str(exc_info.value)

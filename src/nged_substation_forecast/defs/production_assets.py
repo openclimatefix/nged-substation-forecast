@@ -127,8 +127,9 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     which replaces the directory atomically), then reads back ``meta.json`` to report provenance.
     ``live_forecasts`` reads this directory with a plain disk load — never MLflow.
 
-    Promotion refuses a model whose ``selected_features`` this code cannot parse, and refuses it
-    before the directory is replaced, so the previous champion stays in place and keeps serving.
+    Promotion refuses a model whose saved config this code cannot rebuild — a feature name it
+    cannot parse, or a ``model_params`` key it no longer declares — and refuses it before the
+    directory is replaced, so the previous champion stays in place and keeps serving.
 
     Promotion as a Dagster materialisation gives an audit trail and lineage for free, rather than
     a bare script (a script wrapper for the eventual Docker build (#222) stays trivial by calling
@@ -215,12 +216,12 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     Loads the production model from a plain disk directory (``load_forecaster_from_dir`` against
     ``Settings.production_model_path``, populated out-of-band by the ``promoted_model``
     asset) — **no MLflow import or call anywhere in this asset**; live performance is tracked by
-    production monitoring, never logged here. A model whose ``selected_features`` this code cannot
-    parse — one promoted before a feature was renamed — fails at that load, naming the feature,
-    rather than partway through feature engineering. Forecasts exactly
-    ``forecaster.trained_time_series_ids`` (never today's eligibility set — the train==predict
-    population invariant) across every NWP ensemble member, using single-run feature engineering
-    stamped with this partition's ``power_fcst_init_time``.
+    production monitoring, never logged here. A model whose saved config this code cannot rebuild
+    fails at that load rather than partway through feature engineering; promotion applies the same
+    check, so this only bites when the code changed after the champion was promoted. Forecasts
+    exactly ``forecaster.trained_time_series_ids`` (never today's eligibility set — the
+    train==predict population invariant) across every NWP ensemble member, using single-run feature
+    engineering stamped with this partition's ``power_fcst_init_time``.
 
     NWP availability is resolved via ``config.availability_mode``: the scheduled tick always
     uses ``"live"`` (freshest run actually present, no modelled delay); manual backfills of past
