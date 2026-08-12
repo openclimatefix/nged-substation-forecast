@@ -282,9 +282,9 @@ def test_upsert_metadata_adds_a_new_id_when_the_stored_roster_is_thinner(tmp_pat
 
 def test_upsert_metadata_merges_a_snapshot_missing_the_optional_columns(tmp_path: Path):
     """`TimeSeriesMetadata` has four `allow_missing` fields, so a snapshot can be narrower than the
-    stored roster and still validate. Merging the two must not raise, and a field the snapshot no
-    longer carries must be *cleared*, so the roster keeps meaning "the latest snapshot of what NGED
-    published"."""
+    stored roster and still validate. Merging the two must not raise: a field the snapshot no
+    longer carries is *cleared* for the series the snapshot covers, while a series the snapshot
+    omits keeps every value it already had."""
     metadata_path = tmp_path / "metadata.parquet"
     _roster([1, 2], information="note").write_parquet(metadata_path)
 
