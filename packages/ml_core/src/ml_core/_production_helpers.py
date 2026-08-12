@@ -236,10 +236,10 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
 
     Downloads and unpacks into a temporary directory first, so a failed or interrupted download
     never touches ``dest`` — only a fully-downloaded model is moved into place (via ``rmtree`` +
-    ``move``). ``dest`` is always local disk (``Settings.production_model_path`` derives from
-    ``local_artifacts_path``), so unlike the Delta tables this is a directory of many files on a
-    filesystem with no commit protocol, and a part-written one would be served. The run holds the
-    model as a single archive artifact
+    ``move``). ``dest`` is local disk by convention — ``Settings.production_model_path`` derives
+    from ``local_artifacts_path``, though nothing enforces that — so unlike the Delta tables this is
+    a directory of many files with no commit protocol over it, and a part-written one would be
+    served. The run holds the model as a single archive artifact
     (``ml_core.base_forecaster._MLFLOW_MODEL_ARTIFACT``), so ``dest`` gets exactly the files the
     last ``save_to_mlflow`` wrote and can never inherit a stale file from an earlier, larger model.
 

@@ -73,7 +73,7 @@ def open_ecmwf_ens_run(
     if utc_nwp_init_time not in ds.init_time.values:
         raise NwpRunNotYetAvailable(f"{utc_nwp_init_time} is not in ds.init_time.values")
 
-    # These two guard the Dynamical.org catalog itself, which is an external substrate we neither
+    # This guards the Dynamical.org catalog itself, which is an external substrate we neither
     # control nor version-pin, so its shape can change under us between runs.
     if ds.longitude.size == 0 or ds.latitude.size == 0:
         raise ValueError("Dataset has empty longitude or latitude coordinates.")

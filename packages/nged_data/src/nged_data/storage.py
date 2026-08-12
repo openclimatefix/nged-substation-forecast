@@ -388,9 +388,8 @@ def upsert_metadata(
     """
     COMPRESSION: Final[str] = "zstd"
 
-    # The annotation is not enforced at runtime and this is the package's entry point, so check the
-    # caller's snapshot rather than trust it. The three validations below each catch something this
-    # one cannot; none of the four is redundant.
+    # The annotation is not enforced at runtime and this is the package's only public entry point,
+    # so check the caller's snapshot rather than trust it.
     new_metadata = TimeSeriesMetadata.validate(new_metadata.sort("time_series_id"))
 
     if not object_exists(metadata_path, storage_options):
@@ -413,9 +412,9 @@ def upsert_metadata(
         metadata_path, storage_options=typeddict_to_dict(storage_options)
     )
     # The stored roster is outside this code's control — an older writer, a hand-edit, a truncated
-    # upload — so an off-contract file must not be merged blind into the one we write back. Raising
-    # here is contained rather than fatal: the asset records `metadata_upsert_failed` and lets the
-    # power write proceed (see `defs/assets.py`).
+    # upload — so an off-contract file must not be merged blind into the one we write back. As with
+    # any raise from this function, the asset contains it rather than failing: it records
+    # `metadata_upsert_failed` and lets the power write proceed (see `defs/assets.py`).
     TimeSeriesMetadata.validate(existing_metadata)
 
     # `how="diagonal"` because the snapshot and the stored roster can differ in both width and
@@ -429,9 +428,10 @@ def upsert_metadata(
     # Compare metadata. `metadata_diff` contains all rows in `new_metadata` that do not have an
     # exact match in `existing_metadata`. Adapted from https://stackoverflow.com/a/79888719
     metadata_diff = new_rows.filter(~new_rows.hash_rows().is_in(stored_rows.hash_rows().implode()))
-    # First frame that has been through the diagonal concat, which null-fills the four
-    # `allow_missing` fields for whichever side lacked them — so this catches a null landing in a
-    # field the snapshot itself carried non-null, which validating the two inputs cannot.
+    # The first frame carrying the union of both inputs' columns: the concat adds to the snapshot's
+    # rows any `allow_missing` field only the stored roster had. All four of those are nullable, so
+    # this is a shape check on a frame neither validation above saw rather than a guard against a
+    # known fault — the weakest of the four, and the first to reconsider if these get trimmed.
     TimeSeriesMetadata.validate(metadata_diff)
 
     if metadata_diff.is_empty():
