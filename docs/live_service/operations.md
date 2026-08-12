@@ -28,12 +28,13 @@ the stack runs in — bring one up first:
   Fargate task. To get your laptop onto the tailnet and reach that UI, see
   [Connecting to the AWS control plane](connecting.md).
 
-Either UI shows all eleven assets, most of which are nothing to do with running the service. Paste
-`tag:layer=production` into the asset-selection box to cut the view down to the four the AWS box
-runs: `power_time_series_and_metadata`, `h3_grid_weights`, `ecmwf_ens` and `live_forecasts`. Write
-it unquoted, exactly as above. The promotion assets used in steps 1–2 below are deliberately *not*
-in that selection — they need MLflow, so they run on your laptop whichever environment serves the
-forecasts; `tag:layer=research` is the rest.
+Either UI shows every asset, most of which are nothing to do with running the service. Paste
+`tag:layer=production` into the asset-selection box to cut the view down to the four that produce
+the forecasts: `power_time_series_and_metadata`, `h3_grid_weights`, `ecmwf_ens` and
+`live_forecasts`. The promotion assets used in steps 1–2 below are deliberately *not* in that
+selection: they need MLflow, which the deployment does not reach, so you run them yourself —
+today from your laptop, as step 2 says — whichever environment serves the forecasts.
+`tag:layer=research` is the rest.
 
 ## Step 1 — Pick a champion model
 

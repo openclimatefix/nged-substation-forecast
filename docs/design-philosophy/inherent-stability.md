@@ -497,11 +497,11 @@ the feature and validation layer 🚧.
 
 Which assets sit on which side is recorded on the assets themselves, as a `layer` tag valued
 `production` or `research` — see
-[Architecture Overview](../architecture/overview.md#core-components). The tag says which machine
-runs an asset rather than asserting a posture: everything the AWS box runs is on the
-fail-operational side, and a `production` asset may still raise where rule 1 permits it — as
-`live_forecasts` does on an unloadable promoted model, which is our own bug rather than a data
-outage. The asymmetry is also implemented at the telemetry
+[Architecture Overview](../architecture/overview.md#core-components). The tag records which side an
+asset belongs to; it does not assert a posture, and a `production` asset can still raise: on an
+unloadable promoted model, which is our own bug, and — until
+[#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446) — on absent NWP,
+which is the row this page most wants to change. The asymmetry is also implemented at the telemetry
 layer: the Sentry failure hook is attached to the three scheduled production jobs only.
 
 ## Vocabulary
