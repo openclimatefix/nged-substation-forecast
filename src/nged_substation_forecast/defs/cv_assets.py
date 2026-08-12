@@ -791,8 +791,10 @@ def _group_scan(
         fold_id: Fold identifier of the group.
 
     Returns:
-        A lazy scan of this one group's rows, annotated as a plain ``pl.LazyFrame`` because that
-        is how ``.filter()`` is typed; the per-batch loader re-validates on collect.
+        A lazy scan of this one group's rows. Left as a plain ``pl.LazyFrame`` rather than
+        re-wrapped as ``pt.LazyFrame[PowerForecast]``, because every consumer takes it plain and
+        ``_load_series_batch`` validates each batch on collect — a re-wrap here would be discarded
+        unused.
     """
     return pruned_scan.filter(
         (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
