@@ -354,7 +354,7 @@ def power_data_is_fresh() -> AssetCheckResult:
         # `sentry_capture_failure` hook, so a raise here would turn fail-open into fail-closed.
         # Sentry is told explicitly because not failing the run means that hook no longer fires.
         logger.exception("Could not evaluate power-data freshness")
-        report_check_degradation("power_data_is_fresh", exc)
+        report_check_degradation(check_name="power_data_is_fresh", exc=exc)
         return AssetCheckResult(
             passed=False,
             severity=AssetCheckSeverity.WARN,
@@ -930,7 +930,7 @@ def live_forecasts_are_healthy(context: AssetCheckExecutionContext) -> AssetChec
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
             raise  # A cancelled run must cancel.
         logger.exception("Could not evaluate live-forecast health")
-        report_check_degradation("live_forecasts_are_healthy", exc)
+        report_check_degradation(check_name="live_forecasts_are_healthy", exc=exc)
         return AssetCheckResult(
             passed=False,
             severity=AssetCheckSeverity.WARN,

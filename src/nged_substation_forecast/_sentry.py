@@ -143,7 +143,7 @@ def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str)
     """
     try:
         with sentry_sdk.new_scope() as scope:
-            scope.set_tag(tag, value)
+            scope.set_tag(key=tag, value=value)
             sentry_sdk.capture_exception(exc)
     except Exception:
         # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
@@ -314,9 +314,9 @@ def _capture_power_freshness_warning(
     ]
     with sentry_sdk.new_scope() as scope:
         scope.fingerprint = [POWER_DATA_STALE_FINGERPRINT, settings.sentry_environment]
-        scope.set_tag("n_late", result.n_late)
-        scope.set_tag("n_stale", result.n_stale)
-        scope.set_tag("n_never_reported", result.n_never)
+        scope.set_tag(key="n_late", value=result.n_late)
+        scope.set_tag(key="n_stale", value=result.n_stale)
+        scope.set_tag(key="n_never_reported", value=result.n_never)
         scope.set_context(
             "power_freshness",
             {
