@@ -137,6 +137,15 @@ Three places where a positional argument is right:
   might rot is cheaper than a copy that rots invisibly. It cuts the other way too — rationale
   worth a paragraph does not belong *only* in a docstring, where no reader browsing the docs will
   find it.
+- **Say why a guard exists, when the reason is not "this state happens"** — validation that
+  defends a reusable package's public API, rather than a state production can reach, says so in a
+  clause: `# Reusable-package input validation, not a reachable production state: the ecmwf_ens
+  asset always sources h3_grid from h3_grid_weights.` A defence that only makes sense on one
+  substrate names that substrate, since production data lives on S3 where a torn object write
+  cannot happen. Without the clause a reviewer traces the one production call path, finds the state
+  impossible, and proposes deleting the guard — correctly, on the evidence the code gave them.
+  Repeated validation needs the same treatment: say what each call catches that the one above it
+  did not.
 - **MkDocs-compatible constant docs** — document module-level constants with a string literal
   immediately after the assignment, not with Sphinx-style `#:` comments. This is correct:
 
