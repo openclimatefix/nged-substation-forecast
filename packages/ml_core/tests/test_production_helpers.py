@@ -7,8 +7,10 @@ only reads a plain disk directory).
 """
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any, ClassVar
 
 import patito as pt
 import polars as pl
@@ -193,16 +195,47 @@ def test_load_forecaster_from_dir_rejects_an_unparseable_feature(
     assert str(tmp_path) in str(exc_info.value)
 
 
-def test_the_rejection_message_never_mentions_the_experiment_tracker(tmp_path: Path) -> None:
+def _retire_a_feature(meta: dict[str, Any]) -> None:
+    """Name a feature a rename retired."""
+    meta["model_params"]["selected_features"] = ["local_utc_offset"]
+
+
+def _add_an_undeclared_hyperparameter(meta: dict[str, Any]) -> None:
+    """Carry a hyper-parameter ``XGBoostConfig`` does not declare."""
+    meta["model_params"]["gpu_id"] = 0
+
+
+def _drop_the_model_class(meta: dict[str, Any]) -> None:
+    """Leave no way to reach the concrete forecaster class."""
+    del meta["model_class"]
+
+
+@pytest.mark.parametrize(
+    ("break_meta", "expected"),
+    [
+        (_retire_a_feature, "local_utc_offset"),
+        (_add_an_undeclared_hyperparameter, "model_params"),
+        (_drop_the_model_class, "model_class"),
+    ],
+)
+def test_the_rejection_message_never_mentions_the_experiment_tracker(
+    tmp_path: Path, break_meta: Callable[[dict[str, Any]], None], expected: str
+) -> None:
     """``scripts/build_and_verify_image.sh`` fails the image build on that word in the runtime log.
 
     Its one automated gate greps the smoke-test container's log case-insensitively to prove
-    production inference has no experiment-tracker dependency, and this rejection is raised on the
-    path that smoke test exercises — so the wording is load-bearing, not cosmetic.
+    production inference has no experiment-tracker dependency, and these rejections are raised on
+    the path that smoke test exercises — so the wording is load-bearing, not cosmetic. Every way
+    the guard can refuse a model is covered, because any one of them can be what the container
+    logs.
     """
-    XGBoostForecaster(XGBoostConfig(selected_features={"local_utc_offset"})).save(tmp_path)
+    XGBoostForecaster(XGBoostConfig(selected_features={"temperature_2m"})).save(tmp_path)
+    meta_path = tmp_path / "meta.json"
+    meta = json.loads(meta_path.read_text())
+    break_meta(meta)
+    meta_path.write_text(json.dumps(meta))
 
-    with pytest.raises(ValueError, match="local_utc_offset") as exc_info:
+    with pytest.raises(ValueError, match=expected) as exc_info:
         load_forecaster_from_dir(tmp_path)
 
     assert "mlflow" not in str(exc_info.value).lower()
@@ -231,15 +264,39 @@ def test_load_forecaster_from_dir_accepts_the_current_vocabulary(tmp_path: Path)
     )
 
 
-def test_the_feature_guard_ignores_a_subclass_own_hyperparameters(tmp_path: Path) -> None:
-    """The guard reads ``selected_features`` and nothing else out of a saved config.
+class _NarrowerConfig(XGBoostConfig):
+    """Stands in for the config class a second forecaster would bring with it."""
 
-    A saved ``model_params`` is always a *subclass* instance, so it carries hyper-parameters the
-    base class never declares. ``BaseForecasterConfig`` forbids unknown keys, so validating the
-    whole mapping against the base class would reject every real model on its own
-    ``n_estimators`` — with a message blaming the feature vocabulary.
+
+class _NarrowerConfigForecaster(XGBoostForecaster):
+    """Overrides ``CONFIG_CLASS`` and nothing else, so ``load`` alone decides which config is built.
+
+    Module level, not nested in the test: ``save`` stamps ``class_target(self)`` into ``meta.json``,
+    which a class defined inside a function has no importable path for.
     """
-    config = XGBoostConfig(selected_features={"temperature_2m"}, n_estimators=17, device="cpu")
+
+    CONFIG_CLASS: ClassVar[type[XGBoostConfig]] = _NarrowerConfig
+
+
+def test_load_builds_its_config_through_config_class(tmp_path: Path) -> None:
+    """``load`` must reach its config class through ``CONFIG_CLASS``, not by naming one again.
+
+    That identity is what makes the guard's verdict binding: the guard validates a saved
+    ``model_params`` against ``CONFIG_CLASS``, so a ``load`` that used some other class could still
+    reject a model the guard had passed — after promotion had replaced the champion.
+    """
+    _NarrowerConfigForecaster(XGBoostConfig(selected_features={"temperature_2m"})).save(tmp_path)
+
+    assert isinstance(load_forecaster_from_dir(tmp_path).model_params, _NarrowerConfig)
+
+
+def test_the_guard_accepts_a_subclass_own_hyperparameters(tmp_path: Path) -> None:
+    """A saved ``model_params`` is a *subclass* instance, so it is validated as one.
+
+    The negative control for the test below: validating against ``BaseForecasterConfig``, which
+    forbids unknown keys, would reject every real model on its own ``n_estimators``.
+    """
+    config = XGBoostConfig(selected_features={"temperature_2m"}, n_estimators=17)
     XGBoostForecaster(config).save(tmp_path)
     saved = json.loads((tmp_path / "meta.json").read_text())
     assert "n_estimators" in saved["model_params"], "this test is pointless if none are saved"
@@ -248,3 +305,23 @@ def test_the_feature_guard_ignores_a_subclass_own_hyperparameters(tmp_path: Path
 
     assert isinstance(loaded, XGBoostForecaster)
     assert loaded.model_params.n_estimators == 17
+
+
+def test_the_guard_rejects_a_hyperparameter_this_code_no_longer_declares(tmp_path: Path) -> None:
+    """A removed or renamed hyper-parameter is refused, exactly as a retired feature name is.
+
+    ``XGBoostConfig`` forbids unknown keys, so a model saved while the code still declared
+    ``gpu_id`` cannot be loaded once it is gone. The guard must say so, rather than let the
+    ``ValidationError`` surface from ``load`` — which in production means after promotion has
+    already replaced the champion.
+    """
+    XGBoostForecaster(XGBoostConfig(selected_features={"temperature_2m"})).save(tmp_path)
+    meta_path = tmp_path / "meta.json"
+    meta = json.loads(meta_path.read_text())
+    meta["model_params"]["gpu_id"] = 0
+    meta_path.write_text(json.dumps(meta))
+
+    with pytest.raises(ValueError, match="model_params") as exc_info:
+        load_forecaster_from_dir(tmp_path)
+
+    assert str(tmp_path) in str(exc_info.value)
