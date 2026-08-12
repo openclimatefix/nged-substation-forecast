@@ -107,21 +107,30 @@ aggregation, over the downloaded lat/lon box, beyond lead-0.
 — pure and Dagster-free, mirroring `assess_nwp_quality`'s shape. Select the steps beyond lead-0, then
 for each name in `sorted(variables)` reduce `isnull()` over `latitude`/`longitude` to give a null
 count per `(ensemble_member, lead_time)`; sum those for `n_null_nwp_grid_points`, count the non-zero
-ones for `n_affected_nwp_slices`, and take `n_total_nwp_grid_points` from the selected array's
-`.size`.
+ones for `n_affected_nwp_slices`, and accumulate `n_total_nwp_grid_points` as the sum of each
+selected array's `.size` — **over every variable counted, not one of them**. The denominator is
+`len(variables) × n_lat × n_lon × n_members × n_steps_beyond_lead0`; taking a single array's `.size`
+would divide by a third of the population and treble the reported rate.
 
-`variables` is a parameter rather than a hard-coded `Nwp.deaccumulated_var_names` purely so the
+`variables` is a parameter rather than a hard-coded `Nwp.deaccumulated_var_names` so the
 [follow-on check](#follow-on-work) for the instantaneous variables can reuse this function unchanged.
 The asset passes `Nwp.deaccumulated_var_names`. This is the one piece of generality the plan builds
-for a caller that does not exist yet, and it is justified because that caller is already agreed and
-scheduled, not hypothetical.
+for a caller that does not exist yet. The honest status of that caller: agreed with Jack while
+planning this issue, with the issue to be filed at ship time. It is not in the tracker yet, unlike
+issues #501 and #506, which this plan cites.
 
-**Name the lead-0 predicate explicitly: `ds.lead_time > np.timedelta64(0)`.** Not "skip the first
-chunk", which is wrong for a run whose steps do not start at 0, and not an integer comparison, which
-would silently include lead-0 and put `3 × n_lat × n_lon × n_members` guaranteed nulls into the
-numerator. `lead_time` is a `timedelta64` in both the fixture (`[ns]`,
-`packages/dynamical_data/tests/conftest.py:78`) and the committed real slice (`[us]`), and
-`np.timedelta64(0)` compares correctly across units.
+**Name the lead-0 predicate explicitly: `ds.lead_time > np.timedelta64(0, "ns")`.** Not "skip the
+first chunk", which is wrong for a run whose steps do not start at 0, and not an integer comparison,
+which would silently include lead-0 and put `len(variables) × n_lat × n_lon × n_members` guaranteed
+nulls into the numerator. `lead_time` is a `timedelta64` in both the fixture (`[ns]`,
+`packages/dynamical_data/tests/conftest.py:78`) and the committed real slice (`[us]`), and the `ns`
+form compares correctly against both.
+
+**The unit argument is required, not decoration.** A bare `np.timedelta64(0)` raises
+`DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated` on the pinned numpy, and
+`pyproject.toml:339` sets `filterwarnings = ["error"]` — so the bare form fails every unit test
+outright, and inside the asset it would be swallowed by the `except BaseException` guard and
+silently degrade both checks on every run.
 
 Excluding lead-0 is not optional: the de-accumulated variables are null there by design in every run,
 everywhere.
@@ -129,6 +138,12 @@ everywhere.
 ### `docs/api/dynamical_data/index.md`
 
 Add `::: dynamical_data.ecmwf_ens.upstream_nulls` alongside `download` and `convert_to_polars`.
+
+### `packages/dynamical_data/src/dynamical_data/ecmwf_ens/__init__.py`
+
+Its one-line docstring enumerates the package's jobs — "opening a run, downloading it, and
+converting to Polars" — so a third module makes that list incomplete. One sentence, but it is
+rendered in the API reference directly above the module it would omit.
 
 ### `packages/contracts/src/contracts/weather_schemas.py`
 
@@ -143,22 +158,40 @@ scalars, and `contracts` is the home of Patito data schemas; a report describing
 
 ### `src/nged_substation_forecast/defs/assets.py`
 
-- Call `assess_upstream_grid_point_nulls(ds, Nwp.deaccumulated_var_names)` **inside the existing
-  `try` block** at line 308 that
-  already wraps `assess_nwp_quality` and `assess_nwp_run_completeness`. The guard, the ordering
-  before `write_nwp`, and `_degraded_nwp_check_result` all already exist and the new call inherits
-  them unchanged. Positional `ds` is right here under
+- Call `assess_upstream_grid_point_nulls(ds=ds, variables=Nwp.deaccumulated_var_names)` **inside
+  the existing `try` block** at line 308 that already wraps `assess_nwp_quality` and
+  `assess_nwp_run_completeness`. The guard, the ordering before `write_nwp`, and
+  `_degraded_nwp_check_result` all already exist and the new call inherits them unchanged.
+  Both arguments take keywords: the call has two, so none of
   [Calling functions](https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/#calling-functions)'
-  third exception — one argument whose role the function name states — and matches the sibling
-  `assess_nwp_quality(nwp)` on the line above.
+  three exceptions applies, and it matches `assess_nwp_run_completeness(dataframe=…,
+  expected_n_h3_cells=…)` two lines below. `assets.py` does not import `Nwp` today, so the import
+  list grows by one.
 - `_nwp_quality_check_result` gains an `upstream: UpstreamNullRate` parameter. Its call site becomes
   `_nwp_quality_check_result(report=quality, upstream=upstream)` — two arguments now, so the
-  keyword-argument rule applies and the existing positional call must change with it.
+  keyword-argument rule applies and the existing positional call must change with it. **So must the
+  stub that wraps it in `test_ecmwf_ens_assesses_before_writing`**
+  (`tests/test_assets.py:630-632`), whose `_record_then_build(report)` calls `real_build(report)`
+  positionally. Left unfixed, the `TypeError` lands inside the guard and the test fails as
+  `assert table_existed == [False]` with both checks degraded — a symptom that points nowhere near
+  the cause.
 - **Rename every metadata key on this check so it names the population it counts**, per
   [Naming the two populations](#naming-the-two-populations). Six of the eleven are renames of
-  existing keys, which is a deliberate breaking change to the check's metadata; nothing consumes
-  these keys programmatically (no training filter, no metric, no alert — `operations.md` says so
-  explicitly), so the cost is the docs and tests listed below.
+  existing keys, which is a deliberate breaking change to the check's metadata. Nothing in
+  production consumes them (no training filter, no metric, no alert — `operations.md` says so
+  explicitly); the cost is six live assertions plus prose:
+
+    - `tests/test_assets.py:446, 447, 450, 492, 493, 496` assert the old key names, and the
+      explanatory comment at line 449 names one of them.
+    - `docs/live_service/operations.md` names them at lines 240, 241, 244 and 253.
+
+  **`NwpQualityReport`'s Python property names do not change** — `report.n_null_cells` stays, while
+  the key it is published under becomes `n_null_h3_cells`. The property lives on a class whose name
+  already says it is about cells, so it reads unambiguously in code; the key has to survive being
+  read alone in a Dagster UI row, which is why only it grows the prefix. Stated because the mismatch
+  looks like an oversight and would otherwise be "fixed" into a `contracts` change this plan does
+  not want, along with the assertions at
+  `packages/contracts/tests/test_weather_schemas_validation.py:85-148`.
 
   | H3 cells, after aggregation | Raw NWP grid, before aggregation |
   |---|---|
@@ -200,7 +233,11 @@ scalars, and `contracts` is the home of Patito data schemas; a report describing
   and not only the ones that warn — following `_nwp_run_shape_metadata`'s precedent. Like the shape
   keys they are absent from a materialisation whose assessment raised, since they come from the same
   guarded block; the operations runbook already documents that absence and needs one sentence
-  extending it.
+  extending it. **Assign the empty fallback in the `except` branch**, next to the existing
+  `shape_metadata = {}` at `assets.py:332`. Building the dict only inside the `try` leaves the name
+  unbound on the degraded path, and `MaterializeResult` at line 339 is *outside* the guard — so the
+  `NameError` would fail the partition, which is precisely the rule-7 inversion the guard exists to
+  prevent.
 
 ### Naming the two populations
 
@@ -282,8 +319,9 @@ otherwise. `docs/architecture/ecmwf-ens-known-issues.md:98` gives per-grid-point
 (0.014% of `precipitation_surface`'s grid points on 2025-06-04 00Z, the worst run in the archive),
 and lines 111–113 record that only 12 of 862 archived runs carry any de-accumulated null beyond
 lead-0 at all. Since the pre-#496 aggregation let one null point null its cell, that 12/862 ≈ 1.4%
-bounds the runs carrying any null among the grid points our cells use, so a zero-threshold gate would
-fire on order 1% of runs. Gating is therefore affordable; we are declining it because it answers the
+bounds *from below* the runs carrying any null among the grid points our cells use — from below,
+because decision 2 measures the whole downloaded box, including corner points no cell touches, which
+only adds runs. So a zero-threshold gate would fire on at least order 1% of runs. Gating is therefore affordable; we are declining it because it answers the
 wrong question on this check, not because it would be noisy.
 
 The issue's constraint holds: one check, still `WARN`, still `blocking=False`.
@@ -314,34 +352,41 @@ Offline in every case — no network, no wall clock, no trained model.
 function does not exist; what matters is the assertion each pins:
 
 1. *Clean run, exact denominator* — no NaN beyond lead-0 gives `is_healthy`,
-   `n_null_grid_points == 0`, `null_grid_point_fraction == 0.0`, and `n_total_grid_points ==
-   3 × n_lat × n_lon × n_members × n_steps_beyond_lead0` on the default `lead_time_hours=(0, 6, 12)`
-   fixture. The denominator assertion is load-bearing: it is what a corrupt-slices-only denominator
-   gets wrong, and that is the trap `_deaccumulated_null_breakdown`'s `.filter(n_null > 0)` leads an
-   implementer into.
+   `n_null_nwp_grid_points == 0`, `null_nwp_grid_point_fraction == 0.0`, and
+   `n_total_nwp_grid_points == len(variables) × n_lat × n_lon × n_members × n_steps_beyond_lead0` on
+   the default `lead_time_hours=(0, 6, 12)` fixture. The denominator assertion is load-bearing
+   twice over: it is what a corrupt-slices-only denominator gets wrong (the trap
+   `_deaccumulated_null_breakdown`'s `.filter(n_null > 0)` leads an implementer into), and it is what
+   catches a denominator taken from one variable's array rather than all of them.
 2. *Lead-0 nulls are excluded* — de-accumulated variables entirely NaN at lead-0 and clean beyond it
    still gives `is_healthy` and the same denominator. Catches both the skip-the-first-chunk and the
    integer-comparison bugs named above.
 3. *Exact count on a known scatter* — NaN at a known set of `(member, lead_time, lat, lon)` positions
-   **beyond lead-0** in `precipitation_surface` gives exactly that `n_null_nwp_grid_points`, the exact
-   `null_nwp_grid_point_fraction` (compared with `pytest.approx`), `n_affected_nwp_slices` equal to the
-   of distinct `(member, lead_time)` pairs touched, and
-   `affected_variables == ("precipitation_surface",)`.
+   **beyond lead-0** in `precipitation_surface` gives exactly that `n_null_nwp_grid_points`, the
+   exact `null_nwp_grid_point_fraction` (compared with `pytest.approx`), `n_affected_nwp_slices`
+   equal to the number of distinct `(member, lead_time)` pairs touched, and
+   `affected_nwp_variables == ("precipitation_surface",)`.
 4. *The blindness this issue is about* — the load-bearing test. Convert a dataset whose scatter the
    H3 aggregation fully absorbs, and assert the returned `Nwp` frame has **no null cells** for that
    variable while `assess_upstream_grid_point_nulls` on the same dataset reports
-   `n_null_grid_points > 0`. That is the exact condition under which `main`'s signal reads clean.
+   `n_null_nwp_grid_points > 0`. That is the exact condition under which `main`'s signal reads clean.
 
    **`default_h3_grid` cannot express this test** — it maps one grid point per cell at
    `proportion=1.0` (`conftest.py:150`), so any null point it names nulls its cell. Build a grid with
-   two points per cell at 0.5/0.5 via `make_h3_grid`, as `test_convert_to_polars.py:713` already does.
-5. *Instantaneous variables are out of scope* — NaN in `temperature_2m` does not move
-   `n_null_nwp_grid_points`. Same multi-point grid needed: on a single-point cell a null `temperature_2m`
-   nulls the cell, and that column is non-nullable, so `Nwp.validate` raises
-   `DataFrameValidationError` and the test asserts nothing.
-6. *Zero denominator* — a dataset with `lead_time_hours=(0,)` gives `n_total_grid_points == 0`,
-   `null_grid_point_fraction == 0.0` and `is_healthy`, and does **not** raise. Pins the guard that
-   keeps `test_ecmwf_ens_cached.py:83`'s real-slice path working.
+   two points per cell at 0.5/0.5 via `make_h3_grid`, as `test_convert_to_polars.py:713` already
+   does; one NaN in `precipitation_surface` at a single (member, step, point) then renormalises to a
+   non-null cell and survives `Nwp.validate`.
+5. *Instantaneous variables are out of scope* — the mirror of test 4. On the same two-point-per-cell
+   grid, NaN in `temperature_2m` beyond lead-0 leaves `n_null_nwp_grid_points == 0` **and** the
+   converted frame's `temperature_2m` non-null. Both halves are needed: the count assertion alone is
+   a pure-function claim that never touches the converter, and it is the pairing that documents why
+   this variable is excluded — the aggregation absorbs it, so `Nwp.validate` never sees it either.
+6. *Zero denominator* — a dataset with `lead_time_hours=(0,)` gives `n_total_nwp_grid_points == 0`,
+   `null_nwp_grid_point_fraction == 0.0` and `is_healthy`, and does **not** raise. Lead-0-only
+   datasets are real — the committed slice at `test_ecmwf_ens_cached.py:83` is one, and 18 fixtures
+   in `test_convert_to_polars.py` are built that way — which is the evidence that this guard is
+   reachable rather than defensive. (Those tests do not themselves call the new function, so they
+   are not what breaks; the production case is a partial upstream publication.)
 
 **`tests/test_assets.py`**:
 
@@ -353,12 +398,18 @@ function does not exist; what matters is the assertion each pins:
 - **Test 8** — *The description cannot claim health it does not have* — for that same run the description does
   **not** contain "No unexpected nulls" and does name the upstream fraction. **Fails on `main`:**
   `assets.py:413` emits exactly that phrase for this run.
-- **Test 9** — *Degradation* — monkeypatch `assess_upstream_grid_point_nulls` to raise; the run still lands, both
-  checks come back as WARN `_degraded_nwp_check_result`s, one Sentry event is reported, and the
-  shape and upstream metadata keys are absent. Extends
+- **Test 9** — *Degradation* — monkeypatch `assess_upstream_grid_point_nulls` to raise; the run
+  still lands, both checks come back as WARN `_degraded_nwp_check_result`s, one Sentry event is
+  reported, and the shape and upstream metadata keys are absent. Extends
   `test_ecmwf_ens_lands_the_run_when_an_assessment_fails` (line 643), which already asserts
   `"n_ensemble_members" not in materialisation.metadata` at line 679, so the mirror assertion drops
-  straight in. This is what pins that the new call really is inside the guard.
+  straight in. This pins two things at once: that the new call is inside the guard, and that the
+  empty-metadata fallback is assigned on the degraded path rather than left unbound.
+- **Test 10** — *The check carries its standing description* — the `AssetCheckSpec` for
+  `nwp_has_no_unexpected_nulls` has a non-empty `description` naming both populations. Assertable off
+  the asset's check specs, alongside `test_definitions_resolve` (`tests/test_assets.py:770`).
+  **Fails on `main`:** the spec sets no description. Without this the one permanent explanation of
+  what the two key families mean can be dropped in a refactor with nothing to catch it.
 
 New `monkeypatch` calls take keyword arguments — `monkeypatch.setattr(target=assets,
 name="assess_upstream_grid_point_nulls", value=_raise)` — matching every call in the file.
@@ -389,9 +440,10 @@ Written to describe how the code works now, per CLAUDE.md's "Write about the pre
 - **`packages/contracts/src/contracts/weather_schemas.py`** — `NwpQualityReport`'s docstring, as
   above.
 - **Every doc that names a renamed metadata key.** The rename in
-  [Naming the two populations](#naming-the-two-populations) touches six existing keys, and
-  `operations.md` and `ecmwf-ens-known-issues.md` both name several of them in prose. Grep for the
-  old names (`n_null_cells`, `n_affected_slices`, `n_whole_null_slices`, `n_scattered_slices`,
+  [Naming the two populations](#naming-the-two-populations) touches six existing keys. Only
+  `operations.md` names any of them in prose (lines 240, 241, 244, 253) —
+  `ecmwf-ens-known-issues.md` names none, so it needs no rename edit. Still grep the old names
+  (`n_null_cells`, `n_affected_slices`, `n_whole_null_slices`, `n_scattered_slices`,
   `affected_variables`, `affected_slices`) across `docs/` and the docstrings before finishing, since
   a doc naming a key that no longer exists is worse than one naming none.
 - **`docs/design-philosophy/inherent-stability.md`** — add the upstream null rate to the
