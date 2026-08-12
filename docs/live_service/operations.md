@@ -195,7 +195,7 @@ series the check is *watching*: the silenced ones below are excluded from every 
 
 **Silencing a series we know is dead.** `_KNOWN_DEAD_TIME_SERIES_IDS` in
 `src/nged_substation_forecast/defs/checks.py` lists the `time_series_id`s the check ignores, so a
-monitor NGED has not fixed cannot hold it yellow for ever
+broken monitor cannot hold it yellow for ever
 ([why](../architecture/production-deployment.md#silence-the-series-we-already-know-are-dead)). Add
 an id, with a comment saying why, then commit, rebuild the image and redeploy. Removing an id starts
 the warnings again. Either edit is an intervention worth a `routine-ops` row in the

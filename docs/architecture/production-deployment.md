@@ -92,8 +92,8 @@ assets.
 
 ## Silence the series we already know are dead
 
-A broken monitor NGED has not fixed keeps the check yellow for months, and an always-yellow channel
-trains the operator to ignore it — which costs us the
+A broken monitor keeps the check yellow for months, and an always-yellow channel
+trains the human operator to ignore it — which costs us the
 [provider channel](../design-philosophy/inherent-stability.md#three-audiences-three-channels)
 entirely. `_KNOWN_DEAD_TIME_SERIES_IDS` in `defs/checks.py` names the `time_series_id`s the check
 ignores.
