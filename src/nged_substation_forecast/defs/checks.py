@@ -176,11 +176,11 @@ def evaluate_power_freshness(
     # Stale: has data on disk, but the newest observation predates the cutoff.
     #
     # NOTE: this is deliberately not restricted to `roster_ids`. A series that NGED has
-    # decommissioned (dropped from the metadata roster) but that still has old rows on disk will
-    # keep being flagged stale — which is what we want for now: we would rather be told about a
-    # series that has gone quiet than silently stop watching it. If a permanently-yellow check
-    # for a genuinely retired series becomes a nuisance, intersect the stale ids with
-    # `roster_ids` here (when a roster is available) so only currently-expected series count.
+    # decommissioned but that still has old rows on disk will keep being flagged stale — which is
+    # what we want for now: we would rather be told about a series that has gone quiet than
+    # silently stop watching it. Restricting to `roster_ids` would not silence one anyway:
+    # `upsert_metadata` never drops a series, so a retired series stays in the roster for good.
+    # Silencing one needs an explicit record of which ids we have retired.
     stale = coverage.filter(pl.col("last_time") < cutoff).select(
         "time_series_id",
         last_seen=pl.col("last_time"),
