@@ -370,9 +370,12 @@ def upsert_metadata(
     explicit locking is required.
 
     If the Parquet file does not exist, it saves the new_metadata. If it exists, it merges the
-    new_metadata into it and rewrites the file only if something changed. The snapshot and the
-    stored roster need not share a schema, and a field that ``new_metadata`` no longer carries is
-    **cleared**, so the roster always means "the latest snapshot of what NGED published".
+    new_metadata into it and rewrites the file only if something changed. The snapshot need not
+    carry the same columns, or the same column order, as the stored roster, and rows are matched
+    on ``time_series_id``. A series that ``new_metadata`` covers is replaced wholesale, so a field
+    the snapshot has stopped carrying is **cleared** for that series. A series that
+    ``new_metadata`` omits keeps its last stored values indefinitely. The roster therefore holds
+    every time series we have ever seen, not only the ones in the latest snapshot.
 
     Args:
         new_metadata: The new metadata DataFrame.
@@ -385,6 +388,8 @@ def upsert_metadata(
     """
     COMPRESSION: Final[str] = "zstd"
 
+    # The annotation is not enforced at runtime and this is the package's only public entry point,
+    # so check the caller's snapshot rather than trust it.
     new_metadata = TimeSeriesMetadata.validate(new_metadata.sort("time_series_id"))
 
     if not object_exists(metadata_path, storage_options):
@@ -406,6 +411,10 @@ def upsert_metadata(
     existing_metadata = pl.read_parquet(
         metadata_path, storage_options=typeddict_to_dict(storage_options)
     )
+    # The stored roster is outside this code's control — an older writer, a hand-edit, a truncated
+    # upload — so an off-contract file must not be merged blind into the one we write back. As with
+    # any raise from this function, the asset contains it rather than failing: it records
+    # `metadata_upsert_failed` and lets the power write proceed (see `defs/assets.py`).
     TimeSeriesMetadata.validate(existing_metadata)
 
     # `how="diagonal"` because the snapshot and the stored roster can differ in both width and
@@ -419,6 +428,10 @@ def upsert_metadata(
     # Compare metadata. `metadata_diff` contains all rows in `new_metadata` that do not have an
     # exact match in `existing_metadata`. Adapted from https://stackoverflow.com/a/79888719
     metadata_diff = new_rows.filter(~new_rows.hash_rows().is_in(stored_rows.hash_rows().implode()))
+    # The first frame carrying the union of both inputs' columns: the concat adds to the snapshot's
+    # rows any `allow_missing` field only the stored roster had. All four of those are nullable, so
+    # this is a shape check on a frame neither validation above saw rather than a guard against a
+    # known fault — the weakest of the four, and the first to reconsider if these get trimmed.
     TimeSeriesMetadata.validate(metadata_diff)
 
     if metadata_diff.is_empty():
@@ -436,6 +449,8 @@ def upsert_metadata(
     # Merge metadata. Put new_metadata first so that unique(keep="first") keeps the new version
     merged_metadata = combined.unique(subset="time_series_id", keep="first").sort("time_series_id")
 
+    # The last gate before the stored roster is overwritten. `unique` draws rows from both sides of
+    # the concat, so this row set is one no validation above has seen.
     TimeSeriesMetadata.validate(merged_metadata)
 
     merged_metadata.write_parquet(

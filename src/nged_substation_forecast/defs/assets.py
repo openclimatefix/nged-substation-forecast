@@ -308,7 +308,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     try:
         quality = assess_nwp_quality(nwp)
         completeness = assess_nwp_run_completeness(
-            nwp, expected_n_h3_cells=h3_grid["h3_index"].n_unique()
+            dataframe=nwp, expected_n_h3_cells=h3_grid["h3_index"].n_unique()
         )
         check_results = [
             _nwp_quality_check_result(quality),
@@ -324,16 +324,16 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         context.log.exception("Could not assess the ingested NWP run")
         # One event for one fault: both checks share this assessment, so both degrade together.
         # The tag names the quality check either way; the operations runbook says to expect that.
-        report_check_degradation(_NWP_QUALITY_CHECK_NAME, exc)
+        report_check_degradation(check_name=_NWP_QUALITY_CHECK_NAME, exc=exc)
         check_results = [
-            _degraded_nwp_check_result(_NWP_QUALITY_CHECK_NAME, exc),
-            _degraded_nwp_check_result(_NWP_COMPLETENESS_CHECK_NAME, exc),
+            _degraded_nwp_check_result(check_name=_NWP_QUALITY_CHECK_NAME, exc=exc),
+            _degraded_nwp_check_result(check_name=_NWP_COMPLETENESS_CHECK_NAME, exc=exc),
         ]
         shape_metadata = {}
 
     nwp_data_path = settings.nwp_data_path
     if_local_path_then_make_parent_dir(nwp_data_path)
-    write_nwp(nwp, nwp_data_path, storage_options)
+    write_nwp(nwp=nwp, table_uri=nwp_data_path, storage_options=storage_options)
     context.log.info(f"Saved NWP data to Delta table at {nwp_data_path}.")
 
     return MaterializeResult(

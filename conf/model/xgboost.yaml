@@ -1,11 +1,11 @@
 # XGBoost forecaster configuration.
 #
-# The top-level _target_ identifies the BaseForecaster subclass to instantiate.
-# model_params._target_ identifies the companion config object.
-# register_experiment_job loads this file with yaml.safe_load, then does:
+# The top-level _target_ identifies the BaseForecaster subclass to instantiate; model_params are
+# validated by that class's CONFIG_CLASS. register_experiment_job loads this file with
+# yaml.safe_load, then does:
 #
 #   forecaster_class = import_class(raw["_target_"])
-#   forecaster_config = import_class(model_params.pop("_target_"))(**model_params)
+#   forecaster_config = forecaster_class.CONFIG_CLASS(**model_params)
 #
 # A registered experiment's config_overrides replace whole values under model_params. Every
 # override key must name a field XGBoostConfig declares — a key below, or one of the universal
@@ -15,8 +15,6 @@
 _target_: xgboost_forecaster.forecaster.XGBoostForecaster
 
 model_params:
-  _target_: xgboost_forecaster.forecaster.XGBoostConfig
-
   selected_features:
     - "power_lag_24h"
     - "power_lag_48h"

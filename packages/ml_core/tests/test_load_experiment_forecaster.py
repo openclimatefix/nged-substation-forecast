@@ -16,7 +16,11 @@ def mlflow_tracking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_round_trips_class_and_config_through_tags(mlflow_tracking: None) -> None:
-    """The forecaster class + config rebuild exactly from the stamped experiment tags."""
+    """The forecaster class + config rebuild from the ``forecaster_target`` and ``config`` tags.
+
+    The config class is not named by a tag: it is reached through the forecaster's
+    ``CONFIG_CLASS``, so no third tag is stamped here.
+    """
     config = XGBoostConfig(
         selected_features={"temperature_2m", "power_lag_24h"},
         experiment_name="exp",
@@ -28,9 +32,6 @@ def test_round_trips_class_and_config_through_tags(mlflow_tracking: None) -> Non
     client.set_experiment_tag(experiment_id, "config", config.model_dump_json())
     client.set_experiment_tag(
         experiment_id, "forecaster_target", "xgboost_forecaster.forecaster.XGBoostForecaster"
-    )
-    client.set_experiment_tag(
-        experiment_id, "config_target", "xgboost_forecaster.forecaster.XGBoostConfig"
     )
 
     forecaster_cls, loaded_config = load_experiment_forecaster("exp")

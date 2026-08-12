@@ -74,14 +74,18 @@ The check is attached to `power_time_series_and_metadata`, so the existing hourl
 runs it every hour with no extra wiring. It reports two kinds of lateness: a series that once
 reported but has now gone **stale**, and a roster series (present in the `TimeSeriesMetadata`
 parquet) that has **never** sent data. The count of each, plus a table of the offending
-`time_series_id`s, lands in the check's Dagster metadata. That table is **capped** at 50 rows, for
-the same reason the Sentry payloads below are — an uncapped listing writes thousands of rows into
-the event log every hour a whole-feed stall lasts, and the event log is durable storage that gets
-backed up. The counts beside it are uncapped, and an `n_late_listed` field records how many rows
-the table actually holds, so a truncated table can never make a large stall look small. Dagster's
+`time_series_id`s, lands in the check's Dagster metadata. That table is **capped** at 50 rows,
+because an uncapped listing writes thousands of rows into Dagster's event log every hour a
+whole-feed stall lasts, and that log is durable storage — Postgres in the AWS deployment,
+`pg_dump`ed to S3 nightly. At V2 scale (~2,500 series) an uncapped table serialises to about 355 KB
+per hourly evaluation, against about 8 KB at 50 rows. The cap matches the Sentry event *context*
+below (both 50) rather than the tighter 20 on the Sentry message body, so the same leading series
+appear in both and there is one less thing to reconcile. The counts beside it are uncapped, and an `n_late_listed`
+field records how many rows the table actually holds, so a truncated table can never make a large
+stall look small. Dagster's
 Checks view becomes the operator's at-a-glance "is the power data healthy?" status surface, showing
-a green tick when every series is current and a yellow warning naming the late count when the feed
-has stalled.
+a green tick when every series is current and a yellow warning when the feed has stalled — or when a
+series we had written off starts reporting again.
 The severity is a warning rather than a failure: a stalled feed is expected to self-heal once
 NGED recovers (the pipeline back-fills the gap automatically), so it must not block downstream
 assets.
@@ -109,6 +113,35 @@ same staleness to Sentry as a warning (see the freshness-warning bullet under
 evaluation is a pure function, so the Sentry warning reuses the same `PowerFreshnessResult` the
 check already computed rather than recomputing it; the same result will later also feed the
 forecast-warnings delivery table.
+
+## Silence the series we already know are dead
+
+A broken monitor keeps the check yellow for months, and an always-yellow channel
+trains the human operator to ignore it — which costs us the
+[provider channel](../design-philosophy/inherent-stability.md#three-audiences-three-channels)
+entirely. `_KNOWN_DEAD_TIME_SERIES_IDS` in `defs/checks.py` names the `time_series_id`s the check
+ignores.
+
+**The silenced ids are removed from the check's inputs, not from its output.** `evaluate_power_freshness`
+drops them from the coverage frame and the roster before it classifies anything, so `n_stale`,
+`n_never_reported`, `n_series_total` and the late table all describe the series we are still
+watching, with no arithmetic anywhere to get wrong. It also means the Sentry warning inherits the
+silencing without knowing silencing exists: `report_power_freshness` is handed the same result and
+returns early on a healthy one, so a feed whose only late series are silenced sends no event.
+
+**A returning series turns the check yellow rather than being removed automatically.** The list is
+source code shipped read-only in the container image, so the check could not edit it; and a check
+that writes anything is a warning path that can fail, which
+[rule 7](../design-philosophy/inherent-stability.md#the-rules) forbids. The yellow is the prompt,
+and it clears when a human deletes the line.
+
+**The list lives with the code because a dead series is a fact about the world, not about a
+deployment** — it is equally dead whether we run on a laptop or on AWS. That is also the argument
+against the obvious alternative of Dagster's own database, which is per-deployment. The cost is that
+silencing a series takes a commit and a redeploy, which is the wrong interface for something
+expected to change several times a month at V2 scale. Making the list operator-editable from the UI
+is designed alongside the `asset_health_history` table, so that operator-facing health state has one
+home rather than two.
 
 ## Read the live forecast back off disk with a second asset check
 
@@ -208,7 +241,7 @@ is configured — so laptops and CI stay silent by default.
   reported`), and the full per-series detail is attached as structured event context. Both are
   capped — the message to a short leading slice with an `…and N more` line, the context to a larger
   slice — so a whole-feed stall at V2 scale can't attach thousands of rows; the true late count is
-  always carried by the `n_late` tag, so a capped list never makes a large stall look small. Sending
+  always carried by the `n_late` tag. Sending
   is best-effort: `report_power_freshness` never raises, so a Sentry hiccup costs no more than its
   own event. Were it to raise, the check's catch-all would swallow it and discard the whole
   freshness evaluation with it — every late series, in the very hour they went late.
