@@ -81,9 +81,7 @@ series) an uncapped table serialises to about 355 KB per hourly evaluation, agai
 rows. The cap matches the Sentry event context below, so the same leading series appear in both and
 there is one less thing to reconcile. The counts beside it are uncapped, and an `n_late_listed`
 field records how many rows the table actually holds, so a truncated table can never make a large
-stall look small. Rows are ordered never-reported first, then most-stale first, so a roster with
-more than 50 never-reported series fills the table with those alone — `n_stale` and
-`n_never_reported` stay exact regardless. Dagster's
+stall look small. Dagster's
 Checks view becomes the operator's at-a-glance "is the power data healthy?" status surface, showing
 a green tick when every series is current and a yellow warning naming the late count when the feed
 has stalled.

@@ -1,9 +1,16 @@
 # Known ECMWF ENS data-quality issues
 
-**Scope: this page is about *upstream* — the ways the data arrives damaged, and which of those we
-reject and which we tolerate.** How to *interpret* the data that arrives undamaged is the separate
-subject of [NWP variable conventions](nwp-variable-conventions.md), which sets out how the two pages
-divide the subject between them.
+This page and [NWP variable conventions](nwp-variable-conventions.md) split the subject between
+them:
+
+- **This page is about *upstream*.** It covers the ways Dynamical.org's data arrives damaged —
+  corrupt source accumulations, null grid points, incomplete runs — and the ingest policy that
+  decides which of those we reject and which we tolerate. Its subject is data we did not create and
+  cannot fix, so a defect described here is a reason to talk to Dynamical.
+
+- **That page is about *us*.** It covers how the data that arrives intact is meant to be
+  interpreted, and what our own code does with it. Everything there is a choice this project made,
+  or failed to make deliberately, so a defect described there is a reason to change our code.
 
 We ingest ECMWF IFS ENS from [Dynamical.org](https://dynamical.org). Its data carries a few
 known, recurring quality quirks. This page records what they are, how we tell them apart, and the
