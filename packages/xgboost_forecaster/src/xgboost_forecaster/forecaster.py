@@ -3,7 +3,7 @@
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Self, cast
+from typing import Any, ClassVar, Self, cast
 
 import numpy as np
 import patito as pt
@@ -78,6 +78,7 @@ class XGBoostForecaster(BaseForecaster):
 
     MODEL_NAME = "xgboost"
     MODEL_VERSION = 1
+    CONFIG_CLASS: ClassVar[type[XGBoostConfig]] = XGBoostConfig
 
     model_params: XGBoostConfig  # narrows the base class annotation for type checkers
 
@@ -237,7 +238,7 @@ class XGBoostForecaster(BaseForecaster):
         ``BaseForecaster.trained_time_series_ids``).
         """
         meta = json.loads((path / "meta.json").read_text())
-        config = XGBoostConfig.model_validate(meta["model_params"])
+        config = cls.CONFIG_CLASS.model_validate(meta["model_params"])
         instance = cls(config)
         for ts_id in meta["trained_time_series_ids"]:
             booster = xgb.Booster()

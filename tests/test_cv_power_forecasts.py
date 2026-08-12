@@ -189,7 +189,9 @@ def test_cv_power_forecasts_predicts_validation_fold(
         filter_string=f"tags.cv_role = 'fold' and tags.fold_id = '{FOLD_ID}'",
     )
     assert len(fold_runs) == 1
-    assert fold_runs[0].data.metrics["n_forecast_rows"] == float(forecasts.height)
+    # A tag, not a metric: the count shrinks when the trained population or the validation window
+    # does, and MLflow reports a metric's latest value as the max over all writes.
+    assert fold_runs[0].data.tags["n_forecast_rows"] == str(forecasts.height)
 
 
 def test_cv_power_forecasts_storage_format(

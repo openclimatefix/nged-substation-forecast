@@ -53,6 +53,10 @@ def open_ecmwf_ens_run(
     #     uv run pytest --run-network -m network
     # See
     # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#network-gated-tests>.
+
+    # Reusable-package input validation, not a reachable production state: the `ecmwf_ens` asset
+    # always sources `h3_grid` from `h3_grid_weights`, which raises on an empty cell list before
+    # writing anything, so the file it reads can never hold zero rows.
     if h3_grid.is_empty():
         raise ValueError("h3_grid is empty. Cannot download ECMWF data for an empty grid.")
 
@@ -69,7 +73,8 @@ def open_ecmwf_ens_run(
     if utc_nwp_init_time not in ds.init_time.values:
         raise NwpRunNotYetAvailable(f"{utc_nwp_init_time} is not in ds.init_time.values")
 
-    # Check for empty coordinates before computing bounds to fail gracefully.
+    # This guards the Dynamical.org catalog itself, which is an external substrate we neither
+    # control nor version-pin, so its shape can change under us between runs.
     if ds.longitude.size == 0 or ds.latitude.size == 0:
         raise ValueError("Dataset has empty longitude or latitude coordinates.")
 

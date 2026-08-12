@@ -59,8 +59,8 @@ class RegisterExperimentConfig(Config):
 
 _UNOVERRIDABLE_MODEL_PARAMS: Final[dict[str, str]] = {
     "_target_": (
-        "it names the config class, which a forecaster comes paired with, so base_model_config is"
-        " what fixes it — point that at a different YAML instead"
+        "it names the forecaster class, and the config class follows from it, so base_model_config"
+        " is what fixes both — point that at a different YAML instead"
     ),
     "experiment_name": "it is set from the job's own experiment_name parameter",
 }
@@ -72,18 +72,17 @@ own reason. ``experiment_name`` is a *declared* field, so ``BaseForecasterConfig
 the assignment that stamps the job's own value, discarding it without a word. ``_target_`` would be
 caught by ``extra="forbid"`` unaided, and is listed here only for the message — pydantic would say
 just "extra inputs are not permitted", where this names the key and points at ``base_model_config``
-as the way to change the config class.
+as the way to change the forecaster.
 """
 
 
-def _required_targets(raw: Any, config_path: Path) -> tuple[str, str, dict[str, Any]]:
-    """Pull the two ``_target_`` paths and the ``model_params`` mapping out of a parsed model YAML.
+def _forecaster_target_and_params(raw: Any, config_path: Path) -> tuple[str, dict[str, Any]]:
+    """Pull the ``_target_`` path and the ``model_params`` mapping out of a parsed model YAML.
 
     ``base_model_config`` is free text on the launchpad, so a typo points this at the wrong file —
-    ``conf/cv/default.yaml``, say, or a file that does not parse to a mapping at all. Reading the
-    three required pieces in one place means every such mistake reports the path and the whole
-    expected shape, instead of a bare ``KeyError`` that does not say which of the two ``_target_``
-    keys was missing.
+    ``conf/cv/default.yaml``, say, or a file that does not parse to a mapping at all. Reading both
+    required pieces in one place means every such mistake reports the path and the whole expected
+    shape, instead of a bare ``KeyError``.
 
     Args:
         raw: Whatever ``yaml.safe_load`` returned for the model YAML — ``Any``, because
@@ -91,34 +90,33 @@ def _required_targets(raw: Any, config_path: Path) -> tuple[str, str, dict[str, 
         config_path: The file it came from, named in the error message.
 
     Returns:
-        The forecaster's ``_target_``, the config class's ``_target_``, and the ``model_params``
-        mapping — with its ``_target_`` removed, so it is ready to splat into the config class.
+        The forecaster's ``_target_`` and the ``model_params`` mapping, ready to splat into the
+        forecaster's ``CONFIG_CLASS``.
 
     Raises:
-        ValueError: The file is not a mapping, is missing either ``_target_`` or ``model_params``,
-            or has a ``_target_`` that is not a string.
+        ValueError: The file is not a mapping, is missing ``_target_`` or ``model_params``, or has
+            a ``_target_`` that is not a string.
     """
     try:
         forecaster_target = raw["_target_"]
         model_params = dict(raw["model_params"])
-        config_target = model_params.pop("_target_")
     except (KeyError, TypeError, ValueError) as error:
         raise ValueError(
             f"{config_path} is not a usable model config: it must be a mapping with a top-level"
-            " '_target_' naming the BaseForecaster subclass, and a 'model_params' mapping whose"
-            f" own '_target_' names the config class. Got: {error!r}"
+            " '_target_' naming the BaseForecaster subclass, and a 'model_params' mapping."
+            f" Got: {error!r}"
         ) from error
-    # The lookups above catch an absent `_target_`, not a present-but-not-a-string one: an empty
+    # The lookup above catches an absent `_target_`, not a present-but-not-a-string one: an empty
     # `_target_:` parses to None and a number stays a number. Either reaches import_class, which
-    # fails on `str.rpartition` — or, if the other target is resolved first, blames the wrong one.
-    if not isinstance(forecaster_target, str) or not isinstance(config_target, str):
+    # fails on `str.rpartition` — naming neither the file nor the key.
+    if not isinstance(forecaster_target, str):
         # TRY004 wants a TypeError, but this is one of several ways the *file's contents* can be
         # unusable, and a caller should need to catch only one exception type to mean "bad config".
         raise ValueError(  # noqa: TRY004
-            f"{config_path} is not a usable model config: both '_target_' values must be strings"
-            f" naming a class; got {forecaster_target!r} and {config_target!r}."
+            f"{config_path} is not a usable model config: '_target_' must be a string naming the"
+            f" BaseForecaster subclass; got {forecaster_target!r}."
         )
-    return forecaster_target, config_target, model_params
+    return forecaster_target, model_params
 
 
 def _resolve_forecaster_config(
@@ -129,9 +127,10 @@ def _resolve_forecaster_config(
     """Build the concrete forecaster class + config from a model YAML and overrides.
 
     Loads the base model YAML, applies ``config_overrides`` to its ``model_params``, then
-    constructs the ``BaseForecasterConfig`` subclass named by ``model_params._target_``, which is
-    where pydantic validates the hyper-parameters. The forecaster class is resolved too, for its
-    ``MODEL_NAME`` (used as the ``model_family`` tag).
+    constructs the forecaster's ``CONFIG_CLASS``, which is where pydantic validates the
+    hyper-parameters. Reaching the config class through the forecaster is what stops a registration
+    validating hyper-parameters against a different class from the one ``load`` will rebuild them
+    with.
 
     Args:
         base_model_config: Path relative to ``PROJECT_ROOT`` of the base model YAML.
@@ -160,21 +159,20 @@ def _resolve_forecaster_config(
     config_path = PROJECT_ROOT / base_model_config
     with config_path.open(encoding="utf-8") as file:
         raw = yaml.safe_load(file)
-    forecaster_target, config_target, model_params = _required_targets(
+    forecaster_target, model_params = _forecaster_target_and_params(
         raw=raw, config_path=config_path
     )
     model_params.update(config_overrides)
     forecaster_cls = cast(type[BaseForecaster], import_class(forecaster_target))
-    config_cls = cast(type[BaseForecasterConfig], import_class(config_target))
-    forecaster_config = config_cls(**model_params)
+    forecaster_config = forecaster_cls.CONFIG_CLASS(**model_params)
     forecaster_config.experiment_name = experiment_name
     return forecaster_cls, forecaster_config
 
 
-IdentityTagType = Literal["config", "forecaster_target", "config_target"]
+IdentityTagType = Literal["config", "forecaster_target"]
 """Type annotation for the experiment tags that together define an experiment's identity."""
 
-IDENTITY_TAGS: Final[tuple[IdentityTagType, ...]] = ("config", "forecaster_target", "config_target")
+IDENTITY_TAGS: Final[tuple[IdentityTagType, ...]] = ("config", "forecaster_target")
 """Runtime tuple — iterated when comparing a re-registration against the stored identity.
 
 The ``description`` tag is deliberately absent: prose about an experiment is not part of what
@@ -204,14 +202,13 @@ def _identity_tags(
         forecaster_config: The resolved config, with ``experiment_name`` already stamped.
 
     Returns:
-        The ``config``/``forecaster_target``/``config_target`` tag values. ``config`` is the
-        canonical JSON dump — see ``BaseForecasterConfig`` on why serialisation must be
-        order-stable for this comparison to mean anything.
+        The ``config``/``forecaster_target`` tag values. ``config`` is the canonical JSON dump —
+        see ``BaseForecasterConfig`` on why serialisation must be order-stable for this comparison
+        to mean anything.
     """
     return {
         "config": forecaster_config.model_dump_json(),
         "forecaster_target": class_target(forecaster_cls),
-        "config_target": class_target(forecaster_config),
     }
 
 
@@ -371,9 +368,9 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
             }
         )
 
-    # The identity tags carry the resolved config as JSON plus the class identity the JSON itself
-    # lacks, so assets can reconstruct the exact forecaster + config subclass from MLflow alone.
-    # See load_experiment_forecaster.
+    # The identity tags carry the resolved config as JSON plus the forecaster class the JSON itself
+    # cannot name, so assets can reconstruct the exact forecaster — and, through its CONFIG_CLASS,
+    # the exact config subclass — from MLflow alone. See load_experiment_forecaster.
     for tag_name, tag_value in identity_tags.items():
         client.set_experiment_tag(experiment_id=experiment_id, key=tag_name, value=tag_value)
     client.set_experiment_tag(

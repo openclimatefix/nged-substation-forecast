@@ -137,6 +137,15 @@ Three places where a positional argument is right:
   might rot is cheaper than a copy that rots invisibly. It cuts the other way too — rationale
   worth a paragraph does not belong *only* in a docstring, where no reader browsing the docs will
   find it.
+- **Say why a guard exists, when the reason is not "this state happens"** — validation that
+  defends a reusable package's public API, rather than a state production can reach, says so in a
+  clause: `# Reusable-package input validation, not a reachable production state: the ecmwf_ens
+  asset always sources h3_grid from h3_grid_weights.` A defence that only makes sense on one
+  substrate names that substrate, since production data lives on S3 where a torn object write
+  cannot happen. Without the clause a reviewer traces the one production call path, finds the state
+  impossible, and proposes deleting the guard — correctly, on the evidence the code gave them.
+  Repeated validation needs the same treatment: say what each call catches that the one above it
+  did not.
 - **MkDocs-compatible constant docs** — document module-level constants with a string literal
   immediately after the assignment, not with Sphinx-style `#:` comments. This is correct:
 
@@ -163,11 +172,11 @@ Three places where a positional argument is right:
   plain `pl.DataFrame` / `pl.LazyFrame`.
 - **Patito friction budget**: the `polars-patito-gotchas` skill documents five Patito gotchas
   (cross-model LazyFrame joins, dict-`.cast` on model-bearing frames, `ge`/`le` silently ignored
-  on a datetime field, `.filter()` dropping the Patito subclass, and Delta dictionary-encoded
-  columns). Five workarounds is an acceptable price for schema validation — but if a sixth becomes
-  necessary, revisit the approach: either validate only at I/O boundaries (typed annotations
-  everywhere, `.validate()` only at persistence edges) or evaluate an alternative such as
-  `dataframely`.
+  on a datetime field, `pt.LazyFrame` methods typed as plain `pl.LazyFrame`, and Delta
+  dictionary-encoded columns). Five workarounds is an acceptable price for schema validation — but
+  if a sixth becomes necessary, revisit the approach: either validate only at I/O boundaries (typed
+  annotations everywhere, `.validate()` only at persistence edges) or evaluate an alternative such
+  as `dataframely`.
 - **Never row-count a table that can exceed 2³² rows with Polars.** Default Polars builds use a
   32-bit row index, so past ~4.29 billion rows `pl.len()` and `group_by(...).agg(pl.len())` wrap
   modulo 2³² with **no error**. Use the Delta log instead — `DeltaTable(path).count()`, or sum
@@ -244,6 +253,10 @@ confusing failure:
 ## Error Handling
 
 - Use specific exceptions.
+- **Unparenthesised `except` tuples are valid.** `except OSError, ValueError, TypeError:` looks
+  like the Python 2 syntax that Python 3 rejected for years, but
+  [PEP 758](https://peps.python.org/pep-0758/) made it legal in Python 3.14. Parentheses are still
+  required to bind the exception to a name: `except (OSError, ValueError) as err:`.
 - Leverage Sentry for observability in production-like code.
 - Validate data at boundaries using data contracts.
 

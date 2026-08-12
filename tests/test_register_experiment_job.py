@@ -85,9 +85,9 @@ def test_smoke_test_registers_experiment_and_dev_fold(
     assert experiment is not None
     assert experiment.tags["description"] == "a test experiment"
     assert "config" in experiment.tags
-    # Class identity is stamped so assets can reconstruct the exact forecaster + config subclass.
+    # The forecaster class is stamped so assets can reconstruct it — and, through its
+    # CONFIG_CLASS, its config subclass — from MLflow alone.
     assert experiment.tags["forecaster_target"].endswith("XGBoostForecaster")
-    assert experiment.tags["config_target"].endswith("XGBoostConfig")
 
     parent = _parent_run(experiment.experiment_id)
     assert parent.data.tags["model_family"] == "xgboost"

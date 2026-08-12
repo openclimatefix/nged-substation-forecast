@@ -339,7 +339,8 @@ def _load_engineering_inputs(
     )
     if ensemble_members is not None:
         nwp_scan = nwp_scan.filter(pl.col("ensemble_member").is_in(ensemble_members))
-    # ``.filter`` returns a plain ``pl.LazyFrame``; re-attach the model. (Zero-copy re-wrap.)
+    # ``.filter`` is *typed* as a plain ``pl.LazyFrame`` even though the model survives at runtime,
+    # so re-wrap to satisfy the return annotation. (Zero-copy.)
     nwp_lf = pt.LazyFrame.from_existing(nwp_scan).set_model(Nwp)
 
     return power_ts, metadata_df, nwp_lf
@@ -569,8 +570,13 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         )
         is_first = False
         n_rows += forecasts.height
-        time_series_seen.update(forecasts["time_series_id"].to_list())
-        ensemble_members_seen.update(forecasts["ensemble_member"].to_list())
+        # `.unique()` before `.to_list()`: only the distinct values reach the set, so this builds
+        # a ~30-element Python list per chunk rather than a ~14M-element one. Measured on a
+        # 14M-row Int32 column: 2.78 s and 560 MB peak, against 0.05 s and no measurable
+        # allocation. The 560 MB landed inside the loop whose whole job is holding the frame at
+        # 2-3 GB.
+        time_series_seen.update(forecasts["time_series_id"].unique().to_list())
+        ensemble_members_seen.update(forecasts["ensemble_member"].unique().to_list())
 
     n_time_series = len(time_series_seen)
     n_ensemble_members = len(ensemble_members_seen)
@@ -593,11 +599,16 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
                 storage_options=settings.storage_options,
             )
         )
-        mlflow.log_metrics(
+        # Tags, not metrics, for the same reason the training counters are tags (see
+        # `trained_cv_model`): all three shrink when the trained population shrinks or the
+        # validation window is narrowed, and MLflow resolves a metric's "latest" value as the max
+        # over (step, timestamp, value) rather than the newest write — so a shrunk count would be
+        # under-reported. Tags are last-write-wins, which is the semantic wanted here.
+        mlflow.set_tags(
             {
-                "n_forecast_rows": float(n_rows),
-                "n_forecast_time_series": float(n_time_series),
-                "n_ensemble_members": float(n_ensemble_members),
+                "n_forecast_rows": str(n_rows),
+                "n_forecast_time_series": str(n_time_series),
+                "n_ensemble_members": str(n_ensemble_members),
             }
         )
 
@@ -621,7 +632,10 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
 
 
 class PopulationFilter(Config):
-    """Typed filter over ``power_forecasts`` rows to score (§4.8).
+    """Typed filter over ``power_forecasts`` rows to score.
+
+    Every field is tabulated with a worked example under "Step 8 — Materialise ``metrics``":
+    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/>
 
     All fields default to ``None`` (= no filter on that dimension). A mistyped field name is a
     Dagster config validation error, not a silent wrong population — that is the whole point of
@@ -649,9 +663,9 @@ class PopulationFilter(Config):
 
         Returns:
             The same scan with the filter predicates applied, re-wrapped as a
-            ``pt.LazyFrame[PowerForecast]`` (``.filter()`` drops the Patito subclass).
+            ``pt.LazyFrame[PowerForecast]`` (``.filter()`` is typed as a plain ``pl.LazyFrame``).
         """
-        # .filter() drops the pt subclass; accumulate on a plain LazyFrame, re-wrap on return.
+        # .filter() is typed as plain pl.LazyFrame; accumulate on one, re-wrap on return.
         lf: pl.LazyFrame = scan
         if self.experiment_name is not None:
             lf = lf.filter(pl.col("experiment_name") == self.experiment_name)
@@ -671,7 +685,11 @@ class PopulationFilter(Config):
 
 
 class MetricsConfig(Config):
-    """Run config for the ``metrics`` asset (§4.8)."""
+    """Run config for the ``metrics`` asset.
+
+    Filled in from the Dagster run-config dialog; see "Step 8 — Materialise ``metrics``":
+    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/>
+    """
 
     population_filter: PopulationFilter = PopulationFilter()
     evaluation_scope: EvalScopeType = "leaderboard"
@@ -790,8 +808,10 @@ def _group_scan(
         fold_id: Fold identifier of the group.
 
     Returns:
-        A lazy scan of this one group's rows (a plain ``pl.LazyFrame`` — ``.filter()`` drops
-        the Patito subclass; the per-batch loader re-validates on collect).
+        A lazy scan of this one group's rows. Left as a plain ``pl.LazyFrame`` rather than
+        re-wrapped as ``pt.LazyFrame[PowerForecast]``, because every consumer takes it plain and
+        ``_load_series_batch`` validates each batch on collect — a re-wrap here would be discarded
+        unused.
     """
     return pruned_scan.filter(
         (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
@@ -951,7 +971,15 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
 
     For ``evaluation_scope="leaderboard"``, also logs per-type + overall aggregate metrics to each
     fold's MLflow child run and the mean-across-folds aggregates to the experiment's parent run.
-    Lookup is by tag (§4.1.1) so this is idempotent under Dagster retries.
+    Lookup is by tag — never by a handle passed between assets — so this is idempotent under
+    Dagster retries and safe across processes; see "Cross-process run resolution" in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/>.
+
+    ``power_forecasts`` also holds the live service's output under ``fold_id="live"``. Leaderboard
+    scope skips any ``fold_id`` the CV config does not define, naming them in a warning and in the
+    ``skipped_fold_ids`` output metadata, because it dates its evaluation window from that config
+    and has none for them. Use ``evaluation_scope="ad_hoc"`` to score live rows: it takes the
+    window from the rows themselves.
 
     Args:
         context: Dagster execution context; used for logging and ``add_output_metadata``.
@@ -985,9 +1013,30 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         .collect(engine="streaming")
         .rows()
     )
+    # `live_forecasts` writes its output to this same table under `fold_id="live"`, so an
+    # unfiltered leaderboard run — which the operator guide tells you to launch, leaving
+    # `fold_id` null to score every fold — discovers a group the CV config has never heard of.
+    # Leaderboard scope dates its window from that config, so those rows have no window to be
+    # scored against; skip them rather than fail the whole run on the first one. Ad-hoc scope
+    # takes its window from the rows themselves and is the supported way to score live output.
+    skipped_fold_ids: list[str] = []
+    if config.evaluation_scope == "leaderboard":
+        configured_fold_ids = set(_cv_config.fold_ids)
+        skipped_fold_ids = sorted({fold for _, fold in groups if fold not in configured_fold_ids})
+        if skipped_fold_ids:
+            context.log.warning(
+                f"Skipping {skipped_fold_ids} — not folds in the CV config "
+                f"({sorted(configured_fold_ids)}), so leaderboard scope has no evaluation window "
+                'for them. Score these with evaluation_scope="ad_hoc", which dates its window '
+                "from the forecast rows themselves."
+            )
+            groups = [group for group in groups if group[1] in configured_fold_ids]
+
     if not groups:
         context.log.warning("No forecasts matched the population filter — nothing to score.")
-        context.add_output_metadata({"n_rows_written": 0, "n_groups": 0})
+        context.add_output_metadata(
+            {"n_rows_written": 0, "n_groups": 0, "skipped_fold_ids": str(skipped_fold_ids)}
+        )
         return
 
     actuals_lf = pt.LazyFrame.from_existing(
@@ -1070,5 +1119,6 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             "n_groups": len(groups),
             "evaluation_scope": config.evaluation_scope,
             "groups": str(groups),
+            "skipped_fold_ids": str(skipped_fold_ids),
         }
     )
