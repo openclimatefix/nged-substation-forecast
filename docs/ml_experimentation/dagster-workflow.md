@@ -71,15 +71,15 @@ verify the full pipeline is wired up before committing to a potentially long `fu
 **What the job does:**
 
 1. Loads `base_model_config` as plain YAML and applies `config_overrides` to `model_params`.
-2. Constructs the `BaseForecasterConfig` subclass named by `model_params._target_`, so pydantic
-   validates every hyperparameter before anything is registered.
+2. Constructs the forecaster's `CONFIG_CLASS`, so pydantic validates every hyperparameter before
+   anything is registered.
 3. Creates the MLflow experiment (or resolves the existing one if the name already exists), and
    rejects the registration outright if that name is already registered under a *different*
    config — see "An experiment's identity is its config" below.
 4. Creates the experiment's parent run (`cv_summary`) and logs the config as flattened params.
-5. Stamps four tags onto the experiment: the resolved config as JSON (`config`), the
-   fully-qualified Python class path of the forecaster (`forecaster_target`), the class path of
-   the config class (`config_target`), and your `description`.
+5. Stamps three tags onto the experiment: the resolved config as JSON (`config`), the
+   fully-qualified Python class path of the forecaster (`forecaster_target`), and your
+   `description`. The config class needs no tag of its own — it is the forecaster's `CONFIG_CLASS`.
 6. Adds dynamic partition keys (`"{experiment_name}__{fold_id}"`) to the `cv_experiment_folds`
    partition set, one per fold included in the `run_mode`.
 
@@ -170,8 +170,11 @@ Experiment "xgboost_smoke_test"
 4. Writes to the `power_forecasts` Delta table keyed by `(experiment_name, fold_id)`: the **first**
    chunk overwrites the partition (clearing any prior run), the rest **append**, so a full
    re-materialisation replaces the fold's rows without ever holding all forecasts in memory.
-5. Logs `val_start`/`val_end` tags and `n_forecast_rows`/`n_forecast_time_series`/
-   `n_ensemble_members` metrics to the fold run.
+5. Tags the fold run with `val_start`/`val_end` and the `n_forecast_rows`/
+   `n_forecast_time_series`/`n_ensemble_members` counters. All five are tags rather than params or
+   metrics because they legitimately change — and can shrink — between materialisations of the
+   same fold run: params are write-once, and MLflow reports a metric's latest value as the max
+   over all its writes, so a shrunk count would read back too high.
 
 ---
 
@@ -225,7 +228,13 @@ in the run config dialog before launching.
    partition columns (`experiment_name` / `fold_id`) are `String`, matching what delta-rs stores,
    so the predicates push straight into the Delta scan: naming an experiment/fold prunes to just
    that partition rather than reading the whole (unbounded) table.
-2. Discovers the matching `(experiment_name, fold_id)` groups, then loads and scores **one group at
+2. In `leaderboard` scope, drops any group whose `fold_id` is not defined in the CV config, naming
+   the dropped ids in a warning and in the asset's `skipped_fold_ids` metadata. The live service
+   writes to this same table under `fold_id="live"`, so an unfiltered leaderboard run finds it;
+   leaderboard scope dates its evaluation window from the CV config and has none for those rows.
+   To score live output, run the asset with `evaluation_scope="ad_hoc"`, which takes the window
+   from the forecast rows themselves.
+3. Discovers the matching `(experiment_name, fold_id)` groups, then loads and scores **one group at
    a time** — peak memory is a single fold, not the entire matched population. (A whole fold is
    the *coarsest* chunk Polars can safely materialise: fine at V1 scale, but a V2-scale fold will
    need sub-fold chunking — see
@@ -242,7 +251,7 @@ in the run config dialog before launching.
       `window_label`), `computed_at`, and the MLflow fold run id (leaderboard scope only).
    c. Writes to `forecast_metrics` Delta, partitioned by `(experiment_name, fold_id)` with an
       idempotent overwrite predicate — safe to re-run without duplicating rows.
-3. For `evaluation_scope="leaderboard"`: builds an aggregate metric dict and logs it to the
+4. For `evaluation_scope="leaderboard"`: builds an aggregate metric dict and logs it to the
    fold's MLflow child run, then averages across folds and logs the mean to the parent run.
    The key token is `{metric_name}` for scalar metrics and `{metric_name}_{metric_param}` for
    parametric ones, in three families: overall (`rmse__all`, `crps__all`), per type

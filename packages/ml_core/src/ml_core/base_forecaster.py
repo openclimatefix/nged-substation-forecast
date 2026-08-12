@@ -166,10 +166,10 @@ class BaseForecaster(ABC):
     Every forecasting model subclasses this abstract base to allow shared Dagster assets and
     evaluation code to remain completely agnostic to the underlying model implementation.
 
-    Subclasses must define ``MODEL_NAME`` and ``MODEL_VERSION`` as class-level constants.
-    These are stamped onto every ``PowerForecast`` row at predict time and used as the MLflow
-    experiment name. Bumping ``MODEL_VERSION`` requires a code change (intentional), not a
-    config edit.
+    Subclasses must define ``MODEL_NAME``, ``MODEL_VERSION`` and ``CONFIG_CLASS`` as class-level
+    constants. ``MODEL_NAME`` and ``MODEL_VERSION`` are stamped onto every ``PowerForecast`` row at
+    predict time and used as the MLflow experiment name. Bumping ``MODEL_VERSION`` requires a code
+    change (intentional), not a config edit.
 
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
     Callers must not collect before passing data in; doing so wastes memory and prevents Polars
@@ -189,6 +189,14 @@ class BaseForecaster(ABC):
 
     MODEL_NAME: ClassVar[str]
     MODEL_VERSION: ClassVar[int]
+
+    CONFIG_CLASS: ClassVar[type[BaseForecasterConfig]]
+    """The config class ``load`` rebuilds from a saved ``model_params`` mapping.
+
+    A subclass's ``load`` must build its config through this attribute rather than naming its
+    config class again, so the class ``ml_core._production_helpers._check_meta_is_servable``
+    validates a saved config against is always the class ``load`` uses.
+    """
 
     feature_engineer: ClassVar[FeatureEngineer] = TabularFeatureEngineer()
     """The feature pipeline this forecaster's data is engineered through.

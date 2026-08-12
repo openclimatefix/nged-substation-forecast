@@ -5,17 +5,10 @@ to it on the way to the model. Every ECMWF ENS variable we store is listed with 
 governs it: some values describe an instant, some describe the three or six hours before that
 instant, and two are angles that wrap.
 
-This page and [Known ECMWF ENS data-quality issues](ecmwf-ens-known-issues.md) split the subject
-between them:
-
-- **That page is about *upstream*.** It covers the ways Dynamical.org's data arrives damaged —
-  corrupt source accumulations, null grid points, incomplete runs — and the ingest policy that
-  decides which of those we reject and which we tolerate. Its subject is data we did not create and
-  cannot fix, so a defect described there is a reason to talk to Dynamical.
-
-- **This page is about *us*.** It covers how the data that arrives intact is meant to be
-  interpreted, and what our own code does with it. Everything here is a choice this project made, or
-  failed to make deliberately, so a defect described here is a reason to change our code.
+Everything here is a choice this project made, so a defect described on this page is a reason to
+change our code. Damage the data arrives with is the separate subject of [Known ECMWF ENS
+data-quality issues](ecmwf-ens-known-issues.md), which sets out how the two pages divide the subject
+between them.
 
 ## The forecast step grid
 

@@ -86,13 +86,11 @@ def test_resolve_rejects_an_unknown_override_key() -> None:
     "yaml_body",
     [
         pytest.param("", id="empty_file"),
-        pytest.param("model_params:\n  _target_: x.Y\n", id="no_forecaster_target"),
+        pytest.param("model_params:\n  n: 1\n", id="no_forecaster_target"),
         pytest.param("_target_: x.Y\n", id="no_model_params"),
         pytest.param("_target_: x.Y\nmodel_params:\n", id="null_model_params"),
         pytest.param("_target_: x.Y\nmodel_params:\n  - a\n", id="model_params_is_a_list"),
-        pytest.param("_target_: x.Y\nmodel_params:\n  n: 1\n", id="no_config_target"),
-        pytest.param("_target_:\nmodel_params:\n  _target_: x.Y\n", id="null_forecaster_target"),
-        pytest.param("_target_: x.Y\nmodel_params:\n  _target_:\n", id="null_config_target"),
+        pytest.param("_target_:\nmodel_params:\n  n: 1\n", id="null_forecaster_target"),
     ],
 )
 def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
@@ -100,11 +98,9 @@ def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
 ) -> None:
     """``base_model_config`` is free text on the launchpad, so every typo must say what is wrong.
 
-    Without these checks the shapes below surface as a bare ``KeyError``, ``TypeError`` or
-    ``AttributeError`` that names neither the file nor which of the two ``_target_`` keys is at
-    fault. The last two get further still — a ``_target_`` that is present but not a string
-    reaches ``import_class``, where it either dies on ``None.rpartition`` or, once the *other*
-    target happens to be resolved first, reports a failure against that one instead.
+    Without these checks the shapes below surface as a bare ``KeyError`` or ``TypeError`` that
+    names neither the file nor the key at fault. The last gets further still — a ``_target_`` that
+    is present but not a string reaches ``import_class`` and dies on ``None.rpartition``.
     """
     (tmp_path / "bad.yaml").write_text(yaml_body)
     monkeypatch.setattr("nged_substation_forecast.defs.jobs.PROJECT_ROOT", tmp_path)
@@ -236,12 +232,16 @@ def test_the_override_lists_order_does_not_change_the_identity() -> None:
 
 
 def test_unchanged_identity_is_accepted() -> None:
-    """A re-registration of the same config passes — and the description is free to differ."""
+    """A re-registration of the same config passes, and tags outside the identity may differ.
+
+    ``config_target`` is one of those: experiments already in MLflow carry it, it is not part of an
+    experiment's identity, and its value must not decide a re-registration either way.
+    """
     tags = _identity_of(n_estimators=7)
 
     _reject_changed_identity(
         experiment_name="exp",
-        stored_tags=_as_stored(tags, description="unrelated"),
+        stored_tags=_as_stored(tags, description="unrelated", config_target="some.other.Config"),
         requested_tags=tags,
     )
 

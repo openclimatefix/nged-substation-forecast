@@ -61,12 +61,13 @@ deployment bakes into its container image at build time.
 
 1. Downloads that run's saved model artifacts from MLflow
    (`ml_core._production_helpers.fetch_model_artifacts`) into a temporary directory.
-2. Checks the downloaded model's `selected_features` against the running code, and **fails the
-   materialisation if any feature name no longer parses** — naming the offending feature. The check
-   runs before anything is written, so a refused promotion leaves the previous champion in place and
-   still serving. Re-train the model against the current feature vocabulary and promote that run;
-   never hand-edit `meta.json` to rename a feature, because the trained boosters carry the old
-   names too.
+2. Checks the downloaded model's saved config against the running code, and **fails the
+   materialisation if this code could not load that model** — because a feature name no longer
+   parses (the offending feature is named), or because `model_params` carry a hyper-parameter this
+   code no longer declares. The check runs before anything is written, so a refused promotion
+   leaves the previous champion in place and still serving. Re-train the model against the current
+   code and promote that run; never hand-edit `meta.json`, because the boosters on disk were
+   trained under the config it records.
 3. Stamps a `promotion.json` (`mlflow_run_id`, `promoted_at`) and atomically replaces the directory
    at `Settings.production_model_path` (`data/production_model/` by default) with the new artifacts.
 4. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, and
@@ -117,10 +118,11 @@ partition's `power_fcst_init_time` is 2026-07-04 06:00 UTC — not at the midnig
 
 1. Loads the production model from `Settings.production_model_path` via a plain disk `load` —
    the concrete forecaster class is reconstructed from `meta.json`'s `model_class` field. Raises
-   if the model has no trained time series, if its `selected_features` name a feature this code
-   cannot parse, or if its saved `model_params` carry a key this code no longer declares. The last
-   two both mean the promoted model predates the code now serving it: re-promote from a run
-   trained against the current vocabulary, rather than hand-editing what is on disk.
+   if the model has no trained time series, or if the running code cannot rebuild its saved config
+   — a `selected_features` name it cannot parse, or a `model_params` key it no longer declares.
+   Promotion (step 2 above) applies that same check, so it fires here only when the code changed
+   after the champion was promoted; either way, re-promote from a run trained against the current
+   code rather than hand-editing what is on disk.
 2. Resolves which NWP `init_time` to join against via `select_nwp_init_time` and
    `availability_mode` (table above).
 3. Builds the power spine (`build_live_power_frame`), covering 15 days of history (long enough
@@ -178,16 +180,37 @@ series with `last_seen` and `hours_late`. A warning therefore never stops foreca
 produced; it tells you which feed to chase. A handful of persistently-late series is usually a
 decommissioned or renamed substation rather than an outage — check the roster before escalating.
 
-That table is capped at 50 rows, because it is written to the event log every hour a stall lasts.
-**Read `n_late`, not the table's length**, to see how big the stall is: `n_late` is the true count,
-and `n_late_listed` tells you how many rows the table holds, so the two agreeing means you are
-looking at every late series and the two differing means the list is truncated. The same pair
+That table is capped at 50 rows
+([why](../architecture/production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check)).
+**Read `n_late`, not the table's length**, to see how big the stall is: `n_late` counts every late
+series, and `n_late_listed` tells you how many rows the table holds, so the two agreeing means you
+are looking at every late series and the two differing means the list is truncated. The same pair
 appears on the live-forecast check as `n_time_series_missing` and `n_time_series_missing_listed`.
 
 Mind the order when it *is* truncated: never-reported series come first, then the most-stale ones,
 so a roster with more than 50 never-reported series fills the table and no stale series appears in
-it at all. Read `n_stale` and `n_never_reported` — both always exact — before concluding from the
-table that nothing has gone stale.
+it at all. Read `n_stale` and `n_never_reported` — never truncated — before concluding from the
+table that nothing has gone stale. All three counts, and `n_series_total` beside them, describe the
+series the check is *watching*: the silenced ones below are excluded from every one of them.
+
+**Silencing a series we know is dead.** `_KNOWN_DEAD_TIME_SERIES_IDS` in
+`src/nged_substation_forecast/defs/checks.py` lists the `time_series_id`s the check ignores, so a
+broken monitor cannot hold it yellow for ever
+([why](../architecture/production-deployment.md#silence-the-series-we-already-know-are-dead)). Add
+an id, with a comment saying why, then commit, rebuild the image and redeploy. Removing an id starts
+the warnings again. Either edit is an intervention worth an
+[intervention-log](intervention-log.md) row under `upstream-outage`: the data is stuck and a human
+had to act.
+
+Two descriptions come from that list. `Ignoring N known-dead time series: 33.` is appended to
+every run, green or yellow, so the silencing cannot be quietly forgotten — read `n_silenced` and
+`silenced_time_series_ids` for the same thing in the metadata. `Reporting again, so no longer dead:
+33.` means a silenced series has sent data within the threshold, which fails the check until you
+delete it from the list; the check does not remove it for you, and the yellow lasts only while the
+series keeps reporting, so a series that revives for an afternoon and dies again leaves no trace.
+
+`n_silenced` counts the ids you listed, not the ids that were actually withheld, so an id that
+matches no series still appears: that is how a mistyped id shows itself rather than vanishing.
 
 One description means something different from all the others. `Could not evaluate power-data
 freshness: …` is the check reporting that it could not read its own inputs — suspect the object
