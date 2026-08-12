@@ -172,11 +172,11 @@ Three places where a positional argument is right:
   plain `pl.DataFrame` / `pl.LazyFrame`.
 - **Patito friction budget**: the `polars-patito-gotchas` skill documents five Patito gotchas
   (cross-model LazyFrame joins, dict-`.cast` on model-bearing frames, `ge`/`le` silently ignored
-  on a datetime field, `.filter()` dropping the Patito subclass, and Delta dictionary-encoded
-  columns). Five workarounds is an acceptable price for schema validation — but if a sixth becomes
-  necessary, revisit the approach: either validate only at I/O boundaries (typed annotations
-  everywhere, `.validate()` only at persistence edges) or evaluate an alternative such as
-  `dataframely`.
+  on a datetime field, `pt.LazyFrame` methods typed as plain `pl.LazyFrame`, and Delta
+  dictionary-encoded columns). Five workarounds is an acceptable price for schema validation — but
+  if a sixth becomes necessary, revisit the approach: either validate only at I/O boundaries (typed
+  annotations everywhere, `.validate()` only at persistence edges) or evaluate an alternative such
+  as `dataframely`.
 - **Never row-count a table that can exceed 2³² rows with Polars.** Default Polars builds use a
   32-bit row index, so past ~4.29 billion rows `pl.len()` and `group_by(...).agg(pl.len())` wrap
   modulo 2³² with **no error**. Use the Delta log instead — `DeltaTable(path).count()`, or sum
