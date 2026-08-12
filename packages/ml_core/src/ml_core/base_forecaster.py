@@ -81,9 +81,8 @@ def _download_and_unpack_model(run_id: str, work_dir: Path) -> Path:
         cannot appear in it.
 
     Raises:
-        MlflowException: The run holds no model archive — either nothing was ever saved to it,
-            or it was written before the model became a single archive artifact, in which case
-            the fold must be re-trained.
+        MlflowException: The run holds no model archive — re-materialise ``trained_cv_model``
+            for this fold.
     """
     try:
         archive_path = Path(
@@ -93,9 +92,8 @@ def _download_and_unpack_model(run_id: str, work_dir: Path) -> Path:
         )
     except MlflowException as error:
         raise MlflowException(
-            f"MLflow run {run_id} has no {_MLFLOW_MODEL_ARTIFACT} artifact. Either no model was "
-            "ever saved to this run, or it was saved before the model became a single archive "
-            "artifact — re-materialise `trained_cv_model` for this fold to rewrite it."
+            f"MLflow run {run_id} has no {_MLFLOW_MODEL_ARTIFACT} artifact — re-materialise "
+            "`trained_cv_model` for this fold."
         ) from error
     # Unpack beside the archive rather than over it: download_artifacts has already claimed the
     # archive's own name inside work_dir.

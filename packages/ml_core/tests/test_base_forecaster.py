@@ -252,7 +252,6 @@ def test_re_saving_a_smaller_model_leaves_no_trace_of_the_dropped_series(
 def test_loading_a_run_with_no_archive_says_what_to_do_about_it(saved_run: str) -> None:
     """A run holding no model archive fails with an actionable message, not MLflow's raw one.
 
-    The case that matters is a run written before the model became a single archive artifact:
     MLflow's own error says only that the path was not found, which gives an operator
     re-materialising an old fold nothing to act on. (``saved_run`` is depended on for the
     tracking URI it sets up, not for the model it holds.)
