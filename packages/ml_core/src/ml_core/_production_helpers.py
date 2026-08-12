@@ -270,7 +270,11 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
             promote that run instead.
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
-        downloaded_dir = _download_and_unpack_model(run_id, Path(tmp_dir))
+        downloaded_dir = _download_and_unpack_model(
+            run_id=run_id,
+            work_dir=Path(tmp_dir),
+            remedy="check the run id, and pick one whose training completed.",
+        )
         meta_path = downloaded_dir / "meta.json"
         if not meta_path.exists():
             raise ValueError(
