@@ -58,6 +58,8 @@ from ml_core.metrics import (
 )
 from nged_data.storage import time_series_coverage
 
+from nged_substation_forecast.defs._tags import RESEARCH_LAYER_TAGS
+
 # The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
 # (never hard-coded) so every experiment and asset agrees on the same folds. Loaded at import so
 # the partition keys are available when Dagster builds the asset graph. The raw CV_CONFIG_PATH
@@ -107,6 +109,7 @@ is still read exactly once. See ``cv_power_forecasts``.
 
 
 @asset(
+    tags=RESEARCH_LAYER_TAGS,
     partitions_def=cv_fold_partitions,
     deps=["power_time_series_and_metadata"],
 )
@@ -200,7 +203,7 @@ def _compute_effective_capacity(
     return EffectiveCapacity.validate(capacity)
 
 
-@asset(deps=["power_time_series_and_metadata"])
+@asset(tags=RESEARCH_LAYER_TAGS, deps=["power_time_series_and_metadata"])
 def effective_capacity(context: AssetExecutionContext) -> None:
     """Compute and persist each series' v0.1 effective capacity (full-history P99 of ``|power|``).
 
@@ -347,6 +350,7 @@ def _load_engineering_inputs(
 
 
 @asset(
+    tags=RESEARCH_LAYER_TAGS,
     partitions_def=cv_experiment_folds,
     deps=["power_time_series_and_metadata", "ecmwf_ens", "eligible_time_series"],
 )
@@ -475,6 +479,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
 
 
 @asset(
+    tags=RESEARCH_LAYER_TAGS,
     partitions_def=cv_experiment_folds,
     deps=["trained_cv_model"],
 )
@@ -958,7 +963,7 @@ def _score_forecast_group(
     return enriched.height, None
 
 
-@asset(deps=["cv_power_forecasts", "effective_capacity"])
+@asset(tags=RESEARCH_LAYER_TAGS, deps=["cv_power_forecasts", "effective_capacity"])
 def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     """Compute evaluation metrics and write to ``forecast_metrics``.
 

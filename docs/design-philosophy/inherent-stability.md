@@ -492,11 +492,17 @@ if any data is retrievable". The two contexts have different costs of being wron
 > **Fail in the direction where being wrong is cheapest to recover from.**
 
 This is not the same axis as Dagster's WARN-versus-ERROR severity. R&D lives in the
-cross-validation and training assets, so the natural mechanism is a strict-mode flag on the feature
-and validation layer, plus asset tagging
-([#423](https://github.com/openclimatefix/nged-substation-forecast/issues/423)). The asymmetry is
-already implemented at the telemetry layer: the Sentry failure hook is attached to the three
-scheduled production jobs only.
+cross-validation and training assets, so the remaining mechanism to build is a strict-mode flag on
+the feature and validation layer 🚧.
+
+Which assets sit on which side is recorded on the assets themselves, as a `layer` tag valued
+`production` or `research` — see
+[Architecture Overview](../architecture/overview.md#core-components). The tag says which machine
+runs an asset rather than asserting a posture: everything the AWS box runs is on the
+fail-operational side, and a `production` asset may still raise where rule 1 permits it — as
+`live_forecasts` does on an unloadable promoted model, which is our own bug rather than a data
+outage. The asymmetry is also implemented at the telemetry
+layer: the Sentry failure hook is attached to the three scheduled production jobs only.
 
 ## Vocabulary
 

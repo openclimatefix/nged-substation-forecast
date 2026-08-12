@@ -7,9 +7,9 @@ but int found``. Dagster itself only requires ``<4.14``, so the lower bound is o
 ``constraint-dependencies`` floor in ``pyproject.toml`` is what enforces it, and this test is the
 backstop that says what a violation actually costs.
 
-The failure it guards against is not subtle but it is easy to not notice, because nothing in the
-test suite or the Dagster UI parses a selection string — only the CLI does (``dg launch --assets``,
-``dagster asset materialize --select``).
+The failure it guards against is not subtle but it is easy to not notice, because almost nothing
+parses a selection string: the CLI (``dg launch --assets``, ``dagster asset materialize --select``),
+the Dagster UI's asset-selection box, and one assertion in ``test_asset_layer_tags.py``.
 """
 
 from dagster import AssetSelection
