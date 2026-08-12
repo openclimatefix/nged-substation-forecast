@@ -61,12 +61,13 @@ deployment bakes into its container image at build time.
 
 1. Downloads that run's saved model artifacts from MLflow
    (`ml_core._production_helpers.fetch_model_artifacts`) into a temporary directory.
-2. Checks the downloaded model's `selected_features` against the running code, and **fails the
-   materialisation if any feature name no longer parses** — naming the offending feature. The check
-   runs before anything is written, so a refused promotion leaves the previous champion in place and
-   still serving. Re-train the model against the current feature vocabulary and promote that run;
-   never hand-edit `meta.json` to rename a feature, because the trained boosters carry the old
-   names too.
+2. Checks the downloaded model's saved config against the running code, and **fails the
+   materialisation if this code could not load that model** — because a feature name no longer
+   parses (the offending feature is named), or because `model_params` carry a hyper-parameter this
+   code no longer declares. The check runs before anything is written, so a refused promotion
+   leaves the previous champion in place and still serving. Re-train the model against the current
+   code and promote that run; never hand-edit `meta.json`, because the boosters on disk were
+   trained under the config it records.
 3. Stamps a `promotion.json` (`mlflow_run_id`, `promoted_at`) and atomically replaces the directory
    at `Settings.production_model_path` (`data/production_model/` by default) with the new artifacts.
 4. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, and
@@ -117,10 +118,11 @@ partition's `power_fcst_init_time` is 2026-07-04 06:00 UTC — not at the midnig
 
 1. Loads the production model from `Settings.production_model_path` via a plain disk `load` —
    the concrete forecaster class is reconstructed from `meta.json`'s `model_class` field. Raises
-   if the model has no trained time series, if its `selected_features` name a feature this code
-   cannot parse, or if its saved `model_params` carry a key this code no longer declares. The last
-   two both mean the promoted model predates the code now serving it: re-promote from a run
-   trained against the current vocabulary, rather than hand-editing what is on disk.
+   if the model has no trained time series, or if the running code cannot rebuild its saved config
+   — a `selected_features` name it cannot parse, or a `model_params` key it no longer declares.
+   Promotion (step 2 above) applies that same check, so it fires here only when the code changed
+   after the champion was promoted; either way, re-promote from a run trained against the current
+   code rather than hand-editing what is on disk.
 2. Resolves which NWP `init_time` to join against via `select_nwp_init_time` and
    `availability_mode` (table above).
 3. Builds the power spine (`build_live_power_frame`), covering 15 days of history (long enough
@@ -178,7 +180,8 @@ series with `last_seen` and `hours_late`. A warning therefore never stops foreca
 produced; it tells you which feed to chase. A handful of persistently-late series is usually a
 decommissioned or renamed substation rather than an outage — check the roster before escalating.
 
-That table is capped at 50 rows, because it is written to the event log every hour a stall lasts.
+That table is capped at 50 rows
+([why](../architecture/production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check)).
 **Read `n_late`, not the table's length**, to see how big the stall is: `n_late` is the true count,
 and `n_late_listed` tells you how many rows the table holds, so the two agreeing means you are
 looking at every late series and the two differing means the list is truncated. The same pair

@@ -34,10 +34,10 @@ def load_experiment_forecaster(
 ) -> tuple[type[BaseForecaster], BaseForecasterConfig]:
     """Reconstruct the forecaster class + resolved config from an experiment's MLflow tags.
 
-    ``register_experiment`` stamps three tags on the experiment: the config JSON, plus the
-    fully-qualified import paths of the forecaster class and its config class (``forecaster_target``
-    / ``config_target``). The config JSON alone carries no class identity, so both targets are
-    needed to deserialise it into the correct ``BaseForecasterConfig`` subclass. The caller is
+    ``register_experiment`` stamps the config JSON and the forecaster class's fully-qualified
+    import path (``forecaster_target``) on the experiment. The config JSON carries no class
+    identity of its own, so the ``BaseForecasterConfig`` subclass to deserialise it into is reached
+    through the forecaster's ``CONFIG_CLASS`` — the same class its ``load`` uses. The caller is
     responsible for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
 
     Args:
@@ -52,8 +52,7 @@ def load_experiment_forecaster(
         raise ValueError(f"No MLflow experiment named {experiment_name!r}.")
     tags = experiment.tags
     forecaster_cls = cast(type[BaseForecaster], import_class(tags["forecaster_target"]))
-    config_cls = cast(type[BaseForecasterConfig], import_class(tags["config_target"]))
-    forecaster_config = config_cls.model_validate_json(tags["config"])
+    forecaster_config = forecaster_cls.CONFIG_CLASS.model_validate_json(tags["config"])
     return forecaster_cls, forecaster_config
 
 
