@@ -543,7 +543,7 @@ def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=UTC)
-    _stub_ecmwf_download(monkeypatch, init_time)
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success  # WARN, not a failure: the partial run is NOT thrown away
@@ -566,9 +566,14 @@ class _FakePanic(BaseException):
     """
 
 
-def _never_called(name: str, exc: BaseException) -> None:
-    """Stand in for ``report_check_degradation`` on a path that must not report to Sentry."""
-    raise AssertionError(f"report_check_degradation({name!r}, {exc!r}) should not have been called")
+def _never_called(check_name: str, exc: BaseException) -> None:
+    """Stand in for ``report_check_degradation`` on a path that must not report to Sentry.
+
+    Parameter names match the real function's, because the caller passes them by keyword.
+    """
+    raise AssertionError(
+        f"report_check_degradation({check_name!r}, {exc!r}) should not have been called"
+    )
 
 
 def _stub_ecmwf_download(monkeypatch: pytest.MonkeyPatch, init_time: datetime) -> None:
@@ -600,7 +605,7 @@ def test_ecmwf_ens_assesses_before_writing(
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=UTC)
-    _stub_ecmwf_download(monkeypatch, init_time)
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
 
     table_existed: list[bool] = []
     real_build = assets._nwp_quality_check_result
@@ -632,7 +637,7 @@ def test_ecmwf_ens_lands_the_run_when_an_assessment_fails(
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=UTC)
-    _stub_ecmwf_download(monkeypatch, init_time)
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
 
     def _raise(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
         raise raiser("assessment is broken")
@@ -666,7 +671,7 @@ def test_ecmwf_ens_reports_a_degraded_assessment_to_sentry_once(
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=UTC)
-    _stub_ecmwf_download(monkeypatch, init_time)
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
 
     def _raise(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
         raise RuntimeError("assessment is broken")
@@ -674,7 +679,9 @@ def test_ecmwf_ens_reports_a_degraded_assessment_to_sentry_once(
     reported: list[tuple[str, BaseException]] = []
     monkeypatch.setattr(assets, "assess_nwp_quality", _raise)
     monkeypatch.setattr(
-        assets, "report_check_degradation", lambda name, exc: reported.append((name, exc))
+        assets,
+        "report_check_degradation",
+        lambda check_name, exc: reported.append((check_name, exc)),
     )
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
@@ -692,7 +699,7 @@ def test_ecmwf_ens_re_raises_a_cancelled_run_without_writing(
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=UTC)
-    _stub_ecmwf_download(monkeypatch, init_time)
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
 
     def _cancel(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
         raise DagsterExecutionInterruptedError

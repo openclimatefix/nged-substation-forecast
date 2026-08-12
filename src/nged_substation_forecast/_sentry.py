@@ -143,7 +143,7 @@ def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str)
     """
     try:
         with sentry_sdk.new_scope() as scope:
-            scope.set_tag(tag, value)
+            scope.set_tag(key=tag, value=value)
             sentry_sdk.capture_exception(exc)
     except Exception:
         # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR

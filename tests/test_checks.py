@@ -158,7 +158,12 @@ def test_late_series_table_is_capped_but_the_counts_are_not() -> None:
     # Series `i` is `i` hours staler than series `i - 1`, so worst-first order is descending id.
     coverage = _coverage({i: _NOW - timedelta(hours=48 + i) for i in range(1, n_late + 1)})
     result = checks._to_asset_check_result(
-        evaluate_power_freshness(coverage, _roster(list(range(1, n_late + 1))), _NOW, _THRESHOLD)
+        evaluate_power_freshness(
+            coverage=coverage,
+            roster_ids=_roster(list(range(1, n_late + 1))),
+            now=_NOW,
+            threshold=_THRESHOLD,
+        )
     )
 
     assert result.metadata["n_late"].value == n_late  # the true count survives truncation
@@ -189,7 +194,9 @@ def test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table() -> No
     coverage = _coverage({i: _NOW - timedelta(hours=1000) for i in range(1, 11)})  # 10 very stale
     roster = _roster(list(range(1, 11)) + list(range(100, 100 + cap + 5)))  # + cap+5 never-reported
     result = checks._to_asset_check_result(
-        evaluate_power_freshness(coverage, roster, _NOW, _THRESHOLD)
+        evaluate_power_freshness(
+            coverage=coverage, roster_ids=roster, now=_NOW, threshold=_THRESHOLD
+        )
     )
 
     late_table = result.metadata["late_time_series"]
