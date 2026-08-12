@@ -106,28 +106,19 @@ def test_stale_series_flagged_most_stale_first() -> None:
     assert result.late["hours_late"].to_list() == pytest.approx([72.0, 30.0])
 
 
-@pytest.mark.parametrize(
-    ("age", "expected_n_stale"),
-    [
-        (timedelta(hours=23, minutes=59), 0),
-        (timedelta(hours=24, minutes=1), 1),
-    ],
-)
-def test_the_production_staleness_threshold_is_twenty_four_hours(
-    age: timedelta, expected_n_stale: int
-) -> None:
-    """The only case that reads ``_POWER_DATA_STALENESS_THRESHOLD`` rather than ``_THRESHOLD``.
-
-    Every other case passes its own threshold, so they pin the shape of the boundary while leaving
-    the production number free to drift in either direction; a minute either side pins the number.
-    """
+def test_the_production_staleness_threshold_is_twenty_four_hours() -> None:
+    """Series 8 is a minute past the threshold and series 7 a minute short of it, so retuning
+    ``_POWER_DATA_STALENESS_THRESHOLD`` has to change this test too. Every other case passes its own
+    ``_THRESHOLD``, which pins the shape of the boundary but not the production number."""
     result = evaluate_power_freshness(
-        coverage=_coverage({7: _NOW - age}),
-        roster_ids=_roster([7]),
+        coverage=_coverage(
+            {7: _NOW - timedelta(hours=23, minutes=59), 8: _NOW - timedelta(hours=24, minutes=1)}
+        ),
+        roster_ids=_roster([7, 8]),
         now=_NOW,
         threshold=checks._POWER_DATA_STALENESS_THRESHOLD,
     )
-    assert result.n_stale == expected_n_stale
+    assert result.late["time_series_id"].to_list() == [8]
 
 
 def test_never_reported_ids_flagged_from_roster() -> None:
