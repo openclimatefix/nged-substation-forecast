@@ -99,6 +99,20 @@ on `main` and are invisible to `closingIssuesReferences` beforehand — that fie
 up to the merge. Prose *about* a closure counts: "Merging #514 closed #512" in a commit message
 closes 512. Keep those words away from any issue reference when writing about one.
 
+**Don't pass `--delete-branch`.** The repo has `delete_branch_on_merge` turned on, so GitHub deletes
+the head branch on merge by itself. The flag only adds a *local* branch deletion, and that step
+first checks out another branch — usually `main`, which the primary worktree already holds. Git
+refuses, and `gh` reports the refusal as its own exit status:
+
+```text
+failed to run git: fatal: 'main' is already used by worktree at '/home/jack/dev/python/...'
+```
+
+The merge has already gone through by then. **A non-zero exit from `gh pr merge` does not mean the
+merge failed**, so confirm the outcome rather than retrying the command or reporting a failure:
+`gh pr view <N> --json state,mergeCommit` and the issue's own state say what actually landed.
+Delete the local branch afterwards, from a worktree that is not sitting on it.
+
 When something is closed that should not have been: `gh issue reopen <N>`, then put its project
 Status back explicitly. The board automation moves a closed issue to Done, and reopening lands it
 on In Progress rather than Todo — see the `github-graphql` skill for `gh project item-edit`.

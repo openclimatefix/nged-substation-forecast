@@ -1,11 +1,12 @@
 ---
 name: github-graphql
 description: >-
-  Concrete `gh api graphql` invocations for the four GitHub operations plain `gh issue`/`gh pr`
-  can't do: attaching a sub-issue to its parent epic, reordering sub-issues, setting an issue's
-  org-level Type, and setting a Projects (v2) field (Status/Project/Area). Load before running any
-  of them for openclimatefix/nged-substation-forecast, or whenever you'd reach for `gh api graphql`
-  and aren't sure of the mutation name, its input fields, or how to get the node IDs it needs.
+  Concrete `gh api graphql` invocations for the GitHub operations plain `gh issue`/`gh pr` can't
+  do: attaching a sub-issue to its parent epic, reordering sub-issues, setting an issue's org-level
+  Type, setting a Projects (v2) field (Status/Project/Area), and reading back where an issue sits
+  on the board. Load before running any of them for openclimatefix/nged-substation-forecast, or
+  whenever you'd reach for `gh api graphql` and aren't sure of the mutation name, its input fields,
+  or how to get the node IDs it needs.
 ---
 
 # GitHub GraphQL cheatsheet
@@ -109,3 +110,27 @@ gh api graphql -f query='
   }' -f projectId="<project node id>" -f itemId="<item node id>" \
      -f fieldId="<field node id>" -f optionId="<option id>"
 ```
+
+## Read an issue's project fields
+
+To check whether an issue is on the board and how its fields are set, ask **the issue**, not the
+project:
+
+```bash
+gh api graphql -f query='
+  query($n: Int!) { repository(owner: "openclimatefix", name: "nged-substation-forecast") {
+    issue(number: $n) { projectItems(first: 5) { nodes {
+      project { number }
+      fieldValues(first: 20) { nodes { ... on ProjectV2ItemFieldSingleSelectValue {
+        name field { ... on ProjectV2SingleSelectField { name } }
+      } } }
+    } } } } }' -F n=<issue number>
+```
+
+`gh project item-list 33 --owner openclimatefix` is the tempting alternative, and it hides what it
+leaves out: it returns at most `--limit` items with no indication that more exist, and this board
+holds more items than a limit you would think to pass. **Getting back exactly as many items as you
+asked for is the tell that you are holding one page rather than the board.** An issue can be on the
+board, correctly configured, and still be absent from that output, so never conclude an issue is
+missing from the project by searching it. Raising `--limit` is not the fix either — a large enough
+page exhausts the GraphQL rate limit and the command fails outright.
