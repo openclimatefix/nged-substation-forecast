@@ -6,8 +6,8 @@ Tests at two tiers:
    without a network server. Covers leaderboard loop, idempotency, and ad_hoc scope.
 
 2. **Full-stack cross-process** (real ``mlflow server`` subprocess + temp Delta): the one test
-   from §7.10 that proves the by-tag cross-process run resolution (§4.1.1) and the artifact
-   upload/download round-trip (§4.5). Runs against a real HTTP tracking server so each
+   that proves the by-tag cross-process run resolution and the artifact upload/download
+   round-trip. Runs against a real HTTP tracking server so each
    ``materialize()`` call — like a separate Dagster process — uses a fresh MlflowClient
    connection to resolve runs by tag.
 """
@@ -692,7 +692,7 @@ def test_full_stack_real_mlflow_server(
 ) -> None:
     """Full-stack test: real HTTP MLflow server + artifact round-trip + tag resolution.
 
-    Proves §4.1.1 (cross-call tag resolution) and §4.5 (artifact upload/download).
+    Proves cross-call tag resolution and the artifact upload/download round-trip.
     Each ``materialize()`` call starts with a fresh ``mlflow.set_tracking_uri`` inside
     the asset body — simulating what happens when assets run in separate Dagster processes.
     The artifact round-trip is proved by ``cv_power_forecasts`` downloading the model
