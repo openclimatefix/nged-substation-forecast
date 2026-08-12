@@ -98,6 +98,9 @@ _LATE_TABLE_SCHEMA: Final[TableSchema] = TableSchema(
 _MAX_LATE_SERIES_IN_TABLE: Final[int] = 50
 """Cap on how many late series the check's metadata table lists.
 
+Uncapped, a whole-feed stall at V2 scale (~2,500 series) would serialise to about 355 KB per hourly
+evaluation; at 50 rows it is about 8 KB.
+
 The rows follow ``_LATE_STATUS_ORDER``, so the listing is the head of that order rather than the 50
 series in most trouble: when never-reported series outnumber the cap, no stale series is listed at
 all, however stale it is. ``n_stale`` and ``n_never_reported`` stay exact regardless. Why the table

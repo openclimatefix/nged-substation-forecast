@@ -114,9 +114,11 @@ effect.
 **(b) Radiation and precipitation are interpolated as though they were instantaneous.** They are
 period-ending means over the preceding step, so interpolating between `valid_time` stamps treats a
 backward-looking average as a reading at the end of its window. That shifts the modelled solar day
-late by half the step width — three hours beyond day 6 — and cuts its peak by a quarter
+late by half the step width — three hours beyond day 6 — and cuts its peak by a quarter, from
+816 W m⁻² to 590
 ([measurements](../architecture/nwp-variable-conventions.md#period-ending-variables-are-interpolated-as-though-they-were-instantaneous)).
-Shortwave radiation is the worst-affected numeric variable, at half again the next-worst.
+Shortwave radiation is the worst-affected numeric variable, at half again the next-worst
+(MAE/SD 0.44 against 0.30).
 
 The fix is the clear-sky-index resample, and it has **four requirements**. Getting the first wrong
 makes the result worse than doing nothing: normalising by the instantaneous clear-sky value at
@@ -142,8 +144,8 @@ convention but needs no clear-sky treatment: its accumulator features integrate 
 anyway, so only sub-window timing is lost.
 
 **(c) Instantaneous variables lose diurnal amplitude beyond day 6**, because the ~15:00 temperature
-maximum falls between the 12:00 and 18:00 samples: the mean daily temperature range is compressed by
-**11.9%**
+maximum falls between the 12:00 and 18:00 samples: the mean daily temperature range falls from
+6.09 °C to 5.37 °C, an **11.9% compression**
 ([measurements](../architecture/nwp-variable-conventions.md#instantaneous-variables-lose-diurnal-amplitude)).
 This one has no exact fix, since the asymmetric
 afternoon peak needs the second harmonic and four samples a day is at the Nyquist limit for it. A
@@ -152,7 +154,7 @@ not been measured. It feeds the effective-temperature, degree-day and `windchill
 as a bounded experiment rather than a correctness fix, and expect a smaller win than (a) or (b).
 
 The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mean_sea_level` and
-`geopotential_height_500hpa` lose almost nothing at 6-hourly spacing.
+`geopotential_height_500hpa` lose almost nothing at 6-hourly spacing (MAE/SD 0.02–0.09).
 
 ### Store wind as u/v components rather than speed and direction
 
