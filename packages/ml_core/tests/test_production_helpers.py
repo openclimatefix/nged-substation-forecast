@@ -10,7 +10,7 @@ import json
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import patito as pt
 import polars as pl
@@ -262,6 +262,32 @@ def test_load_forecaster_from_dir_accepts_the_current_vocabulary(tmp_path: Path)
     assert load_forecaster_from_dir(tmp_path).model_params.selected_features == (
         config.selected_features
     )
+
+
+class _NarrowerConfig(XGBoostConfig):
+    """Stands in for the config class a second forecaster would bring with it."""
+
+
+class _NarrowerConfigForecaster(XGBoostForecaster):
+    """Overrides ``CONFIG_CLASS`` and nothing else, so ``load`` alone decides which config is built.
+
+    Module level, not nested in the test: ``save`` stamps ``class_target(self)`` into ``meta.json``,
+    which a class defined inside a function has no importable path for.
+    """
+
+    CONFIG_CLASS: ClassVar[type[XGBoostConfig]] = _NarrowerConfig
+
+
+def test_load_builds_its_config_through_config_class(tmp_path: Path) -> None:
+    """``load`` must reach its config class through ``CONFIG_CLASS``, not by naming one again.
+
+    That identity is what makes the guard's verdict binding: the guard validates a saved
+    ``model_params`` against ``CONFIG_CLASS``, so a ``load`` that used some other class could still
+    reject a model the guard had passed — after promotion had replaced the champion.
+    """
+    _NarrowerConfigForecaster(XGBoostConfig(selected_features={"temperature_2m"})).save(tmp_path)
+
+    assert isinstance(load_forecaster_from_dir(tmp_path).model_params, _NarrowerConfig)
 
 
 def test_the_guard_accepts_a_subclass_own_hyperparameters(tmp_path: Path) -> None:
