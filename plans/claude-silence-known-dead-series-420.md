@@ -218,14 +218,13 @@ called" sentinel inside the check body is useless; assert after the call.
     happens in the pure evaluator so the Sentry warning inherits it, and that a returning series
     turns the check yellow for as long as it keeps reporting rather than being removed
     automatically.
-  - `_MAX_LATE_SERIES_IN_TABLE`'s docstring claims `n_stale` and `n_never_reported` are exact.
-    They now count the watched population, so say that — the same rewrite as the operations page
-    below. Do not match on the current wording: open PR #544 cuts this docstring from 18 lines to
-    5, moving the "why" to `production-deployment.md`, and the claim survives as "``n_stale`` and
-    ``n_never_reported`` stay exact regardless". Two test docstrings in `tests/test_checks.py`
-    (`test_late_series_table_is_capped_but_the_counts_are_not` and
-    `test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table`) make the same claim and
-    are reworded by that PR too.
+  - `_MAX_LATE_SERIES_IN_TABLE`'s docstring says "``n_stale`` and ``n_never_reported`` stay exact
+    throughout". They now count the watched population, so say that — the same rewrite as the
+    operations page below. (#544 has merged, shortening this docstring and moving the cap's
+    rationale to `production-deployment.md`; the exactness claim survived the cut, so this item is
+    unaffected beyond the line it sits on.) The same claim appears once more, in
+    `test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table`'s docstring: "the table
+    can hold no stale series at all, while the counts stay exact".
   - The `NOTE` above the `stale` filter now ends "Silencing one needs an explicit record of which
     ids we have retired" — PR #540 rewrote it, so the earlier draft's item about intersecting stale
     ids with `roster_ids` no longer applies. That explicit record is what this change adds, three
@@ -352,8 +351,9 @@ mechanism, a second correctness pass over what it left behind.
   The conclusion survives by two other routes — there is no unfiltered `late` under this design, and
   a silenced id that was never in the roster would be misreported as resurrected — and the stated
   reason is corrected in both places it appeared. The same pass caught that PR #540 has already
-  rewritten the `NOTE`, and that open PR #544 rewords the exactness claim in three places, so both
-  doc items now say what to look for rather than quoting text that has moved.
+  rewritten the `NOTE`, and that PR #544 — then open, since merged — reworks the docstring carrying
+  the exactness claim, so both doc items now say what to look for rather than quoting text that has
+  moved.
 - **A departure from Jack's comment went unlisted** (fourth pass): his first comment sequences this
   issue after #439, #441 and #442, all still open. Now listed, with the reason it does not apply to
   this version.
