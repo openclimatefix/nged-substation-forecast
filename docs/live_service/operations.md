@@ -182,15 +182,35 @@ decommissioned or renamed substation rather than an outage — check the roster 
 
 That table is capped at 50 rows
 ([why](../architecture/production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check)).
-**Read `n_late`, not the table's length**, to see how big the stall is: `n_late` is the true count,
-and `n_late_listed` tells you how many rows the table holds, so the two agreeing means you are
-looking at every late series and the two differing means the list is truncated. The same pair
+**Read `n_late`, not the table's length**, to see how big the stall is: `n_late` counts every late
+series, and `n_late_listed` tells you how many rows the table holds, so the two agreeing means you
+are looking at every late series and the two differing means the list is truncated. The same pair
 appears on the live-forecast check as `n_time_series_missing` and `n_time_series_missing_listed`.
 
 Mind the order when it *is* truncated: never-reported series come first, then the most-stale ones,
 so a roster with more than 50 never-reported series fills the table and no stale series appears in
-it at all. Read `n_stale` and `n_never_reported` — both always exact — before concluding from the
-table that nothing has gone stale.
+it at all. Read `n_stale` and `n_never_reported` — never truncated — before concluding from the
+table that nothing has gone stale. All three counts, and `n_series_total` beside them, describe the
+series the check is *watching*: the silenced ones below are excluded from every one of them.
+
+**Silencing a series we know is dead.** A monitor NGED has not fixed holds the check yellow
+indefinitely, and a channel that is always yellow is a channel nobody reads. `_KNOWN_DEAD_TIME_SERIES_IDS`
+in `src/nged_substation_forecast/defs/checks.py` lists the `time_series_id`s to ignore; add one,
+with a comment saying why, then commit, rebuild the image and redeploy. Removing an id starts the
+warnings again. Either edit is an intervention worth a `routine-ops` row in the
+[intervention log](intervention-log.md).
+
+Three descriptions come from that list. `Ignoring N known-dead time series: 33.` is appended to
+every run, green or yellow, so the silencing cannot be quietly forgotten — read `n_silenced` and
+`silenced_time_series_ids` for the same thing in the metadata. `Reporting again, so no longer dead:
+33.` means a silenced series has sent data within the threshold, which fails the check until you
+delete it from the list; the check does not remove it for you, and the yellow lasts only while the
+series keeps reporting, so a series that revives for an afternoon and dies again leaves no trace.
+`Every known time series is silenced as known-dead: …` means the list has swallowed the whole
+roster — nothing is being watched at all, which on a full deployment means the list is wrong.
+
+`n_silenced` counts the ids you listed, not the ids that were actually withheld, so an id that
+matches no series still appears: that is how a mistyped id shows itself rather than vanishing.
 
 One description means something different from all the others. `Could not evaluate power-data
 freshness: …` is the check reporting that it could not read its own inputs — suspect the object

@@ -216,16 +216,161 @@ def test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table() -> No
 
 
 # ---------------------------------------------------------------------------
+# Silencing series we already know are dead.
+# ---------------------------------------------------------------------------
+
+
+def test_silenced_series_are_withheld_and_others_still_warn() -> None:
+    """One fixture covering every way a silenced id can relate to the data.
+
+    7 is stale and watched, 1 is fresh and watched, 23 is stale and silenced, 33 is in the roster
+    with no data and silenced, and 404 is silenced but exists nowhere. ``n_series_total == 2`` is
+    the assertion that pins *where* the filtering happens: filtering the late frame instead of the
+    inputs would leave the silenced ids in the population and answer 4.
+    """
+    coverage = _coverage(
+        {7: _NOW - timedelta(hours=48), 1: _NOW - timedelta(hours=1), 23: _NOW - timedelta(days=30)}
+    )
+    result = evaluate_power_freshness(
+        coverage=coverage,
+        roster_ids=_roster([7, 1, 23, 33]),
+        now=_NOW,
+        threshold=_THRESHOLD,
+        silenced_ids=(23, 33, 404),
+    )
+
+    assert result.n_stale == 1
+    assert result.n_never == 0
+    assert result.late["time_series_id"].to_list() == [7]
+    assert result.n_series_total == 2
+    assert result.silenced_ids == (23, 33, 404)
+    assert result.resurrected_ids == ()  # a silenced series that is *still* stale has not revived
+
+
+def test_a_feed_whose_only_late_series_are_silenced_is_healthy() -> None:
+    """The point of the whole issue: ``report_power_freshness`` returns early on a healthy result,
+    so silencing the last late series is what stops the hourly Sentry warning."""
+    coverage = _coverage({1: _NOW - timedelta(hours=1), 33: _NOW - timedelta(days=200)})
+    result = evaluate_power_freshness(
+        coverage=coverage,
+        roster_ids=_roster([1, 33]),
+        now=_NOW,
+        threshold=_THRESHOLD,
+        silenced_ids=(33,),
+    )
+    assert result.is_healthy
+    assert result.n_late == 0
+
+
+@pytest.mark.parametrize(
+    ("last_seen_offset", "expected"),
+    [
+        (timedelta(0), (33,)),  # exactly at the cutoff: `stale` uses `<`, so this is not stale
+        (timedelta(seconds=-1), ()),  # a second staler: still dead
+    ],
+)
+def test_a_silenced_series_that_reports_again_is_resurrected(
+    last_seen_offset: timedelta, expected: tuple[int, ...]
+) -> None:
+    """Resurrection is the exact complement of staleness at the cutoff.
+
+    ``is_healthy`` stays true either way — a revived series is not a stale one — which is why a
+    Sentry "it's back" event needs its own sender rather than this gate.
+    """
+    coverage = _coverage({1: _NOW, 33: _NOW - _THRESHOLD + last_seen_offset})
+    result = evaluate_power_freshness(
+        coverage=coverage,
+        roster_ids=_roster([1, 33]),
+        now=_NOW,
+        threshold=_THRESHOLD,
+        silenced_ids=(33,),
+    )
+    assert result.resurrected_ids == expected
+    assert result.is_healthy
+
+
+def test_silencing_works_without_a_roster() -> None:
+    """No roster means never-reported ids cannot be detected, but silencing still applies to the
+    coverage frame — and must not trip over the absent ``roster_ids``."""
+    coverage = _coverage({1: _NOW - timedelta(hours=1), 33: _NOW - timedelta(days=200)})
+    result = evaluate_power_freshness(
+        coverage=coverage, roster_ids=None, now=_NOW, threshold=_THRESHOLD, silenced_ids=(33,)
+    )
+    assert result.is_healthy
+    assert result.n_series_total == 1
+
+
+@pytest.mark.parametrize("stale_id", [None, 7])
+def test_the_check_result_reports_silencing(stale_id: int | None) -> None:
+    """The ignored ids are named on both description branches. The green one matters most: that is
+    the state this feature creates, and where the silencing is easiest to forget."""
+    rows = {1: _NOW - timedelta(hours=1), 33: _NOW - timedelta(days=200)}
+    if stale_id is not None:
+        rows[stale_id] = _NOW - timedelta(hours=48)
+    result = checks._to_asset_check_result(
+        evaluate_power_freshness(
+            coverage=_coverage(rows),
+            roster_ids=_roster(list(rows)),
+            now=_NOW,
+            threshold=_THRESHOLD,
+            silenced_ids=(33,),
+        )
+    )
+
+    assert result.description is not None
+    assert "Ignoring 1 known-dead time series: 33." in result.description
+    assert result.metadata["n_silenced"].value == 1
+    assert result.metadata["silenced_time_series_ids"].value == "[33]"
+    assert result.passed is (stale_id is None)
+
+
+def test_a_resurrection_fails_the_check_and_says_where_to_edit() -> None:
+    coverage = _coverage({1: _NOW - timedelta(hours=1), 33: _NOW - timedelta(hours=2)})
+    result = checks._to_asset_check_result(
+        evaluate_power_freshness(
+            coverage=coverage,
+            roster_ids=_roster([1, 33]),
+            now=_NOW,
+            threshold=_THRESHOLD,
+            silenced_ids=(33,),
+        )
+    )
+    assert not result.passed
+    assert result.description is not None
+    assert "Reporting again, so no longer dead: 33." in result.description
+    assert "_KNOWN_DEAD_TIME_SERIES_IDS" in result.description
+
+
+def test_a_wholly_silenced_roster_is_not_reported_as_an_empty_table() -> None:
+    """Watching nothing because everything is silenced is a different statement from having no data
+    at all, and the two want opposite responses from the operator."""
+    result = checks._to_asset_check_result(
+        evaluate_power_freshness(
+            coverage=_coverage({33: _NOW - timedelta(days=200)}),
+            roster_ids=_roster([33]),
+            now=_NOW,
+            threshold=_THRESHOLD,
+            silenced_ids=(33,),
+        )
+    )
+    assert result.description == "Every known time series is silenced as known-dead: 33."
+    assert not result.passed
+
+
+# ---------------------------------------------------------------------------
 # End-to-end: the real asset check against a temp Delta table + metadata roster.
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Point ``Settings`` at a temp data root (mirrors ``tests/test_assets.py``)."""
+    """Point ``Settings`` at a temp data root (mirrors ``tests/test_assets.py``), and empty the
+    known-dead list so silencing is something a test opts into rather than inherits from whichever
+    ids are really dead today."""
     monkeypatch.setenv("DATA_PATH_INTERNAL", str(tmp_path))
     monkeypatch.setenv("DATA_PATH_DELIVERY", str(tmp_path))
     monkeypatch.setenv("LOCAL_ARTIFACTS_PATH", str(tmp_path))
+    monkeypatch.setattr(checks, "_KNOWN_DEAD_TIME_SERIES_IDS", ())
     return tmp_path
 
 
@@ -303,6 +448,36 @@ def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
     assert result.metadata["n_late"].value == 0
     # Emitted even when nothing is late, so the key keeps one type across runs and stays plottable.
     assert result.metadata["n_late_listed"].value == 0
+    assert result.metadata["n_silenced"].value == 0
+    assert result.metadata["silenced_time_series_ids"].value == "[]"
+
+
+def test_power_data_is_fresh_silences_the_configured_dead_series(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole path, through ``Settings`` and a real Delta table: a series that would otherwise
+    hold the check yellow for ever is ignored, and said to be ignored."""
+    monkeypatch.setattr(checks, "_KNOWN_DEAD_TIME_SERIES_IDS", (99,))
+    now = datetime.now(UTC)
+    settings = Settings()
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 99], dtype=pl.Int32),
+            "time": pl.Series([now - timedelta(hours=1), now - timedelta(days=200)]).cast(
+                UTC_DATETIME_DTYPE
+            ),
+            "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
+        }
+    ).write_delta(settings.power_time_series_data_path)
+    _write_metadata_roster(settings.metadata_path, ids=[1, 99])
+
+    result = checks.power_data_is_fresh()
+    assert isinstance(result, AssetCheckResult)
+    assert result.passed is True
+    assert result.metadata["n_late"].value == 0
+    assert result.metadata["n_series_total"].value == 1
+    assert result.description is not None
+    assert "Ignoring 1 known-dead time series: 99." in result.description
 
 
 def test_power_data_is_fresh_no_data_yet_warns(env: Path) -> None:
