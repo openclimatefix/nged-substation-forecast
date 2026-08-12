@@ -71,15 +71,15 @@ verify the full pipeline is wired up before committing to a potentially long `fu
 **What the job does:**
 
 1. Loads `base_model_config` as plain YAML and applies `config_overrides` to `model_params`.
-2. Constructs the `BaseForecasterConfig` subclass named by `model_params._target_`, so pydantic
-   validates every hyperparameter before anything is registered.
+2. Constructs the forecaster's `CONFIG_CLASS`, so pydantic validates every hyperparameter before
+   anything is registered.
 3. Creates the MLflow experiment (or resolves the existing one if the name already exists), and
    rejects the registration outright if that name is already registered under a *different*
    config — see "An experiment's identity is its config" below.
 4. Creates the experiment's parent run (`cv_summary`) and logs the config as flattened params.
-5. Stamps four tags onto the experiment: the resolved config as JSON (`config`), the
-   fully-qualified Python class path of the forecaster (`forecaster_target`), the class path of
-   the config class (`config_target`), and your `description`.
+5. Stamps three tags onto the experiment: the resolved config as JSON (`config`), the
+   fully-qualified Python class path of the forecaster (`forecaster_target`), and your
+   `description`. The config class needs no tag of its own — it is the forecaster's `CONFIG_CLASS`.
 6. Adds dynamic partition keys (`"{experiment_name}__{fold_id}"`) to the `cv_experiment_folds`
    partition set, one per fold included in the `run_mode`.
 

@@ -14,9 +14,6 @@ Each model family has a base YAML in `conf/model/`. The only one today is
 _target_: xgboost_forecaster.forecaster.XGBoostForecaster
 
 model_params:
-  # Identifies the companion config class.
-  _target_: xgboost_forecaster.forecaster.XGBoostConfig
-
   selected_features:
     - "power_lag_24h"
     - "temperature_2m"
@@ -28,9 +25,11 @@ model_params:
   ...
 ```
 
-`_target_` values are fully-qualified Python class paths, resolved by
-`contracts.config_schemas.import_class` at registration time. You should not change them unless
-you are wiring up a new model family.
+`_target_` is a fully-qualified Python class path, resolved by
+`contracts.config_schemas.import_class` at registration time. You should not change it unless you
+are wiring up a new model family. The class that validates `model_params` is not named here: it is
+the forecaster's `CONFIG_CLASS`, the same class its `load` rebuilds a saved config with, so the two
+cannot drift apart.
 
 ---
 
@@ -187,9 +186,10 @@ that was quietly dropped would give you a grid of *identical* runs, each scoring
 landing on the leaderboard, and nothing to distinguish that grid from a genuine null result. That
 is [principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically).
 
-Two further keys are refused for their own reasons. `_target_` names the config class itself: to
-use a different one, point `base_model_config` at a different YAML. `experiment_name` comes from
-the job's own `experiment_name` parameter, which would overwrite an override of it.
+Two further keys are refused for their own reasons. `_target_` names the forecaster class, and the
+config class follows from it: to use a different one, point `base_model_config` at a different
+YAML. `experiment_name` comes from the job's own `experiment_name` parameter, which would overwrite
+an override of it.
 
 **Example — reduce tree depth and add a feature:**
 
