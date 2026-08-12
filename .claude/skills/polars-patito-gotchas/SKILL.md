@@ -44,11 +44,22 @@ every column to the *model's* declared dtypes. So `df.cast({"foo": pl.Int8})` on
 and your `foo` cast is silently ignored while unrelated columns are reverted to model dtypes. The
 result usually only surfaces later as a confusing `validate()` dtype error.
 
-The trap fires only when the model is still attached. Many Polars ops **drop** the model
-(`group_by(...).agg(...)`, `.collect()`, `.unpivot()`, `.as_polars()`), so a dict-`.cast` after
-them is plain Polars and fine. But **iterating** `group_by` (`for k, g in df.group_by(...)`) yields
-sub-frames that **keep** the model, and `pl.concat` keeps it too — so a dict-`.cast` on the
-concatenated result hits the trap.
+The trap fires only when the model is still attached, and which operations detach it is not
+guessable. Measured on patito 0.8.6:
+
+Only three operations **drop** it, and a dict-`.cast` after one of those is plain Polars and fine:
+
+- `group_by(...).agg(...)`, eager and lazy — but *iterating* `group_by` keeps it
+- `pl.concat([...])`, whether or not the inputs share a model
+- `.as_polars()`
+
+Everything else **keeps** it, so a dict-`.cast` after any of them is swallowed: `.collect()`,
+`.unpivot()`, `.filter()`, `.sort()`, `.select()`, `.with_columns()`, `.head()`, `.unique()`,
+`.drop()`, `.rename()`, `.join()` and `.with_row_index()`.
+
+`.collect()` is the one to watch, because it reads as the boundary back into plain Polars and is
+not. `pt.LazyFrame(...).set_model(S).collect().cast({"a": pl.Int8})` leaves `a` as `Int64` — no
+error, no warning — where the same call on a plain frame gives `Int8`.
 
 Workaround: strip the Patito model before a `{column: dtype}` cast (mirrors the join gotcha above):
 
@@ -92,16 +103,19 @@ error[invalid-assignment]: Object of type `polars.lazyframe.frame.LazyFrame`
 is not assignable to `patito.polars.LazyFrame[PowerForecast]`
 ```
 
-**This is a type-annotation gap, not a runtime one.** At runtime the model survives: `.filter()`,
-`.sort()`, `.select()`, `.with_columns()`, `.head()` and `.unique()` on a `pt.LazyFrame` all return
-the model-bearing subclass with `.model` still set. Nothing is lost and nothing needs restoring —
-the re-wrap below exists only to satisfy the annotation.
+**This is a type-annotation gap, not a runtime one.** At runtime the model survives every one of
+these methods, on both frame types — see the table under
+[`.cast({...})` on a model-bearing frame](#cast-on-a-model-bearing-frame). Nothing is lost and
+nothing needs restoring; the re-wrap below exists only to satisfy the annotation.
 
-The asymmetry is in `patito/polars.py`: `patito.polars.DataFrame` carries a block of
-type-annotation overrides re-declaring `filter`/`select`/`with_columns` as `(self: DF) -> DF`, and
-`patito.polars.LazyFrame` has no such block, so it inherits Polars' own annotations.
-**`pt.DataFrame` is therefore unaffected** — `df.filter(...)` stays `pt.DataFrame[Schema]` to `ty`
-as well as at runtime, and needs no workaround.
+The gap is in `patito/polars.py`, and it is narrower than "lazy versus eager".
+`patito.polars.DataFrame` carries a block of type-annotation overrides re-declaring exactly three
+methods — `filter`, `select` and `with_columns` — as `(self: DF) -> DF`. Those three, on a
+`pt.DataFrame`, need no workaround. **Every other method on either frame type does**, because
+`patito.polars.LazyFrame` has no such block at all and `DataFrame`'s block stops at three. So
+`df.sort(...)`, `df.head(...)`, `df.unique()` and `df.rename(...)` on an *eager* `pt.DataFrame`
+raise the same `invalid-assignment` as the lazy case. (`df.drop(...)` happens not to, because
+Polars annotates `DataFrame.drop` as returning `Self`.)
 
 **Upgrading `ty` will not fix this, because `ty` is not wrong.** Polars annotates
 `LazyFrame.filter`, `.sort`, `.select`, `.with_columns`, `.head`, `.unique`, `.drop` and `.rename`
@@ -110,8 +124,7 @@ as returning `LazyFrame`, not `Self`, so every conforming checker must infer the
 those return annotations to `Self`, or Patito giving its `LazyFrame` the same override block its
 `DataFrame` already has. Until one of those lands, the re-wrap below is the workaround.
 
-Workaround, for the lazy case only: rebind to a plain `pl.LazyFrame` local for the filter
-accumulation, then re-wrap before returning:
+Workaround: rebind to a plain local for the accumulation, then re-wrap before returning.
 
 ```python
 def apply(self, scan: pt.LazyFrame[MySchema]) -> pt.LazyFrame[MySchema]:
@@ -120,6 +133,14 @@ def apply(self, scan: pt.LazyFrame[MySchema]) -> pt.LazyFrame[MySchema]:
         lf = lf.filter(pl.col("foo") == self.foo)
     return pt.LazyFrame.from_existing(lf).set_model(MySchema)  # zero-copy re-wrap
 ```
+
+There is no `pt.DataFrame.from_existing`, so the eager re-wrap spells the same thing as
+`pt.DataFrame._from_pydf(df._df).set_model(MySchema)`.
+
+The runtime and `patito/polars.py` claims in this section and the `.cast` table above are measured
+against **patito 0.8.6 / polars 1.43.2**; `pyproject.toml` pins `polars>=1.0.0` and does not pin
+`patito` at all, so re-check them after an upgrade to either. The `ty` claim needs no such caveat:
+it follows from Polars' own annotations, so no checker version changes it.
 
 ## Delta Lake dictionary-encoded columns: declare Delta filter/partition columns as `String`
 

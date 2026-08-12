@@ -115,6 +115,11 @@ now rather than at implementation time makes the plan durable: it survives Claud
 down, and it is already in the diff when the PR opens, so the reviewer sees the plan next to the
 code that claims to follow it. It is deleted at ship time into the PR body, per the existing rule.
 
+Open the file with two brief summaries, before any of the sections below: what the problem or
+feature is, then what the planned solution is. A reader who stops after the first two paragraphs
+should already know what is broken (or missing) and roughly how the plan fixes it, without reading
+the file-by-file detail.
+
 The plan covers:
 
 - **Verdict and departures** — the step-2 conclusion, and every point where the plan differs

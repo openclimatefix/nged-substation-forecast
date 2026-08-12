@@ -632,7 +632,10 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
 
 
 class PopulationFilter(Config):
-    """Typed filter over ``power_forecasts`` rows to score (§4.8).
+    """Typed filter over ``power_forecasts`` rows to score.
+
+    Every field is tabulated with a worked example under "Step 8 — Materialise ``metrics``":
+    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/>
 
     All fields default to ``None`` (= no filter on that dimension). A mistyped field name is a
     Dagster config validation error, not a silent wrong population — that is the whole point of
@@ -682,7 +685,11 @@ class PopulationFilter(Config):
 
 
 class MetricsConfig(Config):
-    """Run config for the ``metrics`` asset (§4.8)."""
+    """Run config for the ``metrics`` asset.
+
+    Filled in from the Dagster run-config dialog; see "Step 8 — Materialise ``metrics``":
+    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/>
+    """
 
     population_filter: PopulationFilter = PopulationFilter()
     evaluation_scope: EvalScopeType = "leaderboard"
@@ -801,8 +808,10 @@ def _group_scan(
         fold_id: Fold identifier of the group.
 
     Returns:
-        A lazy scan of this one group's rows, annotated as a plain ``pl.LazyFrame`` because that
-        is how ``.filter()`` is typed; the per-batch loader re-validates on collect.
+        A lazy scan of this one group's rows. Left as a plain ``pl.LazyFrame`` rather than
+        re-wrapped as ``pt.LazyFrame[PowerForecast]``, because every consumer takes it plain and
+        ``_load_series_batch`` validates each batch on collect — a re-wrap here would be discarded
+        unused.
     """
     return pruned_scan.filter(
         (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
@@ -962,7 +971,9 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
 
     For ``evaluation_scope="leaderboard"``, also logs per-type + overall aggregate metrics to each
     fold's MLflow child run and the mean-across-folds aggregates to the experiment's parent run.
-    Lookup is by tag (§4.1.1) so this is idempotent under Dagster retries.
+    Lookup is by tag — never by a handle passed between assets — so this is idempotent under
+    Dagster retries and safe across processes; see "Cross-process run resolution" in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/>.
 
     ``power_forecasts`` also holds the live service's output under ``fold_id="live"``. Leaderboard
     scope skips any ``fold_id`` the CV config does not define, naming them in a warning and in the
