@@ -150,7 +150,9 @@ def test_power_time_series_and_metadata_ingests_and_writes(
     """Happy path: a fake S3 store serving two real NGED JSON files → metadata parquet + power
     Delta table both written, and the asset materialises successfully."""
     monkeypatch.setattr(
-        assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
     )
 
     result = materialize([power_time_series_and_metadata], instance=dagster_instance)
@@ -175,9 +177,7 @@ def test_power_time_series_and_metadata_ingests_and_writes(
     assert {"nged_s3_paths", "PowerTimeSeries"} <= metadata_keys
 
 
-@pytest.mark.parametrize(
-    argnames="raised", argvalues=[RuntimeError, BaseException], ids=["exception", "rust_panic"]
-)
+@pytest.mark.parametrize("raised", [RuntimeError, BaseException], ids=["exception", "rust_panic"])
 def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fails(
     raised: type[BaseException],
     env: Path,
@@ -284,14 +284,16 @@ def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(
         "/TimeSeries_10_20260326T080000Z_20260326T140000Z.json"
     )
     files = {object_key: json.dumps(fixture).encode()}
-    monkeypatch.setattr(assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(files))
+    monkeypatch.setattr(
+        target=assets.Settings, name="get_nged_s3_store", value=lambda self: _FakeS3Store(files)
+    )
 
     result = materialize([power_time_series_and_metadata], instance=dagster_instance)
     assert result.success
 
     power = pl.read_delta(str(env / "NGED" / "power_time_series.delta"))
     assert power.height == 1
-    assert power["time"][0] == datetime(2026, 3, 5, 12, 30, tzinfo=UTC)
+    assert power["time"][0] == datetime(year=2026, month=3, day=5, hour=12, minute=30, tzinfo=UTC)
 
     materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
     metadata = {k: v for mat in materialisations for k, v in mat.metadata.items()}
@@ -303,13 +305,15 @@ def test_power_time_series_and_metadata_handles_no_new_data(
 ) -> None:
     """``NoNewData`` from ``download_and_parse_files`` → the asset returns early, writes nothing."""
     monkeypatch.setattr(
-        assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
     )
 
     def _raise_no_new_data(store: object, paths_df: object) -> None:
         raise NoNewData
 
-    monkeypatch.setattr(assets, "download_and_parse_files", _raise_no_new_data)
+    monkeypatch.setattr(target=assets, name="download_and_parse_files", value=_raise_no_new_data)
 
     result = materialize([power_time_series_and_metadata], instance=dagster_instance)
     assert result.success
@@ -329,7 +333,9 @@ def test_h3_grid_weights_materialises_and_writes_parquet(
     The real GB boundary buffers for ~30 s, and is exercised in ``packages/geo`` instead.
     """
     # A 1×1-degree box over central GB — enough to yield several H3 cells, milliseconds to compute.
-    monkeypatch.setattr(assets, "load_gb_boundary", lambda: shapely.box(-2.0, 52.0, -1.0, 53.0))
+    monkeypatch.setattr(
+        target=assets, name="load_gb_boundary", value=lambda: shapely.box(-2.0, 52.0, -1.0, 53.0)
+    )
 
     result = materialize([h3_grid_weights], instance=dagster_instance)
     assert result.success
@@ -361,19 +367,19 @@ def test_ecmwf_ens_materialises_and_appends_nwp(
     NWP Delta table via ``write_nwp``."""
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     # After 2024-11-12, when categorical_precipitation_type_surface became a non-null Nwp variable.
-    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
     captured: dict[str, datetime] = {}
 
     def _open(*, nwp_init_time: datetime, h3_grid: object) -> object:
         captured["nwp_init_time"] = nwp_init_time
         return object()
 
-    monkeypatch.setattr(assets, "open_ecmwf_ens_run", _open)
-    monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
+    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=_open)
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda ds: object())
     monkeypatch.setattr(
-        assets,
-        "convert_nwp_xarray_dataset_to_polars_dataframe",
-        lambda ds, h3_grid: _make_nwp(init_time),
+        target=assets,
+        name="convert_nwp_xarray_dataset_to_polars_dataframe",
+        value=lambda ds, h3_grid: _make_nwp(init_time),
     )
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
@@ -409,7 +415,7 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
     """Scattered per-pixel nulls in a de-accumulated variable (the known upstream ECMWF ENS
     corruption) are tolerated: the run still materialises, and the data-quality check WARNs."""
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
 
     # One (member, valid_time) slice across three h3 cells, one cell's precipitation nulled.
     scattered = _make_nwp(init_time, n=3).with_columns(
@@ -421,13 +427,15 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
     # `object` cannot be inlined in place of this stub: the real function is called with
     # keyword arguments, which `object()` rejects.
     monkeypatch.setattr(
-        assets,
-        "open_ecmwf_ens_run",
-        lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
+        target=assets,
+        name="open_ecmwf_ens_run",
+        value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
     )
-    monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda ds: object())
     monkeypatch.setattr(
-        assets, "convert_nwp_xarray_dataset_to_polars_dataframe", lambda ds, h3_grid: scattered
+        target=assets,
+        name="convert_nwp_xarray_dataset_to_polars_dataframe",
+        value=lambda ds, h3_grid: scattered,
     )
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
@@ -455,7 +463,7 @@ def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
     its report entirely, so the check passed and the missing field was surfaced nowhere.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
 
     # `_make_nwp` gives each row its own (member, valid_time), so nulling one row's precipitation
     # empties one whole slice of three while the other two stay intact.
@@ -465,15 +473,15 @@ def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
     # `object` cannot be inlined in place of this stub: the real function is called with
     # keyword arguments, which `object()` rejects.
     monkeypatch.setattr(
-        assets,
-        "open_ecmwf_ens_run",
-        lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
+        target=assets,
+        name="open_ecmwf_ens_run",
+        value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
     )
-    monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda ds: object())
     monkeypatch.setattr(
-        assets,
-        "convert_nwp_xarray_dataset_to_polars_dataframe",
-        lambda ds, h3_grid: one_slice_missing,
+        target=assets,
+        name="convert_nwp_xarray_dataset_to_polars_dataframe",
+        value=lambda ds, h3_grid: one_slice_missing,
     )
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
@@ -504,7 +512,7 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
     from dagster import RetryRequested
 
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
     # A run whose radiation column carries no weather at all, exactly as the converter would hand
     # it over: `_make_nwp` gives each row its own (member, valid_time), so nulling every row empties
     # the column across every slice beyond lead-0.
@@ -518,13 +526,15 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
     # `object` cannot be inlined in place of this stub: the real function is called with
     # keyword arguments, which `object()` rejects.
     monkeypatch.setattr(
-        assets,
-        "open_ecmwf_ens_run",
-        lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
+        target=assets,
+        name="open_ecmwf_ens_run",
+        value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
     )
-    monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda ds: object())
     monkeypatch.setattr(
-        assets, "convert_nwp_xarray_dataset_to_polars_dataframe", _convert_via_real_validation
+        target=assets,
+        name="convert_nwp_xarray_dataset_to_polars_dataframe",
+        value=_convert_via_real_validation,
     )
 
     with (
@@ -550,7 +560,7 @@ def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
     a cross-product), which is nothing like a complete 51 x 85 x 1 ECMWF ENS run.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
     _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
@@ -629,7 +639,7 @@ def test_ecmwf_ens_assesses_before_writing(
     assert table_existed == [False]
 
 
-@pytest.mark.parametrize(argnames="raiser", argvalues=[RuntimeError, _FakePanic])
+@pytest.mark.parametrize("raiser", [RuntimeError, _FakePanic])
 def test_ecmwf_ens_lands_the_run_when_an_assessment_fails(
     env: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -736,7 +746,7 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
     def _raise_not_available(*, nwp_init_time: datetime, h3_grid: object) -> None:
         raise NwpRunNotYetAvailable
 
-    monkeypatch.setattr(assets, "open_ecmwf_ens_run", _raise_not_available)
+    monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=_raise_not_available)
 
     # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()`
     # (<https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>) and is
@@ -837,7 +847,7 @@ def test_definitions_resolve(env: Path) -> None:
 def _file_listing(
     n: int, time_series_ids: list[int] | None = None
 ) -> pt.DataFrame[_ProcessedFileListing]:
-    base = datetime(2026, 3, 26, 8, tzinfo=UTC)
+    base = datetime(year=2026, month=3, day=26, hour=8, tzinfo=UTC)
     ids = time_series_ids if time_series_ids is not None else list(range(9, 9 + n))
     return (
         _ProcessedFileListing.DataFrame(
@@ -871,7 +881,7 @@ def test_file_listing_summary_non_empty() -> None:
 
 
 def test_power_time_series_summary_non_empty() -> None:
-    base = datetime(2026, 3, 26, 8, tzinfo=UTC)
+    base = datetime(year=2026, month=3, day=26, hour=8, tzinfo=UTC)
     df = (
         PowerTimeSeries.DataFrame(
             {

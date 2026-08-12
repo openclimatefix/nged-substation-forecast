@@ -76,7 +76,9 @@ def _roster(ids: list[int]) -> pl.Series:
 
 def test_all_fresh_is_healthy() -> None:
     coverage = _coverage({1: _NOW - timedelta(hours=1), 2: _NOW - timedelta(hours=23)})
-    result = evaluate_power_freshness(coverage, _roster([1, 2]), _NOW, _THRESHOLD)
+    result = evaluate_power_freshness(
+        coverage=coverage, roster_ids=_roster([1, 2]), now=_NOW, threshold=_THRESHOLD
+    )
     assert result.is_healthy
     assert result.n_late == 0
     assert result.n_series_total == 2
@@ -91,7 +93,9 @@ def test_stale_series_flagged_most_stale_first() -> None:
             3: _NOW - timedelta(hours=72),  # more stale
         }
     )
-    result = evaluate_power_freshness(coverage, _roster([1, 2, 3]), _NOW, _THRESHOLD)
+    result = evaluate_power_freshness(
+        coverage=coverage, roster_ids=_roster([1, 2, 3]), now=_NOW, threshold=_THRESHOLD
+    )
     assert not result.is_healthy
     assert result.n_stale == 2
     assert result.n_never == 0
@@ -105,7 +109,9 @@ def test_stale_series_flagged_most_stale_first() -> None:
 def test_never_reported_ids_flagged_from_roster() -> None:
     """A roster id with no rows in the Delta table counts as late with a null ``last_seen``."""
     coverage = _coverage({1: _NOW - timedelta(hours=1)})
-    result = evaluate_power_freshness(coverage, _roster([1, 2, 3]), _NOW, _THRESHOLD)
+    result = evaluate_power_freshness(
+        coverage=coverage, roster_ids=_roster([1, 2, 3]), now=_NOW, threshold=_THRESHOLD
+    )
     assert not result.is_healthy
     assert result.n_stale == 0
     assert result.n_never == 2
@@ -118,7 +124,9 @@ def test_never_reported_ids_flagged_from_roster() -> None:
 
 def test_never_reported_sorts_before_stale() -> None:
     coverage = _coverage({1: _NOW - timedelta(hours=48)})  # stale
-    result = evaluate_power_freshness(coverage, _roster([1, 2]), _NOW, _THRESHOLD)
+    result = evaluate_power_freshness(
+        coverage=coverage, roster_ids=_roster([1, 2]), now=_NOW, threshold=_THRESHOLD
+    )
     assert result.late["status"].to_list() == ["never", "stale"]
     assert result.late["time_series_id"].to_list() == [2, 1]
 
@@ -126,7 +134,9 @@ def test_never_reported_sorts_before_stale() -> None:
 def test_no_roster_cannot_detect_never_reported() -> None:
     """With no roster, only stale series are detectable; total is the on-disk id count."""
     coverage = _coverage({1: _NOW - timedelta(hours=48)})
-    result = evaluate_power_freshness(coverage, None, _NOW, _THRESHOLD)
+    result = evaluate_power_freshness(
+        coverage=coverage, roster_ids=None, now=_NOW, threshold=_THRESHOLD
+    )
     assert result.n_never == 0
     assert result.n_stale == 1
     assert result.n_series_total == 1
@@ -134,14 +144,18 @@ def test_no_roster_cannot_detect_never_reported() -> None:
 
 def test_empty_table_with_roster_is_all_never() -> None:
     coverage = _coverage({})
-    result = evaluate_power_freshness(coverage, _roster([1, 2]), _NOW, _THRESHOLD)
+    result = evaluate_power_freshness(
+        coverage=coverage, roster_ids=_roster([1, 2]), now=_NOW, threshold=_THRESHOLD
+    )
     assert result.n_never == 2
     assert result.n_series_total == 2
     assert not result.is_healthy
 
 
 def test_result_threshold_hours_reflects_threshold() -> None:
-    result = evaluate_power_freshness(_coverage({}), None, _NOW, timedelta(hours=8))
+    result = evaluate_power_freshness(
+        coverage=_coverage({}), roster_ids=None, now=_NOW, threshold=timedelta(hours=8)
+    )
     assert isinstance(result, PowerFreshnessResult)
     assert result.threshold_hours == 8.0
 
@@ -387,9 +401,14 @@ def _panic_inside_the_check(**_kwargs: object) -> PowerFreshnessResult:
     raise _FakePanic("simulated rust panic inside the check")
 
 
-def _never_called(name: str, exc: BaseException) -> None:
-    """Stand in for ``report_check_degradation`` on a path that must not report to Sentry."""
-    raise AssertionError(f"report_check_degradation({name!r}, {exc!r}) should not have been called")
+def _never_called(check_name: str, exc: BaseException) -> None:
+    """Stand in for ``report_check_degradation`` on a path that must not report to Sentry.
+
+    Parameter names match the real function's, because the caller passes them by keyword.
+    """
+    raise AssertionError(
+        f"report_check_degradation({check_name!r}, {exc!r}) should not have been called"
+    )
 
 
 def test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet(env: Path) -> None:
@@ -433,7 +452,9 @@ def test_power_data_is_fresh_never_fails_the_run(
     monkeypatch.setattr(checks, "evaluate_power_freshness", _raise_inside_the_check)
     reported: list[tuple[str, BaseException]] = []
     monkeypatch.setattr(
-        checks, "report_check_degradation", lambda name, exc: reported.append((name, exc))
+        checks,
+        "report_check_degradation",
+        lambda check_name, exc: reported.append((check_name, exc)),
     )
 
     result = materialize(
@@ -469,7 +490,9 @@ def test_power_data_is_fresh_degrades_on_a_rust_panic(
     monkeypatch.setattr(checks, "evaluate_power_freshness", _panic_inside_the_check)
     reported: list[tuple[str, BaseException]] = []
     monkeypatch.setattr(
-        checks, "report_check_degradation", lambda name, exc: reported.append((name, exc))
+        checks,
+        "report_check_degradation",
+        lambda check_name, exc: reported.append((check_name, exc)),
     )
 
     result = checks.power_data_is_fresh()
@@ -1223,7 +1246,9 @@ def test_live_forecasts_check_contains_an_internal_error(
     monkeypatch.setattr(checks, "_read_live_forecast_rows", _boom)
     reported: list[tuple[str, BaseException]] = []
     monkeypatch.setattr(
-        checks, "report_check_degradation", lambda name, exc: reported.append((name, exc))
+        checks,
+        "report_check_degradation",
+        lambda check_name, exc: reported.append((check_name, exc)),
     )
 
     result = _run_live_check()
