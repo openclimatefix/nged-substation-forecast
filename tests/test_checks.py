@@ -147,12 +147,8 @@ def test_result_threshold_hours_reflects_threshold() -> None:
 
 
 def test_late_series_table_is_capped_but_the_counts_are_not() -> None:
-    """A whole-feed stall lists only ``_MAX_LATE_SERIES_IN_TABLE`` series, most-stale first.
-
-    The table is written to Dagster's event log every hour for as long as a stall lasts, so it is
-    capped; the counts beside it are not, which is what stops a truncated table making a large
-    stall look small.
-    """
+    """A whole-feed stall lists only ``_MAX_LATE_SERIES_IN_TABLE`` series, most-stale first, while
+    the counts beside the table stay uncapped."""
     cap = checks._MAX_LATE_SERIES_IN_TABLE
     n_late = cap + 10
     # Series `i` is `i` hours staler than series `i - 1`, so worst-first order is descending id.
@@ -175,7 +171,7 @@ def test_the_table_never_holds_more_detail_than_the_sentry_event_context() -> No
     """The durable listing may not be more detailed than the transient one.
 
     Both cap the same worst-first ordering, and the table is the one written to the event log every
-    hour a stall lasts, so it is the one that must not grow without a reason. Pinning the
+    hour a stall lasts, so it is the table that must not outgrow the Sentry context. Pinning the
     relationship rather than the number leaves the cap free to be retuned downwards.
     """
     assert checks._MAX_LATE_SERIES_IN_TABLE <= _sentry.MAX_LATE_SERIES_IN_CONTEXT
@@ -183,8 +179,7 @@ def test_the_table_never_holds_more_detail_than_the_sentry_event_context() -> No
 
 def test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table() -> None:
     """Every never-reported series outranks every stale one, so at V2 cutover — a populated roster
-    before data flows — the table can hold no stale series at all. The counts stay exact, which is
-    why the operator is told to read those first."""
+    before data flows — the table can hold no stale series at all, while the counts stay exact."""
     cap = checks._MAX_LATE_SERIES_IN_TABLE
     coverage = _coverage({i: _NOW - timedelta(hours=1000) for i in range(1, 11)})  # 10 very stale
     roster = _roster(list(range(1, 11)) + list(range(100, 100 + cap + 5)))  # + cap+5 never-reported
@@ -737,11 +732,8 @@ def test_missed_nwp_runs_make_an_otherwise_good_slot_unhealthy() -> None:
 
 
 def test_missing_series_metadata_reports_how_many_ids_it_listed() -> None:
-    """A whole missing population spells out only the first ``_MAX_MISSING_SERIES_LISTED`` ids.
-
-    Same rule as the freshness check's late-series table: the list is capped, the count beside it
-    is not, and a third field says how many the list holds so the two can't be confused.
-    """
+    """A whole missing population spells out only the first ``_MAX_MISSING_SERIES_LISTED`` ids,
+    while ``n_time_series_missing`` stays uncapped and a third field says how many were listed."""
     cap = checks._MAX_MISSING_SERIES_LISTED
     n_missing = cap + 5
     result = checks._to_live_forecast_check_result(
