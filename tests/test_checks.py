@@ -263,27 +263,55 @@ def test_a_feed_whose_only_late_series_are_silenced_is_healthy() -> None:
 
 
 @pytest.mark.parametrize(
+    ("last_seen_offset", "expected_n_stale"),
+    [
+        (timedelta(0), 0),  # exactly at the cutoff is fresh: `stale` uses `<`, not `<=`
+        (timedelta(seconds=-1), 1),
+    ],
+)
+def test_the_staleness_cutoff_is_exclusive(
+    last_seen_offset: timedelta, expected_n_stale: int
+) -> None:
+    """The half of the cutoff that resurrection is the complement of.
+
+    Nothing about silencing here, but the test below relies on this boundary sitting exactly where
+    it does: were ``stale`` to use ``<=``, a series last seen on the cutoff would be stale *and*
+    resurrected at once.
+    """
+    result = evaluate_power_freshness(
+        coverage=_coverage({7: _NOW - _THRESHOLD + last_seen_offset}),
+        roster_ids=_roster([7]),
+        now=_NOW,
+        threshold=_THRESHOLD,
+    )
+    assert result.n_stale == expected_n_stale
+
+
+@pytest.mark.parametrize(
     ("last_seen_offset", "expected"),
     [
-        (timedelta(0), (33,)),  # exactly at the cutoff: `stale` uses `<`, so this is not stale
+        (timedelta(0), (23, 33)),  # exactly at the cutoff: not stale, so both have revived
         (timedelta(seconds=-1), ()),  # a second staler: still dead
     ],
 )
 def test_a_silenced_series_that_reports_again_is_resurrected(
     last_seen_offset: timedelta, expected: tuple[int, ...]
 ) -> None:
-    """Resurrection is the exact complement of staleness at the cutoff.
+    """Resurrection is the exact complement of staleness at the cutoff, and is reported in id
+    order rather than in whatever order the coverage frame happens to hold — 33 is the fresher row
+    here, so an unsorted answer would come back as ``(33, 23)``.
 
     ``is_healthy`` stays true either way — a revived series is not a stale one — which is why a
     Sentry "it's back" event needs its own sender rather than this gate.
     """
-    coverage = _coverage({1: _NOW, 33: _NOW - _THRESHOLD + last_seen_offset})
+    last_seen = _NOW - _THRESHOLD + last_seen_offset
+    coverage = _coverage({1: _NOW, 33: last_seen, 23: last_seen})
     result = evaluate_power_freshness(
         coverage=coverage,
-        roster_ids=_roster([1, 33]),
+        roster_ids=_roster([1, 23, 33]),
         now=_NOW,
         threshold=_THRESHOLD,
-        silenced_ids=(33,),
+        silenced_ids=(33, 23),
     )
     assert result.resurrected_ids == expected
     assert result.is_healthy
@@ -453,6 +481,9 @@ def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
     assert result.metadata["n_late_listed"].value == 0
     assert result.metadata["n_silenced"].value == 0
     assert result.metadata["silenced_time_series_ids"].value == "[]"
+    # Silencing nothing says nothing: no "Ignoring 0 known-dead time series: ." on every green run.
+    assert result.description is not None
+    assert "Ignoring" not in result.description
 
 
 def test_power_data_is_fresh_silences_the_configured_dead_series(
