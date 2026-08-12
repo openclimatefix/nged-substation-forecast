@@ -197,7 +197,9 @@ class Nwp(pt.Model):
         dtype=pl.Float32,
         description=(
             "Wind speed at 100 m. Unit: meters per second. This is a vector mean, with the same"
-            " caveat as `wind_speed_10m`. It is the height that matters most for wind generation."
+            " caveat as `wind_speed_10m`. It is the height that matters most for wind generation,"
+            " because a turbine power curve responds to the scalar speed at each grid point. See"
+            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>"
         ),
         ge=0,
         le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s

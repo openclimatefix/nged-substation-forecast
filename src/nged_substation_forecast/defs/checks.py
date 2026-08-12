@@ -98,13 +98,18 @@ _LATE_TABLE_SCHEMA: Final[TableSchema] = TableSchema(
 _MAX_LATE_SERIES_IN_TABLE: Final[int] = 50
 """Cap on how many late series the check's metadata table lists.
 
-Uncapped, a whole-feed stall at V2 scale (~2,500 series) would serialise to about 355 KB per hourly
-evaluation; at 50 rows it is about 8 KB.
+Unlike the other capped listings this one lands in Dagster's event log, so it is written to durable
+storage every hour a stall lasts. Uncapped, a whole-feed stall at V2 scale (~2,500 series) would
+serialise to about 355 KB per hourly evaluation; at 50 rows it is about 8 KB.
+
+Matches ``_sentry.MAX_LATE_SERIES_IN_CONTEXT`` (50) rather than the tighter
+``_sentry.MAX_LATE_SERIES_IN_MESSAGE`` (20) that bounds the Sentry message body, because a browsable
+table and the Sentry event context serve the same drill-down purpose.
 
 The rows follow ``_LATE_STATUS_ORDER``, so the listing is the head of that order rather than the 50
 series in most trouble: when never-reported series outnumber the cap, no stale series is listed at
-all, however stale it is. ``n_stale`` and ``n_never_reported`` stay exact regardless. Why the table
-is capped, and why at this number:
+all, however stale it is. ``n_stale`` and ``n_never_reported`` stay exact throughout, and are what
+the operator should read first. Why the table is capped, and why at this number:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>
 """
 

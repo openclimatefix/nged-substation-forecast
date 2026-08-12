@@ -170,7 +170,9 @@ def test_late_series_table_is_capped_but_the_counts_are_not() -> None:
 def test_the_table_never_holds_more_detail_than_the_sentry_event_context() -> None:
     """The durable listing may not be more detailed than the transient one.
 
-    Pinning the relationship rather than the number leaves the cap free to be retuned downwards.
+    Both cap the same worst-first ordering, and the table is the one written to the event log every
+    hour a stall lasts, so it is the table that must not outgrow the Sentry context. Pinning the
+    relationship rather than the number leaves the cap free to be retuned downwards.
     """
     assert checks._MAX_LATE_SERIES_IN_TABLE <= _sentry.MAX_LATE_SERIES_IN_CONTEXT
 

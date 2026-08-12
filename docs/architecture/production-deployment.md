@@ -76,10 +76,11 @@ reported but has now gone **stale**, and a roster series (present in the `TimeSe
 parquet) that has **never** sent data. The count of each, plus a table of the offending
 `time_series_id`s, lands in the check's Dagster metadata. That table is **capped** at 50 rows,
 because an uncapped listing writes thousands of rows into Dagster's event log every hour a
-whole-feed stall lasts, and that log is durable storage that gets backed up: at V2 scale (~2,500
-series) an uncapped table serialises to about 355 KB per hourly evaluation, against about 8 KB at 50
-rows. The cap matches the Sentry event context below, so the same leading series appear in both and
-there is one less thing to reconcile. The counts beside it are uncapped, and an `n_late_listed`
+whole-feed stall lasts, and that log is durable storage — Postgres in the AWS deployment,
+`pg_dump`ed to S3 nightly. At V2 scale (~2,500 series) an uncapped table serialises to about 355 KB
+per hourly evaluation, against about 8 KB at 50 rows. The cap matches the Sentry event *context*
+below (both 50) rather than the tighter 20 on the Sentry message body, so the same leading series
+appear in both and there is one less thing to reconcile. The counts beside it are uncapped, and an `n_late_listed`
 field records how many rows the table actually holds, so a truncated table can never make a large
 stall look small. Dagster's
 Checks view becomes the operator's at-a-glance "is the power data healthy?" status surface, showing
