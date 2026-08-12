@@ -70,6 +70,9 @@ def compute_h3_grid_weights(
         f" with child_res {child_h3_res} for {len(h3_index)} H3 indicies..."
     )
 
+    # Reusable-package input validation, not a reachable production state: the one asset call path
+    # arrives via `compute_h3_grid_weights_for_boundary`, which has already raised on an empty
+    # cell list. This guards the direct callers — notebooks passing their own `h3_index`.
     if len(h3_index) == 0:
         raise ValueError("h3_index is empty.")
 

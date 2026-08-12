@@ -388,6 +388,9 @@ def upsert_metadata(
     """
     COMPRESSION: Final[str] = "zstd"
 
+    # The annotation is not enforced at runtime and this is the package's entry point, so check the
+    # caller's snapshot rather than trust it. The three validations below each catch something this
+    # one cannot; none of the four is redundant.
     new_metadata = TimeSeriesMetadata.validate(new_metadata.sort("time_series_id"))
 
     if not object_exists(metadata_path, storage_options):
@@ -409,6 +412,10 @@ def upsert_metadata(
     existing_metadata = pl.read_parquet(
         metadata_path, storage_options=typeddict_to_dict(storage_options)
     )
+    # The stored roster is outside this code's control — an older writer, a hand-edit, a truncated
+    # upload — so an off-contract file must not be merged blind into the one we write back. Raising
+    # here is contained rather than fatal: the asset records `metadata_upsert_failed` and lets the
+    # power write proceed (see `defs/assets.py`).
     TimeSeriesMetadata.validate(existing_metadata)
 
     # `how="diagonal"` because the snapshot and the stored roster can differ in both width and
@@ -422,6 +429,9 @@ def upsert_metadata(
     # Compare metadata. `metadata_diff` contains all rows in `new_metadata` that do not have an
     # exact match in `existing_metadata`. Adapted from https://stackoverflow.com/a/79888719
     metadata_diff = new_rows.filter(~new_rows.hash_rows().is_in(stored_rows.hash_rows().implode()))
+    # First frame that has been through the diagonal concat, which null-fills the four
+    # `allow_missing` fields for whichever side lacked them — so this catches a null landing in a
+    # field the snapshot itself carried non-null, which validating the two inputs cannot.
     TimeSeriesMetadata.validate(metadata_diff)
 
     if metadata_diff.is_empty():
@@ -439,6 +449,8 @@ def upsert_metadata(
     # Merge metadata. Put new_metadata first so that unique(keep="first") keeps the new version
     merged_metadata = combined.unique(subset="time_series_id", keep="first").sort("time_series_id")
 
+    # The last gate before the stored roster is overwritten. `unique` draws rows from both sides of
+    # the concat, so this row set is one no validation above has seen.
     TimeSeriesMetadata.validate(merged_metadata)
 
     merged_metadata.write_parquet(
