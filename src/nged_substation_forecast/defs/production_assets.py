@@ -131,6 +131,10 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     cannot parse, or a ``model_params`` key it no longer declares — and refuses it before the
     directory is replaced, so the previous champion stays in place and keeps serving.
 
+    Every such refusal reaches the operator as a failed materialisation: this asset catches
+    nothing, unlike the rest of ``defs/``. The reasoning is in
+    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#failure-modes>.
+
     Promotion as a Dagster materialisation gives an audit trail and lineage for free, rather than
     a bare script (a script wrapper for the eventual Docker build (#222) stays trivial by calling
     the same ``fetch_model_artifacts`` helper).
