@@ -17,26 +17,53 @@ The issue asks for three behaviours, and all three are satisfiable inside the vo
    Dagster's Checks view, not Sentry: a Sentry "happy message" needs `_sentry.py`, which #488 owns.
 3. Any other series going bad still warns exactly as loudly as it does today.
 
-Series 23 has been dead since 4 July 2026, so the hourly check has been yellow for about five
-weeks. That is the warning-fatigue failure the
+The check has been yellow continuously since January, on one series. That is the warning-fatigue
+failure the
 [provider channel](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels)
 cannot survive, and it is happening now.
+
+### The list is one id, not two
+
+Checked against the power Delta table on 2026-08-12. The check reports `1/32 time series are late:
+1 stale (>24h since last data), 0 never reported` — series **33**, last reading 2026-01-26 13:30
+UTC, 4,748 hours stale. That matches James's "the monitor for site 33 is just broken", and confirms
+`time_series_id` is the id James used.
+
+**Series 23 is not late and never has been.** It has 490 readings since 4 July, no nulls, no zeros,
+0–18.4 MW, and its most recent reading is 13.6 hours old. What changed on 4 July is its *shape*:
+mean output at 12:00–13:00 UTC rose from 10.7 MW to 13.4 MW while 07:00 and 17:00 stayed flat —
+embedded PV switching off, so midday net demand is no longer being offset. James's report is
+corroborated; "the PV site is off" means the generator stopped, not the telemetry.
+
+So silencing 23 here would suppress nothing, sit in the hourly "ignoring" note for ever, and disarm
+a genuine future outage of a live feed. It is excluded. The regime change it represents — a silent
+accuracy loss no check in the stack detects — gets its own issue.
 
 The whole change is a `Final` tuple, one keyword-only parameter, three lines inside
 `evaluate_power_freshness`, two description clauses and five tests.
 
 ### Departures from the issue and its comments
 
-**The list is a `Final` tuple in `checks.py`, not `conf/known_dead_time_series.yaml`.** This
-departs from Jack's comment — "the list of dead timeseries should live with the code … So maybe
-YAML in `conf/`?" — on the *file*, while agreeing with it on the *principle*: a module constant
-lives with the code more literally than `conf/` does. The question that comment was answering was
-code versus `.env`, and both forms answer it the same way. What tips it is what the YAML costs:
-every mis-typing that a Python literal turns into a ruff, `ty` or import-time error becomes, in
-YAML, a runtime state that has to be guarded, degraded, documented and tested — and `"2333"` parses
-happily into silencing series 2, 3, 3 and 3. Neither form is operator-editable in any case: both
-need a commit, an image rebuild and a redeploy. This is open question 1, and reverting to YAML is a
-contained change if Jack prefers it.
+**The list is a `Final` tuple in `checks.py`, not `conf/known_dead_time_series.yaml`** — Jack's
+decision, taken with the trade in front of him. A module constant lives with the code more literally
+than `conf/` does, and the YAML's whole failure surface disappears with it: every mis-typing that a
+Python literal turns into a ruff, `ty` or import-time error would, in YAML, be a runtime state
+needing a guard, a degrade path, docs and tests, and `"2333"` parses happily into silencing series
+2, 3, 3 and 3. Neither form is operator-editable in any case; both need a commit, an image rebuild
+and a redeploy.
+
+**This is explicitly an interim answer.** The goal Jack has set is that NGED can operate the whole
+system from the UI without touching code, and at V2 scale he expects the dead list to change
+several times a month — a rate at which "open a PR" is the wrong interface. The constant ships now
+because v0.2 needs to deploy; the operator-editable version is designed with
+[#442 `asset_health_history`](https://github.com/openclimatefix/nged-substation-forecast/issues/442),
+which is already building operator-facing health state, so the two share one storage mechanism
+rather than inventing a second. Dagster's own database is the likely home — a config-driven asset
+the operator materialises from the Launchpad, read back through
+`context.instance.get_latest_materialization_event`. The reason not to reach for it here is that
+Dagster's database is per-deployment, so ids added on AWS are invisible on a laptop, which is the
+opposite of the property that makes a dead series a fact about the world rather than about a
+deployment.
 
 **One list, not the `known late` plus `known missing` pair the same comment suggests.** The
 distinction is already carried, per series and per hour, by the `status` column the check computes:
@@ -59,9 +86,8 @@ the operations page both say the transient version, because it is the true one.
 "worth sequencing downstream of those three so the silencing rules are written against the real
 warning vocabulary rather than a guess at it". That reasoning applies to the UI-editable version,
 which invents vocabulary; this version invents none — it reuses the check's existing `stale` /
-`never` / `late` words and adds a constant. Against a five-week-old permanent yellow, waiting for
-three unstarted issues is the worse trade. The follow-up issue keeps the sequencing. See open
-question 2.
+`never` / `late` words and adds a constant. Against a check that has been yellow since January,
+waiting for three unstarted issues is the worse trade. The follow-up issue keeps the sequencing.
 
 **No Sentry change in this issue.** #488 owns the Sentry event shape. Two consequences are recorded
 below as notes for that issue.
@@ -73,9 +99,9 @@ Only `src/nged_substation_forecast/defs/checks.py`, its tests, and three docs pa
 
 ### `src/nged_substation_forecast/defs/checks.py`
 
-- **`_KNOWN_DEAD_TIME_SERIES_IDS: Final[tuple[int, ...]] = (23, 33)`** — new, beside
-  `_POWER_DATA_STALENESS_THRESHOLD`. Its docstring carries the reason for each id (23: PV site off
-  since 2026-07-04; 33: site monitor broken; both reported by James at NGED), says that deleting an
+- **`_KNOWN_DEAD_TIME_SERIES_IDS: Final[tuple[int, ...]] = (33,)`** — new, beside
+  `_POWER_DATA_STALENESS_THRESHOLD`. Its docstring carries the reason for the id (33: the site
+  monitor is broken, reported by James at NGED; no data since 2026-01-26), says that deleting an
   entry starts the warnings again, and says the check turns yellow by itself if a listed series
   reports data again.
 
@@ -128,7 +154,7 @@ Only `src/nged_substation_forecast/defs/checks.py`, its tests, and three docs pa
 - **`_to_asset_check_result`** does three things more than it does today:
   - `passed = result.is_healthy and result.n_series_total > 0 and not result.resurrected_ids` — a
     resurrection makes the check yellow, which is the "tell me when they come back" requirement.
-  - Appends `Ignoring 2 known-dead time series: 23, 33.` to the description on **every** branch
+  - Appends `Ignoring 1 known-dead time series: 33.` to the description on **every** branch
     whenever `silenced_ids` is non-empty; and appends `Series 23 has reported again — remove it
     from _KNOWN_DEAD_TIME_SERIES_IDS in defs/checks.py.` when `resurrected_ids` is non-empty. The
     ignoring clause is uncapped, unlike every other listing in this module: the other caps guard
@@ -138,7 +164,7 @@ Only `src/nged_substation_forecast/defs/checks.py`, its tests, and three docs pa
     guard a second meaning. `n_series_total == 0` with nothing silenced still means "No power data
     on disk yet."; with something silenced it means every id we know of is on the dead list, which
     is a different and much louder statement, so it gets its own sentence — `Every known time
-    series is silenced as known-dead: 23, 33.` Both keep `passed=False`: watching nothing is not
+    series is silenced as known-dead: 33.` Both keep `passed=False`: watching nothing is not
     healthy. This is the one place the meaning change costs an extra branch rather than falling out
     for free, and it is unreachable at V1 (2 silenced of 32) but trivially reachable on a laptop
     with a small local table.
@@ -202,7 +228,7 @@ All in `tests/test_checks.py`. Seven tests and one added assertion; every one fa
 | *(one added assertion)* in the existing `test_power_data_is_fresh_all_current_passes` | `n_silenced == 0` and `silenced_time_series_ids == "[]"` are emitted when nothing is silenced, so the keys keep one type across runs. The same test already makes this point for `n_late_listed` |
 
 Three notes for whoever writes these. The existing end-to-end tests use ids 1, 2 and 99, so the real
-`(23, 33)` constant does not collide with any of them — but a new end-to-end test must monkeypatch
+`(33,)` constant does not collide with any of them — but a new end-to-end test must monkeypatch
 the constant rather than rely on that. Four of these fail on `main` by signature error (`TypeError`
 on `silenced_ids=`, `AttributeError` from `monkeypatch.setattr` on a constant that does not exist,
 `KeyError` on a new metadata key) rather than by behaviour, so their real worth is mutation
@@ -280,35 +306,17 @@ No network-gated tests are involved.
    saying why. Adding `n_silenced` and `silenced_time_series_ids` to the `power_freshness` context
    closes that gap. In-band the operator does still see it, in the Dagster description every hour.
 
-## Risks and open questions
+## Decisions, and the one risk left
 
-1. **A `Final` tuple in `checks.py`, or the `conf/` YAML file Jack's comment suggested?** The
-   simplicity review argued for the constant and I have planned it that way; this is the one place
-   the plan overrules a comment, so it should be a deliberate decision rather than a silent one.
-
-   *For the constant:* the YAML's whole failure surface disappears. No `Settings` field, no
-   `contracts` change, no `yaml` import in a production check module, no parse guard against
-   `"2333"` silencing series 2, 3, 3 and 3, no degradation path, no exception carved into the
-   module's "salvages nothing" doctrine, no CI test to prove the shipped file parses, and no test
-   fixture hazard from a default path that resolves to the real repo file. About 100 lines of code,
-   tests and prose, and one package, left alone. Every mistyping becomes a static error.
-
-   *For the YAML:* it is what Jack suggested, and a non-programmer editing a two-line list in
-   GitHub's web UI is a smaller ask than editing a 900-line Python module — which matters for the
-   stated aim of a system NGED could operate. Against that: neither form is editable without a
-   commit, an image rebuild and a redeploy, so the operator story is really the follow-up issue's
-   job, and the YAML would be scaffolding thrown away when that lands.
-
-   *Recommendation:* the constant. Reverting to YAML is contained — one file, one `Settings` field,
-   one reader with a guard — if you would rather have it.
-2. **Do you want the follow-up issue for the UI-editable version?** *Recommendation:* yes, opened
-   after this merges, blocked by #439/#441/#442, describing the operator-writable list plus
-   auto-removal on resurrection. I can draft it once you have approved this plan.
-3. **Is James's "TimeSeriesInstance 23" our `time_series_id` 23?** `time_series_id` is documented as
-   "Provided by NGED", so almost certainly yes, but a wrong id silences a healthy series and hides a
-   real fault — the only way this change can do harm. *Recommendation:* treat it as a hard gate:
-   before merging, check 23 and 33 against the live check's late-series table. If they are the two
-   that have been yellow since July, the mapping is confirmed by the data.
+1. **Storage: a `Final` tuple now, the UI-editable version with #442.** Decided by Jack, with the
+   trade stated in the departures above. The operator-editable list is the goal, not a nice-to-have:
+   NGED should be able to run the system without touching code, and at V2 scale the list will change
+   several times a month.
+2. **Only series 33 is silenced.** The data settles both halves of what was open here: 33 is 4,748
+   hours stale and confirms `time_series_id` is the id James used, and 23 is reporting normally, so
+   listing it would suppress nothing. See "The list is one id, not two" above.
+3. **Series 23's regime change gets its own issue**, since nothing in the stack detects a feed that
+   keeps reporting while what it measures changes underneath.
 4. **#523 touches the same function.** It splits the late-series table into separate stale and
    never-reported listings — same `_to_asset_check_result`, same metadata block, different concern.
    Neither needs the other, so whichever lands second rebases; the conflict is textual, not
