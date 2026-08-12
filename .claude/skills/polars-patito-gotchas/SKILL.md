@@ -3,18 +3,19 @@ name: polars-patito-gotchas
 description: >-
   Five Patito/Polars/Delta traps that fail silently rather than raising: cross-model LazyFrame
   joins, a `{column: dtype}` cast swallowed on a model-bearing frame, `ge`/`le` ignored on a
-  datetime field, `.filter()` dropping the Patito subclass, and dictionary-encoded columns
-  blocking Delta predicate pushdown. Load before writing Polars/Patito code that joins, casts,
-  filters a `pt.LazyFrame`, declares a Patito field, or reads/writes Delta — or when a
-  `validate()` dtype error, a `.join()` TypeError, or an over-reading Delta scan looks
-  inexplicable.
+  datetime field, `pt.LazyFrame` methods typed as plain `pl.LazyFrame`, and dictionary-encoded
+  columns blocking Delta predicate pushdown. Load before writing Polars/Patito code that joins,
+  casts, filters a `pt.LazyFrame`, declares a Patito field, or reads/writes Delta — or when a
+  `validate()` dtype error, a `.join()` TypeError, an `invalid-assignment` on a filtered scan, or
+  an over-reading Delta scan looks inexplicable.
 ---
 
 # Patito + Polars + Delta gotchas
 
-Every trap below produces **no error at the point of the mistake**. They surface later as a
-confusing `validate()` failure, a `ty` complaint several lines away, or a query that quietly
-reads the whole table. That is why they are written down.
+**None of the traps below points at itself.** Most produce no error where the mistake is, surfacing
+later as a confusing `validate()` failure or a query that quietly reads the whole table; the rest
+raise on the spot but name types and operations that send you after the wrong cause. That is why
+they are written down.
 
 ## Cross-model LazyFrame joins
 
@@ -80,18 +81,41 @@ the worked examples. A `constraints=` Polars expression on the field also works,
 message is the generic "1 row does not match custom constraints", so prefer the explicit check when
 you want the error to say which bound was broken.
 
-## `pt.LazyFrame.filter()` drops the Patito subclass
+## `pt.LazyFrame` methods are *typed* as plain `pl.LazyFrame`
 
-Most Polars operations on a `pt.LazyFrame` return a plain `pl.LazyFrame`, including `.filter()`.
-Reassigning `scan = scan.filter(...)` where `scan: pt.LazyFrame[Schema]` therefore fails `ty`'s
-assignment check.
+`ty` types `scan.filter(...)` on a `scan: pt.LazyFrame[Schema]` as
+`polars.lazyframe.frame.LazyFrame`, so reassigning `scan = scan.filter(...)` fails its assignment
+check:
 
-Workaround: rebind to a plain `pl.LazyFrame` local for the filter accumulation, then re-wrap before
-returning:
+```text
+error[invalid-assignment]: Object of type `polars.lazyframe.frame.LazyFrame`
+is not assignable to `patito.polars.LazyFrame[PowerForecast]`
+```
+
+**This is a type-annotation gap, not a runtime one.** At runtime the model survives: `.filter()`,
+`.sort()`, `.select()`, `.with_columns()`, `.head()` and `.unique()` on a `pt.LazyFrame` all return
+the model-bearing subclass with `.model` still set. Nothing is lost and nothing needs restoring —
+the re-wrap below exists only to satisfy the annotation.
+
+The asymmetry is in `patito/polars.py`: `patito.polars.DataFrame` carries a block of
+type-annotation overrides re-declaring `filter`/`select`/`with_columns` as `(self: DF) -> DF`, and
+`patito.polars.LazyFrame` has no such block, so it inherits Polars' own annotations.
+**`pt.DataFrame` is therefore unaffected** — `df.filter(...)` stays `pt.DataFrame[Schema]` to `ty`
+as well as at runtime, and needs no workaround.
+
+**Upgrading `ty` will not fix this, because `ty` is not wrong.** Polars annotates
+`LazyFrame.filter`, `.sort`, `.select`, `.with_columns`, `.head`, `.unique`, `.drop` and `.rename`
+as returning `LazyFrame`, not `Self`, so every conforming checker must infer the base class — and
+`pyright` reports the identical error. The fix has to come from upstream: either Polars switching
+those return annotations to `Self`, or Patito giving its `LazyFrame` the same override block its
+`DataFrame` already has. Until one of those lands, the re-wrap below is the workaround.
+
+Workaround, for the lazy case only: rebind to a plain `pl.LazyFrame` local for the filter
+accumulation, then re-wrap before returning:
 
 ```python
 def apply(self, scan: pt.LazyFrame[MySchema]) -> pt.LazyFrame[MySchema]:
-    lf: pl.LazyFrame = scan  # .filter() drops the pt subclass; accumulate on a plain LazyFrame
+    lf: pl.LazyFrame = scan  # .filter() is typed as plain pl.LazyFrame; accumulate on one
     if self.foo is not None:
         lf = lf.filter(pl.col("foo") == self.foo)
     return pt.LazyFrame.from_existing(lf).set_model(MySchema)  # zero-copy re-wrap

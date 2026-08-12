@@ -339,7 +339,8 @@ def _load_engineering_inputs(
     )
     if ensemble_members is not None:
         nwp_scan = nwp_scan.filter(pl.col("ensemble_member").is_in(ensemble_members))
-    # ``.filter`` returns a plain ``pl.LazyFrame``; re-attach the model. (Zero-copy re-wrap.)
+    # ``.filter`` is *typed* as a plain ``pl.LazyFrame`` even though the model survives at runtime,
+    # so re-wrap to satisfy the return annotation. (Zero-copy.)
     nwp_lf = pt.LazyFrame.from_existing(nwp_scan).set_model(Nwp)
 
     return power_ts, metadata_df, nwp_lf
@@ -649,9 +650,9 @@ class PopulationFilter(Config):
 
         Returns:
             The same scan with the filter predicates applied, re-wrapped as a
-            ``pt.LazyFrame[PowerForecast]`` (``.filter()`` drops the Patito subclass).
+            ``pt.LazyFrame[PowerForecast]`` (``.filter()`` is typed as a plain ``pl.LazyFrame``).
         """
-        # .filter() drops the pt subclass; accumulate on a plain LazyFrame, re-wrap on return.
+        # .filter() is typed as plain pl.LazyFrame; accumulate on one, re-wrap on return.
         lf: pl.LazyFrame = scan
         if self.experiment_name is not None:
             lf = lf.filter(pl.col("experiment_name") == self.experiment_name)
@@ -790,8 +791,8 @@ def _group_scan(
         fold_id: Fold identifier of the group.
 
     Returns:
-        A lazy scan of this one group's rows (a plain ``pl.LazyFrame`` — ``.filter()`` drops
-        the Patito subclass; the per-batch loader re-validates on collect).
+        A lazy scan of this one group's rows, annotated as a plain ``pl.LazyFrame`` because that
+        is how ``.filter()`` is typed; the per-batch loader re-validates on collect.
     """
     return pruned_scan.filter(
         (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
