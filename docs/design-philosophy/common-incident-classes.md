@@ -23,11 +23,13 @@ This is the shape [Inherent Stability](inherent-stability.md) is built around: t
 still produce at each stage of loss, from one missed weather-model run through to no fresh data at
 all. Telemetry already degrades this way today — a stalled meter widens nothing yet, but it does
 not stop the forecast either. Weather data is the sharper case: a sustained NWP outage currently
-makes the live-forecast asset **raise** rather than degrade, which is the one hard failure left in
-the [failure-modes table](inherent-stability.md#failure-modes)
-([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) — the gap is
-tracked, and the fix is deliberately sequenced behind training the model against realistic
-outages, so that a degraded forecast is measured rather than merely produced.
+makes the live-forecast asset **raise** rather than degrade — one of two hard-failure rows in the
+[failure-modes table](inherent-stability.md#failure-modes), and the only one tracked to change
+([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)); the other, an
+empty or unloadable promoted model, stays a deliberate raise because it is a promotion bug rather
+than a data outage. The NWP gap is tracked, and the fix is deliberately sequenced behind training
+the model against realistic outages, so that a degraded forecast is measured rather than merely
+produced.
 
 ## Upstream data malformed or silently reshaped
 
@@ -49,20 +51,22 @@ The forecast pipeline runs cleanly end to end and delivers a value — but the v
 wrong: an implausible magnitude, an internally inconsistent set of quantiles, or a forecast that
 quietly diverges from reality — and nothing rejects or flags it before a consumer notices.
 
-Two mechanisms already point the right way. Delivering `power_fcst` normalised to
-**[−1, +1]** ([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246)) makes
-an order-of-magnitude output error structurally harder, since the value is capacity-bounded by
-construction rather than by a downstream check someone has to remember to run. And quantile
-crossing — one quantile level coming out below a lower one — is a *named* failure mode with a
-designed fix already: sorting each member's quantiles at predict time
-([Probabilistic Forecasting](../techniques/probabilistic-forecasting.md#the-tempting-shortcut-that-doesnt-work-averaging-the-quantiles),
+Two mechanisms already point the right way, both 🚧 planned rather than shipped. Normalising
+`power_fcst` to **[−1, +1]**
+([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246), the code today
+still forecasts raw MW/MVA) will make an order-of-magnitude output error structurally harder,
+since the value becomes capacity-bounded by construction rather than by a downstream check someone
+has to remember to run. And quantile crossing — one quantile level coming out below a lower one —
+is a *named* failure mode with a designed fix already: sorting each member's quantiles at predict
+time
+([Probabilistic Forecasting](../techniques/probabilistic-forecasting.md#turning-51-quantile-sets-into-one-the-pooling-recipe),
 [#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)).
 
-The gap: unlike NWP inputs, which get a WARN-level asset check naming exactly which slices are
-anomalous, the forecast **output** has no equivalent check today. Every other boundary in this
-project follows the same pattern — validate, and warn on what validation can't reject outright —
-and the output boundary is the one place that pattern has not yet been applied
-([#560](https://github.com/openclimatefix/nged-substation-forecast/issues/560)).
+The gap: `live_forecasts_are_healthy` already warns on a null, NaN or infinite `power_fcst`, but
+nothing checks a *finite, plausible-looking* output for implausible magnitude or, once quantiles
+ship, crossed levels — the same "validate, and warn on what validation can't reject outright"
+pattern every input boundary in this project follows has not yet been applied to the output
+itself ([#560](https://github.com/openclimatefix/nged-substation-forecast/issues/560)).
 
 ## Shared-compute blast radius
 
@@ -127,7 +131,4 @@ assuming either way.
 
 None of the above is a request to build every mitigation at once — several of these shapes are
 already fully addressed, one is an open question rather than a proposed change, and the rest are
-tracked as the linked issues. The value of naming a shape here is the same as elsewhere in this
-section: a gap that is written down can be weighed against everything else on the roadmap, and a
-mechanism that already exists can be pointed to instead of re-argued from scratch the next time
-this class of failure comes up.
+tracked as the linked issues.
