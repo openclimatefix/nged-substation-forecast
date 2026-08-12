@@ -8,8 +8,8 @@ Issue: <https://github.com/openclimatefix/nged-substation-forecast/issues/505>.
 **Worth implementing, roughly as described.** The issue's premise checks out against the code on
 `main`:
 
-- `assess_nwp_quality` (`packages/contracts/src/contracts/weather_schemas.py:589`) counts nulls in
-  the *stored H3 cells*, via `_deaccumulated_null_breakdown` at line 494. Its input is a validated
+- `assess_nwp_quality` (`packages/contracts/src/contracts/weather_schemas.py:587`) counts nulls in
+  the *stored H3 cells*, via `_deaccumulated_null_breakdown` at line 492. Its input is a validated
   `pt.DataFrame[Nwp]`, which by construction is post-aggregation, so it cannot see a grid point.
 - #496 has landed. `_aggregate_grid_points_to_h3_cells`
   (`packages/dynamical_data/src/dynamical_data/ecmwf_ens/convert_to_polars.py:135`) renormalises each
@@ -18,8 +18,8 @@ Issue: <https://github.com/openclimatefix/nged-substation-forecast/issues/505>.
   contributing grid point is null. The amplification that made `n_null_cells` a usable provider
   proxy is gone by design.
 - The code already admits the gap in prose: `NwpQualityReport`'s docstring
-  (`weather_schemas.py:534`) says "Read this as 'how much did we lose', not as 'how corrupt was the
-  feed'", and `docs/live_service/operations.md:219` tells the operator the same thing. Both point at
+  (`weather_schemas.py:532`) says "Read this as 'how much did we lose', not as 'how corrupt was the
+  feed'", and `docs/live_service/operations.md:243` tells the operator the same thing. Both point at
   this issue. So the change closes a hole the codebase has already documented.
 
 The provider channel in
@@ -47,7 +47,7 @@ that rate convolved with our H3 resolution, our grid spacing and our aggregation
 
    The two counts are not strictly redundant in both directions: a grid point the H3 weights name but
    the dataset does not carry nulls cells with no upstream null behind them at all
-   (`docs/architecture/ecmwf-ens-known-issues.md:258`). That divergence runs the other way and does
+   (`docs/architecture/ecmwf-ens-known-issues.md:262`). That divergence runs the other way and does
    not weaken the argument, but the plan should not claim the two are equivalent.
 
    What this gives up: naming *which* slices carried scatter the aggregation then absorbed. Nothing
@@ -119,9 +119,14 @@ scalars, and `contracts` is the home of Patito data schemas; a report describing
 - Call `assess_upstream_grid_point_nulls(ds)` **inside the existing `try` block** at line 308 that
   already wraps `assess_nwp_quality` and `assess_nwp_run_completeness`. The guard, the ordering
   before `write_nwp`, and `_degraded_nwp_check_result` all already exist and the new call inherits
-  them unchanged.
+  them unchanged. Positional `ds` is right here under
+  [Calling functions](https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/#calling-functions)'
+  third exception — one argument whose role the function name states — and matches the sibling
+  `assess_nwp_quality(nwp)` on the line above.
 - `_nwp_quality_check_result` gains an `upstream: UpstreamNullRate` parameter and five metadata keys,
-  named so the two levels cannot be confused:
+  named so the two levels cannot be confused. Its call site becomes
+  `_nwp_quality_check_result(report=quality, upstream=upstream)` — two arguments now, so the
+  keyword-argument rule applies and the existing positional call must change with it:
 
   | Stored H3 cells (existing) | Upstream grid points (new) |
   |---|---|
@@ -141,7 +146,7 @@ scalars, and `contracts` is the home of Patito data schemas; a report describing
   `n_upstream_scattered_slices` (the difference of two keys already present).
 - **Rewrite the description to always name both levels**, one clause each, with no case analysis.
   Today it reads "No unexpected nulls in the de-accumulated NWP variables." whenever no cell is null
-  (`assets.py:412`) — which after #496 is the *usual* state even when upstream sent a corrupt run, so
+  (`assets.py:413`) — which after #496 is the *usual* state even when upstream sent a corrupt run, so
   the string claims health it did not measure. Always emitting both numbers removes the failure mode
   rather than adding a branch to keep in sync with `passed`.
 - Add `null_grid_point_fraction` and `n_null_grid_points` to the materialisation metadata next to
@@ -162,14 +167,14 @@ downloaded grid point with no H3 geometry in it. It loses on two measured facts:
   break silently in CI and surface only on the manual `--run-network` run. Two of those chain method
   calls straight off the result, so the edit is not uniform. `_process_chunk_for_1_lead_time_and_1_ens_member`
   is called directly at `test_convert_to_polars.py:403` and `:689`. Add the five converter stubs in
-  `tests/test_assets.py` (lines 366, 422, 465, 518, 585). The separate pass changes none of them.
+  `tests/test_assets.py` (lines 381, 437, 483, 536, 610). The separate pass changes none of them.
 - **It puts the counting outside the guard.** Inside the converter, the count sits in the earlier
   `RetryRequested` try (`assets.py:287`), which catches only `NwpRunNotYetAvailable` and
   `NwpVariableWhollyMissing` — so a raise there costs the partition. That is precisely the rule-7
   hazard #509 was filed about, and the zero-denominator case below shows it is not theoretical.
 
-What the separate pass costs: the five download stubs in `tests/test_assets.py` (lines 364, 420, 464,
-517, 584) return a bare `object()`, so they need a small synthetic `xr.Dataset` instead — roughly a
+What the separate pass costs: the five download stubs in `tests/test_assets.py` (lines 378, 434, 480,
+533, 607) return a bare `object()`, so they need a small synthetic `xr.Dataset` instead — roughly a
 dozen lines, once, at module level in that file, since root `tests/` cannot import
 `packages/dynamical_data/tests/conftest.py`. And it reads `ds`'s `latitude`/`longitude` dimension
 names and `lead_time`'s dtype, which `convert_to_polars.py` and `download.py` already assume
@@ -200,9 +205,9 @@ whole workstream exists to prevent. Hence the explicit `0.0`, and test 6.
 
 **What does not hold, and is worth saying because it points the other way:** it would be convenient
 to argue that a zero threshold would warn constantly because the grid-point base rate is unknown. The
-archive says otherwise. `docs/architecture/ecmwf-ens-known-issues.md:94` gives per-grid-point rates
+archive says otherwise. `docs/architecture/ecmwf-ens-known-issues.md:98` gives per-grid-point rates
 directly (0.014% of `precipitation_surface`'s grid points on 2025-06-04 00Z, the worst run in the
-archive), and lines 107–109 record that only 12 of 862 archived runs carry any de-accumulated null
+archive), and lines 111–113 record that only 12 of 862 archived runs carry any de-accumulated null
 beyond lead-0 at all. Since the pre-#496 aggregation let one null point null its cell, that 12/862 ≈
 1.4% bounds the runs carrying any null among the grid points our cells use. A zero-threshold gate
 would therefore fire on order 1% of runs — informative, not noisy. See risk 1: this is Jack's call,
@@ -267,22 +272,26 @@ function does not exist; what matters is the assertion each pins:
 
 **`tests/test_assets.py`**:
 
-7. *The keys are plumbed onto the check and the materialisation* — a run whose stubbed converter
-   returns a frame with no null cells, paired with a dataset carrying upstream scatter, publishes all
-   five new keys on the check and `n_null_grid_points` / `null_grid_point_fraction` on the
-   `MaterializeResult`, while the check still `passed`. **Fails on `main`:** none of those keys exist
-   (`assets.py:430`, `339`).
-8. *The description cannot claim health it does not have* — for that same run the description does
-   **not** contain "No unexpected nulls" and does name the upstream fraction. **Fails on `main`:**
-   `assets.py:412` emits exactly that phrase for this run.
-9. *Degradation* — monkeypatch `assess_upstream_grid_point_nulls` to raise; the run still lands, both
-   checks come back as WARN `_degraded_nwp_check_result`s, one Sentry event is reported, and the
-   shape and upstream metadata keys are absent. Extends
-   `test_ecmwf_ens_lands_the_run_when_an_assessment_fails` (line 620), which already asserts
-   `"n_ensemble_members" not in materialisation.metadata` at line 657, so the mirror assertion drops
-   straight in. This is what pins that the new call really is inside the guard.
+- **Test 7** — *The keys are plumbed onto the check and the materialisation* — a run whose stubbed converter
+  returns a frame with no null cells, paired with a dataset carrying upstream scatter, publishes all
+  five new keys on the check and `n_null_grid_points` / `null_grid_point_fraction` on the
+  `MaterializeResult`, while the check still `passed`. **Fails on `main`:** none of those keys exist
+  (`assets.py:431`, `339`).
+- **Test 8** — *The description cannot claim health it does not have* — for that same run the description does
+  **not** contain "No unexpected nulls" and does name the upstream fraction. **Fails on `main`:**
+  `assets.py:413` emits exactly that phrase for this run.
+- **Test 9** — *Degradation* — monkeypatch `assess_upstream_grid_point_nulls` to raise; the run still lands, both
+  checks come back as WARN `_degraded_nwp_check_result`s, one Sentry event is reported, and the
+  shape and upstream metadata keys are absent. Extends
+  `test_ecmwf_ens_lands_the_run_when_an_assessment_fails` (line 643), which already asserts
+  `"n_ensemble_members" not in materialisation.metadata` at line 679, so the mirror assertion drops
+  straight in. This is what pins that the new call really is inside the guard.
 
-Dropped as duplicates: a cancellation test (`tests/test_assets.py:697` already pins that branch) and
+New `monkeypatch` calls take keyword arguments — `monkeypatch.setattr(target=assets,
+name="assess_upstream_grid_point_nulls", value=_raise)` — matching every call in the file.
+
+Dropped as duplicates: a cancellation test (`test_ecmwf_ens_re_raises_a_cancelled_run_without_writing`,
+`tests/test_assets.py:710`, already pins that branch) and
 a `contracts` refactor guard (there is no refactor left to guard).
 
 ## Docs to update
@@ -307,7 +316,7 @@ Written to describe how the code works now, per CLAUDE.md's "Write about the pre
 - **`packages/contracts/src/contracts/weather_schemas.py`** — `NwpQualityReport`'s docstring, as
   above.
 - **`docs/design-philosophy/inherent-stability.md`** — add the upstream null rate to the
-  provider-channel row of the "Three audiences, three channels" table (line 321). One cell, but it is
+  provider-channel row of the "Three audiences, three channels" table (line 322). One cell, but it is
   the table the issue cites as its justification.
 - No roadmap ship-time triage: this issue is not a roadmap item and completes no milestone banner.
 
@@ -348,7 +357,7 @@ with "the feed is degrading" merges two questions with different remedies — th
 *third* `AssetCheckSpec` with its own `passed`, not a change to this one's.
 
 **2. Should the measurement also cover the instantaneous variables?** Recommendation: **not in this
-issue, but it is worth its own.** `ecmwf-ens-known-issues.md:190` says out loud what #496 cost:
+issue, but it is worth its own.** `ecmwf-ens-known-issues.md:195` says out loud what #496 cost:
 "scattered corruption in a variable that should never carry any is now mostly invisible at ingest",
 because a scattered null in `temperature_2m` is absorbed by a cell's other points and never reaches
 `Nwp.validate`. The machinery here would restore that detector for roughly one extra line — the
