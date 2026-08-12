@@ -341,19 +341,22 @@ def test_a_resurrection_fails_the_check_and_says_where_to_edit() -> None:
     assert "_KNOWN_DEAD_TIME_SERIES_IDS" in result.description
 
 
-def test_a_wholly_silenced_roster_is_not_reported_as_an_empty_table() -> None:
-    """Watching nothing because everything is silenced is a different statement from having no data
-    at all, and the two want opposite responses from the operator."""
+def test_a_deployment_with_no_data_yet_still_says_so_while_silencing() -> None:
+    """The dead list is never empty in production, so "watching nothing" must keep meaning "no data
+    yet" — the state every fresh deployment starts in — rather than being read as the list having
+    swallowed the roster."""
     result = checks._to_asset_check_result(
         evaluate_power_freshness(
-            coverage=_coverage({33: _NOW - timedelta(days=200)}),
-            roster_ids=_roster([33]),
+            coverage=_coverage({}),
+            roster_ids=None,
             now=_NOW,
             threshold=_THRESHOLD,
             silenced_ids=(33,),
         )
     )
-    assert result.description == "Every known time series is silenced as known-dead: 33."
+    assert result.description == (
+        "No power data on disk yet. Ignoring 1 known-dead time series: 33."
+    )
     assert not result.passed
 
 

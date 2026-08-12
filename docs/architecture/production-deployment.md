@@ -96,7 +96,7 @@ A broken monitor NGED has not fixed keeps the check yellow for months, and an al
 trains the operator to ignore it — which costs us the
 [provider channel](../design-philosophy/inherent-stability.md#three-audiences-three-channels)
 entirely. `_KNOWN_DEAD_TIME_SERIES_IDS` in `defs/checks.py` names the `time_series_id`s the check
-ignores. Three design points.
+ignores.
 
 **The silenced ids are removed from the check's inputs, not from its output.** `evaluate_power_freshness`
 drops them from the coverage frame and the roster before it classifies anything, so `n_stale`,

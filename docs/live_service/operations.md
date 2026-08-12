@@ -193,21 +193,20 @@ it at all. Read `n_stale` and `n_never_reported` — never truncated — before 
 table that nothing has gone stale. All three counts, and `n_series_total` beside them, describe the
 series the check is *watching*: the silenced ones below are excluded from every one of them.
 
-**Silencing a series we know is dead.** A monitor NGED has not fixed holds the check yellow
-indefinitely, and a channel that is always yellow is a channel nobody reads. `_KNOWN_DEAD_TIME_SERIES_IDS`
-in `src/nged_substation_forecast/defs/checks.py` lists the `time_series_id`s to ignore; add one,
-with a comment saying why, then commit, rebuild the image and redeploy. Removing an id starts the
-warnings again. Either edit is an intervention worth a `routine-ops` row in the
+**Silencing a series we know is dead.** `_KNOWN_DEAD_TIME_SERIES_IDS` in
+`src/nged_substation_forecast/defs/checks.py` lists the `time_series_id`s the check ignores, so a
+monitor NGED has not fixed cannot hold it yellow for ever
+([why](../architecture/production-deployment.md#silence-the-series-we-already-know-are-dead)). Add
+an id, with a comment saying why, then commit, rebuild the image and redeploy. Removing an id starts
+the warnings again. Either edit is an intervention worth a `routine-ops` row in the
 [intervention log](intervention-log.md).
 
-Three descriptions come from that list. `Ignoring N known-dead time series: 33.` is appended to
+Two descriptions come from that list. `Ignoring N known-dead time series: 33.` is appended to
 every run, green or yellow, so the silencing cannot be quietly forgotten — read `n_silenced` and
 `silenced_time_series_ids` for the same thing in the metadata. `Reporting again, so no longer dead:
 33.` means a silenced series has sent data within the threshold, which fails the check until you
 delete it from the list; the check does not remove it for you, and the yellow lasts only while the
 series keeps reporting, so a series that revives for an afternoon and dies again leaves no trace.
-`Every known time series is silenced as known-dead: …` means the list has swallowed the whole
-roster — nothing is being watched at all, which on a full deployment means the list is wrong.
 
 `n_silenced` counts the ids you listed, not the ids that were actually withheld, so an id that
 matches no series still appears: that is how a mistyped id shows itself rather than vanishing.

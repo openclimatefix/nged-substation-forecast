@@ -15,8 +15,6 @@ Series we already know are dead — ``_KNOWN_DEAD_TIME_SERIES_IDS`` — are drop
 *inputs* rather than from its output, so every count describes the series we are still watching, and
 the Sentry warning inherits the silencing without knowing it exists. The check keeps naming the
 silenced ids every hour, green or yellow, and turns yellow on its own if one of them reports again.
-That yellow lasts only while the series keeps reporting: nothing here remembers, so a series that
-revives for an afternoon and dies again leaves no trace once it is stale.
 
 ``evaluate_power_freshness`` is a pure function so it is unit-testable without Dagster or Delta,
 and it is the hand-off point for routing per-series staleness to Sentry: the same
@@ -327,13 +325,7 @@ def _describe_power_freshness(result: PowerFreshnessResult) -> str:
     threshold_h = result.threshold_hours
     silenced = ", ".join(str(i) for i in result.silenced_ids)
     if result.n_series_total == 0:
-        # Two ways to be watching nothing, and they call for opposite responses: an empty table on
-        # a new deployment, or a dead list that has swallowed every series we know of.
-        summary = (
-            f"Every known time series is silenced as known-dead: {silenced}."
-            if result.silenced_ids
-            else "No power data on disk yet."
-        )
+        summary = "No power data on disk yet."
     elif result.is_healthy:
         summary = (
             f"All {result.n_series_total} watched time series are up to date "
@@ -347,7 +339,7 @@ def _describe_power_freshness(result: PowerFreshnessResult) -> str:
         )
     sentences = [summary]
     # Named on every run, healthy or not, so silencing something is never quietly forgotten.
-    if result.silenced_ids and result.n_series_total > 0:
+    if result.silenced_ids:
         sentences.append(f"Ignoring {len(result.silenced_ids)} known-dead time series: {silenced}.")
     if result.resurrected_ids:
         ids = ", ".join(str(i) for i in result.resurrected_ids)
