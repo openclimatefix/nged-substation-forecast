@@ -3,6 +3,26 @@
 Branch: `claude/grid-point-corruption-signal-505`.
 Issue: <https://github.com/openclimatefix/nged-substation-forecast/issues/505>.
 
+**The problem.** We answer the question "is Dynamical's ECMWF feed broken?" with `n_null_cells`, the
+number of null H3 cells in an ingested run, published as the `nwp_has_no_unexpected_nulls` asset
+check. That number has just gone nearly blind. Since #496 landed, each H3 cell is renormalised over
+the grid points that actually supplied a value, so a corrupt grid point costs only its own share of
+its cell instead of nulling the whole thing — which is the entire point of #496, but it means the
+upstream corruption is absorbed before it reaches anything we count. On the production grid, upstream
+scatter now has to get roughly 230× worse before the check reports what it reported before. The
+corruption itself is unchanged; only our ability to see it has gone.
+
+**The plan.** Count the nulls where they live — on the raw 0.25° grid, before the H3 aggregation
+touches it. A new pure function, `assess_upstream_grid_point_nulls`, makes one pass over the
+downloaded `xr.Dataset` and returns four scalars: how many grid points were null beyond lead-0, out
+of how many, across how many `(variable, member, step)` slices, and which variables. Their ratio,
+`null_grid_point_fraction`, is published on the same WARN check and on every materialisation, so the
+trend is plottable in the Dagster timeline rather than only visible on runs bad enough to warn.
+`n_null_cells` stays exactly as it is: "how much did the model lose" and "how broken is the feed" are
+different questions, and the two numbers are named so they cannot be mistaken for each other. The
+check stays WARN and non-blocking, and the new call sits inside the guard that already stops a
+warning path failing the run.
+
 ## Verdict
 
 **Worth implementing, roughly as described.** The issue's premise checks out against the code on
