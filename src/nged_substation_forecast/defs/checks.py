@@ -11,6 +11,11 @@ timestamp — the job succeeds hourly even when NGED publishes nothing, so only 
 ``time`` reveals whether fresh data really landed. A native materialisation-freshness policy
 would miss exactly the failure this check exists to catch.
 
+Series we already know are dead — ``_KNOWN_DEAD_TIME_SERIES_IDS`` — are dropped from the check's
+*inputs* rather than from its output, so every count describes the series we are still watching, and
+the Sentry warning inherits the silencing without knowing it exists. The check keeps naming the
+silenced ids every hour, green or yellow, and turns yellow on its own if one of them reports again.
+
 ``evaluate_power_freshness`` is a pure function so it is unit-testable without Dagster or Delta,
 and it is the hand-off point for routing per-series staleness to Sentry: the same
 ``PowerFreshnessResult`` is fed to ``report_power_freshness`` (in
@@ -51,7 +56,7 @@ fresh power table would then render an unreadable roster as a green tick.
 
 import json
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -108,8 +113,9 @@ table and the Sentry event context serve the same drill-down purpose.
 
 The rows follow ``_LATE_STATUS_ORDER``, so the listing is the head of that order rather than the 50
 series in most trouble: when never-reported series outnumber the cap, no stale series is listed at
-all, however stale it is. ``n_stale`` and ``n_never_reported`` stay exact throughout, and are what
-the operator should read first. Why the table is capped, and why at this number:
+all, however stale it is. ``n_stale`` and ``n_never_reported`` stay exact for the watched
+population throughout, and are what the operator should read first. Why the table is capped, and
+why at this number:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>
 """
 
@@ -124,6 +130,20 @@ NGED publishes roughly every 6 hours and our pipeline back-fills gaps automatica
 feed recovers, so 24 hours is comfortably past normal jitter while still catching a genuine
 multi-slot stall the same day."""
 
+_KNOWN_DEAD_TIME_SERIES_IDS: Final[tuple[int, ...]] = (33,)
+"""Series ``power_data_is_fresh`` stops warning about, because we already know they are dead.
+
+33: the site monitor is broken (reported by James at NGED); no data since 2026-01-26.
+
+Delete an entry to start warning about that series again. The check keeps naming every id listed
+here, so the silencing cannot be forgotten, and turns yellow by itself if one of them reports data
+again. How to edit the list, and what each description means:
+<https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled>
+
+Why it is a source constant rather than operator-editable state:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#silence-the-series-we-already-know-are-dead>
+"""
+
 
 @dataclass(frozen=True)
 class PowerFreshnessResult:
@@ -132,6 +152,9 @@ class PowerFreshnessResult:
     ``late`` lists every late series — never-reported first, then most-stale first — with columns
     ``time_series_id``, ``last_seen`` (null if never reported), ``hours_late`` (null if never
     reported) and ``status`` (``"never"`` or ``"stale"``).
+
+    Every count here describes the series we are *watching*: the silenced ones are excluded from
+    ``n_series_total`` as well as from ``late``.
     """
 
     n_series_total: int
@@ -140,6 +163,13 @@ class PowerFreshnessResult:
     threshold_hours: float
     late: pl.DataFrame
 
+    silenced_ids: tuple[int, ...] = ()
+    """The ids we were asked to ignore, echoed verbatim — including any that match no series at
+    all, so a mistyped id shows up as silencing nothing rather than vanishing."""
+
+    resurrected_ids: tuple[int, ...] = ()
+    """Silenced ids that have reported since the cutoff, so the silencing no longer fits."""
+
     @property
     def n_late(self) -> int:
         """Total late series: those that went stale plus those that never reported."""
@@ -147,7 +177,13 @@ class PowerFreshnessResult:
 
     @property
     def is_healthy(self) -> bool:
-        """True when no series is late."""
+        """True when no *watched* series is late.
+
+        Deliberately says nothing about ``resurrected_ids``: this is the gate
+        ``report_power_freshness`` gives to Sentry's *staleness* warning, and a series that has
+        started reporting again is not stale. The asset check reacts to a resurrection on its own,
+        through ``passed``.
+        """
         return self.n_late == 0
 
 
@@ -156,6 +192,8 @@ def evaluate_power_freshness(
     roster_ids: pl.Series | None,
     now: datetime,
     threshold: timedelta,
+    *,
+    silenced_ids: Collection[int] = (),
 ) -> PowerFreshnessResult:
     """Classify each time series as fresh, stale, or never-reported.
 
@@ -171,6 +209,9 @@ def evaluate_power_freshness(
             available, in which case never-reported ids cannot be detected.
         now: Current time (UTC).
         threshold: A series is stale when ``last_time < now - threshold``.
+        silenced_ids: Series we already know are dead, dropped from both inputs before anything is
+            classified, so every count describes the watched population. One that has reported
+            since the cutoff comes back as ``resurrected_ids`` instead.
 
     Returns:
         A ``PowerFreshnessResult`` summarising the health of the power feed.
@@ -181,6 +222,21 @@ def evaluate_power_freshness(
     status_dtype = pl.Enum(_LATE_STATUS_ORDER)
     cutoff = now - threshold
 
+    # Drop the silenced series from the *inputs*, so `stale`, `never`, `late` and every count below
+    # describe what we are watching without any of them needing to know about silencing. A silenced
+    # id fresher than the cutoff is reported instead: the fault we silenced has evidently healed,
+    # and the complement of `stale`'s `<` is exactly the right test — an id that is in neither
+    # frame (a typo, or one NGED has never published) is correctly not a resurrection.
+    silenced = list(silenced_ids)
+    resurrected_ids = tuple(
+        coverage.filter(pl.col("last_time") >= cutoff, pl.col("time_series_id").is_in(silenced))[
+            "time_series_id"
+        ].sort()
+    )
+    coverage = coverage.filter(~pl.col("time_series_id").is_in(silenced))
+    if roster_ids is not None:
+        roster_ids = roster_ids.filter(~roster_ids.is_in(silenced))
+
     # Stale: has data on disk, but the newest observation predates the cutoff.
     #
     # NOTE: this is deliberately not restricted to `roster_ids`. A series that NGED has
@@ -188,7 +244,8 @@ def evaluate_power_freshness(
     # what we want for now: we would rather be told about a series that has gone quiet than
     # silently stop watching it. Restricting to `roster_ids` would not silence one anyway:
     # `upsert_metadata` never drops a series, so a retired series stays in the roster for good.
-    # Silencing one needs an explicit record of which ids we have retired.
+    # Silencing one takes the explicit record of dead ids above, which serves a retired series and
+    # a broken sensor alike — the check cannot tell them apart, and does not need to.
     stale = coverage.filter(pl.col("last_time") < cutoff).select(
         "time_series_id",
         last_seen=pl.col("last_time"),
@@ -224,6 +281,8 @@ def evaluate_power_freshness(
         n_never=never.height,
         threshold_hours=threshold.total_seconds() / 3600.0,
         late=late,
+        silenced_ids=tuple(silenced),
+        resurrected_ids=resurrected_ids,
     )
 
 
@@ -261,37 +320,58 @@ def _late_table_metadata(late: pl.DataFrame) -> MetadataValue:
     return MetadataValue.table(records, schema=_LATE_TABLE_SCHEMA)
 
 
-def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
-    """Turn a ``PowerFreshnessResult`` into a WARN-severity Dagster check result."""
+def _describe_power_freshness(result: PowerFreshnessResult) -> str:
+    """One human-readable line: the state of the watched feed, and what is being ignored."""
     threshold_h = result.threshold_hours
     if result.n_series_total == 0:
-        description = "No power data on disk yet."
+        summary = "No power data on disk yet."
     elif result.is_healthy:
-        description = (
-            f"All {result.n_series_total} time series are up to date (within {threshold_h:.0f}h)."
+        summary = (
+            f"All {result.n_series_total} watched time series are up to date "
+            f"(within {threshold_h:.0f}h)."
         )
     else:
-        description = (
-            f"{result.n_late}/{result.n_series_total} time series are late: "
+        summary = (
+            f"{result.n_late}/{result.n_series_total} watched time series are late: "
             f"{result.n_stale} stale (>{threshold_h:.0f}h since last data), "
             f"{result.n_never} never reported."
         )
+    sentences = [summary]
+    # Named on every run, healthy or not, so silencing something is never quietly forgotten.
+    if result.silenced_ids:
+        ids = ", ".join(str(i) for i in result.silenced_ids)
+        sentences.append(f"Ignoring {len(result.silenced_ids)} known-dead time series: {ids}.")
+    if result.resurrected_ids:
+        ids = ", ".join(str(i) for i in result.resurrected_ids)
+        sentences.append(
+            f"Reporting again, so no longer dead: {ids}. Remove from "
+            "_KNOWN_DEAD_TIME_SERIES_IDS in defs/checks.py."
+        )
+    return " ".join(sentences)
+
+
+def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
+    """Turn a ``PowerFreshnessResult`` into a WARN-severity Dagster check result."""
     # Truncate once, here, so the table and the count that describes it come from one slice.
     listed = result.late.head(_MAX_LATE_SERIES_IN_TABLE)
     return AssetCheckResult(
         # A stalled feed is expected to self-heal via back-fill, so warn — never fail the run and
         # block downstream assets. Absent data is not "healthy" either, hence the count guard.
-        passed=result.is_healthy and result.n_series_total > 0,
+        # A resurrection is the one yellow nothing else can raise: the series is healthy, so
+        # `is_healthy` stays true, and only an edit to the dead list clears it.
+        passed=result.is_healthy and result.n_series_total > 0 and not result.resurrected_ids,
         severity=AssetCheckSeverity.WARN,
-        description=description,
+        description=_describe_power_freshness(result),
         metadata={
             "n_late": result.n_late,
             "n_stale": result.n_stale,
             "n_never_reported": result.n_never,
             "n_series_total": result.n_series_total,
-            "threshold_hours": threshold_h,
+            "threshold_hours": result.threshold_hours,
             "n_late_listed": listed.height,
             "late_time_series": _late_table_metadata(listed),
+            "n_silenced": len(result.silenced_ids),
+            "silenced_time_series_ids": str(list(result.silenced_ids)),
         },
     )
 
@@ -310,6 +390,8 @@ def _check_power_data_freshness() -> AssetCheckResult:
         roster_ids=roster_ids,
         now=datetime.now(UTC),
         threshold=_POWER_DATA_STALENESS_THRESHOLD,
+        # Read at the call site, not defaulted into the signature, so a test can monkeypatch it.
+        silenced_ids=_KNOWN_DEAD_TIME_SERIES_IDS,
     )
     # Forward per-series staleness to Sentry (a no-op unless a DSN is set and some series is late).
     # Best-effort: report_power_freshness never raises, so a telemetry hiccup costs no more than
@@ -322,8 +404,9 @@ def _check_power_data_freshness() -> AssetCheckResult:
     asset=power_time_series_and_metadata,
     blocking=False,
     description=(
-        "Warn if any time series has no fresh power data within the staleness threshold "
-        "(stale) or has never reported at all (never)."
+        "Warn if any watched time series has no fresh power data within the staleness threshold "
+        "(stale) or has never reported at all (never), or if a known-dead series has started "
+        "reporting again."
     ),
 )
 def power_data_is_fresh() -> AssetCheckResult:
