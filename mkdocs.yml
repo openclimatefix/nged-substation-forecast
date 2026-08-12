@@ -50,6 +50,7 @@ nav:
       - Design Principles: design-philosophy/design-principles.md
       - Engineering Hypotheses: design-philosophy/engineering-hypotheses.md
       - Inherent Stability: design-philosophy/inherent-stability.md
+      - Common Incident Classes: design-philosophy/common-incident-classes.md
   - Background & Challenges:
       - NGED Network: background/network.md
       - Requirements: background/requirements.md
