@@ -649,6 +649,68 @@ def test_metrics_no_filter_scores_every_group(
     assert scored_experiments == {EXPERIMENT_NAME, second_experiment}
 
 
+def _append_live_fold_rows(forecasts_path: str) -> None:
+    """Copy the produced forecasts into a ``fold_id="live"`` partition of the same table.
+
+    This is what ``live_forecasts`` writes: production output shares ``power_forecasts`` with the
+    CV folds, keyed by ``(experiment_name, fold_id="live")``.
+    """
+    live = pl.read_delta(forecasts_path).with_columns(fold_id=pl.lit("live"))
+    write_deltalake(
+        table_or_uri=forecasts_path,
+        data=live.to_arrow(),
+        mode="append",
+        partition_by=["experiment_name", "fold_id"],
+    )
+
+
+def test_metrics_leaderboard_skips_fold_ids_the_cv_config_does_not_define(
+    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+) -> None:
+    """An unfiltered leaderboard run ignores ``fold_id="live"`` instead of failing on it.
+
+    Leaderboard scope dates its evaluation window from the CV config, which has no entry for
+    ``"live"``. Before this was handled the run raised ``KeyError`` — after paying for the
+    group's full per-series scoring, and on the first group, since ``"live"`` sorts first.
+    """
+    _run_cv_pipeline(dagster_instance)
+    _append_live_fold_rows(str(file_mlflow_env["forecasts"]))
+
+    result = materialize(
+        [metrics],
+        run_config=RunConfig(ops={"metrics": MetricsConfig(evaluation_scope="leaderboard")}),
+        instance=dagster_instance,
+    )
+    assert result.success
+
+    fm = pl.read_delta(str(file_mlflow_env["metrics"]))
+    assert set(fm["fold_id"].unique().to_list()) == {FOLD_ID}
+
+    (materialisation,) = result.asset_materializations_for_node("metrics")
+    assert materialisation.metadata["skipped_fold_ids"].value == "['live']"
+
+
+def test_metrics_ad_hoc_scores_fold_ids_the_cv_config_does_not_define(
+    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+) -> None:
+    """Ad-hoc scope is the supported way to score live rows, so it must not skip them.
+
+    It takes the evaluation window from the forecast rows themselves rather than the CV config,
+    so a ``fold_id`` the config has never heard of is no obstacle.
+    """
+    _run_cv_pipeline(dagster_instance)
+    _append_live_fold_rows(str(file_mlflow_env["forecasts"]))
+
+    assert materialize(
+        [metrics],
+        run_config=RunConfig(ops={"metrics": MetricsConfig(evaluation_scope="ad_hoc")}),
+        instance=dagster_instance,
+    ).success
+
+    fm = pl.read_delta(str(file_mlflow_env["metrics"]))
+    assert set(fm["fold_id"].unique().to_list()) == {FOLD_ID, "live"}
+
+
 # ---------------------------------------------------------------------------
 # Full-stack cross-process test (real mlflow server)
 # ---------------------------------------------------------------------------

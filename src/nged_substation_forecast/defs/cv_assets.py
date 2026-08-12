@@ -570,8 +570,13 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         )
         is_first = False
         n_rows += forecasts.height
-        time_series_seen.update(forecasts["time_series_id"].to_list())
-        ensemble_members_seen.update(forecasts["ensemble_member"].to_list())
+        # `.unique()` before `.to_list()`: only the distinct values reach the set, so this builds
+        # a ~30-element Python list per chunk rather than a ~14M-element one. Measured on a
+        # 14M-row Int32 column: 2.78 s and 560 MB peak, against 0.05 s and no measurable
+        # allocation. The 560 MB landed inside the loop whose whole job is holding the frame at
+        # 2-3 GB.
+        time_series_seen.update(forecasts["time_series_id"].unique().to_list())
+        ensemble_members_seen.update(forecasts["ensemble_member"].unique().to_list())
 
     n_time_series = len(time_series_seen)
     n_ensemble_members = len(ensemble_members_seen)
@@ -594,11 +599,16 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
                 storage_options=settings.storage_options,
             )
         )
-        mlflow.log_metrics(
+        # Tags, not metrics, for the same reason the training counters are tags (see
+        # `trained_cv_model`): all three shrink when the trained population shrinks or the
+        # validation window is narrowed, and MLflow resolves a metric's "latest" value as the max
+        # over (step, timestamp, value) rather than the newest write — so a shrunk count would be
+        # under-reported. Tags are last-write-wins, which is the semantic wanted here.
+        mlflow.set_tags(
             {
-                "n_forecast_rows": float(n_rows),
-                "n_forecast_time_series": float(n_time_series),
-                "n_ensemble_members": float(n_ensemble_members),
+                "n_forecast_rows": str(n_rows),
+                "n_forecast_time_series": str(n_time_series),
+                "n_ensemble_members": str(n_ensemble_members),
             }
         )
 
@@ -954,6 +964,12 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     fold's MLflow child run and the mean-across-folds aggregates to the experiment's parent run.
     Lookup is by tag (§4.1.1) so this is idempotent under Dagster retries.
 
+    ``power_forecasts`` also holds the live service's output under ``fold_id="live"``. Leaderboard
+    scope skips any ``fold_id`` the CV config does not define, naming them in a warning and in the
+    ``skipped_fold_ids`` output metadata, because it dates its evaluation window from that config
+    and has none for them. Use ``evaluation_scope="ad_hoc"`` to score live rows: it takes the
+    window from the rows themselves.
+
     Args:
         context: Dagster execution context; used for logging and ``add_output_metadata``.
         config: Population filter and evaluation scope for this materialisation. Defaults to
@@ -986,9 +1002,30 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         .collect(engine="streaming")
         .rows()
     )
+    # `live_forecasts` writes its output to this same table under `fold_id="live"`, so an
+    # unfiltered leaderboard run — which the operator guide tells you to launch, leaving
+    # `fold_id` null to score every fold — discovers a group the CV config has never heard of.
+    # Leaderboard scope dates its window from that config, so those rows have no window to be
+    # scored against; skip them rather than fail the whole run on the first one. Ad-hoc scope
+    # takes its window from the rows themselves and is the supported way to score live output.
+    skipped_fold_ids: list[str] = []
+    if config.evaluation_scope == "leaderboard":
+        configured_fold_ids = set(_cv_config.fold_ids)
+        skipped_fold_ids = sorted({fold for _, fold in groups if fold not in configured_fold_ids})
+        if skipped_fold_ids:
+            context.log.warning(
+                f"Skipping {skipped_fold_ids} — not folds in the CV config "
+                f"({sorted(configured_fold_ids)}), so leaderboard scope has no evaluation window "
+                'for them. Score these with evaluation_scope="ad_hoc", which dates its window '
+                "from the forecast rows themselves."
+            )
+            groups = [group for group in groups if group[1] in configured_fold_ids]
+
     if not groups:
         context.log.warning("No forecasts matched the population filter — nothing to score.")
-        context.add_output_metadata({"n_rows_written": 0, "n_groups": 0})
+        context.add_output_metadata(
+            {"n_rows_written": 0, "n_groups": 0, "skipped_fold_ids": str(skipped_fold_ids)}
+        )
         return
 
     actuals_lf = pt.LazyFrame.from_existing(
@@ -1071,5 +1108,6 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             "n_groups": len(groups),
             "evaluation_scope": config.evaluation_scope,
             "groups": str(groups),
+            "skipped_fold_ids": str(skipped_fold_ids),
         }
     )
