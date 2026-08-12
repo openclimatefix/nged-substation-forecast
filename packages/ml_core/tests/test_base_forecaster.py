@@ -105,6 +105,14 @@ class _MetaWithUndeclaredHyperparameter(_FakeForecaster):
         (path / "meta.json").write_text(json.dumps(meta))
 
 
+class _MetaJsonMissing(_FakeForecaster):
+    """A forecaster whose saved record omits ``meta.json`` altogether."""
+
+    def save(self, path: Path) -> None:
+        super().save(path)
+        (path / "meta.json").unlink()
+
+
 def test_trained_time_series_ids_is_abstract() -> None:
     """A subclass that omits ``trained_time_series_ids`` cannot be instantiated."""
 
@@ -291,12 +299,22 @@ def _save_with_an_undeclared_hyperparameter(run_id: str) -> None:
     ).save_to_mlflow(run_id)
 
 
+def _save_without_meta_json(run_id: str) -> None:
+    """Save a run whose archive holds the model files but no record describing them."""
+    _MetaJsonMissing(
+        model_params=BaseForecasterConfig(selected_features=set()),
+        payload="recordless",
+        series=[10],
+    ).save_to_mlflow(run_id)
+
+
 @pytest.mark.parametrize(
     ("save_unservable", "expected"),
     [
         (_save_stale_vocabulary, "local_utc_offset"),
         (_save_without_model_params, "model_params"),
         (_save_with_an_undeclared_hyperparameter, "model_params"),
+        (_save_without_meta_json, "no meta.json"),
     ],
 )
 def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable(
@@ -308,9 +326,9 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unse
     """A promotion this code could not serve must not displace the champion already in place.
 
     The check runs before the atomic swap, so ``dest`` is untouched and the outgoing champion keeps
-    serving instead of the service breaking at its next tick. The unservable cases are the three
-    ways a saved record outlives the code that wrote it: a retired feature name, no config at all,
-    and a hyper-parameter this code no longer declares.
+    serving instead of the service breaking at its next tick. The cases are the ways a saved record
+    outlives the code that wrote it: a retired feature name, a hyper-parameter this code no longer
+    declares, no config at all, and no record at all.
     """
     dest = tmp_path / "production_model"
     fetch_model_artifacts(run_id=saved_run, dest=dest)

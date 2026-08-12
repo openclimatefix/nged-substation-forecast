@@ -7,8 +7,10 @@ only reads a plain disk directory).
 """
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import patito as pt
 import polars as pl
@@ -193,16 +195,47 @@ def test_load_forecaster_from_dir_rejects_an_unparseable_feature(
     assert str(tmp_path) in str(exc_info.value)
 
 
-def test_the_rejection_message_never_mentions_the_experiment_tracker(tmp_path: Path) -> None:
+def _retire_a_feature(meta: dict[str, Any]) -> None:
+    """Name a feature a rename retired."""
+    meta["model_params"]["selected_features"] = ["local_utc_offset"]
+
+
+def _add_an_undeclared_hyperparameter(meta: dict[str, Any]) -> None:
+    """Carry a hyper-parameter ``XGBoostConfig`` does not declare."""
+    meta["model_params"]["gpu_id"] = 0
+
+
+def _drop_the_model_class(meta: dict[str, Any]) -> None:
+    """Leave no way to reach the concrete forecaster class."""
+    del meta["model_class"]
+
+
+@pytest.mark.parametrize(
+    ("break_meta", "expected"),
+    [
+        (_retire_a_feature, "local_utc_offset"),
+        (_add_an_undeclared_hyperparameter, "model_params"),
+        (_drop_the_model_class, "model_class"),
+    ],
+)
+def test_the_rejection_message_never_mentions_the_experiment_tracker(
+    tmp_path: Path, break_meta: Callable[[dict[str, Any]], None], expected: str
+) -> None:
     """``scripts/build_and_verify_image.sh`` fails the image build on that word in the runtime log.
 
     Its one automated gate greps the smoke-test container's log case-insensitively to prove
-    production inference has no experiment-tracker dependency, and this rejection is raised on the
-    path that smoke test exercises — so the wording is load-bearing, not cosmetic.
+    production inference has no experiment-tracker dependency, and these rejections are raised on
+    the path that smoke test exercises — so the wording is load-bearing, not cosmetic. Every way
+    the guard can refuse a model is covered, because any one of them can be what the container
+    logs.
     """
-    XGBoostForecaster(XGBoostConfig(selected_features={"local_utc_offset"})).save(tmp_path)
+    XGBoostForecaster(XGBoostConfig(selected_features={"temperature_2m"})).save(tmp_path)
+    meta_path = tmp_path / "meta.json"
+    meta = json.loads(meta_path.read_text())
+    break_meta(meta)
+    meta_path.write_text(json.dumps(meta))
 
-    with pytest.raises(ValueError, match="local_utc_offset") as exc_info:
+    with pytest.raises(ValueError, match=expected) as exc_info:
         load_forecaster_from_dir(tmp_path)
 
     assert "mlflow" not in str(exc_info.value).lower()
@@ -266,6 +299,3 @@ def test_the_guard_rejects_a_hyperparameter_this_code_no_longer_declares(tmp_pat
         load_forecaster_from_dir(tmp_path)
 
     assert str(tmp_path) in str(exc_info.value)
-    # This message reaches the same container log as the one pinned by
-    # test_the_rejection_message_never_mentions_the_experiment_tracker, under the same constraint.
-    assert "mlflow" not in str(exc_info.value).lower()
