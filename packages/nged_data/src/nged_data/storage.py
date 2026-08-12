@@ -370,9 +370,12 @@ def upsert_metadata(
     explicit locking is required.
 
     If the Parquet file does not exist, it saves the new_metadata. If it exists, it merges the
-    new_metadata into it and rewrites the file only if something changed. The snapshot and the
-    stored roster need not share a schema, and a field that ``new_metadata`` no longer carries is
-    **cleared**, so the roster always means "the latest snapshot of what NGED published".
+    new_metadata into it and rewrites the file only if something changed. The snapshot need not
+    carry the same columns, or the same column order, as the stored roster, and rows are matched
+    on ``time_series_id``. A series that ``new_metadata`` covers is replaced wholesale, so a field
+    the snapshot has stopped carrying is **cleared** for that series. A series that
+    ``new_metadata`` omits keeps its last stored values indefinitely. The roster therefore holds
+    every time series we have ever seen, not only the ones in the latest snapshot.
 
     Args:
         new_metadata: The new metadata DataFrame.
