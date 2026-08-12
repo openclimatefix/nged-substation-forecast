@@ -98,24 +98,12 @@ _LATE_TABLE_SCHEMA: Final[TableSchema] = TableSchema(
 _MAX_LATE_SERIES_IN_TABLE: Final[int] = 50
 """Cap on how many late series the check's metadata table lists.
 
-Unlike the other capped listings this one lands in Dagster's event log — Postgres in the AWS
-deployment, `pg_dump`ed to S3 nightly — so it is written to durable storage every hour for as long
-as a stall lasts. Uncapped, a whole-feed stall at V2 scale (~2,500 series) would serialise to about
-355 KB per hourly evaluation; at 50 rows it is about 8 KB.
-
-The rows follow ``_LATE_STATUS_ORDER``: every never-reported series outranks every stale one, and
-the stale ones are most-stale first. So the listing is "the head of that order", not "the 50 series
-in most trouble" — when never-reported series outnumber the cap, no stale series is listed at all,
-however stale it is. That is a real limit of the drill-down at V2 cutover, when the roster is
-populated before data flows; ``n_stale`` and ``n_never_reported`` stay exact throughout, which is
-what the operator should read first.
-
-Matches ``_sentry.MAX_LATE_SERIES_IN_CONTEXT`` rather than the tighter caps on the one-line
-description and the Sentry message body, because a browsable table and the Sentry event context
-serve the same drill-down purpose and showing the same leading series in both is one less thing to
-reconcile. The true count is always carried by the uncapped ``n_late`` metadata field, and
-``n_late_listed`` records how many rows the table actually holds, so a truncated table never makes a
-large stall look small."""
+The rows follow ``_LATE_STATUS_ORDER``, so the listing is the head of that order rather than the 50
+series in most trouble: when never-reported series outnumber the cap, no stale series is listed at
+all, however stale it is. ``n_stale`` and ``n_never_reported`` stay exact regardless. Why the table
+is capped, and why at this number:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>
+"""
 
 _LATE_STATUS_ORDER: Final[tuple[str, ...]] = ("never", "stale")
 """Runtime tuple — declared order for the ``status`` column's ``pl.Enum``, which is also the
@@ -411,9 +399,7 @@ _MAX_MISSING_SERIES_LISTED: Final[int] = 20
 """Cap on how many missing ``time_series_id``s the description and the metadata spell out.
 
 Keeps the one-line description readable at V2 scale (~2,500 series) when a whole population is
-missing; the true count is always carried by the ``n_time_series_missing`` metadata field and
-``n_time_series_missing_listed`` records how many the list holds, so a truncated list never makes a
-large gap look small."""
+missing. ``n_time_series_missing`` carries the uncapped count."""
 
 _UNIX_EPOCH: Final[datetime] = datetime(1970, 1, 1, tzinfo=UTC)
 """Origin for ``_floor_to_interval``'s arithmetic. Both cadences we floor to (daily NWP runs at

@@ -74,11 +74,16 @@ The check is attached to `power_time_series_and_metadata`, so the existing hourl
 runs it every hour with no extra wiring. It reports two kinds of lateness: a series that once
 reported but has now gone **stale**, and a roster series (present in the `TimeSeriesMetadata`
 parquet) that has **never** sent data. The count of each, plus a table of the offending
-`time_series_id`s, lands in the check's Dagster metadata. That table is **capped** at 50 rows, for
-the same reason the Sentry payloads below are — an uncapped listing writes thousands of rows into
-the event log every hour a whole-feed stall lasts, and the event log is durable storage that gets
-backed up. The counts beside it are uncapped, and an `n_late_listed` field records how many rows
-the table actually holds, so a truncated table can never make a large stall look small. Dagster's
+`time_series_id`s, lands in the check's Dagster metadata. That table is **capped** at 50 rows,
+because an uncapped listing writes thousands of rows into Dagster's event log every hour a
+whole-feed stall lasts, and that log is durable storage that gets backed up: at V2 scale (~2,500
+series) an uncapped table serialises to about 355 KB per hourly evaluation, against about 8 KB at 50
+rows. The cap matches the Sentry event context below, so the same leading series appear in both and
+there is one less thing to reconcile. The counts beside it are uncapped, and an `n_late_listed`
+field records how many rows the table actually holds, so a truncated table can never make a large
+stall look small. Rows are ordered never-reported first, then most-stale first, so a roster with
+more than 50 never-reported series fills the table with those alone — `n_stale` and
+`n_never_reported` stay exact regardless. Dagster's
 Checks view becomes the operator's at-a-glance "is the power data healthy?" status surface, showing
 a green tick when every series is current and a yellow warning naming the late count when the feed
 has stalled.
@@ -208,7 +213,7 @@ is configured — so laptops and CI stay silent by default.
   reported`), and the full per-series detail is attached as structured event context. Both are
   capped — the message to a short leading slice with an `…and N more` line, the context to a larger
   slice — so a whole-feed stall at V2 scale can't attach thousands of rows; the true late count is
-  always carried by the `n_late` tag, so a capped list never makes a large stall look small. Sending
+  always carried by the `n_late` tag. Sending
   is best-effort: `report_power_freshness` never raises, so a Sentry hiccup costs no more than its
   own event. Were it to raise, the check's catch-all would swallow it and discard the whole
   freshness evaluation with it — every late series, in the very hour they went late.

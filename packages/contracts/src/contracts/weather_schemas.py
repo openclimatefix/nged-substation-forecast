@@ -172,11 +172,8 @@ class Nwp(pt.Model):
         dtype=pl.Float32,
         description=(
             "Wind speed at 10 m. Unit: meters per second. This is the magnitude of the cell's"
-            " *vector* mean wind, not the mean of its grid points' scalar speeds — the H3"
-            " aggregation averages the u/v components and speed is derived afterwards. The two"
-            " differ wherever direction varies across a cell, and a turbine power curve wants the"
-            " scalar mean. See"
-            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>"
+            " *vector* mean wind, not the mean of its grid points' scalar speeds. See"
+            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>"
         ),
         ge=0,
         le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
@@ -200,8 +197,7 @@ class Nwp(pt.Model):
         dtype=pl.Float32,
         description=(
             "Wind speed at 100 m. Unit: meters per second. This is a vector mean, with the same"
-            " caveat as `wind_speed_10m`. It is the one that matters most for wind generation,"
-            " because a turbine power curve responds to the scalar speed at each grid point."
+            " caveat as `wind_speed_10m`. It is the height that matters most for wind generation."
         ),
         ge=0,
         le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s

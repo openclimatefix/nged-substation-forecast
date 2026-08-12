@@ -178,7 +178,8 @@ series with `last_seen` and `hours_late`. A warning therefore never stops foreca
 produced; it tells you which feed to chase. A handful of persistently-late series is usually a
 decommissioned or renamed substation rather than an outage — check the roster before escalating.
 
-That table is capped at 50 rows, because it is written to the event log every hour a stall lasts.
+That table is capped at 50 rows
+([why](../architecture/production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check)).
 **Read `n_late`, not the table's length**, to see how big the stall is: `n_late` is the true count,
 and `n_late_listed` tells you how many rows the table holds, so the two agreeing means you are
 looking at every late series and the two differing means the list is truncated. The same pair

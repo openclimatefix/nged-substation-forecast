@@ -1,12 +1,9 @@
 # Known ECMWF ENS data-quality issues
 
 **Scope: this page is about *upstream* — the ways the data arrives damaged, and which of those we
-reject and which we tolerate.** Its subject is data we did not create and cannot fix, so a defect
-described here is a reason to talk to Dynamical.org. How to *interpret* the data that arrives
-undamaged — which variables are instantaneous and which are averages over the preceding step, which
-one is an angle that wraps, and what our own feature pipeline does to each on the way to the model —
-is the separate subject of [NWP variable conventions](nwp-variable-conventions.md). A defect
-described on that page is a reason to change our code.
+reject and which we tolerate.** How to *interpret* the data that arrives undamaged is the separate
+subject of [NWP variable conventions](nwp-variable-conventions.md), which sets out how the two pages
+divide the subject between them.
 
 We ingest ECMWF IFS ENS from [Dynamical.org](https://dynamical.org). Its data carries a few
 known, recurring quality quirks. This page records what they are, how we tell them apart, and the
