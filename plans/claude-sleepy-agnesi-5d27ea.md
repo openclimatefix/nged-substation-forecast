@@ -3,6 +3,27 @@
 Issue: <https://github.com/openclimatefix/nged-substation-forecast/issues/423>
 Branch: `claude/sleepy-agnesi-5d27ea`
 
+**What is missing.** The Dagster asset graph holds eleven assets and nothing on them says which
+ones the live forecasting service needs. Six do — the three ingest assets, model promotion, and
+6-hourly inference — and five exist only to compare candidate models on the cross-validation
+leaderboard. All eleven sit in one undifferentiated group in the UI, so whoever operates the
+service has to already know which is which, and cannot filter the experiment assets out of the
+catalog or the lineage graph. The same split is argued at length in the design docs, where
+production degrades rather than raising and R&D fails fast, but it is expressed nowhere in the code
+— the closest thing is a Sentry failure hook that happens to be attached to the three scheduled
+production jobs.
+
+**What the plan does.** Tag every asset with `layer`, valued `production` or `rnd`, so the split
+becomes a thing you can query rather than a thing you have to know. The vocabulary is defined once
+in a new `defs/_tags.py` and applied as one extra argument on each of the eleven `@asset`
+decorators, touching no asset body. An operator then types `tag:layer=production` into the Dagster
+UI's selection box — or `dagster asset list --select tag:layer=production` — and sees exactly the
+six assets the service runs. One new test asserts that every asset carries exactly one of the two
+values, so a future asset added without a layer fails the suite, and it pins the four
+classifications that are contestable. Three doc pages record the classification and give the
+operator the string. Two decisions are left open for Jack: whether to apply the tags per-decorator
+or in bulk in `definitions.py`, and whether the two promotion assets count as production.
+
 ## Verdict
 
 **Worth implementing, roughly as described.** The mechanism the issue names (an asset tag) is the
