@@ -275,8 +275,8 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
         if not meta_path.exists():
             raise ValueError(
                 f"The model saved under run {run_id} has no meta.json, so no forecaster here can "
-                "load it. Re-train and promote a run saved by a code version that writes "
-                "meta.json (see BaseForecaster.save)."
+                "load it. Re-train against the current code and promote that run (see "
+                "BaseForecaster.save)."
             )
         meta = json.loads(meta_path.read_text())
         _check_meta_is_servable(meta=meta, source=f"run {run_id}")
