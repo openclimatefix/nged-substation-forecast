@@ -133,7 +133,7 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
 
     Every such refusal reaches the operator as a failed materialisation: this asset catches
     nothing, unlike the rest of ``defs/``. The reasoning is in
-    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#failure-modes>.
+    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 
     Promotion as a Dagster materialisation gives an audit trail and lineage for free, rather than
     a bare script (a script wrapper for the eventual Docker build (#222) stays trivial by calling

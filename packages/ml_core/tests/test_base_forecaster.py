@@ -352,9 +352,10 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_run_holds_no_mo
 ) -> None:
     """A run id naming a run with no model saved to it must not displace the champion either.
 
-    The likeliest operator slip of the lot — a mistyped or stale run id names a real run that
-    simply never held a model — and the one refusal that happens in the download rather than in
-    ``_check_meta_is_servable``, so it needs its own case to pin that ``dest`` survives it.
+    This is the likeliest operator slip of the three, because a mistyped or stale run id names a
+    real run that simply never held a model. It is also the only refusal that happens in the
+    download rather than in ``_check_meta_is_servable``, so it needs its own case to pin that
+    ``dest`` survives it.
     """
     dest = tmp_path / "production_model"
     fetch_model_artifacts(run_id=saved_run, dest=dest)
