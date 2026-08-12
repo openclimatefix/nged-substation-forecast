@@ -66,8 +66,8 @@ deployment bakes into its container image at build time.
    parses (the offending feature is named), or because `model_params` carry a hyper-parameter this
    code no longer declares. The check runs before anything is written, so a refused promotion
    leaves the previous champion in place and still serving. Re-train the model against the current
-   code and promote that run; never hand-edit `meta.json`, because the trained boosters carry the
-   old names too.
+   code and promote that run; never hand-edit `meta.json`, because the boosters on disk were
+   trained under the config it records.
 3. Stamps a `promotion.json` (`mlflow_run_id`, `promoted_at`) and atomically replaces the directory
    at `Settings.production_model_path` (`data/production_model/` by default) with the new artifacts.
 4. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, and

@@ -200,9 +200,9 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
     (the same mechanism ``ml_core._mlflow_runs.load_experiment_forecaster`` uses), then calls the
     concrete subclass's ``load(path)``.
 
-    The forecaster returned is one this code can engineer features for, not merely one it could
-    deserialise: an unparseable feature vocabulary is rejected here, so it surfaces at model load
-    rather than partway through a live tick's feature engineering.
+    The forecaster returned is one this code can actually serve, not merely one it could
+    deserialise: a config it cannot rebuild, or a feature vocabulary it cannot parse, is rejected
+    here rather than partway through a live tick's feature engineering.
 
     Args:
         path: Directory previously populated by ``fetch_model_artifacts`` (the

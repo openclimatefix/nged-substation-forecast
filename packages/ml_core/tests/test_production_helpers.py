@@ -266,3 +266,6 @@ def test_the_guard_rejects_a_hyperparameter_this_code_no_longer_declares(tmp_pat
         load_forecaster_from_dir(tmp_path)
 
     assert str(tmp_path) in str(exc_info.value)
+    # This message reaches the same container log as the one pinned by
+    # test_the_rejection_message_never_mentions_the_experiment_tracker, under the same constraint.
+    assert "mlflow" not in str(exc_info.value).lower()

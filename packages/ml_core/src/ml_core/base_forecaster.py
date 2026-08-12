@@ -193,11 +193,9 @@ class BaseForecaster(ABC):
     CONFIG_CLASS: ClassVar[type[BaseForecasterConfig]]
     """The config class ``load`` rebuilds from a saved ``model_params`` mapping.
 
-    Declared on the class so that a saved ``meta.json``, which names only ``model_class``, is
-    enough to reach it. That is what lets promotion validate a stored config *before* it replaces
-    the champion on disk (``ml_core._production_helpers.fetch_model_artifacts``). A subclass's
-    ``load`` must build its config through this attribute rather than naming its config class
-    again, so the class promotion checks against is always the class ``load`` uses.
+    A subclass's ``load`` must build its config through this attribute rather than naming its
+    config class again, so the class ``ml_core._production_helpers._check_meta_is_servable``
+    validates a saved config against is always the class ``load`` uses.
     """
 
     feature_engineer: ClassVar[FeatureEngineer] = TabularFeatureEngineer()
