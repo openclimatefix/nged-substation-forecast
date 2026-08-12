@@ -264,8 +264,8 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
 
     Raises:
         ValueError: The run holds no ``meta.json``, or the model's ``selected_features`` are
-            absent, malformed, or name a feature this code cannot parse — re-train against the
-            current feature vocabulary and promote that run instead.
+            absent, malformed, or name a feature this code cannot parse — re-train and promote a
+            run this code version can read instead.
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
         downloaded_dir = _download_and_unpack_model(run_id, Path(tmp_dir))
@@ -273,8 +273,8 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
         if not meta_path.exists():
             raise ValueError(
                 f"The model saved under run {run_id} has no meta.json, so no forecaster here can "
-                "load it. Re-train against the current feature vocabulary and promote that run "
-                "instead."
+                "load it. Re-train and promote a run saved by a code version that writes "
+                "meta.json (see BaseForecaster.save)."
             )
         meta = json.loads(meta_path.read_text())
         _check_meta_features_are_parseable(meta=meta, source=f"run {run_id}")
