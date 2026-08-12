@@ -43,15 +43,18 @@ has.** The distinction matters because the issue contains both framings: the bod
 the fail-fast / fail-operational asymmetry". The two are correlated but not congruent, and they
 disagree on exactly the two assets flagged under [Ambiguous cases](#ambiguous-cases):
 `promoted_model` and `promotable_model_runs` are needed to operate the service, yet both fail fast
-(unguarded `mlflow` calls, an unguarded `read_text` at `production_assets.py:142`).
+(unguarded `mlflow` calls, an unguarded `read_text` at `production_assets.py:147`).
 
 The "needed by" reading is the one to implement, because it is what the issue body asks for and
 what an operator filtering the UI wants. The posture asymmetry stays a *property* of the layers
 argued in `inherent-stability.md` — the tag makes the R&D side easy to enumerate, which is the
 useful half — but the tag does not itself promise that everything marked `production` degrades
 rather than raising. Rule 1 already carves out our-own-bug states from that promise, and the
-failure-modes table lists "the promoted model is empty or unloadable → hard failure" as correct
-production behaviour. The doc edit in [Docs to update](#docs-to-update) has to be worded to match.
+failure-modes table now carries **three** rows about `promoted_model` refusing a promotion, all in
+the *Production* column: the model being empty or unloadable, a saved config this code can no
+longer rebuild, and a run id naming no model at all. Two of them spell out that the asset raising
+*is* the degrading behaviour — "the outgoing champion stays and keeps forecasting". The doc edit in
+[Docs to update](#docs-to-update) has to be worded to match.
 
 ## The mechanism: tags, not a group and not a kind
 
@@ -206,7 +209,10 @@ which is an evaluation concern, and its only consumer is `metrics`.
 service serves, `docs/live_service/operations.md` documents it as steps 1–2 of *operating the live
 service*, and `production-deployment.md` argues promotion-as-an-asset precisely so that changing
 production has an audit trail. Tagging it `rnd` would hide the promotion step from the operator who
-performs it.
+performs it. `inherent-stability.md`'s failure-modes table also treats `promoted_model` as a
+production concern in its own right: it now has three rows for the ways a promotion is refused,
+and two of them say the refusal leaves "the outgoing champion … forecasting" — which is
+fail-operational reasoning applied to this asset, not R&D fail-fast.
 
 *Against*: both assets need a reachable MLflow tracking server, and the production box has none —
 the model arrives there baked into the Docker image, as `live_forecasts`' own `deps` comment
@@ -294,7 +300,7 @@ before collection, so the import-time `init_sentry` is a no-op.
 ## Docs to update
 
 1. **`docs/design-philosophy/inherent-stability.md`**, the *R&D fails the other way* section
-   (around line 496). It currently forward-references this issue: "the natural mechanism is a
+   (around line 497). It currently forward-references this issue: "the natural mechanism is a
    strict-mode flag on the feature and validation layer, plus asset tagging ([#423])". Rewrite in
    the present tense to say the tag exists and what it is — per CLAUDE.md's "write about the
    present, not the past", the issue reference goes away rather than becoming a history note. The
@@ -322,7 +328,7 @@ before collection, so the import-time `init_sentry` is a no-op.
 
    **It must say what the selection includes, not just the string.** Six assets match, and two of
    them — `promoted_model` and `promotable_model_runs` — only ever run on a laptop: the same page
-   already says at line 52 that "Promotion (this step and the next) always happens **on your
+   already says at line 50 that "Promotion (this step and the next) always happens **on your
    laptop**, whichever environment serves the forecasts", and
    `docs/design-philosophy/design-principles.md:555` says the production box "has no MLflow and
    never runs promotion". A bare selection string would tell an operator on the AWS box that six
@@ -402,19 +408,26 @@ skill documents several ways a page renders wrong while both linters pass.
    another session edits the same decorator. Worth merging `main` immediately before opening the
    PR. Answering open question 1 the other way removes this risk entirely.
 
-## Re-checked against `main` at 088d21b4
+## Re-checked against `main` at 92feca64
 
-The branch was 65 commits behind and has been merged up. Nothing in that range changes the plan's
-substance:
+The branch has been merged up twice while this plan was being written — 65 commits, then a further
+64. Nothing in either range changes the plan's substance:
 
 - **Still exactly eleven assets**, same names, same three modules, and `get_all_asset_keys()` still
-  equals `executable_asset_keys`. Only line numbers moved, and the plan's citations now match.
+  equals `executable_asset_keys`. Still exactly four asset checks, all of them hanging off
+  production assets (`ecmwf_ens` ×2, `live_forecasts`, `power_time_series_and_metadata`). Only line
+  numbers moved, and the plan's citations match the current tree.
 - **Every empirical claim re-verified on the merged tree** against the same Dagster 1.13.17,
-  including the quoted-selection-string breakage under `pytest`.
-- **#486 landed** (`promoted_model` now refuses a model whose `selected_features` it cannot parse,
-  before replacing the directory, so the previous champion keeps serving). It does not change the
-  classification, and it slightly strengthens the `production` reading: refusing a bad promotion
-  while the incumbent model keeps forecasting is production behaviour, not R&D fail-fast.
+  including the quoted-selection-string breakage under `pytest`, and `tests/test_assets.py` still
+  collecting 24 tests in a plain run.
+- **#486 and #549 both landed**, and together they strengthen the `production` classification of
+  `promoted_model` rather than weakening it. Promotion now refuses a model whose saved config this
+  code cannot rebuild, and one whose run holds no model at all — in both cases before replacing the
+  model on disk. The failure-modes table records all three refusal paths in its *Production*
+  column, twice noting that the outgoing champion keeps forecasting. That is fail-operational
+  reasoning applied to this asset.
+- **#505 and #488 have not landed**, so the merge-collision risk on `ecmwf_ens` and
+  `production_assets.py` still stands.
 - **A new house rule landed** — *Calling functions* in `docs/architecture/code-style.md`: pass
   arguments by keyword wherever the callee allows. The test spec above now says
   `AssetSelection.tag(key=…, value=…)`. The decorator change is unaffected: `tags=` is already a
