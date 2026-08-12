@@ -97,11 +97,18 @@ is not assignable to `patito.polars.LazyFrame[PowerForecast]`
 the model-bearing subclass with `.model` still set. Nothing is lost and nothing needs restoring —
 the re-wrap below exists only to satisfy the annotation.
 
-The asymmetry is in `patito/polars.py`: `patito.polars.DataFrame` carries a block of type-annotation
-overrides re-declaring `filter`/`select`/`with_columns` as `(self: DF) -> DF`, and
-`patito.polars.LazyFrame` has no such block, so it inherits Polars' own annotations. **`pt.DataFrame`
-is therefore unaffected** — `df.filter(...)` stays `pt.DataFrame[Schema]` to `ty` as well as at
-runtime, and needs no workaround.
+The asymmetry is in `patito/polars.py`: `patito.polars.DataFrame` carries a block of
+type-annotation overrides re-declaring `filter`/`select`/`with_columns` as `(self: DF) -> DF`, and
+`patito.polars.LazyFrame` has no such block, so it inherits Polars' own annotations.
+**`pt.DataFrame` is therefore unaffected** — `df.filter(...)` stays `pt.DataFrame[Schema]` to `ty`
+as well as at runtime, and needs no workaround.
+
+**Upgrading `ty` will not fix this, because `ty` is not wrong.** Polars annotates
+`LazyFrame.filter`, `.sort`, `.select`, `.with_columns`, `.head`, `.unique`, `.drop` and `.rename`
+as returning `LazyFrame`, not `Self`, so every conforming checker must infer the base class — and
+`pyright` reports the identical error. The fix has to come from upstream: either Polars switching
+those return annotations to `Self`, or Patito giving its `LazyFrame` the same override block its
+`DataFrame` already has. Until one of those lands, the re-wrap below is the workaround.
 
 Workaround, for the lazy case only: rebind to a plain `pl.LazyFrame` local for the filter
 accumulation, then re-wrap before returning:
