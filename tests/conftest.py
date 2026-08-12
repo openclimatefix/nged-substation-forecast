@@ -6,6 +6,7 @@ unit suites.
 """
 
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from dagster import DagsterInstance
@@ -33,3 +34,40 @@ def dagster_instance() -> Iterator[DagsterInstance]:
     """
     with DagsterInstance.ephemeral() as instance:
         yield instance
+
+
+@pytest.fixture(autouse=True)
+def _fail_on_an_undisposed_dagster_instance(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Fail the test that leaves a ``DagsterInstance.ephemeral()`` instance for the collector.
+
+    Being autouse, this fixture is set up before the ones a test asks for by name and so torn down
+    after them, which is what lets it see ``dagster_instance`` dispose.
+
+    It catches an instance that *survives* the test, not a call that forgot to own one: CPython
+    frees an unreferenced context as soon as the invoking helper returns, so a missing
+    ``instance=`` still passes green until something — a captured traceback, most often — pins the
+    frame holding it. Instances made by any route other than ``ephemeral()``, such as
+    ``local_temp()``, are invisible to it.
+    """
+    undisposed: set[DagsterInstance] = set()
+    make_ephemeral = DagsterInstance.ephemeral
+    dispose = DagsterInstance.dispose
+
+    def _tracked_ephemeral(*args: Any, **kwargs: Any) -> DagsterInstance:
+        instance = make_ephemeral(*args, **kwargs)
+        undisposed.add(instance)
+        return instance
+
+    def _tracked_dispose(self: DagsterInstance) -> None:
+        undisposed.discard(self)
+        dispose(self)
+
+    monkeypatch.setattr(DagsterInstance, "ephemeral", _tracked_ephemeral)
+    monkeypatch.setattr(DagsterInstance, "dispose", _tracked_dispose)
+
+    yield
+
+    assert not undisposed, (
+        f"{len(undisposed)} ephemeral DagsterInstance(s) outlived this test. Take the "
+        "`dagster_instance` fixture, or enter the instance as a context manager."
+    )
