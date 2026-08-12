@@ -14,8 +14,9 @@ feature at all.
 
 **The solution.** Four independent fixes in one PR. Move the metadata join off the power frame and
 onto the assembled frame, so `time_series_type` is populated in both modes. Delete the
-`AllFeatures.validate()` override, which cannot pass on any real output and which nothing calls,
-and widen the two fields whose declarations state something false. Probe the raw NWP frame rather
+`AllFeatures.validate()` override, which nothing calls and which could only ever run behind a
+`collect()` this module exists to avoid, and widen the two fields whose declarations state something
+false. Probe the raw NWP frame rather
 than the upsampled one for the control member. And replace `rolling().agg()` + join-back with
 `rolling_mean_by(...).over(...)`, which needs neither the join nor the sort, then delete the sort —
 which is where nearly all of the measured win sits.
@@ -28,7 +29,9 @@ overlapping lines in the same two files, so splitting them buys nothing but merg
 Departures from the clean-room review that produced these findings:
 
 - The review proposed calling `AllFeatures.validate()` "somewhere it is affordable". There is no
-  such place, and the check cannot pass anywhere — see fix 2. It gets deleted instead.
+  such place — validating `AllFeatures` means collecting the largest frame in the system, and
+  `docs/architecture/code-style.md:178` puts `.validate()` at persistence edges only. It gets
+  deleted instead; see fix 2.
 - The review also found three dead branches and a dangling `FLAW-001` label. Those are in scope
   here (~10 lines) but they are cleanup, not defects, and are listed separately below so they can
   be dropped without touching the rest.
@@ -49,14 +52,21 @@ The four fixes are independent and can land in any order.
 `packages/ml_core/src/ml_core/features/tabular_feature_engineer.py:197`
 
 Today `metadata_lf` is joined onto `power_lf` *before* the NWP join. Bulk mode then left-joins power
-onto NWP (`_nwp.py:47-49`), so an NWP row with no matching power observation loses
+onto NWP (`_nwp.py:45-47`), so an NWP row with no matching power observation loses
 `time_series_type` even though its `time_series_id` is known and the metadata is sitting in the
-input.
+input. Measured: 20 of 22 rows null, with NWP running 8 hours past the last power observation.
 
 Move the join: pass `power_lf` to `_join_nwp_bulk_mode` / `_join_nwp_single_run`, and join
 `metadata_lf` onto the assembled frame immediately after, before `_apply_post_join_features`.
 `time_series_id` is present on both sides in both modes, so this is a move, not a redesign. Rename
-the `power_with_metadata` parameter on both join helpers accordingly.
+the `power_with_metadata` parameter on both join helpers, **and update the docstrings that describe
+the frame they receive** — both helpers' docstrings in `_nwp.py` and `_apply_post_join_features`'s
+`raw_data` argument doc at `tabular_feature_engineer.py:273-274` ("The power-with-metadata frame
+already joined to NWP").
+
+No new fan-out: `TimeSeriesMetadata.time_series_id` is `unique=True` (`power_schemas.py:175`). No
+column collision: after `_attach_nearest_nwp_cell` the NWP frame shares no column name with
+`TimeSeriesMetadata`, and `h3_res_5` is consumed by the cell join and never reaches the pipeline.
 
 Checked: nothing between the two points needs metadata. `STATIC_FEATURE_REGISTRY`
 (`_parsed_features.py:20`) holds only `windchill`, which is weather-derived; no feature in the
@@ -75,31 +85,39 @@ values at train time and nulls at bulk-predict time. Frame it that way in the PR
 
 `packages/contracts/src/contracts/ml_schemas.py:130-191`
 
-The override cannot pass on any real pipeline output, and no amount of fixing the *data* changes
-that, because two of its four failure modes are structural:
+Delete the override (64 lines, including the `Sequence` and `Self` imports at `ml_schemas.py:7,9`
+that go dead with it). Nothing calls it outside `packages/contracts/tests/test_ml_schemas.py`.
 
-- **`local_day_of_week` (`ml_schemas.py:124`) is the one time feature declared without
-  `allow_missing=True`.** Any config that does not request it fails with `Missing column` —
-  including `conf/model/xgboost.yaml`, which requests its `_sin`/`_cos` siblings only.
-- **Every dynamic feature is "superfluous".** `power_lag_24h`,
-  `temperature_2m_rolling_mean_6h` and the rest are deliberately not declared as Patito fields —
-  the `AllFeatures` docstring says so at `ml_schemas.py:61-64`. So the override could only ever be
-  called with `allow_superfluous_columns=True`, which switches off the column-set check entirely
-  and leaves a dtype check plus the primary-key check.
+The reason is **where validation is affordable, not whether this one can pass.** It can: with the
+two widenings below and `allow_superfluous_columns=True`, it validates real bulk-mode output.
+But:
 
-Delete the override (62 lines). Nothing calls it outside
-`packages/contracts/tests/test_ml_schemas.py`, so the fan-out backstop that commits `75bafdf1` and
-`7ba598f5` both reason about has never existed. Replace it with a primary-key uniqueness assertion
-in the existing cross-mode test, where a `collect()` is free.
+- **Validating `AllFeatures` means a `collect()` on the largest frame in the system.** The module
+  is deliberately lazy end-to-end, and `docs/architecture/code-style.md:178` puts `.validate()` at
+  persistence edges only. `AllFeatures` is not a persistence edge — it is the in-memory hand-off to
+  the model.
+- **Half the override is unusable for this model by construction.** Every dynamic feature —
+  `power_lag_24h`, `temperature_2m_rolling_mean_6h` — is deliberately not declared as a Patito
+  field (`ml_schemas.py:61-64`), so any call must pass `allow_superfluous_columns=True`. What
+  survives is a dtype check and the primary-key check.
+
+Keep the primary-key check, as an assertion in the existing cross-mode bulk test where a
+`collect()` is free. **That assertion is a real guard, not a formality**, because fix 4 removes the
+only thing that surfaces a fan-out today: the existing `len(bulk) == 3*2*12` row-count assertion
+catches a duplicate primary key only because `rolling().agg()`'s join-back amplifies it into a
+visible explosion. After fix 4 a duplicate is absorbed silently. See "Risks".
 
 **Separately, widen the two fields whose declarations state something false**: `power: float | None`
 (`ml_schemas.py:86`) and `time_series_type: str | None`. Live inference deliberately feeds an
 all-null power spine past the last observation (`_production_helpers.py:99-101`) and
-`XGBoostForecaster.train` drops those rows explicitly (`forecaster.py:130`). This is no longer
-needed to make `validate()` pass — it is needed because `contracts` is the single source of truth
-for data shapes and currently misdescribes the data. Do **not** widen `PowerTimeSeries.power`
-(`power_schemas.py:41`): that model's `validate()` genuinely runs on ingested data
-(`nged_data/storage.py:211`), where a null power *is* malformed.
+`XGBoostForecaster.train` drops those rows explicitly (`forecaster.py:130`). `contracts` is the
+single source of truth for data shapes and currently misdescribes the data. Do **not** widen
+`PowerTimeSeries.power` (`power_schemas.py:42`): that model's `validate()` genuinely runs on
+ingested data (`nged_data/storage.py:211`), where a null power *is* malformed.
+
+Say explicitly what happens to `packages/contracts/tests/test_ml_schemas.py`: all three `validate()`
+call sites stay green, but `test_all_features_validation` becomes a plain-Patito check rather than
+an exercise of the override.
 
 **Follow-up for Jack, not this PR:** the primary-key check belongs on `PowerForecast`, whose
 `validate()` is called for real on every predict (`forecaster.py:203`) and which today has no
@@ -111,7 +129,14 @@ different change from these four fixes; it should be its own issue.
 
 `packages/ml_core/src/ml_core/features/tabular_feature_engineer.py:183`
 
-Probe `nwp_lf` instead of `processed_nwp`. `ensemble_member` is one of
+Probe `nwp_lf` instead of `processed_nwp`, **and change the guard's first clause from
+`processed_nwp is not None` to `nwp_lf is not None`.** The two are equivalent by construction
+(`processed_nwp is None` iff `nwp_lf is None`, `:169-178`), and without it `ty check` fails with
+`unresolved-attribute: Attribute 'filter' is not defined on 'None' in union 'LazyFrame | None'` at
+`:183` — `nwp_lf` is `pl.LazyFrame | None` at `:163` and the existing narrowing does not reach it.
+Verified: with the clause swapped, `ty check` passes.
+
+`ensemble_member` is one of
 `_upsample_nwp_to_half_hourly`'s group-by keys, so the upsample can neither create nor destroy
 control-member rows; the two checks are equivalent by construction. `SLICE` cannot push through the
 sort and the window functions in the upsample, so today the guard executes the entire upsample of
@@ -146,8 +171,13 @@ the rolling rewrite.
 
 The window form also closes a latent fan-out hazard the join-back has: `rolling().agg()` emits one
 row per input row, so two rows sharing `(time_series_id, nwp_init_time, ensemble_member,
-valid_time)` would fan out quadratically. One clause, not a paragraph — a second `nwp_model_id`
-would already fan out the bulk join before the rolling ever ran.
+valid_time)` would fan out quadratically (verified: 4 rows become 8 under the current form, stay 4
+under the window form). One clause, not a paragraph — a second `nwp_model_id` would already fan out
+the bulk join before the rolling ever ran.
+
+**But that hazard is also a detector, and this removes it.** A duplicate primary key today makes the
+frame visibly explode; after fix 4 it is absorbed silently. That is why fix 2 keeps the primary-key
+assertion, and it is the strongest argument for the `PowerForecast` follow-up.
 
 **One genuine behaviour change, unobservable in practice.** Where `ensemble_member` is null and
 weather is non-null, the two forms differ: a null join key never matches in the `how="left"`
@@ -194,9 +224,10 @@ No principle in `design-principles.md` is traded away.
 | Fix | New or changed test | The assertion that fails on `main` today |
 |---|---|---|
 | 1 | Bulk mode with NWP extending past the last power observation | `time_series_type` is non-null on every output row — today it is null on all rows past the observation |
-| 2 | One primary-key uniqueness assertion added to the existing cross-mode bulk test | None: it passes today. It is a regression guard replacing a deleted one, and the plan says so rather than pretending otherwise |
+| 2 | `AllFeatures.validate()` on a one-row frame with null `power`, in `test_ml_schemas.py` | Raises `1 missing values` today; passes after the widening. This is the guard for the half of fix 2 that changes a contract |
+| 2 | One primary-key uniqueness assertion added to the existing cross-mode bulk test | None: it passes today. It replaces the fan-out detector fix 4 removes, so it guards against a regression that only becomes possible in this PR |
 | 3 | None — see below | — |
-| 4 | Parametrise the existing `test_apply_rolling_mean_feature` with `shuffle=True` | Current form raises `ComputeError: input data is not sorted` on shuffled input; window form returns the values already pinned there |
+| 4 | Parametrise the existing `test_apply_rolling_mean_feature` with a reversed input | Current form raises `ComputeError: input data is not sorted`; window form returns the values already pinned there. Use `df.reverse()`, **not** `sample(shuffle=True, seed=…)` — a random shuffle of four rows can land sorted, and one did |
 | 4 | Existing `test_apply_rolling_mean_feature_partitions_by_group` and `test_cross_mode_equivalence` | Must stay green — they pin the values and the null-skipping invariant |
 
 **Fix 3 gets no test, deliberately.** Its behaviour is already covered by
@@ -207,8 +238,9 @@ and the only test that could pin it would assert where `SLICE` sits in `LazyFram
 ## Docs to update
 
 - `docs/architecture/performance.md:58` — names `_build_historical_weather`, which exists nowhere in
-  the repo (deleted in `2805d950`), and describes the probe as checking "before building the lazy
-  plan", which fix 3 is what makes true. Rewrite to name the real call site and the real behaviour.
+  the repo (deleted in `2805d950`). Rewrite to name the real call site and the real behaviour, and
+  **do not reuse the phrase "before building the lazy plan"**: even after fix 3 the probe collects
+  partway through plan construction. What changes is that it no longer executes the upsample.
 - `docs/architecture/performance.md:66` — lists `group_by` + `explode` + `sort` + `interpolate` as
   the upsample's cost. Drop the `sort` once fix 4 removes it.
 
@@ -258,19 +290,30 @@ roughly 460 MB on the 116M-row predict chunk `performance.md` sizes at a 9 GB pe
 win but it is an optimisation, not a defect fix, and it is orthogonal to fix 1 (a *requested*
 `time_series_type` still needs the join moved). *Recommendation:* keep it out of this PR; file it.
 
-## What the first adversarial review changed
+**Fix 1 moves a join from the small side to the large one.** Metadata × power becomes metadata ×
+NWP-joined, on the production path. The metadata columns are already replicated across every NWP row
+today, so it should be close to a wash — but this plan measures fix 3 and fix 4 to the millisecond
+and should not stay silent about the one fix that touches the largest join.
+*Recommendation:* measure it during implementation and put the number in the PR body.
+
+**Between this PR and the `PowerForecast` follow-up there is no fan-out detector at all**, because
+fix 4 removes the row-count explosion and fix 2 removes the (never-run) uniqueness check. The
+cross-mode assertion covers the training path only. *Recommendation:* file the follow-up issue when
+this PR opens, not later — or say the word and I will fold the `PowerForecast` check into this PR
+instead, accepting that it adds a production raise path.
+
+## What the two adversarial reviews changed
 
 Recorded so the reasoning survives into the PR.
 
-**Adopted.** Fix 2 was rewritten wholesale: the reviewer proved `AllFeatures.validate()` fails on
-four things, not the two this plan claimed, and that two of them (`local_day_of_week` without
-`allow_missing`, dynamic features being structurally superfluous) cannot be fixed by fixing the
-data. I confirmed both against `ml_schemas.py:61-64` and `:124` — the original fix 2 would not have
-worked. Also adopted: the `assert` in the cleanup group (deleting the branch fails `ty check`);
-parametrising the existing rolling test instead of adding one; leading fix 4 with the sort
-measurement rather than the rolling rewrite; recording that two of the four defects are unreached by
-any config here; and the note that the two rolling forms genuinely differ on a null
-`ensemble_member`.
+### Review 1 — simplicity
+
+**Adopted.** Fix 2 was rewritten from "make `validate()` real" to "delete the override": it has no
+callers, and calling it needs a `collect()` this module exists to avoid. Also adopted: the `assert`
+in the cleanup group (deleting the branch fails `ty check`); parametrising the existing rolling test
+instead of adding one; leading fix 4 with the sort measurement rather than the rolling rewrite;
+recording that two of the four defects are unreached by any config here; and the note that the two
+rolling forms genuinely differ on a null `ensemble_member`.
 
 **Rejected.** The reviewer implied the two nullability widenings become unnecessary once
 `validate()` is deleted. They are kept: `contracts` is the single source of truth for data shapes,
@@ -279,3 +322,27 @@ of whether anything validates against it.
 
 **Deferred, not rejected.** Dropping `time_series_type` from `base_cols`, and the `PowerForecast`
 primary-key check — both good, both larger than a defect fix, both above as open questions for Jack.
+
+### Review 2 — correctness and testability
+
+The second reviewer found that **three of the claims this plan had just taken from the first
+reviewer were false.** All three are corrected above; all three were confirmed against the code
+before correcting.
+
+- **`AllFeatures.validate()` can pass on real output** — with the two widenings and
+  `allow_superfluous_columns=True`, it validates real bulk-mode output. The first review's "cannot
+  pass" rested on a probe whose feature set omitted `local_day_of_week`. The deletion still stands,
+  but on affordability, not impossibility.
+- **`conf/model/xgboost.yaml:29` does request `local_day_of_week`** — as does
+  `scripts/run_baseline_experiment.py:58`. The `Missing column` failure fires for no config here.
+- **Neither `75bafdf1` nor `7ba598f5` mentions `validate()`, a backstop or uniqueness.** That
+  provenance came from the clean-room report and this plan repeated it twice. What `7ba598f5`
+  actually argues is that the rolling join-back is 1:1 on the full primary key. Claim dropped.
+
+**Also adopted:** fix 3 needs its guard clause swapped or `ty check` fails (reproduced here); the
+widening ships with a test that fails first; `df.reverse()` rather than a seeded shuffle; the
+detector-removal consequence of fix 4; fix 1's stale docstrings and its move of a join to the large
+side; the dead `Sequence`/`Self` imports; `test_ml_schemas.py`'s disposition; and two line
+references that were off by two.
+
+**Nothing rejected.** Every finding checked out.
