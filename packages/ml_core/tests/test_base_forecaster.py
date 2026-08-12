@@ -345,3 +345,25 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unse
     assert unservable_run_id in str(exc_info.value)
     assert _FakeForecaster.load(dest).payload == "hello-model"
     assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run
+
+
+def test_fetch_model_artifacts_keeps_the_previous_model_when_the_run_holds_no_model(
+    saved_run: str, tmp_path: Path
+) -> None:
+    """A run id naming a run with no model saved to it must not displace the champion either.
+
+    This is the likeliest operator slip of the three, because a mistyped or stale run id names a
+    real run that simply never held a model. It is also the only refusal that happens in the
+    download rather than in ``_check_meta_is_servable``, so it needs its own case to pin that
+    ``dest`` survives it.
+    """
+    dest = tmp_path / "production_model"
+    fetch_model_artifacts(run_id=saved_run, dest=dest)
+
+    with mlflow.start_run(experiment_id=mlflow.create_experiment("modelless")) as run:
+        modelless_run_id = run.info.run_id
+
+    with pytest.raises(MlflowException, match="re-materialise `trained_cv_model`"):
+        fetch_model_artifacts(run_id=modelless_run_id, dest=dest)
+
+    assert _FakeForecaster.load(dest).payload == "hello-model"

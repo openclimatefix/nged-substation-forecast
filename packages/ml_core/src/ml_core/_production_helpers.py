@@ -259,6 +259,9 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
         dest: Directory to populate — typically ``Settings.production_model_path``.
 
     Raises:
+        MlflowException: ``run_id`` names a run holding no model archive — most often a mistyped
+            or stale run id, since a run that trained a model has one. Raised by
+            ``ml_core.base_forecaster._download_and_unpack_model``, before ``dest`` is touched.
         ValueError: The run holds no ``meta.json``, or this code cannot serve the model it
             describes — see ``_check_meta_is_servable``. Re-train against the current code and
             promote that run instead.
