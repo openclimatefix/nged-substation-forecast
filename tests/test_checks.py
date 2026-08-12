@@ -106,6 +106,30 @@ def test_stale_series_flagged_most_stale_first() -> None:
     assert result.late["hours_late"].to_list() == pytest.approx([72.0, 30.0])
 
 
+@pytest.mark.parametrize(
+    ("age", "expected_n_stale"),
+    [
+        (timedelta(hours=23, minutes=59), 0),
+        (timedelta(hours=24, minutes=1), 1),
+    ],
+)
+def test_the_production_staleness_threshold_is_twenty_four_hours(
+    age: timedelta, expected_n_stale: int
+) -> None:
+    """The only case that reads ``_POWER_DATA_STALENESS_THRESHOLD`` rather than ``_THRESHOLD``.
+
+    Every other case passes its own threshold, so they pin the shape of the boundary while leaving
+    the production number free to drift in either direction; a minute either side pins the number.
+    """
+    result = evaluate_power_freshness(
+        coverage=_coverage({7: _NOW - age}),
+        roster_ids=_roster([7]),
+        now=_NOW,
+        threshold=checks._POWER_DATA_STALENESS_THRESHOLD,
+    )
+    assert result.n_stale == expected_n_stale
+
+
 def test_never_reported_ids_flagged_from_roster() -> None:
     """A roster id with no rows in the Delta table counts as late with a null ``last_seen``."""
     coverage = _coverage({1: _NOW - timedelta(hours=1)})
