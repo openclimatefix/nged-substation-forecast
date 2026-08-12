@@ -175,8 +175,8 @@ def test_failure_hook_noop_without_exception(monkeypatch: pytest.MonkeyPatch) ->
 
 
 @pytest.mark.parametrize(
-    ("report", "tag", "name"),
-    [
+    argnames=("report", "tag", "name"),
+    argvalues=[
         (
             lambda name, exc: _sentry.report_check_degradation(check_name=name, exc=exc),
             "asset_check",

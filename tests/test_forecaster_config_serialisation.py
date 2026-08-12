@@ -35,7 +35,9 @@ def test_every_concrete_forecaster_config_is_covered() -> None:
     assert XGBoostConfig in _CONFIG_CLASSES
 
 
-@pytest.mark.parametrize("config_cls", _CONFIG_CLASSES, ids=lambda cls: cls.__name__)
+@pytest.mark.parametrize(
+    argnames="config_cls", argvalues=_CONFIG_CLASSES, ids=lambda cls: cls.__name__
+)
 def test_every_config_class_forbids_extra_keys(config_cls: type[BaseForecasterConfig]) -> None:
     """An unknown key must raise, so a misspelled hyperparameter cannot register silently.
 

@@ -175,7 +175,9 @@ def test_power_time_series_and_metadata_ingests_and_writes(
     assert {"nged_s3_paths", "PowerTimeSeries"} <= metadata_keys
 
 
-@pytest.mark.parametrize("raised", [RuntimeError, BaseException], ids=["exception", "rust_panic"])
+@pytest.mark.parametrize(
+    argnames="raised", argvalues=[RuntimeError, BaseException], ids=["exception", "rust_panic"]
+)
 def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fails(
     raised: type[BaseException],
     env: Path,
@@ -192,18 +194,20 @@ def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fail
     one on its own.
     """
     monkeypatch.setattr(
-        assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
     )
 
     def boom(*_: object, **__: object) -> None:
         raise raised("roster upsert exploded")
 
-    monkeypatch.setattr(assets, "upsert_metadata", boom)
+    monkeypatch.setattr(target=assets, name="upsert_metadata", value=boom)
     reported: list[tuple[str, BaseException]] = []
     monkeypatch.setattr(
-        assets,
-        "report_asset_degradation",
-        lambda asset_name, exc: reported.append((asset_name, exc)),
+        target=assets,
+        name="report_asset_degradation",
+        value=lambda asset_name, exc: reported.append((asset_name, exc)),
     )
 
     result = materialize([power_time_series_and_metadata], instance=dagster_instance)
@@ -232,16 +236,20 @@ def test_power_time_series_and_metadata_re_raises_a_cancelled_run(
     net as a panic, so the handler re-raises it explicitly: a run the operator cancelled has to
     stop, not finish green having quietly skipped the roster."""
     monkeypatch.setattr(
-        assets.Settings, "get_nged_s3_store", lambda self: _FakeS3Store(_NGED_FILES)
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
     )
 
     def _cancel(*_: object, **__: object) -> None:
         raise DagsterExecutionInterruptedError
 
-    monkeypatch.setattr(assets, "upsert_metadata", _cancel)
+    monkeypatch.setattr(target=assets, name="upsert_metadata", value=_cancel)
     reported: list[str] = []
     monkeypatch.setattr(
-        assets, "report_asset_degradation", lambda asset_name, exc: reported.append(asset_name)
+        target=assets,
+        name="report_asset_degradation",
+        value=lambda asset_name, exc: reported.append(asset_name),
     )
 
     result = materialize(
@@ -582,15 +590,15 @@ def _stub_ecmwf_download(monkeypatch: pytest.MonkeyPatch, init_time: datetime) -
     ``open_ecmwf_ens_run`` is called with keyword arguments, which a bare ``object()`` rejects.
     """
     monkeypatch.setattr(
-        assets,
-        "open_ecmwf_ens_run",
-        lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
+        target=assets,
+        name="open_ecmwf_ens_run",
+        value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
     )
-    monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda ds: object())
     monkeypatch.setattr(
-        assets,
-        "convert_nwp_xarray_dataset_to_polars_dataframe",
-        lambda ds, h3_grid: _make_nwp(init_time),
+        target=assets,
+        name="convert_nwp_xarray_dataset_to_polars_dataframe",
+        value=lambda ds, h3_grid: _make_nwp(init_time),
     )
 
 
@@ -604,7 +612,7 @@ def test_ecmwf_ens_assesses_before_writing(
     half a partial fix would leave below the write.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
     _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
 
     table_existed: list[bool] = []
@@ -614,14 +622,14 @@ def test_ecmwf_ens_assesses_before_writing(
         table_existed.append(Path(Settings().nwp_data_path).exists())
         return real_build(report)
 
-    monkeypatch.setattr(assets, "_nwp_quality_check_result", _record_then_build)
+    monkeypatch.setattr(target=assets, name="_nwp_quality_check_result", value=_record_then_build)
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success
     assert table_existed == [False]
 
 
-@pytest.mark.parametrize("raiser", [RuntimeError, _FakePanic])
+@pytest.mark.parametrize(argnames="raiser", argvalues=[RuntimeError, _FakePanic])
 def test_ecmwf_ens_lands_the_run_when_an_assessment_fails(
     env: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -636,13 +644,13 @@ def test_ecmwf_ens_lands_the_run_when_an_assessment_fails(
     panic from one derives from ``BaseException``.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
     _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
 
     def _raise(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
         raise raiser("assessment is broken")
 
-    monkeypatch.setattr(assets, "assess_nwp_quality", _raise)
+    monkeypatch.setattr(target=assets, name="assess_nwp_quality", value=_raise)
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success  # the ingest is not failed by a bug in a *reporting* function
@@ -670,18 +678,18 @@ def test_ecmwf_ens_reports_a_degraded_assessment_to_sentry_once(
     ``sentry_capture_failure`` hook no longer fires.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
     _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
 
     def _raise(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
         raise RuntimeError("assessment is broken")
 
     reported: list[tuple[str, BaseException]] = []
-    monkeypatch.setattr(assets, "assess_nwp_quality", _raise)
+    monkeypatch.setattr(target=assets, name="assess_nwp_quality", value=_raise)
     monkeypatch.setattr(
-        assets,
-        "report_check_degradation",
-        lambda check_name, exc: reported.append((check_name, exc)),
+        target=assets,
+        name="report_check_degradation",
+        value=lambda check_name, exc: reported.append((check_name, exc)),
     )
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
@@ -698,14 +706,14 @@ def test_ecmwf_ens_re_raises_a_cancelled_run_without_writing(
     partition Dagster then marks cancelled.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(2024, 12, 1, tzinfo=UTC)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
     _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
 
     def _cancel(nwp: pt.DataFrame[Nwp]) -> NwpQualityReport:
         raise DagsterExecutionInterruptedError
 
-    monkeypatch.setattr(assets, "assess_nwp_quality", _cancel)
-    monkeypatch.setattr(assets, "report_check_degradation", _never_called)
+    monkeypatch.setattr(target=assets, name="assess_nwp_quality", value=_cancel)
+    monkeypatch.setattr(target=assets, name="report_check_degradation", value=_never_called)
 
     with (
         build_asset_context(partition_key="2024-12-01") as context,
