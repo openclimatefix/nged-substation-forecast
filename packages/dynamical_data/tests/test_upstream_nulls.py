@@ -67,6 +67,62 @@ def test_scattered_nulls_are_counted_exactly(
     assert rate.null_nwp_grid_point_fraction == pytest.approx(2 / _EXPECTED_N_TOTAL)
 
 
+@pytest.mark.parametrize(
+    ("first", "second", "expected_n_slices"),
+    [
+        # Same step, different members: a slice is per member.
+        ((1, 0, 0, 0), (1, 1, 0, 0), 2),
+        # Same member, different steps: a slice is per step.
+        ((1, 0, 0, 0), (2, 0, 0, 0), 2),
+        # Same (member, step): one slice however many of its grid points are null.
+        ((1, 0, 0, 0), (1, 0, 0, 1), 1),
+    ],
+)
+def test_a_slice_is_one_variable_member_and_step(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    first: tuple[int, int, int, int],
+    second: tuple[int, int, int, int],
+    expected_n_slices: int,
+) -> None:
+    """Both slice keys are pinned independently, and neither is the grid.
+
+    Each case fixes one index and varies the other, so a count grouped by the wrong dimension gives
+    a different answer to at least one of them. ``n_affected_nwp_slices`` exists to separate one bad
+    slice from a hundred, which a grouping that silently drops ``ensemble_member`` or ``lead_time``
+    would not do.
+    """
+    precipitation = np.full(_DEFAULT_SHAPE, 0.0001, dtype=np.float32)
+    precipitation[first] = np.nan
+    precipitation[second] = np.nan
+    ds = make_ens_dataset(var_values={"precipitation_surface": precipitation})
+
+    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED)
+
+    assert rate.n_null_nwp_grid_points == 2
+    assert rate.n_affected_nwp_slices == expected_n_slices
+
+
+def test_affected_variables_are_sorted(make_ens_dataset: Callable[..., xr.Dataset]) -> None:
+    """Two corrupt variables come back in a stable, ascending order."""
+    corrupt = np.full(_DEFAULT_SHAPE, 0.0001, dtype=np.float32)
+    corrupt[1, 0, 0, 0] = np.nan
+    radiation = np.full(_DEFAULT_SHAPE, 200.0, dtype=np.float32)
+    radiation[1, 0, 0, 0] = np.nan
+    ds = make_ens_dataset(
+        var_values={
+            "precipitation_surface": corrupt,
+            "downward_short_wave_radiation_flux_surface": radiation,
+        }
+    )
+
+    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED)
+
+    assert rate.affected_nwp_variables == (
+        "downward_short_wave_radiation_flux_surface",
+        "precipitation_surface",
+    )
+
+
 def test_instantaneous_variables_are_not_counted(
     make_ens_dataset: Callable[..., xr.Dataset],
 ) -> None:
