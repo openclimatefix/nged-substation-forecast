@@ -244,6 +244,10 @@ confusing failure:
 ## Error Handling
 
 - Use specific exceptions.
+- **Unparenthesised `except` tuples are valid.** `except OSError, ValueError, TypeError:` looks
+  like the Python 2 syntax that Python 3 rejected for years, but
+  [PEP 758](https://peps.python.org/pep-0758/) made it legal in Python 3.14. Parentheses are still
+  required to bind the exception to a name: `except (OSError, ValueError) as err:`.
 - Leverage Sentry for observability in production-like code.
 - Validate data at boundaries using data contracts.
 
