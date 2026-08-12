@@ -355,6 +355,10 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_run_holds_no_mo
     real run that simply never held a model. It is also the only refusal that happens in the
     download rather than in ``_check_meta_is_servable``, so it needs its own case to pin that
     ``dest`` survives it.
+
+    The message must send the operator back to the run id they chose. Re-materialising
+    ``trained_cv_model`` is the remedy for the *other* caller of the same download helper, and
+    would be no help to someone who mistyped a run id here.
     """
     dest = tmp_path / "production_model"
     fetch_model_artifacts(run_id=saved_run, dest=dest)
@@ -362,7 +366,7 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_run_holds_no_mo
     with mlflow.start_run(experiment_id=mlflow.create_experiment("modelless")) as run:
         modelless_run_id = run.info.run_id
 
-    with pytest.raises(MlflowException, match="re-materialise `trained_cv_model`"):
+    with pytest.raises(MlflowException, match="check the run id"):
         fetch_model_artifacts(run_id=modelless_run_id, dest=dest)
 
     assert _FakeForecaster.load(dest).payload == "hello-model"
