@@ -247,21 +247,6 @@ def test_silenced_series_are_withheld_and_others_still_warn() -> None:
     assert result.resurrected_ids == ()  # a silenced series that is *still* stale has not revived
 
 
-def test_a_feed_whose_only_late_series_are_silenced_is_healthy() -> None:
-    """The point of the whole issue: ``report_power_freshness`` returns early on a healthy result,
-    so silencing the last late series is what stops the hourly Sentry warning."""
-    coverage = _coverage({1: _NOW - timedelta(hours=1), 33: _NOW - timedelta(days=200)})
-    result = evaluate_power_freshness(
-        coverage=coverage,
-        roster_ids=_roster([1, 33]),
-        now=_NOW,
-        threshold=_THRESHOLD,
-        silenced_ids=(33,),
-    )
-    assert result.is_healthy
-    assert result.n_late == 0
-
-
 @pytest.mark.parametrize(
     ("last_seen_offset", "expected_n_stale"),
     [
@@ -330,8 +315,10 @@ def test_silencing_works_without_a_roster() -> None:
 
 @pytest.mark.parametrize("stale_id", [None, 7])
 def test_the_check_result_reports_silencing(stale_id: int | None) -> None:
-    """The ignored ids are named on both description branches. The green one matters most: that is
-    the state this feature creates, and where the silencing is easiest to forget."""
+    """The ignored ids are named on both description branches. The green one matters most: it is
+    the state this feature creates, where the silencing is easiest to forget, and — since
+    ``report_power_freshness`` returns early on a healthy result — where the hourly Sentry warning
+    stops."""
     rows = {1: _NOW - timedelta(hours=1), 33: _NOW - timedelta(days=200)}
     if stale_id is not None:
         rows[stale_id] = _NOW - timedelta(hours=48)

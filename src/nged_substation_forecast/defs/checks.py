@@ -323,7 +323,6 @@ def _late_table_metadata(late: pl.DataFrame) -> MetadataValue:
 def _describe_power_freshness(result: PowerFreshnessResult) -> str:
     """One human-readable line: the state of the watched feed, and what is being ignored."""
     threshold_h = result.threshold_hours
-    silenced = ", ".join(str(i) for i in result.silenced_ids)
     if result.n_series_total == 0:
         summary = "No power data on disk yet."
     elif result.is_healthy:
@@ -340,7 +339,8 @@ def _describe_power_freshness(result: PowerFreshnessResult) -> str:
     sentences = [summary]
     # Named on every run, healthy or not, so silencing something is never quietly forgotten.
     if result.silenced_ids:
-        sentences.append(f"Ignoring {len(result.silenced_ids)} known-dead time series: {silenced}.")
+        ids = ", ".join(str(i) for i in result.silenced_ids)
+        sentences.append(f"Ignoring {len(result.silenced_ids)} known-dead time series: {ids}.")
     if result.resurrected_ids:
         ids = ", ".join(str(i) for i in result.resurrected_ids)
         sentences.append(
@@ -404,8 +404,9 @@ def _check_power_data_freshness() -> AssetCheckResult:
     asset=power_time_series_and_metadata,
     blocking=False,
     description=(
-        "Warn if any time series has no fresh power data within the staleness threshold "
-        "(stale) or has never reported at all (never)."
+        "Warn if any watched time series has no fresh power data within the staleness threshold "
+        "(stale) or has never reported at all (never), or if a known-dead series has started "
+        "reporting again."
     ),
 )
 def power_data_is_fresh() -> AssetCheckResult:

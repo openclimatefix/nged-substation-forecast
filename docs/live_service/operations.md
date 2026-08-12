@@ -198,8 +198,9 @@ series the check is *watching*: the silenced ones below are excluded from every 
 broken monitor cannot hold it yellow for ever
 ([why](../architecture/production-deployment.md#silence-the-series-we-already-know-are-dead)). Add
 an id, with a comment saying why, then commit, rebuild the image and redeploy. Removing an id starts
-the warnings again. Either edit is an intervention worth a `routine-ops` row in the
-[intervention log](intervention-log.md).
+the warnings again. Either edit is an intervention worth an
+[intervention-log](intervention-log.md) row under `upstream-outage`: the data is stuck and a human
+had to act.
 
 Two descriptions come from that list. `Ignoring N known-dead time series: 33.` is appended to
 every run, green or yellow, so the silencing cannot be quietly forgotten — read `n_silenced` and

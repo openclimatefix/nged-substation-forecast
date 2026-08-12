@@ -90,36 +90,6 @@ The severity is a warning rather than a failure: a stalled feed is expected to s
 NGED recovers (the pipeline back-fills the gap automatically), so it must not block downstream
 assets.
 
-## Silence the series we already know are dead
-
-A broken monitor keeps the check yellow for months, and an always-yellow channel
-trains the human operator to ignore it — which costs us the
-[provider channel](../design-philosophy/inherent-stability.md#three-audiences-three-channels)
-entirely. `_KNOWN_DEAD_TIME_SERIES_IDS` in `defs/checks.py` names the `time_series_id`s the check
-ignores.
-
-**The silenced ids are removed from the check's inputs, not from its output.** `evaluate_power_freshness`
-drops them from the coverage frame and the roster before it classifies anything, so `n_stale`,
-`n_never_reported`, `n_series_total` and the late table all describe the series we are still
-watching, with no arithmetic anywhere to get wrong. It also means the Sentry warning inherits the
-silencing without knowing silencing exists: `report_power_freshness` is handed the same result and
-returns early on a healthy one, so a feed whose only late series are silenced sends no event.
-
-**A returning series turns the check yellow rather than being removed automatically.** The list is
-source code shipped read-only in the container image, so the check could not edit it; and a check
-that writes anything is a warning path that can fail, which
-[rule 7](../design-philosophy/inherent-stability.md#the-rules) forbids. The yellow is the prompt,
-and it clears when a human deletes the line. It is recomputed hourly with no remembered state, so it
-lasts only while the series keeps reporting.
-
-**The list lives with the code because a dead series is a fact about the world, not about a
-deployment** — it is equally dead whether we run on a laptop or on AWS. That is also the argument
-against the obvious alternative of Dagster's own database, which is per-deployment. The cost is that
-silencing a series takes a commit and a redeploy, which is the wrong interface for something
-expected to change several times a month at V2 scale. Making the list operator-editable from the UI
-is designed alongside the `asset_health_history` table, so that operator-facing health state has one
-home rather than two.
-
 Nothing the check's **body** does can fail its own step. It runs as a step of the hooked
 `power_time_series_and_metadata_job`, and Dagster fails a run whose check step *errors* however
 non-blocking that check is — so an object-store error, a half-written `metadata.parquet` or a bug
@@ -143,6 +113,35 @@ same staleness to Sentry as a warning (see the freshness-warning bullet under
 evaluation is a pure function, so the Sentry warning reuses the same `PowerFreshnessResult` the
 check already computed rather than recomputing it; the same result will later also feed the
 forecast-warnings delivery table.
+
+## Silence the series we already know are dead
+
+A broken monitor keeps the check yellow for months, and an always-yellow channel
+trains the human operator to ignore it — which costs us the
+[provider channel](../design-philosophy/inherent-stability.md#three-audiences-three-channels)
+entirely. `_KNOWN_DEAD_TIME_SERIES_IDS` in `defs/checks.py` names the `time_series_id`s the check
+ignores.
+
+**The silenced ids are removed from the check's inputs, not from its output.** `evaluate_power_freshness`
+drops them from the coverage frame and the roster before it classifies anything, so `n_stale`,
+`n_never_reported`, `n_series_total` and the late table all describe the series we are still
+watching, with no arithmetic anywhere to get wrong. It also means the Sentry warning inherits the
+silencing without knowing silencing exists: `report_power_freshness` is handed the same result and
+returns early on a healthy one, so a feed whose only late series are silenced sends no event.
+
+**A returning series turns the check yellow rather than being removed automatically.** The list is
+source code shipped read-only in the container image, so the check could not edit it; and a check
+that writes anything is a warning path that can fail, which
+[rule 7](../design-philosophy/inherent-stability.md#the-rules) forbids. The yellow is the prompt,
+and it clears when a human deletes the line.
+
+**The list lives with the code because a dead series is a fact about the world, not about a
+deployment** — it is equally dead whether we run on a laptop or on AWS. That is also the argument
+against the obvious alternative of Dagster's own database, which is per-deployment. The cost is that
+silencing a series takes a commit and a redeploy, which is the wrong interface for something
+expected to change several times a month at V2 scale. Making the list operator-editable from the UI
+is designed alongside the `asset_health_history` table, so that operator-facing health state has one
+home rather than two.
 
 ## Read the live forecast back off disk with a second asset check
 
