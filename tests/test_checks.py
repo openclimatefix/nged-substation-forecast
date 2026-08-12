@@ -249,6 +249,19 @@ def _write_metadata_roster(path: str, ids: list[int]) -> None:
     TimeSeriesMetadata.DataFrame(rows).cast().validate().write_parquet(path)
 
 
+def _run_freshness_check() -> AssetCheckResult:
+    """Invoke ``power_data_is_fresh`` directly, on an instance closed before we return.
+
+    Dagster builds a context even though this check declares no context parameter, and never
+    disposes the instance inside it:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#fixtures-and-mocking>.
+    """
+    with DagsterInstance.ephemeral() as instance:
+        result = checks.power_data_is_fresh(build_asset_check_context(instance=instance))
+    assert isinstance(result, AssetCheckResult)  # narrows the directly-invoked check's return
+    return result
+
+
 def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """One fresh series, one stale series, one never-reported roster id → a WARN naming all late."""
     # Freeze "now" so the fresh/stale split is deterministic regardless of wall-clock.
@@ -266,8 +279,7 @@ def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPat
     ).write_delta(settings.power_time_series_data_path)
     _write_metadata_roster(settings.metadata_path, ids=[1, 2, 99])
 
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)  # narrows the directly-invoked check's return
+    result = _run_freshness_check()
 
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
@@ -297,8 +309,7 @@ def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
     ).write_delta(settings.power_time_series_data_path)
     _write_metadata_roster(settings.metadata_path, ids=[1, 2])
 
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)
+    result = _run_freshness_check()
     assert result.passed is True
     assert result.metadata["n_late"].value == 0
     # Emitted even when nothing is late, so the key keeps one type across runs and stays plottable.
@@ -307,8 +318,7 @@ def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
 
 def test_power_data_is_fresh_no_data_yet_warns(env: Path) -> None:
     """No Delta table and no roster → not healthy, WARN, 'no data yet'."""
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)
+    result = _run_freshness_check()
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
     assert result.metadata["n_series_total"].value == 0
@@ -358,8 +368,7 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
     ).write_delta(settings.power_time_series_data_path)
     _write_metadata_roster(settings.metadata_path, ids=[1])
 
-    check_result = checks.power_data_is_fresh()
-    assert isinstance(check_result, AssetCheckResult)
+    check_result = _run_freshness_check()
     assert len(captured) == 1
     assert captured[0] is sentinel  # the exact evaluated object, not a recomputation
     # ...and that same object drove the returned check result (n_late == n_stale + n_never == 7).
@@ -423,8 +432,7 @@ def test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet(env: Path) -
     _write_one_fresh_series(settings)
     Path(settings.metadata_path).write_bytes(b"not a parquet file")
 
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)
+    result = _run_freshness_check()
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
     assert "Could not evaluate power-data freshness" in str(result.description)
@@ -490,8 +498,7 @@ def test_power_data_is_fresh_degrades_on_a_rust_panic(
         lambda check_name, exc: reported.append((check_name, exc)),
     )
 
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)
+    result = _run_freshness_check()
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
     assert "simulated rust panic inside the check" in str(result.description)
@@ -515,7 +522,7 @@ def test_power_data_is_fresh_re_raises_a_cancelled_run(
     monkeypatch.setattr(checks, "report_check_degradation", _never_called)
 
     with pytest.raises(DagsterExecutionInterruptedError):
-        checks.power_data_is_fresh()
+        _run_freshness_check()
 
 
 # ---------------------------------------------------------------------------
@@ -897,7 +904,13 @@ def _write_promoted_model_meta(
 
 
 def _run_live_check() -> AssetCheckResult:
-    result = checks.live_forecasts_are_healthy(build_asset_check_context())
+    """Invoke ``live_forecasts_are_healthy`` directly, on an instance closed before we return.
+
+    Dagster default-constructs an instance for a directly-invoked check and never disposes it:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#fixtures-and-mocking>.
+    """
+    with DagsterInstance.ephemeral() as instance:
+        result = checks.live_forecasts_are_healthy(build_asset_check_context(instance=instance))
     assert isinstance(result, AssetCheckResult)  # narrows the directly-invoked check's return
     return result
 

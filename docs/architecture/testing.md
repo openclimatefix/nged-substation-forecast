@@ -58,9 +58,11 @@ tests: Polars row counts wrapping past 2³² rows, in
   leftover parquet. Keep the *server* module-scoped for speed, but give each test a
   **function-scoped** fixture that `POST`s to `/moto-api/reset` and recreates the bucket before
   the test body runs, so every test starts pristine and independent of execution order.
-- **Take the `dagster_instance` fixture; never call `DagsterInstance.ephemeral()` in a test.** The
-  fixture (in `tests/conftest.py`) enters the instance as a context manager, so `dispose()` runs
-  when the test ends.
+- **Take the `dagster_instance` fixture, or enter the instance as a context manager — never leave
+  a `DagsterInstance.ephemeral()` unowned.** The fixture (in `tests/conftest.py`) enters the
+  instance for you, so `dispose()` runs when the test ends. A module-level test helper that a
+  fixture cannot reach — `_run_live_check` in `tests/test_checks.py` — takes the second form
+  instead, and disposes on the way out of the helper.
 
     `DagsterInstance` has no finaliser, so an undisposed instance defers two cleanups to whenever
     the garbage collector reaches it. Both then surface as failures owned by no test:
@@ -100,12 +102,26 @@ tests: Polars row counts wrapping past 2³² rows, in
   `tests/test_assets.py::test_ecmwf_ens_retries_when_run_not_yet_available` — probing right after
   that test's teardown with **no forced `gc.collect()`** found 2 open connections before the fix,
   0 after, every time.
+- **`build_asset_check_context()` is the exception: give it `instance=`, because it cannot be
+  entered.** `DirectAssetCheckExecutionContext` defines no `__enter__`, so the context-manager
+  form above is a `TypeError`, and the `with` block has to hold the instance instead. Dagster
+  builds one of these for a directly-invoked check that declares *no* context parameter too, so
+  `power_data_is_fresh()` leaks an instance on a call that mentions Dagster nowhere; pass it a
+  context anyway, which Dagster accepts and uses in place of the one it would build. Worked
+  examples: `_run_freshness_check` and `_run_live_check` in `tests/test_checks.py`.
 - **`materialize()` and `JobDefinition.execute_in_process()` do *not* need this.** Both wrap their
   default instance in their own internal `with ephemeral_instance_if_missing(instance):`, entered
   and exited inside the call, so disposal is already deterministic however the caller uses the
   return value. The distinguishing question for any Dagster helper that can default-construct an
   instance is whether *the helper itself* closes the `with` block, or hands you an object that
   expects *you* to.
+- **An autouse fixture fails whichever test leaks one.**
+  `_fail_on_an_undisposed_dagster_instance` in `tests/conftest.py` wraps `DagsterInstance.ephemeral`
+  and `DagsterInstance.dispose` for the duration of each test, then asserts at teardown that every
+  instance created was disposed — so the fault is reported by name instead of against an unrelated
+  test. It catches a leak, not an omission: an unreferenced context is freed as soon as the helper
+  that built it returns, so a missing `instance=` can still pass green until something pins the
+  frame holding it.
 
 ## Warnings are errors
 
