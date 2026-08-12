@@ -28,8 +28,7 @@ class UpstreamNullRate:
 
     This is the provider channel: the number to quote to Dynamical.org when asking whether their
     feed is degrading. It counts grid points on the 0.25° lat/lon box we downloaded, before any H3
-    aggregation, so it is free of our H3 resolution, our grid spacing and our aggregation policy —
-    all of which move a cell-level count without anything upstream having changed.
+    aggregation.
 
     Read it alongside, never instead of, :class:`contracts.weather_schemas.NwpQualityReport`, which
     counts null H3 *cells* and answers the different question of how much the model lost. The two
@@ -50,9 +49,7 @@ class UpstreamNullRate:
     """``(variable, ensemble_member, lead_time)`` slices carrying at least one null grid point.
 
     Separates "one bad slice" from "a hundred" at the same overall rate, which the fraction alone
-    cannot. Whether an affected slice is *wholly* null is answered better by ``NwpQualityReport``'s
-    ``n_whole_null_h3_slices``: a slice null at every grid point leaves every cell it feeds with
-    zero contributing weight, so it reaches the stored cells intact.
+    cannot.
     """
 
     affected_nwp_variables: tuple[str, ...]
@@ -62,11 +59,9 @@ class UpstreamNullRate:
     def null_nwp_grid_point_fraction(self) -> float:
         """Null grid points as a fraction of those counted; ``0.0`` when none were counted.
 
-        A run carrying no step beyond lead-0 has nothing to measure. Returning ``0.0`` rather than
-        dividing is what keeps this a warning path: a partial upstream publication that lands only
-        lead-0 is absent input, and
-        [rule 7](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
-        forbids a warning path failing the run it is warning about.
+        A run carrying no step beyond lead-0 has nothing to measure, and a warning path must not
+        raise
+        ([rule 7](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
         """
         if self.n_total_nwp_grid_points == 0:
             return 0.0
@@ -91,22 +86,25 @@ def assess_upstream_grid_point_nulls(
             :func:`dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
             ``(lead_time, ensemble_member, latitude, longitude)``, with ``init_time`` already
             reduced to a scalar coordinate.
-        variables: The weather variables to count over. The asset passes
-            :attr:`contracts.weather_schemas.Nwp.deaccumulated_var_names`, whose nulls are known
-            upstream corruption. Pooling variables with different null semantics into one rate
-            would make that rate meaningless, so a caller wanting the instantaneous variables asks
-            for them separately rather than adding them here.
+        variables: The weather variables to count over, whose nulls must share one meaning — a
+            rate pooled over variables with opposite null semantics measures nothing. The asset
+            passes :attr:`contracts.weather_schemas.Nwp.deaccumulated_var_names`, whose nulls are
+            known upstream corruption.
     """
-    beyond_lead_0 = ds.sel(lead_time=ds.lead_time > _LEAD_0)
+    # Selected per variable rather than once on `ds`: this runs inside `ecmwf_ens`, whose ECMWF
+    # concurrency pool exists because the download is memory-intensive, and slicing the whole
+    # dataset would copy all thirteen downloaded variables to read three.
+    beyond_lead_0 = ds.lead_time > _LEAD_0
     n_null = 0
     n_total = 0
     n_affected_slices = 0
     affected_variables: list[str] = []
     for name in sorted(variables):
-        nulls_per_slice = beyond_lead_0[name].isnull().sum(dim=["latitude", "longitude"])
+        values = ds[name].isel(lead_time=beyond_lead_0)
+        nulls_per_slice = values.isnull().sum(dim=["latitude", "longitude"])
         variable_n_null = int(nulls_per_slice.sum())
         n_null += variable_n_null
-        n_total += beyond_lead_0[name].size
+        n_total += values.size
         n_affected_slices += int((nulls_per_slice > 0).sum())
         if variable_n_null:
             affected_variables.append(name)

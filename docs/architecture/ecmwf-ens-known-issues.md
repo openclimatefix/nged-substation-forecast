@@ -191,7 +191,8 @@ denominator is the whole downloaded lat/lon box, including the corner points no 
 is what keeps our geometry out of the number. What they do share is the slice filter — both ignore
 lead-0. And `null_nwp_grid_point_fraction` pools the three de-accumulated variables, so it does not
 equal any single variable's rate: the 2025-06-04 figures above are per-variable, and that run's
-pooled fraction is roughly a third of the 0.014% quoted for `precipitation_surface`.
+pooled fraction is roughly 0.008%, a little over half the 0.014% quoted for
+`precipitation_surface`.
 
 Only the cell count drives the check's `passed`. The upstream rate is published on every
 materialisation instead, because "is the feed degrading?" is a question about the trend across runs

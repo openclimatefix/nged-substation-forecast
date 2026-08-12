@@ -237,16 +237,15 @@ _NWP_QUALITY_CHECK_DESCRIPTION: Final[str] = (
     "is the feed broken, and since when? The `h3_cell` keys count the cells we store after "
     "area-weighted aggregation: that is how much the model actually lost. The aggregation "
     "renormalises each cell over the grid points that supplied a value, so it absorbs most "
-    "upstream scatter, and a run routinely has null grid points and no null cell. The two are not "
-    "comparable as rates — different units over different populations — and only this check's "
+    "upstream scatter, and a corrupt run can have null grid points and no null cell. The two are "
+    "not comparable as rates — different units over different populations — and only this check's "
     "`passed` follows the cells. See "
     "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
 )
 """Standing explanation shown in the Dagster UI's Checks view.
 
-Separate from the per-run ``AssetCheckResult.description``, which carries that run's numbers: this
-one says what the numbers *mean*, and is the only place a reader of the UI can learn that the check
-counts two different populations."""
+The per-run ``AssetCheckResult.description`` carries that run's numbers; this says what they
+mean."""
 
 _NWP_COMPLETENESS_CHECK_NAME: Final[str] = "nwp_run_is_complete"
 """Name of the per-run NWP completeness check emitted by ``ecmwf_ens`` (see
@@ -482,27 +481,39 @@ def _nwp_quality_check_result(
 
 
 def _nwp_quality_description(report: NwpQualityReport, upstream: UpstreamNullRate) -> str:
-    """Describe both populations on every run, whether or not either is degraded.
+    """Describe both populations on every run, because the two routinely disagree.
 
-    Unconditionally, because the two can disagree: the aggregation absorbs most upstream scatter,
-    so a run can arrive visibly corrupt and still store no null cell. A description that reported
-    only the cells would call that run clean.
+    The aggregation absorbs most upstream scatter, so a run can arrive corrupt and still store no
+    null cell; a description written from the cells alone would call that run clean.
     """
-    return (
+    grid_points = (
         f"Raw NWP grid: {upstream.n_null_nwp_grid_points} of {upstream.n_total_nwp_grid_points} "
-        f"grid point(s) null beyond lead-0 ({upstream.null_nwp_grid_point_fraction:.4%}) in "
-        f"{_or_none(upstream.affected_nwp_variables)}, across {upstream.n_affected_nwp_slices} "
-        f"(variable, member, step) slice(s). Stored H3 cells: {report.n_null_cells} null cell(s) "
-        f"in {_or_none(report.affected_variables)}, across {report.n_scattered_slices} partly-null "
-        f"and {report.n_whole_null_slices} wholly-null (member, valid_time) slice(s). Known "
-        "upstream ECMWF ENS corruption, tolerated. See "
-        "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
+        f"grid point(s) null beyond lead-0 ({upstream.null_nwp_grid_point_fraction:.4%})"
     )
-
-
-def _or_none(variables: tuple[str, ...]) -> str:
-    """Render a variable list for a check description, matching ``_or_na``'s "no value" habit."""
-    return ", ".join(variables) if variables else "none"
+    if not upstream.is_healthy:
+        grid_points += (
+            f" in {', '.join(upstream.affected_nwp_variables)}, across "
+            f"{upstream.n_affected_nwp_slices} (variable, member, step) slice(s)"
+        )
+    cells = f"Stored H3 cells: {report.n_null_cells} null cell(s)"
+    if not report.is_healthy:
+        cells += (
+            f" in {', '.join(report.affected_variables)}, across {report.n_scattered_slices} "
+            f"partly-null and {report.n_whole_null_slices} wholly-null (member, valid_time) "
+            "slice(s)"
+        )
+    # Only claim corruption when some was found: this string is the operator's summary of the run,
+    # and a clean run described as tolerated corruption is the same false claim, inverted, that
+    # reporting the cells alone used to make.
+    verdict = (
+        ""
+        if upstream.is_healthy and report.is_healthy
+        else (
+            " Known upstream ECMWF ENS corruption, tolerated. See "
+            "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
+        )
+    )
+    return f"{grid_points}. {cells}.{verdict}"
 
 
 def _upstream_null_metadata(upstream: UpstreamNullRate) -> dict[str, MetadataValue]:

@@ -252,8 +252,8 @@ store afterwards. They answer different questions and are not comparable as rate
   count stays small even when the feed is badly corrupt. Only this side drives the check's
   pass/fail.
 
-A run with a non-zero grid-point fraction and zero null cells is the normal, healthy case: the feed
-sent corruption and the aggregation absorbed it. The check's
+A run with a non-zero grid-point fraction and zero null cells is a corrupt run the aggregation
+absorbed, not a broken one. The check's
 `n_whole_null_h3_slices` metadata is the one worth a second look: those are
 `(variable, ensemble_member, valid_time)` slices where the field arrived wholesale empty. A handful
 is not a fault and the run is kept regardless, but a count that climbs run after run is worth
@@ -285,8 +285,8 @@ itself failed, not that the run is degraded — so it appears on *both* checks a
 metadata (`n_ensemble_members` and the rest) and the grid-point metadata
 (`null_nwp_grid_point_fraction` and `n_null_nwp_grid_points`) are absent from that materialisation:
 there is no report to read them from. Treat the corruption rate as unknown for that run, not zero,
-and mind the gap when reading the trend. The run still lands. One Sentry event is sent, tagged `asset_check:nwp_has_no_unexpected_nulls` whichever
-assessment raised.
+and mind the gap when reading the trend. The run still lands. One Sentry event is sent, tagged
+`asset_check:nwp_has_no_unexpected_nulls` whichever assessment raised.
 
 **Do not re-materialise a partition that has already landed.** `write_nwp` is append-only, so
 re-running the partition after Dynamical republishes the run would append a *second* copy of it

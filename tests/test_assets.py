@@ -138,8 +138,6 @@ def _make_downloaded_ds(n_null_grid_points: int = 0) -> xr.Dataset:
     dims = ("lead_time", "ensemble_member", "latitude", "longitude")
     corrupt = np.full(shape, 0.001, dtype=np.float32)
     corrupt[1, 0, 0, :n_null_grid_points] = np.nan
-    # Only precipitation is corrupted, so the reported variable list is a real attribution rather
-    # than "all of them" — which is what an operator quotes to Dynamical.org.
     return xr.Dataset(
         data_vars={
             name: (
@@ -148,7 +146,7 @@ def _make_downloaded_ds(n_null_grid_points: int = 0) -> xr.Dataset:
                 if name == "precipitation_surface"
                 else np.full(shape, 0.001, dtype=np.float32),
             )
-            for name in sorted(Nwp.deaccumulated_var_names)
+            for name in Nwp.deaccumulated_var_names
         },
         coords={
             "lead_time": np.asarray([0, 6], dtype="timedelta64[h]").astype("timedelta64[ns]"),
@@ -686,14 +684,14 @@ def test_ecmwf_ens_assesses_before_writing(
     assert table_existed == [False]
 
 
-def test_ecmwf_ens_reports_upstream_corruption_the_aggregation_absorbed(
+def test_ecmwf_ens_publishes_both_null_populations(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """The blindness this measure exists for, seen through the asset.
+    """A run whose stored cells are clean still reports the corruption the feed sent.
 
-    The stored frame has no null cell, so the check passes and every H3 key reads zero — and the
-    grid-point keys still report that the feed sent corruption. Before this measure existed the run
-    was indistinguishable from a perfect one.
+    That combination — every H3 key zero, the grid-point keys non-zero — is the state this measure
+    exists for, and the one that was indistinguishable from a perfect run before it. The converter
+    is stubbed, so this pins the plumbing and the description, not the aggregation itself.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
@@ -716,6 +714,12 @@ def test_ecmwf_ens_reports_upstream_corruption_the_aggregation_absorbed(
     assert evaluation.metadata["n_affected_nwp_slices"].value == 1
     assert evaluation.metadata["affected_nwp_variables"].value == ["precipitation_surface"]
 
+    # The description must name both populations, or it claims the health of the one it read.
+    description = str(evaluation.description)
+    assert "Raw NWP grid: 1 of 6 grid point(s) null" in description
+    assert "precipitation_surface" in description
+    assert "Stored H3 cells: 0 null cell(s)" in description
+
     # Published on the materialisation too, so the trend plots on the asset timeline rather than
     # only appearing on the runs bad enough to warn.
     (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
@@ -723,43 +727,11 @@ def test_ecmwf_ens_reports_upstream_corruption_the_aggregation_absorbed(
     assert materialisation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
 
 
-def test_ecmwf_ens_quality_description_never_claims_health_it_did_not_measure(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
-) -> None:
-    """The description names both populations on a run whose corruption the aggregation absorbed.
-
-    A description written from the cells alone would call this run clean, because it is clean *as
-    stored*. Naming both unconditionally is what stops the check asserting more than it measured.
-    """
-    _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
-    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
-    monkeypatch.setattr(
-        target=assets,
-        name="download_ecmwf_ens_data",
-        value=lambda ds: _make_downloaded_ds(n_null_grid_points=1),
-    )
-
-    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
-    description = str(_check_evaluations(result)["nwp_has_no_unexpected_nulls"].description)
-
-    assert "Raw NWP grid: 1 of 6 grid point(s) null" in description
-    assert "precipitation_surface" in description
-    assert "Stored H3 cells: 0 null cell(s)" in description
-
-
-def test_nwp_quality_check_spec_explains_both_populations() -> None:
-    """The Checks view needs a standing explanation, not just this run's numbers.
-
-    The per-run description carries the counts; only the spec's description can say what they
-    *mean*, and it is the sole place a reader of the Dagster UI learns the check counts two
-    populations that are not comparable.
-    """
+def test_nwp_quality_check_spec_carries_a_standing_description() -> None:
+    """Only the spec's description reaches the Checks view before any run has happened."""
     (spec,) = [spec for spec in ecmwf_ens.check_specs if spec.name == "nwp_has_no_unexpected_nulls"]
 
-    assert spec.description is not None
-    assert "nwp_grid_point" in spec.description
-    assert "h3_cell" in spec.description
+    assert spec.description == assets._NWP_QUALITY_CHECK_DESCRIPTION
 
 
 @pytest.mark.parametrize("raiser", [RuntimeError, _FakePanic])
