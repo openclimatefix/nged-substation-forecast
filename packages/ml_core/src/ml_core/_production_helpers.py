@@ -273,7 +273,7 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
         downloaded_dir = _download_and_unpack_model(
             run_id=run_id,
             work_dir=Path(tmp_dir),
-            remedy="check the run id, since a run that trained a model has this artifact.",
+            remedy="check the run id, and pick one whose training completed.",
         )
         meta_path = downloaded_dir / "meta.json"
         if not meta_path.exists():

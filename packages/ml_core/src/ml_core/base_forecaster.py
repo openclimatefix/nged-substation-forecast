@@ -76,8 +76,8 @@ def _download_and_unpack_model(run_id: str, work_dir: Path, remedy: str) -> Path
             extract into. Needs room for the archive *and* its unpacked contents.
         remedy: What the reader should do when the run holds no archive, appended to the
             message. The two callers reach this state by different routes — a CV fold run that
-            no training has written yet, versus a run id an operator chose — so neither wording
-            is right for both, and the caller that knows which one it is supplies it.
+            no training has written yet, versus a run id an operator chose — so no one wording
+            is right for both.
 
     Returns:
         The directory holding the unpacked model, ready to hand to a subclass's ``load``. It
@@ -85,7 +85,7 @@ def _download_and_unpack_model(run_id: str, work_dir: Path, remedy: str) -> Path
         cannot appear in it.
 
     Raises:
-        MlflowException: The run holds no model archive, followed by ``remedy``.
+        MlflowException: The run holds no model archive; the message ends with ``remedy``.
     """
     try:
         archive_path = Path(

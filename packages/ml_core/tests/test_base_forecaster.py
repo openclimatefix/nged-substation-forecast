@@ -357,8 +357,7 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_run_holds_no_mo
     ``dest`` survives it.
 
     The message must send the operator back to the run id they chose. Re-materialising
-    ``trained_cv_model`` is the remedy for the *other* caller of the same download helper, and
-    would be no help to someone who mistyped a run id here.
+    ``trained_cv_model`` is the remedy for the *other* caller of the same download helper.
     """
     dest = tmp_path / "production_model"
     fetch_model_artifacts(run_id=saved_run, dest=dest)
