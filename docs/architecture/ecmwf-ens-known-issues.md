@@ -171,6 +171,33 @@ reports them (WARN, non-blocking), naming the affected `(variable, ensemble_memb
 slices and counting the wholly-null ones separately from the scattered ones — the two warrant
 different responses even though neither fails the run.
 
+### Two populations, counted separately
+
+That check counts nulls at both stages of ingest, and the metadata keys say which stage each number
+came from. The `nwp_grid_point` keys count the raw 0.25° grid, before the aggregation
+([`assess_upstream_grid_point_nulls`](../api/dynamical_data/index.md)); the `h3_cell` keys count the
+cells we store afterwards (`assess_nwp_quality`).
+
+Both are needed because the aggregation deliberately breaks the link between them. Renormalising
+over the contributing grid points is what keeps a scattered upstream null out of the stored cells —
+and it is therefore also what stops a cell count from measuring the feed. A cell count is the
+grid-point rate convolved with our H3 resolution, our grid spacing and our aggregation policy, so a
+change to any of those three moves it without anything upstream having changed. Only the grid-point
+rate answers the provider question in
+[Three audiences, three channels](../design-philosophy/inherent-stability.md#three-audiences-three-channels).
+
+The two are not comparable as rates: different units over different populations. The grid-point
+denominator is the whole downloaded lat/lon box, including the corner points no H3 cell uses, which
+is what keeps our geometry out of the number. What they do share is the slice filter — both ignore
+lead-0. And `null_nwp_grid_point_fraction` pools the three de-accumulated variables, so it does not
+equal any single variable's rate: the 2025-06-04 figures above are per-variable, and that run's
+pooled fraction is roughly a third of the 0.014% quoted for `precipitation_surface`.
+
+Only the cell count drives the check's `passed`. The upstream rate is published on every
+materialisation instead, because "is the feed degrading?" is a question about the trend across runs
+that no single run can answer, and the archive offers no threshold that separates a healthy feed
+from a worsening one.
+
 ## A wholly-missing variable, and instantaneous nulls (fatal)
 
 Two null patterns *do* fail ingest:

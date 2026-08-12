@@ -12,10 +12,12 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 import patito as pt
 import polars as pl
 import pytest
 import shapely
+import xarray as xr
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
@@ -31,6 +33,7 @@ from dagster import (
     materialize,
 )
 from dynamical_data.ecmwf_ens.download import NwpRunNotYetAvailable
+from dynamical_data.ecmwf_ens.upstream_nulls import UpstreamNullRate
 from nged_data.storage import NoNewData, _ProcessedFileListing
 
 from nged_substation_forecast.defs import assets
@@ -122,6 +125,38 @@ def _make_nwp(init_time: datetime, n: int = 4) -> pl.DataFrame:
         **{var: [value] * n for var, value in _CONTINUOUS_NWP_VALUES.items()},
     }
     return Nwp.DataFrame(rows).cast().validate()
+
+
+def _make_downloaded_ds(n_null_grid_points: int = 0) -> xr.Dataset:
+    """A tiny stand-in for ``download_ecmwf_ens_data``'s output.
+
+    Only what ``assess_upstream_grid_point_nulls`` reads: the three de-accumulated variables on a
+    ``(lead_time, ensemble_member, latitude, longitude)`` grid whose first step is lead-0. Nulls are
+    placed beyond lead-0, so they are counted rather than filtered out as the by-design lead-0 ones.
+    """
+    shape = (2, 1, 1, 2)  # 2 steps (one is lead-0), 1 member, 2 grid points
+    dims = ("lead_time", "ensemble_member", "latitude", "longitude")
+    corrupt = np.full(shape, 0.001, dtype=np.float32)
+    corrupt[1, 0, 0, :n_null_grid_points] = np.nan
+    # Only precipitation is corrupted, so the reported variable list is a real attribution rather
+    # than "all of them" — which is what an operator quotes to Dynamical.org.
+    return xr.Dataset(
+        data_vars={
+            name: (
+                dims,
+                corrupt
+                if name == "precipitation_surface"
+                else np.full(shape, 0.001, dtype=np.float32),
+            )
+            for name in sorted(Nwp.deaccumulated_var_names)
+        },
+        coords={
+            "lead_time": np.asarray([0, 6], dtype="timedelta64[h]").astype("timedelta64[ns]"),
+            "ensemble_member": np.asarray([0]),
+            "latitude": np.asarray([52.5], dtype=np.float32),
+            "longitude": np.asarray([-1.0, -0.75], dtype=np.float32),
+        },
+    )
 
 
 def _write_h3_grid_weights(path: str) -> None:
@@ -375,7 +410,9 @@ def test_ecmwf_ens_materialises_and_appends_nwp(
         return object()
 
     monkeypatch.setattr(target=assets, name="open_ecmwf_ens_run", value=_open)
-    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda ds: object())
+    monkeypatch.setattr(
+        target=assets, name="download_ecmwf_ens_data", value=lambda ds: _make_downloaded_ds()
+    )
     monkeypatch.setattr(
         target=assets,
         name="convert_nwp_xarray_dataset_to_polars_dataframe",
@@ -431,7 +468,9 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
         name="open_ecmwf_ens_run",
         value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
     )
-    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda ds: object())
+    monkeypatch.setattr(
+        target=assets, name="download_ecmwf_ens_data", value=lambda ds: _make_downloaded_ds()
+    )
     monkeypatch.setattr(
         target=assets,
         name="convert_nwp_xarray_dataset_to_polars_dataframe",
@@ -443,11 +482,11 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
     assert pl.read_delta(Settings().nwp_data_path).height == 3  # data was persisted
     evaluation = _check_evaluations(result)["nwp_has_no_unexpected_nulls"]
     assert not evaluation.passed  # WARN: the scatter is surfaced
-    assert evaluation.metadata["n_null_cells"].value == 1
-    assert evaluation.metadata["n_whole_null_slices"].value == 0
+    assert evaluation.metadata["n_null_h3_cells"].value == 1
+    assert evaluation.metadata["n_whole_null_h3_slices"].value == 0
     # Both halves of the split are emitted, not just the whole-null one: the operations runbook
-    # names `n_scattered_slices` as a number to read off this check.
-    assert evaluation.metadata["n_scattered_slices"].value == 1
+    # names `n_scattered_h3_slices` as a number to read off this check.
+    assert evaluation.metadata["n_scattered_h3_slices"].value == 1
 
 
 def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
@@ -477,7 +516,9 @@ def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
         name="open_ecmwf_ens_run",
         value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
     )
-    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda ds: object())
+    monkeypatch.setattr(
+        target=assets, name="download_ecmwf_ens_data", value=lambda ds: _make_downloaded_ds()
+    )
     monkeypatch.setattr(
         target=assets,
         name="convert_nwp_xarray_dataset_to_polars_dataframe",
@@ -489,11 +530,11 @@ def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
     assert pl.read_delta(Settings().nwp_data_path).height == 3  # data was persisted
     evaluation = _check_evaluations(result)["nwp_has_no_unexpected_nulls"]
     assert not evaluation.passed  # WARN: the missing slice is surfaced
-    assert evaluation.metadata["n_whole_null_slices"].value == 1
-    assert evaluation.metadata["n_null_cells"].value == 1
+    assert evaluation.metadata["n_whole_null_h3_slices"].value == 1
+    assert evaluation.metadata["n_null_h3_cells"].value == 1
     # The mirror of the scattered test above: the same slice must be counted once, on one side of
     # the split, so the two metadata fields cannot both claim it.
-    assert evaluation.metadata["n_scattered_slices"].value == 0
+    assert evaluation.metadata["n_scattered_h3_slices"].value == 0
 
 
 def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
@@ -530,7 +571,9 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
         name="open_ecmwf_ens_run",
         value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
     )
-    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda ds: object())
+    monkeypatch.setattr(
+        target=assets, name="download_ecmwf_ens_data", value=lambda ds: _make_downloaded_ds()
+    )
     monkeypatch.setattr(
         target=assets,
         name="convert_nwp_xarray_dataset_to_polars_dataframe",
@@ -604,7 +647,9 @@ def _stub_ecmwf_download(monkeypatch: pytest.MonkeyPatch, init_time: datetime) -
         name="open_ecmwf_ens_run",
         value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
     )
-    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda ds: object())
+    monkeypatch.setattr(
+        target=assets, name="download_ecmwf_ens_data", value=lambda ds: _make_downloaded_ds()
+    )
     monkeypatch.setattr(
         target=assets,
         name="convert_nwp_xarray_dataset_to_polars_dataframe",
@@ -628,15 +673,93 @@ def test_ecmwf_ens_assesses_before_writing(
     table_existed: list[bool] = []
     real_build = assets._nwp_quality_check_result
 
-    def _record_then_build(report: NwpQualityReport) -> AssetCheckResult:
+    def _record_then_build(
+        report: NwpQualityReport, upstream: UpstreamNullRate
+    ) -> AssetCheckResult:
         table_existed.append(Path(Settings().nwp_data_path).exists())
-        return real_build(report)
+        return real_build(report=report, upstream=upstream)
 
     monkeypatch.setattr(target=assets, name="_nwp_quality_check_result", value=_record_then_build)
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success
     assert table_existed == [False]
+
+
+def test_ecmwf_ens_reports_upstream_corruption_the_aggregation_absorbed(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The blindness this measure exists for, seen through the asset.
+
+    The stored frame has no null cell, so the check passes and every H3 key reads zero — and the
+    grid-point keys still report that the feed sent corruption. Before this measure existed the run
+    was indistinguishable from a perfect one.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
+    monkeypatch.setattr(
+        target=assets,
+        name="download_ecmwf_ens_data",
+        value=lambda ds: _make_downloaded_ds(n_null_grid_points=1),
+    )
+
+    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
+    assert result.success
+
+    evaluation = _check_evaluations(result)["nwp_has_no_unexpected_nulls"]
+    assert evaluation.passed  # no stored cell is null...
+    assert evaluation.metadata["n_null_h3_cells"].value == 0
+    assert evaluation.metadata["n_null_nwp_grid_points"].value == 1  # ...but the feed was corrupt
+    assert evaluation.metadata["n_total_nwp_grid_points"].value == 6  # 3 variables x 1 step x 2
+    assert evaluation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
+    assert evaluation.metadata["n_affected_nwp_slices"].value == 1
+    assert evaluation.metadata["affected_nwp_variables"].value == ["precipitation_surface"]
+
+    # Published on the materialisation too, so the trend plots on the asset timeline rather than
+    # only appearing on the runs bad enough to warn.
+    (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
+    assert materialisation.metadata["n_null_nwp_grid_points"].value == 1
+    assert materialisation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
+
+
+def test_ecmwf_ens_quality_description_never_claims_health_it_did_not_measure(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The description names both populations on a run whose corruption the aggregation absorbed.
+
+    A description written from the cells alone would call this run clean, because it is clean *as
+    stored*. Naming both unconditionally is what stops the check asserting more than it measured.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
+    monkeypatch.setattr(
+        target=assets,
+        name="download_ecmwf_ens_data",
+        value=lambda ds: _make_downloaded_ds(n_null_grid_points=1),
+    )
+
+    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
+    description = str(_check_evaluations(result)["nwp_has_no_unexpected_nulls"].description)
+
+    assert "Raw NWP grid: 1 of 6 grid point(s) null" in description
+    assert "precipitation_surface" in description
+    assert "Stored H3 cells: 0 null cell(s)" in description
+
+
+def test_nwp_quality_check_spec_explains_both_populations() -> None:
+    """The Checks view needs a standing explanation, not just this run's numbers.
+
+    The per-run description carries the counts; only the spec's description can say what they
+    *mean*, and it is the sole place a reader of the Dagster UI learns the check counts two
+    populations that are not comparable.
+    """
+    (spec,) = [spec for spec in ecmwf_ens.check_specs if spec.name == "nwp_has_no_unexpected_nulls"]
+
+    assert spec.description is not None
+    assert "nwp_grid_point" in spec.description
+    assert "h3_cell" in spec.description
 
 
 @pytest.mark.parametrize("raiser", [RuntimeError, _FakePanic])
@@ -673,10 +796,13 @@ def test_ecmwf_ens_lands_the_run_when_an_assessment_fails(
         assert evaluation.severity == AssetCheckSeverity.WARN
         assert "assessment is broken" in str(evaluation.description)
 
-    # The shape keys come from the completeness report, which never got built.
+    # The shape and upstream keys come from reports that never got built. Both fallbacks must be
+    # assigned in the `except` branch: `MaterializeResult` is built *outside* the guard, so an
+    # unbound name there would fail the partition — the failure the guard exists to prevent.
     (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
     assert materialisation.metadata["n_rows"].value == 4
     assert "n_ensemble_members" not in materialisation.metadata
+    assert "null_nwp_grid_point_fraction" not in materialisation.metadata
 
 
 def test_ecmwf_ens_reports_a_degraded_assessment_to_sentry_once(

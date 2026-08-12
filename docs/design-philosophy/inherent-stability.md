@@ -324,7 +324,7 @@ here: nothing else says clear-sky is what we fall back *to*.
 | Audience | Question | Channel |
 |---|---|---|
 | **Forecast users** (NGED) | "How much should I trust *this row*?" | In-band: quantile spread, plus `nwp_init_time`, already on the row |
-| **Data providers** | "Is *your* feed broken, and since when?" | Aggregated and **attributable**: `power_forecast_warnings`, the freshness check's late-series table, the live check's missed-NWP-run count |
+| **Data providers** | "Is *your* feed broken, and since when?" | Aggregated and **attributable**: `power_forecast_warnings`, the freshness check's late-series table, the live check's missed-NWP-run count, the NWP quality check's upstream grid-point null rate |
 | **Us, the developers** | "Is *our* system at fault?" | Out-of-band: Sentry, plus the missed-check-in alarm |
 
 Inherent stability creates a specific hazard for the third channel: **a system that always succeeds
