@@ -318,7 +318,8 @@ No static AWS keys anywhere in either role — the same IAM-role auto-discovery
 The deployed service genuinely needs `NGED_S3_BUCKET_URL`, `NGED_S3_BUCKET_ACCESS_KEY` and
 `NGED_S3_BUCKET_SECRET`: the hourly `power_time_series_and_metadata` schedule pulls fresh
 telemetry from NGED's bucket. Without them that schedule fails every hour — loudly, since
-`Settings.get_nged_s3_store` raises an error naming the unset variables and the job's
+`Settings.get_nged_s3_store` raises an error naming the unset variables, which the asset retries
+twice (its guard cannot tell an unset variable from a transient S3 error) before the job's
 `sentry_capture_failure` hook reports it — while everything that does not read NGED's own bucket
 carries on. `Settings` deliberately does *not* require them at construction, for two reasons: a
 laptop, a test run or a training job then needs no third-party credentials

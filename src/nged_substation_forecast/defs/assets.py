@@ -71,6 +71,19 @@ from pydantic import BaseModel, computed_field, field_validator
 from nged_substation_forecast._sentry import report_asset_degradation, report_check_degradation
 from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS
 
+_POWER_INGEST_MAX_RETRIES: Final[int] = 2
+"""How many times to retry the NGED S3 read before letting the hourly ingest fail.
+
+Deliberately small. The retry exists only to stop a transient object-store error from reporting a
+fault that has already fixed itself; the data is never at risk, because this asset is unpartitioned,
+re-lists NGED's bucket from scratch on every attempt, and the next hourly run back-fills whatever
+this one missed. A longer budget would buy nothing the next hour does not already buy, and each
+retry re-runs the whole listing, download and parse — which at V2 scale costs far more than the
+delay does. A persistent outage still fails after the budget and still reports."""
+
+_POWER_INGEST_RETRY_DELAY_SECONDS: Final[int] = 2
+"""How long to wait between retries of a transient NGED S3 failure."""
+
 
 @asset(tags=PRODUCTION_LAYER_TAGS)
 def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
@@ -95,30 +108,53 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # Fetch new data from S3, using the existing delta table to determine what's new.
     # We are deliberately keeping the code simple for now, but may move the S3 store
     # to a Dagster ConfigurableResource in the future.
-    store = settings.get_nged_s3_store()
-    list_of_all_json_files = list_timeseries_json_files(store)
-    list_of_large_json_files = remove_small_files_from_listing(list_of_all_json_files)
-    list_of_new_json_files = select_new_rows(list_of_large_json_files, delta_path, storage_options)
-
-    # Log statistics to be shown in Dagster's UI.
-    context.add_output_metadata(
-        _FileListingSummary.make_table(
-            "nged_s3_paths",
-            {
-                "All JSON files on S3": list_of_all_json_files,
-                "Files larger than 1kB": list_of_large_json_files,
-                "Files with new data": list_of_new_json_files,
-            },
-        )
-    )
-
+    #
+    # Everything that talks to NGED's bucket sits under one retry guard, so a transient object-store
+    # error costs a short wait instead of a Sentry event for a fault that has already fixed itself.
+    # The guard stops here rather than wrapping the whole body: a fault in the writes below is ours,
+    # and retrying it would let `select_new_rows` dedupe the second attempt to a no-op and turn a
+    # real failure into a green run.
     try:
+        store = settings.get_nged_s3_store()
+        list_of_all_json_files = list_timeseries_json_files(store)
+        list_of_large_json_files = remove_small_files_from_listing(list_of_all_json_files)
+        list_of_new_json_files = select_new_rows(
+            list_of_large_json_files, delta_path, storage_options
+        )
+
+        # Log statistics to be shown in Dagster's UI.
+        context.add_output_metadata(
+            _FileListingSummary.make_table(
+                "nged_s3_paths",
+                {
+                    "All JSON files on S3": list_of_all_json_files,
+                    "Files larger than 1kB": list_of_large_json_files,
+                    "Files with new data": list_of_new_json_files,
+                },
+            )
+        )
+
         downloaded = download_and_parse_files(store, list_of_new_json_files)
     except NoNewData:
+        # An ordinary hour in which NGED published nothing new. Must be caught before the retry
+        # guard below, or every such hour would retry.
         context.add_output_metadata(
             UpsertMetadataStats(metadata_n_new_TimeSeriesIDs=0, metadata_n_updated_TimeSeriesIDs=0)
         )
         return
+    except BaseException as exc:
+        # `BaseException` for the same reason as `checks.py::power_data_is_fresh`: obstore, delta-rs
+        # and polars each define their own exception classes and a Rust panic is not an `Exception`,
+        # so naming what must *propagate* is the only version that stays true as dependencies come
+        # and go. That makes this deliberately liberal — a bug in our own code in here is retried
+        # too, which costs the budget and then reports as it would have anyway.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        context.log.warning(f"Could not read NGED's S3 bucket, requesting a retry: {exc!r}")
+        raise RetryRequested(
+            max_retries=_POWER_INGEST_MAX_RETRIES,
+            seconds_to_wait=_POWER_INGEST_RETRY_DELAY_SECONDS,
+        ) from exc
     new_metadata, new_power_ts = downloaded.metadata, downloaded.power_time_series
 
     if downloaded.n_implausible_power_rows_dropped > 0:

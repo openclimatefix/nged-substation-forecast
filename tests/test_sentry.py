@@ -9,6 +9,7 @@ the right Sentry call is made with the right arguments.
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import polars as pl
@@ -16,7 +17,7 @@ import pytest
 import sentry_sdk
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.settings import Settings
-from dagster import build_hook_context
+from dagster import DagsterExecutionInterruptedError, RetryRequested, build_hook_context
 from sentry_sdk.types import Event, Hint
 
 from nged_substation_forecast import _sentry
@@ -52,6 +53,64 @@ def _freshness_result(
     return PowerFreshnessResult(
         n_series_total=n_total, n_stale=n_stale, n_never=n_never, threshold_hours=24.0, late=late
     )
+
+
+def _wrap_in_retry_request(cause: BaseException) -> RetryRequested:
+    """Build what a guard's ``raise RetryRequested(...) from cause`` gives the failure hook."""
+    retry = RetryRequested(max_retries=2)
+    retry.__cause__ = cause
+    return retry
+
+
+def _hook_context_with(exception: BaseException | None) -> Any:
+    """A duck-typed stand-in for ``HookContext``, carrying only what the failure hook reads.
+
+    ``build_hook_context`` runs ``check.opt_inst_param(op_exception, ..., Exception)``, so it
+    rejects every ``BaseException`` that is not an ``Exception`` — including the three deliberate
+    exits the hook has to ignore."""
+    return SimpleNamespace(op_exception=exception)
+
+
+def _build_one_event(send: Callable[[], None]) -> Event:
+    """Run ``send`` against a real client and return the single event it built.
+
+    The assertion this enables is on the *built event*, not on the arguments to
+    ``capture_exception``: a tag set on the wrong scope, or not set at all, still reaches
+    ``capture_exception`` intact and would slip past an argument-level check. Building an event
+    needs a real client, which is confined to a temporary isolation scope, and ``before_send``
+    returns ``None`` so the event is dropped rather than transmitted. Both integration sets are off
+    because ``setup_once`` is *irreversible* and process-global — it monkeypatches
+    ``sys.excepthook``, ``threading.Thread.run``, ``logging.Logger.callHandlers`` and more, none of
+    which leaving the scope would undo, and this suite uses threads (moto), logging (``caplog``)
+    and sqlalchemy (the Dagster instance).
+    """
+    events: list[Event] = []
+
+    def collect(event: Event, _hint: Hint) -> Event | None:
+        """Record the built event and return ``None``, which tells the SDK to drop it."""
+        events.append(event)
+        return None
+
+    with sentry_sdk.isolation_scope() as scope:
+        scope.set_client(
+            sentry_sdk.Client(
+                dsn=_DSN,
+                before_send=collect,
+                default_integrations=False,
+                auto_enabling_integrations=False,
+            )
+        )
+        send()
+
+    (event,) = events
+    return event
+
+
+def _assert_no_tags_leaked() -> None:
+    """The tag lived on a scope forked for the one event, so it cannot leak into a later unrelated
+    one — including via the isolation scope this whole Dagster process shares."""
+    assert sentry_sdk.get_current_scope()._tags == {}
+    assert sentry_sdk.get_isolation_scope()._tags == {}
 
 
 def _capture_message_recorder(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
@@ -174,6 +233,80 @@ def test_failure_hook_noop_without_exception(monkeypatch: pytest.MonkeyPatch) ->
     assert captured == []
 
 
+def test_failure_hook_reports_the_cause_of_a_retry_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An exhausted in-band retry must reach Sentry titled and grouped by the fault that actually
+    happened, not by the ``RetryRequested`` wrapper Dagster hands the hook. Dagster unwraps only its
+    own ``RetryRequestedFromPolicy``, so without this an ``ecmwf_ens`` run that never publishes
+    would group as ``RetryRequested`` rather than ``NwpRunNotYetAvailable``."""
+    captured: list[BaseException] = []
+    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
+    hook_fn = _sentry.sentry_capture_failure.decorated_fn
+    assert hook_fn is not None
+    cause = OSError("upstream down")
+    hook_fn(build_hook_context(op_exception=_wrap_in_retry_request(cause)))
+    assert captured == [cause]
+
+
+def test_failure_hook_captures_a_retry_requested_with_no_cause(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A ``RetryRequested`` raised without ``from exc`` has no cause to unwrap to, so it is reported
+    as itself rather than dereferencing ``None``."""
+    captured: list[BaseException] = []
+    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
+    hook_fn = _sentry.sentry_capture_failure.decorated_fn
+    assert hook_fn is not None
+    retry = RetryRequested(max_retries=2)
+    hook_fn(build_hook_context(op_exception=retry))
+    assert captured == [retry]
+
+
+@pytest.mark.parametrize(
+    "exception",
+    [
+        SystemExit(),
+        DagsterExecutionInterruptedError(),
+        KeyboardInterrupt(),
+        _wrap_in_retry_request(DagsterExecutionInterruptedError()),
+    ],
+    ids=["system_exit", "interrupted", "keyboard_interrupt", "interrupt_wrapped_in_retry"],
+)
+def test_failure_hook_ignores_a_deliberate_exit(
+    exception: BaseException, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cancelling a run is an operator's decision, not a fault, so none of these reports.
+
+    ``SystemExit`` is the only shape that reaches the hook as things stand: it is neither a
+    ``DagsterError`` nor an ``Exception``, so Dagster's interrupt handling does not re-raise it
+    ahead of the hook the way it does for the other two. The remaining cases pin the guard's stated
+    contract rather than a reachable state — and the wrapped one also pins the *ordering*, since
+    reversing the unwrap and this check is the one mutation that only it catches."""
+    captured: list[BaseException] = []
+    monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
+    hook_fn = _sentry.sentry_capture_failure.decorated_fn
+    assert hook_fn is not None
+    hook_fn(_hook_context_with(exception))
+    assert captured == []
+
+
+def test_failure_hook_tags_the_fault_category() -> None:
+    """A failed production run is the one class an operator should be alerted on, so it carries a
+    positive marker rather than being identified by the *absence* of the degradation tags.
+
+    Asserted on the built event, so a tag set on the wrong scope is caught — see
+    ``_build_one_event``."""
+    hook_fn = _sentry.sentry_capture_failure.decorated_fn
+    assert hook_fn is not None
+    event = _build_one_event(lambda: hook_fn(build_hook_context(op_exception=ValueError("boom"))))
+    # Literals, not the module's own constants: the production alert rule is configured against
+    # these exact strings, so a rename has to fail here rather than compare equal to itself.
+    assert event["tags"] == {"fault_category": "run_failed"}
+    assert event["exception"]["values"][0]["type"] == "ValueError"
+    _assert_no_tags_leaked()
+
+
 @pytest.mark.parametrize(
     ("report", "tag", "name"),
     [
@@ -198,40 +331,13 @@ def test_degradation_reporters_capture_the_exception_and_tag_the_name(
     ``asset_check:power_data_is_fresh`` as the operator's Sentry filter). Without the capture, one
     that caught its own exception would reach nobody, log-to-event capture being disabled.
 
-    The assertion is on the *built event*, not on the arguments to ``capture_exception``: a tag set
-    on the wrong scope, or not set at all, still reaches ``capture_exception`` intact and would slip
-    past an argument-level check. Building an event needs a real client, which is confined to a
-    temporary isolation scope, and ``before_send`` returns ``None`` so the event is dropped rather
-    than transmitted. Both integration sets are off because ``setup_once`` is *irreversible* and
-    process-global — it monkeypatches ``sys.excepthook``, ``threading.Thread.run``,
-    ``logging.Logger.callHandlers`` and more, none of which leaving the scope would undo, and this
-    suite uses threads (moto), logging (``caplog``) and sqlalchemy (the Dagster instance).
+    The assertion is on the built event rather than on the arguments to ``capture_exception`` — see
+    ``_build_one_event`` for why.
     """
-    events: list[Event] = []
-
-    def collect(event: Event, _hint: Hint) -> Event | None:
-        """Record the built event and return ``None``, which tells the SDK to drop it."""
-        events.append(event)
-        return None
-
-    with sentry_sdk.isolation_scope() as scope:
-        scope.set_client(
-            sentry_sdk.Client(
-                dsn=_DSN,
-                before_send=collect,
-                default_integrations=False,
-                auto_enabling_integrations=False,
-            )
-        )
-        report(name, ValueError("boom"))
-
-    (event,) = events
+    event = _build_one_event(lambda: report(name, ValueError("boom")))
     assert event["tags"] == {tag: name}
     assert event["exception"]["values"][0]["type"] == "ValueError"
-    # The tag lived on a scope forked for the one event, so it cannot leak into a later unrelated
-    # one — including via the isolation scope this whole Dagster process shares.
-    assert sentry_sdk.get_current_scope()._tags == {}
-    assert sentry_sdk.get_isolation_scope()._tags == {}
+    _assert_no_tags_leaked()
 
 
 def test_report_check_degradation_swallows_and_logs_on_send_error(

@@ -218,6 +218,32 @@ is configured — so laptops and CI stay silent by default.
     that degrades rather than failing — today, `power_time_series_and_metadata`'s roster upsert. Since
     log capture is off, either handler's `ERROR` log alone would reach nobody.
 
+    Those tags are what an alert rule routes on, and the failure hook is the one sender that would
+    otherwise arrive with nothing to route on — so it tags `fault_category:run_failed`. That is a
+    *positive* marker on the one class worth telling a human about, rather than a rule phrased as
+    "error level, and neither degradation tag is set", which is correct today and misclassifies
+    silently the day a fifth sender is added.
+
+    **What deliberately never becomes an event.** A transient failure reading NGED's bucket is
+    retried in-band by `power_time_series_and_metadata` — twice, seconds apart — because nothing is
+    lost by waiting: the asset re-lists the bucket from scratch on each attempt and the next hourly
+    run back-fills anyway, so failing would report a fault that has already fixed itself. A
+    persistent outage still exhausts the budget, fails, and reports. Cancelling a run is likewise
+    not a fault: Dagster re-raises `KeyboardInterrupt` and `DagsterExecutionInterruptedError` ahead
+    of the hook, and the hook drops the `SystemExit` that does reach it.
+
+    **Why that retry is in-band rather than a Dagster `RetryPolicy`.** `RetryPolicy` is the shorter
+    spelling and it is unsafe here (measured on Dagster 1.13.17). It converts an interrupt into a
+    retry request, and Dagster delivers a termination as exactly one interrupt — so the interrupt is
+    consumed, the step restarts, and the cancelled run finishes **green** having written its data.
+    It also retries the *whole* body, so a bug after the Delta append would dedupe to a no-op on the
+    second attempt and turn a real failure into a green run every hour. Raising `RetryRequested`
+    from inside a guard that re-raises the three interrupt types avoids both.
+
+    Either way the hook receives a `RetryRequested` wrapper once the budget is exhausted, and
+    Dagster unwraps only its own `RetryRequestedFromPolicy` — so the hook unwraps the plain class
+    too, or every exhausted retry would group under `RetryRequested` rather than under its cause.
+
 - **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
   `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron
   monitor; Sentry raises the alarm when no heartbeat lands within the margin (the 6-hourly schedule

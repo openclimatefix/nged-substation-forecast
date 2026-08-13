@@ -180,6 +180,13 @@ reasoning, and the ladder of degradation states, are in
 [Inherent Stability](../design-philosophy/inherent-stability.md). None of the situations below is a
 same-day emergency; all are next-business-day fixes.
 
+**What a Sentry event's tags tell you first.** `fault_category:run_failed` means a scheduled job
+failed outright, so that cycle did not run; an event without it is a degradation the service kept
+forecasting through. The full routing is in
+[Setting up Sentry telemetry](sentry.md#turn-it-on-in-production). Two things send nothing at all: a
+transient failure reading NGED's bucket, which `power_time_series_and_metadata` retries twice
+before reporting, and a run you cancelled yourself.
+
 **Reading the freshness check.** `power_data_is_fresh` runs against
 `power_time_series_and_metadata`, is **non-blocking** and **WARN**-severity, and reports on
 *on-disk data recency* rather than on whether the asset materialised. It flags any time series

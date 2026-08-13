@@ -165,7 +165,7 @@ SENTRY_MONITOR_FORECASTS=true
 ```
 
 `SENTRY_MONITOR_FORECASTS=true` makes each successful live `live_forecasts` run check in to the
-production `live-forecasts` monitor. Three one-time console steps complete the setup:
+production `live-forecasts` monitor. Four one-time console steps complete the setup:
 
 1. The monitor is created automatically on the first check-in (the code sends its schedule and
    margin with every heartbeat), so no manual monitor creation is needed.
@@ -179,6 +179,14 @@ production `live-forecasts` monitor. Three one-time console steps complete the s
    stall after a recovery re-pages instead of silently appending to the old, unresolved issue. This
    warning is a richer per-series breadcrumb layered on top of the missed-check-in alarm, which
    remains the primary two-directional signal.
+4. **Route error events by their `fault_category` tag.** `fault_category:run_failed` means a
+   scheduled job failed, so that cycle did not run — notify whoever is on for the next business
+   day. Everything else is a degradation the service kept forecasting through, and belongs in a
+   digest rather than a notification: `degraded_asset:*` (an asset carried on with reduced
+   function) and `asset_check:*` (a check could not evaluate its own inputs, so one signal is
+   unknown rather than bad). Nothing here warrants waking anyone — see
+   [Inherent stability](../design-philosophy/inherent-stability.md) for the uptime posture that
+   makes that the right call.
 
 One handover note: the Sentry account is OCF's today, so at handover the alert routing (and
 possibly the account itself) moves to NGED — see

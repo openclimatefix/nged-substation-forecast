@@ -11,6 +11,7 @@ the wiring, branching, and metadata each asset owns — stubbing the S3/network 
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import patito as pt
@@ -29,6 +30,7 @@ from dagster import (
     DagsterExecutionInterruptedError,
     DagsterInstance,
     ExecuteInProcessResult,
+    RetryRequested,
     TableMetadataValue,
     build_asset_context,
     materialize,
@@ -358,7 +360,11 @@ def test_power_time_series_and_metadata_handles_no_new_data(
         value=lambda self: _FakeS3Store(_NGED_FILES),
     )
 
+    calls = 0
+
     def _raise_no_new_data(store: object, paths_df: object) -> None:
+        nonlocal calls
+        calls += 1
         raise NoNewData
 
     monkeypatch.setattr(target=assets, name="download_and_parse_files", value=_raise_no_new_data)
@@ -367,6 +373,167 @@ def test_power_time_series_and_metadata_handles_no_new_data(
     assert result.success
     assert not (env / "NGED" / "metadata.parquet").exists()
     assert not (env / "NGED" / "power_time_series.delta").exists()
+    # Once, not retried: an hour in which NGED published nothing new is the common case, so
+    # `NoNewData` has to be caught ahead of the retry guard that wraps the same block.
+    assert calls == 1
+
+
+def test_power_time_series_and_metadata_retries_a_transient_upstream_failure(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """A blip reading NGED's bucket costs a short wait, not a failed run: no data is lost either
+    way, so failing would report a fault that has already fixed itself.
+
+    The assertions on the written data are the point of doing this through ``materialize`` rather
+    than counting calls alone — a second attempt re-lists and re-downloads everything, so this is
+    also what pins down that re-running the ingest cannot duplicate rows.
+    """
+    monkeypatch.setattr(
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
+    )
+    # Nothing here asserts on timing, so skip the wait rather than sleeping through it.
+    monkeypatch.setattr(target=assets, name="_POWER_INGEST_RETRY_DELAY_SECONDS", value=0)
+    real_download = assets.download_and_parse_files
+    calls = 0
+
+    def _fail_once(store: Any, paths_df: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("transient object-store error")
+        return real_download(store, paths_df)
+
+    monkeypatch.setattr(target=assets, name="download_and_parse_files", value=_fail_once)
+
+    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
+    assert result.success
+    assert calls == 2
+
+    metadata = pl.read_parquet(env / "NGED" / "metadata.parquet")
+    assert set(metadata["time_series_id"].to_list()) == {10, 11}
+    power = pl.read_delta(str(env / "NGED" / "power_time_series.delta")).sort(
+        PowerTimeSeries.columns_to_sort_by
+    )
+    PowerTimeSeries.validate(power)
+    assert set(power["time_series_id"].unique().to_list()) == {10, 11}
+
+
+def test_power_time_series_and_metadata_gives_up_after_its_retry_budget(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """A persistent outage still fails, and still reports — the retry only buys the budget."""
+    monkeypatch.setattr(
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
+    )
+    monkeypatch.setattr(target=assets, name="_POWER_INGEST_RETRY_DELAY_SECONDS", value=0)
+    calls = 0
+    retries_raised: list[RetryRequested] = []
+
+    class _RecordingRetryRequested(RetryRequested):
+        """Keeps each request the guard raises, so the test can inspect its ``__cause__``."""
+
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**kwargs)
+            retries_raised.append(self)
+
+    monkeypatch.setattr(target=assets, name="RetryRequested", value=_RecordingRetryRequested)
+
+    def _always_fail(store: object, paths_df: object) -> None:
+        nonlocal calls
+        calls += 1
+        raise OSError("object store is down")
+
+    monkeypatch.setattr(target=assets, name="download_and_parse_files", value=_always_fail)
+
+    result = materialize(
+        [power_time_series_and_metadata], instance=dagster_instance, raise_on_error=False
+    )
+    assert not result.success
+    # A literal, not `_POWER_INGEST_MAX_RETRIES + 1`: computing the expected count from the constant
+    # pins only "the budget is honoured", so raising the budget to 99 would keep this green while
+    # every failing hour re-listed and re-downloaded NGED's bucket a hundred times.
+    assert calls == 3
+
+    # The failure hook reports `__cause__`, so dropping the `from exc` on the guard's raise would
+    # silently put us back to Sentry issues titled `RetryRequested`. This is the raising half of
+    # that contract; `test_sentry.py` covers the unwrapping half.
+    assert [type(request.__cause__) for request in retries_raised] == [OSError] * 3
+
+
+@pytest.mark.parametrize(
+    "interrupt",
+    [DagsterExecutionInterruptedError, KeyboardInterrupt, SystemExit],
+    ids=["interrupted", "keyboard_interrupt", "system_exit"],
+)
+def test_power_time_series_and_metadata_does_not_retry_a_cancelled_run(
+    interrupt: type[BaseException],
+    env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+) -> None:
+    """The retry guard wraps everything that reads NGED's bucket, so it is also the place a
+    cancellation would be swallowed. It re-raises instead: a run the operator cancelled has to stop
+    at once, not read the bucket twice more first.
+
+    ``DagsterExecutionInterruptedError`` is what a production termination actually delivers; the
+    other two cover a Ctrl-C at a local ``dg dev``."""
+    monkeypatch.setattr(
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
+    )
+    calls = 0
+
+    def _cancel(store: object, paths_df: object) -> None:
+        nonlocal calls
+        calls += 1
+        raise interrupt
+
+    monkeypatch.setattr(target=assets, name="download_and_parse_files", value=_cancel)
+
+    result = materialize(
+        [power_time_series_and_metadata], instance=dagster_instance, raise_on_error=False
+    )
+    assert not result.success
+    assert calls == 1
+
+
+def test_power_time_series_and_metadata_does_not_retry_a_failure_after_the_write(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The guard stops before the writes deliberately, and this is what that buys.
+
+    Were it extended over them, a bug after the Delta append would be retried; the second attempt's
+    ``select_new_rows`` would dedupe the already-written rows to nothing, the body would run to the
+    end, and a real failure would land as a green run — every hour, with nothing sent to Sentry.
+    """
+    monkeypatch.setattr(
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
+    )
+    monkeypatch.setattr(target=assets, name="_POWER_INGEST_RETRY_DELAY_SECONDS", value=0)
+    calls = 0
+
+    def _boom(*_: object, **__: object) -> None:
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("a bug in our own code, after the rows have landed")
+
+    # `_PowerTimeSeriesSummary.make_table` is the first statement after the Delta append; patching
+    # it on the subclass leaves `_FileListingSummary`'s inherited copy (used inside the guard)
+    # alone.
+    monkeypatch.setattr(target=assets._PowerTimeSeriesSummary, name="make_table", value=_boom)
+
+    result = materialize(
+        [power_time_series_and_metadata], instance=dagster_instance, raise_on_error=False
+    )
+    assert not result.success
+    assert calls == 1
 
 
 # --- h3_grid_weights -----------------------------------------------------------------------------
