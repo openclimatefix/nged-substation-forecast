@@ -196,9 +196,9 @@ all the PV sites or all the primaries sit together), a **forecast date**, and on
 **forecast runs**.
 
 **Reload data** re-reads the tables, so a CV job that finishes while the app is open shows up
-without restarting marimo. Its new experiment appears in the **Experiment** dropdown, which — like
-**Fold**, **forecast date** and **forecast run** — goes back to its default; the chosen time series
-is kept.
+without restarting marimo. Its new experiment appears in the **Experiment** dropdown; **Fold**,
+**forecast date** and **forecast run** go back to their defaults, and the chosen time series is
+kept.
 
 The chart layers all 51 ensemble members as thin grey lines, observed power (wherever available,
 including past the init time) as a thick blue line, and a vertical rule at the forecast init

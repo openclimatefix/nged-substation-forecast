@@ -8,8 +8,7 @@ chart builder) lives in the importable `dashboard` package under `src/`.
   a CV fold), and a forecast init time, then see every forecast ensemble member (thin grey lines)
   against the observed power (thick blue line), from 24 hours before the init time to 14 days
   after it. The x-axis is labelled at Europe/London midnight with the day of week and date.
-  **Reload data** re-reads the forecast, power and NWP tables and moves the fold, experiment, date
-  and run selectors to the newest run, keeping the chosen time series.
+  **Reload data** re-reads the forecast, power and NWP tables.
 - **`map_and_timeseries.py`** — a map of every time series in the trial area; click a dot to see
   its observed power.
 

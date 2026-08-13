@@ -144,22 +144,20 @@ every Delta read already descends from `source` via `settings`, so the assertion
 `main` today and would survive deletion of the very statement it exists to protect. Verified by
 probe on the current notebook: all four Delta-read cells descend from the `source` cell.
 
-Three assertions, each killing a distinct mutant:
+Two assertions:
 
-1. Exactly one cell defines `reload`, and its code constructs `mo.ui.refresh(`. Kills swapping in
-   `mo.ui.button`, which renders and clicks identically but whose value never changes
-   (`marimo/_plugins/ui/_impl/input.py`, `on_click=None` returns a constant), so nothing re-runs.
-2. The set of cells whose code calls `pl.scan_delta(` or `DeltaTable(` is non-empty (four today).
-   Without it, a marimo release that changed what `cell_data()` yields would empty the set and the
+1. The set of cells whose code calls `pl.scan_delta(` or `DeltaTable(` is non-empty (four today).
+   Without it, a marimo release that changed what the graph yields would empty the set and the
    test would pass green over nothing — the silent degradation `check_marimo_notebooks.py` raises
    `ValueError` to avoid.
-3. Every cell in that set is in the descendant closure of the root set. Kills deleting the bare
+2. Every cell in that set is in the descendant closure of the root set. Kills deleting the bare
    `reload` statement, and kills defining and referencing `reload` in one cell (inert, per the
    mechanism section).
 
-**Fails on `main` today** at assertion 1, and for the right reason: no cell defines `reload`.
+**Fails on `main` today** at assertion 2, and for the right reason: no cell references `reload`, so
+the root set is empty.
 
-Assertion 3 is the point of the file. The dependency edge is a bare `reload` statement with no
+Assertion 2 is the point of the file. The dependency edge is a bare `reload` statement with no
 assignment, which reads like dead code and is the obvious thing for a future tidy-up to delete;
 deleting it leaves a button that still renders, still clicks, and silently stops re-reading
 anything. A comment says not to; a test notices.
@@ -271,11 +269,7 @@ time-series selection is unchanged.
   via `settings`, on `main`, today. Verified by probe, not by argument. The root set is now the
   referencing cells minus the defining cells, which is marimo's own rule and kills both the
   deleted-statement and the defined-and-referenced-in-one-cell mutants.
-- Guard against the test degrading to a silent pass: assert the Delta-read set is non-empty, and
-  that exactly one cell defines `reload`, so "fails on `main`" is a clean failure rather than an
-  error from a lookup on a name that is not there.
-- Assert the element is an `mo.ui.refresh`: swapping in `mo.ui.button` leaves the graph identical
-  and the button inert, which is the cheapest way to break this feature silently.
+- Guard against the test degrading to a silent pass: assert the Delta-read set is non-empty.
 - Update `docs/ml_experimentation/dagster-workflow.md` after all. Declining it while open question
   3 argues the R&D user is the one most likely to press **Reload** was a contradiction.
 - Record `map_and_timeseries.py`'s identical staleness as a flagged, out-of-scope observation
