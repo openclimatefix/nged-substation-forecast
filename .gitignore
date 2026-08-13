@@ -28,8 +28,10 @@ packages/dashboard/.env.s3
 # Data storage
 # Anchored: an unanchored `data/` also matches `packages/*/tests/data/`, which hold *tracked* test
 # fixtures — and because ruff respects .gitignore, that hid two tracked Python files from
-# `ruff check .` and from CI while pre-commit still checked them.
-/data/
+# `ruff check .` and from CI while pre-commit still checked them. No trailing slash, because that
+# would match only a directory: a git worktree reaches the data root through a `data` symlink,
+# which would then show up as an untracked file in every worktree.
+/data
 
 #######################
 # Dagster
