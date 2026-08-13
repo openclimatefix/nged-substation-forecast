@@ -44,9 +44,11 @@ forecasts ────────────> nwp, nwp_analysis               
 
 Referencing `reload` from the cell at line 90 therefore re-runs, in order: the partition listing,
 `fold_picker`, `experiment_picker`, `available_init_times`, `date_picker`, `run_picker`, the
-controls cell, the forecast/actuals load, the power chart, the NWP load and the NWP chart. That is
-**every Delta read in the notebook**, and every picker whose options come from the data. The one
-data read it does not reach is the metadata parquet at line 60 — which is the point (see below).
+controls cell, the forecast/actuals load, the power chart, and — when a run is selected and rows
+come back, since the existing `mo.stop`s cancel descendants otherwise — the NWP load and the NWP
+chart. That is **every Delta read in the notebook**, and every picker whose options come from the
+data. The one data read it does not reach is the metadata parquet at line 60 — which is the point
+(see below).
 
 Nothing caches underneath: each re-run constructs a fresh `DeltaTable`/`pl.scan_delta`, which reads
 the current Delta log, so a re-run genuinely sees new commits.
@@ -73,16 +75,18 @@ into one cell would leave the button inert while looking correct.
   disappeared with them.
 
   `mo.ui.refresh` with neither `options` nor `default_interval` renders as a plain button with no
-  auto-refresh dropdown. Its `value` is `""` before the first click and `"<interval> (<count>)"`
-  after each one, with `<count>` incrementing — so every click is a genuine value change and the
+  auto-refresh dropdown. Its `value` is `""` before the first click and `"off (<count>)"` after
+  each one, with `<count>` incrementing — so every click is a genuine value change and the
   descendants re-run every time, not just the first.
 
 - **Cell at line 90** (defines `forecast_partitions`) — add a bare `reload` statement at the top of
   the cell, under a comment naming what it does, what it deliberately misses, and that the
   statement is load-bearing rather than dead code. Update the generated signature from
-  `def _(settings)` to `def _(reload, settings)`. A bare-name expression is the idiom for taking a
-  marimo dependency without using the value; `B018` is already declined for this file in
-  `pyproject.toml`'s `per-file-ignores`, so it is lint-clean.
+  `def _(settings)` to `def _(reload, settings)` — required by `ruff`, which reports `F821` on the
+  stale form, though marimo itself derives refs from the body and rewrites the signature on save.
+  A bare-name expression is the idiom for taking a marimo dependency without using the value;
+  `B018` is already declined for this file in `pyproject.toml`'s `per-file-ignores`, so it is
+  lint-clean.
 
 - Nothing else in the notebook changes.
 
@@ -127,24 +131,45 @@ re-enters those same paths. No asset checks are involved, and no principle in
 ## Tests
 
 One new file, `packages/dashboard/tests/test_view_forecasts.py`, holding a
-`test_reload_reaches_every_delta_read`: every cell whose code calls `pl.scan_delta(` or
-`DeltaTable(` is a transitive descendant of the cell defining `reload`. **Fails on `main` today**,
-because no cell defines `reload`.
+`test_reload_reaches_every_delta_read`. It needs a dozen lines to turn the notebook into cells with
+their `defs`, `refs` and `code` (`marimo._ast`'s `get_notebook_status` → `load_notebook_ir` →
+`cell_manager.cell_data()`) and a short breadth-first walk over the resulting graph. It does not
+need the line numbers or the compile guards that make `scripts/check_marimo_notebooks.py` longer,
+because `tests/test_marimo_notebooks.py` already fails loudly if this notebook stops parsing.
 
-It needs a dozen lines to turn the notebook into cells with their `defs`, `refs` and `code`
-(`marimo._ast`'s `get_notebook_status` → `load_notebook_ir` → `cell_manager.cell_data()`) and a
-short breadth-first walk over the resulting graph. It does not need the line numbers or the
-compile guards that make `scripts/check_marimo_notebooks.py` longer, because
-`tests/test_marimo_notebooks.py` already fails loudly if this notebook stops parsing.
+**The root set is the cells that *reference* `reload`, minus the cells that *define* it** — which
+is `marimo/_runtime/runtime.py`'s own rule, and the only formulation that tests anything. Rooting
+the walk at the cell that *defines* `reload` would be vacuous: that cell also defines `source`, and
+every Delta read already descends from `source` via `settings`, so the assertion would hold on
+`main` today and would survive deletion of the very statement it exists to protect. Verified by
+probe on the current notebook: all four Delta-read cells descend from the `source` cell.
 
-This is the one part of the change worth a test, for a reason particular to the mechanism: the
-dependency edge is a bare `reload` statement with no assignment, which reads like dead code and is
-the obvious thing for a future tidy-up to delete. Deleting it leaves a button that still renders,
-still clicks, and silently stops re-reading anything. A comment says not to; a test notices.
+Three assertions, each killing a distinct mutant:
 
-The test's blind spot, worth stating in the file: it matches on the cell's own source, so a Delta
-read reached through a helper in `packages/dashboard/src/dashboard/` would not be seen. Nothing in
-the notebook reads that way today.
+1. Exactly one cell defines `reload`, and its code constructs `mo.ui.refresh(`. Kills swapping in
+   `mo.ui.button`, which renders and clicks identically but whose value never changes
+   (`marimo/_plugins/ui/_impl/input.py`, `on_click=None` returns a constant), so nothing re-runs.
+2. The set of cells whose code calls `pl.scan_delta(` or `DeltaTable(` is non-empty (four today).
+   Without it, a marimo release that changed what `cell_data()` yields would empty the set and the
+   test would pass green over nothing — the silent degradation `check_marimo_notebooks.py` raises
+   `ValueError` to avoid.
+3. Every cell in that set is in the descendant closure of the root set. Kills deleting the bare
+   `reload` statement, and kills defining and referencing `reload` in one cell (inert, per the
+   mechanism section).
+
+**Fails on `main` today** at assertion 1, and for the right reason: no cell defines `reload`.
+
+Assertion 3 is the point of the file. The dependency edge is a bare `reload` statement with no
+assignment, which reads like dead code and is the obvious thing for a future tidy-up to delete;
+deleting it leaves a button that still renders, still clicks, and silently stops re-reading
+anything. A comment says not to; a test notices.
+
+Blind spots to state in the file: the test matches on each cell's own source, so a Delta read
+reached through a helper in `packages/dashboard/src/dashboard/` would not be seen (nothing reads
+that way today), and dropping `reload` from the `mo.hstack` display leaves the graph intact while
+the button is never rendered. The test also hardwires open question 3 — moving the anchor to the
+`available_init_times` cell would make assertion 3 fail, since the partition listing at line 90
+would stop being a descendant.
 
 ## Docs to update
 
@@ -154,10 +179,12 @@ the notebook reads that way today.
 - **`docs/live_service/operations.md`**, "Inspecting a live forecast" (around line 393) — one
   sentence telling the operator to press **Reload** to pick up runs written since the app was
   opened, rather than restarting marimo.
+- **`docs/ml_experimentation/dagster-workflow.md`**, "Inspecting a forecast" (around line 191) —
+  one sentence in the control walkthrough, which is the page that enumerates the app's controls and
+  the page `operations.md` links to as "the same app". This is also the page for the person open
+  question 3 is about: someone waiting on a CV job who wants the new experiment to appear.
 
-`docs/ml_experimentation/dagster-workflow.md` describes inspecting backtest forecasts, where the
-data does not change under the user, and needs no change. This issue does not complete a roadmap
-item, so there is no ship-time triage.
+This issue does not complete a roadmap item, so there is no ship-time triage.
 
 ## Verification commands
 
@@ -203,6 +230,11 @@ time-series selection is unchanged.
 4. **The test reads private marimo API** (`marimo._ast`), so a marimo upgrade could break it. That
    risk is already taken and documented by `scripts/check_marimo_notebooks.py`; the failure mode is
    a loud test error on a lock-bump PR, not a silent pass.
+5. **`map_and_timeseries.py` has the same staleness problem** (`pl.scan_delta` over
+   `power_time_series`, read once) and this issue does not fix it, so the two dashboard apps
+   diverge while `packages/dashboard/README.md` describes their controls as shared. Out of scope
+   for #520 — flagging it rather than fixing it. *Recommendation: its own issue, once the shape of
+   the button here has been used in anger.*
 
 ## First review (simplicity): findings taken and rejected
 
@@ -229,3 +261,31 @@ time-series selection is unchanged.
   for Jack, since it is a close call.
 - *Delete the design-philosophy check section, since it concludes nothing is traded away.* The
   `plan-issue` skill requires the section; shortened to three lines instead.
+
+## Second review (correctness and testability): findings taken and rejected
+
+**Taken**
+
+- **The test as first specified was vacuous.** It rooted the descendant walk at the cell *defining*
+  `reload`, which also defines `source` — and all four Delta reads already descend from `source`
+  via `settings`, on `main`, today. Verified by probe, not by argument. The root set is now the
+  referencing cells minus the defining cells, which is marimo's own rule and kills both the
+  deleted-statement and the defined-and-referenced-in-one-cell mutants.
+- Guard against the test degrading to a silent pass: assert the Delta-read set is non-empty, and
+  that exactly one cell defines `reload`, so "fails on `main`" is a clean failure rather than an
+  error from a lookup on a name that is not there.
+- Assert the element is an `mo.ui.refresh`: swapping in `mo.ui.button` leaves the graph identical
+  and the button inert, which is the cheapest way to break this feature silently.
+- Update `docs/ml_experimentation/dagster-workflow.md` after all. Declining it while open question
+  3 argues the R&D user is the one most likely to press **Reload** was a contradiction.
+- Record `map_and_timeseries.py`'s identical staleness as a flagged, out-of-scope observation
+  (risk 5), and note the test's remaining blind spots and its coupling to open question 3.
+- Prose corrections verified in the marimo source: the refresh value is `"off (<count>)"`, not
+  `"<interval> (<count>)"`; the existing `mo.stop`s cancel the NWP cells at runtime, so "re-runs
+  everything downstream" needed qualifying; the stale `def _(...)` signature is caught by `ruff`
+  as `F821`, while the `return (...)` tuple is cosmetic and no gate catches it.
+
+**Rejected**
+
+- Nothing. All four load-bearing marimo claims and the dependency graph were independently
+  re-derived by the reviewer and came back true, and its two defect findings both reproduced.
