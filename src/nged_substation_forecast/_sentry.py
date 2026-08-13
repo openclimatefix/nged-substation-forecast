@@ -125,19 +125,15 @@ def init_sentry(settings: Settings) -> None:
 
 
 FAULT_CATEGORY_TAG: Final[str] = "fault_category"
-"""Tag naming what *kind* of fault an event reports, so an alert rule can route by urgency.
+"""Tag naming what kind of fault an event reports, so an alert rule can route by urgency.
 
-Only :data:`sentry_capture_failure` sets it, because it is the only sender that would otherwise
-arrive unmarked: :func:`report_asset_degradation` tags ``degraded_asset``,
-:func:`report_check_degradation` tags ``asset_check``, and :func:`report_power_freshness` sends at
-``warning`` level with a stable fingerprint. Marking the alerting class *positively* is what
-matters — a rule phrased as "error level, and neither degradation tag is set" is correct today and
-misclassifies silently the day a fifth sender is added."""
+Only :data:`sentry_capture_failure` sets it — the other three senders already carry a mark of their
+own. The reasoning is on the design page linked from this module's docstring; the production alert
+rules key off this value, so treat it as a contract rather than a label."""
 
 RUN_FAILED_FAULT_CATEGORY: Final[str] = "run_failed"
 """The one :data:`FAULT_CATEGORY_TAG` value: a scheduled production job failed, so that cycle did
-not run. Distinct from the degradation senders, where the service carried on with reduced
-function."""
+not run."""
 
 
 @failure_hook
@@ -157,8 +153,10 @@ def sentry_capture_failure(context: HookContext) -> None:
       be titled and grouped as ``RetryRequested`` — hiding, say, ``NwpRunNotYetAvailable``. The
       whole chain is serialized either way; what this fixes is the title and the grouping.
     - **A deliberate exit is not reported at all.** A cancelled or terminated run is an operator's
-      decision, not a fault, and the same three types are already re-raised by the guards in
-      ``defs/assets.py`` and ``defs/checks.py``.
+      decision, not a fault. ``SystemExit`` is the shape that gets this far: Dagster re-raises
+      ``KeyboardInterrupt`` and ``DagsterExecutionInterruptedError`` ahead of the hook, but a
+      ``SystemExit`` reaches it as an ordinary step failure. All three are named anyway, matching
+      the guards in ``defs/assets.py`` and ``defs/checks.py``.
 
     Args:
         context: The Dagster hook context for the failed step, carrying ``op_exception``.
@@ -168,8 +166,10 @@ def sentry_capture_failure(context: HookContext) -> None:
         return
     if isinstance(exception, RetryRequested) and exception.__cause__ is not None:
         exception = exception.__cause__
-    # Checked *after* the unwrap: a cancellation arrives wrapped whenever a retry guard converted
-    # it, and unwrapped when none did.
+    # Checked *after* the unwrap, so that a wrapped interrupt is still recognised. Nothing here
+    # wraps one today — every guard in `defs/` re-raises the three types — but Dagster does it
+    # itself for any op carrying a `RetryPolicy`, which is exactly the trap the design page warns
+    # against, so the ordering costs nothing and removes one way of falling into it.
     if isinstance(exception, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
         return
     _capture_tagged(

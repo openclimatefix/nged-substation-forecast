@@ -392,6 +392,8 @@ def test_power_time_series_and_metadata_retries_a_transient_upstream_failure(
         name="get_nged_s3_store",
         value=lambda self: _FakeS3Store(_NGED_FILES),
     )
+    # Nothing here asserts on timing, so skip the wait rather than sleeping through it.
+    monkeypatch.setattr(target=assets, name="_POWER_INGEST_RETRY_DELAY_SECONDS", value=0)
     real_download = assets.download_and_parse_files
     calls = 0
 
@@ -426,6 +428,7 @@ def test_power_time_series_and_metadata_gives_up_after_its_retry_budget(
         name="get_nged_s3_store",
         value=lambda self: _FakeS3Store(_NGED_FILES),
     )
+    monkeypatch.setattr(target=assets, name="_POWER_INGEST_RETRY_DELAY_SECONDS", value=0)
     calls = 0
 
     def _always_fail(store: object, paths_df: object) -> None:

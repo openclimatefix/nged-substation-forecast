@@ -245,9 +245,7 @@ def test_failure_hook_reports_the_cause_of_a_retry_requested(
     hook_fn = _sentry.sentry_capture_failure.decorated_fn
     assert hook_fn is not None
     cause = OSError("upstream down")
-    retry = RetryRequested(max_retries=2)
-    retry.__cause__ = cause
-    hook_fn(_hook_context_with(retry))
+    hook_fn(build_hook_context(op_exception=_wrap_in_retry_request(cause)))
     assert captured == [cause]
 
 
@@ -261,7 +259,7 @@ def test_failure_hook_captures_a_retry_requested_with_no_cause(
     hook_fn = _sentry.sentry_capture_failure.decorated_fn
     assert hook_fn is not None
     retry = RetryRequested(max_retries=2)
-    hook_fn(_hook_context_with(retry))
+    hook_fn(build_hook_context(op_exception=retry))
     assert captured == [retry]
 
 
@@ -280,10 +278,11 @@ def test_failure_hook_ignores_a_deliberate_exit(
 ) -> None:
     """Cancelling a run is an operator's decision, not a fault, so none of these reports.
 
-    ``SystemExit`` is the shape that reaches the hook unaided: it is neither a ``DagsterError`` nor
-    an ``Exception``, so Dagster's interrupt handling does not re-raise it ahead of the hook the way
-    it does for the other two. The wrapped case is what a retry guard produces when it converts an
-    interrupt, which is why the unwrap above has to run before this check."""
+    ``SystemExit`` is the only shape that reaches the hook as things stand: it is neither a
+    ``DagsterError`` nor an ``Exception``, so Dagster's interrupt handling does not re-raise it
+    ahead of the hook the way it does for the other two. The remaining cases pin the guard's stated
+    contract rather than a reachable state — and the wrapped one also pins the *ordering*, since
+    reversing the unwrap and this check is the one mutation that only it catches."""
     captured: list[BaseException] = []
     monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
     hook_fn = _sentry.sentry_capture_failure.decorated_fn
@@ -300,8 +299,10 @@ def test_failure_hook_tags_the_fault_category() -> None:
     ``_build_one_event``."""
     hook_fn = _sentry.sentry_capture_failure.decorated_fn
     assert hook_fn is not None
-    event = _build_one_event(lambda: hook_fn(_hook_context_with(ValueError("boom"))))
-    assert event["tags"] == {_sentry.FAULT_CATEGORY_TAG: _sentry.RUN_FAILED_FAULT_CATEGORY}
+    event = _build_one_event(lambda: hook_fn(build_hook_context(op_exception=ValueError("boom"))))
+    # Literals, not the module's own constants: the production alert rule is configured against
+    # these exact strings, so a rename has to fail here rather than compare equal to itself.
+    assert event["tags"] == {"fault_category": "run_failed"}
     assert event["exception"]["values"][0]["type"] == "ValueError"
     _assert_no_tags_leaked()
 
