@@ -62,9 +62,9 @@ gets read before any Python is written or edited. Change a rule here and nowhere
 
 ## Type hints and signatures
 
-**Prefer self-documenting type hints over bare containers — a signature is documentation.** Jack
-strongly prefers expressive signatures and is happy to spend a few extra lines of code to get
-them, as long as complexity stays low. Whenever you would write `dict[str, str]` (or a bare `str`
+**Prefer self-documenting type hints over bare containers — a signature is documentation.** This
+repo prefers expressive signatures and is happy to spend a few extra lines of code to get them, as
+long as complexity stays low. Whenever you would write `dict[str, str]` (or a bare `str`
 for a value from a fixed set, or a tuple of positional values), stop and ask whether a more
 self-documenting type is practical. Reach for:
 
@@ -171,8 +171,8 @@ Three places where a positional argument is right:
   Don't invent a new schema just to annotate a private helper; if no existing schema fits, use
   plain `pl.DataFrame` / `pl.LazyFrame`. **A schema is the authoritative account of what the data
   means, so when code and contract disagree the code is the first suspect** — never widen a field
-  or relax a range just to make a failing `validate()` pass, and ask Jack before changing a
-  contract at all. The reasoning is in
+  or relax a range just to make a failing `validate()` pass, and get any contract change agreed
+  before making it. The reasoning is in
   [Contracts / Design Principles](../api/contracts/index.md).
 - **Patito friction budget**: the `polars-patito-gotchas` skill documents five Patito gotchas
   (cross-model LazyFrame joins, dict-`.cast` on model-bearing frames, `ge`/`le` silently ignored
