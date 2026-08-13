@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import patito as pt
@@ -63,12 +63,17 @@ def test_power_forecast_invalid_data(data: dict[str, list[Any]], expected_error:
         df.cast().validate()
 
 
-def _two_forecast_rows(ensemble_members: list[int]) -> pt.DataFrame:
-    """Two forecast rows identical but for `ensemble_member` and the forecast value itself."""
+def _two_forecast_rows(
+    ensemble_members: list[int], valid_time_offsets_minutes: list[int]
+) -> pt.DataFrame:
+    """Two forecast rows differing only in the primary-key columns named."""
     return (
         pt.DataFrame(
             {
-                "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)] * 2,
+                "valid_time": [
+                    datetime(2026, 1, 1, 0, 0, tzinfo=UTC) + timedelta(minutes=offset)
+                    for offset in valid_time_offsets_minutes
+                ],
                 "time_series_id": [123] * 2,
                 "ensemble_member": ensemble_members,
                 "ml_flow_experiment_id": [1] * 2,
@@ -89,9 +94,14 @@ def _two_forecast_rows(ensemble_members: list[int]) -> pt.DataFrame:
 def test_power_forecast_rejects_duplicate_primary_key():
     """Two rows sharing the full primary key mean the same forecast reached us twice."""
     with pytest.raises(ValueError, match="Duplicate entries found for primary key"):
-        _two_forecast_rows(ensemble_members=[1, 1]).validate()
+        _two_forecast_rows(ensemble_members=[1, 1], valid_time_offsets_minutes=[30, 30]).validate()
 
 
 def test_power_forecast_accepts_rows_differing_only_in_ensemble_member():
     """`ensemble_member` is part of the key, so an ensemble is not a duplicate."""
-    _two_forecast_rows(ensemble_members=[1, 2]).validate()
+    _two_forecast_rows(ensemble_members=[1, 2], valid_time_offsets_minutes=[30, 30]).validate()
+
+
+def test_power_forecast_accepts_rows_differing_only_in_valid_time():
+    """`valid_time` is part of the key, so two lead times of one run are not duplicates."""
+    _two_forecast_rows(ensemble_members=[1, 1], valid_time_offsets_minutes=[30, 60]).validate()

@@ -57,6 +57,27 @@ def test_all_features_accepts_null_power_and_absent_time_series_type():
     df.validate()
 
 
+def test_all_features_accepts_present_but_null_time_series_type():
+    """A series absent from the metadata parquet leaves the column present and null."""
+    df = (
+        pt.DataFrame(
+            {
+                "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
+                "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=UTC)],
+                "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=UTC)],
+                "time_series_id": [123],
+                "time_series_type": [None],
+                "power": [10.0],
+                "nwp_lead_time_hours": [1.0],
+                "local_day_of_week": ["Monday"],
+            }
+        )
+        .set_model(AllFeatures)
+        .cast()
+    )
+    df.validate()
+
+
 def test_all_features_invalid_day_of_week():
     # Invalid day of week
     df = pt.DataFrame(

@@ -1088,3 +1088,108 @@ def test_engineer_features_rolling_mean_collects_under_streaming_engine():
 
     assert streamed.height > 0
     assert streamed.equals(in_memory)
+
+
+def test_apply_rolling_mean_feature_window_is_time_not_rows():
+    """The window is `window_hours` of wall-clock time, not that many rows.
+
+    NWP reaches this function upsampled to half-hourly, so a row-count window would silently be
+    a half-length one. Irregular spacing is what tells the two apart.
+    """
+    t0 = datetime(2023, 1, 1, 0, 0)
+    df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"] * 4,
+            "nwp_init_time": [t0] * 4,
+            "ensemble_member": [0] * 4,
+            "valid_time": [
+                t0,
+                t0 + timedelta(minutes=30),
+                t0 + timedelta(hours=1),
+                t0 + timedelta(hours=3),
+            ],
+            "temperature_2m": [10.0, 20.0, 30.0, 40.0],
+        }
+    )
+    result = (
+        _apply_rolling_mean_feature(lf=df.lazy(), base_col="temperature_2m", window_hours=2)
+        .collect()
+        .sort("valid_time")
+    )
+    # The window is (t - 2h, t]: [10] / [10, 20] / [10, 20, 30] / [40] — the last row's
+    # predecessors all fall outside it, which a 2-row window would not notice.
+    assert result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 20.0, 40.0]
+
+
+def test_upsample_nwp_fills_agree_across_engines():
+    """`order_by="valid_time"` is the only thing ordering the fills, so pin it on both engines.
+
+    The upsample does not sort, so `interpolate()` and `forward_fill()` each carry their own
+    `order_by`. The streaming engine — the one `XGBoostForecaster` uses — reorders morsels, so
+    dropping either `order_by` leaves nulls unfilled and the two engines disagreeing.
+    """
+    t0 = datetime(2020, 1, 1)
+    steps = [t0 + timedelta(hours=3 * i) for i in range(9)]
+    members = [0, 1, 2, 3]
+    df = pl.DataFrame(
+        {
+            "nwp_init_time": [t0] * len(steps) * len(members),
+            "ensemble_member": pl.Series(
+                [member for member in members for _ in steps], dtype=pl.UInt8
+            ),
+            "valid_time": steps * len(members),
+            "temperature_2m": [float(i) for i in range(len(steps))] * len(members),
+            "categorical_precipitation_type_surface": pl.Series(
+                [0, 0, 0, 5, 5, 5, 0, 0, 0] * len(members), dtype=pl.UInt8
+            ),
+        }
+    )
+    lf = _upsample_nwp_to_half_hourly(df.lazy())
+
+    sort_cols = ["ensemble_member", "valid_time"]
+    streamed = lf.collect(engine="streaming").sort(sort_cols)
+
+    assert streamed["categorical_precipitation_type_surface"].null_count() == 0
+    assert streamed["temperature_2m"].null_count() == 0
+    assert streamed.equals(lf.collect(engine="in-memory").sort(sort_cols))
+
+
+def test_engineer_features_keeps_rows_whose_series_has_no_metadata():
+    """A series missing from the metadata parquet gets a null type, never a dropped row.
+
+    The metadata join must stay a left join: an inner join would silently drop every row for a
+    newly-connected substation not yet in the parquet, which is a fail-closed live service.
+    """
+    nwp_init_time = datetime(2023, 1, 1, 0, 0)
+    valid_times = [nwp_init_time + timedelta(hours=i) for i in range(12)]
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"] * len(valid_times),
+            "valid_time": valid_times,
+            "ensemble_member": [0] * len(valid_times),
+            "init_time": [nwp_init_time] * len(valid_times),
+            "temperature_2m": [10.0] * len(valid_times),
+        }
+    )
+    power_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"] * len(valid_times),
+            "time": valid_times,
+            "power": [100.0] * len(valid_times),
+        }
+    )
+    # Metadata for a different series entirely.
+    metadata_df = pl.DataFrame({"time_series_id": ["ts2"], "time_series_type": ["BESS"]}).cast(
+        {"time_series_type": pl.Enum(LIST_OF_TIME_SERIES_TYPES)}
+    )
+
+    result = _engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=nwp_df.lazy(),
+        selected_features={"temperature_2m", "time_series_type"},
+        power_fcst_init_time=None,
+    ).collect()
+
+    assert result.height > 0
+    assert result["time_series_type"].null_count() == result.height
