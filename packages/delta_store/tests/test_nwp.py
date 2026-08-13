@@ -3,8 +3,9 @@
 Writes real (tiny) ``Nwp`` frames into a temp Delta table and asserts the on-disk format:
 ZSTD with parquet's *default* encodings (measured better than ``BYTE_STREAM_SPLIT`` /
 ``DELTA_BINARY_PACKED`` for this table — see ``delta_store.nwp``), member-early sort within
-each file, every continuous variable rounded to ``NWP_SIGNIFICAND_BITS``, and appends landing
-as separate ``(nwp_model_id, init_time)`` Hive partitions.
+each file, every continuous variable rounded to ``NWP_SIGNIFICAND_BITS``, successive runs landing
+as separate ``(nwp_model_id, init_time)`` Hive partitions, and a re-written run replacing its own
+partition and no other.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -96,7 +97,7 @@ def test_continuous_vars_rounded_to_significand_bits(tmp_path: Path) -> None:
         assert (stored.view(np.dtype(np.uint32)) & discarded == 0).all(), var
 
 
-def test_successive_appends_create_separate_partitions(tmp_path: Path) -> None:
+def test_successive_runs_create_separate_partitions(tmp_path: Path) -> None:
     table = tmp_path / "nwp"
     n = 4
     t1 = _T0 + timedelta(days=1)
@@ -116,3 +117,22 @@ def test_successive_appends_create_separate_partitions(tmp_path: Path) -> None:
     assert collected.filter(pl.col("init_time") == t1).height == n
     assert collected.schema["temperature_2m"] == pl.Float32
     assert collected.schema["nwp_model_id"] == pl.Enum(["ECMWF_ENS_0_25_degree"])
+
+
+def test_rewriting_a_run_replaces_only_its_own_partition(tmp_path: Path) -> None:
+    table = tmp_path / "nwp"
+    n = 4
+    init_times = [_T0 + timedelta(days=day) for day in range(3)]
+    for init_time in init_times:
+        write_nwp(_make_nwp(n, init_time=init_time), table)
+    before = Nwp.scan_delta(table).collect().sort(*NWP_SORT_COLS)
+
+    # The replacement run is a different length, so the row count alone says which copy survived.
+    replaced = init_times[1]
+    write_nwp(_make_nwp(2, init_time=replaced), table)
+    after = Nwp.scan_delta(table).collect().sort(*NWP_SORT_COLS)
+
+    assert after.height == 2 * n + 2, "the re-written run landed alongside the first copy"
+    assert after.filter(pl.col("init_time") != replaced).equals(
+        before.filter(pl.col("init_time") != replaced)
+    ), "the replace predicate reached beyond its own (nwp_model_id, init_time) partition"

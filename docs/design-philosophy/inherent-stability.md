@@ -144,7 +144,7 @@ code as it stands; "intended" describes where this principle takes it.
 | A whole ECMWF slice corrupt | Landed; `nwp_has_no_unexpected_nulls` warns, naming the slice | Unchanged | No |
 | A whole ECMWF weather variable absent | `Nwp.validate` rejects it; `ecmwf_ens` turns each rejection into a retry for up to 4h, and once those are exhausted it manifests downstream as a missed run | Unchanged | No |
 | The promoted model is empty or unloadable | **Hard failure** — the asset raises | Unchanged: this is a promotion bug, not a data outage | Yes, next business day |
-| A duplicated forecast row reaches the model output — most plausibly from NWP rows duplicated at rest, since `ecmwf_ens` appends without dedup | **Hard failure** — `PowerForecast.validate` raises on the duplicated primary key and NGED gets nothing for that slot | Unchanged: writing a silently duplicated forecast would corrupt the delivered table and every metric computed from it | Yes, next business day |
+| A duplicated forecast row reaches the model output — a join fanning out, which takes a bug of ours rather than duplicated data at rest, since every NWP write replaces its partition | **Hard failure** — `PowerForecast.validate` raises on the duplicated primary key and NGED gets nothing for that slot | Unchanged: writing a silently duplicated forecast would corrupt the delivered table and every metric computed from it | Yes, next business day |
 | A model is promoted whose saved config this code can no longer rebuild — a feature name it does not recognise, or a `model_params` key it no longer declares | `promoted_model` refuses it before replacing the model on disk, so the outgoing champion stays and keeps forecasting | Unchanged | Yes, at promotion time |
 | The run named for promotion holds no model at all — usually a mistyped or stale run id | `promoted_model` fails on the download, again before replacing the model on disk, so the outgoing champion stays and keeps forecasting | Unchanged | Yes, at promotion time |
 | The service is not running at all | Sentry missed-check-in alarm fires from outside the deployment | Unchanged | Yes, next business day |
@@ -190,10 +190,10 @@ appear nowhere else.
    own: Dagster fails a run whose check step *errors*, whatever its `blocking` setting, and the
    scheduled jobs carry a Sentry failure hook — so an unguarded warning path both fails the run and
    pages. A warning path computed *inside* an asset must also run **before** that asset's
-   non-idempotent write, not merely under a guard: `ecmwf_ens` appends its NWP run with no dedup, so
-   a bug that raised after the append would leave the rows committed on a failed run and duplicate
-   them when the partition was re-materialised. Ordering decides whether such a bug can corrupt the
-   data; the guard only decides whether it costs a run.
+   write, not merely under a guard: a bug that raised after the write would leave the rows committed
+   on a run Dagster reports as failed, so the table and the run history disagree about what landed.
+   Ordering decides whether such a bug can land data at all; the guard only decides whether it costs
+   a run.
 8. **When a capability could live in the training loop or in the production service, put it in the
    training loop.** See [Where complexity should live](#where-complexity-should-live). *(The
    [complexity-offline

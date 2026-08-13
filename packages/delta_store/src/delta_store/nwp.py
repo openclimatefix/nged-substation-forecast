@@ -61,22 +61,23 @@ def write_nwp(
     table_uri: str | Path,
     storage_options: ObjectStoreOptions | None = None,
 ) -> None:
-    """Append ``Nwp`` rows to the ``nwp`` Delta table in its storage format.
+    """Write one NWP run into the ``nwp`` Delta table in its storage format.
 
     Rounds every continuous weather variable to ``NWP_SIGNIFICAND_BITS`` significand bits, sorts
     rows by ``NWP_SORT_COLS``, and writes with ``NWP_WRITER_PROPERTIES``. The table is
     partitioned by ``(nwp_model_id, init_time)``, matching ``Nwp.scan_delta``'s
     partition-pruning assumptions; the first write creates the table.
 
-    Append-only: each ``(nwp_model_id, init_time)`` partition is written exactly once — the
-    daily ``ecmwf_ens`` asset downloads one brand-new NWP run per Dagster partition. (No
-    ``replace_partition`` option like ``write_power_forecasts``: nothing re-materialises an
-    existing NWP partition today, and a partition-replace predicate on a ``Timestamp`` partition
-    column would need its own careful verification — add it only when a caller actually needs
-    it.)
+    The write **replaces** the ``(nwp_model_id, init_time)`` partition named by the frame's first
+    row, so re-materialising an ``ecmwf_ens`` partition leaves one copy of the run. delta-rs checks
+    every row against that predicate and rejects the whole write, table untouched, if any row falls
+    outside it (confirmed empirically against ``deltalake`` 1.6.2, locally and on S3, on a
+    partition column despite its percent-encoded Hive directory name). Two materialisations of the
+    *same* partition at once contend and the loser raises ``CommitFailedError``; disjoint
+    partitions do not.
 
     Args:
-        nwp: Validated NWP rows for a single ``(nwp_model_id, init_time)`` partition.
+        nwp: Validated, non-empty NWP rows for a single ``(nwp_model_id, init_time)`` partition.
         table_uri: Path or URI of the ``nwp`` Delta table.
         storage_options: delta-rs object-store options (credentials/endpoint) for a remote
             ``table_uri``; ``None``/empty for a local path.
@@ -99,7 +100,11 @@ def write_nwp(
     write_deltalake(
         table_or_uri=table_uri,
         data=prepared,
-        mode="append",
+        mode="overwrite",
+        predicate=(
+            f"nwp_model_id = '{nwp.item(0, 'nwp_model_id')}' "
+            f"AND init_time = '{nwp.item(0, 'init_time').isoformat()}'"
+        ),
         partition_by=["nwp_model_id", "init_time"],
         writer_properties=NWP_WRITER_PROPERTIES,
         storage_options=typeddict_to_dict(storage_options),

@@ -32,8 +32,9 @@ gridded NWP forecasts onto the H3 cells attached to each substation.
 of your training window). Use "Materialise all" or select a date range in the Dagster UI.
 
 Downloads the 00Z ECMWF ENS run for each partition date, converts it to a Polars DataFrame, and
-appends it to `nwp_data.delta` (partitioned by `[nwp_model_id, init_time]`) as physical-unit
-`Float32` rounded to a 13-bit significand at write time by `delta_store.nwp`. The `pool="ECMWF"` concurrency limit prevents OOM errors when
+writes it to `nwp_data.delta` (partitioned by `[nwp_model_id, init_time]`) as physical-unit
+`Float32` rounded to a 13-bit significand at write time by `delta_store.nwp`. Each run replaces its
+own partition, so re-materialising a date range you have already ingested is safe. The `pool="ECMWF"` concurrency limit prevents OOM errors when
 backfilling — Dagster schedules downloads one at a time if you materialise many partitions at
 once.
 

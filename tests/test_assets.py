@@ -407,7 +407,7 @@ def _check_evaluations(result: ExecuteInProcessResult) -> dict[str, AssetCheckEv
     }
 
 
-def test_ecmwf_ens_materialises_and_appends_nwp(
+def test_ecmwf_ens_materialises_and_writes_nwp(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """Happy path with the download/convert pipeline stubbed: the partition key parses into
@@ -609,8 +609,7 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
 
     assert exc_info.value.max_retries == _ECMWF_ENS_MAX_RETRIES
     assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS
-    # Validation runs before the Delta append, so a retry (or a later manual re-run) has no partial
-    # partition to double-count against.
+    # Validation runs before the Delta write, so a retry leaves no partial partition behind.
     assert not Path(Settings().nwp_data_path).exists()
 
 
@@ -681,7 +680,7 @@ def _stub_ecmwf_download(monkeypatch: pytest.MonkeyPatch, init_time: datetime) -
 def test_ecmwf_ens_assesses_before_writing(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """The check *results* are built before the Delta append, not just the assessments.
+    """The check *results* are built before the Delta write, not just the assessments.
 
     ``_nwp_quality_check_result`` reaches ``_nwp_null_slices_metadata``, which sorts the affected
     frame and builds a ``TableRecord`` per row — the most raise-prone code in the block, and the
@@ -705,6 +704,25 @@ def test_ecmwf_ens_assesses_before_writing(
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success
     assert table_existed == [False]
+
+
+def test_ecmwf_ens_re_materialising_a_partition_does_not_duplicate_rows(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """Re-running a landed partition replaces its rows instead of landing a second copy of the run.
+
+    ``Nwp.validate`` sees only the frame in hand, so a duplicated key would reach the table
+    silently and fan every later ``Nwp.scan_delta`` read out.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
+
+    for _ in range(2):
+        result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
+        assert result.success
+
+    assert pl.read_delta(Settings().nwp_data_path).height == 4
 
 
 def test_ecmwf_ens_publishes_both_null_populations(
