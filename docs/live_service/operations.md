@@ -320,9 +320,16 @@ Two things a re-run does cost:
   running.** The two writes contend and the loser fails with delta-rs' `CommitFailedError`. That
   costs a run, not the table, and re-running afterwards is safe. Partitions for *different* dates
   do not contend at all, so a backfill alongside the daily schedule is fine.
-- **The superseded rows stay on disk.** Delta marks the old parquet files as removed rather than
-  deleting them, and nothing here runs `vacuum`, so replacing a V1 partition leaves ~7.24M dead
-  rows behind. Reads are unaffected — every reader goes through the transaction log.
+- **The superseded rows stay on disk, and `vacuum` will not clear them.** Delta marks the old
+  parquet files as removed rather than deleting them, so replacing a V1 partition leaves ~7.24M
+  dead rows — about 137 MiB — behind. `DeltaTable.vacuum` reports deleting those files and does
+  not: the `init_time` partition directory's name is percent-encoded, and vacuum deletes at a
+  double-encoded path that does not exist, so it removes nothing while writing vacuum commits
+  saying it did
+  ([issue #593](https://github.com/openclimatefix/nged-substation-forecast/issues/593)). Reads are
+  unaffected — every reader goes through the transaction log. Until that is fixed, reclaiming the
+  space means listing the current version's add actions, diffing them against what is on disk, and
+  deleting the orphans by hand.
 
 Every materialisation whose completeness assessment succeeded also publishes `n_ensemble_members`,
 `n_valid_times`, `n_h3_cells` and the `valid_time` range as metadata, so the Dagster UI timeline
