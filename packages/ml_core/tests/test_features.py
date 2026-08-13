@@ -4,7 +4,11 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.ml_schemas import AllFeatures
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import (
+    LIST_OF_TIME_SERIES_TYPES,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
+)
 from ml_core.features._lags import _apply_power_lag, _nullify_leaky_lags
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
 from ml_core.features._parsed_features import (
@@ -406,7 +410,14 @@ def test_parsed_features_from_strings_rejects_invalid(
         ParsedFeatures.from_strings({bad_feature})
 
 
-def test_apply_rolling_mean_feature():
+@pytest.mark.parametrize("reversed_input", [False, True])
+def test_apply_rolling_mean_feature(reversed_input: bool) -> None:
+    """The window orders by valid_time itself, so the caller need not present sorted rows.
+
+    The reversed case is the one that matters: it is what lets ``_upsample_nwp_to_half_hourly``
+    drop its sort. A `lf.rolling()`-based implementation raises `ComputeError: input data is not
+    sorted` here.
+    """
     nwp_init_time = datetime(2023, 1, 1, 0, 0)
     df = pl.DataFrame(
         {
@@ -422,14 +433,19 @@ def test_apply_rolling_mean_feature():
             "temperature_2m": [10.0, 20.0, 30.0, 40.0],
         }
     )
+    if reversed_input:
+        df = df.reverse()
     # Rolling mean with window of 2 hours
     # For 0:00: mean([10.0]) = 10.0
     # For 1:00: mean([10.0, 20.0]) = 15.0
     # For 2:00: mean([20.0, 30.0]) = 25.0
     # For 3:00: mean([30.0, 40.0]) = 35.0
-    result = _apply_rolling_mean_feature(df.lazy(), "temperature_2m", 2).collect()
+    result = _apply_rolling_mean_feature(
+        lf=df.lazy(), base_col="temperature_2m", window_hours=2
+    ).collect()
     assert "temperature_2m_rolling_mean_2h" in result.columns
-    assert result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 25.0, 35.0]
+    by_time = result.sort("valid_time")
+    assert by_time["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 25.0, 35.0]
 
 
 @pytest.mark.parametrize(
@@ -965,3 +981,110 @@ def test_engineer_features_raises_when_no_control_member_for_weather_lag():
             power_fcst_init_time=datetime(2023, 1, 1, 6, 0),
             nwp_init_time=nwp_init_time,
         )
+
+
+def _bulk_features_with_nwp_past_last_observation(selected_features: set[str]) -> pl.DataFrame:
+    """Bulk mode where NWP runs 4 hours past the last power observation.
+
+    Those trailing rows are the ones the NWP-centric left join leaves without a power match, so
+    they are where a metadata column joined onto the power frame would be null.
+    """
+    nwp_init_time = datetime(2023, 1, 1, 0, 0)
+    valid_times = [nwp_init_time + timedelta(hours=i) for i in range(12)]
+    observed_times = valid_times[:8]
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"] * len(valid_times),
+            "valid_time": valid_times,
+            "ensemble_member": [0] * len(valid_times),
+            "init_time": [nwp_init_time] * len(valid_times),
+            "temperature_2m": [10.0] * len(valid_times),
+        }
+    )
+    power_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"] * len(observed_times),
+            "time": observed_times,
+            "power": [100.0] * len(observed_times),
+        }
+    )
+    # A real LIST_OF_TIME_SERIES_TYPES value in the Enum dtype the metadata parquet actually
+    # holds, so the assertions see what production sees. `set_model` does not cast, so a plain
+    # string here would travel through the pipeline as a plain string.
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["BESS"]}).cast(
+        {"time_series_type": pl.Enum(LIST_OF_TIME_SERIES_TYPES)}
+    )
+
+    return _engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=nwp_df.lazy(),
+        selected_features=selected_features,
+        power_fcst_init_time=None,  # bulk mode
+    ).collect()
+
+
+def test_engineer_features_bulk_mode_populates_requested_time_series_type():
+    """A requested time_series_type must be non-null on rows past the last power observation.
+
+    Metadata is joined onto the assembled frame, not onto the power frame: in bulk mode power is
+    left-joined *onto* NWP, so a metadata column carried in on the power side would be null for
+    every valid_time the observations do not reach.
+    """
+    result = _bulk_features_with_nwp_past_last_observation({"temperature_2m", "time_series_type"})
+
+    assert result["power"].null_count() > 0, "fixture must contain rows with no power observation"
+    assert result["time_series_type"].null_count() == 0
+    assert result["time_series_type"].dtype == pl.Enum(LIST_OF_TIME_SERIES_TYPES)
+
+
+def test_engineer_features_omits_unrequested_time_series_type():
+    """time_series_type is emitted only when asked for, so the metadata join can be skipped."""
+    result = _bulk_features_with_nwp_past_last_observation({"temperature_2m"})
+
+    assert "time_series_type" not in result.columns
+
+
+def test_engineer_features_rolling_mean_collects_under_streaming_engine():
+    """A rolling-mean feature must survive `collect(engine="streaming")`.
+
+    That is the engine `XGBoostForecaster.train` and `.predict` use, and a `LazyFrame.rolling`
+    implementation raises `ComputeError: input data is not sorted` there — the streaming engine
+    does not carry the sortedness flag an upstream `.sort()` sets. Sorting within the window
+    instead makes the precondition local, so both engines agree.
+    """
+    nwp_init_time = datetime(2025, 1, 1, 0, 0)
+    steps = [nwp_init_time + timedelta(hours=3 * i) for i in range(9)]
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": [1] * len(steps) * 2,
+            "valid_time": steps * 2,
+            "ensemble_member": [0] * len(steps) + [1] * len(steps),
+            "init_time": [nwp_init_time] * len(steps) * 2,
+            "temperature_2m": [10.0] * len(steps) * 2,
+        }
+    ).cast({"ensemble_member": pl.UInt8})
+    observed_times = [nwp_init_time + timedelta(minutes=30 * i) for i in range(48)]
+    power_df = pl.DataFrame(
+        {
+            "time_series_id": [1] * len(observed_times),
+            "time": observed_times,
+            "power": [100.0] * len(observed_times),
+        }
+    )
+    metadata_df = pl.DataFrame({"time_series_id": [1], "time_series_type": ["BESS"]})
+
+    lf = _engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=nwp_df.lazy(),
+        selected_features={"temperature_2m", "temperature_2m_rolling_mean_6h"},
+    )
+
+    sort_cols = ["valid_time", "ensemble_member"]
+    streamed = lf.collect(engine="streaming").sort(sort_cols)
+    in_memory = lf.collect(engine="in-memory").sort(sort_cols)
+
+    assert streamed.height > 0
+    assert streamed.equals(in_memory)

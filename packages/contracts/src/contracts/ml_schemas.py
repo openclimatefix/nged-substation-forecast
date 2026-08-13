@@ -4,9 +4,8 @@ The feature vocabulary, the joined `AllFeatures` frame handed to models, the eli
 population, and the metrics schema.
 """
 
-from collections.abc import Sequence
 from datetime import datetime
-from typing import Final, Literal, Self
+from typing import Final, Literal
 
 import patito as pt
 import polars as pl
@@ -66,7 +65,14 @@ class AllFeatures(pt.Model):
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     time_series_id: int = _get_time_series_id_dtype()
-    time_series_type: str = pt.Field(dtype=pl.Enum(LIST_OF_TIME_SERIES_TYPES))
+    time_series_type: str | None = pt.Field(
+        dtype=pl.Enum(LIST_OF_TIME_SERIES_TYPES),
+        allow_missing=True,
+        description=(
+            "The substation's category. Only emitted when a feature set requests it, and null "
+            "for a time series with no row in the metadata parquet."
+        ),
+    )
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
 
     power_fcst_init_time: datetime = pt.Field(
@@ -83,7 +89,13 @@ class AllFeatures(pt.Model):
         description="When the NWP run was initialised.",
     )
 
-    power: float = pt.Field(dtype=pl.Float32)
+    power: float | None = pt.Field(
+        dtype=pl.Float32,
+        description=(
+            "The observed power, or null where there is no observation. Live inference feeds a "
+            "dense spine that runs past the last observation, and training drops the null rows."
+        ),
+    )
     nwp_lead_time_hours: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Weather features
@@ -126,69 +138,6 @@ class AllFeatures(pt.Model):
             ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         )
     )
-
-    @classmethod
-    def validate(  # ty: ignore[invalid-method-override]
-        cls,
-        dataframe: pl.DataFrame,
-        columns: Sequence[str] | None = None,
-        allow_missing_columns: bool = False,
-        allow_superfluous_columns: bool = False,
-        drop_superfluous_columns: bool = False,
-    ) -> pt.DataFrame[Self]:
-        """Validate the given dataframe, ensuring uniqueness of the primary key.
-
-        This custom validation step is crucial for preventing weather forecast leakage
-        and ensuring data integrity. We enforce uniqueness on the combination of:
-
-        - `time_series_id`: Identifies the specific substation/time series.
-        - `power_fcst_init_time`: The initialization time of the power forecast.
-        - `valid_time`: The target time for which the forecast is made.
-        - `ensemble_member`: The weather forecast ensemble member (if present).
-
-        If `ensemble_member` is present in the dataframe columns, we include it in the
-        primary key check to support ensemble forecasts. If it is not present (e.g.,
-        for deterministic forecasts or when ensemble members have been aggregated),
-        we only check uniqueness across the remaining three columns.
-
-        Args:
-            dataframe: The Polars DataFrame to validate.
-            columns: Optional list of columns to validate against.
-            allow_missing_columns: Whether to allow missing columns.
-            allow_superfluous_columns: Whether to allow extra columns.
-            drop_superfluous_columns: Whether to drop extra columns.
-
-        Returns:
-            A validated Patito DataFrame.
-
-        Raises:
-            ValueError: If duplicate entries are found for the primary key.
-        """
-        validated_df = super().validate(
-            dataframe=dataframe,
-            columns=columns,
-            allow_missing_columns=allow_missing_columns,
-            allow_superfluous_columns=allow_superfluous_columns,
-            drop_superfluous_columns=drop_superfluous_columns,
-        )
-
-        # Define the base primary key columns that must always be unique.
-        # This ensures that for any given substation (time_series_id) and target time (valid_time),
-        # there is at most one forecast initialized at a specific power_fcst_init_time.
-        pk_cols = ["time_series_id", "power_fcst_init_time", "valid_time"]
-
-        if "ensemble_member" in validated_df.columns:
-            pk_cols.append("ensemble_member")
-
-        # Check for duplicates. We fail loudly here to prevent downstream training or
-        # evaluation on corrupted/duplicated datasets, which could lead to silent bugs.
-        if validated_df.select(pk_cols).is_duplicated().any():
-            raise ValueError(
-                f"Duplicate entries found for primary key columns: {pk_cols}. "
-                "This indicates a data integrity issue or potential weather forecast leakage."
-            )
-
-        return validated_df
 
 
 HORIZON_SLICES: Final[tuple[str, ...]] = (

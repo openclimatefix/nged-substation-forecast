@@ -471,7 +471,8 @@ features exist. Same logic, more mildly, for PV.
 
 Mechanics: YAML gains `selected_features_by_type: {type: [...]}` with the existing
 `selected_features` as the default for unlisted types. Boosters are already per-series, so
-each can resolve its series' type (in `AllFeatures`) to a feature list at train/predict time;
+each can resolve its series' type to a feature list at train/predict time (add `time_series_type`
+to `selected_features`, which is what makes the feature pipeline emit it);
 persist the mapping in `meta.json`. The value compounds as the later feature-engineering items (holidays, effective temperature, the solar/wind physics proxies) diverge the useful
 per-type sets (solar features for PV, turbine features for wind, holidays for demand).
 

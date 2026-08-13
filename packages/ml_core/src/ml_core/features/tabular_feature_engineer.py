@@ -177,10 +177,14 @@ def _engineer_features(
     else:
         processed_nwp = None
     weather_lags = [lag for lag in parsed_features.lags if lag.base_col != "power"]
+    # Probe the raw NWP rather than `processed_nwp`: `ensemble_member` is one of the upsample's
+    # group-by keys, so the upsample can neither create nor destroy control-member rows, and
+    # `SLICE` cannot push through its sort and window functions — probing the upsampled frame
+    # would run the whole upsample before answering.
     if (
-        processed_nwp is not None
+        nwp_lf is not None
         and weather_lags
-        and processed_nwp.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty()
+        and nwp_lf.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty()
     ):
         raise ValueError(
             "Weather lag features require the NWP control member (ensemble_member == 0) "
@@ -194,20 +198,28 @@ def _engineer_features(
         else None
     )
 
-    power_with_metadata = power_lf.join(metadata_lf, on="time_series_id", how="left")
-
     if power_fcst_init_time is None:
         raw_data = _join_nwp_bulk_mode(
-            power_with_metadata, processed_nwp, nwp_publication_delay_hours
+            power_lf=power_lf,
+            processed_nwp=processed_nwp,
+            nwp_publication_delay_hours=nwp_publication_delay_hours,
         )
     else:
         raw_data = _join_nwp_single_run(
-            power_with_metadata,
-            processed_nwp,
-            power_fcst_init_time,
-            nwp_init_time,
-            nwp_publication_delay_hours,
+            power_lf=power_lf,
+            processed_nwp=processed_nwp,
+            power_fcst_init_time=power_fcst_init_time,
+            nwp_init_time=nwp_init_time,
+            nwp_publication_delay_hours=nwp_publication_delay_hours,
         )
+
+    # Metadata joins *after* the NWP join, not before: bulk mode left-joins power onto NWP, so a
+    # row whose valid_time has no power observation would lose time_series_type even though its
+    # time_series_id is known. Conditional because Polars keeps a left join whose right-hand
+    # columns are all projected away, so an unconditional join here would cost every caller that
+    # never asked for the column.
+    if "time_series_type" in selected_features:
+        raw_data = raw_data.join(metadata_lf, on="time_series_id", how="left")
 
     engineered_lf = _apply_post_join_features(
         raw_data,
@@ -246,7 +258,6 @@ def _select_output_columns(
     base_cols = [
         "valid_time",
         "time_series_id",
-        "time_series_type",
         "power",
         "power_fcst_init_time",
         "nwp_init_time",
@@ -271,8 +282,8 @@ def _apply_post_join_features(
     """Applies requested features dynamically based on parsed feature configurations.
 
     Args:
-        raw_data: The power-with-metadata frame already joined to NWP, one row per forecast
-            instance, that feature columns are accumulated onto.
+        raw_data: The power frame already joined to NWP, one row per forecast instance, that
+            feature columns are accumulated onto.
         parsed_features: The requested features, parsed into typed objects.
         observed_power_lf: The dense observed-power series (one row per
             ``(time_series_id, valid_time)``), used as the lookup source for power lags. Sourcing
@@ -295,10 +306,9 @@ def _apply_post_join_features(
         if lag_feat.base_col == "power":
             engineered_lf = _apply_power_lag(engineered_lf, observed_power_lf, lag_feat)
         else:
-            if processed_nwp is None:
-                raise ValueError(
-                    "processed_nwp cannot be None when applying a weather lag feature."
-                )
+            # Both hold by construction: `_engineer_features` raises for a weather lag with no
+            # NWP, and builds `historical_weather` from the same condition.
+            assert processed_nwp is not None
             assert historical_weather is not None
             engineered_lf = _apply_weather_lag(
                 engineered_lf, processed_nwp, lag_feat, historical_weather
@@ -310,7 +320,7 @@ def _apply_post_join_features(
         )
 
     leaky_features = parsed_features.get_leaky_features()
-    if leaky_features and "power_fcst_init_time" in engineered_lf.collect_schema().names():
+    if leaky_features:
         engineered_lf = _nullify_leaky_lags(engineered_lf, leaky_features)
 
     return engineered_lf
@@ -323,20 +333,24 @@ def _apply_rolling_mean_feature(lf: pl.LazyFrame, base_col: str, window_hours: i
     NWP runs, which would contaminate the feature with data from other forecast initializations.
 
     Cross-mode invariant: the rolling aggregation MUST be null-skipping over the value column
-    (mean/min/max/std/median/sum) and MUST NOT be row-count-dependent (e.g. ``.len()``). Single-run
-    mode stamps a constant nwp_init_time, so each group is padded with out-of-window rows whose
-    weather is null; a null-skipping aggregation ignores them (so values match bulk mode), but a
-    row count would not — silently skewing the feature between training and serving. This is locked
-    by test_cross_mode_equivalence.py.
-    """
-    rolled = lf.rolling(
-        index_column="valid_time",
-        period=f"{window_hours}h",
-        group_by=["time_series_id", "nwp_init_time", "ensemble_member"],
-    ).agg(pl.col(base_col).mean().alias(f"{base_col}_rolling_mean_{window_hours}h"))
+    (mean/min/max/std/median/sum) and MUST NOT be row-count-dependent (e.g. ``.len()``). The two
+    modes present different numbers of rows to a group — single-run mode stamps a constant
+    nwp_init_time, and rows the NWP join missed carry a null ensemble_member and so form a group of
+    their own — so a null-skipping aggregation matches across modes where a row count would not,
+    silently skewing the feature between training and serving. This is locked by
+    test_cross_mode_equivalence.py.
 
-    join_keys = ["time_series_id", "nwp_init_time", "ensemble_member", "valid_time"]
-    return lf.join(rolled, on=join_keys, how="left")
+    ``rolling_mean_by`` inside ``over(..., order_by=)`` rather than ``lf.rolling().agg()``: the
+    window form sorts only within each group and emits one value per input row, so it needs
+    neither a join back onto the frame nor a global sort to satisfy a sortedness precondition.
+    """
+    return lf.with_columns(
+        **{
+            f"{base_col}_rolling_mean_{window_hours}h": pl.col(base_col)
+            .rolling_mean_by("valid_time", window_size=f"{window_hours}h", closed="right")
+            .over(["time_series_id", "nwp_init_time", "ensemble_member"], order_by="valid_time")
+        }
+    )
 
 
 def _local_utc_offset_minutes(local_time: pl.Expr) -> pl.Expr:

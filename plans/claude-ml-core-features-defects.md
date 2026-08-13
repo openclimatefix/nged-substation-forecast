@@ -208,6 +208,14 @@ valid_time)` would fan out quadratically (verified: 4 rows become 8 under the cu
 under the window form). One clause, not a paragraph — a second `nwp_model_id` would already fan out
 the bulk join before the rolling ever ran.
 
+**Found during implementation: fix 4 also fixes a crash.** `lf.rolling()` raises `ComputeError:
+input data is not sorted` under `collect(engine="streaming")` *even with the sort in place* — the
+streaming engine does not carry the sortedness flag a `.sort()` sets. That is the engine
+`XGBoostForecaster.train` (`forecaster.py:130`) and `.predict` (`:185`) both use, so on `main` any
+feature set requesting a rolling mean crashes at the model boundary. Reproduced on a nine-step
+fixture and pinned by a new test. Nobody hit it because no config here requests a rolling mean.
+This makes fix 4 the headline of the PR, ahead of the sort measurement.
+
 **But that hazard is also a detector, and this removes it.** A duplicate primary key today makes the
 frame visibly explode; after fix 4 it is absorbed silently. That is why fix 2 keeps the primary-key
 assertion, and it is the strongest argument for the `PowerForecast` follow-up.
