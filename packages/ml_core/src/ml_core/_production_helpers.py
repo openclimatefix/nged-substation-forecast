@@ -25,7 +25,12 @@ from contracts.config_schemas import import_class
 from contracts.power_schemas import PowerTimeSeries
 from pydantic import ValidationError
 
-from ml_core.base_forecaster import BaseForecaster, _download_and_unpack_model
+from ml_core.base_forecaster import (
+    TRAINED_METADATA_FILENAME,
+    BaseForecaster,
+    _download_and_unpack_model,
+    load_trained_metadata,
+)
 from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
 from ml_core.features._parsed_features import ParsedFeatures
 
@@ -193,6 +198,34 @@ def _check_meta_is_servable(meta: dict[str, Any], source: str) -> type[BaseForec
     return forecaster_cls
 
 
+def _check_trained_metadata_is_readable(model_dir: Path, run_id: str) -> None:
+    """Raise if a staged model carries no readable frozen metadata to locate its series by.
+
+    Production inference reads each series' H3 cell from this file, so a model without a usable one
+    would forecast nothing at its next 6-hourly slot. Checking here refuses the promotion instead,
+    before the swap, leaving the outgoing champion serving.
+
+    Whether the file *covers* the trained population is not checked: ``save_to_mlflow`` is the only
+    writer, and its caller has already passed ``_require_metadata_coverage`` over a population the
+    trained one is a subset of.
+
+    Args:
+        model_dir: The staged, unpacked model directory (not yet moved into place).
+        run_id: The run being promoted, quoted back in the message.
+
+    Raises:
+        ValueError: The file is absent, or cannot be read.
+    """
+    try:
+        load_trained_metadata(model_dir)
+    except Exception as error:
+        raise ValueError(
+            f"The model saved under run {run_id} has no readable {TRAINED_METADATA_FILENAME}, so "
+            "live inference could not locate its time series. Re-train against the current code "
+            "and promote that run."
+        ) from error
+
+
 def load_forecaster_from_dir(path: Path) -> BaseForecaster:
     """Load the production model from a plain disk directory (no MLflow at inference time).
 
@@ -266,8 +299,9 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
             or stale run id, since a run that trained a model has one. Raised by
             ``ml_core.base_forecaster._download_and_unpack_model``, before ``dest`` is touched.
         ValueError: The run holds no ``meta.json``, or this code cannot serve the model it
-            describes — see ``_check_meta_is_servable``. Re-train against the current code and
-            promote that run instead.
+            describes — see ``_check_meta_is_servable`` — or it carries no readable frozen
+            metadata — see ``_check_trained_metadata_is_readable``. Re-train against the current
+            code and promote that run instead.
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
         downloaded_dir = _download_and_unpack_model(
@@ -284,6 +318,7 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
             )
         meta = json.loads(meta_path.read_text())
         _check_meta_is_servable(meta=meta, source=f"run {run_id}")
+        _check_trained_metadata_is_readable(model_dir=downloaded_dir, run_id=run_id)
 
         promotion = {
             "mlflow_run_id": run_id,

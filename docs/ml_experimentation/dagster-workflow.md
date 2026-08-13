@@ -122,7 +122,8 @@ written, so a rejected re-registration leaves the experiment exactly as it was.
 7. Calls `forecaster.train(features, eligible_ids)` (the population is passed explicitly). The asset
    then **raises** if zero boosters were trained (e.g. no series had usable power in the window).
 8. Resolves the MLflow fold run by tag and uploads the trained model artifacts via
-   `forecaster.save_to_mlflow(fold_run_id)`.
+   `forecaster.save_to_mlflow(fold_run_id, time_series_metadata=...)`, which puts the roster rows
+   the model trained against into the archive alongside it.
 9. Records the training run on the fold run as **tags**: the training window (`train_start`,
    `train_end`) and the populations (`n_eligible_time_series`, `n_trained_time_series`).
 

@@ -38,10 +38,11 @@ from ml_core._production_helpers import (
     load_forecaster_from_dir,
     select_nwp_init_time,
 )
+from ml_core.base_forecaster import load_trained_metadata
 
 from nged_substation_forecast._sentry import send_forecast_checkin
+from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
 from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS, RESEARCH_LAYER_TAGS
-from nged_substation_forecast.defs.cv_assets import _load_engineering_inputs
 
 LIVE_FORECAST_HORIZON: Final[timedelta] = timedelta(days=14)
 """How far past ``power_fcst_init_time`` ``live_forecasts`` forecasts — inside ECMWF ENS's
@@ -229,6 +230,12 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     train==predict population invariant) across every NWP ensemble member, using single-run feature
     engineering stamped with this partition's ``power_fcst_init_time``.
 
+    Each series' location comes from the model's own frozen metadata copy
+    (``load_trained_metadata``), never from the ``TimeSeriesMetadata`` roster, so a roster that is
+    unreadable or has lost rows can neither fail a slot nor silently drop a series from it. The H3
+    cells the NWP scan is pruned to are therefore the cells the model trained against rather than
+    whatever the roster says today.
+
     NWP availability is resolved via ``config.availability_mode``: the scheduled tick always
     uses ``"live"`` (freshest run actually present, no modelled delay); manual backfills of past
     partitions pass ``"replay"`` (reconstructs what was available ``nwp_publication_delay_hours``
@@ -261,9 +268,11 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         availability_mode=config.availability_mode,
     )
 
-    power_ts, metadata_df, nwp_lf = _load_engineering_inputs(
+    metadata_df = load_trained_metadata(Path(settings.production_model_path))
+    power_ts, nwp_lf = load_engineering_inputs(
         settings,
-        trained_ids,
+        time_series_ids=trained_ids,
+        metadata=metadata_df,
         window_start=power_fcst_init_time - LIVE_POWER_HISTORY,
         window_end=power_fcst_init_time + LIVE_FORECAST_HORIZON,
         init_time_start=nwp_init,

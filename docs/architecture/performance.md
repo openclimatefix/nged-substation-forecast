@@ -63,7 +63,7 @@ Nwp.scan_delta(path)                     # lazy scan, already Float32 physical u
 
 The feature-engineering plan is dominated by the **NWP scan**. The NWP Delta is large — for the V1 trial it is **~86 GB**: 810 daily `init_time` partitions, each up to ~7.24M rows = **1671 H3 cells × 51 ensemble members × 85 native steps** (control member alone is 142k rows/partition). The 30-min upsample and the multi-run bulk join inflate that further. So the whole memory question is: *how little of that NWP do we touch?*
 
-**You cannot prune the scan by filtering the engineered output.** `data.filter(time_series_id == x)` runs the cell-attach join, the 30-min upsample (`group_by` + `explode` + `interpolate`) and the bulk join *first*, then drops rows. And NWP is keyed by `h3_index`, not `time_series_id`, so a `time_series_id` predicate can never reach the NWP scan at all. Pruning must be applied to the **raw inputs**, in `_load_engineering_inputs`, directly on the `Nwp.scan_delta` scan.
+**You cannot prune the scan by filtering the engineered output.** `data.filter(time_series_id == x)` runs the cell-attach join, the 30-min upsample (`group_by` + `explode` + `interpolate`) and the bulk join *first*, then drops rows. And NWP is keyed by `h3_index`, not `time_series_id`, so a `time_series_id` predicate can never reach the NWP scan at all. Pruning must be applied to the **raw inputs**, in `load_engineering_inputs`, directly on the `Nwp.scan_delta` scan.
 
 What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 
@@ -79,7 +79,7 @@ What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 
 **Many-to-one `h3_index` ↔ `time_series_id`:** one NWP cell covers several series (the 32 V1 series live in just **9 cells**, one holding 12), so `h3_index` pruning is keyed on the (few) cells the requested series occupy, and the feature engineer's spatial join replicates each cell's weather across its series.
 
-**Resulting design** (`_load_engineering_inputs` applies all three NWP predicates — `init_time`, `ensemble_member`, and `h3_index` = the requested series' cells — to the raw scan, and every collect streams):
+**Resulting design** (`load_engineering_inputs` applies all three NWP predicates — `init_time`, `ensemble_member`, and `h3_index` = the requested series' cells — to the raw scan, and every collect streams):
 
 | | control member (train) | full 51-member ensemble (predict) |
 |---|---|---|

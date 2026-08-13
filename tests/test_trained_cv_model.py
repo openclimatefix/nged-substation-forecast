@@ -6,7 +6,7 @@ artifact round-trips from MLflow and that training honoured the fold's eligible 
 inclusive training window.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import mlflow
@@ -17,11 +17,14 @@ from contracts.ml_schemas import EligibleTimeSeries
 from contracts.settings import Settings
 from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
+from ml_core._production_helpers import fetch_model_artifacts
+from ml_core.base_forecaster import load_trained_metadata
 from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
 from xgboost_forecaster.forecaster import XGBoostForecaster
 
-from nged_substation_forecast.defs.cv_assets import _load_engineering_inputs, trained_cv_model
+from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
+from nged_substation_forecast.defs.cv_assets import _load_roster, trained_cv_model
 from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
 pytestmark = pytest.mark.integration
@@ -36,6 +39,16 @@ _TS1_CELL = 10
 _TS2_CELL = 20
 _IN_WINDOW = datetime(2024, 6, 1, tzinfo=UTC)
 _AFTER_TRAIN_END = datetime(2025, 8, 1, tzinfo=UTC)
+
+_TRAIN_START = datetime(2024, 4, 1, tzinfo=UTC)
+"""The fold's inclusive training-window start, from ``conf/cv/default.yaml``."""
+
+_EARLY_INIT_TIME = _TRAIN_START - timedelta(days=10)
+"""``init_time`` of one NWP run forecasting into the window from before it.
+
+Inside ``MAX_NWP_LEAD`` (16 days) of ``_TRAIN_START``, so the default ``init_time`` lower bound
+must reach it; before ``_TRAIN_START``, so nothing else does.
+"""
 
 
 def _write_power(path: str) -> None:
@@ -59,18 +72,32 @@ def _write_power(path: str) -> None:
 
 _NWP_ENSEMBLE_MEMBERS = (0, 1, 2)
 """Members written to the synthetic NWP. Member 0 is the control; 1 and 2 exercise the
-``ensemble_members`` filter in ``_load_engineering_inputs`` (training keeps only the control)."""
+``ensemble_members`` filter in ``load_engineering_inputs`` (training keeps only the control)."""
 
 
 def _write_nwp(path: str) -> None:
-    """Write a minimal Nwp-shaped Delta (Float32 physical-unit weather cols) for two cells/days.
+    """Write a minimal Nwp-shaped Delta (Float32 physical-unit weather cols).
 
     Each (cell, valid_time) carries all of ``_NWP_ENSEMBLE_MEMBERS`` so tests can assert that
     training narrows NWP to the control member while prediction would keep every member.
+
+    Three (cell, day) combinations, so each of ``load_engineering_inputs``'s scan predicates is the
+    *only* thing that can remove one of them:
+
+    - ts1's cell, in-window — the rows every test expects to survive.
+    - ts2's cell, in-window on the same ``init_time`` and ``valid_time``s as ts1's. Only the
+      ``h3_index`` predicate can drop these, so a test that requests ts1 alone and still sees ts2's
+      cell has caught the cell prune going missing.
+    - ts1's cell again, initialised at ``_EARLY_INIT_TIME`` — before the training window — and
+      forecasting into its first day. Only the ``MAX_NWP_LEAD`` lookback keeps these, so their
+      absence means the lookback has gone.
     """
     records = []
-    for cell, day in ((_TS1_CELL, _IN_WINDOW), (_TS2_CELL, _AFTER_TRAIN_END)):
-        init_time = day.replace(hour=0)
+    for cell, day, init_time in (
+        (_TS1_CELL, _IN_WINDOW, _IN_WINDOW.replace(hour=0)),
+        (_TS2_CELL, _IN_WINDOW, _IN_WINDOW.replace(hour=0)),
+        (_TS1_CELL, _TRAIN_START, _EARLY_INIT_TIME),
+    ):
         for valid_time in pl.datetime_range(
             day.replace(hour=6), day.replace(hour=8), interval="30m", time_zone="UTC", eager=True
         ):
@@ -178,12 +205,13 @@ def test_load_engineering_inputs_filters_ensemble_members(env: None) -> None:
     train_start = datetime(2024, 4, 1, tzinfo=UTC)
     train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=UTC)
 
-    _, _, nwp_control = _load_engineering_inputs(
-        settings, [1, 2], train_start, train_end, ensemble_members=[0]
+    metadata = _load_roster(settings, [1, 2])
+    _, nwp_control = load_engineering_inputs(
+        settings, [1, 2], metadata, train_start, train_end, ensemble_members=[0]
     )
     assert nwp_control.collect()["ensemble_member"].unique().sort().to_list() == [0]
 
-    _, _, nwp_all = _load_engineering_inputs(settings, [1, 2], train_start, train_end)
+    _, nwp_all = load_engineering_inputs(settings, [1, 2], metadata, train_start, train_end)
     assert nwp_all.collect()["ensemble_member"].unique().sort().to_list() == list(
         _NWP_ENSEMBLE_MEMBERS
     )
@@ -192,19 +220,46 @@ def test_load_engineering_inputs_filters_ensemble_members(env: None) -> None:
 def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     env: None,
 ) -> None:
-    """NWP is pruned to the requested series' H3 cells and the window's ``init_time`` partitions."""
+    """NWP is pruned to the requested series' H3 cells, over an ``init_time`` range that reaches
+    back ``MAX_NWP_LEAD`` before the window."""
     settings = Settings()
-    train_start = datetime(2024, 4, 1, tzinfo=UTC)
+    train_start = _TRAIN_START
     train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=UTC)
 
-    # Requesting only ts1 must scan only ts1's cell, never ts2's.
-    _, _, nwp_ts1 = _load_engineering_inputs(settings, [1], train_start, train_end)
+    # Both cells carry the same in-window init_time and valid_times, so requesting ts1 alone can
+    # only drop ts2's cell through the h3_index predicate.
+    _, nwp_ts1 = load_engineering_inputs(
+        settings,
+        time_series_ids=[1],
+        metadata=_load_roster(settings, [1]),
+        window_start=train_start,
+        window_end=train_end,
+    )
     assert nwp_ts1.collect()["h3_index"].unique().to_list() == [_TS1_CELL]
+    # ts2's only power is after train_end, so widen the window before asserting the power scan is
+    # pruned by population — otherwise the window filter would be doing the work.
+    power_wide, _ = load_engineering_inputs(
+        settings,
+        time_series_ids=[1],
+        metadata=_load_roster(settings, [1]),
+        window_start=train_start,
+        window_end=_AFTER_TRAIN_END + timedelta(days=1),
+    )
+    assert power_wide.collect()["time_series_id"].unique().to_list() == [1]
 
-    # Requesting both: ts2's cell is initialised at 2025-08-01 (after train_end), so the init_time
-    # partition prune drops it entirely — only ts1's in-window cell survives.
-    _, _, nwp_both = _load_engineering_inputs(settings, [1, 2], train_start, train_end)
-    assert nwp_both.collect()["h3_index"].unique().to_list() == [_TS1_CELL]
+    # Requesting both keeps both, so the line above is a prune rather than an empty table.
+    _, nwp_both = load_engineering_inputs(
+        settings,
+        time_series_ids=[1, 2],
+        metadata=_load_roster(settings, [1, 2]),
+        window_start=train_start,
+        window_end=train_end,
+    )
+    assert sorted(nwp_both.collect()["h3_index"].unique().to_list()) == [_TS1_CELL, _TS2_CELL]
+
+    # The run initialised before the window still reaches it: init_time_start defaults to
+    # window_start - MAX_NWP_LEAD, not to window_start.
+    assert _EARLY_INIT_TIME in nwp_ts1.collect()["init_time"].unique().to_list()
 
 
 def _fold_run(client: MlflowClient) -> Run:
@@ -220,7 +275,7 @@ def _fold_run(client: MlflowClient) -> Run:
 
 
 def test_trained_cv_model_trains_and_saves_to_mlflow(
-    env: None, dagster_instance: DagsterInstance
+    env: None, dagster_instance: DagsterInstance, tmp_path: Path
 ) -> None:
     _register(dagster_instance)
 
@@ -242,6 +297,15 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(
     # past train_end, so the inclusive-window filter excludes it).
     loaded = XGBoostForecaster.load_from_mlflow(fold_run.info.run_id)
     assert loaded.trained_time_series_ids == [1]
+
+    # The archive also carries the roster rows the model was engineered against, which is what
+    # `live_forecasts` locates its time series by instead of reading the roster.
+    model_dir = tmp_path / "promoted"
+    fetch_model_artifacts(fold_run.info.run_id, model_dir)
+    frozen = load_trained_metadata(model_dir)
+    # Narrowed to the trained population, not the wider eligible one it was engineered over.
+    assert frozen["time_series_id"].to_list() == [1]
+    assert frozen["h3_res_5"].item() == _TS1_CELL
 
 
 def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(

@@ -184,7 +184,7 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
 docs.** Three changes to the shared rails, none baseline-specific.
 
 - **`uses_nwp_ensemble: ClassVar[bool] = True` on `BaseForecaster`.** `cv_power_forecasts` passes
-  `ensemble_members=[0]` to `_load_engineering_inputs` when a class sets it `False`. Semantics to
+  `ensemble_members=[0]` to `load_engineering_inputs` when a class sets it `False`. Semantics to
   document: `True` → the forecaster consumes the NWP member axis (output members = NWP members);
   `False` → the forecaster does **not fan out across NWP members** — it either passes member 0
   through (persistence) or synthesises its own member axis (`nged_incumbent`: 13 analogues;
@@ -194,7 +194,7 @@ docs.** Three changes to the shared rails, none baseline-specific.
   `weather_source: "none"` does **not** mean "no NWP input": in bulk mode the control-member NWP scan
   defines the shared `(init_time, valid_time)` forecast-run grid, which is what keeps every
   leaderboard row — baseline or ML — scored on the identical grid.
-- **Power-lag lookback at feature-engineering load time.** Today `_load_engineering_inputs` filters
+- **Power-lag lookback at feature-engineering load time.** Today `load_engineering_inputs` filters
   power to `[window_start, window_end]`, and `_apply_power_lag` reads lags from that same frame — so
   any lag longer than the elapsed window is null. This is a real existing gap: XGBoost's 336 h lag is
   null for the first fortnight of every validation window, and the incumbent's 49–55-week lags would
