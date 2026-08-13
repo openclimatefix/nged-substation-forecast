@@ -116,6 +116,14 @@ the upstream scatter documented above lands outside the small GB box we download
 therefore a correctness fix — the estimator was wrong, and a wholly-uncovered cell was a false
 zero — rather than a change that recovers much data.
 
+A surviving cell can rest on very little of its own area. `compute_h3_grid_weights` samples each
+cell with H3 children two resolutions finer by default — 49 of them for a hexagon, 7² — and on the
+V1 grid every `proportion` comes out an exact multiple of 1/49, so the least a single grid point can
+carry is 2.0% of its cell. 294 of that grid's 1671 cells contain a point at the floor, 572 contain
+one under 5%, and 859 contain one under 10%. A cell reduced to one of those points is stored exactly
+like a fully-covered one: the `Nwp` contract has no column for the contributing weight, and
+`_aggregate_grid_points_to_h3_cells` drops it once the division is done.
+
 A cell where *no* point contributed is a different case, and it yields **null**, never `0.0`. That
 distinction is the whole reason the contributing weight is computed rather than assumed: Polars
 sums an all-null group to `0.0`, which for weather is a physically plausible, in-bounds lie
