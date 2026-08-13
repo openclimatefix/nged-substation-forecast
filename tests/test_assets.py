@@ -11,6 +11,7 @@ the wiring, branching, and metadata each asset owns — stubbing the S3/network 
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import patito as pt
@@ -358,7 +359,11 @@ def test_power_time_series_and_metadata_handles_no_new_data(
         value=lambda self: _FakeS3Store(_NGED_FILES),
     )
 
+    calls = 0
+
     def _raise_no_new_data(store: object, paths_df: object) -> None:
+        nonlocal calls
+        calls += 1
         raise NoNewData
 
     monkeypatch.setattr(target=assets, name="download_and_parse_files", value=_raise_no_new_data)
@@ -367,6 +372,101 @@ def test_power_time_series_and_metadata_handles_no_new_data(
     assert result.success
     assert not (env / "NGED" / "metadata.parquet").exists()
     assert not (env / "NGED" / "power_time_series.delta").exists()
+    # Once, not retried: an hour in which NGED published nothing new is the common case, so
+    # `NoNewData` has to be caught ahead of the retry guard that wraps the same block.
+    assert calls == 1
+
+
+def test_power_time_series_and_metadata_retries_a_transient_upstream_failure(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """A blip reading NGED's bucket costs a short wait, not a failed run: no data is lost either
+    way, so failing would report a fault that has already fixed itself.
+
+    The assertions on the written data are the point of doing this through ``materialize`` rather
+    than counting calls alone — a second attempt re-lists and re-downloads everything, so this is
+    also what pins down that re-running the ingest cannot duplicate rows.
+    """
+    monkeypatch.setattr(
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
+    )
+    real_download = assets.download_and_parse_files
+    calls = 0
+
+    def _fail_once(store: Any, paths_df: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("transient object-store error")
+        return real_download(store, paths_df)
+
+    monkeypatch.setattr(target=assets, name="download_and_parse_files", value=_fail_once)
+
+    result = materialize([power_time_series_and_metadata], instance=dagster_instance)
+    assert result.success
+    assert calls == 2
+
+    metadata = pl.read_parquet(env / "NGED" / "metadata.parquet")
+    assert set(metadata["time_series_id"].to_list()) == {10, 11}
+    power = pl.read_delta(str(env / "NGED" / "power_time_series.delta")).sort(
+        PowerTimeSeries.columns_to_sort_by
+    )
+    PowerTimeSeries.validate(power)
+    assert set(power["time_series_id"].unique().to_list()) == {10, 11}
+
+
+def test_power_time_series_and_metadata_gives_up_after_its_retry_budget(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """A persistent outage still fails, and still reports — the retry only buys the budget."""
+    monkeypatch.setattr(
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
+    )
+    calls = 0
+
+    def _always_fail(store: object, paths_df: object) -> None:
+        nonlocal calls
+        calls += 1
+        raise OSError("object store is down")
+
+    monkeypatch.setattr(target=assets, name="download_and_parse_files", value=_always_fail)
+
+    result = materialize(
+        [power_time_series_and_metadata], instance=dagster_instance, raise_on_error=False
+    )
+    assert not result.success
+    assert calls == assets._POWER_INGEST_MAX_RETRIES + 1
+
+
+def test_power_time_series_and_metadata_does_not_retry_a_cancelled_run(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The retry guard wraps everything that reads NGED's bucket, so it is also the place a
+    cancellation would be swallowed. It re-raises instead: a run the operator cancelled has to stop
+    at once, not read the bucket twice more first."""
+    monkeypatch.setattr(
+        target=assets.Settings,
+        name="get_nged_s3_store",
+        value=lambda self: _FakeS3Store(_NGED_FILES),
+    )
+    calls = 0
+
+    def _cancel(store: object, paths_df: object) -> None:
+        nonlocal calls
+        calls += 1
+        raise DagsterExecutionInterruptedError
+
+    monkeypatch.setattr(target=assets, name="download_and_parse_files", value=_cancel)
+
+    result = materialize(
+        [power_time_series_and_metadata], instance=dagster_instance, raise_on_error=False
+    )
+    assert not result.success
+    assert calls == 1
 
 
 # --- h3_grid_weights -----------------------------------------------------------------------------

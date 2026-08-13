@@ -218,6 +218,37 @@ is configured — so laptops and CI stay silent by default.
     that degrades rather than failing — today, `power_time_series_and_metadata`'s roster upsert. Since
     log capture is off, either handler's `ERROR` log alone would reach nobody.
 
+    Those tags are what an alert rule routes on, and the failure hook is the one sender that would
+    otherwise arrive with nothing to route on — so it tags `fault_category:run_failed`. That is a
+    *positive* marker on the one class worth telling a human about, rather than a rule phrased as
+    "error level, and neither degradation tag is set", which is correct today and misclassifies
+    silently the day a fifth sender is added.
+
+    **What deliberately never becomes an event.** A transient failure reading NGED's bucket is
+    retried in-band by `power_time_series_and_metadata` — twice, seconds apart — because nothing is
+    lost by waiting: the asset re-lists the bucket from scratch on each attempt and the next hourly
+    run back-fills anyway, so failing would report a fault that has already fixed itself. A
+    persistent outage still exhausts the budget, fails, and reports. Cancelling a run is likewise
+    not a fault, so the hook drops `KeyboardInterrupt`, `SystemExit` and
+    `DagsterExecutionInterruptedError` rather than reporting the operator's own decision.
+
+    **Why that retry is in-band rather than a Dagster `RetryPolicy`.** A `RetryPolicy` on the asset
+    would be the shorter spelling, and it is unsafe here. `dagster._core.execution.plan.utils`
+    converts an interrupt into a retry request whenever the op carries a policy, and Dagster
+    delivers a termination as exactly one interrupt: that interrupt is consumed by the conversion,
+    the step restarts, no second signal arrives, and the cancelled run finishes **green** having
+    written its data. That is measured against Dagster 1.13.17, not inferred. A `RetryPolicy` also
+    retries the *whole* body, so a bug occurring after the Delta append would be retried, dedupe to
+    a no-op on the second attempt, and turn a real failure into a green run every hour. Raising
+    `RetryRequested` from inside a guard that re-raises the three interrupt types keeps cancellation
+    immediate and aims the retry at the upstream read alone. `ecmwf_ens` uses the same idiom for
+    "the NWP run is not published yet".
+
+    Because a retry restarts the whole step, the exception the hook finally receives is a
+    `RetryRequested` wrapper. Dagster unwraps only its own `RetryRequestedFromPolicy`, so the hook
+    unwraps the plain class too — otherwise every exhausted retry would group in Sentry under
+    `RetryRequested` rather than under the fault that caused it.
+
 - **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
   `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron
   monitor; Sentry raises the alarm when no heartbeat lands within the margin (the 6-hourly schedule

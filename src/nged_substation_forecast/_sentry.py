@@ -5,7 +5,10 @@ Sentry configuration:
 
 - **Error telemetry** — :func:`init_sentry` initialises the SDK once per process (a no-op unless
   ``Settings.sentry_dsn`` is set), and the :data:`sentry_capture_failure` Dagster failure hook
-  reports the real exception (with traceback) from inside the run worker.
+  reports the real exception (with traceback) from inside the run worker, tagged
+  :data:`FAULT_CATEGORY_TAG` so an alert rule can tell a failed run from the degradation events
+  below. It reports neither a cancelled run nor the bare ``RetryRequested`` wrapper around an
+  exhausted in-band retry.
   :func:`report_check_degradation` and :func:`report_asset_degradation` cover the production faults
   the hook cannot see, because they never fail a run: a check, or an asset, that caught its own
   exception instead of raising. The hook is used
@@ -41,7 +44,12 @@ from typing import TYPE_CHECKING, Final, TypedDict
 
 import sentry_sdk
 from contracts.settings import Settings
-from dagster import HookContext, failure_hook
+from dagster import (
+    DagsterExecutionInterruptedError,
+    HookContext,
+    RetryRequested,
+    failure_hook,
+)
 from sentry_sdk.crons import capture_checkin
 from sentry_sdk.crons.consts import MonitorStatus
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -116,20 +124,60 @@ def init_sentry(settings: Settings) -> None:
     )
 
 
+FAULT_CATEGORY_TAG: Final[str] = "fault_category"
+"""Tag naming what *kind* of fault an event reports, so an alert rule can route by urgency.
+
+Only :data:`sentry_capture_failure` sets it, because it is the only sender that would otherwise
+arrive unmarked: :func:`report_asset_degradation` tags ``degraded_asset``,
+:func:`report_check_degradation` tags ``asset_check``, and :func:`report_power_freshness` sends at
+``warning`` level with a stable fingerprint. Marking the alerting class *positively* is what
+matters — a rule phrased as "error level, and neither degradation tag is set" is correct today and
+misclassifies silently the day a fifth sender is added."""
+
+RUN_FAILED_FAULT_CATEGORY: Final[str] = "run_failed"
+"""The one :data:`FAULT_CATEGORY_TAG` value: a scheduled production job failed, so that cycle did
+not run. Distinct from the degradation senders, where the service carried on with reduced
+function."""
+
+
 @failure_hook
 def sentry_capture_failure(context: HookContext) -> None:
     """Report a failed op/asset step to Sentry with its real exception and traceback.
 
     Runs in the run worker after a step raises, so ``context.op_exception`` is the live exception
-    (traceback intact) rather than Dagster's serialized error info. A no-op when Sentry is
+    (traceback intact) rather than Dagster's serialized error info. Tagged
+    ``fault_category=run_failed`` (see :data:`FAULT_CATEGORY_TAG`). A no-op when Sentry is
     uninitialised (empty DSN), because ``capture_exception`` needs an active Sentry client.
+
+    Two exceptions are treated specially, so that what reaches Sentry names the actual fault:
+
+    - **A retry request is unwrapped to its cause.** Dagster's own ``HookContext.op_exception``
+      unwraps a ``RetryRequestedFromPolicy`` but not the plain ``RetryRequested`` that ``ecmwf_ens``
+      and ``power_time_series_and_metadata`` raise in-band, so an exhausted retry would otherwise
+      be titled and grouped as ``RetryRequested`` — hiding, say, ``NwpRunNotYetAvailable``. The
+      whole chain is serialized either way; what this fixes is the title and the grouping.
+    - **A deliberate exit is not reported at all.** A cancelled or terminated run is an operator's
+      decision, not a fault, and the same three types are already re-raised by the guards in
+      ``defs/assets.py`` and ``defs/checks.py``.
 
     Args:
         context: The Dagster hook context for the failed step, carrying ``op_exception``.
     """
     exception = context.op_exception
-    if exception is not None:
-        sentry_sdk.capture_exception(exception)
+    if exception is None:
+        return
+    if isinstance(exception, RetryRequested) and exception.__cause__ is not None:
+        exception = exception.__cause__
+    # Checked *after* the unwrap: a cancellation arrives wrapped whenever a retry guard converted
+    # it, and unwrapped when none did.
+    if isinstance(exception, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+        return
+    _capture_tagged(
+        tag=FAULT_CATEGORY_TAG,
+        value=RUN_FAILED_FAULT_CATEGORY,
+        exc=exception,
+        failure_note="Failed to report a failed step to Sentry",
+    )
 
 
 def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str) -> None:
