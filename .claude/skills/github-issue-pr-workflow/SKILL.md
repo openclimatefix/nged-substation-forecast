@@ -90,7 +90,7 @@ git log origin/main..HEAD --format='%B' | grep -inE "$KW"
 ```
 
 **`closingIssuesReferences` proves nothing before the merge.** It stays `[]` right up to the point
-the merge lands and only then fills in. A PR body reading "tracked in issue #593, which this does
+the merge lands and only then fills in. A PR body reading "tracked in issue \#593, which this does
 not close" reported `[]` when checked minutes before merging, registered a closing link on merge,
 and closed 593. Commit-message keywords are invisible to the field for the same reason. Treat an
 empty result as no evidence at all.
