@@ -16,6 +16,7 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.ml_schemas import AllFeatures
+from contracts.power_schemas import TimeSeriesMetadata
 from dagster import DagsterInstance, RunConfig, TableMetadataValue, materialize
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
@@ -78,7 +79,15 @@ def _save_trained_model_to_mlflow(
         # Tag as a fold run, matching what trained_cv_model does via get_or_create_fold_run — so
         # list_promotable_runs (and the promotable_model_runs asset) picks this run up.
         mlflow.set_tags({"cv_role": "fold", "fold_id": "test_fold"})
-    forecaster.save_to_mlflow(run_id)
+    metadata = pt.DataFrame(
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series([1], dtype=pl.Int32),
+                "h3_res_5": pl.Series([10], dtype=pl.UInt64),
+            }
+        )
+    ).set_model(TimeSeriesMetadata)
+    forecaster.save_to_mlflow(run_id, time_series_metadata=metadata)
     return run_id
 
 

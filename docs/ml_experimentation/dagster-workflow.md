@@ -32,8 +32,9 @@ gridded NWP forecasts onto the H3 cells attached to each substation.
 of your training window). Use "Materialise all" or select a date range in the Dagster UI.
 
 Downloads the 00Z ECMWF ENS run for each partition date, converts it to a Polars DataFrame, and
-appends it to `nwp_data.delta` (partitioned by `[nwp_model_id, init_time]`) as physical-unit
-`Float32` rounded to a 13-bit significand at write time by `delta_store.nwp`. The `pool="ECMWF"` concurrency limit prevents OOM errors when
+writes it to `nwp_data.delta` (partitioned by `[nwp_model_id, init_time]`) as physical-unit
+`Float32` rounded to a 13-bit significand at write time by `delta_store.nwp`. Each run replaces its
+own partition, so re-materialising a date range you have already ingested is safe. The `pool="ECMWF"` concurrency limit prevents OOM errors when
 backfilling — Dagster schedules downloads one at a time if you materialise many partitions at
 once.
 
@@ -121,7 +122,8 @@ written, so a rejected re-registration leaves the experiment exactly as it was.
 7. Calls `forecaster.train(features, eligible_ids)` (the population is passed explicitly). The asset
    then **raises** if zero boosters were trained (e.g. no series had usable power in the window).
 8. Resolves the MLflow fold run by tag and uploads the trained model artifacts via
-   `forecaster.save_to_mlflow(fold_run_id)`.
+   `forecaster.save_to_mlflow(fold_run_id, time_series_metadata=...)`, which puts the roster rows
+   the model trained against into the archive alongside it.
 9. Records the training run on the fold run as **tags**: the training window (`train_start`,
    `train_end`) and the populations (`n_eligible_time_series`, `n_trained_time_series`).
 

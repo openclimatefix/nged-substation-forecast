@@ -11,8 +11,9 @@ from typing import ClassVar, Final, Self
 
 import mlflow
 import patito as pt
+import polars as pl
 from contracts.ml_schemas import AllFeatures
-from contracts.power_schemas import PowerForecast
+from contracts.power_schemas import PowerForecast, TimeSeriesMetadata
 from mlflow.exceptions import MlflowException
 from pydantic import BaseModel, ConfigDict, field_serializer
 
@@ -32,6 +33,29 @@ API to clean them up. One replaceable archive makes that accumulation impossible
 
 A run holding exactly *one* model file is what the fix rests on: logging a second per-model
 artifact alongside this archive would reopen the merge problem for that artifact.
+"""
+
+TRAINED_METADATA_FILENAME: Final[str] = "time_series_metadata.parquet"
+"""Name of the ``TimeSeriesMetadata`` rows a saved model carries for its trained population.
+
+Production inference reads each series' location from here, never from the
+``TimeSeriesMetadata`` roster, so an unreadable or thinned roster cannot fail a live slot or
+silently drop a series from it. Being the model's own frozen copy of what it trained against also
+keeps a series' H3 cell and static feature values identical between training and serving. See
+<https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
+
+Logging it as a second MLflow artifact instead of putting it in the model directory would reopen
+the merge problem ``_MLFLOW_MODEL_ARTIFACT`` documents.
+"""
+
+_UNPERSISTED_METADATA_COLUMN: Final[str] = "area_wkt"
+"""The one ``TimeSeriesMetadata`` column ``write_trained_metadata`` drops.
+
+Measured on the V1 roster (32 series, 12 columns): the frame is 129,582 bytes and ``area_wkt``
+holds 127,635 of them — 98.5%, against under 2 KB for everything else. Nothing in the feature
+pipeline reads it, and at V2 scale (~2,500 series) it would put megabytes of polygon text into
+every fold's archive. It is ``allow_missing``, so the frame still validates against
+``TimeSeriesMetadata`` without it.
 """
 
 _ARCHIVE_COMPRESSLEVEL: Final[int] = 1
@@ -58,6 +82,57 @@ def _archive_model_dir(model_dir: Path, archive_path: Path) -> None:
     with tarfile.open(archive_path, "w:gz", compresslevel=_ARCHIVE_COMPRESSLEVEL) as tar:
         for item in sorted(model_dir.iterdir()):
             tar.add(item, arcname=item.name)
+
+
+def write_trained_metadata(
+    model_dir: Path, time_series_metadata: pt.DataFrame[TimeSeriesMetadata]
+) -> None:
+    """Write a model's frozen ``TimeSeriesMetadata`` copy into its saved directory.
+
+    Call this *after* a subclass's ``save``, which clears the directory first.
+
+    Args:
+        model_dir: The directory a subclass's ``save`` just wrote.
+        time_series_metadata: The roster rows the model was engineered against.
+            ``_UNPERSISTED_METADATA_COLUMN`` is dropped; everything else is kept.
+    """
+    # `pl.exclude` rather than `drop`: Patito overrides `DataFrame.drop` with a signature that
+    # takes no `strict=False`, and the column is `allow_missing`, so it may not be there to drop.
+    time_series_metadata.select(pl.exclude(_UNPERSISTED_METADATA_COLUMN)).write_parquet(
+        model_dir / TRAINED_METADATA_FILENAME
+    )
+
+
+def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
+    """Read back the ``TimeSeriesMetadata`` rows a saved model carries.
+
+    ``set_model`` rather than ``validate``, matching how the R&D assets read the roster itself:
+    this reads back what was written, so re-checking it would only reject rosters the rest of the
+    system already accepts.
+
+    Args:
+        model_dir: A directory written by ``save_to_mlflow`` (via ``write_trained_metadata``) and
+            typically unpacked by ``fetch_model_artifacts``.
+
+    Returns:
+        One row per series in ``trained_time_series_ids`` — the population the model will serve a
+        ``predict`` for, not the wider one it was engineered over — without
+        ``_UNPERSISTED_METADATA_COLUMN``.
+
+    Raises:
+        FileNotFoundError: The directory holds no such file, so it was saved by code predating
+            this file or assembled by hand. This is a promotion fault rather than a data outage —
+            the model on disk is not one this code can serve — so it raises rather than degrading,
+            as a missing ``meta.json`` does.
+    """
+    path = model_dir / TRAINED_METADATA_FILENAME
+    if not path.exists():
+        raise FileNotFoundError(
+            f"The model directory {model_dir} has no {TRAINED_METADATA_FILENAME}, so there is no "
+            "record of where its time series are and it cannot be served. Re-train against the "
+            "current code and promote that run."
+        )
+    return pt.DataFrame(pl.read_parquet(path)).set_model(TimeSeriesMetadata)
 
 
 def _download_and_unpack_model(run_id: str, work_dir: Path, remedy: str) -> Path:
@@ -260,23 +335,37 @@ class BaseForecaster(ABC):
     def load(cls, path: Path) -> Self:
         """Reconstruct a trained instance from a previously saved directory."""
 
-    def save_to_mlflow(self, run_id: str) -> None:
+    def save_to_mlflow(
+        self, run_id: str, *, time_series_metadata: pt.DataFrame[TimeSeriesMetadata]
+    ) -> None:
         """Upload this trained model to the given MLflow run, as one replaceable archive.
 
-        Writes the model to a temporary directory via ``save`` (the subclass's own format),
-        packs that directory into a single ``model.tar.gz`` and logs *that one file* to the
-        run's artifact root. Logging one archive rather than a directory of files is what makes
-        a re-upload **replace** the previous model instead of merging with it — see
-        ``_MLFLOW_MODEL_ARTIFACT``. The caller is responsible for setting the tracking URI
-        (``mlflow.set_tracking_uri``) beforehand.
+        Writes the model to a temporary directory via ``save`` (the subclass's own format), adds
+        the frozen metadata copy (``write_trained_metadata``), packs that directory into a single
+        ``model.tar.gz`` and logs *that one file* to the run's artifact root. Logging one archive
+        rather than a directory of files is what makes a re-upload **replace** the previous model
+        instead of merging with it — see ``_MLFLOW_MODEL_ARTIFACT``. The caller is responsible for
+        setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
 
         Args:
             run_id: The MLflow run to attach the artifact to.
+            time_series_metadata: The roster rows this model was engineered against. Required,
+                because a model uploaded without them cannot be promoted — see
+                ``TRAINED_METADATA_FILENAME``. Narrowed to ``trained_time_series_ids`` before it is
+                written: callers engineer over a wider population than they end up training (an
+                eligible series with no usable power gets no model), and carrying the extras would
+                widen the NWP scan every consumer prunes with these rows.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
             model_dir = Path(tmp_dir) / "model"
             model_dir.mkdir()
             self.save(model_dir)
+            write_trained_metadata(
+                model_dir=model_dir,
+                time_series_metadata=time_series_metadata.filter(
+                    pl.col("time_series_id").is_in(self.trained_time_series_ids)
+                ),
+            )
             archive_path = Path(tmp_dir) / _MLFLOW_MODEL_ARTIFACT
             _archive_model_dir(model_dir, archive_path)
             with mlflow.start_run(run_id=run_id):
