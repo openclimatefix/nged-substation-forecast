@@ -236,10 +236,8 @@ Two null patterns *do* fail ingest:
   whereas the previous run is stale but complete. The judgement is made per `init_time`, so a run
   with an empty column is caught even in a frame that also holds healthy runs.
 
-A run that fails ingest writes nothing, because validation runs before the Delta write, so there are
-no partial partitions to clean up. A run that lands and is later republished upstream can be
-corrected by re-materialising its partition: `write_nwp` overwrites the `(nwp_model_id, init_time)`
-partition rather than appending to it.
+A run that fails ingest writes nothing (validation runs before the Delta write), so there are no
+partial partitions to clean up.
 
 ### The instantaneous variables: scattered nulls, counted on the raw grid
 

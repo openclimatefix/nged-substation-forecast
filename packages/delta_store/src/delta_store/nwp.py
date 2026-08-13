@@ -56,20 +56,6 @@ NWP_WRITER_PROPERTIES: Final[WriterProperties] = WriterProperties(
 that choice, which won for ``power_forecasts``, measures worse here."""
 
 
-def _partition_predicate(nwp: pt.DataFrame[Nwp]) -> str:
-    """Build the SQL predicate naming the one Delta partition ``nwp`` belongs to.
-
-    Read from the frame's first row rather than taken as an argument, so the predicate cannot
-    disagree with the data written alongside it. Rows outside that partition are not silently
-    dropped: delta-rs validates every row against the predicate and rejects the whole write,
-    leaving the table untouched.
-    """
-    return (
-        f"nwp_model_id = '{nwp.item(0, 'nwp_model_id')}' "
-        f"AND init_time = '{nwp.item(0, 'init_time').isoformat()}'"
-    )
-
-
 def write_nwp(
     nwp: pt.DataFrame[Nwp],
     table_uri: str | Path,
@@ -82,20 +68,13 @@ def write_nwp(
     partitioned by ``(nwp_model_id, init_time)``, matching ``Nwp.scan_delta``'s
     partition-pruning assumptions; the first write creates the table.
 
-    The write **replaces** the ``(nwp_model_id, init_time)`` partition it is given rather than
-    appending to it, so re-materialising an ``ecmwf_ens`` partition — to pick up a run
-    Dynamical.org has republished, or after one was killed between the Delta commit and Dagster
-    recording success — costs a rewrite rather than a second copy of the run beside the first.
-    ``Nwp.validate`` sees only the frame in hand, so an appended duplicate would land silently and
-    fan out every later ``Nwp.scan_delta`` read.
-
-    delta-rs' ``replaceWhere`` predicate matches a ``Timestamp`` partition column correctly, which
-    is worth stating because the Hive directory holds a percent-encoded string: confirmed
-    empirically that an ``isoformat()`` literal matches only the named partition, on a local path
-    and on S3 alike, and works on a table that does not exist yet as well as on a partition that
-    does not. Two materialisations of the *same* partition at once contend, and the loser raises
-    ``CommitFailedError`` — one lost run rather than a table needing repair. Disjoint partitions do
-    not contend, so the daily schedule and a backfill of other dates run happily together.
+    The write **replaces** the ``(nwp_model_id, init_time)`` partition named by the frame's first
+    row, so re-materialising an ``ecmwf_ens`` partition leaves one copy of the run. delta-rs checks
+    every row against that predicate and rejects the whole write, table untouched, if any row falls
+    outside it (confirmed empirically against ``deltalake`` 1.6.2, locally and on S3, on a
+    partition column despite its percent-encoded Hive directory name). Two materialisations of the
+    *same* partition at once contend and the loser raises ``CommitFailedError``; disjoint
+    partitions do not.
 
     Args:
         nwp: Validated, non-empty NWP rows for a single ``(nwp_model_id, init_time)`` partition.
@@ -122,7 +101,10 @@ def write_nwp(
         table_or_uri=table_uri,
         data=prepared,
         mode="overwrite",
-        predicate=_partition_predicate(nwp),
+        predicate=(
+            f"nwp_model_id = '{nwp.item(0, 'nwp_model_id')}' "
+            f"AND init_time = '{nwp.item(0, 'init_time').isoformat()}'"
+        ),
         partition_by=["nwp_model_id", "init_time"],
         writer_properties=NWP_WRITER_PROPERTIES,
         storage_options=typeddict_to_dict(storage_options),

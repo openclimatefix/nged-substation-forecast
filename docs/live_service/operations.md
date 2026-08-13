@@ -309,13 +309,12 @@ and mind the gap when reading the trend. The run still lands. One Sentry event i
 
 **Re-materialising a partition that has already landed replaces it.** `write_nwp` overwrites the
 `(nwp_model_id, init_time)` partition it is handed rather than appending to it, so re-running the
-partition after Dynamical republishes a run swaps the short copy for the complete one. That holds
-for a partition whose run *failed* too, whether it wrote nothing (validation and both quality
-assessments all run before the Delta write) or left rows on disk after being killed between the
-Delta commit and Dagster recording success — re-running replaces whatever landed, so there is no
-need to inspect the table first.
+partition after Dynamical republishes a run swaps the short copy for the complete one. Wait until
+they actually have: a re-run against a run that is still incomplete replaces the good rows with the
+short ones. The same holds for a partition whose run *failed* — re-running replaces whatever
+landed, so there is no need to inspect the table first.
 
-Two consequences worth knowing before you re-run:
+Two things a re-run does cost:
 
 - **Do not re-materialise a partition while another materialisation of that same partition is
   running.** The two writes contend and the loser fails with delta-rs' `CommitFailedError`. That
@@ -323,8 +322,7 @@ Two consequences worth knowing before you re-run:
   do not contend at all, so a backfill alongside the daily schedule is fine.
 - **The superseded rows stay on disk.** Delta marks the old parquet files as removed rather than
   deleting them, and nothing here runs `vacuum`, so replacing a V1 partition leaves ~7.24M dead
-  rows behind. Reads are unaffected — every reader goes through the transaction log — but the
-  table on disk grows by roughly one partition each time.
+  rows behind. Reads are unaffected — every reader goes through the transaction log.
 
 Every materialisation whose completeness assessment succeeded also publishes `n_ensemble_members`,
 `n_valid_times`, `n_h3_cells` and the `valid_time` range as metadata, so the Dagster UI timeline

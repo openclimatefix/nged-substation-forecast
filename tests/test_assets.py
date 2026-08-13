@@ -609,8 +609,7 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
 
     assert exc_info.value.max_retries == _ECMWF_ENS_MAX_RETRIES
     assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS
-    # Validation runs before the Delta append, so a retry (or a later manual re-run) has no partial
-    # partition to double-count against.
+    # Validation runs before the Delta write, so a retry leaves no partial partition behind.
     assert not Path(Settings().nwp_data_path).exists()
 
 
@@ -681,7 +680,7 @@ def _stub_ecmwf_download(monkeypatch: pytest.MonkeyPatch, init_time: datetime) -
 def test_ecmwf_ens_assesses_before_writing(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """The check *results* are built before the Delta append, not just the assessments.
+    """The check *results* are built before the Delta write, not just the assessments.
 
     ``_nwp_quality_check_result`` reaches ``_nwp_null_slices_metadata``, which sorts the affected
     frame and builds a ``TableRecord`` per row — the most raise-prone code in the block, and the
@@ -723,10 +722,7 @@ def test_ecmwf_ens_re_materialising_a_partition_does_not_duplicate_rows(
         result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
         assert result.success
 
-    written = pl.read_delta(Settings().nwp_data_path)
-    assert written.height == 4
-    key = ["nwp_model_id", "init_time", "valid_time", "ensemble_member", "h3_index"]
-    assert not written.select(key).is_duplicated().any()
+    assert pl.read_delta(Settings().nwp_data_path).height == 4
 
 
 def test_ecmwf_ens_publishes_both_null_populations(
