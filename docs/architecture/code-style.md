@@ -169,7 +169,11 @@ Three places where a positional argument is right:
   annotations (`pt.DataFrame[MySchema]`, `pt.LazyFrame[MySchema]`) whenever a function consumes or
   returns data that conforms to an existing schema — whether the function is public or private.
   Don't invent a new schema just to annotate a private helper; if no existing schema fits, use
-  plain `pl.DataFrame` / `pl.LazyFrame`.
+  plain `pl.DataFrame` / `pl.LazyFrame`. **A schema is the authoritative account of what the data
+  means, so when code and contract disagree the code is the first suspect** — never widen a field
+  or relax a range just to make a failing `validate()` pass, and ask Jack before changing a
+  contract at all. The reasoning is in
+  [Contracts / Design Principles](../api/contracts/index.md).
 - **Patito friction budget**: the `polars-patito-gotchas` skill documents five Patito gotchas
   (cross-model LazyFrame joins, dict-`.cast` on model-bearing frames, `ge`/`le` silently ignored
   on a datetime field, `pt.LazyFrame` methods typed as plain `pl.LazyFrame`, and Delta

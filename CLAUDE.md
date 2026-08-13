@@ -160,6 +160,12 @@ any code moves:
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
+**Ask Jack before changing a Patito data contract.** The schemas in `packages/contracts/` are the
+authoritative account of what the data means, so code that violates one is usually the thing at
+fault. Widening a field to `| None` or relaxing a range to make a failing `validate()` pass hides
+the defect in the one place the rest of the system trusts. Reasoning and the rest of the rule:
+[`packages/contracts/README.md`](packages/contracts/README.md).
+
 **Why:** Jack reviews diffs in GitHub's UI and wants a PR to already have survived an
 adversarial pass by the time he looks at it, so his review is the last line of defence rather
 than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by the

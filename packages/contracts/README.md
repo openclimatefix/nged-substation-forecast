@@ -20,6 +20,14 @@ This package is designed to be extremely lightweight. It defines the *shape* of 
 
 ## Design Principles
 
+- **The contract is the authoritative account of what the data means.** It says what the data
+  *should* be, not what some current code path happens to produce. So when code and contract
+  disagree, the code is the first suspect: a null the contract forbids usually means an upstream
+  join kept a row it should have dropped, or a caller passed input it should have rejected.
+  Widening a field to `| None`, or relaxing a range, so that a failing `validate()` passes buries
+  that defect in the one place the rest of the system trusts. Fix the code instead, and change the
+  contract only when you can say what the data now means and why that meaning is right. **Ask Jack
+  before changing a contract**, including a widening that looks like a formality.
 - **Column naming**: Prefer `snake_case`, except for acronyms or SI units. Capitalise "DER" (distributed energy resource) and use uppercase for "MW" (megawatts).
 - **Semantic checks**: Range validation should be generous — the aim is to catch physically impossible values (e.g., 1 GW from a 1 MW solar farm), not possible-but-unlikely values.
 - **Datetime ranges**: Timestamps on the columns where external data enters — `PowerTimeSeries.time`, `Nwp.init_time` and `Nwp.valid_time` — are bounded to `[MIN_PLAUSIBLE_DATETIME, MAX_PLAUSIBLE_DATETIME]` (2000-01-01 to 2100-01-01, inclusive), which rejects a corrupt feed or an epoch-unit mix-up without ever excluding a real reading. The check lives in each model's `validate` override via `check_datetime_bounds`, because Patito silently ignores `ge`/`le` on a datetime field — it derives its bounds checks from the JSON schema's `minimum`/`maximum`, which JSON Schema defines for numbers only. Columns on our own *output* schemas (`PowerForecast`, `EffectiveCapacity`, `AllFeatures`) have not opted in: they are computed from already-bounded inputs rather than received from outside.
