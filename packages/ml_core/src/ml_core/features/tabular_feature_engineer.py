@@ -179,8 +179,8 @@ def _engineer_features(
     weather_lags = [lag for lag in parsed_features.lags if lag.base_col != "power"]
     # Probe the raw NWP rather than `processed_nwp`: `ensemble_member` is one of the upsample's
     # group-by keys, so the upsample can neither create nor destroy control-member rows, and
-    # `SLICE` cannot push through its sort and window functions — probing the upsampled frame
-    # would run the whole upsample before answering.
+    # `SLICE` cannot push through its window functions — probing the upsampled frame would run
+    # the whole upsample before answering.
     if (
         nwp_lf is not None
         and weather_lags

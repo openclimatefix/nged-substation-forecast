@@ -173,9 +173,9 @@ def test_bulk_and_single_run_features_are_identical() -> None:
     # step land at or before the derived power_fcst_init_time, and bulk mode drops those
     # undeliverable hindcast rows after computing features on the full window.
     assert len(bulk) == len(_NWP_RUNS) * len(_MEMBERS) * 12
-    # Guard: no fan-out. The row count above would catch a duplicate primary key only while the
-    # rolling mean was computed by a join back onto the frame, which amplified one duplicate into
-    # a visible explosion; the window form absorbs it silently, so assert the key directly.
+    # Guard: no fan-out. The row count above cannot catch a duplicate primary key — every step of
+    # the pipeline emits one row per input row, so a duplicate stays invisible in the count.
+    # Assert the key directly.
     pk_cols = ["time_series_id", "power_fcst_init_time", "valid_time", "ensemble_member"]
     assert bulk.select(pk_cols).n_unique() == len(bulk)
     # Guard: the power lag must actually resolve to non-null observed values for some rows,

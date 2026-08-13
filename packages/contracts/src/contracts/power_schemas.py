@@ -428,9 +428,9 @@ class PowerForecast(pt.Model):
     ) -> pt.DataFrame[Self]:
         """Validate the given dataframe, ensuring the primary key is unique.
 
-        A duplicated primary key means a join upstream fanned out, which corrupts both training
-        and the metrics computed from these rows. It is our own bug rather than the outside world
-        misbehaving, so this raises rather than degrading — see
+        A duplicated primary key means either a join fanned out on the way here or the same rows
+        were written twice, and both corrupt the metrics computed from them. It is our own bug
+        rather than the outside world misbehaving, so this raises rather than degrading — see
         <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
         """
         validated_df = super().validate(
@@ -448,7 +448,7 @@ class PowerForecast(pt.Model):
         if validated_df.select(pk_cols).n_unique() != validated_df.height:
             raise ValueError(
                 f"Duplicate entries found for primary key columns: {pk_cols}. "
-                "This indicates an upstream join fanned out."
+                "Either an upstream join fanned out or these rows were written twice."
             )
 
         return validated_df
