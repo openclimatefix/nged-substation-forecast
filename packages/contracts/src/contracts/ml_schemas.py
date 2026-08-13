@@ -329,11 +329,13 @@ class Metrics(pt.Model):
     metric rows and have the asset enrich them with scope/window provenance before the frame is
     written to the ``forecast_metrics`` Delta table."""
 
-    time_series_type: str | None = pt.Field(
+    time_series_type: str = pt.Field(
         dtype=pl.Enum(TIME_SERIES_TYPE_SLICES),
         allow_missing=True,
         description=(
-            "The time-series category for this row. Null when metadata is unavailable for a series."
+            "The time-series category for this row. Never null: `compute_metrics` raises if any "
+            "scored series has no metadata row, because a null would drop that series out of "
+            "every per-type aggregate while still counting towards the overall mean."
         ),
     )
 

@@ -256,14 +256,20 @@ def test_compute_metrics_populates_time_series_type():
     assert (result["time_series_type"] == "PV").all()
 
 
-def test_compute_metrics_unknown_series_gets_null_type():
-    """Series absent from metadata receive null time_series_type (left join)."""
+def test_compute_metrics_raises_for_series_with_no_metadata_row():
+    """A scored series absent from metadata is a hard error, not a null type.
+
+    A null would drop the series out of every per-type MLflow aggregate while still counting
+    towards the overall mean, so two experiments scored over the same population would not be
+    comparable — and metrics is R&D, which fails fast.
+    """
     times = [_utc(2022, 1, 1, 0, 0)]
     actuals = _make_actuals(1, times, [10.0])
     forecasts = _make_cv_forecasts(1, times, [10.0])
+
     # ts_id=1 is absent — metadata only knows about ts_id=99.
-    result = compute_metrics(forecasts, actuals, _make_metadata([99]), _make_capacity([1], [10.0]))
-    assert result["time_series_type"].is_null().all()
+    with pytest.raises(ValueError, match=r"No metadata row for time_series_id\(s\) \[1\]"):
+        compute_metrics(forecasts, actuals, _make_metadata([99]), _make_capacity([1], [10.0]))
 
 
 # ---------------------------------------------------------------------------
@@ -695,8 +701,12 @@ def test_build_mlflow_aggregate_metrics_sliced_keys():
     assert "rmse__wind__day_ahead" not in result
 
 
-def test_build_mlflow_aggregate_metrics_null_type_excluded_from_per_type():
-    """Series with null time_series_type contribute to 'all' but not to per-type keys."""
+def test_build_mlflow_aggregate_metrics_keys_every_type_present():
+    """Every series reaches both its per-type key and the overall 'all' key.
+
+    `Metrics.time_series_type` is non-nullable, so there is no null-type population to exclude
+    and the two key families cover the same rows.
+    """
     rows = [
         {
             "time_series_id": 1,
@@ -710,17 +720,16 @@ def test_build_mlflow_aggregate_metrics_null_type_excluded_from_per_type():
             "time_series_id": 2,
             "metric_name": "rmse",
             "metric_value": 4.0,
-            "time_series_type": None,
+            "time_series_type": "Wind",
             "horizon_slice": "all",
             "metric_param": "all",
         },
     ]
     df = pl.DataFrame(rows).cast({"time_series_id": pl.Int32, "metric_value": pl.Float32})
     result = build_mlflow_aggregate_metrics(df)
-    # null type: only "pv" per-type key, not a null-type key
-    assert "rmse__pv" in result
-    assert all("__none" not in k and "null" not in k for k in result)
-    # "all" includes both series
+
+    assert math.isclose(result["rmse__pv"], 2.0, rel_tol=1e-5)
+    assert math.isclose(result["rmse__wind"], 4.0, rel_tol=1e-5)
     assert math.isclose(result["rmse__all"], 3.0, rel_tol=1e-5)
 
 
