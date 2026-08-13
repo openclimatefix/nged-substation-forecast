@@ -115,7 +115,8 @@ def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
             typically unpacked by ``fetch_model_artifacts``.
 
     Returns:
-        One row per series the model was engineered against, without
+        One row per series in ``trained_time_series_ids`` — the population the model will serve a
+        ``predict`` for, not the wider one it was engineered over — without
         ``_UNPERSISTED_METADATA_COLUMN``.
 
     Raises:
