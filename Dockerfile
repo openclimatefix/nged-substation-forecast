@@ -53,14 +53,13 @@ ENV GIT_SHA="${GIT_SHA}" \
 WORKDIR /app
 
 # contracts.settings.PROJECT_ROOT walks up to the nearest ancestor holding uv.lock, so copying
-# uv.lock here anchors every repo-relative default (conf/, metadata/) at /app — which is where
-# the COPYs below place those files. conf/ also keeps conf/model/ available so training jobs
-# (register_experiment_job) can run in-container.
+# uv.lock here anchors the repo-relative default (conf/) at /app — which is where the COPY below
+# places it. conf/ also keeps conf/model/ available so training jobs (register_experiment_job)
+# can run in-container.
 COPY --from=builder /app/.venv /app/.venv
 COPY uv.lock ./
 COPY data/production_model/ data/production_model/
 COPY conf/ conf/
-COPY metadata/ metadata/
 
 ENTRYPOINT ["dagster"]
 # This ENTRYPOINT exists for `docker run` smoke-test ergonomics. In the deployed service every

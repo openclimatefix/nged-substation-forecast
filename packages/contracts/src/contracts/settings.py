@@ -25,7 +25,7 @@ def _find_project_root(start: Path) -> Path:
     non-editable install (``uv sync --no-editable``) walks up from
     ``<repo>/.venv/lib/python*/site-packages/`` past the venv to the same root. The
     production Docker image copies ``uv.lock`` to ``/app``, so there the root resolves to
-    ``/app``, where the image's ``COPY conf/`` / ``COPY metadata/`` place the resource files.
+    ``/app``, where the image's ``COPY conf/`` places the resource files.
 
     When no ancestor holds a ``uv.lock`` — a wheel installed into a venv outside any
     workspace checkout — fall back to the current working directory. Such a deployment must
@@ -45,8 +45,7 @@ def _find_project_root(start: Path) -> Path:
 
 
 PROJECT_ROOT: Final[Path] = _find_project_root(Path(__file__))
-"""The repo root — anchor for the repo-relative defaults below (``conf/``, ``metadata/``,
-``data/``, ``.env``).
+"""The repo root — anchor for the repo-relative defaults below (``conf/``, ``data/``, ``.env``).
 
 Resolved by :func:`_find_project_root`; see its docstring for the per-install-mode behaviour
 and the caveat for wheels installed outside a workspace checkout.
