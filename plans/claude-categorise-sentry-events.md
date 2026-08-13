@@ -231,12 +231,12 @@ Every assertion below fails on `main` today.
 **`tests/test_assets.py`** (the `test_power_time_series_and_metadata_*` block, :195–375 — this
 session's territory; #580 owns only the `test_ecmwf_ens_*` block):
 
-5. `test_power_time_series_and_metadata_retries_a_transient_failure` — stub
+1. `test_power_time_series_and_metadata_retries_a_transient_failure` — stub
    `list_timeseries_json_files` to raise `OSError` on its first call and delegate to the real
    listing afterwards; `materialize(...)`; assert `result.success` **and** that it was called twice.
    *Fails on `main`*: with no retry policy the first `OSError` fails the run. Costs ~2 s of wall
    clock (the first retry delay).
-6. `test_power_time_series_and_metadata_gives_up_after_its_retry_budget` — stub the same function to
+2. `test_power_time_series_and_metadata_gives_up_after_its_retry_budget` — stub the same function to
    raise every time; assert the run fails and the stub was called exactly `max_retries + 1` times.
    *Fails on `main`*: 1 call, not 4. This is the test that pins the budget down; it costs ~14 s, and
    if that proves unacceptable in the suite the fallback is to drop it and keep only a definition
@@ -277,7 +277,8 @@ wall-clock to three tests by design, and the reviewer should see how much.
 2. **Is the ~14 s retry budget right?** *My recommendation: yes, for the reason in the assets.py
    section — the hourly back-fill, not the retry, is what protects the data, so the retry only has
    to cover an instantaneous glitch.* If the reviewer wants a budget measured in minutes instead,
-   test 6 above should be dropped rather than made to sleep, and replaced by an assertion on
+   `test_power_time_series_and_metadata_gives_up_after_its_retry_budget` should be dropped rather
+   than made to sleep, and replaced by an assertion on
    `power_time_series_and_metadata.op.retry_policy`.
 3. **Should blame — upstream vs our code — be tagged at all?** This plan says no, and explains why
    an exception-type allowlist cannot be kept honest. A design that *would* work is a project-defined
