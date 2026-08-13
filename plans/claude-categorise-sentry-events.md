@@ -11,7 +11,7 @@ published".
 types to keep honest:
 
 1. **A bounded in-band retry around the S3-facing region of `power_time_series_and_metadata`** —
-   `raise RetryRequested(...) from exc`, exactly as `ecmwf_ens` already does at `assets.py:369-371`
+   `raise RetryRequested(...) from exc`, exactly as `ecmwf_ens` already does at `assets.py:370-372`
    — so a transient blip never becomes a Sentry event at all. **Not** a Dagster `RetryPolicy` on the
    asset: that mechanism was tried, probed, and rejected on evidence (see "The mechanism, and why
    the obvious one is wrong" below — it makes a cancelled run finish green).
@@ -61,10 +61,11 @@ reviews in `implement-issue`.
 
 **Departure from this session's wave brief:** the brief says to keep the `defs/assets.py` diff to
 the decorator at :75 and the degradation call at :146, on the assumption that the retry would be a
-decorator argument. Change 1 instead edits the asset *body*, roughly lines 95–120. That region is
-well clear of #580's `ecmwf_ens` docstring (:329–338) and #506's NWP region (~:300–680), so there is
-no collision — but it is a departure from the brief as written, and is flagged as open question 1
-for the human to confirm.
+decorator argument. Change 1 instead edits the asset *body*, roughly lines 96–119. Two of the three
+territory constraints the brief named have since expired — #580 merged as PR #589 and #528 as
+PR #591, both of which this branch has merged in — and the remaining one, #506's NWP region
+(~:300–680), is nowhere near the power asset's body. So there is no collision, but it is a departure
+from the brief as written, and is flagged as open question 1 for the human to confirm.
 
 ## The mechanism, and why the obvious one is wrong
 
@@ -84,7 +85,7 @@ signal ever arrives, and the retried attempt runs to completion. Probed with
 ONE-SHOT INTERRUPT + POLICY: run_success=True attempts=2 side_effects=['WROTE DATA']
 ```
 
-That directly defeats `assets.py:143-144`'s `raise  # A cancelled run must cancel.` — a line this
+That directly defeats `assets.py:144`'s `raise  # A cancelled run must cancel.` — a line this
 repo maintains deliberately, with its own regression test — and it is a far worse fault than the
 alert noise it was meant to fix. It is invisible to a probe that raises the interrupt on *every*
 attempt, which is why it is easy to miss.
@@ -101,7 +102,7 @@ attempt, which is why it is easy to miss.
    `run success: True, hook fired: 0`). Wrapping only the S3 read means a bug after that point still
    fails the step and still reports.
 3. **It matches the precedent already in this file.** `ecmwf_ens` uses in-band `RetryRequested` for
-   "upstream not ready" (`assets.py:365-371`), and reviewers of this file will read one idiom rather
+   "upstream not ready" (`assets.py:366-372`), and reviewers of this file will read one idiom rather
    than two.
 
 The one cost of in-band retry — that the failure hook sees a `RetryRequested` instead of the real
@@ -160,8 +161,8 @@ Two `Final` constants beside the existing `_ECMWF_ENS_*` pair, named and documen
 
 The S3-facing region — `list_timeseries_json_files`, `remove_small_files_from_listing`,
 `select_new_rows` and `download_and_parse_files` (`assets.py:96-119`) — is wrapped so that anything
-it raises becomes a bounded retry, using the guard idiom this repo already uses at `assets.py:143`
-and `checks.py:440`:
+it raises becomes a bounded retry, using the guard idiom this repo already uses at `assets.py:140-144`
+and `checks.py:426-432`:
 
 - `except NoNewData` keeps its existing early-return behaviour and **must be handled before the
   retry guard**, or a normal "nothing new on S3" hour would start retrying.
@@ -169,10 +170,10 @@ and `checks.py:440`:
   DagsterExecutionInterruptedError` unchanged, so a cancelled run still cancels; otherwise
   `context.log.warning(...)` and `raise RetryRequested(max_retries=..., seconds_to_wait=...) from exc`.
 
-`BaseException` rather than a list of upstream exception types, for the reason `checks.py:440`
+`BaseException` rather than a list of upstream exception types, for the reason `checks.py:426-431`
 already gives: obstore, delta-rs and polars each define their own classes and a pyo3 panic is not an
 `Exception`, so naming what must *propagate* is the only version that stays true as dependencies
-come and go. `RetryRequested` needs no new import — it is already imported at `assets.py:53` for
+come and go. `RetryRequested` needs no new import — it is already imported at `assets.py:36` for
 `ecmwf_ens`.
 
 **The budget is 2 retries × 2 s = 4 s of waiting, and is deliberately short.** The whole value of
@@ -187,7 +188,7 @@ implies: `RetryRequested` restarts the whole step, so the S3 listing, download a
 At V2 scale (~2,500 series) that is the dominant term. The docs paragraph should say so, and it is
 another reason to keep the retry count at 2.
 
-**Retrying is safe, but not for the reason it first appears.** The Delta append at :152-160 is *not*
+**Retrying is safe, but not for the reason it first appears.** The Delta append at :155-160 is *not*
 the last statement in the body — the summary metadata at :163-171 follows it. Idempotency comes from
 `select_new_rows` instead, which filters on `time > last_time`, so a second attempt appends nothing
 even though the file listing still offers the same file; and `upsert_metadata` is an upsert. In any
@@ -205,13 +206,13 @@ gains, in order:
 1. **The `RetryRequested` unwrap.** When the exception is a `dagster.RetryRequested` with a
    non-`None` `__cause__`, work with the cause instead. The comment should cite
    `HookContext.op_exception`'s own unwrap at `hook.py:134` and say this extends it to the plain
-   class, which `assets.py:369` — and now the power ingest — raises. Must tolerate `__cause__ is
+   class, which `assets.py:370` — and now the power ingest — raises. Must tolerate `__cause__ is
    None` without crashing. `isinstance` against `RetryRequested` covers `RetryRequestedFromPolicy`
    too, since it is a subclass.
 2. **The deliberate-exit guard.** If the resulting exception is a `KeyboardInterrupt | SystemExit |
    DagsterExecutionInterruptedError`, return without capturing. The justification in the comment must
    be fact 5 — that `SystemExit` reaches this hook today, verified — and the repo's existing idiom at
-   `assets.py:143` / `checks.py:440`, which already treats all three as "must cancel, not a fault".
+   `assets.py:144` / `checks.py:432`, which already treats all three as "must cancel, not a fault".
    Do **not** write that the retry mechanism routes cancellations here: with the in-band form it
    does not, and a comment that says so would be false and would invite deletion.
 3. **The `fault_category: run_failed` tag**, with the value as a `Final` module constant. **Set it by
@@ -264,7 +265,7 @@ This path is **production**, so it must degrade rather than raise, and it does:
 - The retry strictly *reduces* production alerts on the upstream-read path and cannot introduce a
   failure. A persistent fault still fails after 4 s exactly as today.
 - **A cancelled run still cancels** — the property the `RetryPolicy` mechanism would have broken,
-  and the reason it was rejected. `assets.py:143-144` and its regression test keep their meaning.
+  and the reason it was rejected. `assets.py:144` and its regression test keep their meaning.
 - **No warning path gains the ability to raise.** `_capture_tagged` and `report_power_freshness` are
   unchanged, so their existing guards hold. `sentry_capture_failure` now routes through
   `_capture_tagged`, which is itself guarded; and it runs inside Dagster's hook error boundary (a
@@ -303,7 +304,7 @@ because `build_hook_context` rejects a `BaseException`. Budget for that stub.
 4. `test_failure_hook_tags_the_fault_category` — assert the tag value and that it is set on a forked
    scope. *Fails on `main`*: the hook sets no tag and forks no scope.
 
-**`tests/test_assets.py`**, in the `test_power_time_series_and_metadata_*` block (:195–375 — this
+**`tests/test_assets.py`**, in the `test_power_time_series_and_metadata_*` block (:192–371 — this
 session's territory; #580 owns only the `test_ecmwf_ens_*` block):
 
 1. `test_power_time_series_and_metadata_retries_a_transient_upstream_failure` — stub
@@ -327,7 +328,7 @@ session's territory; #580 owns only the `test_ecmwf_ens_*` block):
    regression test for the defect that sank the `RetryPolicy` design. Cheap and worth having.
 
 **Existing test that must keep its meaning**:
-`test_power_time_series_and_metadata_re_raises_a_cancelled_run` (:280-308) stubs `upsert_metadata`,
+`test_power_time_series_and_metadata_re_raises_a_cancelled_run` (:280) stubs `upsert_metadata`,
 which is *outside* the guarded region, so it is unaffected in both behaviour and runtime. Confirm
 that when implementing — under the rejected `RetryPolicy` design it would have stayed green while
 the property it documents became false in production, which is precisely the trap this plan exists
