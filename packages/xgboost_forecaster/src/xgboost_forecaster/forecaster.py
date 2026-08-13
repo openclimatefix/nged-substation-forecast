@@ -111,7 +111,7 @@ class XGBoostForecaster(BaseForecaster):
         Float32 copy). Keeping this bounded is the *caller's* job — the NWP scan must be pruned at
         the inputs (control member, the relevant H3 cells, the window's ``init_time`` partitions),
         because filtering the engineered output cannot prune the upstream join/upsample. See
-        ``_load_engineering_inputs`` and the "NWP scan pruning" notes in
+        ``load_engineering_inputs`` and the "NWP scan pruning" notes in
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
 
         Only the requested ``time_series_ids`` are trained; a requested series with no non-null
@@ -231,8 +231,9 @@ class XGBoostForecaster(BaseForecaster):
         ``meta.json``'s ``trained_time_series_ids`` — not whatever ``.ubj`` files happen to be in
         the directory — decides the population, because a model's population is the model's own
         frozen record and not a directory listing (issue #197). A directory can hold files this
-        model did not write: ``ml_core._production_helpers.fetch_model_artifacts`` adds a
-        ``promotion.json``, and a hand-assembled directory can hold anything. Globbing would let
+        model did not write: ``ml_core.base_forecaster.save_to_mlflow`` adds a
+        ``time_series_metadata.parquet`` and ``ml_core._production_helpers.fetch_model_artifacts``
+        a ``promotion.json``, and a hand-assembled directory can hold anything. Globbing would let
         such a file enlarge the population, silently scoring a series with a model that was never
         trained for it and breaking the train==predict invariant (see
         ``BaseForecaster.trained_time_series_ids``).

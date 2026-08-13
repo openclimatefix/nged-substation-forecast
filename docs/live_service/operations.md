@@ -240,6 +240,11 @@ landed and `select_new_rows` will not offer those files again. Read the tracebac
 an off-contract roster after a schema change and a bug in our own code both land here, and both want
 a fix rather than a re-run.
 
+The 6-hourly forecasts are unaffected while this persists, however long it persists: `live_forecasts`
+locates each series from the promoted model's own frozen copy of the roster rows it trained against,
+never from the roster itself. What a stalled upsert costs is the metadata change, which matters at
+the next training run.
+
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from
 the frame already in memory, and is likewise non-blocking WARN. Nulls in the three de-accumulated
 variables are *expected* and are not a fault — see

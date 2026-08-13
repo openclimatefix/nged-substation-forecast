@@ -28,7 +28,6 @@ from contracts.power_schemas import (
 )
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
-from contracts.weather_schemas import Nwp
 from dagster import (
     AssetExecutionContext,
     Config,
@@ -58,6 +57,10 @@ from ml_core.metrics import (
 )
 from nged_data.storage import time_series_coverage
 
+from nged_substation_forecast.defs._engineering_inputs import (
+    MAX_NWP_LEAD,
+    load_engineering_inputs,
+)
 from nged_substation_forecast.defs._tags import RESEARCH_LAYER_TAGS
 
 # The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
@@ -87,15 +90,6 @@ cv_experiment_folds = DynamicPartitionsDefinition(name=CV_EXPERIMENT_FOLDS_NAME)
 Keys are added by ``register_experiment_job`` and consumed by the per-fold CV assets
 (``trained_cv_model`` / ``cv_power_forecasts``). Dynamic (not static) because experiments are
 registered at runtime and there can be thousands of them.
-"""
-
-_MAX_NWP_LEAD: Final[timedelta] = timedelta(days=16)
-"""Upper bound on an NWP run's forecast horizon, used to prune the ``init_time``-partitioned scan.
-
-A run initialised at ``init_time = T`` only produces ``valid_time``s in ``[T, T + horizon]``, so a
-run can cover a ``valid_time`` window ``[start, end]`` only if ``init_time`` lies in
-``[start - horizon, end]``. ECMWF ENS forecasts to 15 days; 16 gives a safe margin. See
-``_load_engineering_inputs``.
 """
 
 _PREDICT_INIT_CHUNK: Final[timedelta] = timedelta(days=14)
@@ -292,106 +286,32 @@ def _require_metadata_coverage(
         )
 
 
-def _load_engineering_inputs(
-    settings: Settings,
-    time_series_ids: list[int],
-    window_start: datetime,
-    window_end: datetime,
-    ensemble_members: list[int] | None = None,
-    init_time_start: datetime | None = None,
-    init_time_end: datetime | None = None,
-) -> tuple[pt.LazyFrame[PowerTimeSeries], pt.DataFrame[TimeSeriesMetadata], pt.LazyFrame[Nwp]]:
-    """Load observed power, metadata, and NWP for a window and time-series population.
+def _load_roster(
+    settings: Settings, time_series_ids: list[int]
+) -> pt.DataFrame[TimeSeriesMetadata]:
+    """Read the ``TimeSeriesMetadata`` roster, filtered to ``time_series_ids``.
 
-    Shared by ``trained_cv_model`` (training window + eligible population) and
-    ``cv_power_forecasts`` (validation window + trained population). Power and NWP are filtered to
-    the inclusive ``[window_start, window_end]`` window; all three inputs are filtered to
-    ``time_series_ids``.
-
-    **Memory: prune the NWP scan at the source.** The NWP Delta is large (tens of GB: every
-    ``init_time`` × every H3 cell × ~51 ensemble members × the 30-min forecast horizon). Every
-    filter below is applied directly to the ``Nwp.scan_delta`` scan, so only the surviving rows
-    are ever decoded into memory. This is the difference between a few GB and an OOM. See the
-    "NWP scan pruning" notes in
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>. The three
-    levers:
-
-    - ``init_time``: the table is partitioned by ``init_time``, so bounding it to the runs that can
-      cover the window (``[window_start - _MAX_NWP_LEAD, window_end]``) is a true *partition* prune
-      — Polars opens only those partition directories. Filtering ``valid_time`` alone does **not**
-      prune partitions.
-    - ``ensemble_member``: applied at the scan so we never decode the ~50 discarded members; the
-      member-early sort (``delta_store.nwp.NWP_SORT_COLS``) additionally lets Parquet row-group
-      stats skip most of each partition outright for this predicate — see
-      <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
-    - ``h3_index``: restricted to the cells the requested series sit in. There is a *many-to-one*
-      relationship between ``time_series_id`` and ``h3_index`` (one NWP cell covers several series),
-      so this is a small set of cells; the per-cell weather is later replicated across the series in
-      that cell by the feature engineer's spatial join.
+    **Research callers only.** The roster is the live registry of what NGED operates, so a fault in
+    it — an off-contract file, or one rebuilt from a snapshot that dropped rows — must stop a
+    training or scoring run rather than silently shrink its population. ``live_forecasts`` takes
+    the opposite posture and reads the promoted model's own frozen copy instead
+    (``ml_core.base_forecaster.load_trained_metadata``), so no roster fault can cost a forecast.
+    See <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#rd-fails-the-other-way>.
 
     Args:
         settings: Application settings (data paths, credentials).
-        time_series_ids: IDs to include; all three inputs are filtered to this population.
-        window_start: Inclusive start of the time window for power observations and NWP
-            ``valid_time``.
-        window_end: Inclusive end of the time window for power observations and NWP
-            ``valid_time``.
-        ensemble_members: If provided, NWP is filtered to these ``ensemble_member`` indices. If
-            ``None`` (the default), every ensemble member is carried through. Training restricts to
-            the control member (``[0]``) to avoid fanning every forecast row out across all ~51
-            members against the same power target; prediction passes ``None`` because the
-            probabilistic leaderboard metrics need the full ensemble.
-        init_time_start: Optional explicit lower ``init_time`` partition bound. When ``None`` it
-            defaults to ``window_start - _MAX_NWP_LEAD``, the earliest run that can cover the
-            window.
-        init_time_end: Optional explicit upper ``init_time`` partition bound. When ``None`` it
-            defaults to ``window_end``. Together with ``init_time_start`` this lets
-            ``cv_power_forecasts`` pass a narrower sub-range and process the validation window in
-            ``init_time`` chunks, so the full-ensemble forecast frame for one chunk stays in RAM
-            while the rest streams from the partition-pruned scan.
+        time_series_ids: The population to keep.
 
     Returns:
-        ``(power_time_series, metadata, nwp)`` — a lazy power frame, an eager metadata frame, and a
-        lazy NWP frame, all filtered to ``time_series_ids`` and the requested window.
+        One row per series in ``time_series_ids`` that the roster covers — check the coverage with
+        ``_require_metadata_coverage``.
     """
-    if init_time_start is None:
-        init_time_start = window_start - _MAX_NWP_LEAD
-    if init_time_end is None:
-        init_time_end = window_end
-    storage_options = settings.storage_options
-    power_lf = pl.scan_delta(
-        settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
-    ).filter(
-        pl.col("time_series_id").is_in(time_series_ids),
-        pl.col("time") >= window_start,
-        pl.col("time") <= window_end,
-    )
-    power_ts = pt.LazyFrame.from_existing(power_lf).set_model(PowerTimeSeries)
-
-    metadata_df = pt.DataFrame(
+    return pt.DataFrame(
         pl.read_parquet(
-            settings.metadata_path, storage_options=typeddict_to_dict(storage_options)
+            settings.metadata_path,
+            storage_options=typeddict_to_dict(settings.storage_options),
         ).filter(pl.col("time_series_id").is_in(time_series_ids))
     ).set_model(TimeSeriesMetadata)
-
-    # The H3 cells the requested series sit in (many series may share one cell).
-    cells = metadata_df["h3_res_5"].unique().to_list()
-
-    nwp_scan = Nwp.scan_delta(settings.nwp_data_path, storage_options=storage_options).filter(
-        # init_time is the partition key — this prunes whole partitions, not just row groups.
-        pl.col("init_time") >= init_time_start,
-        pl.col("init_time") <= init_time_end,
-        pl.col("valid_time") >= window_start,
-        pl.col("valid_time") <= window_end,
-        pl.col("h3_index").is_in(cells),
-    )
-    if ensemble_members is not None:
-        nwp_scan = nwp_scan.filter(pl.col("ensemble_member").is_in(ensemble_members))
-    # ``.filter`` is *typed* as a plain ``pl.LazyFrame`` even though the model survives at runtime,
-    # so re-wrap to satisfy the return annotation. (Zero-copy.)
-    nwp_lf = pt.LazyFrame.from_existing(nwp_scan).set_model(Nwp)
-
-    return power_ts, metadata_df, nwp_lf
 
 
 @asset(
@@ -445,10 +365,11 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
             "`eligible_time_series` for this fold and confirm power coverage reaches val_end."
         )
 
-    power_ts, metadata_df, nwp_lf = _load_engineering_inputs(
-        settings, eligible_ids, train_start, train_end, ensemble_members=[0]
-    )
+    metadata_df = _load_roster(settings, eligible_ids)
     _require_metadata_coverage(metadata_df, eligible_ids, population="eligible")
+    power_ts, nwp_lf = load_engineering_inputs(
+        settings, eligible_ids, metadata_df, train_start, train_end, ensemble_members=[0]
+    )
 
     forecaster = forecaster_cls(model_params=config)
     features = forecaster.feature_engineer.engineer(
@@ -472,7 +393,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     parent_run_id = get_or_create_parent_run(experiment_id)
     fold_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
 
-    forecaster.save_to_mlflow(fold_run_id)
+    forecaster.save_to_mlflow(fold_run_id, time_series_metadata=metadata_df)
     with mlflow.start_run(run_id=fold_run_id):
         # MLflow params are immutable and the fold run is reused on every re-materialisation, so
         # nothing here that can legitimately change between materialisations may be a param.
@@ -582,24 +503,26 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     time_series_seen: set[int] = set()
     ensemble_members_seen: set[int] = set()
 
+    # Before the loop, not inside it: the metadata does not vary by init_time window, and raising
+    # on a later chunk would leave the partition holding a partial fold.
+    metadata_df = _load_roster(settings, trained_ids)
+    _require_metadata_coverage(metadata_df, trained_ids, population="trained")
+
     # Walk disjoint init_time chunks covering every run that can forecast into the window:
-    # init_time in [val_start - _MAX_NWP_LEAD, val_end].
-    chunk_start = val_start - _MAX_NWP_LEAD
+    # init_time in [val_start - MAX_NWP_LEAD, val_end].
+    chunk_start = val_start - MAX_NWP_LEAD
     is_first = True
     while chunk_start <= val_end:
         chunk_end = min(chunk_start + _PREDICT_INIT_CHUNK, val_end)
-        power_ts, metadata_df, nwp_lf = _load_engineering_inputs(
+        power_ts, nwp_lf = load_engineering_inputs(
             settings,
             trained_ids,
+            metadata_df,
             val_start,
             val_end,
             init_time_start=chunk_start,
             init_time_end=chunk_end,
         )
-        # First chunk only: metadata does not vary by init_time window, and raising on a later
-        # chunk would leave the partition holding a partial fold.
-        if is_first:
-            _require_metadata_coverage(metadata_df, trained_ids, population="trained")
         features = forecaster.feature_engineer.engineer(
             selected_features=config.selected_features,
             power_time_series=power_ts,
@@ -641,7 +564,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         mlflow.set_tag("val_start", val_start.isoformat())
         mlflow.set_tag("val_end", val_end.isoformat())
         # Provenance: prediction may run on yet another SHA / data state than training. Stamps the
-        # two Delta tables the forecasting path reads (via _load_engineering_inputs) — not
+        # two Delta tables the forecasting path reads (via load_engineering_inputs) — not
         # eligible_time_series, which prediction does not read (the trained series come from the
         # loaded model).
         mlflow.set_tags(

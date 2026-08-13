@@ -299,7 +299,13 @@ The champion model is therefore baked into the image at build time and loaded vi
 produced once, out of band (a researcher picks the champion fold from the MLflow leaderboard
 and downloads its artifacts to local disk), then `COPY`'d into the image at build time.
 Promotion becomes rebuild + redeploy, which is auditable (image tags) and keeps MLflow
-completely out of the production runtime. (The rejected alternative — fetching the model from
+completely out of the production runtime.
+
+That directory also holds `time_series_metadata.parquet`, the roster rows the model was trained
+against. Inference reads each series' H3 cell and static features from there rather than from the
+live roster, so the only data the container needs at runtime is the NWP and power Delta tables —
+and a roster that is unreadable, or has lost rows, cannot fail a slot or silently drop a series
+from it. (The rejected alternative — fetching the model from
 MLflow at container startup — is covered in
 [Considered but rejected designs](#fetching-the-champion-model-from-mlflow-at-container-startup).)
 

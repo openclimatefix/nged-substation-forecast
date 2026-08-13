@@ -6,6 +6,7 @@ artifact round-trips from MLflow and that training honoured the fold's eligible 
 inclusive training window.
 """
 
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -17,11 +18,14 @@ from contracts.ml_schemas import EligibleTimeSeries
 from contracts.settings import Settings
 from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
+from ml_core._production_helpers import fetch_model_artifacts
+from ml_core.base_forecaster import load_trained_metadata
 from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
 from xgboost_forecaster.forecaster import XGBoostForecaster
 
-from nged_substation_forecast.defs.cv_assets import _load_engineering_inputs, trained_cv_model
+from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
+from nged_substation_forecast.defs.cv_assets import _load_roster, trained_cv_model
 from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
 pytestmark = pytest.mark.integration
@@ -59,7 +63,7 @@ def _write_power(path: str) -> None:
 
 _NWP_ENSEMBLE_MEMBERS = (0, 1, 2)
 """Members written to the synthetic NWP. Member 0 is the control; 1 and 2 exercise the
-``ensemble_members`` filter in ``_load_engineering_inputs`` (training keeps only the control)."""
+``ensemble_members`` filter in ``load_engineering_inputs`` (training keeps only the control)."""
 
 
 def _write_nwp(path: str) -> None:
@@ -178,12 +182,13 @@ def test_load_engineering_inputs_filters_ensemble_members(env: None) -> None:
     train_start = datetime(2024, 4, 1, tzinfo=UTC)
     train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=UTC)
 
-    _, _, nwp_control = _load_engineering_inputs(
-        settings, [1, 2], train_start, train_end, ensemble_members=[0]
+    metadata = _load_roster(settings, [1, 2])
+    _, nwp_control = load_engineering_inputs(
+        settings, [1, 2], metadata, train_start, train_end, ensemble_members=[0]
     )
     assert nwp_control.collect()["ensemble_member"].unique().sort().to_list() == [0]
 
-    _, _, nwp_all = _load_engineering_inputs(settings, [1, 2], train_start, train_end)
+    _, nwp_all = load_engineering_inputs(settings, [1, 2], metadata, train_start, train_end)
     assert nwp_all.collect()["ensemble_member"].unique().sort().to_list() == list(
         _NWP_ENSEMBLE_MEMBERS
     )
@@ -198,12 +203,16 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=UTC)
 
     # Requesting only ts1 must scan only ts1's cell, never ts2's.
-    _, _, nwp_ts1 = _load_engineering_inputs(settings, [1], train_start, train_end)
+    _, nwp_ts1 = load_engineering_inputs(
+        settings, [1], _load_roster(settings, [1]), train_start, train_end
+    )
     assert nwp_ts1.collect()["h3_index"].unique().to_list() == [_TS1_CELL]
 
     # Requesting both: ts2's cell is initialised at 2025-08-01 (after train_end), so the init_time
     # partition prune drops it entirely — only ts1's in-window cell survives.
-    _, _, nwp_both = _load_engineering_inputs(settings, [1, 2], train_start, train_end)
+    _, nwp_both = load_engineering_inputs(
+        settings, [1, 2], _load_roster(settings, [1, 2]), train_start, train_end
+    )
     assert nwp_both.collect()["h3_index"].unique().to_list() == [_TS1_CELL]
 
 
@@ -242,6 +251,15 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(
     # past train_end, so the inclusive-window filter excludes it).
     loaded = XGBoostForecaster.load_from_mlflow(fold_run.info.run_id)
     assert loaded.trained_time_series_ids == [1]
+
+    # The archive also carries the roster rows the model was engineered against, which is what
+    # `live_forecasts` locates its time series by instead of reading the roster.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        model_dir = Path(tmp_dir) / "production_model"
+        fetch_model_artifacts(fold_run.info.run_id, model_dir)
+        frozen = load_trained_metadata(model_dir)
+    assert frozen["time_series_id"].to_list() == [1, 2]
+    assert frozen.filter(pl.col("time_series_id") == 1)["h3_res_5"].item() == _TS1_CELL
 
 
 def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(

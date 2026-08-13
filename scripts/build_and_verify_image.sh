@@ -65,6 +65,16 @@ if [[ ! -f "$PROMOTION_JSON" ]]; then
   exit 2
 fi
 
+# The bake COPYs the promoted directory wholesale and never re-runs promotion, so a directory
+# promoted before live inference started reading this file would build and pass the smoke test,
+# then fail every 6-hourly slot in production.
+TRAINED_METADATA="data/production_model/time_series_metadata.parquet"
+if [[ ! -f "$TRAINED_METADATA" ]]; then
+  echo "error: $TRAINED_METADATA not found — this model predates the frozen metadata copy" >&2
+  echo "       live inference reads. Re-train, then re-materialise promoted_model." >&2
+  exit 2
+fi
+
 # The run id is read from the directory the build COPYs from, so the OCI label can never drift
 # from the model actually baked in. The image tag is its first 12 hex chars — unique per promoted
 # model and human-readable.

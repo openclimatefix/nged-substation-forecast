@@ -16,6 +16,7 @@ import polars as pl
 import pytest
 from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
 from contracts.ml_schemas import AllFeatures
+from contracts.power_schemas import TimeSeriesMetadata
 from dagster import (
     AssetCheckSeverity,
     DagsterInstance,
@@ -24,6 +25,7 @@ from dagster import (
     materialize,
 )
 from deltalake import write_deltalake
+from ml_core.base_forecaster import TRAINED_METADATA_FILENAME, write_trained_metadata
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 from nged_substation_forecast.defs.checks import live_forecasts_are_healthy
@@ -116,15 +118,29 @@ def _write_power(path: str) -> None:
     ).write_delta(path, delta_write_options={"partition_by": "time_series_id"})
 
 
+def _typed_metadata(frame: pl.DataFrame) -> pt.DataFrame[TimeSeriesMetadata]:
+    """Label a partial roster frame with its model, as the assets' own readers do.
+
+    These fixtures carry only the columns the pipeline reads, so ``set_model`` (never
+    ``validate``) is what the production code does with them too.
+    """
+    return pt.DataFrame(frame).set_model(TimeSeriesMetadata)
+
+
+def _metadata_for(time_series_ids: tuple[int, ...], cells: tuple[int, ...]) -> pl.DataFrame:
+    """A minimal roster frame: the columns the feature pipeline actually reads."""
+    return pl.DataFrame(
+        {
+            "time_series_id": pl.Series(time_series_ids, dtype=pl.Int32),
+            "h3_res_5": pl.Series(cells, dtype=pl.UInt64),
+            "time_series_type": ["Primary"] * len(time_series_ids),
+        }
+    )
+
+
 def _write_metadata(path: Path) -> None:
     """ts1 (trained, cell 10) and ts2 (untrained, cell 20 — no NWP data for that cell)."""
-    pl.DataFrame(
-        {
-            "time_series_id": pl.Series([1, 2], dtype=pl.Int32),
-            "h3_res_5": pl.Series([_TRAINED_CELL, _UNTRAINED_CELL], dtype=pl.UInt64),
-            "time_series_type": ["Primary", "Primary"],
-        }
-    ).write_parquet(path)
+    _metadata_for((1, 2), (_TRAINED_CELL, _UNTRAINED_CELL)).write_parquet(path)
 
 
 def _save_promoted_model(path: Path) -> None:
@@ -147,6 +163,8 @@ def _save_promoted_model(path: Path) -> None:
     forecaster = XGBoostForecaster(config)
     forecaster.train(train_data, time_series_ids=[1])
     forecaster.save(path)
+    # Stands in for `fetch_model_artifacts`, which is what deposits this in production.
+    write_trained_metadata(path, _typed_metadata(_metadata_for((1,), (_TRAINED_CELL,))))
 
 
 @pytest.fixture
@@ -170,7 +188,10 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
 
 
 def _materialize(
-    instance: DagsterInstance, availability_mode: str, partition_key: str = _PARTITION_KEY
+    instance: DagsterInstance,
+    availability_mode: str,
+    partition_key: str = _PARTITION_KEY,
+    raise_on_error: bool = True,
 ) -> ExecuteInProcessResult:
     return materialize(
         [live_forecasts],
@@ -179,6 +200,7 @@ def _materialize(
             ops={"live_forecasts": LiveForecastsConfig(availability_mode=availability_mode)}
         ),
         instance=instance,
+        raise_on_error=raise_on_error,
     )
 
 
@@ -339,41 +361,61 @@ def _save_model_trained_on(path: Path, time_series_ids: list[int]) -> None:
     )
     forecaster.train(train_data, time_series_ids=time_series_ids)
     forecaster.save(path)
+    write_trained_metadata(
+        path,
+        _typed_metadata(
+            _metadata_for(tuple(time_series_ids), (_TRAINED_CELL,) * len(time_series_ids))
+        ),
+    )
 
 
-def test_a_trained_series_losing_its_metadata_row_does_not_stop_the_others(
+def test_the_roster_cannot_thin_or_fail_a_live_slot(
     env: dict[str, str], dagster_instance: DagsterInstance, tmp_path: Path
 ) -> None:
-    """The live service degrades rather than failing closed.
+    """A roster fault costs the live service nothing, because it does not read the roster.
 
-    A trained series with no metadata row has no H3 cell, so it has no weather and can produce no
-    forecast. That must cost that one series, not the whole run. `live_forecasts_are_healthy`
-    already reports which trained series a slot did not forecast, so nothing here needs to say it
-    a second time.
+    Each series' H3 cell comes from the model's own frozen copy, so a roster that has lost rows,
+    or cannot be read at all, leaves the forecast identical. Losing a row used to drop that series
+    silently and an unreadable file used to fail the slot outright — both off the degradation
+    ladder entirely (issue #528).
     """
-    nged_path = tmp_path / "NGED"
+    roster = tmp_path / "NGED" / "metadata.parquet"
     # ts3 shares ts1's NWP cell, so both are genuinely forecastable to begin with.
-    pl.DataFrame(
-        {
-            "time_series_id": pl.Series([1, 3], dtype=pl.Int32),
-            "h3_res_5": pl.Series([_TRAINED_CELL, _TRAINED_CELL], dtype=pl.UInt64),
-            "time_series_type": ["Primary", "Primary"],
-        }
-    ).write_parquet(nged_path / "metadata.parquet")
-    _write_power_for(str(nged_path / "power_time_series.delta"), (1, 3))
+    _metadata_for((1, 3), (_TRAINED_CELL, _TRAINED_CELL)).write_parquet(roster)
+    _write_power_for(str(tmp_path / "NGED" / "power_time_series.delta"), (1, 3))
     _save_model_trained_on(tmp_path / "production_model", [1, 3])
 
     assert _materialize(dagster_instance, "live").success
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
 
-    # Now ts3 loses its metadata row. ts1 must still be forecast.
-    pl.DataFrame(
-        {
-            "time_series_id": pl.Series([1], dtype=pl.Int32),
-            "h3_res_5": pl.Series([_TRAINED_CELL], dtype=pl.UInt64),
-            "time_series_type": ["Primary"],
-        }
-    ).write_parquet(nged_path / "metadata.parquet")
-
+    # Thin (ts3's row is gone), then unreadable, then absent — the three states an incident walks
+    # through, since deleting the file is how an operator recovers from an unreadable one.
+    _metadata_for((1,), (_TRAINED_CELL,)).write_parquet(roster)
     assert _materialize(dagster_instance, "live").success
-    assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1}
+    assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
+
+    roster.write_bytes(b"not a parquet file")
+    assert _materialize(dagster_instance, "live").success
+    assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
+
+    roster.unlink()
+    assert _materialize(dagster_instance, "live").success
+    assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
+
+
+def test_a_model_directory_with_no_frozen_metadata_is_refused(
+    env: dict[str, str], dagster_instance: DagsterInstance, tmp_path: Path
+) -> None:
+    """A model saved before the frozen copy existed cannot be served, and says so.
+
+    This is the one metadata state that still fails the slot, deliberately: it is a promotion
+    fault — the model on disk is not one this code can serve — not an input outage.
+    """
+    (tmp_path / "production_model" / TRAINED_METADATA_FILENAME).unlink()
+
+    result = _materialize(dagster_instance, "live", raise_on_error=False)
+
+    assert not result.success
+    failure = result.failure_data_for_node("live_forecasts")
+    assert failure is not None
+    assert "promote that run" in str(failure.error)
