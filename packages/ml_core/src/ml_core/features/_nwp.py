@@ -19,7 +19,7 @@ __all__ = ["NWP_PUBLICATION_DELAY_HOURS"]
 
 
 def _join_nwp_bulk_mode(
-    power_with_metadata: pl.LazyFrame,
+    power_lf: pl.LazyFrame,
     processed_nwp: pl.LazyFrame | None,
     nwp_publication_delay_hours: int,
 ) -> pl.LazyFrame:
@@ -31,9 +31,12 @@ def _join_nwp_bulk_mode(
     derived power_fcst_init_time; those hindcast rows are kept here so that window features
     (e.g. weather rolling means) see the same predecessor rows as single-run mode, and are
     dropped by ``_engineer_features`` after feature computation.
+
+    ``power_lf`` carries no metadata: ``_engineer_features`` joins that onto the result, because
+    a valid_time with no power observation would otherwise lose its metadata here.
     """
     if processed_nwp is None:
-        result = power_with_metadata.with_columns(
+        result = power_lf.with_columns(
             power_fcst_init_time=pl.col("valid_time"),
             nwp_init_time=pl.lit(None, dtype=UTC_DATETIME_DTYPE),
         )
@@ -42,14 +45,12 @@ def _join_nwp_bulk_mode(
             power_fcst_init_time=pl.col("nwp_init_time")
             + pl.duration(hours=nwp_publication_delay_hours)
         )
-        result = nwp_with_init.join(
-            power_with_metadata, on=["time_series_id", "valid_time"], how="left"
-        )
+        result = nwp_with_init.join(power_lf, on=["time_series_id", "valid_time"], how="left")
     return result
 
 
 def _join_nwp_single_run(
-    power_with_metadata: pl.LazyFrame,
+    power_lf: pl.LazyFrame,
     processed_nwp: pl.LazyFrame | None,
     power_fcst_init_time: datetime,
     nwp_init_time: datetime | None,
@@ -60,13 +61,15 @@ def _join_nwp_single_run(
     Stamps a constant power_fcst_init_time across all rows and joins exclusively the one NWP
     run identified by nwp_init_time. If nwp_init_time is None, it is derived as
     power_fcst_init_time - nwp_publication_delay_hours.
+
+    ``power_lf`` carries no metadata — see ``_join_nwp_bulk_mode``.
     """
     nwp_init_time_val = (
         nwp_init_time
         if nwp_init_time is not None
         else power_fcst_init_time - timedelta(hours=nwp_publication_delay_hours)
     )
-    power_with_init = power_with_metadata.with_columns(
+    power_with_init = power_lf.with_columns(
         power_fcst_init_time=pl.lit(power_fcst_init_time),
         nwp_init_time=pl.lit(nwp_init_time_val),
     )
@@ -134,9 +137,7 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     )
 
     # Left-join original NWP onto the grid; new 30-min rows come in as nulls.
-    upsampled = time_grid.join(nwp_lf, on=[*group_cols, "valid_time"], how="left").sort(
-        [*group_cols, "valid_time"]
-    )
+    upsampled = time_grid.join(nwp_lf, on=[*group_cols, "valid_time"], how="left")
 
     # Fill nulls within each group, never crossing group boundaries.
     # order_by="valid_time" ensures correct temporal ordering within each group window.

@@ -33,19 +33,16 @@ def _apply_power_lag(
         target_time=pl.col("valid_time") - pl.duration(hours=lag_feature.hours)
     )
 
-    has_ensemble = "ensemble_member" in observed_power_lf.collect_schema().names()
-    id_keys = ["time_series_id", "ensemble_member"] if has_ensemble else ["time_series_id"]
-
     right_lf = observed_power_lf.select(
-        *id_keys,
+        pl.col("time_series_id"),
         pl.col("valid_time"),
         pl.col("power").alias(lag_feature.string_repr),
     )
 
     return lf_with_target_time.join(
         right_lf,
-        left_on=[*id_keys, "target_time"],
-        right_on=[*id_keys, "valid_time"],
+        left_on=["time_series_id", "target_time"],
+        right_on=["time_series_id", "valid_time"],
         how="left",
     ).drop("target_time")
 
@@ -125,8 +122,8 @@ def _nullify_leaky_lags(
     or equal to the forecast lead time, the feature is effectively a "future"
     value and must be nullified.
 
-    To prevent over-nullification (FLAW-001), we calculate power_lead_time_hours
-    relative to power_fcst_init_time, not nwp_init_time.
+    To prevent over-nullification, we calculate power_lead_time_hours relative to
+    power_fcst_init_time, not nwp_init_time.
     """
     lf = lf.with_columns(
         power_lead_time_hours=(

@@ -33,6 +33,57 @@ def test_all_features_validation():
     df.validate()
 
 
+def test_all_features_accepts_null_power_and_absent_time_series_type():
+    """The two shapes the feature pipeline really produces.
+
+    Live inference feeds a dense spine whose rows past the last observation have no power, and
+    `time_series_type` is only emitted when a feature set asks for it.
+    """
+    df = (
+        pt.DataFrame(
+            {
+                "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
+                "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=UTC)],
+                "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=UTC)],
+                "time_series_id": [123],
+                "power": [None],
+                "nwp_lead_time_hours": [1.0],
+                "local_day_of_week": ["Monday"],
+            }
+        )
+        .set_model(AllFeatures)
+        .cast()
+    )
+    df.validate()
+
+
+def test_all_features_rejects_null_time_series_type():
+    """The column is optional, but a null value in it is a bug rather than a degraded row.
+
+    ``_engineer_features`` semi-joins the power frame to the metadata, so a series with no
+    metadata row produces no rows at all rather than rows carrying a null type.
+    """
+    df = (
+        pt.DataFrame(
+            {
+                "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=UTC)],
+                "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=UTC)],
+                "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=UTC)],
+                "time_series_id": [123],
+                "time_series_type": [None],
+                "power": [10.0],
+                "nwp_lead_time_hours": [1.0],
+                "local_day_of_week": ["Monday"],
+            }
+        )
+        .set_model(AllFeatures)
+        .cast()
+    )
+
+    with pytest.raises(pt.exceptions.DataFrameValidationError, match="time_series_type"):
+        df.validate()
+
+
 def test_all_features_invalid_day_of_week():
     # Invalid day of week
     df = pt.DataFrame(

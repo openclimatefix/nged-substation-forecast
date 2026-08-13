@@ -34,12 +34,7 @@ doesn't transfer between tables. See ``POWER_FORECASTS_WRITER_PROPERTIES`` for t
 size impact.
 """
 
-POWER_FORECASTS_SORT_COLS: Final[tuple[str, ...]] = (
-    "time_series_id",
-    "power_fcst_init_time",
-    "valid_time",
-    "ensemble_member",
-)
+POWER_FORECASTS_SORT_COLS: Final[tuple[str, ...]] = PowerForecast.PRIMARY_KEY
 """Within-file row order for ``power_forecasts`` writes.
 
 Placing the ~51 ensemble members of one (series, init time, valid time) target on adjacent rows
@@ -47,6 +42,12 @@ makes ``power_fcst`` locally smooth and the timestamp columns stepped sequences 
 the BYTE_STREAM_SPLIT and DELTA_BINARY_PACKED encodings in ``POWER_FORECASTS_WRITER_PROPERTIES``
 need to compress well. Leading with ``time_series_id`` also lets parquet row-group statistics
 prune scans that filter on one series.
+
+Defined as ``PowerForecast.PRIMARY_KEY`` rather than repeating its columns, because the set that
+identifies a row uniquely is exactly the set whose adjacency makes a row compress. The *order*
+is this module's own choice and is pinned by ``test_sort_cols_lead_with_time_series_id`` — a
+reordered primary key is still a correct key but a worse layout, so the tuple is not free to
+follow one.
 """
 
 _TIMESTAMP_COLUMN_PROPERTIES: Final[ColumnProperties] = ColumnProperties(

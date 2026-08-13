@@ -301,3 +301,79 @@ def test_replay_run_sends_no_sentry_heartbeat(
     calls = _capture_checkins(monkeypatch)
     assert _materialize(dagster_instance, "replay").success
     assert calls == []
+
+
+def _write_power_for(path: str, time_series_ids: tuple[int, ...]) -> None:
+    """Overwrite the power table with a little history for each of `time_series_ids`."""
+    times = [
+        _POWER_FCST_INIT_TIME - timedelta(hours=1),
+        _POWER_FCST_INIT_TIME - timedelta(minutes=30),
+    ]
+    rows = [
+        {"time_series_id": ts_id, "time": t, "power": 100.0 + i}
+        for ts_id in time_series_ids
+        for i, t in enumerate(times)
+    ]
+    pl.DataFrame(rows).sort(["time_series_id", "time"]).cast(
+        {"time_series_id": pl.Int32, "time": pl.Datetime("us", "UTC"), "power": pl.Float32}
+    ).write_delta(path, mode="overwrite", delta_write_options={"partition_by": "time_series_id"})
+
+
+def _save_model_trained_on(path: Path, time_series_ids: list[int]) -> None:
+    """A tiny real ``XGBoostForecaster`` trained on each of `time_series_ids`."""
+    times = [datetime(2025, 1, 1, hour, tzinfo=UTC) for hour in (0, 1, 2)]
+    train_df = pl.DataFrame(
+        {
+            "time_series_id": [ts_id for ts_id in time_series_ids for _ in times],
+            "valid_time": times * len(time_series_ids),
+            "power_fcst_init_time": times * len(time_series_ids),
+            "power": [10.0, 12.0, 11.0] * len(time_series_ids),
+            "temperature_2m": [5.0, 6.0, 7.0] * len(time_series_ids),
+        }
+    )
+    train_data = pt.LazyFrame.from_existing(train_df.lazy()).set_model(AllFeatures)
+    forecaster = XGBoostForecaster(
+        XGBoostConfig(
+            selected_features={"temperature_2m"}, experiment_name="live_test", n_estimators=5
+        )
+    )
+    forecaster.train(train_data, time_series_ids=time_series_ids)
+    forecaster.save(path)
+
+
+def test_a_trained_series_losing_its_metadata_row_does_not_stop_the_others(
+    env: dict[str, str], dagster_instance: DagsterInstance, tmp_path: Path
+) -> None:
+    """The live service degrades rather than failing closed.
+
+    A trained series with no metadata row has no H3 cell, so it has no weather and can produce no
+    forecast. That must cost that one series, not the whole run. `live_forecasts_are_healthy`
+    already reports which trained series a slot did not forecast, so nothing here needs to say it
+    a second time.
+    """
+    nged_path = tmp_path / "NGED"
+    # ts3 shares ts1's NWP cell, so both are genuinely forecastable to begin with.
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 3], dtype=pl.Int32),
+            "h3_res_5": pl.Series([_TRAINED_CELL, _TRAINED_CELL], dtype=pl.UInt64),
+            "time_series_type": ["Primary", "Primary"],
+        }
+    ).write_parquet(nged_path / "metadata.parquet")
+    _write_power_for(str(nged_path / "power_time_series.delta"), (1, 3))
+    _save_model_trained_on(tmp_path / "production_model", [1, 3])
+
+    assert _materialize(dagster_instance, "live").success
+    assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
+
+    # Now ts3 loses its metadata row. ts1 must still be forecast.
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1], dtype=pl.Int32),
+            "h3_res_5": pl.Series([_TRAINED_CELL], dtype=pl.UInt64),
+            "time_series_type": ["Primary"],
+        }
+    ).write_parquet(nged_path / "metadata.parquet")
+
+    assert _materialize(dagster_instance, "live").success
+    assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1}

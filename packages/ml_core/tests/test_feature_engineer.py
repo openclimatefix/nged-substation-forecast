@@ -94,6 +94,43 @@ def test_tabular_feature_engineer_returns_all_features_shape() -> None:
     assert ts1["temperature_2m"].to_list() == [10.0]
 
 
+def test_tabular_feature_engineer_drops_series_with_no_metadata_row() -> None:
+    """A series with power observations but no metadata row produces no output rows at all.
+
+    Single-run mode is power-centric, so without the semi-join in ``_engineer_features`` the
+    series would survive with every weather feature null and be predicted on regardless — a
+    garbage forecast that reads as healthy to ``live_forecasts_are_healthy`` because the series
+    is present. ``AllFeatures.time_series_type`` is declared non-nullable on the strength of this.
+    """
+    power_fcst_init_time = datetime(2024, 6, 1, 12, 0)
+    # ts1 has a metadata row; ts3 does not.
+    power = pt.LazyFrame.from_existing(
+        pl.DataFrame(
+            {
+                "time_series_id": [1, 3],
+                "time": [power_fcst_init_time, power_fcst_init_time],
+                "power": [100.0, 200.0],
+            }
+        ).lazy()
+    ).set_model(PowerTimeSeries)
+
+    result = (
+        TabularFeatureEngineer()
+        .engineer(
+            selected_features={"temperature_2m", "time_series_type"},
+            power_time_series=power,
+            time_series_metadata=_metadata_two_series(),
+            nwp=_nwp_two_cells(),
+            power_fcst_init_time=power_fcst_init_time,
+            nwp_init_time=datetime(2024, 6, 1, 0, 0),
+        )
+        .collect()
+    )
+
+    assert result["time_series_id"].to_list() == [1]
+    assert result["time_series_type"].null_count() == 0
+
+
 def test_tabular_feature_engineer_single_run_params_reach_engineer_features() -> None:
     """``TabularFeatureEngineer.engineer``'s single-run kwargs pass through unchanged.
 

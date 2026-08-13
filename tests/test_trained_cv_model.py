@@ -320,3 +320,29 @@ def test_trained_cv_model_fails_loudly_when_no_eligible_series(
     failure = result.failure_data_for_node("trained_cv_model")
     assert failure is not None
     assert "No eligible time series" in str(failure.error)
+
+
+def test_trained_cv_model_fails_loudly_when_an_eligible_series_has_no_metadata(
+    env: None, dagster_instance: DagsterInstance
+) -> None:
+    """R&D fails fast: a CV run must not quietly train fewer series than its population names.
+
+    A series with no metadata row has no H3 cell, so it can never be joined to NWP. Training
+    around it silently would make this fold's leaderboard numbers incomparable with every other
+    experiment's, which is exactly what the shared eligible population exists to prevent.
+    """
+    _write_eligible(str(Settings().eligible_time_series_data_path), time_series_ids=(1, 2, 9))
+
+    _register(dagster_instance)
+    result = materialize(
+        [trained_cv_model],
+        partition_key=PARTITION_KEY,
+        instance=dagster_instance,
+        raise_on_error=False,
+    )
+
+    assert not result.success
+    failure = result.failure_data_for_node("trained_cv_model")
+    assert failure is not None
+    assert "no row in the metadata parquet" in str(failure.error)
+    assert "[9]" in str(failure.error)

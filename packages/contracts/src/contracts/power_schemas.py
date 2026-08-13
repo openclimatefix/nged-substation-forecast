@@ -409,6 +409,50 @@ class PowerForecast(pt.Model):
         ),
     )
 
+    PRIMARY_KEY: ClassVar[tuple[str, ...]] = (
+        "time_series_id",
+        "power_fcst_init_time",
+        "valid_time",
+        "ensemble_member",
+    )
+    """At most one forecast per series, per init time, per target time, per ensemble member."""
+
+    @classmethod
+    def validate(  # ty: ignore[invalid-method-override]
+        cls,
+        dataframe: pl.DataFrame,
+        columns: Sequence[str] | None = None,
+        allow_missing_columns: bool = False,
+        allow_superfluous_columns: bool = False,
+        drop_superfluous_columns: bool = False,
+    ) -> pt.DataFrame[Self]:
+        """Validate the given dataframe, ensuring the primary key is unique.
+
+        A duplicated primary key means either a join fanned out on the way here or the same rows
+        were written twice, and both corrupt the metrics computed from them. It is our own bug
+        rather than the outside world misbehaving, so this raises rather than degrading — see
+        <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
+        """
+        validated_df = super().validate(
+            dataframe=dataframe,
+            columns=columns,
+            allow_missing_columns=allow_missing_columns,
+            allow_superfluous_columns=allow_superfluous_columns,
+            drop_superfluous_columns=drop_superfluous_columns,
+        )
+
+        # `n_unique`, not `is_duplicated().any()`: the two are equivalent here (every primary-key
+        # column is non-nullable) but `is_duplicated` materialises a per-row mask, costing ~5x the
+        # peak memory on a predict-sized frame.
+        pk_cols = list(cls.PRIMARY_KEY)
+        if validated_df.select(pk_cols).n_unique() != validated_df.height:
+            raise ValueError(
+                f"Duplicate entries found for primary key columns: {pk_cols}. "
+                "Either an upstream join fanned out or these rows were written twice."
+            )
+
+        return validated_df
+
 
 class EffectiveCapacity(pt.Model):
     """Effective capacity of each time series at each half-hourly timestep.

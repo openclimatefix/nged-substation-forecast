@@ -55,7 +55,7 @@ Nwp.scan_delta(path)                     # lazy scan, already Float32 physical u
 * **Query optimisation**: Polars can see the full plan end-to-end and push down filters (e.g. date ranges, `time_series_id` subsets) into the Delta Lake scan before any data crosses the wire.
 * **Clean boundaries**: The materialisation site is the model boundary — the one place where a third-party library (XGBoost, PyTorch, …) needs a concrete in-memory array. Keeping it there makes the boundary explicit and easy to find.
 
-**The one exception** is a `limit(1).collect()` guard in `_build_historical_weather` (inside `ml_core`) that cheaply checks for the NWP control member before building the lazy plan, so the pipeline fails loudly instead of silently returning an empty frame.
+**The one exception** is a `limit(1).collect()` guard in `_engineer_features` (inside `ml_core`), reached only when a weather lag feature is requested. It checks the raw NWP scan for the control member, so the pipeline fails loudly instead of silently returning an empty frame. It probes the raw frame rather than the upsampled one deliberately: `ensemble_member` is one of the upsample's group-by keys, so the two are equivalent, but `SLICE` cannot push through the upsample's window functions — probing the upsampled frame would execute the whole upsample of the control member before answering.
 
 **Contract for `BaseForecaster` subclasses**: the lazy plan is materialised *at the model boundary*, as late as possible, and never by callers — never ask a caller to collect before passing data in. A subclass typically does a single `.collect()`; keeping that bounded is the **caller's** job, by pruning the *inputs* before feature engineering (not by filtering the engineered output — see below).
 
@@ -63,7 +63,7 @@ Nwp.scan_delta(path)                     # lazy scan, already Float32 physical u
 
 The feature-engineering plan is dominated by the **NWP scan**. The NWP Delta is large — for the V1 trial it is **~86 GB**: 810 daily `init_time` partitions, each up to ~7.24M rows = **1671 H3 cells × 51 ensemble members × 85 native steps** (control member alone is 142k rows/partition). The 30-min upsample and the multi-run bulk join inflate that further. So the whole memory question is: *how little of that NWP do we touch?*
 
-**You cannot prune the scan by filtering the engineered output.** `data.filter(time_series_id == x)` runs the cell-attach join, the 30-min upsample (`group_by` + `explode` + `sort` + `interpolate`) and the bulk join *first*, then drops rows. And NWP is keyed by `h3_index`, not `time_series_id`, so a `time_series_id` predicate can never reach the NWP scan at all. Pruning must be applied to the **raw inputs**, in `_load_engineering_inputs`, directly on the `Nwp.scan_delta` scan.
+**You cannot prune the scan by filtering the engineered output.** `data.filter(time_series_id == x)` runs the cell-attach join, the 30-min upsample (`group_by` + `explode` + `interpolate`) and the bulk join *first*, then drops rows. And NWP is keyed by `h3_index`, not `time_series_id`, so a `time_series_id` predicate can never reach the NWP scan at all. Pruning must be applied to the **raw inputs**, in `_load_engineering_inputs`, directly on the `Nwp.scan_delta` scan.
 
 What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 

@@ -266,3 +266,38 @@ def test_cv_power_forecasts_is_idempotent(
         [cv_power_forecasts], partition_key=PARTITION_KEY, instance=dagster_instance
     ).success
     assert _read_forecasts(env).height == first_height
+
+
+def test_cv_power_forecasts_fails_loudly_when_a_trained_series_loses_its_metadata(
+    env: dict[str, str], dagster_instance: DagsterInstance, tmp_path: Path
+) -> None:
+    """The metadata parquet can change between training and scoring, so check again at predict.
+
+    The check in `trained_cv_model` cannot cover this: the parquet is re-read here.
+    """
+    _register(dagster_instance)
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+
+    # ts1 was trained, then vanishes from the metadata parquet before scoring.
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([2], dtype=pl.Int32),
+            "h3_res_5": pl.Series([_TS1_CELL], dtype=pl.UInt64),
+            "time_series_type": ["Primary"],
+        }
+    ).write_parquet(tmp_path / "NGED" / "metadata.parquet")
+
+    result = materialize(
+        [cv_power_forecasts],
+        partition_key=PARTITION_KEY,
+        instance=dagster_instance,
+        raise_on_error=False,
+    )
+
+    assert not result.success
+    failure = result.failure_data_for_node("cv_power_forecasts")
+    assert failure is not None
+    assert "no row in the metadata parquet" in str(failure.error)
+    assert "[1]" in str(failure.error)
