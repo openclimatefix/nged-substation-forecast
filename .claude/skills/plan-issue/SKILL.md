@@ -3,19 +3,21 @@ name: plan-issue
 description: >-
   Turn a GitHub issue in openclimatefix/nged-substation-forecast into a reviewed implementation
   plan, writing no code: read the issue and its comments, decide whether it is worth implementing
-  at all, write a plan that may overrule a stale issue body, put it through two fresh adversarial
-  sub-agent reviews — one hunting for a simpler approach, then one checking correctness and
-  testability — triage the findings, stop for Jack. Load whenever Jack asks for a plan for an issue,
-  says "plan issue N" or "/plan-issue N", asks whether an issue is worth doing, or asks you to
-  think through an implementation before touching code. To implement an approved plan, use
-  `implement-issue` instead.
+  at all, size how much process it needs, write a plan that may overrule a stale issue body, put it
+  through up to two fresh adversarial sub-agent reviews — one hunting for a simpler approach, then
+  one checking correctness and testability — triage the findings, stop for human review. A very
+  simple issue skips the plan entirely and goes straight to `implement-issue`. Load whenever the
+  user asks for a plan for an issue, says "plan issue N" or "/plan-issue N", asks whether an issue
+  is worth doing, or asks you to think through an implementation before touching code. To implement
+  an approved plan, use `implement-issue` instead.
 ---
 
 # Plan a GitHub issue
 
-The output is a **plan file and a recommendation**, never a code change. Jack approves a plan
-before any code moves, so his review of the eventual diff checks execution rather than discovering
-the design for the first time.
+The output is a **plan file and a recommendation**, never a code change. A human approves the plan
+before any code moves, so the review of the eventual diff checks execution rather than discovering
+the design for the first time. The exception is an issue simple enough that there is no design to
+approve: step 3 sizes the issue, and a simple one skips this skill entirely.
 
 Take the issue number from the invocation (`/plan-issue 500`). If several are given, run the whole
 procedure once per issue, each on its own branch — do not merge them into one plan unless the
@@ -63,13 +65,13 @@ in parentheses. Not the issue's own title verbatim — those run long and bury t
 "Reject unknown keys in config_overrides (extra=\"forbid\" on BaseForecasterConfig)", which wants
 to become "Reject unknown config_overrides keys (#512)").
 
-Jack picks sessions out of the desktop app's session list, where the default title is derived from
-the `/plan-issue <N>` invocation and reads "Plan issue 510" — which does not say what the session
-is about once several are open at once.
+The user picks sessions out of the desktop app's session list, where the default title is derived
+from the `/plan-issue <N>` invocation and reads "Plan issue 510" — which does not say what the
+session is about once several are open at once.
 
 **Do not reach for a tool to do this.** Every session-management tool refuses the session it is
 running in, by contract, so there is nothing to call. The line above is a hint to whatever titles
-the session, and failing that a title Jack can copy in one gesture. If you find the session list
+the session, and failing that a title the user can copy in one gesture. If you find the session list
 still showing "Plan issue \<N\>" after a run, say so rather than working around it — that is the
 signal that this needs solving at the harness level instead.
 
@@ -96,7 +98,61 @@ If the verdict is "worth it, roughly as described", continue — but you are sti
 any specific mechanism the issue proposes. Say plainly which parts of the issue body you are
 departing from and why.
 
-## 3. Write the plan
+## 3. Size the process to the issue
+
+Not every issue needs a plan, and not every plan needs two reviews. Pick one of three sizes,
+**state it in your reply with a one-line reason before doing anything else**, and let the human
+override it.
+
+**Simple — no plan, and no agentic review at all.** Skip the rest of this skill and go straight to
+`implement-issue` at its step 1: worktree, implement, the verification set, PR, stop for human
+review. An issue is simple when all of these hold:
+
+- The change is mechanical, and reading the diff is enough to see whether it is right — a rename or
+  a find-and-replace across files, a prose or docs edit, deleting dead code, a dependency bump, a
+  one-line fix whose failing test you can name before you start.
+- There is one obvious way to do it, so there is no design to approve.
+- It touches no Patito contract, no production degradation path, no asset graph, and nothing about
+  what gets stored.
+- The green-before-push verification set is the whole of the risk: if `ruff`, `ty`, `pytest` and
+  the markdown lint pass, the change is right.
+
+Issue #583 — replace one word across seven skill and docs files — is the shape to picture. Say in
+the same reply that you are taking this path, and open it with `Implementing:` rather than the
+`Planning:` prefix from step 1a.
+
+**Complex — the full routine**: a plan, both plan reviews below, and both diff reviews in
+`implement-issue`. An issue is complex when any of these hold:
+
+- It adds or changes a Patito model, a Delta table, an asset, or anything else about what gets
+  stored.
+- It touches the production serving path, or a degradation rule in
+  `docs/design-philosophy/inherent-stability.md`.
+- More than one design would defensibly satisfy it, so the choice wants approving before code moves.
+- It spans enough code that you could not name every caller of what it changes without searching.
+
+**Medium — everything else.** Write the plan, then choose how much review to spend on it: between
+zero and two of the plan reviews below (steps 5 and 7, each with its triage step), and between
+zero and two of the diff reviews in `implement-issue`. The choice is yours, under four rules:
+
+- **Run the earlier of a pair first.** One plan review means the simplicity review, not the
+  correctness one, because a plan bigger than its issue survives a correctness review intact. One
+  diff review means the correctness-and-cut-it-down review, not the mutation pass.
+- **Spend a plan review** on a plan that adds an abstraction, a config field, a column or a new
+  file (the simplicity review), or on a plan whose account of current behaviour was hard to pin
+  down or whose tests are the risky part (the correctness review).
+- **Spend a diff review** on a diff that came out larger than the plan implied or grew a lot of
+  prose (the first review), or on a change whose whole value is a behaviour the tests are meant to
+  pin down — a boundary, an ordering, a join key, a warning path that must not raise (the mutation
+  pass).
+- **When you cannot decide, run it.** A review costs one sub-agent; the other error puts a design
+  nobody attacked into `main`.
+
+Carry the size and the chosen counts forward: they go in the plan file (step 4), in the report
+(step 9), and into the PR body when `implement-issue` opens it, so whoever reviews the diff knows
+what scrutiny it has already had.
+
+## 4. Write the plan
 
 The plan is a committed file on the issue's own branch, so set up the worktree now rather than
 leaving it to implementation — this is step 1 of the `implement-issue` skill, pulled forward:
@@ -107,7 +163,19 @@ cd .claude/worktrees/<branch-name>
 ln -s /home/jack/dev/python/nged-substation-forecast/.env .env   # if it exists and isn't already there
 ```
 
-Then write the plan to **`plans/<branch-name>.md`** inside that worktree, and commit it.
+Then write the plan to **`plans/<branch-name>.md`** inside that worktree, commit it and push the
+branch:
+
+```bash
+git push -u origin <branch-name>
+```
+
+**Then hand over the plan before anything else happens to it.** Say in your next reply that the
+plan is ready and give a **clickable markdown link** to it, written as the path relative to the
+worktree so the terminal turns it into a link: `[plans/<branch-name>.md](plans/<branch-name>.md)`.
+Do this *before* launching any reviewer. The reviews take minutes, and whoever wants to read the
+first draft — or to stop the work outright — should not have to wait for them, nor work out
+afterwards which parts of the plan the reviews wrote.
 
 One worktree per issue means `plans/` holds exactly one file on each branch, so the "at most one
 plan" rule in `plans/README.md` holds with no coordination between parallel sessions. Committing
@@ -122,8 +190,8 @@ the file-by-file detail.
 
 The plan covers:
 
-- **Verdict and departures** — the step-2 conclusion, and every point where the plan differs
-  from the issue body, each with its reason.
+- **Verdict, size and departures** — the step-2 conclusion, the step-3 size with the reviews it
+  buys, and every point where the plan differs from the issue body, each with its reason.
 - **What changes, file by file** — named files and functions, with what happens to each. Prefer
   naming the actual symbols over describing the change in the abstract.
 - **Design-philosophy check** — how the change sits against
@@ -144,14 +212,15 @@ The plan covers:
   anything this change specifically needs (for example `uv run pytest --run-network -m network` for
   convention-sensitive NWP conversion code, or `uv run mkdocs build --strict` *and reading the
   rendered HTML* for any change that touches links).
-- **Risks and open questions** — the things Jack should decide, stated as questions with your
-  recommendation attached.
+- **Risks and open questions** — the things the human reviewer should decide, stated as questions
+  with your recommendation attached.
 
 Do not paste large code blocks into the plan. Name the change; the implementer writes the code.
 
-## 4. First adversarial review: is there a simpler way?
+## 5. First adversarial review: is there a simpler way?
 
-The plan now goes through **two** reviews, by two separate fresh sub-agents, in this order:
+Run this if step 3 called for it — always for a complex issue, and for a medium one whenever it is
+the review you chose. The two reviews go to two separate fresh sub-agents, in this order:
 simplicity first, then correctness. Simplifying a plan can break it, so the correctness reviewer
 has to see the plan that simplification left behind, not the one that went in.
 
@@ -205,26 +274,27 @@ A proposal that big has to arrive with its case made, not as a suggestion:
   rearchitecture as its own issue afterwards? That is usually the answer, and saying so is not a
   weaker recommendation.
 
-## 5. Triage and revise
+## 6. Triage and revise
 
 Verify each proposed simplification against the code rather than accepting it — **reviewer
 findings are often wrong, and applying them uncritically makes the plan worse**. Take the genuine
 ones into the plan file. Reject a simplification when it drops something the issue actually asked
 for, or trades away a rule in `docs/design-philosophy/` — and say which, in one line.
 
-For each finding you reject, record the finding and the one-line reason in the plan file, so Jack
-can see what was considered and dismissed. Commit the revised plan.
+For each finding you reject, record the finding and the one-line reason in the plan file, so the
+human reviewer can see what was considered and dismissed. Commit the revised plan and push, so the
+branch on GitHub is never behind what the reviews have already done.
 
-**A proposed rearchitecture is Jack's call, not yours** — it is bigger than the issue, so neither
-adopting it nor dropping it silently is right. Put it in the plan's "Risks and open questions" with
-the reviewer's pros and cons, your view of whether it is genuinely simpler, and a recommendation on
-whether it should become its own issue. Then plan the issue under the current architecture unless
-Jack says otherwise.
+**A proposed rearchitecture is the human reviewer's call, not yours** — it is bigger than the
+issue, so neither adopting it nor dropping it silently is right. Put it in the plan's "Risks and
+open questions" with the sub-agent's pros and cons, your view of whether it is genuinely simpler,
+and a recommendation on whether it should become its own issue. Then plan the issue under the
+current architecture unless the human reviewer says otherwise.
 
-## 6. Second adversarial review: correctness and testability
+## 7. Second adversarial review: correctness and testability
 
-Launch **another** new sub-agent — not the one from step 4, and again with no account of your
-reasoning or of what the first review changed. Give it the issue number and the path to the
+Run this if step 3 called for it. Launch **another** new sub-agent — not the one from step 5, and
+again with no account of your reasoning or of what the first review changed. Give it the issue number and the path to the
 revised plan file. Its job is to establish whether the plan, as now written, is correct and whether
 its tests would actually catch it being wrong.
 
@@ -245,19 +315,19 @@ The attacks worth naming, when they apply:
 Ask the reviewer for findings with file/line evidence, and for an explicit verdict on each: real
 defect, or not.
 
-## 7. Triage the findings
+## 8. Triage the findings
 
-Verify each finding against the code, on the same terms as step 5: fix the genuine ones in the
-plan file, and record each rejected finding with its one-line reason. Commit the updated plan, so
-the branch carries the original plan and what both reviews did to it.
+Verify each finding against the code, on the same terms as step 6: fix the genuine ones in the
+plan file, and record each rejected finding with its one-line reason. Commit and push the updated
+plan, so the branch carries the original plan and what each review did to it.
 
-## 8. Stop
+## 9. Stop
 
-Report to Jack: the verdict from step 2, a short summary of the plan, what each of the two reviews
-changed, and what each found that you rejected. Give the branch name and the path to the plan
-file.
+Report: the verdict from step 2, the size from step 3 and which reviews it bought, a short summary
+of the plan, what each review that ran changed, and what each found that you rejected. Give the
+branch name and, again, the clickable link to the plan file.
 
-**Do not write any code, and do not open a PR.** Once Jack approves the plan, implementation runs
+**Do not write any code, and do not open a PR.** Once a human approves the plan, implementation runs
 under the `implement-issue` skill, resuming at its step 2 in the worktree this skill already
-created — implement, verify, PR, then two further independent adversarial reviews of the *diff*,
-triaging and pushing after each, stop.
+created — implement, verify, PR, then the diff reviews this skill's step 3 called for, each by a
+further independent sub-agent, triaging and pushing after each, stop for human review.

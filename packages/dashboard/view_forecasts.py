@@ -44,8 +44,12 @@ def _():
         label="Data source",
         inline=True,
     )
-    source
-    return (source,)
+    # Reload is defined here rather than where it is referenced, because marimo never re-runs the
+    # cell that *defines* a changed name. This cell also sits above every `mo.stop` below, so the
+    # button stays on screen when a missing forecast table has stopped the rest of the app.
+    reload = mo.ui.refresh(label="Reload data")
+    mo.hstack([source, reload], justify="start", gap=2)
+    return reload, source
 
 
 @app.cell
@@ -87,7 +91,11 @@ def _(settings):
 
 
 @app.cell
-def _(settings):
+def _(reload, settings):
+    # Load-bearing, not dead code: every Delta read in the notebook descends from this cell, so
+    # referencing `reload` here is what makes the button re-read them all. The metadata cell above
+    # is left out on purpose — re-running it would reset the time-series dropdown to its default.
+    reload
     # Delta partition metadata (no data scan) lists the available (experiment_name, fold_id)
     # pairs. If the table is missing entirely (e.g. a fresh local checkout), stop here — the
     # data-source radio above stays usable so the user can switch to S3.
