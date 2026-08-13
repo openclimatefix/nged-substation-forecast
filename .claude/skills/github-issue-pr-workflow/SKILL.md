@@ -79,25 +79,37 @@ Never squash-merge. We keep the full commit history in `main`, so use a merge co
 (`gh pr merge --merge`) or rebase (`gh pr merge --rebase`), not `gh pr merge --squash`. Under the
 `implement-issue` routine you stop for human review rather than merging at all.
 
-**Check what the merge will close, before you merge.** Issues are closed by two independent
-routes, and you have to check both — neither one shows you the other's:
+**Check what the merge will close, before you merge.** Issues are closed by two independent routes,
+the **PR body** and the **commit messages**, and neither is reliably visible in
+`closingIssuesReferences` beforehand. Read the text yourself:
 
 ```bash
-gh pr view <N> --json closingIssuesReferences --jq '.closingIssuesReferences[].number'
-git log origin/main..HEAD --format='%B' | grep -inE '(close[sd]?|fix(e[sd])?|resolve[sd]?) +#[0-9]+'
+KW='(clos|fix|resolv)[a-z]*.{0,60}#[0-9]+|#[0-9]+.{0,60}(clos|fix|resolv)'
+gh pr view <N> --json body --jq .body | grep -inE "$KW"
+git log origin/main..HEAD --format='%B' | grep -inE "$KW"
 ```
 
-The first lists the links registered from the **PR body** (and the Development sidebar). That list
-is *sticky*: GitHub registers a link when the text containing the keyword is first saved and does
-not drop it when the text is edited away. A PR whose body now reads "filed rather than fixed, see
-\#512" can still hold a closing link to 512 from an early draft, so reading the current body proves
-nothing. A link you did not intend cannot be edited out either — close the PR and open it again
-from the same branch with a clean body.
+**`closingIssuesReferences` proves nothing before the merge.** It stays `[]` right up to the point
+the merge lands and only then fills in. A PR body reading "tracked in issue \#593, which this does
+not close" reported `[]` when checked minutes before merging, registered a closing link on merge,
+and closed 593. Commit-message keywords are invisible to the field for the same reason. Treat an
+empty result as no evidence at all.
 
-The second catches keywords in **commit messages**, which close their issue when the commit lands
-on `main` and are invisible to `closingIssuesReferences` beforehand — that field stays `[]` right
-up to the merge. Prose *about* a closure counts: "Merging #514 closed #512" in a commit message
-closes 512. Keep those words away from any issue reference when writing about one.
+**Word order does not save you, and neither does a negation.** GitHub matches the keyword whether
+it falls before or after the reference, and it ignores the "not": both `closes #512` and "#512,
+which this does not close" register the link. Prose *about* a closure counts too — "Merging #514
+closed #512" in a commit message closes 512. When writing about an issue the PR leaves open, keep
+close, fix and resolve out of the sentence entirely. "Tracked separately in #512" and "issue #512
+stays open" are safe; anything pairing the word with the number is not.
+
+**The link is sticky once registered.** GitHub records it when the text containing the keyword is
+first saved and does not drop it when the text is edited away, so a body that now reads "filed
+rather than fixed, see \#512" can still hold a closing link from an early draft. A link you did not
+intend cannot be edited out — close the PR and open it again from the same branch with a clean
+body.
+
+**Check every issue the PR mentioned once the merge lands.** The pre-merge checks tell you about
+the text, not about what GitHub decided to do with it.
 
 **Don't pass `--delete-branch`.** The repo has `delete_branch_on_merge` turned on, so GitHub deletes
 the head branch on merge by itself. The flag only adds a *local* branch deletion, and that step
