@@ -86,9 +86,16 @@ questions".
   with `pl.lit` over the whole frame
   (`packages/dynamical_data/src/dynamical_data/ecmwf_ens/convert_to_polars.py:71-72`) — and
   delta-rs already rejects any row that fails the predicate and leaves the table untouched (verified
-  twice, below).
-- **Docstrings** — the module docstring needs no change. `write_nwp`'s "Append-only: …" paragraph
-  (`:71–76`) is replaced by what it now does: each `(nwp_model_id, init_time)` partition is written
+  twice, below; it validates *every* row, not a sample — 1 bad row in 5001, placed last, was
+  caught). An **empty** frame is a different case and is not covered by that backstop: taking the
+  partition from row 0 raises `IndexError` before anything is written, which is the outcome we want
+  (had an empty frame reached delta-rs it would have cleared the whole partition), and an NWP frame
+  with no rows is our own bug rather than an absent input — `convert_nwp_xarray_dataset_to_polars_dataframe`
+  raises on `pl.concat([])` first, so reaching `write_nwp` empty takes an empty `h3_grid_weights`
+  parquet. No guard for it, and a docstring line saying the frame must be non-empty.
+- **Docstrings** — the module docstring needs no change. `write_nwp`'s summary line (`:64`, "Append
+  ``Nwp`` rows to the ``nwp`` Delta table…") and its "Append-only: …" paragraph
+  (`:71–76`) are replaced by what it now does: each `(nwp_model_id, init_time)` partition is written
   whole, so re-materialising a partition replaces its rows rather than duplicating them. Say that
   the partition comes from the frame's first row and that delta-rs rejects a frame not wholly inside
   it. Record the `Timestamp`-predicate verification here, in the same form
@@ -130,7 +137,12 @@ partition". This is the only edit in this file — the rest of it belongs to #50
 - `docs/live_service/operations.md:309–316` — "**Do not re-materialise a partition that has already
   landed**" is now false. Rewrite it to say a re-materialisation replaces the partition, so a run
   that Dynamical republishes is corrected by re-running the Dagster partition. The #476 pointer goes
-  with it.
+  with it. Two things the rewrite must add, both established by review rather than assumed:
+  **re-materialising a partition while another materialisation of the same partition is in flight
+  fails one of them** with delta-rs' `CommitFailedError` (verified: 4 concurrent same-partition
+  writers, 3 raised) — one lost run instead of a corrupted table, and the opposite of what the same
+  race does today, which is to commit both copies; and **the superseded parquet stays on disk**
+  (nothing in this repo calls `vacuum`), so re-running a V1 partition leaves ~7.24M dead rows behind.
 - `docs/live_service/operations.md:318–323` — "A partition whose run *failed* is safe to
   re-materialise" stays true and gets simpler: the "check the table before re-running it" advice for
   a run killed between the Delta commit and Dagster recording success is no longer needed, because
@@ -138,29 +150,25 @@ partition". This is the only edit in this file — the rest of it belongs to #50
 - `docs/live_service/operations.md:278` — "Combined with the append-only write above, a
   badly-degraded run cannot be corrected in place either." Now it can; rewrite the sentence rather
   than deleting the paragraph, which is otherwise still right about the check being the only signal.
+- `docs/live_service/operations.md:298` — "The action is to chase Dynamical.org, not to touch
+  the table." That is exactly the situation this change exists to unblock: the action becomes chase
+  Dynamical *and then* re-materialise the partition once they republish.
 - `docs/design-philosophy/inherent-stability.md:147` — the failure-modes row whose trigger is "most
   plausibly from NWP rows duplicated at rest, since `ecmwf_ens` appends without dedup". That trigger
   is closed; the row stays (a duplicated forecast row is still a hard failure) with the trigger
   restated as a code bug.
-- `docs/design-philosophy/inherent-stability.md:194` — rule 7's justifying clause, "`ecmwf_ens`
+- `docs/design-philosophy/inherent-stability.md:193–195` — rule 7's justifying clause, "`ecmwf_ens`
   appends its NWP run with no dedup, so a bug that raised after the append would leave the rows
   committed on a failed run and duplicate them when the partition was re-materialised". The rule
   itself is untouched and the first half stays true; the duplication half does not.
-- `docs/live_service/operations.md` ~`:296` — "The action is to chase Dynamical.org, not to touch
-  the table." That is exactly the situation this change exists to unblock: the action becomes chase
-  Dynamical *and then* re-materialise the partition once they republish.
 - `docs/ml_experimentation/dagster-workflow.md:35` — the `ecmwf_ens` backfill step says the asset
   "appends it to `nwp_data.delta`". Reuse the wording that page already uses at `:47` for
   `eligible_time_series` ("an idempotent partition overwrite, so re-materialising replaces rather
   than appends"), which also tells a backfiller that re-running a date range is now safe.
-- `docs/design-philosophy/inherent-stability.md:147` — the failure-modes row whose trigger is "most
-  plausibly from NWP rows duplicated at rest, since `ecmwf_ens` appends without dedup". That trigger
-  is closed; the row stays (a duplicated forecast row is still a hard failure) with the trigger
-  restated as a code bug.
-- `docs/design-philosophy/inherent-stability.md:194` — rule 7's justifying clause, "`ecmwf_ens`
-  appends its NWP run with no dedup, so a bug that raised after the append would leave the rows
-  committed on a failed run and duplicate them when the partition was re-materialised". The rule
-  itself is untouched and the first half stays true; the duplication half does not.
+- `docs/architecture/ecmwf-ens-known-issues.md:239` — "A run that fails ingest writes nothing
+  (validation runs before the Delta append) …". Still true, but the word "append" goes stale, and
+  this is one of the two pages #476 cites as telling an operator to leave a landed partition alone,
+  so a reader arriving from there should find the new behaviour named.
 - `CLAUDE.md:248` — "appends it to Delta Lake via `delta_store.nwp.write_nwp`".
 - `packages/delta_store/tests/test_nwp.py:6` (module docstring, "appends landing as separate …
   Hive partitions") and the name `tests/test_assets.py:410::test_ecmwf_ens_materialises_and_appends_nwp`.
@@ -178,12 +186,20 @@ is unaffected.
 
 `ecmwf_ens` is production code (`PRODUCTION_LAYER_TAGS`), so
 [Inherent Stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
-governs. The change adds no raise of its own and removes none. The two ways the upstream run can
-genuinely be absent or incomplete are untouched: `NwpRunNotYetAvailable` and
-`NwpVariableWhollyMissing` are still caught and retried before the write is reached, and a short run
-still lands with `nwp_run_is_complete` WARNing. What the change does is make the *recovery* from a
-short run possible at all, which is a degradation path getting shorter rather than a new failure
-mode.
+governs. The two ways the upstream run can genuinely be absent or incomplete are untouched:
+`NwpRunNotYetAvailable` and `NwpVariableWhollyMissing` are still caught and retried before the write
+is reached, and a short run still lands with `nwp_run_is_complete` WARNing. What the change mainly
+does is make the *recovery* from a short run possible at all — a degradation path getting shorter.
+
+It does add one new way for `ecmwf_ens` to fail, which the runbook edit above has to name: two
+materialisations of the *same* partition running at once now contend, and delta-rs raises
+`CommitFailedError` on the loser (verified: 4 concurrent writers, 3 raised). Under `mode="append"`
+they both commit — which is precisely the silent duplication this issue exists to remove — so
+failing is the right behaviour, and it costs one run rather than a corrupted table. It is our own
+concurrency bug rather than the outside world misbehaving, so rule 1 permits it; it surfaces as a
+missed NWP run, which the failure-modes table (`inherent-stability.md:135–152`) already covers, so
+that table needs no new row. Disjoint partitions do not contend at all (8 concurrent writers, 8
+partitions, all committed), so the daily schedule and a non-overlapping backfill are unaffected.
 
 No asset check is added or edited, so the WARN/`blocking=False` question does not arise, and rule
 7's ordering constraint (assess before the non-idempotent write) is untouched — the change makes the
@@ -235,10 +251,22 @@ two edited `docs/live_service/operations.md` sections rather than trusting the l
 5. **Should `write_nwp` keep any way to append?** *Recommendation: no.* Nothing calls it that way,
    and a young project can add the parameter back the day a caller needs it.
 
-**Not a risk, checked so the next reader need not check it again:** concurrent backfill writes do
-not start conflicting. Eight threads writing eight disjoint partitions with `mode="overwrite"` and
-per-partition predicates all committed — table at version 8, every row present, no
-`CommitFailedError`. Disjoint `replaceWhere` predicates do not contend.
+**Checked so the next reader need not check it again**, all reproduced independently in the second
+review against the pinned `deltalake` 1.6.2:
+
+- Concurrent writes to *disjoint* partitions do not contend (8 threads, 8 partitions, all
+  committed, table at version 8). Concurrent writes to the *same* partition do — see the
+  design-philosophy section.
+- The replace is one commit carrying both the remove and the add, so there is no window in which
+  the old partition is gone and the new one not yet written. A kill mid-write leaves an orphan
+  parquet no reader sees, exactly as an append does. Rule 7's ordering is untouched.
+- The S3 path behaves identically to local (run against moto with this repo's `storage_options`
+  shape): create, new partition, replace, and the mismatched-frame rejection all match.
+- Every NWP reader goes through the Delta log (`Nwp.scan_delta` at `weather_schemas.py:483–489`,
+  `packages/dashboard/view_forecasts.py:384,406`); nothing globs parquet under `nwp_data_path`, and
+  nothing in the repo calls `vacuum` or `optimize`, so a long-running read cannot be pulled out from
+  under.
+- The predicate survives a non-midnight and a microsecond-precision `init_time`.
 
 ## What the reviews changed
 
@@ -252,3 +280,15 @@ a risk note to the blocking question above. Modified rather than accepted: the r
 folding `test_successive_appends_create_separate_partitions` into the new test — kept and renamed
 instead, because its real subject is the `Nwp.scan_delta` round-trip (dtypes, the `nwp_model_id`
 `Enum`), which the new test has no reason to repeat.
+
+**Second review (correctness).** It re-ran every empirical claim above and reproduced all of them,
+and it *built and ran both proposed tests* — confirming that `test_ecmwf_ens_re_materialising_…` is
+achievable with the existing `env` fixture and `_stub_ecmwf_download` (4 rows → 8 on `main`, 4 → 4
+with the change) and that the `delta_store` test is `3n` versus `4n` as written. Accepted from it:
+the concurrent same-partition `CommitFailedError`, which the plan had wrongly claimed did not exist,
+now named in the design-philosophy section and required of the runbook edit; the empty-frame
+rationale, which the first review had recorded as "delta-rs rejects it" when in fact delta-rs would
+have *cleared the partition* and it is the `IndexError` that prevents that; the fact that delta-rs
+validates every row rather than sampling; the dead parquet left behind by a replace; and three more
+edit sites (`nwp.py:64`, `ecmwf-ens-known-issues.md:239`, and a duplicated pair of bullets and a
+wrong line number in this file). Nothing was rejected — every finding checked out.
