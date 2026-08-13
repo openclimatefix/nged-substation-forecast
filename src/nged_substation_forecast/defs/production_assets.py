@@ -40,6 +40,7 @@ from ml_core._production_helpers import (
 )
 
 from nged_substation_forecast._sentry import send_forecast_checkin
+from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS, RESEARCH_LAYER_TAGS
 from nged_substation_forecast.defs.cv_assets import _load_engineering_inputs
 
 LIVE_FORECAST_HORIZON: Final[timedelta] = timedelta(days=14)
@@ -78,7 +79,7 @@ six hours after the timestamp named in the key, not at the midnight the key name
 """
 
 
-@asset
+@asset(tags=RESEARCH_LAYER_TAGS)
 def promotable_model_runs(context: AssetExecutionContext) -> None:
     """List MLflow fold runs eligible for promotion via ``promoted_model``.
 
@@ -116,7 +117,7 @@ class PromotedModelConfig(Config):
     ``promotable_model_runs``'s candidate table)."""
 
 
-@asset
+@asset(tags=RESEARCH_LAYER_TAGS)
 def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) -> None:
     """Promote a champion model from MLflow to local disk for zero-MLflow-at-runtime inference.
 
@@ -184,6 +185,7 @@ class LiveForecastsConfig(Config):
 
 
 @asset(
+    tags=PRODUCTION_LAYER_TAGS,
     partitions_def=live_forecast_partitions,
     deps=[
         AssetDep(
