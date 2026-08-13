@@ -16,8 +16,10 @@ We ingest ECMWF IFS ENS from [Dynamical.org](https://dynamical.org). Its data ca
 known, recurring quality quirks. This page records what they are, how we tell them apart, and the
 policy the `ecmwf_ens` ingest applies to each. The policy is implemented in
 [`contracts.weather_schemas`](../api/contracts/index.md): `Nwp.validate` is the fatal ingest gate,
-and two non-fatal reporters sit behind the asset's two WARN checks — `assess_nwp_quality` behind
-`nwp_has_no_unexpected_nulls`, and `assess_nwp_run_completeness` behind `nwp_run_is_complete`.
+and non-fatal reporters sit behind the asset's three WARN checks — `assess_nwp_quality` behind
+`nwp_has_no_unexpected_nulls`, `assess_upstream_grid_point_nulls` behind
+`nwp_instantaneous_variables_have_no_nulls`, and `assess_nwp_run_completeness` behind
+`nwp_run_is_complete`.
 
 ## The guiding principle
 
@@ -176,7 +178,10 @@ different responses even though neither fails the run.
 `nwp_has_no_unexpected_nulls` counts nulls at both stages of ingest, and the metadata keys say which
 stage each number came from. The `nwp_grid_point` keys count the raw 0.25° grid, before the
 aggregation ([`assess_upstream_grid_point_nulls`](../api/dynamical_data/index.md)); the `h3_cell`
-keys count the cells we store afterwards (`assess_nwp_quality`).
+keys count the cells we store afterwards (`assess_nwp_quality`). The same grid-point keys appear on
+`nwp_instantaneous_variables_have_no_nulls`, counting the same raw grid over
+[the other null population](#the-instantaneous-variables-scattered-nulls-counted-on-the-raw-grid) —
+the check name says which is which.
 
 Both are needed because the aggregation deliberately breaks the link between them. Renormalising
 over the contributing grid points is what keeps a scattered upstream null out of the stored cells —
@@ -219,9 +224,10 @@ Two null patterns *do* fail ingest:
     variable's nulls have only ever arrived as whole-step dropouts, and losing an entire run over
     one bad pixel is the outage
     [principle 7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary)'s
-    granularity clause exists to prevent. What it costs is a detector, and that cost is real:
-    scattered corruption in a variable that should never carry any is now mostly invisible at
-    ingest.
+    granularity clause exists to prevent. What it costs is that the *gate* cannot see scattered
+    corruption in a variable that should never carry any, so a separate detector counts it on the
+    raw grid instead: the `nwp_instantaneous_variables_have_no_nulls` check, described
+    [below](#the-instantaneous-variables-scattered-nulls-counted-on-the-raw-grid).
 
 - **A de-accumulated variable null in *every* slice beyond lead-0 of a run** — the column is absent
   rather than degraded, so `Nwp._check_no_wholly_missing_deaccumulated_variable` raises
@@ -232,6 +238,29 @@ Two null patterns *do* fail ingest:
 
 A run that fails ingest writes nothing (validation runs before the Delta append), so there are no
 partial partitions to clean up.
+
+### The instantaneous variables: scattered nulls, counted on the raw grid
+
+The gate above judges cells, so it sees an instantaneous variable's corruption only when a whole
+cell goes. The `nwp_instantaneous_variables_have_no_nulls` check counts the same corruption where it
+arrives, on the raw 0.25° grid, over the nine downloaded variables that are never legitimately null.
+Its `passed` is false on a single null grid point — a zero threshold, unlike
+`nwp_has_no_unexpected_nulls`, whose nulls are expected — and it still only WARNs, because by the
+time it runs the aggregation has already absorbed what it counted. What is at stake is whether we
+raise the run with Dynamical.org, not whether we keep it.
+
+The variable set comes from the download list rather than from the `Nwp` contract, because the two
+name the winds differently: we download `wind_u_10m`/`wind_v_10m` and derive
+`wind_speed_10m`/`wind_direction_10m` from them, so a set drawn from the contract would name four
+variables the downloaded dataset does not carry.
+
+Two things it cannot see. **Lead-0** is excluded from the count, which for these variables is a
+blind spot rather than a filter — a small one, since a lead-0 null that reaches a cell is fatal at
+validation anyway, so what goes uncounted is lead-0 scatter the aggregation absorbed. And a **blocky
+failure never reaches it**: every grid point of a cell goes at once, the cell is null, and
+`Nwp.validate` rejects the run before any check runs. So a run that lands with this check red is
+telling you about scatter, which is the pattern this project has never yet seen in an instantaneous
+variable — their nulls have only ever arrived as whole-step dropouts.
 
 ### A wholly-missing variable is retried, not failed outright
 
