@@ -139,8 +139,8 @@ step 1a: the chip title becomes the spawned session's title, the app's auto-titl
 Each chip prompt has to stand alone — the session cannot see this conversation — and carries:
 
 1. The issue number, the wave number, and `/plan-wave`'s standing instruction: run
-   `/plan-issue <N>` first, write no code until Jack approves the plan, then follow
-   `implement-issue`.
+   `/plan-issue <N>` first, and let it size the issue — if it writes a plan, write no code until
+   that plan is approved; if it sizes the issue simple, go straight on to `implement-issue`.
 
 2. An instruction to keep the `W<n>:` prefix when `plan-issue` step 1a asks it to state a session
    title, so the session does not retitle itself out of the wave.
@@ -177,7 +177,8 @@ attribution line every GitHub body written by Claude carries, and do not hard-wr
 `github-issue-pr-workflow` skill for both rules.
 
 Then stop. Do not plan the wave after this one, and do not write per-issue plans — each session
-does its own under `plan-issue`, in its own worktree, with its own adversarial reviews.
+does its own under `plan-issue`, in its own worktree, with whatever adversarial reviews that
+issue's size warrants.
 
 **Why the collision rule is the whole design:** these sessions branch from `main` and merge back
 independently, with no coordination between them and no shared context. Everything else — the

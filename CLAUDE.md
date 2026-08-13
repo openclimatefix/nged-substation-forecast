@@ -50,9 +50,9 @@ needed one, the mistake is already written.
 | `marimo-notebooks` | creating or editing a Marimo notebook (`packages/dashboard/*.py`, `packages/notebooks/*.py`) |
 | `ty-workarounds` | acting on a `ty` error in Altair chart code or numpy `.view()` code, or adding any `# ty: ignore` |
 | `plan-wave` | choosing the next batch of issues under an epic to run in parallel (`/plan-wave <EPIC>`) |
-| `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — writes a reviewed plan, no code |
+| `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — sizes the issue, then writes a reviewed plan unless it is trivial, no code |
 | `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
-| `implement-issue` | writing code for an approved plan: worktree, verify set, PR, two adversarial reviews, stop |
+| `implement-issue` | writing code for an approved plan: worktree, verify set, PR, up to two adversarial reviews, stop |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh pr merge`, or ship-time triage |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
 
@@ -145,7 +145,8 @@ Full description and a "which place do I use?" table: `docs/documentation-guide.
   never renumber.
 - **`plans/`** holds at most one file: the in-flight branch's implementation plan, written by the
   `plan-issue` skill before any code is touched and deleted on merge. One worktree per branch is
-  what keeps it to one file, so parallel sessions never collide. Usually empty on `main`.
+  what keeps it to one file, so parallel sessions never collide. Usually empty on `main`, and empty
+  on a branch whose issue was simple enough to need no plan.
 
 **Creating an issue or a PR has a checklist** — labels, org issue Type, OCF project membership
 and its fields, sub-issue ordering, the `JackKelly` assignee — and none of it can be set by `gh
@@ -162,14 +163,28 @@ before any code moves:
    launched as its own Claude Code session. It plans one wave and stops, because the epic gains
    issues while a wave is in flight. Skip it when the issue to work on has already been named.
 2. **`plan-issue`** (`/plan-issue <N>`) reads the issue, decides whether it is worth implementing
-   at all, writes `plans/<branch-name>.md`, has two fresh sub-agents adversarially review that
-   plan in turn — the first hunting for a simpler approach, the second checking correctness and
-   testability — and stops for review. It writes no code.
+   at all, and sizes how much process it needs. It writes `plans/<branch-name>.md`, links to the
+   plan as soon as it is committed and pushed, has up to two fresh sub-agents adversarially review
+   that plan in turn — the first hunting for a simpler approach, the second checking correctness
+   and testability — and stops for review. It writes no code.
 3. **`implement-issue`** picks up an approved plan: worktree, implement, the green-before-push
-   verification set, PR with labels and assignee, then two *further independent* adversarial
+   verification set, PR with labels and assignee, then up to two *further independent* adversarial
    reviews of the diff — the first for correctness and for cutting the code, tests and prose
-   down to what the change needs, the second mutation-testing the change — triaging and pushing
-   after each, stop. **Never merge.**
+   down to what the change needs, the second mutation-testing the change — committing, triaging
+   and pushing after each, stop. **Never merge.**
+
+**How much process an issue gets is sized to the issue**, in step 3 of `plan-issue`:
+
+- **Simple** — a mechanical change with one obvious way to do it, touching no contract, no
+  production degradation path and nothing stored, where the verification set is the whole of the
+  risk. It gets **no plan and no agentic review**: implement it, open the PR saying that no
+  sub-agent reviewed it, and stop for human review.
+- **Complex** — anything that changes what gets stored, touches the production serving path or a
+  degradation rule, or admits more than one defensible design. It gets the plan and **all four**
+  reviews.
+- **Medium** — everything else. It gets a plan, and Claude chooses between zero and two of the
+  plan reviews and between zero and two of the diff reviews, running the earlier of each pair
+  first and erring towards running one more when the call is close.
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
@@ -187,7 +202,9 @@ must not be applied uncritically. Simplicity gets its own reviewer, and gets it 
 plan that is more complicated than the issue requires is the failure mode that survives a
 correctness review intact. Mutation testing gets the last reviewer because a green suite proves
 nothing on its own: whether a test would catch the bug it exists for is only settled by writing
-that bug and watching.
+that bug and watching. The sizing exists because that machinery costs wall-clock time and a round
+of triage: on a change whose correctness is visible in the diff it finds nothing the diff did not
+already show, and the process then delays the change instead of protecting it.
 
 ## Architecture
 
