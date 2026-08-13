@@ -166,12 +166,12 @@ before any code moves:
    at all, and sizes how much process it needs. It writes `plans/<branch-name>.md`, links to the
    plan as soon as it is committed and pushed, has up to two fresh sub-agents adversarially review
    that plan in turn — the first hunting for a simpler approach, the second checking correctness
-   and testability — and stops for review. It writes no code.
+   and testability — and stops for human review. It writes no code.
 3. **`implement-issue`** picks up an approved plan: worktree, implement, the green-before-push
    verification set, PR with labels and assignee, then up to two *further independent* adversarial
    reviews of the diff — the first for correctness and for cutting the code, tests and prose
    down to what the change needs, the second mutation-testing the change — committing, triaging
-   and pushing after each, stop. **Never merge.**
+   and pushing after each, stop for human review. **Never merge.**
 
 **How much process an issue gets is sized to the issue**, in step 3 of `plan-issue`:
 

@@ -127,15 +127,15 @@ front — a report back after step 1 is not finished work.
    confirm that test goes red against the mutation and green without it. Re-run the step-3
    verification set, commit and push.
 
-9. **Stop and wait for human review. Never merge.** Report the size the issue was given, which
-   reviews ran, what each of them changed, and what each found that you rejected.
+9. **Stop for human review. Never merge.** Report the size the issue was given, which reviews ran,
+   what each of them changed, and what each found that you rejected.
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
-**Why:** Jack reviews diffs in GitHub's UI and wants a PR to already have survived an
-adversarial pass by the time he looks at it, so his review is the last line of defence rather
-than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by the
-implementer's rationale; the triage step exists because reviewer findings are often wrong and
+**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an
+adversarial pass by the time a human opens it, so that human review is the last line of defence
+rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by
+the implementer's rationale; the triage step exists because reviewer findings are often wrong and
 must not be applied uncritically. Mutation testing goes second because it should be aimed at the
 tests that survive the first round, not at ones the first round deletes — and it gets its own
 reviewer because a green suite proves nothing on its own: the only way to learn whether a test

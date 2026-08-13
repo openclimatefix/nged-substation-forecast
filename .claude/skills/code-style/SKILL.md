@@ -1,7 +1,7 @@
 ---
 name: code-style
 description: >-
-  This repo's code conventions, which Jack cares about and expects to be followed: Python 3.14+,
+  This repo's code conventions, which every change is expected to follow: Python 3.14+,
   Polars only (pandas banned), Patito schemas, ruff configuration and its traps, naming, how
   expressive a type hint has to be, `Final` on constants, calling functions with keyword arguments,
   comment and doc-link rules, and Polars style. Load before writing or editing any Python in this repo — a new module, a new function, a

@@ -3,10 +3,10 @@ name: plan-wave
 description: >-
   Work out the next wave of GitHub issues under an epic in
   openclimatefix/nged-substation-forecast that can safely be planned and implemented in parallel,
-  then dispatch them as background-task chips Jack launches as separate Claude Code sessions.
+  then dispatch them as background-task chips the user launches as separate Claude Code sessions.
   Reads the epic's open sub-issues, verifies each one's file surface against the code, groups
   between one and five that share no file, and records the wave on the epic so the next run knows
-  its number. Load whenever Jack asks what to work on next under an epic, says "plan the next
+  its number. Load whenever the user asks what to work on next under an epic, says "plan the next
   wave", "/plan-wave 138", or asks which issues can run in parallel. Plans exactly one wave and
   stops — it does not schedule the whole epic, and it writes no code and no per-issue plan.
 ---
@@ -14,21 +14,21 @@ description: >-
 # Plan the next wave of parallel work
 
 The output is a **wave**: between one and five open issues under the epic that can be worked at
-the same time by separate Claude Code sessions without colliding, plus one chip per issue for Jack
-to launch, plus a comment on the epic recording what was dispatched.
+the same time by separate Claude Code sessions without colliding, plus one chip per issue to
+launch, plus a comment on the epic recording what was dispatched.
 
 Plan **one wave, then stop.** Do not sketch the waves after it. The epic changes while a wave is
 in flight — under v0.2, planning issues #480 and #496 filed seven new sub-issues between them, and
 those became most of the next two waves. A schedule written before that work happened would have
 been wrong about everything past the wave in progress, and the effort spent writing it wasted.
 
-Take the epic number from the invocation (`/plan-wave 138`). If Jack names the epic by milestone
+Take the epic number from the invocation (`/plan-wave 138`). If the epic is named by milestone
 ("v0.2") instead, find it: epics map 1:1 to the roadmap milestones.
 
 ## 1. Establish the wave number
 
-Jack uses it to tell this wave's sessions apart from the last one's in the desktop app's session
-list, so it has to be right.
+The wave number is what tells this wave's sessions apart from the last one's in the desktop app's
+session list, so it has to be right.
 
 The ledger is a comment on the epic issue, written by step 7 of this skill at the end of every
 run. Read the epic's comments and take the highest wave number you find, plus one:
@@ -39,8 +39,8 @@ gh issue view <EPIC> --comments
 
 If there are no ledger comments and every sub-issue is open, this is wave 1. If there are no
 ledger comments but sub-issues are already closed, waves have run before this skill existed —
-**ask Jack which number to start from**, then seed the ledger in step 7. That is the one question
-worth blocking on, and it is asked once per epic.
+**ask the human which number to start from**, then seed the ledger in step 7. That is the one
+question worth blocking on, and it is asked once per epic.
 
 ## 2. Check the previous wave has landed
 
@@ -52,8 +52,8 @@ git worktree list
 ```
 
 Cross-check against the previous ledger comment. If issues from the last wave are still open, say
-so and ask Jack before dispatching — an unmerged branch still owns its files, so a new wave chosen
-against `main` can collide with work that is nearly ready to land. Leftover worktrees in
+so and ask the human before dispatching — an unmerged branch still owns its files, so a new wave
+chosen against `main` can collide with work that is nearly ready to land. Leftover worktrees in
 `.claude/worktrees/` are the other tell.
 
 ## 3. Read the candidates
@@ -118,17 +118,17 @@ Pick the largest set, up to five, in which **no two issues edit the same file**,
 
 Two issues touching the same file in provably separate regions — one editing `@asset(...)`
 decorators while another rewrites an asset body — may share a wave, but only if **both** chip
-prompts name the other's territory and say to stop and ask Jack rather than edit it. Prefer
+prompts name the other's territory and say to stop and ask the human rather than edit it. Prefer
 serialising over relying on that.
 
 Prefer fewer, larger-value sessions to five thin ones. Five is a ceiling, not a target: the wave
-costs Jack five plan reviews.
+costs five plan reviews.
 
 ## 6. Present the wave, then drop the chips
 
-Show Jack the wave as a table — issue, one-line change, file surface, and what it waits on — plus
+Present the wave as a table — issue, one-line change, file surface, and what it waits on — plus
 the reason anything obvious was held back. Then drop one chip per issue with `spawn_task` in the
-same reply. A chip is inert until Jack clicks it, so there is no need to ask first.
+same reply. A chip is inert until it is clicked, so there is no need to ask first.
 
 **Chip title**: `W<n>: <imperative phrase naming what the issue changes> (#<N>)` — for example
 `W4: Tag assets R&D or production (#423)`. Under 60 characters. This deliberately departs from
@@ -139,8 +139,8 @@ step 1a: the chip title becomes the spawned session's title, the app's auto-titl
 Each chip prompt has to stand alone — the session cannot see this conversation — and carries:
 
 1. The issue number, the wave number, and `/plan-wave`'s standing instruction: run
-   `/plan-issue <N>` first, and let it size the issue — if it writes a plan, write no code until
-   that plan is approved; if it sizes the issue simple, go straight on to `implement-issue`.
+   `/plan-issue <N>` first, and let it size the issue — if it writes a plan, write no code until a
+   human approves that plan; if it sizes the issue simple, go straight on to `implement-issue`.
 
 2. An instruction to keep the `W<n>:` prefix when `plan-issue` step 1a asks it to state a session
    title, so the session does not retitle itself out of the wave.
@@ -149,18 +149,19 @@ Each chip prompt has to stand alone — the session cannot see this conversation
    is the most valuable thing in the prompt: it saves the session the search, and it stops the
    session inheriting a wrong location from the issue.
 
-4. **The other sessions' territory**, named file by file, with an instruction to stop and ask Jack
-   rather than edit it. Say which issues own those files and that they are running concurrently.
+4. **The other sessions' territory**, named file by file, with an instruction to stop and ask the
+   human rather than edit it. Say which issues own those files and that they are running
+   concurrently.
 
 5. **Any prerequisite to verify first** — `gh issue view <M> --json state` — with an instruction to
-   ask Jack rather than plan on top of code that is about to move.
+   ask the human rather than plan on top of code that is about to move.
 
 6. **The design questions the plan must settle**, especially where the issue leaves them open, and
    any repo rule the change implicates: a check staying `WARN`/`blocking=False` and unable to
    raise, production degrading where R&D fails fast, a hypothesis label the change delivers.
 
 Set `cwd` to the repository root, and write the `tldr` in plain English with no file paths — it is
-what Jack reads in the tooltip.
+what the user reads in the tooltip.
 
 ## 7. Record the wave on the epic
 
