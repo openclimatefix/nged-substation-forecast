@@ -6,8 +6,8 @@ description: >-
   verification set, PR with labels and the JackKelly assignee, then two fresh sub-agents
   adversarially review the diff in turn — one for correctness and for keeping the code, tests and
   prose as short as they can be, then one that mutation-tests the change — triaging and pushing
-  after each, stop for Jack, never merge. Load before writing any code for an issue, and when
-  dispatching a sub-agent or a fresh session to solve one. To decide *what* to build, use
+  after each, stop for human review, never merge. Load before writing any code for an issue, and
+  when dispatching a sub-agent or a fresh session to solve one. To decide *what* to build, use
   `plan-issue` first.
 ---
 
@@ -16,9 +16,9 @@ description: >-
 This routine starts from an **approved plan**. The `plan-issue` skill (invoked as
 `/plan-issue <N>`) is how you get one: it reads the issue, decides whether it is worth
 implementing at all, writes `plans/<branch-name>.md`, has two fresh sub-agents adversarially
-review the plan — one for simplicity, one for correctness and testability — and stops for Jack. It
-also does step 1 below, so when it hands over, the worktree and branch already exist and
-implementation resumes at step 2.
+review the plan — one for simplicity, one for correctness and testability — and stops for human
+review. It also does step 1 below, so when it hands over, the worktree and branch already exist
+and implementation resumes at step 2.
 
 When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it these steps up
 front — a report back after step 1 is not finished work.
@@ -110,15 +110,15 @@ front — a report back after step 1 is not finished work.
    confirm that test goes red against the mutation and green without it. Re-run the step-3
    verification set and push.
 
-9. **Stop and wait for Jack's review. Never merge.** Report what each of the two reviews changed
-   and what each found that you rejected.
+9. **Stop for human review. Never merge.** Report what each of the two reviews changed and what
+   each found that you rejected.
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
-**Why:** Jack reviews diffs in GitHub's UI and wants a PR to already have survived an
-adversarial pass by the time he looks at it, so his review is the last line of defence rather
-than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by the
-implementer's rationale; the triage step exists because reviewer findings are often wrong and
+**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an
+adversarial pass by the time a human opens it, so that human review is the last line of defence
+rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by
+the implementer's rationale; the triage step exists because reviewer findings are often wrong and
 must not be applied uncritically. Mutation testing goes second because it should be aimed at the
 tests that survive the first round, not at ones the first round deletes — and it gets its own
 reviewer because a green suite proves nothing on its own: the only way to learn whether a test

@@ -75,9 +75,9 @@ no linter touches it, and pass that path to `--body-file`. Never commit a body d
 
 ## Merging pull requests
 
-Never squash-merge. Jack wants the full commit history preserved in `main`, so use a merge commit
+Never squash-merge. We keep the full commit history in `main`, so use a merge commit
 (`gh pr merge --merge`) or rebase (`gh pr merge --rebase`), not `gh pr merge --squash`. Under the
-`implement-issue` routine you stop and wait for Jack's review rather than merging at all.
+`implement-issue` routine you stop for human review rather than merging at all.
 
 **Check what the merge will close, before you merge.** Issues are closed by two independent
 routes, and you have to check both — neither one shows you the other's:

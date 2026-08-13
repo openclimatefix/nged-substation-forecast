@@ -5,16 +5,16 @@ description: >-
   plan, writing no code: read the issue and its comments, decide whether it is worth implementing
   at all, write a plan that may overrule a stale issue body, put it through two fresh adversarial
   sub-agent reviews — one hunting for a simpler approach, then one checking correctness and
-  testability — triage the findings, stop for Jack. Load whenever Jack asks for a plan for an issue,
-  says "plan issue N" or "/plan-issue N", asks whether an issue is worth doing, or asks you to
-  think through an implementation before touching code. To implement an approved plan, use
-  `implement-issue` instead.
+  testability — triage the findings, stop for human review. Load whenever the user asks for a plan
+  for an issue, says "plan issue N" or "/plan-issue N", asks whether an issue is worth doing, or
+  asks you to think through an implementation before touching code. To implement an approved plan,
+  use `implement-issue` instead.
 ---
 
 # Plan a GitHub issue
 
-The output is a **plan file and a recommendation**, never a code change. Jack approves a plan
-before any code moves, so his review of the eventual diff checks execution rather than discovering
+The output is a **plan file and a recommendation**, never a code change. A human approves a plan
+before any code moves, so the review of the eventual diff checks execution rather than discovering
 the design for the first time.
 
 Take the issue number from the invocation (`/plan-issue 500`). If several are given, run the whole
@@ -63,13 +63,13 @@ in parentheses. Not the issue's own title verbatim — those run long and bury t
 "Reject unknown keys in config_overrides (extra=\"forbid\" on BaseForecasterConfig)", which wants
 to become "Reject unknown config_overrides keys (#512)").
 
-Jack picks sessions out of the desktop app's session list, where the default title is derived from
-the `/plan-issue <N>` invocation and reads "Plan issue 510" — which does not say what the session
-is about once several are open at once.
+The user picks sessions out of the desktop app's session list, where the default title is derived
+from the `/plan-issue <N>` invocation and reads "Plan issue 510" — which does not say what the
+session is about once several are open at once.
 
 **Do not reach for a tool to do this.** Every session-management tool refuses the session it is
 running in, by contract, so there is nothing to call. The line above is a hint to whatever titles
-the session, and failing that a title Jack can copy in one gesture. If you find the session list
+the session, and failing that a title the user can copy in one gesture. If you find the session list
 still showing "Plan issue \<N\>" after a run, say so rather than working around it — that is the
 signal that this needs solving at the harness level instead.
 
@@ -144,8 +144,8 @@ The plan covers:
   anything this change specifically needs (for example `uv run pytest --run-network -m network` for
   convention-sensitive NWP conversion code, or `uv run mkdocs build --strict` *and reading the
   rendered HTML* for any change that touches links).
-- **Risks and open questions** — the things Jack should decide, stated as questions with your
-  recommendation attached.
+- **Risks and open questions** — the things the human reviewer should decide, stated as questions
+  with your recommendation attached.
 
 Do not paste large code blocks into the plan. Name the change; the implementer writes the code.
 
@@ -212,14 +212,14 @@ findings are often wrong, and applying them uncritically makes the plan worse**.
 ones into the plan file. Reject a simplification when it drops something the issue actually asked
 for, or trades away a rule in `docs/design-philosophy/` — and say which, in one line.
 
-For each finding you reject, record the finding and the one-line reason in the plan file, so Jack
-can see what was considered and dismissed. Commit the revised plan.
+For each finding you reject, record the finding and the one-line reason in the plan file, so the
+human reviewer can see what was considered and dismissed. Commit the revised plan.
 
-**A proposed rearchitecture is Jack's call, not yours** — it is bigger than the issue, so neither
-adopting it nor dropping it silently is right. Put it in the plan's "Risks and open questions" with
-the reviewer's pros and cons, your view of whether it is genuinely simpler, and a recommendation on
-whether it should become its own issue. Then plan the issue under the current architecture unless
-Jack says otherwise.
+**A proposed rearchitecture is the human reviewer's call, not yours** — it is bigger than the
+issue, so neither adopting it nor dropping it silently is right. Put it in the plan's "Risks and
+open questions" with the sub-agent's pros and cons, your view of whether it is genuinely simpler,
+and a recommendation on whether it should become its own issue. Then plan the issue under the
+current architecture unless the human reviewer says otherwise.
 
 ## 6. Second adversarial review: correctness and testability
 
@@ -253,11 +253,11 @@ the branch carries the original plan and what both reviews did to it.
 
 ## 8. Stop
 
-Report to Jack: the verdict from step 2, a short summary of the plan, what each of the two reviews
+Report: the verdict from step 2, a short summary of the plan, what each of the two reviews
 changed, and what each found that you rejected. Give the branch name and the path to the plan
 file.
 
-**Do not write any code, and do not open a PR.** Once Jack approves the plan, implementation runs
+**Do not write any code, and do not open a PR.** Once a human approves the plan, implementation runs
 under the `implement-issue` skill, resuming at its step 2 in the worktree this skill already
 created — implement, verify, PR, then two further independent adversarial reviews of the *diff*,
 triaging and pushing after each, stop.

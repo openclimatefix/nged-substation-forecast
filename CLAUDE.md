@@ -164,12 +164,12 @@ before any code moves:
 2. **`plan-issue`** (`/plan-issue <N>`) reads the issue, decides whether it is worth implementing
    at all, writes `plans/<branch-name>.md`, has two fresh sub-agents adversarially review that
    plan in turn — the first hunting for a simpler approach, the second checking correctness and
-   testability — and stops for review. It writes no code.
+   testability — and stops for human review. It writes no code.
 3. **`implement-issue`** picks up an approved plan: worktree, implement, the green-before-push
    verification set, PR with labels and assignee, then two *further independent* adversarial
    reviews of the diff — the first for correctness and for cutting the code, tests and prose
    down to what the change needs, the second mutation-testing the change — triaging and pushing
-   after each, stop. **Never merge.**
+   after each, stop for human review. **Never merge.**
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
