@@ -49,6 +49,7 @@ needed one, the mistake is already written.
 | `mkdocs-authoring` | editing markdown MkDocs renders — `docs/`, READMEs, `SKILL.md`, docstrings — especially nested lists, list items with code blocks, or wrapped links |
 | `marimo-notebooks` | creating or editing a Marimo notebook (`packages/dashboard/*.py`, `packages/notebooks/*.py`) |
 | `ty-workarounds` | acting on a `ty` error in Altair chart code or numpy `.view()` code, or adding any `# ty: ignore` |
+| `plan-wave` | choosing the next batch of issues under an epic to run in parallel (`/plan-wave <EPIC>`) |
 | `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — writes a reviewed plan, no code |
 | `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
 | `implement-issue` | writing code for an approved plan: worktree, verify set, PR, two adversarial reviews, stop |
@@ -153,14 +154,18 @@ never-squash-merge rule and ship-time triage. Load it before you run either comm
 
 ## How work gets done
 
-Two skills, in order, and they are deliberately separate so that a design is approved before
-any code moves:
+Three skills, in order. The last two are deliberately separate so that a design is approved
+before any code moves:
 
-1. **`plan-issue`** (`/plan-issue <N>`) reads the issue, decides whether it is worth implementing
+1. **`plan-wave`** (`/plan-wave <EPIC>`) chooses the next one-to-five issues under an epic that
+   can run concurrently without editing the same files, and dispatches each as a chip to be
+   launched as its own Claude Code session. It plans one wave and stops, because the epic gains
+   issues while a wave is in flight. Skip it when the issue to work on has already been named.
+2. **`plan-issue`** (`/plan-issue <N>`) reads the issue, decides whether it is worth implementing
    at all, writes `plans/<branch-name>.md`, has two fresh sub-agents adversarially review that
    plan in turn — the first hunting for a simpler approach, the second checking correctness and
    testability — and stops for review. It writes no code.
-2. **`implement-issue`** picks up an approved plan: worktree, implement, the green-before-push
+3. **`implement-issue`** picks up an approved plan: worktree, implement, the green-before-push
    verification set, PR with labels and assignee, then two *further independent* adversarial
    reviews of the diff — the first for correctness and for cutting the code, tests and prose
    down to what the change needs, the second mutation-testing the change — triaging and pushing

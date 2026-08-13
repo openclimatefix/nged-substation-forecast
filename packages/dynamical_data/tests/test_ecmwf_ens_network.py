@@ -66,6 +66,13 @@ def test_real_ecmwf_ens_pipeline_conventions_match_offline_fixtures() -> None:
     assert lons.max() <= -2.9
 
     downloaded = download.download_ecmwf_ens_data(sliced)
+
+    # The null counters index this dataset by name, so the two populations they count must be named
+    # as the *live* catalog names them. The offline twin of this assertion reads a frozen slice, so
+    # only this one can catch the catalog renaming a variable under us.
+    assert set(downloaded.data_vars) >= download.ECMWF_ENS_INSTANTANEOUS_VARS
+    assert set(downloaded.data_vars) >= Nwp.deaccumulated_var_names
+
     df = convert(ds=downloaded, h3_grid=h3_grid)
 
     # --- Whole-pipeline checks on real values ---

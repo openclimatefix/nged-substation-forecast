@@ -185,7 +185,7 @@ appear nowhere else.
 7. **Never let the warning path be able to fail the thing it is warning about.** A bug in a warning
    function that raises would convert fail-open into fail-closed at exactly the wrong moment, which
    is why `report_power_freshness` never raises and why every asset check — the standalone
-   `power_data_is_fresh` and `live_forecasts_are_healthy`, and the two per-run checks computed
+   `power_data_is_fresh` and `live_forecasts_are_healthy`, and the three per-run checks computed
    inside `ecmwf_ens` — runs its whole body under a catch-all. Non-blocking is not enough on its
    own: Dagster fails a run whose check step *errors*, whatever its `blocking` setting, and the
    scheduled jobs carry a Sentry failure hook — so an unguarded warning path both fails the run and
@@ -325,7 +325,7 @@ here: nothing else says clear-sky is what we fall back *to*.
 | Audience | Question | Channel |
 |---|---|---|
 | **Forecast users** (NGED) | "How much should I trust *this row*?" | In-band: quantile spread, plus `nwp_init_time`, already on the row |
-| **Data providers** | "Is *your* feed broken, and since when?" | Aggregated and **attributable**: `power_forecast_warnings`, the freshness check's late-series table, the live check's missed-NWP-run count |
+| **Data providers** | "Is *your* feed broken, and since when?" | Aggregated and **attributable**: `power_forecast_warnings`, the freshness check's late-series table, the live check's missed-NWP-run count, the NWP quality check's upstream grid-point null rate |
 | **Us, the developers** | "Is *our* system at fault?" | Out-of-band: Sentry, plus the missed-check-in alarm |
 
 Inherent stability creates a specific hazard for the third channel: **a system that always succeeds

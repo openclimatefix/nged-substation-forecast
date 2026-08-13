@@ -17,6 +17,7 @@ from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
 from contracts.weather_schemas import (
     ECMWF_ENS_H3_RESOLUTION,
+    Nwp,
     NwpQualityReport,
     NwpRunCompletenessReport,
     NwpVariableWhollyMissing,
@@ -44,9 +45,14 @@ from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe,
 )
 from dynamical_data.ecmwf_ens.download import (
+    ECMWF_ENS_INSTANTANEOUS_VARS,
     NwpRunNotYetAvailable,
     download_ecmwf_ens_data,
     open_ecmwf_ens_run,
+)
+from dynamical_data.ecmwf_ens.upstream_nulls import (
+    UpstreamNullRate,
+    assess_upstream_grid_point_nulls,
 )
 from geo.great_britain.load import load_gb_boundary
 from geo.h3 import compute_h3_grid_weights_for_boundary
@@ -226,6 +232,23 @@ so there is nothing to re-scan (and re-scanning the whole ~5.9B-row NWP table wo
 2**32 row-count ceiling). This differs from ``power_data_is_fresh``, whose freshness genuinely
 drifts over time and so must re-read the table on a schedule."""
 
+_NWP_QUALITY_CHECK_DESCRIPTION: Final[str] = (
+    "Nulls in the de-accumulated NWP variables (precipitation and the two radiation fluxes) beyond "
+    "lead-0, counted at both stages of ingest and never mixed. The `nwp_grid_point` keys count the "
+    "raw 0.25 degree grid Dynamical.org sent us, before aggregation: that is the provider signal — "
+    "is the feed broken, and since when? The `h3_cell` keys count the cells we store after "
+    "area-weighted aggregation: that is how much the model actually lost. The aggregation "
+    "renormalises each cell over the grid points that supplied a value, so it absorbs most "
+    "upstream scatter, and a corrupt run can have null grid points and no null cell. The two are "
+    "not comparable as rates — different units over different populations — and only this check's "
+    "`passed` follows the cells. See "
+    "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
+)
+"""Standing explanation shown in the Dagster UI's Checks view.
+
+The per-run ``AssetCheckResult.description`` carries that run's numbers; this says what they
+mean."""
+
 _NWP_COMPLETENESS_CHECK_NAME: Final[str] = "nwp_run_is_complete"
 """Name of the per-run NWP completeness check emitted by ``ecmwf_ens`` (see
 ``assess_nwp_run_completeness``).
@@ -233,6 +256,27 @@ _NWP_COMPLETENESS_CHECK_NAME: Final[str] = "nwp_run_is_complete"
 Separate from ``nwp_has_no_unexpected_nulls`` because the two answer different questions with
 different remedies: that one asks whether the rows we got are usable, this one asks whether we got
 all the rows. Computed in-asset from the frame in memory, for the same reason."""
+
+_NWP_INSTANTANEOUS_CHECK_NAME: Final[str] = "nwp_instantaneous_variables_have_no_nulls"
+"""Name of the per-run check on the instantaneous variables' raw-grid nulls.
+
+Separate from ``nwp_has_no_unexpected_nulls`` because the two count populations whose nulls mean
+opposite things, and so warrant opposite thresholds and different remedies: tolerated corruption to
+read as a trend, against an anomaly to raise with Dynamical.org today."""
+
+_NWP_INSTANTANEOUS_CHECK_DESCRIPTION: Final[str] = (
+    "Nulls in the instantaneous NWP variables (temperature, dew point, the winds, the pressures, "
+    "geopotential height) on the raw 0.25 degree grid Dynamical.org sent us. These are never "
+    "legitimately null, so `passed` is false on a single null grid point — unlike "
+    "`nwp_has_no_unexpected_nulls`, whose nulls are expected. A red result is a mail to "
+    "Dynamical.org, not a re-run: the run has landed and no stored cell is affected, because the "
+    "aggregation renormalises each H3 cell over the grid points that supplied a value and so "
+    "absorbs scattered nulls before they reach one. That absorption is also why this check counts "
+    "the raw grid: a null that does reach a cell never gets here, since `Nwp.validate` rejects "
+    "the run first. See "
+    "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
+)
+"""Standing explanation shown in the Dagster UI's Checks view."""
 
 _NWP_NULL_SLICES_SCHEMA: Final[TableSchema] = TableSchema(
     columns=[
@@ -245,13 +289,34 @@ _NWP_NULL_SLICES_SCHEMA: Final[TableSchema] = TableSchema(
 )
 """Fixed schema for the affected-slices metadata table (so an empty table still renders)."""
 
+_UPSTREAM_PER_VARIABLE_SCHEMA: Final[TableSchema] = TableSchema(
+    columns=[
+        TableColumn("variable", "string"),
+        TableColumn("n_null_grid_points", "int"),
+        TableColumn("n_affected_slices", "int"),
+        TableColumn("n_total_grid_points", "int"),
+    ]
+)
+"""Fixed schema for the per-variable raw-grid null table (so a clean run still renders one)."""
+
 
 @asset(
     tags=PRODUCTION_LAYER_TAGS,
     partitions_def=ecmwf_ens_partitions,
     deps=["h3_grid_weights"],
     check_specs=[
-        AssetCheckSpec(name=_NWP_QUALITY_CHECK_NAME, asset="ecmwf_ens", blocking=False),
+        AssetCheckSpec(
+            name=_NWP_QUALITY_CHECK_NAME,
+            asset="ecmwf_ens",
+            blocking=False,
+            description=_NWP_QUALITY_CHECK_DESCRIPTION,
+        ),
+        AssetCheckSpec(
+            name=_NWP_INSTANTANEOUS_CHECK_NAME,
+            asset="ecmwf_ens",
+            blocking=False,
+            description=_NWP_INSTANTANEOUS_CHECK_DESCRIPTION,
+        ),
         AssetCheckSpec(name=_NWP_COMPLETENESS_CHECK_NAME, asset="ecmwf_ens", blocking=False),
     ],
     # The `pool="ECMWF"` works in conjunction with the Dagster instance configuration
@@ -266,6 +331,11 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     This asset fetches the 00Z NWP run for the partition date, converts it to a
     Polars DataFrame, and appends it to the Delta table through
     ``delta_store.nwp.write_nwp`` (Float32, significand-rounded).
+
+    Its ``nwp_has_no_unexpected_nulls`` check reports null counts for both the raw NWP grid and the
+    stored H3 cells; that check's own description says which keys are which and why they differ.
+    ``nwp_instantaneous_variables_have_no_nulls`` counts the raw grid again, over the variables that
+    are never legitimately null, where a single null is worth acting on.
     """
     settings = Settings()
     storage_options = settings.storage_options
@@ -301,22 +371,32 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         ) from exc
     context.log.info(f"Converted NWP data to Polars. Columns: {nwp.columns}")
 
-    # Two non-fatal per-run checks. The first surfaces the tolerated scattered nulls (known upstream
-    # ECMWF ENS corruption) that Nwp.validate deliberately let through. The second asks whether the
-    # run is *whole*; a short run is the upstream provider misbehaving, so we keep the rows that did
-    # arrive and WARN rather than discarding the run. Computed before the write, not merely under a
-    # guard — rule 7 of
+    # Three non-fatal per-run checks. The first surfaces the tolerated scattered nulls (known
+    # upstream ECMWF ENS corruption) that Nwp.validate deliberately let through. The second counts
+    # the same raw grid over the variables that are never legitimately null, where the aggregation
+    # absorbs scattered corruption so completely that nothing downstream of it can see any. The
+    # third asks whether the run is *whole*; a short run is the upstream provider misbehaving, so we
+    # keep the rows that did arrive and WARN rather than discarding the run. Computed before the
+    # write, not merely under a guard — rule 7 of
     # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules
     try:
         quality = assess_nwp_quality(nwp)
+        upstream = assess_upstream_grid_point_nulls(
+            ds=ds, variables=Nwp.deaccumulated_var_names, exclude_lead_0=True
+        )
+        instantaneous = assess_upstream_grid_point_nulls(
+            ds=ds, variables=ECMWF_ENS_INSTANTANEOUS_VARS, exclude_lead_0=False
+        )
         completeness = assess_nwp_run_completeness(
             dataframe=nwp, expected_n_h3_cells=h3_grid["h3_index"].n_unique()
         )
         check_results = [
-            _nwp_quality_check_result(quality),
+            _nwp_quality_check_result(report=quality, upstream=upstream),
+            _nwp_instantaneous_check_result(instantaneous),
             _nwp_completeness_check_result(completeness),
         ]
         shape_metadata = _nwp_run_shape_metadata(completeness)
+        upstream_metadata = _upstream_null_metadata(upstream)
     except BaseException as exc:
         # The same guard as `power_data_is_fresh` — see the comment there for why it catches
         # `BaseException`, what that costs when writing tests, and rule 7 for why a warning path
@@ -324,14 +404,16 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
             raise  # A cancelled run must cancel.
         context.log.exception("Could not assess the ingested NWP run")
-        # One event for one fault: both checks share this assessment, so both degrade together.
-        # The tag names the quality check either way; the operations runbook says to expect that.
+        # One event for one fault: all three checks share this guard, so they degrade together.
+        # The tag names the quality check whichever one raised; the runbook says to expect that.
         report_check_degradation(check_name=_NWP_QUALITY_CHECK_NAME, exc=exc)
         check_results = [
             _degraded_nwp_check_result(check_name=_NWP_QUALITY_CHECK_NAME, exc=exc),
+            _degraded_nwp_check_result(check_name=_NWP_INSTANTANEOUS_CHECK_NAME, exc=exc),
             _degraded_nwp_check_result(check_name=_NWP_COMPLETENESS_CHECK_NAME, exc=exc),
         ]
         shape_metadata = {}
+        upstream_metadata = {}
 
     nwp_data_path = settings.nwp_data_path
     if_local_path_then_make_parent_dir(nwp_data_path)
@@ -344,6 +426,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
             "path": nwp_data_path,
             "init_time": str(nwp_init_time),
             **shape_metadata,
+            **upstream_metadata,
         },
         check_results=check_results,
     )
@@ -352,8 +435,8 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
 def _degraded_nwp_check_result(check_name: str, exc: BaseException) -> AssetCheckResult:
     """A WARN result for a per-run NWP check that could not be evaluated at all.
 
-    Inside an asset declaring two ``AssetCheckSpec``s an unnamed result fails the step outright, so
-    ``check_name`` is required — unlike in a standalone ``@asset_check``.
+    Inside an asset declaring several ``AssetCheckSpec``s an unnamed result fails the step outright,
+    so ``check_name`` is required — unlike in a standalone ``@asset_check``.
     """
     return AssetCheckResult(
         check_name=check_name,
@@ -409,18 +492,16 @@ def _nwp_completeness_check_result(report: NwpRunCompletenessReport) -> AssetChe
     )
 
 
-def _nwp_quality_check_result(report: NwpQualityReport) -> AssetCheckResult:
-    """Wrap an :class:`NwpQualityReport` into a WARN-severity Dagster check result."""
-    if report.is_healthy:
-        description = "No unexpected nulls in the de-accumulated NWP variables."
-    else:
-        variables = ", ".join(report.affected_variables)
-        description = (
-            f"{report.n_null_cells} null cell(s) beyond lead-0 in {variables}, across "
-            f"{report.n_scattered_slices} partly-null and {report.n_whole_null_slices} wholly-null "
-            "(member, valid_time) slice(s) — known upstream ECMWF ENS corruption, tolerated. See "
-            "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
-        )
+def _nwp_quality_check_result(
+    report: NwpQualityReport, upstream: UpstreamNullRate
+) -> AssetCheckResult:
+    """Wrap the two null reports for one run into a WARN-severity Dagster check result.
+
+    ``passed`` follows the H3 cells alone. The upstream rate is a trend across runs, not a verdict
+    on this one, and the archive has no threshold that separates a healthy feed from a degrading
+    one — so it is published and plotted rather than gated. Escalating a badly-degraded run is
+    <https://github.com/openclimatefix/nged-substation-forecast/issues/501>.
+    """
     return AssetCheckResult(
         check_name=_NWP_QUALITY_CHECK_NAME,
         # WARN, never fail: these nulls are expected upstream corruption we deliberately ingest.
@@ -428,21 +509,133 @@ def _nwp_quality_check_result(report: NwpQualityReport) -> AssetCheckResult:
         # that before this runs.
         passed=report.is_healthy,
         severity=AssetCheckSeverity.WARN,
-        description=description,
+        description=_nwp_quality_description(report=report, upstream=upstream),
         metadata={
-            "n_null_cells": report.n_null_cells,
-            "n_affected_slices": report.n_affected_slices,
-            # The split of `n_affected_slices`, broken out because the two halves mean different
+            "n_null_h3_cells": report.n_null_cells,
+            "n_affected_h3_slices": report.n_affected_slices,
+            # The split of `n_affected_h3_slices`, broken out because the two halves mean different
             # things and only one of them is measured well: a wholly-null slice reaches the cells
             # intact however they are aggregated, whereas the scattered remainder is only whatever
             # upstream corruption happened to take out every grid point of a cell. Both are
             # emitted so the operations runbook can name either as a number to read off this check.
-            "n_whole_null_slices": report.n_whole_null_slices,
-            "n_scattered_slices": report.n_scattered_slices,
-            "affected_variables": list(report.affected_variables),
-            "affected_slices": _nwp_null_slices_metadata(report.affected),
+            "n_whole_null_h3_slices": report.n_whole_null_slices,
+            "n_scattered_h3_slices": report.n_scattered_slices,
+            "affected_h3_variables": list(report.affected_variables),
+            "affected_h3_slices": _nwp_null_slices_metadata(report.affected),
+            "n_null_nwp_grid_points": upstream.n_null_nwp_grid_points,
+            "n_total_nwp_grid_points": upstream.n_total_nwp_grid_points,
+            "null_nwp_grid_point_fraction": upstream.null_nwp_grid_point_fraction,
+            "n_affected_nwp_slices": upstream.n_affected_nwp_slices,
+            "affected_nwp_variables": list(upstream.affected_nwp_variables),
+            "per_nwp_variable": _upstream_per_variable_metadata(upstream.per_variable),
         },
     )
+
+
+def _nwp_instantaneous_check_result(upstream: UpstreamNullRate) -> AssetCheckResult:
+    """Wrap the instantaneous variables' raw-grid null count into a WARN Dagster check result.
+
+    ``passed`` is a zero threshold, unlike ``nwp_has_no_unexpected_nulls``'s: these variables are
+    never legitimately null, so one null grid point is worth an operator's attention. It still only
+    WARNs, because by the time this runs the aggregation has already absorbed whatever it counts —
+    the run is landed either way, and what is at stake is whether we ask Dynamical.org about it.
+    """
+    return AssetCheckResult(
+        check_name=_NWP_INSTANTANEOUS_CHECK_NAME,
+        passed=upstream.is_healthy,
+        severity=AssetCheckSeverity.WARN,
+        description=_nwp_instantaneous_description(upstream),
+        metadata={
+            "n_null_nwp_grid_points": upstream.n_null_nwp_grid_points,
+            "n_total_nwp_grid_points": upstream.n_total_nwp_grid_points,
+            "null_nwp_grid_point_fraction": upstream.null_nwp_grid_point_fraction,
+            "n_affected_nwp_slices": upstream.n_affected_nwp_slices,
+            "affected_nwp_variables": list(upstream.affected_nwp_variables),
+            "per_nwp_variable": _upstream_per_variable_metadata(upstream.per_variable),
+        },
+    )
+
+
+def _nwp_instantaneous_description(upstream: UpstreamNullRate) -> str:
+    """Describe the instantaneous variables' raw-grid nulls for one run."""
+    if upstream.is_healthy:
+        return f"No nulls in {upstream.n_total_nwp_grid_points} instantaneous-variable grid points."
+    return (
+        f"{upstream.n_null_nwp_grid_points} of {upstream.n_total_nwp_grid_points} "
+        f"instantaneous-variable grid point(s) null "
+        f"({upstream.null_nwp_grid_point_fraction:.4%}) in "
+        f"{', '.join(upstream.affected_nwp_variables)}, across "
+        f"{upstream.n_affected_nwp_slices} (variable, member, step) slice(s)."
+    )
+
+
+def _upstream_per_variable_metadata(per_variable: pl.DataFrame) -> TableMetadataValue:
+    """Render the per-variable raw-grid null counts as a Dagster metadata table.
+
+    Uncapped, unlike the affected-slices table: there are thirteen weather variables in all, so this
+    frame has no bad day on which it can grow.
+    """
+    records = [
+        TableRecord(
+            {
+                "variable": row["variable"],
+                "n_null_grid_points": row["n_null"],
+                "n_affected_slices": row["n_affected_slices"],
+                "n_total_grid_points": row["n_total"],
+            }
+        )
+        for row in per_variable.iter_rows(named=True)
+    ]
+    return MetadataValue.table(records, schema=_UPSTREAM_PER_VARIABLE_SCHEMA)
+
+
+def _nwp_quality_description(report: NwpQualityReport, upstream: UpstreamNullRate) -> str:
+    """Describe both populations on every run, because the two routinely disagree.
+
+    The aggregation absorbs most upstream scatter, so a run can arrive corrupt and still store no
+    null cell; a description written from the cells alone would call that run clean.
+    """
+    grid_points = (
+        f"Raw NWP grid: {upstream.n_null_nwp_grid_points} of {upstream.n_total_nwp_grid_points} "
+        f"grid point(s) null beyond lead-0 ({upstream.null_nwp_grid_point_fraction:.4%})"
+    )
+    if not upstream.is_healthy:
+        grid_points += (
+            f" in {', '.join(upstream.affected_nwp_variables)}, across "
+            f"{upstream.n_affected_nwp_slices} (variable, member, step) slice(s)"
+        )
+    cells = f"Stored H3 cells: {report.n_null_cells} null cell(s)"
+    if not report.is_healthy:
+        cells += (
+            f" in {', '.join(report.affected_variables)}, across {report.n_scattered_slices} "
+            f"partly-null and {report.n_whole_null_slices} wholly-null (member, valid_time) "
+            "slice(s)"
+        )
+    # Only claim corruption when some was found: this string is the operator's summary of the run,
+    # and a clean run described as tolerated corruption is the same false claim, inverted, that
+    # reporting the cells alone used to make.
+    verdict = (
+        ""
+        if upstream.is_healthy and report.is_healthy
+        else (
+            " Known upstream ECMWF ENS corruption, tolerated. See "
+            "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
+        )
+    )
+    return f"{grid_points}. {cells}.{verdict}"
+
+
+def _upstream_null_metadata(upstream: UpstreamNullRate) -> dict[str, MetadataValue]:
+    """The upstream corruption rate, for the materialisation timeline.
+
+    Published on every materialisation whose assessment succeeded, including the ones where the
+    check passes, because the provider question this answers — is the feed degrading? — is about
+    the trend across runs and is invisible in any single one.
+    """
+    return {
+        "n_null_nwp_grid_points": MetadataValue.int(upstream.n_null_nwp_grid_points),
+        "null_nwp_grid_point_fraction": MetadataValue.float(upstream.null_nwp_grid_point_fraction),
+    }
 
 
 _NWP_NULL_SLICES_TABLE_LIMIT: Final[int] = 100

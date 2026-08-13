@@ -265,7 +265,7 @@ def compute_metrics(
             Deduplicated on ``(time_series_id, time)`` before the join — a duplicated actual
             would otherwise double the ensemble members and corrupt the member-aware metrics.
         metadata: Substation metadata used to join ``time_series_type`` onto each metric row.
-            Series absent from ``metadata`` receive a null ``time_series_type``.
+            Must cover every scored ``time_series_id``.
         capacity: Pre-computed per-series effective capacity; ``effective_capacity_mw`` is the
             NMAE denominator. Must cover every scored ``time_series_id``.
 
@@ -277,7 +277,8 @@ def compute_metrics(
             period with no observed data).
         ValueError: If any forecast row has a negative lead time (``valid_time`` before
             ``power_fcst_init_time`` — an undeliverable hindcast row; see issue #346), if
-            any scored series has no row in ``capacity``, or if any computed metric value is
+            any scored series has no row in ``capacity`` or in ``metadata``, or if any
+            computed metric value is
             non-finite (NaN/inf — which ``Metrics.validate`` would otherwise accept, since
             NaN is not null, and which would poison the MLflow aggregate means).
     """
@@ -417,11 +418,22 @@ def compute_metrics(
             f"silently poison the MLflow aggregate means. First offenders:\n{offenders.head(10)}"
         )
 
-    # Join time_series_type from metadata (left — keeps all metric rows; unmatched → null).
+    # Join time_series_type from metadata. Left, so a series with no metadata row surfaces as a
+    # null to be named below rather than vanishing from the leaderboard.
     type_map = metadata.select(["time_series_id", "time_series_type"])
     metrics_tall = metrics_tall.join(type_map, on="time_series_id", how="left").with_columns(
         time_series_type=pl.col("time_series_type").cast(pl.Enum(TIME_SERIES_TYPE_SLICES))
     )
+
+    # Every scored series must have a metadata row. A null here would drop the series out of every
+    # per-type MLflow aggregate while still counting towards the overall mean, so two experiments
+    # scored over the same population would not be comparable.
+    missing_type = metrics_tall.filter(pl.col("time_series_type").is_null())["time_series_id"]
+    if missing_type.len() > 0:
+        raise ValueError(
+            f"No metadata row for time_series_id(s) {sorted(set(missing_type.to_list()))}; "
+            "materialise the time-series metadata for these series before scoring."
+        )
 
     return Metrics.validate(metrics_tall, allow_superfluous_columns=True)
 
@@ -494,12 +506,11 @@ def build_mlflow_aggregate_metrics(
 
     result: dict[str, float] = {}
 
-    # Per-type aggregates (only for non-null time_series_type values).
+    # Per-type aggregates. The column is `allow_missing` on `Metrics`, so guard its presence —
+    # but never its nullability: `compute_metrics` raises rather than emit a null type.
     if "time_series_type" in base.columns:
-        per_type = (
-            base.filter(pl.col("time_series_type").is_not_null())
-            .group_by(["metric_key", "time_series_type"])
-            .agg(mean_value=pl.col("metric_value").mean())
+        per_type = base.group_by(["metric_key", "time_series_type"]).agg(
+            mean_value=pl.col("metric_value").mean()
         )
         for row in per_type.iter_rows(named=True):
             key = f"{row['metric_key']}__{_type_slug(str(row['time_series_type']))}"
