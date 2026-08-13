@@ -79,7 +79,12 @@ class UpstreamNullRate:
 
     @property
     def affected_nwp_variables(self) -> tuple[str, ...]:
-        """The counted variables carrying at least one null grid point, sorted."""
+        """The counted variables carrying at least one null grid point.
+
+        In ``per_variable``'s row order, which is sorted by variable name because
+        :func:`assess_upstream_grid_point_nulls` builds it that way — ``filter`` preserves row
+        order rather than imposing one.
+        """
         return tuple(self.per_variable.filter(pl.col("n_null") > 0)["variable"])
 
     @property
