@@ -329,5 +329,5 @@ branch name and, again, the clickable link to the plan file.
 
 **Do not write any code, and do not open a PR.** Once a human approves the plan, implementation runs
 under the `implement-issue` skill, resuming at its step 2 in the worktree this skill already
-created — implement, verify, PR, then the diff reviews step 3 called for, each by a further
-independent sub-agent, triaging and pushing after each, stop.
+created — implement, verify, PR, then the diff reviews this skill's step 3 called for, each by a
+further independent sub-agent, triaging and pushing after each, stop for human review.
