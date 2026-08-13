@@ -56,27 +56,49 @@ NWP_WRITER_PROPERTIES: Final[WriterProperties] = WriterProperties(
 that choice, which won for ``power_forecasts``, measures worse here."""
 
 
+def _partition_predicate(nwp: pt.DataFrame[Nwp]) -> str:
+    """Build the SQL predicate naming the one Delta partition ``nwp`` belongs to.
+
+    Read from the frame's first row rather than taken as an argument, so the predicate cannot
+    disagree with the data written alongside it. Rows outside that partition are not silently
+    dropped: delta-rs validates every row against the predicate and rejects the whole write,
+    leaving the table untouched.
+    """
+    return (
+        f"nwp_model_id = '{nwp.item(0, 'nwp_model_id')}' "
+        f"AND init_time = '{nwp.item(0, 'init_time').isoformat()}'"
+    )
+
+
 def write_nwp(
     nwp: pt.DataFrame[Nwp],
     table_uri: str | Path,
     storage_options: ObjectStoreOptions | None = None,
 ) -> None:
-    """Append ``Nwp`` rows to the ``nwp`` Delta table in its storage format.
+    """Write one NWP run into the ``nwp`` Delta table in its storage format.
 
     Rounds every continuous weather variable to ``NWP_SIGNIFICAND_BITS`` significand bits, sorts
     rows by ``NWP_SORT_COLS``, and writes with ``NWP_WRITER_PROPERTIES``. The table is
     partitioned by ``(nwp_model_id, init_time)``, matching ``Nwp.scan_delta``'s
     partition-pruning assumptions; the first write creates the table.
 
-    Append-only: each ``(nwp_model_id, init_time)`` partition is written exactly once — the
-    daily ``ecmwf_ens`` asset downloads one brand-new NWP run per Dagster partition. (No
-    ``replace_partition`` option like ``write_power_forecasts``: nothing re-materialises an
-    existing NWP partition today, and a partition-replace predicate on a ``Timestamp`` partition
-    column would need its own careful verification — add it only when a caller actually needs
-    it.)
+    The write **replaces** the ``(nwp_model_id, init_time)`` partition it is given rather than
+    appending to it, so re-materialising an ``ecmwf_ens`` partition — to pick up a run
+    Dynamical.org has republished, or after one was killed between the Delta commit and Dagster
+    recording success — costs a rewrite rather than a second copy of the run beside the first.
+    ``Nwp.validate`` sees only the frame in hand, so an appended duplicate would land silently and
+    fan out every later ``Nwp.scan_delta`` read.
+
+    delta-rs' ``replaceWhere`` predicate matches a ``Timestamp`` partition column correctly, which
+    is worth stating because the Hive directory holds a percent-encoded string: confirmed
+    empirically that an ``isoformat()`` literal matches only the named partition, on a local path
+    and on S3 alike, and works on a table that does not exist yet as well as on a partition that
+    does not. Two materialisations of the *same* partition at once contend, and the loser raises
+    ``CommitFailedError`` — one lost run rather than a table needing repair. Disjoint partitions do
+    not contend, so the daily schedule and a backfill of other dates run happily together.
 
     Args:
-        nwp: Validated NWP rows for a single ``(nwp_model_id, init_time)`` partition.
+        nwp: Validated, non-empty NWP rows for a single ``(nwp_model_id, init_time)`` partition.
         table_uri: Path or URI of the ``nwp`` Delta table.
         storage_options: delta-rs object-store options (credentials/endpoint) for a remote
             ``table_uri``; ``None``/empty for a local path.
@@ -99,7 +121,8 @@ def write_nwp(
     write_deltalake(
         table_or_uri=table_uri,
         data=prepared,
-        mode="append",
+        mode="overwrite",
+        predicate=_partition_predicate(nwp),
         partition_by=["nwp_model_id", "init_time"],
         writer_properties=NWP_WRITER_PROPERTIES,
         storage_options=typeddict_to_dict(storage_options),

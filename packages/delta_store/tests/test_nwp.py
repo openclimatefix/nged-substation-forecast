@@ -3,8 +3,9 @@
 Writes real (tiny) ``Nwp`` frames into a temp Delta table and asserts the on-disk format:
 ZSTD with parquet's *default* encodings (measured better than ``BYTE_STREAM_SPLIT`` /
 ``DELTA_BINARY_PACKED`` for this table — see ``delta_store.nwp``), member-early sort within
-each file, every continuous variable rounded to ``NWP_SIGNIFICAND_BITS``, and appends landing
-as separate ``(nwp_model_id, init_time)`` Hive partitions.
+each file, every continuous variable rounded to ``NWP_SIGNIFICAND_BITS``, successive runs landing
+as separate ``(nwp_model_id, init_time)`` Hive partitions, and a re-written run replacing its own
+partition and only its own.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -37,8 +38,14 @@ _CONTINUOUS_BASE_VALUES = {
 mantissas so the significand-rounding assertions have something to measure."""
 
 
-def _make_nwp(n: int = 6, *, init_time: datetime = _T0) -> pt.DataFrame[Nwp]:
-    """Build a valid ``Nwp`` frame with deliberately unsorted key columns."""
+def _make_nwp(
+    n: int = 6, *, init_time: datetime = _T0, precipitation_type: int = 1
+) -> pt.DataFrame[Nwp]:
+    """Build a valid ``Nwp`` frame with deliberately unsorted key columns.
+
+    ``precipitation_type`` marks which write a row came from. It is the one variable
+    ``write_nwp`` does not round, so a test can compare it exactly.
+    """
     rows = {
         # Reverse-ordered members and cycling valid_times so the writer's sort has work to do.
         "nwp_model_id": ["ECMWF_ENS_0_25_degree"] * n,
@@ -46,7 +53,7 @@ def _make_nwp(n: int = 6, *, init_time: datetime = _T0) -> pt.DataFrame[Nwp]:
         "valid_time": [init_time + timedelta(hours=(i % 3) + 1) for i in range(n)],
         "ensemble_member": list(range(n - 1, -1, -1)),
         "h3_index": [100 + i for i in range(n)],
-        "categorical_precipitation_type_surface": [1] * n,
+        "categorical_precipitation_type_surface": [precipitation_type] * n,
         **{
             var: [base * (1 + 0.003 * i) for i in range(n)]
             for var, base in _CONTINUOUS_BASE_VALUES.items()
@@ -96,7 +103,7 @@ def test_continuous_vars_rounded_to_significand_bits(tmp_path: Path) -> None:
         assert (stored.view(np.dtype(np.uint32)) & discarded == 0).all(), var
 
 
-def test_successive_appends_create_separate_partitions(tmp_path: Path) -> None:
+def test_successive_runs_create_separate_partitions(tmp_path: Path) -> None:
     table = tmp_path / "nwp"
     n = 4
     t1 = _T0 + timedelta(days=1)
@@ -116,3 +123,27 @@ def test_successive_appends_create_separate_partitions(tmp_path: Path) -> None:
     assert collected.filter(pl.col("init_time") == t1).height == n
     assert collected.schema["temperature_2m"] == pl.Float32
     assert collected.schema["nwp_model_id"] == pl.Enum(["ECMWF_ENS_0_25_degree"])
+
+
+def test_rewriting_a_run_replaces_only_its_own_partition(tmp_path: Path) -> None:
+    table = tmp_path / "nwp"
+    n = 4
+    init_times = [_T0 + timedelta(days=day) for day in range(3)]
+    for init_time in init_times:
+        write_nwp(_make_nwp(n, init_time=init_time), table)
+    before = Nwp.scan_delta(table).collect().sort(*NWP_SORT_COLS)
+
+    replaced = init_times[1]
+    write_nwp(_make_nwp(n, init_time=replaced, precipitation_type=2), table)
+    after = Nwp.scan_delta(table).collect().sort(*NWP_SORT_COLS)
+
+    assert after.height == 3 * n, "the re-written run was appended alongside the first copy"
+    assert after.filter(pl.col("init_time") != replaced).equals(
+        before.filter(pl.col("init_time") != replaced)
+    ), "the replace predicate reached beyond its own (nwp_model_id, init_time) partition"
+    assert (
+        after.filter(pl.col("init_time") == replaced)[
+            "categorical_precipitation_type_surface"
+        ].to_list()
+        == [2] * n
+    )

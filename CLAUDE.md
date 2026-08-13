@@ -245,7 +245,7 @@ Three main assets:
 
 - `power_time_series_and_metadata` — pulls NGED telemetry from S3, appends to Delta Lake, upserts metadata parquet
 - `h3_grid_weights` — computes fractional H3 cell overlap with the GB boundary for spatial NWP aggregation
-- `ecmwf_ens` — daily-partitioned asset that downloads ECMWF ENS NWP and appends it to Delta Lake via `delta_store.nwp.write_nwp`
+- `ecmwf_ens` — daily-partitioned asset that downloads ECMWF ENS NWP and writes it to Delta Lake via `delta_store.nwp.write_nwp`, which replaces that `(nwp_model_id, init_time)` partition
 
 ### Data Contracts (`packages/contracts/`)
 

@@ -275,10 +275,10 @@ the time you read it.** Everything short of a wholly-empty variable lands, so
 `n_whole_null_h3_slices` is not merely informational — it is the sole signal distinguishing a run
 that lost two slices from one that lost nearly all of them, and both land looking equally green.
 Nothing downstream consumes it: no training filter, no metric, and no Sentry alert, because
-Sentry fires on a failed *run* and a WARN check is not one. Combined with the append-only write
-above, a badly-degraded run cannot be corrected in place either. So if this count is ever large
-rather than a handful, treat it as an incident to act on deliberately — the pipeline will not act
-on it for you. Making a large count escalate is tracked in
+Sentry fires on a failed *run* and a WARN check is not one. Correcting a badly-degraded run means
+re-materialising its partition by hand, once the upstream data is fixed. So if this count is ever
+large rather than a handful, treat it as an incident to act on deliberately — the pipeline will not
+act on it for you. Making a large count escalate is tracked in
 [issue #501](https://github.com/openclimatefix/nged-substation-forecast/issues/501).
 
 **Reading the instantaneous-variable check.** `nwp_instantaneous_variables_have_no_nulls` counts the
@@ -295,7 +295,8 @@ non-blocking WARN, and asks the other question: did the whole run arrive? Its de
 the missing ensemble members and the missing lead times in hours, and its metadata carries the
 observed-versus-expected member, step, cell and row counts. **The run has already landed when this
 warns** — a short run is kept, because partial NWP forecasts better than falling back on
-yesterday's run. The action is to chase Dynamical.org, not to touch the table.
+yesterday's run. The action is to chase Dynamical.org, and to re-materialise the partition once
+they republish the complete run.
 
 **All three NWP checks share one description that means something different from all the others**,
 just as `power_data_is_fresh` does above. `Could not assess the ingested NWP run: …` says the
@@ -306,21 +307,24 @@ there is no report to read them from. Treat the corruption rate as unknown for t
 and mind the gap when reading the trend. The run still lands. One Sentry event is sent, tagged
 `asset_check:nwp_has_no_unexpected_nulls` whichever assessment raised.
 
-**Do not re-materialise a partition that has already landed.** `write_nwp` is append-only, so
-re-running the partition after Dynamical republishes the run would append a *second* copy of it
-alongside the short one. `Nwp.validate` checks uniqueness only within the in-memory frame, so the
-duplicate primary keys would land silently and every later `Nwp.scan_delta` read would fan out. If
-a short run genuinely needs replacing, that needs a partition-replace path in `delta_store.nwp`,
-which does not exist today — tracked in
-[issue #476](https://github.com/openclimatefix/nged-substation-forecast/issues/476). (Materialising
-a *missed* partition, below, is a different case and is safe: nothing landed for it.)
+**Re-materialising a partition that has already landed replaces it.** `write_nwp` overwrites the
+`(nwp_model_id, init_time)` partition it is handed rather than appending to it, so re-running the
+partition after Dynamical republishes a run swaps the short copy for the complete one. That holds
+for a partition whose run *failed* too, whether it wrote nothing (validation and both quality
+assessments all run before the Delta write) or left rows on disk after being killed between the
+Delta commit and Dagster recording success — re-running replaces whatever landed, so there is no
+need to inspect the table first.
 
-**A partition whose run *failed* is safe to re-materialise**, because the work that can raise —
-validation and both quality assessments alike — runs before the Delta append, so a failed
-`ecmwf_ens` run wrote nothing. Two things sit after the append and both leave a red partition with
-rows on disk: Dagster's validation of the returned check results, and the process being killed
-between the Delta commit and Dagster recording success. So for a partition that failed for an
-infrastructure reason rather than a raised exception, check the table before re-running it.
+Two consequences worth knowing before you re-run:
+
+- **Do not re-materialise a partition while another materialisation of that same partition is
+  running.** The two writes contend and the loser fails with delta-rs' `CommitFailedError`. That
+  costs a run, not the table, and re-running afterwards is safe. Partitions for *different* dates
+  do not contend at all, so a backfill alongside the daily schedule is fine.
+- **The superseded rows stay on disk.** Delta marks the old parquet files as removed rather than
+  deleting them, and nothing here runs `vacuum`, so replacing a V1 partition leaves ~7.24M dead
+  rows behind. Reads are unaffected — every reader goes through the transaction log — but the
+  table on disk grows by roughly one partition each time.
 
 Every materialisation whose completeness assessment succeeded also publishes `n_ensemble_members`,
 `n_valid_times`, `n_h3_cells` and the `valid_time` range as metadata, so the Dagster UI timeline

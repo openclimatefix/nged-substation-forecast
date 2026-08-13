@@ -407,7 +407,7 @@ def _check_evaluations(result: ExecuteInProcessResult) -> dict[str, AssetCheckEv
     }
 
 
-def test_ecmwf_ens_materialises_and_appends_nwp(
+def test_ecmwf_ens_materialises_and_writes_nwp(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """Happy path with the download/convert pipeline stubbed: the partition key parses into
@@ -705,6 +705,28 @@ def test_ecmwf_ens_assesses_before_writing(
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
     assert result.success
     assert table_existed == [False]
+
+
+def test_ecmwf_ens_re_materialising_a_partition_does_not_duplicate_rows(
+    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """Re-running a landed partition replaces its rows instead of landing a second copy of the run.
+
+    ``Nwp.validate`` sees only the frame in hand, so a duplicated key would reach the table
+    silently and fan every later ``Nwp.scan_delta`` read out.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
+
+    for _ in range(2):
+        result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
+        assert result.success
+
+    written = pl.read_delta(Settings().nwp_data_path)
+    assert written.height == 4
+    key = ["nwp_model_id", "init_time", "valid_time", "ensemble_member", "h3_index"]
+    assert not written.select(key).is_duplicated().any()
 
 
 def test_ecmwf_ens_publishes_both_null_populations(

@@ -329,8 +329,10 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     """Downloads and processes ECMWF ensemble NWP data for a specific day.
 
     This asset fetches the 00Z NWP run for the partition date, converts it to a
-    Polars DataFrame, and appends it to the Delta table through
-    ``delta_store.nwp.write_nwp`` (Float32, significand-rounded).
+    Polars DataFrame, and writes it to the Delta table through
+    ``delta_store.nwp.write_nwp`` (Float32, significand-rounded), which replaces that
+    ``(nwp_model_id, init_time)`` partition — so re-materialising a partition cannot
+    duplicate the run.
 
     Its ``nwp_has_no_unexpected_nulls`` check reports null counts for both the raw NWP grid and the
     stored H3 cells; that check's own description says which keys are which and why they differ.
