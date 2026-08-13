@@ -528,9 +528,10 @@ class NwpQualityReport:
     :meth:`Nwp.validate` rejects that before this runs.
 
     Read this as "how much did we lose", not as "how corrupt was the feed". The aggregation absorbs
-    most per-pixel upstream corruption before it reaches a cell, so this report is a poor proxy for
-    the upstream null rate; measuring that rate where it lives is tracked in
-    <https://github.com/openclimatefix/nged-substation-forecast/issues/505>.
+    most per-pixel upstream corruption before it reaches a cell, so this is a poor proxy for the
+    upstream null rate. That rate is measured where it lives, on the raw grid, by
+    :class:`dynamical_data.ecmwf_ens.upstream_nulls.UpstreamNullRate`; the ``ecmwf_ens`` asset
+    publishes both on one check, and they are not comparable as rates.
     """
 
     affected: pl.DataFrame
