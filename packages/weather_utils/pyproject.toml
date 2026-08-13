@@ -1,6 +1,6 @@
 [project]
 name = "weather_utils"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shared NWP query helpers reused across the dashboard and the feature pipeline"
 readme = "README.md"
 authors = [
