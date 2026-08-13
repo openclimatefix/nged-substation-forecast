@@ -9,13 +9,20 @@ eligibility logic is unit-tested in ``packages/ml_core/tests/test_cv_helpers.py`
 from datetime import UTC, datetime
 from pathlib import Path
 
+import patito as pt
 import polars as pl
 import pytest
 from contracts.ml_schemas import EligibleTimeSeries
+from contracts.power_schemas import TimeSeriesMetadata
 from dagster import materialize
 from deltalake import write_deltalake
 
-from nged_substation_forecast.defs.cv_assets import effective_capacity, eligible_time_series
+from nged_substation_forecast.defs.cv_assets import (
+    _require_metadata_coverage,
+    _time_series_ids_missing_metadata,
+    effective_capacity,
+    eligible_time_series,
+)
 
 # The leaderboard fold (conf/cv/default.yaml): train 2024-04-01..2025-06-30,
 # validate 2025-07-01..2026-06-30, min_training_months=6.
@@ -169,3 +176,33 @@ def test_effective_capacity_is_idempotent(cv_paths: dict[str, str]) -> None:
     assert materialize([effective_capacity]).success
 
     assert pl.read_delta(cv_paths["effective_capacity"]).height == 4
+
+
+def _metadata(time_series_ids: list[int]) -> pt.DataFrame[TimeSeriesMetadata]:
+    """A minimal metadata frame covering exactly `time_series_ids`."""
+    return pt.DataFrame(
+        {
+            "time_series_id": time_series_ids,
+            "time_series_type": ["BESS"] * len(time_series_ids),
+        }
+    ).set_model(TimeSeriesMetadata)
+
+
+def test_time_series_ids_missing_metadata_names_the_gap() -> None:
+    """Sorted, and reports only the requested ids — extra metadata rows are not a gap."""
+    assert _time_series_ids_missing_metadata(_metadata([1, 4]), [4, 1, 3, 2]) == [2, 3]
+    assert _time_series_ids_missing_metadata(_metadata([1, 2, 3]), [1, 2]) == []
+
+
+def test_require_metadata_coverage_raises_and_names_the_series() -> None:
+    """The R&D half fails fast: a CV run that silently trains fewer series poisons the leaderboard.
+
+    The message must name the ids, because the operator's next step is to look them up in the
+    metadata parquet.
+    """
+    with pytest.raises(ValueError, match=r"metadata parquet.*\[7\]"):
+        _require_metadata_coverage(_metadata([1, 2]), [1, 2, 7], population="eligible")
+
+
+def test_require_metadata_coverage_passes_when_every_series_is_covered() -> None:
+    _require_metadata_coverage(_metadata([1, 2]), [1, 2], population="eligible")

@@ -247,6 +247,45 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     )
 
 
+def _time_series_ids_missing_metadata(
+    metadata: pt.DataFrame[TimeSeriesMetadata], time_series_ids: list[int]
+) -> list[int]:
+    """The requested series that have no row in the metadata parquet.
+
+    Such a series cannot be forecast: ``TabularFeatureEngineer`` maps NWP to series through the
+    metadata's ``h3_res_5``, so a series with no metadata row has no weather and produces no
+    output rows. Worth naming rather than inferring from an empty result, and cheap to compute —
+    the metadata frame is already eager and already filtered to ``time_series_ids``.
+
+    Callers decide what to do with the answer, because R&D and production want opposite things:
+    the CV assets raise, and ``live_forecasts`` logs and carries on. See
+    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
+    """
+    return sorted(set(time_series_ids) - set(metadata["time_series_id"].to_list()))
+
+
+def _require_metadata_coverage(
+    metadata: pt.DataFrame[TimeSeriesMetadata], time_series_ids: list[int], population: str
+) -> None:
+    """Raise if any requested series has no metadata row (the fail-fast R&D half of the rule).
+
+    A CV run that quietly trains or scores fewer series than its population says poisons every
+    leaderboard comparison built on it, so this is one of the R&D paths that fails fast.
+
+    Args:
+        metadata: The loaded metadata, already filtered to ``time_series_ids``.
+        time_series_ids: The population the caller asked for.
+        population: What that population is, for the error message (e.g. ``"eligible"``).
+    """
+    missing = _time_series_ids_missing_metadata(metadata, time_series_ids)
+    if missing:
+        raise ValueError(
+            f"{len(missing)} of {len(time_series_ids)} {population} time series have no row in "
+            f"the metadata parquet, so they have no H3 cell and cannot be joined to NWP: "
+            f"{missing}. Re-materialise `power_time_series_and_metadata`."
+        )
+
+
 def _load_engineering_inputs(
     settings: Settings,
     time_series_ids: list[int],
@@ -403,6 +442,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     power_ts, metadata_df, nwp_lf = _load_engineering_inputs(
         settings, eligible_ids, train_start, train_end, ensemble_members=[0]
     )
+    _require_metadata_coverage(metadata_df, eligible_ids, population="eligible")
 
     forecaster = forecaster_cls(model_params=config)
     features = forecaster.feature_engineer.engineer(
@@ -550,6 +590,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             init_time_start=chunk_start,
             init_time_end=chunk_end,
         )
+        _require_metadata_coverage(metadata_df, trained_ids, population="trained")
         features = forecaster.feature_engineer.engineer(
             selected_features=config.selected_features,
             power_time_series=power_ts,
