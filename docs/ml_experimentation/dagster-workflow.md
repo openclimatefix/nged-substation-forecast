@@ -195,6 +195,11 @@ forecasts), and an **Experiment** dropdown appears when the chosen fold holds mo
 all the PV sites or all the primaries sit together), a **forecast date**, and one of that day's
 **forecast runs**.
 
+**Reload data** re-reads the tables, so a CV job that finishes while the app is open shows up
+without restarting marimo. Its new experiment appears in the **Experiment** dropdown; **Fold**,
+**forecast date** and **forecast run** go back to their defaults, and the chosen time series is
+kept.
+
 The chart layers all 51 ensemble members as thin grey lines, observed power (wherever available,
 including past the init time) as a thick blue line, and a vertical rule at the forecast init
 time, spanning 24 hours before the init time to 14 days after it. The x-axis is labelled at

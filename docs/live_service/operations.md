@@ -397,6 +397,9 @@ holding the read-only laptop credentials — see the
 forecast ensemble member against the observed power, from 24 hours before the forecast init time
 to 14 days after it.
 
+Press **Reload data** to pick up runs written since you opened the app: the date and run selectors
+move to the newest run, and your chosen time series is kept.
+
 The dashboard reads whichever tables it needs directly via their `Settings` paths and renders on
 demand, so it works identically whether each path is local or `s3://` — nothing runs on AWS, and
 nothing is written anywhere.
