@@ -4,9 +4,9 @@ description: >-
   A three-stage sub-agent exercise that tests whether a module is more complicated than its problem
   requires: extract a black-box requirements spec, have an isolated agent design the module afresh
   from that spec alone, then compare the two under a filter that treats only *unjustified*
-  divergence as a finding. Produces a report, never a code change. Load when Jack suspects a module
-  is over-built, asks for a simplicity review of a specific file or package, or says "clean room" —
-  and read the "What it actually yields" section before promising him anything.
+  divergence as a finding. Produces a report, never a code change. Load when the user suspects a
+  module is over-built, asks for a simplicity review of a specific file or package, or says "clean
+  room" — and read the "What it actually yields" section before promising anything.
 ---
 
 # The code-structure clean room
@@ -20,11 +20,11 @@ Three sub-agents in sequence, each seeing less or more than the last:
    complexity nothing justifies.
 
 The output is a report. **Change no repo files in any stage.** Acting on the findings is a separate
-piece of work, and Jack decides which findings are worth it.
+piece of work, and a human decides which findings are worth it.
 
 ## What it actually yields
 
-Say this to Jack up front, because it sets the right expectation and it is what two runs both
+Say this to the user up front, because it sets the right expectation and it is what two runs both
 showed:
 
 - **The structure usually comes back justified.** Run 1 (`defs/cv_assets.py`, 1,074 lines) and run 2
@@ -191,7 +191,7 @@ searches come up empty:
 
 A search that finds the justification sends the divergence to the **"considered and rejected"**
 table, with what was found. Ask explicitly for the places the fresh design was *more* complex too —
-that is direct evidence the real code is already lean, and it is the half of the answer Jack's
+that is direct evidence the real code is already lean, and it is the half of the answer the
 question actually needs.
 
 ### Ask for bugs, not just complexity
@@ -216,13 +216,13 @@ class of bug made impossible, a concept the reader no longer has to hold.
 
 ## Triage, then report
 
-**Verify the top findings yourself against the code before repeating any of them to Jack.** Stage 3
-runs 40-odd tool calls and reports confidently; the same rule as every other review in this repo
-applies — findings are often wrong, and passing them on uncritically is worse than not running the
-exercise. Both runs' reports survived spot-checking, but the checking is cheap and the claim you
+**Verify the top findings yourself against the code before repeating any of them to the user.**
+Stage 3 runs 40-odd tool calls and reports confidently; the same rule as every other review in this
+repo applies — findings are often wrong, and passing them on uncritically is worse than not running
+the exercise. Both runs' reports survived spot-checking, but the checking is cheap and the claim you
 repeat becomes yours.
 
 Report: the verdict on whether the structure is justified, the findings ranked, the bugs separately
-from the complexity, and what the "considered and rejected" table cleared. Then ask Jack which
-findings he wants acted on — do not start fixing them, and do not roll several unrelated findings
-into one PR without saying so.
+from the complexity, and what the "considered and rejected" table cleared. Then ask which findings
+should be acted on — do not start fixing them, and do not roll several unrelated findings into one
+PR without saying so.
