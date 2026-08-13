@@ -736,6 +736,11 @@ def test_ecmwf_ens_publishes_both_null_populations(
     assert evaluation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
     assert evaluation.metadata["n_affected_nwp_slices"].value == 1
     assert evaluation.metadata["affected_nwp_variables"].value == ["precipitation_surface"]
+    # The per-variable table is on this check too — the runbook sends the operator to it for the
+    # de-accumulated population as well.
+    per_variable = evaluation.metadata["per_nwp_variable"].value
+    assert isinstance(per_variable, TableMetadataValue)
+    assert len(per_variable.records) == len(Nwp.deaccumulated_var_names)
 
     # The description must name both populations, or it claims the health of the one it read, and
     # must lead with the grid-point clause — the signal this check exists to surface.
@@ -757,17 +762,20 @@ def test_ecmwf_ens_publishes_both_null_populations(
     ("n_nulls", "expected_passed", "expected_description", "expected_corrupt_rows"),
     [
         (0, True, "No nulls in 36 instantaneous-variable grid points.", []),
+        # Two nulls in *one* slice, so the table's two count columns hold different numbers and
+        # swapping them is visible. Both grid points of the one step, which the stubbed converter
+        # never sees.
         (
-            1,
+            2,
             False,
             (
-                "1 of 36 instantaneous-variable grid point(s) null (2.7778%) in temperature_2m, "
+                "2 of 36 instantaneous-variable grid point(s) null (5.5556%) in temperature_2m, "
                 "across 1 (variable, member, step) slice(s)."
             ),
             [
                 {
                     "variable": "temperature_2m",
-                    "n_null_grid_points": 1,
+                    "n_null_grid_points": 2,
                     "n_affected_slices": 1,
                     "n_total_grid_points": 4,
                 }
@@ -819,6 +827,14 @@ def test_ecmwf_ens_flags_instantaneous_nulls_the_aggregation_absorbed(
     # The per-variable table separates one bad variable from nine, which the totals cannot.
     per_variable = evaluation.metadata["per_nwp_variable"].value
     assert isinstance(per_variable, TableMetadataValue)  # narrows before reading `.records`
+    # The declared schema is what names the columns in the Dagster UI, and is what makes a clean
+    # run render an empty table rather than nothing at all.
+    assert [column.name for column in per_variable.schema.columns] == [
+        "variable",
+        "n_null_grid_points",
+        "n_affected_slices",
+        "n_total_grid_points",
+    ]
     assert len(per_variable.records) == 9
     corrupt = [record.data for record in per_variable.records if record.data["n_null_grid_points"]]
     assert corrupt == expected_corrupt_rows
@@ -832,10 +848,15 @@ def test_ecmwf_ens_flags_instantaneous_nulls_the_aggregation_absorbed(
     ],
 )
 def test_nwp_check_specs_carry_a_standing_description(check_name: str, expected: str) -> None:
-    """Only the spec's description reaches the Checks view before any run has happened."""
+    """Only the spec's description reaches the Checks view before any run has happened.
+
+    ``blocking`` is asserted here too: no check in this repo may fail the thing it warns about
+    (inherent stability, rule 6).
+    """
     (spec,) = [spec for spec in ecmwf_ens.check_specs if spec.name == check_name]
 
     assert spec.description == expected
+    assert spec.blocking is False
 
 
 @pytest.mark.parametrize("raiser", [RuntimeError, _FakePanic])

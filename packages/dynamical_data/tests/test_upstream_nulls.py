@@ -248,3 +248,22 @@ def test_every_downloaded_variable_belongs_to_exactly_one_population() -> None:
     assert (ECMWF_ENS_INSTANTANEOUS_VARS | _DEACCUMULATED | Nwp.categorical_var_names) == set(
         _ECMWF_ENS_VARS_TO_DOWNLOAD
     )
+
+
+def test_counting_no_variables_at_all_reports_zero_rather_than_raising(
+    make_ens_dataset: Callable[..., xr.Dataset],
+) -> None:
+    """An empty variable set must not take the warning path down with it.
+
+    No caller in this repo passes one, but the properties read named columns, and an inferred empty
+    frame has none — so the schema is declared rather than inferred
+    ([rule 7](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+    """
+    rate = assess_upstream_grid_point_nulls(
+        ds=make_ens_dataset(), variables=frozenset(), exclude_lead_0=True
+    )
+
+    assert rate.is_healthy
+    assert rate.n_total_nwp_grid_points == 0
+    assert rate.null_nwp_grid_point_fraction == 0.0
+    assert rate.affected_nwp_variables == ()
