@@ -34,8 +34,11 @@ We deliberately researched best practices across multiple industries. Several of
 pages are borrowed from disciplines that have been solving the same shape of problem for longer than
 data engineering has existed: *inherent stability* comes from vehicle dynamics, *fail-operational*
 from avionics autoland (the flight-deck technology that fully automates the landing phase) and
-ISO 26262, *blast radius* from site reliability engineering. Borrowing across disciplines is the
-point, not a flourish: some of them have been shipping safety-critical systems for fifty years.
+ISO 26262, *blast radius* from site reliability engineering, and mobile telecoms supplies the case
+that a heavily-corrupted channel can still run genuinely unattended — see
+[H1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). Borrowing across disciplines
+is the point, not a flourish: some of them have been shipping safety-critical systems for fifty
+years.
 
 Not every borrowed idea survives contact with reality, and we record those outcomes too — that is
 what makes this a field report rather than a manifesto. *Error budgets* were examined and declined
