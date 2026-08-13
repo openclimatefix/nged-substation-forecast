@@ -1,4 +1,4 @@
-# Fix four defects in `ml_core.features`
+# Fix four defects in `ml_core.features`, and move one check to where it runs
 
 **The problem.** A clean-room review of `packages/ml_core/src/ml_core/features/` found four
 defects. Two are latent correctness bugs: `time_series_type` — a requestable feature — is null on
@@ -12,19 +12,24 @@ rather than O(1); and a `rolling().agg()` + join-back drags an unconditional ful
 largest frame in the system, which runs even for the production config, which requests no rolling
 feature at all.
 
-**The solution.** Four independent fixes in one PR. Move the metadata join off the power frame and
+**The solution.** Six independent fixes in one PR. Move the metadata join off the power frame and
 onto the assembled frame, so `time_series_type` is populated in both modes. Delete the
 `AllFeatures.validate()` override, which nothing calls and which could only ever run behind a
 `collect()` this module exists to avoid, and widen the two fields whose declarations state something
 false. Probe the raw NWP frame rather
 than the upsampled one for the control member. And replace `rolling().agg()` + join-back with
 `rolling_mean_by(...).over(...)`, which needs neither the join nor the sort, then delete the sort —
-which is where nearly all of the measured win sits.
+which is where nearly all of the measured win sits. Then put the primary-key uniqueness check on
+`PowerForecast`, where `validate()` really runs, and stop emitting `time_series_type` on every
+frame that never asked for it.
 
 ## Verdict and departures
 
 Worth doing, and worth doing as one PR: each fix is small, independently testable, and they touch
 overlapping lines in the same two files, so splitting them buys nothing but merge conflicts.
+
+Fixes 5 and 6 were written up as open questions for Jack in the first draft of this plan. He has
+since decided both: fold them in.
 
 Departures from the clean-room review that produced these findings:
 
@@ -45,7 +50,7 @@ production pays for either today.
 
 ## What changes, file by file
 
-The four fixes are independent and can land in any order.
+The six fixes are independent and can land in any order.
 
 ### Fix 1 — `time_series_type` nulls in bulk mode
 
@@ -109,7 +114,7 @@ visible explosion. After fix 4 a duplicate is absorbed silently. See "Risks".
 
 **Separately, widen the two fields whose declarations state something false**: `power: float | None`
 (`ml_schemas.py:86`) and `time_series_type: str | None`. Live inference deliberately feeds an
-all-null power spine past the last observation (`_production_helpers.py:99-101`) and
+all-null power spine past the last observation (`_production_helpers.py:99-100`) and
 `XGBoostForecaster.train` drops those rows explicitly (`forecaster.py:130`). `contracts` is the
 single source of truth for data shapes and currently misdescribes the data. Do **not** widen
 `PowerTimeSeries.power` (`power_schemas.py:42`): that model's `validate()` genuinely runs on
@@ -119,11 +124,7 @@ Say explicitly what happens to `packages/contracts/tests/test_ml_schemas.py`: al
 call sites stay green, but `test_all_features_validation` becomes a plain-Patito check rather than
 an exercise of the override.
 
-**Follow-up for Jack, not this PR:** the primary-key check belongs on `PowerForecast`, whose
-`validate()` is called for real on every predict (`forecaster.py:203`) and which today has no
-uniqueness check at all — so a fan-out reaches the `power_forecasts` Delta table undetected. It runs
-on an already-collected frame, so it adds no `collect()`. That is a new production raise path and a
-different change from these four fixes; it should be its own issue.
+The primary-key check itself does not disappear — it moves to `PowerForecast` in fix 5.
 
 ### Fix 3 — the `collect()` probe
 
@@ -190,6 +191,53 @@ out-of-window rows whose weather is null, and that is not what happens: those ro
 `ensemble_member`, so they form their own group rather than padding a real one. The conclusion (the
 aggregation must be null-skipping, never row-count-dependent) stands; the stated mechanism does not.
 
+### Fix 5 — put the primary-key uniqueness check where `validate()` actually runs
+
+`packages/contracts/src/contracts/power_schemas.py:296`
+
+Fix 2 deletes a uniqueness check that has never executed. Fix 4 removes the row-count explosion that
+made a fan-out visible without it. Between them, nothing detects a duplicate primary key on the
+forecast path at all — so add the check to `PowerForecast`, whose `validate()` **is** called on
+every predict (`forecaster.py:203`) and on every CV fold (`cv_assets.py:851`), and which today has
+no uniqueness check.
+
+`PowerForecast`'s primary key is `(time_series_id, power_fcst_init_time, valid_time,
+ensemble_member)`. `ensemble_member` is non-nullable and always present here
+(`power_schemas.py:321-323`), so the override is simpler than the one being deleted: no conditional
+key assembly, just `is_duplicated().any()` on four columns of an already-collected frame.
+
+**This adds a production raise path, which is the point to weigh.** The inherent-stability rules
+reserve raising for states that are our own bug rather than the outside
+world misbehaving, and a duplicated forecast primary key is exactly that: it means the join fanned
+out, which no absent or stale input can cause. `PowerForecast.validate()` already raises in
+production on the `valid_time > power_fcst_init_time` constraint (`power_schemas.py:308`), so this
+adds a second reason to fail, not a first.
+
+Measure `is_duplicated()` on a predict-sized frame during implementation and put the number in the
+PR body; if it is not cheap, that changes the decision and I will say so rather than ship it
+quietly.
+
+### Fix 6 — stop emitting `time_series_type` on frames that never asked for it
+
+`packages/ml_core/src/ml_core/features/tabular_feature_engineer.py:249`
+
+`time_series_type` sits in `_select_output_columns`' unconditional `base_cols`, so every frame
+carries an Enum column whether or not anything requested it. Drop it from `base_cols`. It stays
+requestable — it is a `SafeInputBaseColumn` (`ml_schemas.py:37-44`) and `ParsedFeatures` already
+routes it through `base_features` (`test_features.py:580-583`), so a config that asks for it still
+gets it, now with fix 1's non-null values.
+
+Roughly 460 MB on the 116M-row predict chunk `performance.md` sizes at a 9 GB peak. With fix 1
+having moved the metadata join downstream, an unrequested `time_series_type` also lets projection
+pushdown drop the metadata join entirely.
+
+`AllFeatures.time_series_type` therefore becomes `allow_missing=True` as well as `str | None`: the
+column is now optional in the output, and `contracts` should say so.
+
+Nothing outside the module reads it off `AllFeatures`. `metrics` joins it from metadata itself
+(`metrics.py:420-423`), `_build_part` (`forecaster.py:165-181`) does not select it, and the two
+dashboards read it from the metadata parquet.
+
 ### Cleanup, droppable without affecting the above
 
 - `_lags.py:36-37` — the `has_ensemble` ternary. Dead since `75bafdf1` repointed the lag source at
@@ -206,9 +254,14 @@ aggregation must be null-skipping, never row-count-dependent) stands; the stated
 
 ## Design-philosophy check
 
-All of this is R&D and training-path code, not the live serving path, so the fail-fast side of
+Fixes 1–4 and 6 are R&D and training-path code, not the live serving path, so the fail-fast side of
 `docs/design-philosophy/inherent-stability.md` applies: no degradation paths are added, and no
 warning path is touched. No asset checks change.
+
+Fix 5 is the exception: it adds a raise to a `validate()` that runs in live inference. That is
+inside the rules rather than against them — raising is reserved for our own bugs, and a duplicated
+forecast primary key can only come from a join fanning out, never from an absent or stale input. The
+same `validate()` already raises there on the hindcast-row constraint.
 
 Fix 2 makes a schema *more* permissive, which cuts against "strict about malformed inputs". The
 trade is deliberate: null `power` is not malformed, it is the documented shape of an inference
@@ -229,6 +282,8 @@ No principle in `design-principles.md` is traded away.
 | 3 | None — see below | — |
 | 4 | Parametrise the existing `test_apply_rolling_mean_feature` with a reversed input | Current form raises `ComputeError: input data is not sorted`; window form returns the values already pinned there. Use `df.reverse()`, **not** `sample(shuffle=True, seed=…)` — a random shuffle of four rows can land sorted, and one did |
 | 4 | Existing `test_apply_rolling_mean_feature_partitions_by_group` and `test_cross_mode_equivalence` | Must stay green — they pin the values and the null-skipping invariant |
+| 5 | `PowerForecast.validate()` on a frame with one duplicated `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` | Passes today; raises after. Plus a near-miss row differing only in `ensemble_member`, which must still validate |
+| 6 | The fix-1 test requests `time_series_type` explicitly; add one asserting it is absent when unrequested | Today it is present unrequested, so the absence assertion fails on `main` |
 
 **Fix 3 gets no test, deliberately.** Its behaviour is already covered by
 `test_engineer_features_raises_when_no_control_member_for_weather_lag`; what changes is plan shape,
@@ -271,36 +326,27 @@ advance rather than discovered as an unexplained leaderboard diff. *Recommendati
 say so in the PR body.
 
 **Fix 2 deletes a check and widens two schema fields.** `AllFeatures` is a contract, but nothing
-outside this repo consumes it and no trained model encodes it, so this is free today.
-*Recommendation:* proceed, and file the `PowerForecast` primary-key check as its own issue in the
-same breath, so deleting the dead check and adding a live one are visibly two halves of one
-argument.
+outside this repo consumes it and no trained model encodes it, so this is free today. Fix 5 puts the
+uniqueness check back where it runs, so deleting the dead check and adding a live one are two halves
+of one argument in one PR.
 
-**Open question for Jack:** should `time_series_type` being null be an error rather than a widened
-type? A series in the power table but absent from the metadata parquet is arguably malformed input,
-which the inherent-stability rules would reject at the contract boundary rather than tolerate.
-*Recommendation:* widen it now, since fix 1 removes the only common cause of the null, and file the
-stricter check separately if it is wanted — making it an error in the same PR would turn a latent
-null into a new fail-fast path with no evidence about how often it fires.
+**Fix 5 costs a `is_duplicated()` on every predict.** No extra `collect()`, but not free either.
+*Recommendation:* measure it on a predict-sized frame during implementation, put the number in the
+PR body, and if it is expensive enough to matter, say so rather than shipping it silently.
 
-**Second open question:** `time_series_type` sits in `_select_output_columns`' unconditional
-`base_cols` (`tabular_feature_engineer.py:249`), so every frame carries it whether or not anything
-asked for it. Removing it from `base_cols` keeps all 627 tests green and saves an Enum column —
-roughly 460 MB on the 116M-row predict chunk `performance.md` sizes at a 9 GB peak. That is a real
-win but it is an optimisation, not a defect fix, and it is orthogonal to fix 1 (a *requested*
-`time_series_type` still needs the join moved). *Recommendation:* keep it out of this PR; file it.
+**Open question for Jack, still open and deliberately not fixed here:** should `time_series_type`
+being null be an error rather than a widened type? A series in the power table but absent from the
+metadata parquet is arguably malformed input, which the inherent-stability rules would reject at the
+contract boundary rather than tolerate. *Recommendation:* widen it now, since fix 1 removes the only
+common cause of the null, and file the stricter check separately if it is wanted — making it an
+error in the same PR would turn a latent null into a new fail-fast path with no evidence about how
+often it fires.
 
 **Fix 1 moves a join from the small side to the large one.** Metadata × power becomes metadata ×
 NWP-joined, on the production path. The metadata columns are already replicated across every NWP row
 today, so it should be close to a wash — but this plan measures fix 3 and fix 4 to the millisecond
 and should not stay silent about the one fix that touches the largest join.
 *Recommendation:* measure it during implementation and put the number in the PR body.
-
-**Between this PR and the `PowerForecast` follow-up there is no fan-out detector at all**, because
-fix 4 removes the row-count explosion and fix 2 removes the (never-run) uniqueness check. The
-cross-mode assertion covers the training path only. *Recommendation:* file the follow-up issue when
-this PR opens, not later — or say the word and I will fold the `PowerForecast` check into this PR
-instead, accepting that it adds a production raise path.
 
 ## What the two adversarial reviews changed
 
@@ -320,8 +366,10 @@ rolling forms genuinely differ on a null `ensemble_member`.
 and a field declared non-nullable that the pipeline routinely nulls is a false statement regardless
 of whether anything validates against it.
 
-**Deferred, not rejected.** Dropping `time_series_type` from `base_cols`, and the `PowerForecast`
-primary-key check — both good, both larger than a defect fix, both above as open questions for Jack.
+**Deferred, then adopted.** Dropping `time_series_type` from `base_cols` and the `PowerForecast`
+primary-key check both came from this reviewer. They were put to Jack as open questions rather than
+folded in silently, because one is an optimisation and the other adds a production raise path. He
+decided both in; they are fixes 6 and 5.
 
 ### Review 2 — correctness and testability
 
