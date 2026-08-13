@@ -116,22 +116,13 @@ the upstream scatter documented above lands outside the small GB box we download
 therefore a correctness fix — the estimator was wrong, and a wholly-uncovered cell was a false
 zero — rather than a change that recovers much data.
 
-A surviving cell can rest on very little of its own area. `compute_h3_grid_weights_for_boundary`
-samples each cell with H3 children two resolutions finer — 49 of them — so every `proportion` is a
-multiple of 1/49, and the least a single grid point can carry is 2.0% of its cell. 572 of the V1
-grid's 1671 cells contain a point that thin, and 859 contain one under 10%. A cell reduced to one of
-those points is stored exactly like a fully-covered one: the `Nwp` contract has no column for the
-contributing weight, and `_aggregate_grid_points_to_h3_cells` drops it once the division is done.
-
-No per-run metric reports that weight either, because every available summary of it either
-duplicates a number `nwp_has_no_unexpected_nulls` already publishes or goes blind exactly when it
-would matter. Where the corruption is scattered, the count of partially-covered cells runs at 4.7
-times `n_null_nwp_grid_points` and the total weight deficit at 1.68 times it — the deficit being the
-mean total `proportion` a grid point carries across the 4.92 cells it feeds. Where it is clustered,
-which is the shape it takes in practice, both saturate: the interior of a corrupt patch goes null
-and is counted by `n_null_h3_cells`, so only the rim stays partially covered and the two numbers
-stop moving while the damage grows. The thinnest surviving weight is no better a summary, since it
-pins to the 1/49 floor on any run corrupt enough to ask about.
+A surviving cell can rest on very little of its own area. `compute_h3_grid_weights` samples each
+cell with H3 children two resolutions finer by default — 49 of them for a hexagon, 7² — and on the
+V1 grid every `proportion` comes out an exact multiple of 1/49, so the least a single grid point can
+carry is 2.0% of its cell. 294 of that grid's 1671 cells contain a point at the floor, 572 contain
+one under 5%, and 859 contain one under 10%. A cell reduced to one of those points is stored exactly
+like a fully-covered one: the `Nwp` contract has no column for the contributing weight, and
+`_aggregate_grid_points_to_h3_cells` drops it once the division is done.
 
 A cell where *no* point contributed is a different case, and it yields **null**, never `0.0`. That
 distinction is the whole reason the contributing weight is computed rather than assumed: Polars
