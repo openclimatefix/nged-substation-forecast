@@ -173,10 +173,10 @@ different responses even though neither fails the run.
 
 ### Two populations, counted separately
 
-That check counts nulls at both stages of ingest, and the metadata keys say which stage each number
-came from. The `nwp_grid_point` keys count the raw 0.25° grid, before the aggregation
-([`assess_upstream_grid_point_nulls`](../api/dynamical_data/index.md)); the `h3_cell` keys count the
-cells we store afterwards (`assess_nwp_quality`).
+`nwp_has_no_unexpected_nulls` counts nulls at both stages of ingest, and the metadata keys say which
+stage each number came from. The `nwp_grid_point` keys count the raw 0.25° grid, before the
+aggregation ([`assess_upstream_grid_point_nulls`](../api/dynamical_data/index.md)); the `h3_cell`
+keys count the cells we store afterwards (`assess_nwp_quality`).
 
 Both are needed because the aggregation deliberately breaks the link between them. Renormalising
 over the contributing grid points is what keeps a scattered upstream null out of the stored cells —
