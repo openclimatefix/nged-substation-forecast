@@ -325,16 +325,18 @@ Two things a re-run does cost:
   running.** The two writes contend and the loser fails with delta-rs' `CommitFailedError`. That
   costs a run, not the table, and re-running afterwards is safe. Partitions for *different* dates
   do not contend at all, so a backfill alongside the daily schedule is fine.
-- **The superseded rows stay on disk, and `vacuum` will not clear them.** Delta marks the old
-  parquet files as removed rather than deleting them, so replacing a V1 partition leaves ~7.24M
-  dead rows — about 137 MiB — behind. `DeltaTable.vacuum` reports deleting those files and does
-  not: the `init_time` partition directory's name is percent-encoded, and vacuum deletes at a
-  double-encoded path that does not exist, so it removes nothing while writing vacuum commits
-  saying it did
+- **The superseded rows stay on disk, and the default `vacuum` will not clear them.** Delta marks
+  the old parquet files as removed rather than deleting them, so replacing a V1 partition leaves
+  ~7.24M dead rows — about 137 MiB — behind. `DeltaTable.vacuum()` reports deleting those files and
+  does not: it re-encodes the `init_time` partition directory's already percent-encoded name,
+  deletes at a path that does not exist, and counts the resulting `NotFound` as a deletion
   ([issue #593](https://github.com/openclimatefix/nged-substation-forecast/issues/593)). Reads are
-  unaffected — every reader goes through the transaction log. Until that is fixed, reclaiming the
-  space means listing the current version's add actions, diffing them against what is on disk, and
-  deleting the orphans by hand.
+  unaffected — every reader goes through the transaction log. `vacuum(full=True)` does reclaim the
+  space, because it deletes at paths taken from a storage listing rather than from the tombstones.
+  Run it only when nothing needs an older version of the table: it removes a superseded file once
+  that file is older than the retention window, counting from when the file was *written* rather
+  than from when it was replaced, so time travel to the version before a re-materialisation can go
+  immediately instead of seven days later.
 
 Every materialisation whose completeness assessment succeeded also publishes `n_ensemble_members`,
 `n_valid_times`, `n_h3_cells` and the `valid_time` range as metadata, so the Dagster UI timeline
