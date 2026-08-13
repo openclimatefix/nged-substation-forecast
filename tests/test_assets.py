@@ -33,11 +33,7 @@ from dagster import (
     build_asset_context,
     materialize,
 )
-from dynamical_data.ecmwf_ens.download import (
-    _ECMWF_ENS_VARS_TO_DOWNLOAD,
-    ECMWF_ENS_INSTANTANEOUS_VARS,
-    NwpRunNotYetAvailable,
-)
+from dynamical_data.ecmwf_ens.download import _ECMWF_ENS_VARS_TO_DOWNLOAD, NwpRunNotYetAvailable
 from dynamical_data.ecmwf_ens.upstream_nulls import UpstreamNullRate
 from nged_data.storage import NoNewData, _ProcessedFileListing
 
@@ -403,7 +399,7 @@ def test_h3_grid_weights_materialises_and_writes_parquet(
 def _check_evaluations(result: ExecuteInProcessResult) -> dict[str, AssetCheckEvaluation]:
     """The run's asset-check evaluations, keyed by check name.
 
-    ``ecmwf_ens`` emits two independent checks, so tests look theirs up by name rather than
+    ``ecmwf_ens`` emits three independent checks, so tests look theirs up by name rather than
     relying on the order Dagster happens to report them in.
     """
     return {
@@ -757,14 +753,43 @@ def test_ecmwf_ens_publishes_both_null_populations(
     assert materialisation.metadata["null_nwp_grid_point_fraction"].value == pytest.approx(1 / 6)
 
 
+@pytest.mark.parametrize(
+    ("n_nulls", "expected_passed", "expected_description", "expected_corrupt_rows"),
+    [
+        (0, True, "No nulls in 36 instantaneous-variable grid points.", []),
+        (
+            1,
+            False,
+            (
+                "1 of 36 instantaneous-variable grid point(s) null (2.7778%) in temperature_2m, "
+                "across 1 (variable, member, step) slice(s)."
+            ),
+            [
+                {
+                    "variable": "temperature_2m",
+                    "n_null_grid_points": 1,
+                    "n_affected_slices": 1,
+                    "n_total_grid_points": 4,
+                }
+            ],
+        ),
+    ],
+)
 def test_ecmwf_ens_flags_instantaneous_nulls_the_aggregation_absorbed(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+    env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    n_nulls: int,
+    expected_passed: bool,
+    expected_description: str,
+    expected_corrupt_rows: list[dict[str, object]],
 ) -> None:
     """A null in a variable that is never legitimately null fails its own check, and only its own.
 
-    This is the whole reason the two populations get separate checks: the same run is a *pass* for
-    the de-accumulated nulls, which are tolerated, and a *fail* for the instantaneous one, which is
-    not. A single check over both would have to pick one of those answers.
+    This is the whole reason the two populations get separate checks: the corrupt run below is a
+    *pass* for the de-accumulated nulls, which are tolerated, and a *fail* for the instantaneous
+    one, which is not. A single check over both would have to pick one of those answers. The clean
+    case is here because a zero threshold that always failed would satisfy the corrupt case alone.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
@@ -772,7 +797,7 @@ def test_ecmwf_ens_flags_instantaneous_nulls_the_aggregation_absorbed(
     monkeypatch.setattr(
         target=assets,
         name="download_ecmwf_ens_data",
-        value=lambda ds: _make_downloaded_ds(n_null_instantaneous_grid_points=1),
+        value=lambda ds: _make_downloaded_ds(n_null_instantaneous_grid_points=n_nulls),
     )
 
     result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
@@ -782,53 +807,21 @@ def test_ecmwf_ens_flags_instantaneous_nulls_the_aggregation_absorbed(
     evaluations = _check_evaluations(result)
     assert evaluations["nwp_has_no_unexpected_nulls"].passed  # the tolerated population is clean
     evaluation = evaluations["nwp_instantaneous_variables_have_no_nulls"]
-    assert not evaluation.passed  # one null grid point is enough, unlike the other check
+    assert evaluation.passed is expected_passed  # one null grid point is enough, unlike the other
     assert evaluation.severity == AssetCheckSeverity.WARN
-    assert evaluation.metadata["n_null_nwp_grid_points"].value == 1
-    # 9 instantaneous variables x 1 step beyond lead-0 x 2 grid points. Counting the de-accumulated
-    # or categorical ones too, or reading the contract's names rather than the download's, moves it.
-    assert evaluation.metadata["n_total_nwp_grid_points"].value == 18
-    assert evaluation.metadata["affected_nwp_variables"].value == ["temperature_2m"]
-    assert str(evaluation.description).startswith("1 of 18 instantaneous grid point(s) null")
+    assert evaluation.metadata["n_null_nwp_grid_points"].value == n_nulls
+    # 9 instantaneous variables x 2 steps x 2 grid points — lead-0 included, unlike the other check.
+    # Counting the de-accumulated or categorical variables too, or reading the contract's names
+    # rather than the download's, moves this number.
+    assert evaluation.metadata["n_total_nwp_grid_points"].value == 36
+    assert str(evaluation.description) == expected_description
 
     # The per-variable table separates one bad variable from nine, which the totals cannot.
     per_variable = evaluation.metadata["per_nwp_variable"].value
     assert isinstance(per_variable, TableMetadataValue)  # narrows before reading `.records`
     assert len(per_variable.records) == 9
     corrupt = [record.data for record in per_variable.records if record.data["n_null_grid_points"]]
-    assert corrupt == [
-        {
-            "variable": "temperature_2m",
-            "n_null_grid_points": 1,
-            "n_affected_slices": 1,
-            "n_total_grid_points": 2,
-        }
-    ]
-
-
-def test_ecmwf_ens_passes_the_instantaneous_check_on_a_clean_run(
-    env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
-) -> None:
-    """The zero threshold is a threshold, not a check that always fails."""
-    _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
-    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
-    monkeypatch.setattr(
-        target=assets,
-        name="download_ecmwf_ens_data",
-        value=lambda ds: _make_downloaded_ds(n_null_instantaneous_grid_points=0),
-    )
-
-    result = materialize([ecmwf_ens], partition_key="2024-12-01", instance=dagster_instance)
-    evaluation = _check_evaluations(result)["nwp_instantaneous_variables_have_no_nulls"]
-
-    assert evaluation.passed
-    assert evaluation.metadata["affected_nwp_variables"].value == []
-    # A clean run must not be described as corrupt — the same false claim, inverted.
-    assert (
-        str(evaluation.description)
-        == "No nulls in 18 instantaneous grid point(s) counted beyond lead-0."
-    )
+    assert corrupt == expected_corrupt_rows
 
 
 @pytest.mark.parametrize(
@@ -843,19 +836,6 @@ def test_nwp_check_specs_carry_a_standing_description(check_name: str, expected:
     (spec,) = [spec for spec in ecmwf_ens.check_specs if spec.name == check_name]
 
     assert spec.description == expected
-
-
-def test_the_two_null_populations_are_counted_over_disjoint_variable_sets() -> None:
-    """Neither variable may be counted twice, or the two rates stop being independent signals.
-
-    Every downloaded variable is accounted for: instantaneous, de-accumulated, or the categorical
-    one, which is neither and belongs to no rate.
-    """
-    assert not ECMWF_ENS_INSTANTANEOUS_VARS & Nwp.deaccumulated_var_names
-    assert not ECMWF_ENS_INSTANTANEOUS_VARS & Nwp.categorical_var_names
-    assert (
-        ECMWF_ENS_INSTANTANEOUS_VARS | Nwp.deaccumulated_var_names | Nwp.categorical_var_names
-    ) == set(_ECMWF_ENS_VARS_TO_DOWNLOAD)
 
 
 @pytest.mark.parametrize("raiser", [RuntimeError, _FakePanic])

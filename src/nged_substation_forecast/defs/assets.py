@@ -267,14 +267,13 @@ read as a trend, against an anomaly to raise with Dynamical.org today."""
 _NWP_INSTANTANEOUS_CHECK_DESCRIPTION: Final[str] = (
     "Nulls in the instantaneous NWP variables (temperature, dew point, the winds, the pressures, "
     "geopotential height) on the raw 0.25 degree grid Dynamical.org sent us. These are never "
-    "legitimately null, so this check's `passed` is false on a single null grid point — unlike "
-    "`nwp_has_no_unexpected_nulls`, whose nulls are expected. What it catches is *scattered* "
-    "corruption: the aggregation renormalises each H3 cell over the grid points that supplied a "
-    "value, so scattered nulls are absorbed and reach no stored cell, which is why nothing "
-    "downstream of the aggregation can see them. A *blocky* failure never reaches this check at "
-    "all — every grid point of a cell goes at once, so the cell is null and `Nwp.validate` rejects "
-    "the run before any check runs. The count excludes lead-0, which for these variables is a "
-    "blind spot rather than a filter. See "
+    "legitimately null, so `passed` is false on a single null grid point — unlike "
+    "`nwp_has_no_unexpected_nulls`, whose nulls are expected. A red result is a mail to "
+    "Dynamical.org, not a re-run: the run has landed and no stored cell is affected, because the "
+    "aggregation renormalises each H3 cell over the grid points that supplied a value and so "
+    "absorbs scattered nulls before they reach one. That absorption is also why this check counts "
+    "the raw grid: a null that does reach a cell never gets here, since `Nwp.validate` rejects "
+    "the run first. See "
     "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
 )
 """Standing explanation shown in the Dagster UI's Checks view."""
@@ -382,9 +381,11 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules
     try:
         quality = assess_nwp_quality(nwp)
-        upstream = assess_upstream_grid_point_nulls(ds=ds, variables=Nwp.deaccumulated_var_names)
+        upstream = assess_upstream_grid_point_nulls(
+            ds=ds, variables=Nwp.deaccumulated_var_names, exclude_lead_0=True
+        )
         instantaneous = assess_upstream_grid_point_nulls(
-            ds=ds, variables=ECMWF_ENS_INSTANTANEOUS_VARS
+            ds=ds, variables=ECMWF_ENS_INSTANTANEOUS_VARS, exclude_lead_0=False
         )
         completeness = assess_nwp_run_completeness(
             dataframe=nwp, expected_n_h3_cells=h3_grid["h3_index"].n_unique()
@@ -558,18 +559,13 @@ def _nwp_instantaneous_check_result(upstream: UpstreamNullRate) -> AssetCheckRes
 def _nwp_instantaneous_description(upstream: UpstreamNullRate) -> str:
     """Describe the instantaneous variables' raw-grid nulls for one run."""
     if upstream.is_healthy:
-        return (
-            f"No nulls in {upstream.n_total_nwp_grid_points} instantaneous grid point(s) counted "
-            "beyond lead-0."
-        )
+        return f"No nulls in {upstream.n_total_nwp_grid_points} instantaneous-variable grid points."
     return (
-        f"{upstream.n_null_nwp_grid_points} of {upstream.n_total_nwp_grid_points} instantaneous "
-        f"grid point(s) null beyond lead-0 ({upstream.null_nwp_grid_point_fraction:.4%}) in "
+        f"{upstream.n_null_nwp_grid_points} of {upstream.n_total_nwp_grid_points} "
+        f"instantaneous-variable grid point(s) null "
+        f"({upstream.null_nwp_grid_point_fraction:.4%}) in "
         f"{', '.join(upstream.affected_nwp_variables)}, across "
-        f"{upstream.n_affected_nwp_slices} (variable, member, step) slice(s). These are never "
-        "legitimately null. The H3 aggregation absorbed them, so the stored cells are unaffected "
-        "and the run is landed; the feed is not. See "
-        "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
+        f"{upstream.n_affected_nwp_slices} (variable, member, step) slice(s)."
     )
 
 

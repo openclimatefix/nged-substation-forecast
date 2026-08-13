@@ -30,13 +30,16 @@ _PER_VARIABLE_SCHEMA: Final[pl.Schema] = pl.Schema(
         "n_total": pl.Int64,
     }
 )
-"""Columns of :attr:`UpstreamNullRate.per_variable`, declared so a run counting nothing still sums
-to ``0`` rather than to a null."""
+"""Columns of :attr:`UpstreamNullRate.per_variable`.
+
+Declared rather than inferred for the empty-``variables`` case, which no caller in this repo reaches
+but a reusable package should survive: an inferred empty frame carries no columns at all, and the
+properties below would raise ``ColumnNotFoundError`` inside a warning path."""
 
 
 @dataclass(frozen=True)
 class UpstreamNullRate:
-    """How much of one ingested NWP run arrived null on the **raw grid**, beyond lead-0.
+    """How much of one ingested NWP run arrived null on the **raw grid**.
 
     This is the provider channel: the number to quote to Dynamical.org when asking whether their
     feed is degrading. It counts grid points on the 0.25° lat/lon box we downloaded, before any H3
@@ -45,11 +48,6 @@ class UpstreamNullRate:
     Read it alongside, never instead of, :class:`contracts.weather_schemas.NwpQualityReport`, which
     counts null H3 *cells* and answers the different question of how much the model lost. The two
     are not comparable as rates: different units over different populations.
-
-    Lead-0 is excluded from every count. For the de-accumulated variables that is the whole point,
-    since they are null there by design. For the instantaneous ones it is a blind spot rather than a
-    filter, and a small one: a lead-0 null that reaches a *cell* is fatal at validation anyway, so
-    what goes uncounted is lead-0 scatter the aggregation absorbed.
 
     See
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
@@ -62,12 +60,12 @@ class UpstreamNullRate:
 
     @property
     def n_null_nwp_grid_points(self) -> int:
-        """Null grid points in the counted variables, beyond lead-0."""
+        """Null grid points in the counted variables and steps."""
         return int(self.per_variable["n_null"].sum())
 
     @property
     def n_total_nwp_grid_points(self) -> int:
-        """The denominator: counted variables × members × steps beyond lead-0 × grid points."""
+        """The denominator: counted variables × ensemble members × counted steps × grid points."""
         return int(self.per_variable["n_total"].sum())
 
     @property
@@ -88,7 +86,7 @@ class UpstreamNullRate:
     def null_nwp_grid_point_fraction(self) -> float:
         """Null grid points as a fraction of those counted; ``0.0`` when none were counted.
 
-        A run carrying no step beyond lead-0 has nothing to measure, and a warning path must not
+        A run with no step left to count has nothing to measure, and a warning path must not
         raise
         ([rule 7](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
         """
@@ -98,14 +96,14 @@ class UpstreamNullRate:
 
     @property
     def is_healthy(self) -> bool:
-        """True when no counted grid point arrived null beyond lead-0."""
+        """True when no counted grid point arrived null."""
         return self.n_null_nwp_grid_points == 0
 
 
 def assess_upstream_grid_point_nulls(
-    ds: xr.Dataset, variables: Collection[str]
+    ds: xr.Dataset, variables: Collection[str], exclude_lead_0: bool
 ) -> UpstreamNullRate:
-    """Count nulls on the raw NWP grid of one downloaded run, beyond lead-0.
+    """Count nulls on the raw NWP grid of one downloaded run.
 
     Pure and Dagster-free (unit-testable in isolation); the ``ecmwf_ens`` asset calls it twice, once
     per null population, and publishes each result on its own WARN check.
@@ -122,6 +120,10 @@ def assess_upstream_grid_point_nulls(
             with opposite null semantics measures nothing: the asset passes the de-accumulated
             variables, whose nulls are known upstream corruption, and the instantaneous ones, whose
             nulls are anomalous, on separate calls.
+        exclude_lead_0: Skip the lead-0 step. True for the de-accumulated variables, which are null
+            there by design, so counting it would report every healthy run as corrupt. False for
+            the instantaneous ones, where lead-0 is an ordinary step and a null in it means what a
+            null in any other step means.
     """
     # Selected per variable rather than once on `ds`: this runs inside `ecmwf_ens`, whose ECMWF
     # concurrency pool exists because the download is memory-intensive, and slicing the whole
@@ -129,7 +131,7 @@ def assess_upstream_grid_point_nulls(
     beyond_lead_0 = ds.lead_time > _LEAD_0
     rows = []
     for name in sorted(variables):
-        values = ds[name].isel(lead_time=beyond_lead_0)
+        values = ds[name].isel(lead_time=beyond_lead_0) if exclude_lead_0 else ds[name]
         nulls_per_slice = values.isnull().sum(dim=["latitude", "longitude"])
         rows.append(
             {

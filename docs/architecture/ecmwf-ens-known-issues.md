@@ -254,13 +254,14 @@ name the winds differently: we download `wind_u_10m`/`wind_v_10m` and derive
 `wind_speed_10m`/`wind_direction_10m` from them, so a set drawn from the contract would name four
 variables the downloaded dataset does not carry.
 
-Two things it cannot see. **Lead-0** is excluded from the count, which for these variables is a
-blind spot rather than a filter — a small one, since a lead-0 null that reaches a cell is fatal at
-validation anyway, so what goes uncounted is lead-0 scatter the aggregation absorbed. And a **blocky
-failure never reaches it**: every grid point of a cell goes at once, the cell is null, and
-`Nwp.validate` rejects the run before any check runs. So a run that lands with this check red is
-telling you about scatter, which is the pattern this project has never yet seen in an instantaneous
-variable — their nulls have only ever arrived as whole-step dropouts.
+Unlike the de-accumulated count, this one includes **lead-0**: these variables are not null there by
+design, so a null at lead-0 means what a null at any other step means.
+
+What it cannot see is a null that reached a stored cell, because `Nwp.validate` rejects that run
+before any check runs. That covers a blocky failure, where every grid point of a cell goes at once,
+and also a scattered null that happens to land on one of the 10 single-point cells. So a run that
+lands with this check red is telling you about absorbed scatter — a pattern this project has never
+yet seen in an instantaneous variable, whose nulls have only ever arrived as whole-step dropouts.
 
 ### A wholly-missing variable is retried, not failed outright
 
