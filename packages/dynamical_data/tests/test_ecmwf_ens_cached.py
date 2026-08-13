@@ -25,6 +25,7 @@ from contracts.weather_schemas import Nwp
 from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe as convert,
 )
+from dynamical_data.ecmwf_ens.download import ECMWF_ENS_INSTANTANEOUS_VARS
 
 _SLICE = Path(__file__).parent / "data" / "ecmwf_ens_real_slice.nc"
 
@@ -64,6 +65,19 @@ def _one_cell_per_grid_point(
         .cast()
     )
     return grid, expected
+
+
+def test_the_counted_variable_sets_name_variables_a_real_download_carries() -> None:
+    """``assess_upstream_grid_point_nulls`` indexes the raw dataset, so it needs download names.
+
+    The ``Nwp`` contract's are not those: it carries ``wind_speed_10m``/``wind_direction_10m`` where
+    the download carries ``wind_u_10m``/``wind_v_10m``. A variable set drawn from the contract
+    raises ``KeyError`` here — on every run, inside a warning path, taking every NWP check with it.
+    """
+    ds = xr.open_dataset(_SLICE)
+
+    assert set(ds.data_vars) >= ECMWF_ENS_INSTANTANEOUS_VARS
+    assert set(ds.data_vars) >= Nwp.deaccumulated_var_names
 
 
 def test_cached_real_slice_conventions_and_orientation() -> None:

@@ -102,6 +102,55 @@ def test_a_slice_is_one_variable_member_and_step(
     assert rate.n_affected_nwp_slices == expected_n_slices
 
 
+def test_per_variable_breakdown_counts_each_variable_separately(
+    make_ens_dataset: Callable[..., xr.Dataset],
+) -> None:
+    """Which variable is corrupt, and by how much — neither of which the pooled totals can say.
+
+    The two corrupt variables differ in both counts, and in the relationship between them: two
+    nulls in one slice against one null in another. A breakdown that split the totals evenly, or
+    attributed either variable's nulls to the other, disagrees with this.
+    """
+    precipitation = np.full(_DEFAULT_SHAPE, 0.0001, dtype=np.float32)
+    precipitation[1, 0, 0, 0] = np.nan
+    precipitation[1, 0, 1, 1] = np.nan  # the same (member, step) slice, so two nulls but one slice
+    radiation = np.full(_DEFAULT_SHAPE, 200.0, dtype=np.float32)
+    radiation[2, 1, 0, 0] = np.nan
+    ds = make_ens_dataset(
+        var_values={
+            "precipitation_surface": precipitation,
+            "downward_short_wave_radiation_flux_surface": radiation,
+        }
+    )
+
+    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED)
+
+    n_per_variable = _N_STEPS_BEYOND_LEAD_0 * _N_MEMBERS * _N_GRID_POINTS
+    # Rows are sorted by variable name, so the clean variable comes first here.
+    assert rate.per_variable.to_dicts() == [
+        {
+            "variable": "downward_long_wave_radiation_flux_surface",
+            "n_null": 0,
+            "n_affected_slices": 0,
+            "n_total": n_per_variable,
+        },
+        {
+            "variable": "downward_short_wave_radiation_flux_surface",
+            "n_null": 1,
+            "n_affected_slices": 1,
+            "n_total": n_per_variable,
+        },
+        {
+            "variable": "precipitation_surface",
+            "n_null": 2,
+            "n_affected_slices": 1,
+            "n_total": n_per_variable,
+        },
+    ]
+    assert rate.n_null_nwp_grid_points == 3
+    assert rate.n_affected_nwp_slices == 2
+
+
 def test_affected_variables_are_sorted(make_ens_dataset: Callable[..., xr.Dataset]) -> None:
     """Two corrupt variables come back in a stable, ascending order."""
     corrupt = np.full(_DEFAULT_SHAPE, 0.0001, dtype=np.float32)

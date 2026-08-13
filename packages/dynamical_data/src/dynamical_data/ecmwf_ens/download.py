@@ -10,6 +10,7 @@ import patito as pt
 import polars as pl
 import xarray as xr
 from contracts.geo_schemas import H3GridWeights
+from contracts.weather_schemas import Nwp
 
 
 class NwpRunNotYetAvailable(Exception):
@@ -31,6 +32,23 @@ _ECMWF_ENS_VARS_TO_DOWNLOAD: Final[tuple[str, ...]] = (
     "precipitation_surface",
     "categorical_precipitation_type_surface",
 )
+
+ECMWF_ENS_INSTANTANEOUS_VARS: Final[frozenset[str]] = (
+    frozenset(_ECMWF_ENS_VARS_TO_DOWNLOAD) - Nwp.deaccumulated_var_names - Nwp.categorical_var_names
+)
+"""The downloaded variables describing conditions at one instant, under their *download* names.
+
+None of these is ever legitimately null, anywhere in a run, which is why
+:func:`dynamical_data.ecmwf_ens.upstream_nulls.assess_upstream_grid_point_nulls` counts them
+separately from the de-accumulated ones and the ``ecmwf_ens`` asset gates a check on that count
+being zero.
+
+Derived from the download list rather than from ``Nwp``'s fields, because the two namespaces differ:
+we download ``wind_u_10m``/``wind_v_10m`` (and the 100 m pair), and
+:func:`dynamical_data.ecmwf_ens.convert_to_polars.convert_nwp_xarray_dataset_to_polars_dataframe`
+derives ``wind_speed_*``/``wind_direction_*`` from them. A set taken from the contract would name
+four variables the downloaded dataset does not carry, and indexing it would raise ``KeyError``.
+"""
 
 
 def open_ecmwf_ens_run(
