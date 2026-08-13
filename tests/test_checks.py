@@ -106,6 +106,21 @@ def test_stale_series_flagged_most_stale_first() -> None:
     assert result.late["hours_late"].to_list() == pytest.approx([72.0, 30.0])
 
 
+def test_the_production_staleness_threshold_is_twenty_four_hours() -> None:
+    """Series 8 is a minute past the threshold and series 7 a minute short of it, so retuning
+    ``_POWER_DATA_STALENESS_THRESHOLD`` has to change this test too. Every other case passes its own
+    ``_THRESHOLD``, which pins the shape of the boundary but not the production number."""
+    result = evaluate_power_freshness(
+        coverage=_coverage(
+            {7: _NOW - timedelta(hours=23, minutes=59), 8: _NOW - timedelta(hours=24, minutes=1)}
+        ),
+        roster_ids=_roster([7, 8]),
+        now=_NOW,
+        threshold=checks._POWER_DATA_STALENESS_THRESHOLD,
+    )
+    assert result.late["time_series_id"].to_list() == [8]
+
+
 def test_never_reported_ids_flagged_from_roster() -> None:
     """A roster id with no rows in the Delta table counts as late with a null ``last_seen``."""
     coverage = _coverage({1: _NOW - timedelta(hours=1)})
@@ -412,6 +427,19 @@ def _write_metadata_roster(path: str, ids: list[int]) -> None:
     TimeSeriesMetadata.DataFrame(rows).cast().validate().write_parquet(path)
 
 
+def _run_freshness_check() -> AssetCheckResult:
+    """Invoke ``power_data_is_fresh`` directly, on an instance closed before we return.
+
+    Dagster builds a context even though this check declares no context parameter, and never
+    disposes the instance inside it:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#fixtures-and-mocking>.
+    """
+    with DagsterInstance.ephemeral() as instance:
+        result = checks.power_data_is_fresh(build_asset_check_context(instance=instance))
+    assert isinstance(result, AssetCheckResult)  # narrows the directly-invoked check's return
+    return result
+
+
 def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """One fresh series, one stale series, one never-reported roster id → a WARN naming all late."""
     # Freeze "now" so the fresh/stale split is deterministic regardless of wall-clock.
@@ -429,8 +457,7 @@ def test_power_data_is_fresh_end_to_end(env: Path, monkeypatch: pytest.MonkeyPat
     ).write_delta(settings.power_time_series_data_path)
     _write_metadata_roster(settings.metadata_path, ids=[1, 2, 99])
 
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)  # narrows the directly-invoked check's return
+    result = _run_freshness_check()
 
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
@@ -460,8 +487,7 @@ def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
     ).write_delta(settings.power_time_series_data_path)
     _write_metadata_roster(settings.metadata_path, ids=[1, 2])
 
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)
+    result = _run_freshness_check()
     assert result.passed is True
     assert result.metadata["n_late"].value == 0
     # Emitted even when nothing is late, so the key keeps one type across runs and stays plottable.
@@ -501,10 +527,38 @@ def test_power_data_is_fresh_silences_the_configured_dead_series(
     assert "Ignoring 1 known-dead time series: 99." in result.description
 
 
-def test_power_data_is_fresh_no_data_yet_warns(env: Path) -> None:
-    """No Delta table and no roster → not healthy, WARN, 'no data yet'."""
+def test_power_data_is_fresh_uses_the_production_threshold(env: Path) -> None:
+    """The check's own boundary, not just the constant's value: series 7, a minute short of
+    ``_POWER_DATA_STALENESS_THRESHOLD``, is fresh, and series 8, a minute past it, is stale.
+
+    Both times are derived from the constant, so a deliberate retune leaves this test passing and
+    only the wiring going astray — a literal threshold, or a shifted ``now`` — fails it.
+    """
+    now = datetime.now(UTC)
+    threshold = checks._POWER_DATA_STALENESS_THRESHOLD
+    settings = Settings()
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([7, 8], dtype=pl.Int32),
+            "time": pl.Series(
+                [now - threshold + timedelta(minutes=1), now - threshold - timedelta(minutes=1)]
+            ).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
+        }
+    ).write_delta(settings.power_time_series_data_path)
+    _write_metadata_roster(settings.metadata_path, ids=[7, 8])
+
     result = checks.power_data_is_fresh()
     assert isinstance(result, AssetCheckResult)
+    assert result.metadata["n_stale"].value == 1
+    late_table = result.metadata["late_time_series"]
+    assert isinstance(late_table, TableMetadataValue)
+    assert [r.data["time_series_id"] for r in late_table.records] == [8]
+
+
+def test_power_data_is_fresh_no_data_yet_warns(env: Path) -> None:
+    """No Delta table and no roster → not healthy, WARN, 'no data yet'."""
+    result = _run_freshness_check()
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
     assert result.metadata["n_series_total"].value == 0
@@ -554,8 +608,7 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
     ).write_delta(settings.power_time_series_data_path)
     _write_metadata_roster(settings.metadata_path, ids=[1])
 
-    check_result = checks.power_data_is_fresh()
-    assert isinstance(check_result, AssetCheckResult)
+    check_result = _run_freshness_check()
     assert len(captured) == 1
     assert captured[0] is sentinel  # the exact evaluated object, not a recomputation
     # ...and that same object drove the returned check result (n_late == n_stale + n_never == 7).
@@ -619,8 +672,7 @@ def test_power_data_is_fresh_degrades_on_a_corrupt_metadata_parquet(env: Path) -
     _write_one_fresh_series(settings)
     Path(settings.metadata_path).write_bytes(b"not a parquet file")
 
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)
+    result = _run_freshness_check()
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
     assert "Could not evaluate power-data freshness" in str(result.description)
@@ -686,8 +738,7 @@ def test_power_data_is_fresh_degrades_on_a_rust_panic(
         lambda check_name, exc: reported.append((check_name, exc)),
     )
 
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)
+    result = _run_freshness_check()
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
     assert "simulated rust panic inside the check" in str(result.description)
@@ -711,7 +762,7 @@ def test_power_data_is_fresh_re_raises_a_cancelled_run(
     monkeypatch.setattr(checks, "report_check_degradation", _never_called)
 
     with pytest.raises(DagsterExecutionInterruptedError):
-        checks.power_data_is_fresh()
+        _run_freshness_check()
 
 
 # ---------------------------------------------------------------------------
@@ -1093,7 +1144,13 @@ def _write_promoted_model_meta(
 
 
 def _run_live_check() -> AssetCheckResult:
-    result = checks.live_forecasts_are_healthy(build_asset_check_context())
+    """Invoke ``live_forecasts_are_healthy`` directly, on an instance closed before we return.
+
+    Dagster default-constructs an instance for a directly-invoked check and never disposes it:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#fixtures-and-mocking>.
+    """
+    with DagsterInstance.ephemeral() as instance:
+        result = checks.live_forecasts_are_healthy(build_asset_check_context(instance=instance))
     assert isinstance(result, AssetCheckResult)  # narrows the directly-invoked check's return
     return result
 

@@ -60,7 +60,7 @@ def _archive_model_dir(model_dir: Path, archive_path: Path) -> None:
             tar.add(item, arcname=item.name)
 
 
-def _download_and_unpack_model(run_id: str, work_dir: Path) -> Path:
+def _download_and_unpack_model(run_id: str, work_dir: Path, remedy: str) -> Path:
     """Download an MLflow run's model archive into ``work_dir`` and unpack it.
 
     Shared by ``BaseForecaster.load_from_mlflow`` and
@@ -74,6 +74,10 @@ def _download_and_unpack_model(run_id: str, work_dir: Path) -> Path:
         run_id: The MLflow run the model was saved under.
         work_dir: A scratch directory (typically a ``TemporaryDirectory``) to download and
             extract into. Needs room for the archive *and* its unpacked contents.
+        remedy: What the reader should do when the run holds no archive, appended to the
+            message. The two callers reach this state by different routes — a CV fold run that
+            no training has written yet, versus a run id an operator chose — so no one wording
+            is right for both.
 
     Returns:
         The directory holding the unpacked model, ready to hand to a subclass's ``load``. It
@@ -81,9 +85,7 @@ def _download_and_unpack_model(run_id: str, work_dir: Path) -> Path:
         cannot appear in it.
 
     Raises:
-        MlflowException: The run holds no model archive — either nothing was ever saved to it,
-            or it was written before the model became a single archive artifact, in which case
-            the fold must be re-trained.
+        MlflowException: The run holds no model archive; the message ends with ``remedy``.
     """
     try:
         archive_path = Path(
@@ -93,9 +95,7 @@ def _download_and_unpack_model(run_id: str, work_dir: Path) -> Path:
         )
     except MlflowException as error:
         raise MlflowException(
-            f"MLflow run {run_id} has no {_MLFLOW_MODEL_ARTIFACT} artifact. Either no model was "
-            "ever saved to this run, or it was saved before the model became a single archive "
-            "artifact — re-materialise `trained_cv_model` for this fold to rewrite it."
+            f"MLflow run {run_id} has no {_MLFLOW_MODEL_ARTIFACT} artifact — {remedy}"
         ) from error
     # Unpack beside the archive rather than over it: download_artifacts has already claimed the
     # archive's own name inside work_dir.
@@ -303,7 +303,13 @@ class BaseForecaster(ABC):
             The reconstructed, trained forecaster.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
-            return cls.load(_download_and_unpack_model(run_id, Path(tmp_dir)))
+            return cls.load(
+                _download_and_unpack_model(
+                    run_id=run_id,
+                    work_dir=Path(tmp_dir),
+                    remedy="re-materialise `trained_cv_model` for this fold.",
+                )
+            )
 
     @abstractmethod
     def train(self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]) -> None:

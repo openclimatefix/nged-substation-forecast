@@ -252,9 +252,8 @@ def test_re_saving_a_smaller_model_leaves_no_trace_of_the_dropped_series(
 def test_loading_a_run_with_no_archive_says_what_to_do_about_it(saved_run: str) -> None:
     """A run holding no model archive fails with an actionable message, not MLflow's raw one.
 
-    The case that matters is a run written before the model became a single archive artifact:
     MLflow's own error says only that the path was not found, which gives an operator
-    re-materialising an old fold nothing to act on. (``saved_run`` is depended on for the
+    re-materialising a fold nothing to act on. (``saved_run`` is depended on for the
     tracking URI it sets up, not for the model it holds.)
     """
     with mlflow.start_run(experiment_id=mlflow.create_experiment("empty_run")) as run:
@@ -356,6 +355,9 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_run_holds_no_mo
     real run that simply never held a model. It is also the only refusal that happens in the
     download rather than in ``_check_meta_is_servable``, so it needs its own case to pin that
     ``dest`` survives it.
+
+    The message must send the operator back to the run id they chose. Re-materialising
+    ``trained_cv_model`` is the remedy for the *other* caller of the same download helper.
     """
     dest = tmp_path / "production_model"
     fetch_model_artifacts(run_id=saved_run, dest=dest)
@@ -363,7 +365,7 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_run_holds_no_mo
     with mlflow.start_run(experiment_id=mlflow.create_experiment("modelless")) as run:
         modelless_run_id = run.info.run_id
 
-    with pytest.raises(MlflowException, match="re-materialise `trained_cv_model`"):
+    with pytest.raises(MlflowException, match="check the run id"):
         fetch_model_artifacts(run_id=modelless_run_id, dest=dest)
 
     assert _FakeForecaster.load(dest).payload == "hello-model"

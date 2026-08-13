@@ -50,6 +50,7 @@ needed one, the mistake is already written.
 | `marimo-notebooks` | creating or editing a Marimo notebook (`packages/dashboard/*.py`, `packages/notebooks/*.py`) |
 | `ty-workarounds` | acting on a `ty` error in Altair chart code or numpy `.view()` code, or adding any `# ty: ignore` |
 | `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — writes a reviewed plan, no code |
+| `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
 | `implement-issue` | writing code for an approved plan: worktree, verify set, PR, two adversarial reviews, stop |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh pr merge`, or ship-time triage |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |

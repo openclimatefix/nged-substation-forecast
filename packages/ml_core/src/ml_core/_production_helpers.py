@@ -270,13 +270,17 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
             promote that run instead.
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
-        downloaded_dir = _download_and_unpack_model(run_id, Path(tmp_dir))
+        downloaded_dir = _download_and_unpack_model(
+            run_id=run_id,
+            work_dir=Path(tmp_dir),
+            remedy="check the run id, and pick one whose training completed.",
+        )
         meta_path = downloaded_dir / "meta.json"
         if not meta_path.exists():
             raise ValueError(
                 f"The model saved under run {run_id} has no meta.json, so no forecaster here can "
-                "load it. Re-train and promote a run saved by a code version that writes "
-                "meta.json (see BaseForecaster.save)."
+                "load it. Re-train against the current code and promote that run (see "
+                "BaseForecaster.save)."
             )
         meta = json.loads(meta_path.read_text())
         _check_meta_is_servable(meta=meta, source=f"run {run_id}")

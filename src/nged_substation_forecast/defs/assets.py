@@ -68,9 +68,10 @@ from nged_data.storage import (
 from pydantic import BaseModel, computed_field, field_validator
 
 from nged_substation_forecast._sentry import report_asset_degradation, report_check_degradation
+from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS
 
 
-@asset
+@asset(tags=PRODUCTION_LAYER_TAGS)
 def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     """Ingests raw telemetry and metadata from NGED S3 into our local storage.
 
@@ -169,7 +170,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     )
 
 
-@asset
+@asset(tags=PRODUCTION_LAYER_TAGS)
 def h3_grid_weights(context: AssetExecutionContext) -> None:
     """Computes H3 grid weights for the Great Britain boundary.
 
@@ -268,6 +269,7 @@ _NWP_NULL_SLICES_SCHEMA: Final[TableSchema] = TableSchema(
 
 
 @asset(
+    tags=PRODUCTION_LAYER_TAGS,
     partitions_def=ecmwf_ens_partitions,
     deps=["h3_grid_weights"],
     check_specs=[
