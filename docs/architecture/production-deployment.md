@@ -375,9 +375,9 @@ somewhere arbitrary in the other — the venv root, in the image's case — and 
 default then fails with `FileNotFoundError`
 ([#287](https://github.com/openclimatefix/nged-substation-forecast/issues/287)). The marker walk
 handles both layouts: a dev checkout resolves to the repo root, and the production image resolves
-to `/app` because the Dockerfile copies `uv.lock` there alongside `conf/` and `metadata/` — so the
-image needs no per-path env-var overrides, and `conf/model/` stays available for running training
-jobs in-container.
+to `/app` because the Dockerfile copies `uv.lock` there alongside `conf/` — so the image needs no
+per-path env-var overrides, and `conf/model/` stays available for running training jobs
+in-container.
 
 The fallback case — a wheel installed into a venv outside any workspace checkout — is a
 deployment shape we don't currently have. If one appears, it must either run with its working
