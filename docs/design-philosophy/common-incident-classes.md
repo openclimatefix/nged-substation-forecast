@@ -23,11 +23,12 @@ This is the shape [Inherent Stability](inherent-stability.md) is built around: t
 still produce at each stage of loss, from one missed weather-model run through to no fresh data at
 all. Telemetry already degrades this way today — a stalled meter widens nothing yet, but it does
 not stop the forecast either. Weather data is the sharper case: a sustained NWP outage currently
-makes the live-forecast asset **raise** rather than degrade — one of two hard-failure rows in the
+makes the live-forecast asset **raise** rather than degrade — one of three hard-failure rows in the
 [failure-modes table](inherent-stability.md#failure-modes), and the only one tracked to change
-([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)); the other, an
-empty or unloadable promoted model, stays a deliberate raise because it is a promotion bug rather
-than a data outage. The NWP gap is tracked, and the fix is deliberately sequenced behind training
+([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)). The other two stay
+deliberate raises: an empty or unloadable promoted model is a promotion bug rather than a data
+outage, and a duplicated forecast primary key means malformed input has fanned a join out, which
+rule 2 rejects at the contract boundary rather than delivering. The NWP gap is tracked, and the fix is deliberately sequenced behind training
 the model against realistic outages, so that a degraded forecast is measured rather than merely
 produced.
 
@@ -122,10 +123,12 @@ affects.
 
 Per-`(experiment, fold)` partitioning and Patito's own null-tolerance policy — reject a
 structurally empty column outright, but absorb a locally corrupt value the model can tolerate —
-both push in the right direction by construction. Whether a single malformed `time_series_id`
-inside a live-forecast run can currently take down the whole materialisation, rather than just
-that series, has not been verified empirically, and is worth checking directly rather than
-assuming either way.
+both push in the right direction by construction. One case is now settled rather than assumed: NWP
+rows duplicated for a single H3 cell fan the feature join out, `PowerForecast.validate` rejects the
+duplicated primary key, and the whole slot is lost — including every series the duplicated cell
+never touched. That is the propagation this section describes, accepted for now because delivering
+a silently duplicated forecast is worse, and because the trigger is a bug in our own ingest rather
+than a routine outage.
 
 ## How to use this page
 

@@ -273,9 +273,7 @@ def test_cv_power_forecasts_fails_loudly_when_a_trained_series_loses_its_metadat
 ) -> None:
     """The metadata parquet can change between training and scoring, so check again at predict.
 
-    Scoring a fold on fewer series than the model was trained on makes its leaderboard numbers
-    incomparable, which is the same reason `trained_cv_model` checks. R&D fails fast; the live
-    service is the one that degrades.
+    The check in `trained_cv_model` cannot cover this: the parquet is re-read here.
     """
     _register(dagster_instance)
     assert materialize(

@@ -410,13 +410,11 @@ def test_parsed_features_from_strings_rejects_invalid(
         ParsedFeatures.from_strings({bad_feature})
 
 
-@pytest.mark.parametrize("reversed_input", [False, True])
-def test_apply_rolling_mean_feature(reversed_input: bool) -> None:
-    """The window orders by valid_time itself, so the caller need not present sorted rows.
+def test_apply_rolling_mean_feature_orders_by_valid_time_itself():
+    """The caller need not present sorted rows, which is what lets the upsample drop its sort.
 
-    The reversed case is the one that matters: it is what lets ``_upsample_nwp_to_half_hourly``
-    drop its sort. A `lf.rolling()`-based implementation raises `ComputeError: input data is not
-    sorted` here.
+    The input is deliberately reversed: a `LazyFrame.rolling`-based implementation raises
+    `ComputeError: input data is not sorted` on it.
     """
     nwp_init_time = datetime(2023, 1, 1, 0, 0)
     df = pl.DataFrame(
@@ -433,8 +431,7 @@ def test_apply_rolling_mean_feature(reversed_input: bool) -> None:
             "temperature_2m": [10.0, 20.0, 30.0, 40.0],
         }
     )
-    if reversed_input:
-        df = df.reverse()
+    df = df.reverse()
     # Rolling mean with window of 2 hours
     # For 0:00: mean([10.0]) = 10.0
     # For 1:00: mean([10.0, 20.0]) = 15.0

@@ -41,10 +41,7 @@ from ml_core._production_helpers import (
 
 from nged_substation_forecast._sentry import send_forecast_checkin
 from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS, RESEARCH_LAYER_TAGS
-from nged_substation_forecast.defs.cv_assets import (
-    _load_engineering_inputs,
-    _time_series_ids_missing_metadata,
-)
+from nged_substation_forecast.defs.cv_assets import _load_engineering_inputs
 
 LIVE_FORECAST_HORIZON: Final[timedelta] = timedelta(days=14)
 """How far past ``power_fcst_init_time`` ``live_forecasts`` forecasts — inside ECMWF ENS's
@@ -272,18 +269,6 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         init_time_start=nwp_init,
         init_time_end=nwp_init,
     )
-    # Degrade, don't raise — the CV assets raise on this same condition and the live service must
-    # not. A trained series with no metadata row has no H3 cell, so the feature engineer's spatial
-    # join already drops it and the remaining series forecast normally. This does not filter it out
-    # again; it names it, so a short forecast gets diagnosed rather than puzzled over.
-    missing_metadata = _time_series_ids_missing_metadata(metadata_df, trained_ids)
-    if missing_metadata:
-        context.log.warning(
-            f"{len(missing_metadata)} of {len(trained_ids)} trained time series have no row in "
-            f"the metadata parquet, so they have no H3 cell, no weather, and will be absent from "
-            f"this forecast: {missing_metadata}. Re-materialise `power_time_series_and_metadata`."
-        )
-
     power_full = build_live_power_frame(
         power_ts,
         trained_ids,

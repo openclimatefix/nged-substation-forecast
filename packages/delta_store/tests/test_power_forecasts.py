@@ -123,3 +123,17 @@ def test_empty_replace_chunk_clears_partition(tmp_path: Path) -> None:
     # so a re-materialisation that produces no forecasts never leaves stale rows behind).
     write_power_forecasts(_make_forecasts([]), table, replace_partition=partition)
     assert pl.read_delta(str(table)).height == 0
+
+
+def test_sort_cols_lead_with_time_series_id() -> None:
+    """The sort order is this module's choice, even though its columns come from the primary key.
+
+    `POWER_FORECASTS_SORT_COLS` is `PowerForecast.PRIMARY_KEY` so the two cannot disagree about
+    *which* columns matter. The order is a separate decision: leading with `time_series_id` is
+    what lets row-group statistics prune a single-series scan, and putting `ensemble_member` last
+    is what places an ensemble's members on adjacent rows for `BYTE_STREAM_SPLIT`. A primary key
+    reordered for any other reason would still be a correct key and a worse layout.
+    """
+    assert set(POWER_FORECASTS_SORT_COLS) == set(PowerForecast.PRIMARY_KEY)
+    assert POWER_FORECASTS_SORT_COLS[0] == "time_series_id"
+    assert POWER_FORECASTS_SORT_COLS[-1] == "ensemble_member"

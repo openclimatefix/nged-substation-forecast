@@ -18,7 +18,6 @@ from dagster import materialize
 from deltalake import write_deltalake
 
 from nged_substation_forecast.defs.cv_assets import (
-    _require_metadata_coverage,
     _time_series_ids_missing_metadata,
     effective_capacity,
     eligible_time_series,
@@ -192,17 +191,3 @@ def test_time_series_ids_missing_metadata_names_the_gap() -> None:
     """Sorted, and reports only the requested ids — extra metadata rows are not a gap."""
     assert _time_series_ids_missing_metadata(_metadata([1, 4]), [4, 1, 3, 2]) == [2, 3]
     assert _time_series_ids_missing_metadata(_metadata([1, 2, 3]), [1, 2]) == []
-
-
-def test_require_metadata_coverage_raises_and_names_the_series() -> None:
-    """The R&D half fails fast: a CV run that silently trains fewer series poisons the leaderboard.
-
-    The message must name the ids, because the operator's next step is to look them up in the
-    metadata parquet.
-    """
-    with pytest.raises(ValueError, match=r"metadata parquet.*\[7\]"):
-        _require_metadata_coverage(_metadata([1, 2]), [1, 2, 7], population="eligible")
-
-
-def test_require_metadata_coverage_passes_when_every_series_is_covered() -> None:
-    _require_metadata_coverage(_metadata([1, 2]), [1, 2], population="eligible")

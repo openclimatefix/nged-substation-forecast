@@ -32,12 +32,8 @@ def _join_nwp_bulk_mode(
     (e.g. weather rolling means) see the same predecessor rows as single-run mode, and are
     dropped by ``_engineer_features`` after feature computation.
 
-    Args:
-        power_lf: The observed power series, one row per ``(time_series_id, valid_time)``.
-            Carries no metadata: ``_engineer_features`` joins that onto the result, because a
-            valid_time with no observation would otherwise lose its metadata here.
-        processed_nwp: The upsampled NWP frame, or None for a power-only feature set.
-        nwp_publication_delay_hours: Hours between an NWP run's init time and its availability.
+    ``power_lf`` carries no metadata: ``_engineer_features`` joins that onto the result, because
+    a valid_time with no power observation would otherwise lose its metadata here.
     """
     if processed_nwp is None:
         result = power_lf.with_columns(
@@ -66,13 +62,7 @@ def _join_nwp_single_run(
     run identified by nwp_init_time. If nwp_init_time is None, it is derived as
     power_fcst_init_time - nwp_publication_delay_hours.
 
-    Args:
-        power_lf: The observed power series, one row per ``(time_series_id, valid_time)``.
-            Carries no metadata — see ``_join_nwp_bulk_mode``.
-        processed_nwp: The upsampled NWP frame, or None for a power-only feature set.
-        power_fcst_init_time: The single forecast init time stamped onto every row.
-        nwp_init_time: The NWP run to join, or None to derive it from the publication delay.
-        nwp_publication_delay_hours: Hours between an NWP run's init time and its availability.
+    ``power_lf`` carries no metadata — see ``_join_nwp_bulk_mode``.
     """
     nwp_init_time_val = (
         nwp_init_time

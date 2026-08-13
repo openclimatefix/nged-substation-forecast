@@ -8,7 +8,6 @@ valid times just after ``power_fcst_init_time`` — so ``live`` and ``replay`` a
 are forced to pick different runs.
 """
 
-import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -348,8 +347,9 @@ def test_a_trained_series_losing_its_metadata_row_does_not_stop_the_others(
     """The live service degrades rather than failing closed.
 
     A trained series with no metadata row has no H3 cell, so it has no weather and can produce no
-    forecast. That must cost that one series, not the whole run — the CV assets raise on the same
-    condition, the live service does not.
+    forecast. That must cost that one series, not the whole run. `live_forecasts_are_healthy`
+    already reports which trained series a slot did not forecast, so nothing here needs to say it
+    a second time.
     """
     nged_path = tmp_path / "NGED"
     # ts3 shares ts1's NWP cell, so both are genuinely forecastable to begin with.
@@ -375,16 +375,5 @@ def test_a_trained_series_losing_its_metadata_row_does_not_stop_the_others(
         }
     ).write_parquet(nged_path / "metadata.parquet")
 
-    result = _materialize(dagster_instance, "live")
-    assert result.success
+    assert _materialize(dagster_instance, "live").success
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1}
-
-    # And it says which series went missing, so a short forecast is diagnosable.
-    warnings = [
-        record.user_message
-        for record in dagster_instance.all_logs(result.run_id)
-        if record.level == logging.WARNING
-    ]
-    assert any(
-        "no row in the metadata parquet" in message and "[3]" in message for message in warnings
-    ), warnings

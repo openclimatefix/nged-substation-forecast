@@ -43,9 +43,11 @@ the BYTE_STREAM_SPLIT and DELTA_BINARY_PACKED encodings in ``POWER_FORECASTS_WRI
 need to compress well. Leading with ``time_series_id`` also lets parquet row-group statistics
 prune scans that filter on one series.
 
-This is the primary key, in key order, and is defined as such rather than repeated: the columns
-that identify a row uniquely are exactly the ones that make its neighbours compress, so the two
-cannot drift apart without one of them becoming wrong.
+Defined as ``PowerForecast.PRIMARY_KEY`` rather than repeating its columns, because the set that
+identifies a row uniquely is exactly the set whose adjacency makes a row compress. The *order*
+is this module's own choice and is pinned by ``test_sort_cols_lead_with_time_series_id`` — a
+reordered primary key is still a correct key but a worse layout, so the tuple is not free to
+follow one.
 """
 
 _TIMESTAMP_COLUMN_PROPERTIES: Final[ColumnProperties] = ColumnProperties(

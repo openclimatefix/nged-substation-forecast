@@ -257,8 +257,8 @@ def _time_series_ids_missing_metadata(
     output rows. Worth naming rather than inferring from an empty result, and cheap to compute —
     the metadata frame is already eager and already filtered to ``time_series_ids``.
 
-    Callers decide what to do with the answer, because R&D and production want opposite things:
-    the CV assets raise, and ``live_forecasts`` logs and carries on. See
+    The CV assets raise on a non-empty answer; ``live_forecasts`` does not, and reports the
+    missing series through ``live_forecasts_are_healthy`` instead. See
     <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
     """
     return sorted(set(time_series_ids) - set(metadata["time_series_id"].to_list()))
@@ -267,10 +267,12 @@ def _time_series_ids_missing_metadata(
 def _require_metadata_coverage(
     metadata: pt.DataFrame[TimeSeriesMetadata], time_series_ids: list[int], population: str
 ) -> None:
-    """Raise if any requested series has no metadata row (the fail-fast R&D half of the rule).
+    """Raise if any requested series has no metadata row.
 
-    A CV run that quietly trains or scores fewer series than its population says poisons every
-    leaderboard comparison built on it, so this is one of the R&D paths that fails fast.
+    Names the metadata cause specifically, because a series dropped for want of an H3 cell
+    otherwise shows up only as a fold that trained on fewer series than its population — which is
+    hard to diagnose and easy to miss. It is not a complete guard on that larger property: a
+    series can also drop out for want of NWP in the window, or of any non-null power.
 
     Args:
         metadata: The loaded metadata, already filtered to ``time_series_ids``.
@@ -279,10 +281,14 @@ def _require_metadata_coverage(
     """
     missing = _time_series_ids_missing_metadata(metadata, time_series_ids)
     if missing:
+        # Capped for the same reason `checks._MAX_MISSING_SERIES_LISTED` caps its list: at V2
+        # scale an empty metadata parquet would otherwise spell out ~2,500 ids.
+        listed = ", ".join(str(ts_id) for ts_id in missing[:20])
+        suffix = "" if len(missing) <= 20 else ", …"
         raise ValueError(
             f"{len(missing)} of {len(time_series_ids)} {population} time series have no row in "
             f"the metadata parquet, so they have no H3 cell and cannot be joined to NWP: "
-            f"{missing}. Re-materialise `power_time_series_and_metadata`."
+            f"[{listed}{suffix}]. Re-materialise `power_time_series_and_metadata`."
         )
 
 
@@ -590,7 +596,10 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             init_time_start=chunk_start,
             init_time_end=chunk_end,
         )
-        _require_metadata_coverage(metadata_df, trained_ids, population="trained")
+        # First chunk only: metadata does not vary by init_time window, and raising on a later
+        # chunk would leave the partition holding a partial fold.
+        if is_first:
+            _require_metadata_coverage(metadata_df, trained_ids, population="trained")
         features = forecaster.feature_engineer.engineer(
             selected_features=config.selected_features,
             power_time_series=power_ts,
