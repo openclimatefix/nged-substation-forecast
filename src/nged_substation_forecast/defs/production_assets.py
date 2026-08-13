@@ -268,18 +268,13 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         availability_mode=config.availability_mode,
     )
 
-    # After the NWP-availability lookup, not before it: the offline smoke test and the first cloud
-    # run both prove the model loaded by dying at that lookup with `TableNotFoundError`, which
-    # https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/ records as a
-    # deployment step. Reading the metadata earlier would change what a healthy smoke test looks
-    # like.
     metadata_df = load_trained_metadata(Path(settings.production_model_path)).filter(
         pl.col("time_series_id").is_in(trained_ids)
     )
     power_ts, nwp_lf = load_engineering_inputs(
         settings,
-        trained_ids,
-        metadata_df,
+        time_series_ids=trained_ids,
+        metadata=metadata_df,
         window_start=power_fcst_init_time - LIVE_POWER_HISTORY,
         window_end=power_fcst_init_time + LIVE_FORECAST_HORIZON,
         init_time_start=nwp_init,

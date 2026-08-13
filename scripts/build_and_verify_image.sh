@@ -66,12 +66,12 @@ if [[ ! -f "$PROMOTION_JSON" ]]; then
 fi
 
 # The bake COPYs the promoted directory wholesale and never re-runs promotion, so a directory
-# promoted before live inference started reading this file would build and pass the smoke test,
-# then fail every 6-hourly slot in production.
+# promoted by code that does not write this file would build and pass the smoke test, then fail
+# every 6-hourly slot in production.
 TRAINED_METADATA="data/production_model/time_series_metadata.parquet"
 if [[ ! -f "$TRAINED_METADATA" ]]; then
-  echo "error: $TRAINED_METADATA not found — this model predates the frozen metadata copy" >&2
-  echo "       live inference reads. Re-train, then re-materialise promoted_model." >&2
+  echo "error: $TRAINED_METADATA not found — live inference locates its time series from" >&2
+  echo "       this file. Re-train, then re-materialise promoted_model." >&2
   exit 2
 fi
 

@@ -293,10 +293,8 @@ def _load_roster(
 
     **Research callers only.** The roster is the live registry of what NGED operates, so a fault in
     it — an off-contract file, or one rebuilt from a snapshot that dropped rows — must stop a
-    training or scoring run rather than silently shrink its population. ``live_forecasts`` takes
-    the opposite posture and reads the promoted model's own frozen copy instead
-    (``ml_core.base_forecaster.load_trained_metadata``), so no roster fault can cost a forecast.
-    See <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#rd-fails-the-other-way>.
+    training or scoring run rather than silently shrink its population. ``live_forecasts`` reads
+    ``ml_core.base_forecaster.load_trained_metadata`` instead.
 
     Args:
         settings: Application settings (data paths, credentials).
@@ -368,7 +366,12 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     metadata_df = _load_roster(settings, eligible_ids)
     _require_metadata_coverage(metadata_df, eligible_ids, population="eligible")
     power_ts, nwp_lf = load_engineering_inputs(
-        settings, eligible_ids, metadata_df, train_start, train_end, ensemble_members=[0]
+        settings,
+        time_series_ids=eligible_ids,
+        metadata=metadata_df,
+        window_start=train_start,
+        window_end=train_end,
+        ensemble_members=[0],
     )
 
     forecaster = forecaster_cls(model_params=config)
@@ -516,10 +519,10 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         chunk_end = min(chunk_start + _PREDICT_INIT_CHUNK, val_end)
         power_ts, nwp_lf = load_engineering_inputs(
             settings,
-            trained_ids,
-            metadata_df,
-            val_start,
-            val_end,
+            time_series_ids=trained_ids,
+            metadata=metadata_df,
+            window_start=val_start,
+            window_end=val_end,
             init_time_start=chunk_start,
             init_time_end=chunk_end,
         )

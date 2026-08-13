@@ -6,7 +6,6 @@ artifact round-trips from MLflow and that training honoured the fold's eligible 
 inclusive training window.
 """
 
-import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -229,7 +228,7 @@ def _fold_run(client: MlflowClient) -> Run:
 
 
 def test_trained_cv_model_trains_and_saves_to_mlflow(
-    env: None, dagster_instance: DagsterInstance
+    env: None, dagster_instance: DagsterInstance, tmp_path: Path
 ) -> None:
     _register(dagster_instance)
 
@@ -254,10 +253,9 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(
 
     # The archive also carries the roster rows the model was engineered against, which is what
     # `live_forecasts` locates its time series by instead of reading the roster.
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        model_dir = Path(tmp_dir) / "production_model"
-        fetch_model_artifacts(fold_run.info.run_id, model_dir)
-        frozen = load_trained_metadata(model_dir)
+    model_dir = tmp_path / "promoted"
+    fetch_model_artifacts(fold_run.info.run_id, model_dir)
+    frozen = load_trained_metadata(model_dir)
     assert frozen["time_series_id"].to_list() == [1, 2]
     assert frozen.filter(pl.col("time_series_id") == 1)["h3_res_5"].item() == _TS1_CELL
 

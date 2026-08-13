@@ -40,24 +40,22 @@ TRAINED_METADATA_FILENAME: Final[str] = "time_series_metadata.parquet"
 
 Production inference reads each series' location from here, never from the
 ``TimeSeriesMetadata`` roster, so an unreadable or thinned roster cannot fail a live slot or
-silently drop a series from it. The roster is where those values are *maintained*; this is the
-model's own frozen copy of what it trained against, which also keeps a series' H3 cell and static
-feature values identical between training and serving. See
+silently drop a series from it. Being the model's own frozen copy of what it trained against also
+keeps a series' H3 cell and static feature values identical between training and serving. See
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 
-The file goes *inside* the model directory, so it rides in the one archive ``save_to_mlflow``
-uploads. Logging it as a second MLflow artifact would reopen the merge problem
-``_MLFLOW_MODEL_ARTIFACT`` documents.
+Logging it as a second MLflow artifact instead of putting it in the model directory would reopen
+the merge problem ``_MLFLOW_MODEL_ARTIFACT`` documents.
 """
 
 _UNPERSISTED_METADATA_COLUMN: Final[str] = "area_wkt"
 """The one ``TimeSeriesMetadata`` column ``write_trained_metadata`` drops.
 
 Measured on the V1 roster (32 series, 12 columns): the frame is 129,582 bytes and ``area_wkt``
-holds 127,635 of them — 98.5%, against under 2 KB for everything else. It is a WKT polygon per
-Primary substation, nothing in the feature pipeline reads it, and at V2 scale (~2,500 series) it
-would put megabytes of polygon text into every fold's archive. It is ``allow_missing``, so the
-frame still validates against ``TimeSeriesMetadata`` without it.
+holds 127,635 of them — 98.5%, against under 2 KB for everything else. Nothing in the feature
+pipeline reads it, and at V2 scale (~2,500 series) it would put megabytes of polygon text into
+every fold's archive. It is ``allow_missing``, so the frame still validates against
+``TimeSeriesMetadata`` without it.
 """
 
 _ARCHIVE_COMPRESSLEVEL: Final[int] = 1
@@ -91,21 +89,18 @@ def write_trained_metadata(
 ) -> None:
     """Write a model's frozen ``TimeSeriesMetadata`` copy into its saved directory.
 
-    Call this *after* a subclass's ``save``, which clears the directory first. ``save_to_mlflow``
-    does so on every upload; the other caller is a test that hand-builds a production model
-    directory, standing in for ``_production_helpers.fetch_model_artifacts``.
+    Call this *after* a subclass's ``save``, which clears the directory first.
 
     Args:
         model_dir: The directory a subclass's ``save`` just wrote.
         time_series_metadata: The roster rows the model was engineered against.
             ``_UNPERSISTED_METADATA_COLUMN`` is dropped; everything else is kept.
     """
-    # `select` rather than `drop`: Patito overrides `DataFrame.drop` with a signature that takes no
-    # `strict=False`, and the column is `allow_missing`, so it may not be there to drop.
-    kept = [
-        column for column in time_series_metadata.columns if column != _UNPERSISTED_METADATA_COLUMN
-    ]
-    time_series_metadata.select(kept).write_parquet(model_dir / TRAINED_METADATA_FILENAME)
+    # `pl.exclude` rather than `drop`: Patito overrides `DataFrame.drop` with a signature that
+    # takes no `strict=False`, and the column is `allow_missing`, so it may not be there to drop.
+    time_series_metadata.select(pl.exclude(_UNPERSISTED_METADATA_COLUMN)).write_parquet(
+        model_dir / TRAINED_METADATA_FILENAME
+    )
 
 
 def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
@@ -361,8 +356,7 @@ class BaseForecaster(ABC):
             model_dir = Path(tmp_dir) / "model"
             model_dir.mkdir()
             self.save(model_dir)
-            # After `save`, which clears the directory it is given.
-            write_trained_metadata(model_dir, time_series_metadata)
+            write_trained_metadata(model_dir=model_dir, time_series_metadata=time_series_metadata)
             archive_path = Path(tmp_dir) / _MLFLOW_MODEL_ARTIFACT
             _archive_model_dir(model_dir, archive_path)
             with mlflow.start_run(run_id=run_id):

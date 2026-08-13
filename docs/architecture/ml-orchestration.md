@@ -52,7 +52,8 @@ temporary directory and loads from there; there is no local-disk cache.
 
 `save_to_mlflow` adds `time_series_metadata.parquet` to the model directory — the roster rows the
 model trained against, which production inference locates its series by — then packs the whole
-directory into a single `model.tar.gz` and logs that one file to the run's artifact root. `load_from_mlflow` and the production download path
+directory into a single `model.tar.gz` and logs that one file to the run's artifact root.
+`load_from_mlflow` and the production download path
 (`ml_core._production_helpers.fetch_model_artifacts`) each unpack it into a temporary directory.
 Subclass `save`/`load` never see the archive: they stay directory-based and MLflow-free, so the
 Docker bake path (`load_forecaster_from_dir`) is unaffected.

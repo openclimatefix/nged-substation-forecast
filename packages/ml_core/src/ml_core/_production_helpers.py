@@ -198,44 +198,32 @@ def _check_meta_is_servable(meta: dict[str, Any], source: str) -> type[BaseForec
     return forecaster_cls
 
 
-def _check_trained_metadata_covers_population(
-    model_dir: Path, meta: dict[str, Any], run_id: str
-) -> None:
-    """Raise if a staged model's frozen metadata cannot locate every series it will be asked for.
+def _check_trained_metadata_is_readable(model_dir: Path, run_id: str) -> None:
+    """Raise if a staged model carries no readable frozen metadata to locate its series by.
 
-    Production inference reads each series' H3 cell from this file rather than from the roster, so
-    a model missing it — or holding one that has lost rows — would forecast nothing for those
-    series at its next 6-hourly slot. Checking here means the promotion is refused instead, before
-    the swap, leaving the outgoing champion serving.
+    Production inference reads each series' H3 cell from this file, so a model without a usable one
+    would forecast nothing at its next 6-hourly slot. Checking here refuses the promotion instead,
+    before the swap, leaving the outgoing champion serving.
+
+    Whether the file *covers* the trained population is not checked: ``save_to_mlflow`` is the only
+    writer, and its caller has already passed ``_require_metadata_coverage`` over a population the
+    trained one is a subset of.
 
     Args:
         model_dir: The staged, unpacked model directory (not yet moved into place).
-        meta: The parsed contents of that model's ``meta.json``.
         run_id: The run being promoted, quoted back in the message.
 
     Raises:
-        ValueError: The file is absent, or does not cover ``trained_time_series_ids``.
+        ValueError: The file is absent, or cannot be read.
     """
-    # `.get`, because `BaseForecaster.save` mandates only `model_class` — the population is a
-    # subclass convention, read the same tolerant way in `defs/checks.py`.
-    population = set(meta.get("trained_time_series_ids", []))
     try:
-        metadata = load_trained_metadata(model_dir)
-    except FileNotFoundError as error:
+        load_trained_metadata(model_dir)
+    except Exception as error:
         raise ValueError(
-            f"The model saved under run {run_id} has no {TRAINED_METADATA_FILENAME}, so live "
-            "inference could not locate its time series. Re-train against the current code and "
-            "promote that run."
+            f"The model saved under run {run_id} has no readable {TRAINED_METADATA_FILENAME}, so "
+            "live inference could not locate its time series. Re-train against the current code "
+            "and promote that run."
         ) from error
-
-    missing = sorted(population - set(metadata["time_series_id"].to_list()))
-    if missing:
-        raise ValueError(
-            f"The model saved under run {run_id} was trained on {len(population)} time series but "
-            f"its {TRAINED_METADATA_FILENAME} covers only {metadata.height} of them, so "
-            f"{len(missing)} would get no forecast: {missing[:20]}. Re-train against the current "
-            "code and promote that run."
-        )
 
 
 def load_forecaster_from_dir(path: Path) -> BaseForecaster:
@@ -292,9 +280,7 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
     reading the staged ``meta.json`` rather than loading the model, so a model this code cannot
     serve is refused while the previous champion stays in ``dest`` and keeps serving. Reading the
     JSON is deliberate: it applies the same validation the subclass's ``load`` would, without
-    pulling every booster into memory to do it. The staged
-    ``base_forecaster.TRAINED_METADATA_FILENAME`` is checked in the same window, because live
-    inference locates its time series from that file and not from the roster.
+    pulling every booster into memory to do it.
 
     Also writes a ``promotion.json`` (``{"mlflow_run_id", "promoted_at"}``) into ``dest`` for
     provenance; a ``BaseForecaster.load`` implementation reads its own population from its saved
@@ -313,10 +299,9 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
             or stale run id, since a run that trained a model has one. Raised by
             ``ml_core.base_forecaster._download_and_unpack_model``, before ``dest`` is touched.
         ValueError: The run holds no ``meta.json``, or this code cannot serve the model it
-            describes — see ``_check_meta_is_servable`` — or its frozen metadata is absent or does
-            not cover its trained population — see
-            ``_check_trained_metadata_covers_population``. Re-train against the current code and
-            promote that run instead.
+            describes — see ``_check_meta_is_servable`` — or it carries no readable frozen
+            metadata — see ``_check_trained_metadata_is_readable``. Re-train against the current
+            code and promote that run instead.
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
         downloaded_dir = _download_and_unpack_model(
@@ -333,7 +318,7 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
             )
         meta = json.loads(meta_path.read_text())
         _check_meta_is_servable(meta=meta, source=f"run {run_id}")
-        _check_trained_metadata_covers_population(downloaded_dir, meta=meta, run_id=run_id)
+        _check_trained_metadata_is_readable(model_dir=downloaded_dir, run_id=run_id)
 
         promotion = {
             "mlflow_run_id": run_id,

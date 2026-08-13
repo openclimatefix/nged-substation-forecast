@@ -1,10 +1,8 @@
 """Loading the observed power and gridded NWP that feature engineering runs on.
 
 Shared by the research assets in ``cv_assets`` and the production asset in ``production_assets``,
-so it belongs to neither. Loading the ``TimeSeriesMetadata`` that goes alongside is deliberately
-*not* here: the two layers get it from different places, R&D from the roster and production from
-the promoted model's own frozen copy, which is what keeps a roster fault off the live path. See
-<https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
+so it belongs to neither. The caller supplies the ``TimeSeriesMetadata`` that goes alongside,
+because the two layers get it from different places.
 """
 
 from datetime import datetime, timedelta
