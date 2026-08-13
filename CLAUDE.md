@@ -87,8 +87,8 @@ by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised expor
 
 ### Prose style
 
-These four rules apply to everything we write in prose: `docs/` pages, READMEs, docstrings, code
-comments, and GitHub issue and PR bodies.
+These five rules apply to everything we write in prose: `docs/` pages, READMEs, `SKILL.md` files,
+docstrings, code comments, and GitHub issue and PR bodies.
 
 **Be concrete and plain; write for a skim-reader.** Assume the reader is skimming and wants the
 meaning to jump off the page, not to spend effort decoding a clever, abstract or metaphorical
@@ -123,6 +123,14 @@ to describe the new behaviour rather than appending a note about what changed. T
 "comments and docs must reflect current state only" rule in
 [`docs/architecture/code-style.md`](docs/architecture/code-style.md), applied to prose.
 
+**Don't name individuals.** Write the rule, not who asked for it: "get a contract change agreed
+before making it", never "ask so-and-so before changing a contract". One person maintains this repo
+today, but the docs and skills outlive that, and a name that reads as "the person responsible" to
+us reads as an unknown third party to whoever picks the work up next. Where the sentence needs an
+actor, name the role — the reviewer, the maintainer, whoever runs the pipeline. Real GitHub
+handles used as data are fine (the `JackKelly` assignee, a commit's `Co-Authored-By`); it is prose
+about a named person that this forbids.
+
 ## How planning works
 
 Full description and a "which place do I use?" table: `docs/documentation-guide.md`. In brief:
@@ -146,17 +154,17 @@ never-squash-merge rule and ship-time triage. Load it before you run either comm
 
 ## How work gets done
 
-Three skills, in order. The last two are deliberately separate so that Jack approves a design
+Three skills, in order. The last two are deliberately separate so that a design is approved
 before any code moves:
 
 1. **`plan-wave`** (`/plan-wave <EPIC>`) chooses the next one-to-five issues under an epic that
-   can run concurrently without editing the same files, and dispatches each as a chip Jack
-   launches as its own Claude Code session. It plans one wave and stops, because the epic gains
-   issues while a wave is in flight. Skip it when Jack has already named the issue to work on.
+   can run concurrently without editing the same files, and dispatches each as a chip to be
+   launched as its own Claude Code session. It plans one wave and stops, because the epic gains
+   issues while a wave is in flight. Skip it when the issue to work on has already been named.
 2. **`plan-issue`** (`/plan-issue <N>`) reads the issue, decides whether it is worth implementing
    at all, writes `plans/<branch-name>.md`, has two fresh sub-agents adversarially review that
    plan in turn — the first hunting for a simpler approach, the second checking correctness and
-   testability — and stops for Jack. It writes no code.
+   testability — and stops for review. It writes no code.
 3. **`implement-issue`** picks up an approved plan: worktree, implement, the green-before-push
    verification set, PR with labels and assignee, then two *further independent* adversarial
    reviews of the diff — the first for correctness and for cutting the code, tests and prose
@@ -165,9 +173,15 @@ before any code moves:
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
-**Why:** Jack reviews diffs in GitHub's UI and wants a PR to already have survived an
-adversarial pass by the time he looks at it, so his review is the last line of defence rather
-than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by the
+**Ask before changing a Patito data contract.** The schemas in `packages/contracts/` are the
+authoritative account of what the data means, so code that violates one is usually the thing at
+fault. Widening a field to `| None` or relaxing a range to make a failing `validate()` pass hides
+the defect in the one place the rest of the system trusts. Reasoning and the rest of the rule:
+[`packages/contracts/README.md`](packages/contracts/README.md).
+
+**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an
+adversarial pass by the time a human opens it, so that human review is the last line of defence
+rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by the
 implementer's rationale; the triage step exists because reviewer findings are often wrong and
 must not be applied uncritically. Simplicity gets its own reviewer, and gets it first, because a
 plan that is more complicated than the issue requires is the failure mode that survives a
