@@ -736,7 +736,7 @@ wheels = [
 
 [[package]]
 name = "contracts"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/contracts" }
 dependencies = [
     { name = "deltalake" },
@@ -1094,7 +1094,7 @@ wheels = [
 
 [[package]]
 name = "dashboard"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/dashboard" }
 dependencies = [
     { name = "altair" },
@@ -1156,7 +1156,7 @@ wheels = [
 
 [[package]]
 name = "delta-store"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/delta_store" }
 dependencies = [
     { name = "contracts" },
@@ -1275,7 +1275,7 @@ wheels = [
 
 [[package]]
 name = "dynamical-data"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/dynamical_data" }
 dependencies = [
     { name = "contracts" },
@@ -1445,7 +1445,7 @@ wheels = [
 
 [[package]]
 name = "geo"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/geo" }
 dependencies = [
     { name = "contracts" },
@@ -2582,7 +2582,7 @@ wheels = [
 
 [[package]]
 name = "ml-core"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/ml_core" }
 dependencies = [
     { name = "contracts" },
@@ -2818,7 +2818,7 @@ wheels = [
 
 [[package]]
 name = "nged-data"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/nged_data" }
 dependencies = [
     { name = "contracts" },
@@ -2839,7 +2839,7 @@ requires-dist = [
 
 [[package]]
 name = "nged-substation-forecast"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "altair" },
@@ -2939,7 +2939,7 @@ wheels = [
 
 [[package]]
 name = "notebooks"
-version = "0.1.0"
+version = "0.2.0"
 source = { virtual = "packages/notebooks" }
 dependencies = [
     { name = "altair" },
@@ -3337,7 +3337,7 @@ wheels = [
 
 [[package]]
 name = "plotting"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/plotting" }
 dependencies = [
     { name = "altair" },
@@ -4874,7 +4874,7 @@ wheels = [
 
 [[package]]
 name = "weather-utils"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/weather_utils" }
 dependencies = [
     { name = "polars" },
@@ -5031,7 +5031,7 @@ wheels = [
 
 [[package]]
 name = "xgboost-forecaster"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/xgboost_forecaster" }
 dependencies = [
     { name = "contracts" },
