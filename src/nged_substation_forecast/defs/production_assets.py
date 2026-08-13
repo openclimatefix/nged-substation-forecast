@@ -268,9 +268,7 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         availability_mode=config.availability_mode,
     )
 
-    metadata_df = load_trained_metadata(Path(settings.production_model_path)).filter(
-        pl.col("time_series_id").is_in(trained_ids)
-    )
+    metadata_df = load_trained_metadata(Path(settings.production_model_path))
     power_ts, nwp_lf = load_engineering_inputs(
         settings,
         time_series_ids=trained_ids,

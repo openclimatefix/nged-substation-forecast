@@ -350,13 +350,21 @@ class BaseForecaster(ABC):
             run_id: The MLflow run to attach the artifact to.
             time_series_metadata: The roster rows this model was engineered against. Required,
                 because a model uploaded without them cannot be promoted — see
-                ``TRAINED_METADATA_FILENAME``.
+                ``TRAINED_METADATA_FILENAME``. Narrowed to ``trained_time_series_ids`` before it is
+                written: callers engineer over a wider population than they end up training (an
+                eligible series with no usable power gets no model), and carrying the extras would
+                widen the NWP scan every consumer prunes with these rows.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
             model_dir = Path(tmp_dir) / "model"
             model_dir.mkdir()
             self.save(model_dir)
-            write_trained_metadata(model_dir=model_dir, time_series_metadata=time_series_metadata)
+            write_trained_metadata(
+                model_dir=model_dir,
+                time_series_metadata=time_series_metadata.filter(
+                    pl.col("time_series_id").is_in(self.trained_time_series_ids)
+                ),
+            )
             archive_path = Path(tmp_dir) / _MLFLOW_MODEL_ARTIFACT
             _archive_model_dir(model_dir, archive_path)
             with mlflow.start_run(run_id=run_id):

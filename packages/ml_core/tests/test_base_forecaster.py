@@ -386,6 +386,30 @@ def _save_without_trained_metadata(run_id: str) -> None:
             mlflow.log_artifact(str(archive_path))
 
 
+class _TrainedMetadataCorrupt(_FakeForecaster):
+    """A forecaster whose frozen metadata is present but not a readable parquet."""
+
+    def save(self, path: Path) -> None:
+        super().save(path)
+        # Written here rather than after `save_to_mlflow`'s own write, which would overwrite it.
+        (path / TRAINED_METADATA_FILENAME).write_bytes(b"not a parquet file")
+
+
+def _save_with_corrupt_trained_metadata(run_id: str) -> None:
+    """Save a run whose frozen metadata cannot be read back."""
+    forecaster = _TrainedMetadataCorrupt(
+        BaseForecasterConfig(selected_features=set()), payload="corrupt", series=[10]
+    )
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        model_dir = Path(tmp_dir) / "model"
+        model_dir.mkdir()
+        forecaster.save(model_dir)
+        archive_path = Path(tmp_dir) / "model.tar.gz"
+        _archive_model_dir(model_dir, archive_path)
+        with mlflow.start_run(run_id=run_id):
+            mlflow.log_artifact(str(archive_path))
+
+
 @pytest.mark.parametrize(
     ("save_unservable", "expected"),
     [
@@ -394,6 +418,7 @@ def _save_without_trained_metadata(run_id: str) -> None:
         (_save_with_an_undeclared_hyperparameter, "model_params"),
         (_save_without_meta_json, "no meta.json"),
         (_save_without_trained_metadata, TRAINED_METADATA_FILENAME),
+        (_save_with_corrupt_trained_metadata, TRAINED_METADATA_FILENAME),
     ],
 )
 def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable(
@@ -407,8 +432,8 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unse
     The check runs before the atomic swap, so ``dest`` is untouched and the outgoing champion keeps
     serving instead of the service breaking at its next tick. The cases are the ways a saved record
     outlives the code that wrote it: a retired feature name, a hyper-parameter this code no longer
-    declares, no config at all, no record at all, and no frozen metadata to locate its series
-    with.
+    declares, no config at all, no record at all, and frozen metadata that is missing or
+    unreadable.
     """
     dest = tmp_path / "production_model"
     fetch_model_artifacts(run_id=saved_run, dest=dest)
