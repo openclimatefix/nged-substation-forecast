@@ -30,6 +30,20 @@ this is a defensive argument (an outage does not cost much) whereas H1 is a stro
 (interventions will be rare). The positive claim is the one actually in dispute, and a sceptic is
 not moved by "it's fine when it breaks".
 
+Mobile telecoms is where that positive claim already holds, in an environment far noisier than any
+input this project depends on. A phone call crossing between cell towers rides a radio channel
+disrupted by multipath fading, interference and a lift shaft blocking the signal outright, and it
+degrades to a choppy few seconds rather than dropping — with nobody watching a dashboard per call.
+Forward error correction and packet-loss concealment absorb that corruption structurally, which is
+the same shape of claim H1 is making about the forecast: build the tolerance into the system so
+that nobody has to operate it awake. The analogy has a real limit, worth stating rather than
+glossing over: telecoms mostly reconstructs the *exact* signal, through redundancy and
+retransmission, where we have no retransmission to reach for — a gap in yesterday's telemetry is
+simply gone, not resendable — so our recovery is a wider uncertainty band, not a recovered fact.
+What the analogy proves is narrower than "the two systems work the same way"; it proves that a
+system living in continuous, heavy corruption can still run unattended, which is the part of H1 a
+sceptic doubts.
+
 **T1.1 — Operability.** Interventions per quarter, classified by cause, counted from the
 [intervention log](#the-intervention-log). The headline quote says "only"; the test operationalises
 that at ≥90% so a single fluke cannot falsify the claim on its own. "Zero out-of-hours" means no
