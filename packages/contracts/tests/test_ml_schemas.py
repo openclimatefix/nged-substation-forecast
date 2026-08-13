@@ -57,8 +57,12 @@ def test_all_features_accepts_null_power_and_absent_time_series_type():
     df.validate()
 
 
-def test_all_features_accepts_present_but_null_time_series_type():
-    """A series absent from the metadata parquet leaves the column present and null."""
+def test_all_features_rejects_null_time_series_type():
+    """The column is optional, but a null value in it is a bug rather than a degraded row.
+
+    ``_engineer_features`` semi-joins the power frame to the metadata, so a series with no
+    metadata row produces no rows at all rather than rows carrying a null type.
+    """
     df = (
         pt.DataFrame(
             {
@@ -75,7 +79,9 @@ def test_all_features_accepts_present_but_null_time_series_type():
         .set_model(AllFeatures)
         .cast()
     )
-    df.validate()
+
+    with pytest.raises(pt.exceptions.DataFrameValidationError, match="time_series_type"):
+        df.validate()
 
 
 def test_all_features_invalid_day_of_week():

@@ -160,6 +160,14 @@ def _engineer_features(
         )
     power_lf = pl.LazyFrame._from_pyldf(power_time_series._ldf).rename({"time": "valid_time"})
     metadata_lf = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf)
+    # The metadata is the registry of what we forecast, so a series with power observations but no
+    # metadata row is dropped here rather than carried to the model. Bulk mode drops it regardless
+    # — `_attach_nearest_nwp_cell` inner-joins on `h3_res_5` — but single-run mode is power-centric
+    # and would otherwise keep it with every weather feature null and predict on that, a garbage
+    # forecast that reads as healthy because the series is present. Dropping it instead makes
+    # `live_forecasts_are_healthy` report it, via `missing_time_series_ids`. Unconditional, so the
+    # output row set never depends on which features were requested.
+    power_lf = power_lf.join(metadata_lf.select("time_series_id"), on="time_series_id", how="semi")
     nwp_lf: pl.LazyFrame | None = nwp
 
     parsed_features = ParsedFeatures.from_strings(selected_features)

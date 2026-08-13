@@ -65,12 +65,12 @@ class AllFeatures(pt.Model):
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     time_series_id: int = _get_time_series_id_dtype()
-    time_series_type: str | None = pt.Field(
+    time_series_type: str = pt.Field(
         dtype=pl.Enum(LIST_OF_TIME_SERIES_TYPES),
         allow_missing=True,
         description=(
-            "The substation's category. Only emitted when a feature set requests it, and null "
-            "for a time series with no row in the metadata parquet."
+            "The substation's category. Only emitted when a feature set requests it, and never "
+            "null: the feature pipeline drops any time series with no row in the metadata."
         ),
     )
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
