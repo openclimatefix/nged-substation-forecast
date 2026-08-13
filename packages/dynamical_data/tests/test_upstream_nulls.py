@@ -7,6 +7,10 @@ import numpy as np
 import pytest
 import xarray as xr
 from contracts.weather_schemas import Nwp
+from dynamical_data.ecmwf_ens.download import (
+    _ECMWF_ENS_VARS_TO_DOWNLOAD,
+    ECMWF_ENS_INSTANTANEOUS_VARS,
+)
 from dynamical_data.ecmwf_ens.upstream_nulls import assess_upstream_grid_point_nulls
 
 _DEACCUMULATED: Final[frozenset[str]] = Nwp.deaccumulated_var_names
@@ -25,7 +29,9 @@ def test_clean_run_counts_every_grid_point_beyond_lead_0(
     make_ens_dataset: Callable[..., xr.Dataset],
 ) -> None:
     """A run with no upstream nulls is healthy, and the denominator spans every counted variable."""
-    rate = assess_upstream_grid_point_nulls(ds=make_ens_dataset(), variables=_DEACCUMULATED)
+    rate = assess_upstream_grid_point_nulls(
+        ds=make_ens_dataset(), variables=_DEACCUMULATED, exclude_lead_0=True
+    )
 
     assert rate.is_healthy
     assert rate.n_null_nwp_grid_points == 0
@@ -42,7 +48,7 @@ def test_lead_0_nulls_are_excluded(make_ens_dataset: Callable[..., xr.Dataset]) 
     all_null_at_lead_0[0, :, :, :] = np.nan
     ds = make_ens_dataset(var_values=dict.fromkeys(_DEACCUMULATED, all_null_at_lead_0))
 
-    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED)
+    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED, exclude_lead_0=True)
 
     assert rate.is_healthy
     assert rate.n_null_nwp_grid_points == 0
@@ -58,7 +64,7 @@ def test_scattered_nulls_are_counted_exactly(
     precipitation[2, 1, 1, 1] = np.nan  # lead 12 h, member 1
     ds = make_ens_dataset(var_values={"precipitation_surface": precipitation})
 
-    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED)
+    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED, exclude_lead_0=True)
 
     assert not rate.is_healthy
     assert rate.n_null_nwp_grid_points == 2
@@ -96,10 +102,59 @@ def test_a_slice_is_one_variable_member_and_step(
     precipitation[second] = np.nan
     ds = make_ens_dataset(var_values={"precipitation_surface": precipitation})
 
-    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED)
+    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED, exclude_lead_0=True)
 
     assert rate.n_null_nwp_grid_points == 2
     assert rate.n_affected_nwp_slices == expected_n_slices
+
+
+def test_per_variable_breakdown_counts_each_variable_separately(
+    make_ens_dataset: Callable[..., xr.Dataset],
+) -> None:
+    """Which variable is corrupt, and by how much — neither of which the pooled totals can say.
+
+    The two corrupt variables differ in both counts, and in the relationship between them: two
+    nulls in one slice against one null in another. A breakdown that split the totals evenly, or
+    attributed either variable's nulls to the other, disagrees with this.
+    """
+    precipitation = np.full(_DEFAULT_SHAPE, 0.0001, dtype=np.float32)
+    precipitation[1, 0, 0, 0] = np.nan
+    precipitation[1, 0, 1, 1] = np.nan  # the same (member, step) slice, so two nulls but one slice
+    radiation = np.full(_DEFAULT_SHAPE, 200.0, dtype=np.float32)
+    radiation[2, 1, 0, 0] = np.nan
+    ds = make_ens_dataset(
+        var_values={
+            "precipitation_surface": precipitation,
+            "downward_short_wave_radiation_flux_surface": radiation,
+        }
+    )
+
+    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED, exclude_lead_0=True)
+
+    n_per_variable = _N_STEPS_BEYOND_LEAD_0 * _N_MEMBERS * _N_GRID_POINTS
+    # Rows are sorted by variable name, so the clean variable comes first here.
+    assert rate.per_variable.to_dicts() == [
+        {
+            "variable": "downward_long_wave_radiation_flux_surface",
+            "n_null": 0,
+            "n_affected_slices": 0,
+            "n_total": n_per_variable,
+        },
+        {
+            "variable": "downward_short_wave_radiation_flux_surface",
+            "n_null": 1,
+            "n_affected_slices": 1,
+            "n_total": n_per_variable,
+        },
+        {
+            "variable": "precipitation_surface",
+            "n_null": 2,
+            "n_affected_slices": 1,
+            "n_total": n_per_variable,
+        },
+    ]
+    assert rate.n_null_nwp_grid_points == 3
+    assert rate.n_affected_nwp_slices == 2
 
 
 def test_affected_variables_are_sorted(make_ens_dataset: Callable[..., xr.Dataset]) -> None:
@@ -115,7 +170,7 @@ def test_affected_variables_are_sorted(make_ens_dataset: Callable[..., xr.Datase
         }
     )
 
-    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED)
+    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED, exclude_lead_0=True)
 
     assert rate.affected_nwp_variables == (
         "downward_short_wave_radiation_flux_surface",
@@ -134,7 +189,7 @@ def test_instantaneous_variables_are_not_counted(
     temperature[1, 0, 0, 0] = np.nan
     ds = make_ens_dataset(var_values={"temperature_2m": temperature})
 
-    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED)
+    rate = assess_upstream_grid_point_nulls(ds=ds, variables=_DEACCUMULATED, exclude_lead_0=True)
 
     assert rate.n_null_nwp_grid_points == 0
     assert rate.is_healthy
@@ -149,9 +204,66 @@ def test_a_run_with_no_step_beyond_lead_0_reports_zero_rather_than_dividing(
     warning path fail the run it is warning about.
     """
     rate = assess_upstream_grid_point_nulls(
-        ds=make_ens_dataset(lead_time_hours=(0,)), variables=_DEACCUMULATED
+        ds=make_ens_dataset(lead_time_hours=(0,)), variables=_DEACCUMULATED, exclude_lead_0=True
     )
 
     assert rate.n_total_nwp_grid_points == 0
     assert rate.null_nwp_grid_point_fraction == 0.0
     assert rate.is_healthy
+
+
+def test_lead_0_nulls_are_counted_when_not_excluded(
+    make_ens_dataset: Callable[..., xr.Dataset],
+) -> None:
+    """Lead-0 is an ordinary step for the instantaneous variables, so a null there counts.
+
+    Excluding it is right only for the de-accumulated variables, which are null there by design.
+    Applied to these it would be a blind spot over 1 of the run's 85 steps, and this run — whose
+    only null is at lead-0 — is the one it would report as clean.
+    """
+    temperature = np.full(_DEFAULT_SHAPE, 15.0, dtype=np.float32)
+    temperature[0, 0, 0, 0] = np.nan
+    ds = make_ens_dataset(var_values={"temperature_2m": temperature})
+
+    counted = assess_upstream_grid_point_nulls(
+        ds=ds, variables=ECMWF_ENS_INSTANTANEOUS_VARS, exclude_lead_0=False
+    )
+    excluded = assess_upstream_grid_point_nulls(
+        ds=ds, variables=ECMWF_ENS_INSTANTANEOUS_VARS, exclude_lead_0=True
+    )
+
+    assert counted.n_null_nwp_grid_points == 1
+    assert counted.affected_nwp_variables == ("temperature_2m",)
+    assert excluded.is_healthy
+
+
+def test_every_downloaded_variable_belongs_to_exactly_one_population() -> None:
+    """A variable missed by all three sets would go uncounted by both checks, silently.
+
+    ``ECMWF_ENS_INSTANTANEOUS_VARS`` is what the download list has left after subtracting the two
+    ``Nwp`` classvars, so this is the assertion that the subtraction means anything: it fails if a
+    contract name is spelled differently in the download list, which is exactly how the winds
+    differ.
+    """
+    assert (ECMWF_ENS_INSTANTANEOUS_VARS | _DEACCUMULATED | Nwp.categorical_var_names) == set(
+        _ECMWF_ENS_VARS_TO_DOWNLOAD
+    )
+
+
+def test_counting_no_variables_at_all_reports_zero_rather_than_raising(
+    make_ens_dataset: Callable[..., xr.Dataset],
+) -> None:
+    """An empty variable set must not take the warning path down with it.
+
+    No caller in this repo passes one, but the properties read named columns, and an inferred empty
+    frame has none — so the schema is declared rather than inferred
+    ([rule 7](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+    """
+    rate = assess_upstream_grid_point_nulls(
+        ds=make_ens_dataset(), variables=frozenset(), exclude_lead_0=True
+    )
+
+    assert rate.is_healthy
+    assert rate.n_total_nwp_grid_points == 0
+    assert rate.null_nwp_grid_point_fraction == 0.0
+    assert rate.affected_nwp_variables == ()

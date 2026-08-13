@@ -250,7 +250,8 @@ the raw 0.25° grid Dynamical.org sent us, before aggregation; the `h3_cell` key
 store afterwards. They answer different questions and are not comparable as rates.
 
 - **"Is the feed broken, and since when?"** — read `null_nwp_grid_point_fraction`, and
-  `affected_nwp_variables` for which variable to name in a mail to Dynamical.org. This is the
+  `affected_nwp_variables` (or the `per_nwp_variable` table, for each variable's own counts) for
+  which variable to name in a mail to Dynamical.org. This is the
   number to take to the provider, because it is free of our H3 resolution and aggregation policy,
   both of which move a cell count without anything upstream having changed. It is published on
   every materialisation as well as on the check, so plot it on the asset timeline: a single run's
@@ -280,6 +281,15 @@ rather than a handful, treat it as an incident to act on deliberately — the pi
 on it for you. Making a large count escalate is tracked in
 [issue #501](https://github.com/openclimatefix/nged-substation-forecast/issues/501).
 
+**Reading the instantaneous-variable check.** `nwp_instantaneous_variables_have_no_nulls` counts the
+raw grid again, over the nine variables that are never legitimately null, and fails on a single null
+grid point. It carries the same `nwp_grid_point` keys, and counts lead-0, which the de-accumulated
+check excludes. **A red result here is a mail to Dynamical.org, not a re-run**: the run has landed,
+the aggregation absorbed the nulls before they reached a stored cell, and there is nothing to fix on
+our side. Quote `affected_nwp_variables` and the `per_nwp_variable` counts. This has never yet fired
+on real data — an instantaneous variable's nulls have so far only arrived as whole-step dropouts,
+which fail ingest outright and show up as a missed run instead.
+
 **Reading the NWP completeness check.** `nwp_run_is_complete` also runs inside `ecmwf_ens`, also
 non-blocking WARN, and asks the other question: did the whole run arrive? Its description names
 the missing ensemble members and the missing lead times in hours, and its metadata carries the
@@ -287,10 +297,10 @@ observed-versus-expected member, step, cell and row counts. **The run has alread
 warns** — a short run is kept, because partial NWP forecasts better than falling back on
 yesterday's run. The action is to chase Dynamical.org, not to touch the table.
 
-**Both NWP checks share one description that means something different from all the others**, just
-as `power_data_is_fresh` does above. `Could not assess the ingested NWP run: …` says the assessment
-itself failed, not that the run is degraded — so it appears on *both* checks at once, and the shape
-metadata (`n_ensemble_members` and the rest) and the grid-point metadata
+**All three NWP checks share one description that means something different from all the others**,
+just as `power_data_is_fresh` does above. `Could not assess the ingested NWP run: …` says the
+assessment itself failed, not that the run is degraded — so it appears on all three checks at once,
+and the shape metadata (`n_ensemble_members` and the rest) and the grid-point metadata
 (`null_nwp_grid_point_fraction` and `n_null_nwp_grid_points`) are absent from that materialisation:
 there is no report to read them from. Treat the corruption rate as unknown for that run, not zero,
 and mind the gap when reading the trend. The run still lands. One Sentry event is sent, tagged

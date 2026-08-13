@@ -211,7 +211,7 @@ is configured — so laptops and CI stay silent by default.
 
     One production fault the hook cannot see is an asset check that caught its own exception
     instead of failing the run — which, by design, is every one of them: the two standalone
-    `@asset_check`s, and the two per-run checks computed inside the `ecmwf_ens` asset.
+    `@asset_check`s, and the three per-run checks computed inside the `ecmwf_ens` asset.
     `report_check_degradation` covers exactly that gap: each check's
     catch-all sends the same exception the hook would have sent, tagged `asset_check` with the
     check's name, and `report_asset_degradation` does the same tagged `degraded_asset` for an *asset*
