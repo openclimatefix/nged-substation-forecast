@@ -32,8 +32,9 @@ gridded NWP forecasts onto the H3 cells attached to each substation.
 of your training window). Use "Materialise all" or select a date range in the Dagster UI.
 
 Downloads the 00Z ECMWF ENS run for each partition date, converts it to a Polars DataFrame, and
-appends it to `nwp_data.delta` (partitioned by `[nwp_model_id, init_time]`) as physical-unit
-`Float32` rounded to a 13-bit significand at write time by `delta_store.nwp`. The `pool="ECMWF"` concurrency limit prevents OOM errors when
+writes it to `nwp_data.delta` (partitioned by `[nwp_model_id, init_time]`) as physical-unit
+`Float32` rounded to a 13-bit significand at write time by `delta_store.nwp`. Each run replaces its
+own partition, so re-materialising a date range you have already ingested is safe. The `pool="ECMWF"` concurrency limit prevents OOM errors when
 backfilling — Dagster schedules downloads one at a time if you materialise many partitions at
 once.
 
@@ -195,6 +196,11 @@ forecasts), and an **Experiment** dropdown appears when the chosen fold holds mo
 `experiment_name`. Then choose a **time series** (the dropdown groups the 32 series by type, so
 all the PV sites or all the primaries sit together), a **forecast date**, and one of that day's
 **forecast runs**.
+
+**Reload data** re-reads the tables, so a CV job that finishes while the app is open shows up
+without restarting marimo. Its new experiment appears in the **Experiment** dropdown; **Fold**,
+**forecast date** and **forecast run** go back to their defaults, and the chosen time series is
+kept.
 
 The chart layers all 51 ensemble members as thin grey lines, observed power (wherever available,
 including past the init time) as a thick blue line, and a vertical rule at the forecast init
