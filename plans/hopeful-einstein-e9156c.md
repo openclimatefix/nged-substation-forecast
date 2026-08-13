@@ -63,8 +63,9 @@ Two corrections to the issue body, both verified against `main` at 66de9c6c:
   sanctions this shape — "Depositing a file *after* a save is fine, and is how
   `_production_helpers.fetch_model_artifacts` puts `promotion.json` beside the model" — and
   `checks.py:816-852` already reads a model-directory file with a plain function. Consequence:
-  **`packages/xgboost_forecaster/` is not touched at all**, and models saved before this change
-  still load.
+  **no code in `packages/xgboost_forecaster/` changes** (one docstring line does), and models saved
+  before this change still `load` — so `cv_power_forecasts` replays of old fold runs are
+  unaffected.
 - **The `forecasts.height == 0` raise at `production_assets.py:285` stays.** Once metadata travels
   with the model, the only remaining input that can empty the forecast is NWP — and "NWP absent, or
   too old to cover the horizon" is
@@ -88,14 +89,22 @@ Two corrections to the issue body, both verified against `main` at 66de9c6c:
   written into `model_dir` **after** `self.save(model_dir)` — `save` clears the directory, so the
   order matters — and before `_archive_model_dir`. Required, not optional: a caller that trains a
   model has the roster in hand, and a model uploaded without it cannot be promoted.
-  `metadata.drop("area_wkt", strict=False)` is what gets written; see below.
-- New module function `load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]`,
-  the read half. Uses `set_model`, not `validate`, mirroring how `_load_engineering_inputs` reads
-  the roster today, so this change smuggles in no new strictness about roster shape. Raises a
-  `ValueError` naming the remedy (re-promote) when the file is absent — a model directory missing
-  it is a promotion bug, the same class as "the promoted model is empty or unloadable", which the
-  failure-modes table already lists as a deliberate hard failure.
-  It lives here rather than in `_production_helpers` because that module imports *from* this one
+  It writes through `write_trained_metadata`, which drops `area_wkt`; see below.
+- Two new module functions defining the file's layout in one place:
+  `write_trained_metadata(model_dir, metadata)`, which does the `area_wkt` drop and the write, and
+  `load_trained_metadata(model_dir) -> pt.DataFrame[TimeSeriesMetadata]`. `save_to_mlflow` calls
+  the first; `live_forecasts`, `fetch_model_artifacts` and the test fixtures that hand-build a
+  production model directory call one or the other, so no caller re-states the filename or the
+  drop.
+  `load_trained_metadata` uses `set_model`, not `validate`, mirroring how `_load_engineering_inputs`
+  reads the roster today — this is load-bearing, not stylistic: `TimeSeriesMetadata.validate` fails
+  with eight missing-column errors on the three-column frames `tests/test_live_forecasts.py`'s
+  fixtures write, so validating here would break every test in that file.
+  It raises a `ValueError` naming the remedy (re-promote) when the file is absent — a model
+  directory missing it is a promotion bug, the same class as "the promoted model is empty or
+  unloadable", which the failure-modes table already lists as a deliberate hard failure, and the
+  same class as `load_forecaster_from_dir`'s existing raise on a missing `meta.json`.
+  Both live here rather than in `_production_helpers` because that module imports *from* this one
   (`_production_helpers.py:28`), and this module owns the model-directory layout
   (`_archive_model_dir`).
 
@@ -109,12 +118,18 @@ bytes each) available for the rung-4 clear-sky floor when it is built.
 
 ### `packages/ml_core/src/ml_core/_production_helpers.py`
 
-- `fetch_model_artifacts` refuses a staged model whose `time_series_metadata.parquet` is absent or
-  does not cover `meta["trained_time_series_ids"]`, immediately after `_check_meta_is_servable`
-  (`:286`) and **before** the `rmtree`/`move` swap (`:296-298`). That is the existing
-  refuse-before-the-swap pattern, and it turns a would-be 06:00 production failure into a promotion
-  that is declined while the outgoing champion keeps serving. The docstring's `Raises:` section
-  gains the case.
+- `fetch_model_artifacts` refuses a staged model whose `time_series_metadata.parquet` is absent,
+  unreadable, or does not cover the model's trained population, immediately after
+  `_check_meta_is_servable` (`:286`) and **before** the `rmtree`/`move` swap (`:294-297`). That is
+  the existing refuse-before-the-swap pattern, and it turns a would-be 06:00 production failure
+  into a promotion that is declined while the outgoing champion keeps serving. It reads the staged
+  file through `load_trained_metadata`, so a corrupt file is refused on the same path as a missing
+  one. The population comes from `meta.get("trained_time_series_ids", [])` — **not** a subscript:
+  `BaseForecaster.save` mandates only `model_class` in `meta.json` (`base_forecaster.py:238-256`),
+  `trained_time_series_ids` is an `XGBoostForecaster` convention (`forecaster.py:221`), and every
+  other reader treats it as optional (`checks.py:829`, `production_assets.py:155`). A subscript
+  would turn a future subclass into a bare `KeyError` with none of the "which run, what to do"
+  wording the neighbouring refusals carry. The docstring's `Raises:` section gains the case.
 
 ### `src/nged_substation_forecast/defs/cv_assets.py`
 
@@ -124,14 +139,16 @@ bytes each) available for the rung-4 clear-sky floor when it is built.
   from the promoted model directory.
 - `_load_engineering_inputs` takes `metadata: pt.DataFrame[TimeSeriesMetadata]` as an argument and
   returns `tuple[pt.LazyFrame[PowerTimeSeries], pt.LazyFrame[Nwp]]`. The `cells` derivation at
-  `:379` now reads from the passed frame. Everything else in the function is unchanged, including
+  `:378` now reads from the passed frame. Everything else in the function is unchanged, including
   all three NWP pruning levers and their docstring.
 - `trained_cv_model` (`:448`) calls `_load_roster`, then `_require_metadata_coverage`, then
   `_load_engineering_inputs`, and passes the roster to `forecaster.save_to_mlflow(...)` at `:475`.
 - `cv_power_forecasts` (`:591`) calls `_load_roster` **once before** the `init_time` chunk loop and
   `_require_metadata_coverage` on it, instead of re-reading the roster on every chunk. The
-  `is_first` guard around `_require_metadata_coverage` disappears with it — its own comment says it
-  exists only because "metadata does not vary by init_time window".
+  `is_first` guard around `_require_metadata_coverage` disappears with it. Its comment
+  (`:600-601`) gives two reasons — "metadata does not vary by init_time window, and raising on a
+  later chunk would leave the partition holding a partial fold" — and calling it once *before* the
+  loop honours both, because it still raises before the first `write_power_forecasts`.
 - `forecast_metrics` (`:1103`) is untouched: it reads the roster directly, not through
   `_load_engineering_inputs`, and R&D should keep failing fast on it.
 
@@ -140,11 +157,29 @@ bytes each) available for the rung-4 clear-sky floor when it is built.
 - `live_forecasts` gets `metadata_df = load_trained_metadata(Path(settings.production_model_path))`
   filtered to `trained_ids`, and passes it to both `_load_engineering_inputs` and
   `feature_engineer.engineer`. No roster read remains in the production path.
+- **The read goes immediately before the `_load_engineering_inputs` call — after
+  `_available_nwp_init_times` and `select_nwp_init_time`, not before them.** `docs/live_service/aws.md:640-643`
+  makes the current ordering a runbook step: the offline smoke test and the first cloud run both
+  prove the model loaded by dying at `_available_nwp_init_times` with `TableNotFoundError`, "so
+  dying at the lookup means `load_forecaster_from_dir` already succeeded". Reading the metadata
+  earlier would change what a healthy smoke test looks like and invalidate that text. A comment
+  says so, so a later tidy-up does not move it.
 - The `power_time_series_and_metadata` entry in `deps` stays — the asset still reads that asset's
   power Delta.
 - The asset docstring gains a short paragraph: static per-series features come from the model
   directory, so the roster's state cannot fail or thin a live slot, and the H3 cells the NWP scan
   is pruned to are the cells the model trained against rather than whatever the roster says today.
+
+### `scripts/build_and_verify_image.sh`
+
+Promotion is gated by `fetch_model_artifacts`, but the **image bake bypasses promotion entirely**:
+`Dockerfile:61` does `COPY data/production_model/ data/production_model/`, and the script's only
+automated gate is the `grep -qi mlflow` hermeticity check (a non-zero container exit is *expected*
+in the offline smoke test). So an image baked from a directory promoted before this change would
+build, print `[PASS]`, deploy, and then fail every 6-hourly slot. Add the same four-line hard fail
+the script already has for a missing `data/production_model/promotion.json` (`:61-67`), for
+`data/production_model/time_series_metadata.parquet`, pointing at re-promotion. This is the gate
+that makes the hard raise in `load_trained_metadata` safe to ship.
 
 ## Design-philosophy check
 
@@ -192,41 +227,48 @@ Each new assertion, and why it fails on `main` today.
   three steps fail on `main`: the thin roster yields `{1}`, and the corrupt and missing files raise
   out of `pl.read_parquet` inside `_load_engineering_inputs`. Deleting the file is the strictly
   strongest assertion (it proves nothing even `stat()`s the path), but the thin step is the issue's
-  second named failure mode and the one that fails *silently*, and the corrupt step is the incident
-  #508 was filed for.
-- `_save_model_trained_on` (`:306`) deposits a `time_series_metadata.parquet` beside the saved
-  model, as `fetch_model_artifacts` does in production.
+  second named failure mode and the one that fails *silently*, and the corrupt step is the
+  incident #508 was filed for.
+- **Both** model-directory fixtures deposit a `time_series_metadata.parquet` via
+  `write_trained_metadata`, as `fetch_model_artifacts` does in production: `_save_promoted_model`
+  (`:129`), which the `env` fixture uses for every test in the file, and `_save_model_trained_on`
+  (`:324`), which the degradation test uses. Missing either one fails the whole file.
 - New `test_live_forecasts_refuses_a_model_directory_with_no_metadata`: delete the file from the
-  production model directory and assert the materialisation fails naming the remedy. This is the
-  deliberate hard failure — a promotion bug, not an input outage — and pins it so a later change
-  cannot quietly turn it into an empty forecast.
-
-**`tests/test_promoted_model.py`**
-
-- New `test_promotion_is_refused_when_the_model_carries_no_metadata`: upload an archive with no
-  `time_series_metadata.parquet`, promote, assert it raises and that the pre-existing directory in
-  `production_model_path` is untouched. Fails on `main`: there is no such refusal, and a bad
-  promotion would surface at the next 06:00 slot instead.
+  production model directory and assert the materialisation fails naming the remedy (via
+  `materialize(..., raise_on_error=False)`, the pattern already used at
+  `tests/test_trained_cv_model.py:316`). This is the deliberate hard failure — a promotion bug, not
+  an input outage — and pins it so a later change cannot quietly turn it into an empty forecast.
 
 **`tests/test_trained_cv_model.py`**
 
 - The two existing `test_load_engineering_inputs_*` tests (`:171`, `:192`) are updated for the new
   signature — they build metadata through `_load_roster` and pass it in. Signature updates, not new
   coverage.
-- New `test_trained_cv_model_uploads_the_metadata_it_trained_on`: after the existing end-to-end
-  training materialisation, download and unpack the fold run's archive and assert
-  `load_trained_metadata` returns rows covering `trained_time_series_ids` with the roster's
-  `h3_res_5`, and no `area_wkt` column. Fails on `main`: the archive holds no such file.
+- The existing end-to-end training materialisation gains assertions rather than getting a sibling
+  test: unpack the fold run's archive and assert `load_trained_metadata` returns rows covering
+  `trained_time_series_ids` with the roster's `h3_res_5`, and no `area_wkt` column. Fails on
+  `main`: the archive holds no such file. As a separate test it would re-run the whole slow
+  training materialisation for one assertion, since pytest tests share no state.
 
 **`packages/ml_core/tests/test_base_forecaster.py`**
 
-- New `test_save_to_mlflow_round_trips_the_trained_metadata`: save with a metadata frame, download
-  and unpack, assert `load_trained_metadata` returns the same rows with the same dtypes —
-  specifically that `TimeSeriesMetadata`'s four `pl.Enum` columns and its `Float32` lat/lon survive
-  the parquet round-trip. Fails on `main`: nothing is written.
+- A fifth case in the existing `test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable`
+  parametrised table (`:305-345`): `_save_without_trained_metadata`, which archives a `save()`d
+  directory without the deposit (the pre-change archive shape — i.e. what an old fold run actually
+  holds). The table already asserts the champion in `dest` survives, which is the property that
+  matters. This replaces a Dagster-level promotion test in `tests/test_promoted_model.py`: the
+  machinery for building a defective archive lives here, and an integration test would only
+  re-prove what this case proves.
+- `test_fetch_model_artifacts_unpacks_the_archive_into_dest` (`:264`) asserts the exact directory
+  listing at `:243-250`; `time_series_metadata.parquet` joins it.
 - New `test_load_trained_metadata_raises_on_a_directory_without_it`, asserting the message names
   re-promotion. Fails on `main`: the function does not exist.
-- The existing `save_to_mlflow` call sites (`:156`, `:289`, `:298`, `:307`) gain the argument.
+- New `test_save_to_mlflow_carries_the_trained_metadata_without_area_wkt`: save with a metadata
+  frame that has an `area_wkt` column, unpack, assert the file is there with the same rows and no
+  `area_wkt`. Deliberately **not** a dtype-preservation test — that `pl.Enum` and `Float32` survive
+  a parquet round-trip is Polars' behaviour, verified once by hand, not ours to pin.
+- The `save_to_mlflow` call sites gain the argument: `:156`, `:289`, `:298`, `:307` here, **and
+  `tests/test_promoted_model.py:81`**, which the first draft of this plan missed.
 
 ## Docs to update
 
@@ -244,9 +286,17 @@ Each new assertion, and why it fails on `main` today.
   dependency.
 - `docs/architecture/ml-orchestration.md:53-75` — the "one archive file" section should note that
   the trained metadata rides inside the same archive, so the one-artifact property is unchanged.
+- `docs/ml_experimentation/dagster-workflow.md:124` quotes the call as
+  `forecaster.save_to_mlflow(fold_run_id)`, which the new required argument falsifies.
+- `packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py:234` — `load`'s docstring
+  enumerates the files a model directory can hold that the model did not write
+  ("`fetch_model_artifacts` adds a `promotion.json`"); it now also holds the metadata parquet.
+  This is the only line in `packages/xgboost_forecaster/` that changes, and it is prose.
 - `packages/xgboost_forecaster/README.md` needs **no** change: the file is written by
   `save_to_mlflow`, not by `XGBoostForecaster.save`, so the subclass's saved-directory listing is
   still complete and correct.
+- `docs/live_service/aws.md:640-643` needs **no** change, because the plan keeps the metadata read
+  after the NWP-availability lookup precisely so that text stays true.
 - No roadmap item completes here, so no ship-time triage.
 
 ## Verification commands
@@ -265,14 +315,14 @@ No network-gated tests are involved; nothing here touches NWP conversion convent
 
 ## Risks and open questions
 
-1. **The currently promoted champion (`xgboost_cv_0002`) has no `time_series_metadata.parquet`, so
-   `live_forecasts` will refuse to run against it.** Under CLAUDE.md's "a change that invalidates
-   an existing trained model costs us a retrain, not a migration path" this is acceptable, but the
-   deploy has an ordering requirement worth stating in the PR body: re-train, re-promote, then
-   rebuild the image (`scripts/build_and_verify_image.sh` COPYs `data/production_model/`), so the
-   model and the image ship together. Note that models saved before this change still **load**
-   fine — `XGBoostForecaster.load` is untouched, so `cv_power_forecasts` replays of old fold runs
-   are unaffected. **Jack's call** if he would rather keep the current champion serving and defer.
+1. **The currently promoted champion (`xgboost_cv_0002`, promoted 2026-08-07) has no
+   `time_series_metadata.parquet`, so `live_forecasts` will refuse to run against it.** Under
+   CLAUDE.md's "a change that invalidates an existing trained model costs us a retrain, not a
+   migration path" this is acceptable, and it is caught by machine rather than by a note: the
+   `fetch_model_artifacts` refusal blocks a promotion that would break it, and the new
+   `build_and_verify_image.sh` gate blocks an image bake from a stale directory. The deploy
+   sequence is re-train, re-promote, rebuild the image — stated in the PR body. **Jack's call** if
+   he would rather keep the current champion serving and defer the whole issue.
 2. **`cv_power_forecasts` still forecasts against the roster, not the model's frozen copy.** Making
    it use `load_trained_metadata` would make CV and live agree exactly, which is the stronger
    position for leaderboard comparability. *Recommendation:* not in this issue — it changes what
@@ -289,6 +339,21 @@ No network-gated tests are involved; nothing here touches NWP conversion convent
    a thin roster still narrows what that check watches. Out of scope: it is a warning path, it
    already handles an absent roster (`object_exists` guard at `:293`), and its job is to report on
    ingested data rather than on the model's population. Flagging, not fixing.
+
+## Second review: what it changed, and what was rejected
+
+The correctness review confirmed the plan's account of `main` (including the `area_wkt`
+measurement, re-run independently) and found six real defects, all now fixed above: the
+`meta["trained_time_series_ids"]` subscript, three missed call sites
+(`tests/test_promoted_model.py:81`, the exact-directory-listing assertion at
+`packages/ml_core/tests/test_base_forecaster.py:243-250`, and the `_save_promoted_model` fixture
+the `env` fixture actually uses), two tests placed where they cost far more than they buy, the
+ungated image-bake path, and the read-ordering that `docs/live_service/aws.md:640-643` depends on.
+
+Nothing it raised was rejected. Two of its "not a defect" observations were acted on anyway,
+because both improve the plan: the round-trip test was reframed so it stops pinning Polars'
+behaviour as if it were ours, and the `is_first` comment is now quoted in full so a reviewer can
+see the constraint it states is respected.
 
 ## First review: findings rejected, and why
 
