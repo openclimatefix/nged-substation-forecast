@@ -1,8 +1,10 @@
 # Inherent Stability
 
 > **We never stop forecasting power. When an input goes missing or stale, the forecast degrades
-> gracefully instead of stopping: it becomes less certain, and it says so, through wider uncertainty
-> bands. Wherever possible, that stability should be an inherent property of the system's design,
+> gracefully instead of stopping: it becomes less certain, and it says so — through wider
+> uncertainty bands to whoever reads the forecast, a warning row naming the feed at fault, and a
+> Sentry event when a human can do something about it. Wherever possible, that stability should be
+> an inherent property of the system's design,
 > rather than something bolted on afterwards by post-processing and `if-then-else` branches in the
 > production service.**
 
@@ -139,7 +141,7 @@ code as it stands; "intended" describes where this principle takes it.
 | NWP stale but still covering the horizon | Forecast produced from an increasingly ancient run; `nwp_init_time` is on every row and `live_forecasts_are_healthy` warns with the missed-run count, but the forecast itself looks as confident as a fresh one | Bands widen with the regime; `STALE NWP` warning row 🚧 | No |
 | A slot produces no rows, or unusable ones, while the asset still succeeds | `live_forecasts_are_healthy` warns, naming the row count, the invalid rows and any trained series that went missing | Unchanged | No |
 | NWP absent, or too old to cover the horizon | **Hard failure** — the asset raises and NGED gets nothing (tracked to change in [#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) | Weather-blind forecast, wide bands, warning row 🚧 | No |
-| Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns and names the late series | Unchanged, plus regime-appropriate band widening 🚧 | No |
+| Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns, names the late series and sends a Sentry warning event | Unchanged, plus regime-appropriate band widening 🚧 | Yes, next business day |
 | A meter reporting detectably wrong values | Partly detected at ingest; see [Missing versus wrong](#missing-versus-wrong) | Treated as missing, which routes it into the always-output path 🚧 | No |
 | A whole ECMWF slice corrupt | Landed; `nwp_has_no_unexpected_nulls` warns, naming the slice | Unchanged | No |
 | A whole ECMWF weather variable absent | `Nwp.validate` rejects it; `ecmwf_ens` turns each rejection into a retry for up to 4h, and once those are exhausted it manifests downstream as a missed run | Unchanged | No |
@@ -184,8 +186,11 @@ appear nowhere else.
    is between 12 and 30 hours old depending on the slot, so an absolute age threshold is either a
    daily false alarm or a magic number silently coupled to the ingest schedule — and either way it
    cannot say how many runs are missing.
-6. **Asset checks warn; they do not block.** `AssetCheckSeverity.WARN` with `blocking=False` is the
-   house pattern, and there is deliberately no `ERROR`-severity check anywhere in the repo.
+6. **Asset checks warn; they do not block — but warning is not the same as staying quiet.**
+   `AssetCheckSeverity.WARN` with `blocking=False` is the house pattern, and there is deliberately
+   no `ERROR`-severity check anywhere in the repo. Non-blocking never means non-notifying: a check
+   that finds degradation must still send a Sentry event, without failing the run it is warning
+   about.
 7. **Never let the warning path be able to fail the thing it is warning about.** A bug in a warning
    function that raises would convert fail-open into fail-closed at exactly the wrong moment, which
    is why `report_power_freshness` never raises and why every asset check — the standalone
@@ -298,8 +303,10 @@ A stale forecast **looks identical to a fresh one**. Staleness columns and warni
 channels: they require the consumer to go and look. Uncertainty bands are not. A forecast whose
 P5–P95 spread has doubled has already told the consumer to be more cautious, through the only number
 they were going to read anyway. The system reports its own degradation through the same mechanism it
-uses to do its job, which means **no separate monitoring system has to work for the safety property
-to hold**.
+uses to do its job, which means **the consumer-facing safety property does not depend on a separate
+monitoring system working**. That is an argument for the band being first and unconditional, not an
+argument against the other two channels: they answer questions the band cannot, and
+[rule 4](#the-rules) requires all three.
 
 Two caveats. `XGBoostConfig.objective` currently defaults to `reg:squarederror`, so today's model is
 a point forecast; quantile output
@@ -339,10 +346,14 @@ is load-bearing rather than belt-and-braces — it is the one piece of active mo
 cannot do without.
 
 That alarm fires on *absence*, though, and the developer channel is only half wired for the other
-case: a run that succeeds on degraded inputs. `power_data_is_fresh` raises a Sentry event for stale
-power data, but `live_forecasts_are_healthy` and the per-run NWP quality checks report only to
-Dagster, so a degraded slot still sends a healthy check-in.
-[Issue #501](https://github.com/openclimatefix/nged-substation-forecast/issues/501) tracks that.
+case: a run that succeeds on degraded inputs. `power_data_is_fresh` sends a Sentry event when power
+data goes stale, but `live_forecasts_are_healthy` and the three per-run `ecmwf_ens` checks send one
+only when the check itself cannot evaluate — never when it evaluates fine and finds the degradation
+it exists to find. Separately, the check-in is not conditional on health: it is sent from the asset
+body after a successful write, before any check runs, so a degraded slot reports the service
+healthy. [Issue #501](https://github.com/openclimatefix/nged-substation-forecast/issues/501) tracks
+the first of those; the second is deliberate, because the alarm is meant to fire purely on the
+absence of a heartbeat.
 
 For the provider channel, a warning is only actionable if it names *whose* NWP and *which* run,
 which is why `power_forecast_warnings` carries a `warning_source` field
