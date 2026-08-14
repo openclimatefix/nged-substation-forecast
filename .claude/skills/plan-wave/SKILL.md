@@ -2,23 +2,35 @@
 name: plan-wave
 description: >-
   Work out the next wave of GitHub issues under an epic in
-  openclimatefix/nged-substation-forecast that can safely be planned and implemented in parallel,
-  then dispatch them as background-task chips the user launches as separate Claude Code sessions.
-  Reads the epic's open sub-issues, verifies each one's file surface against the code, spots issues
-  that are duplicates or near-duplicates and should be folded into one session instead of run
-  apart, groups the rest between one and five wave slots that share no file, and records the wave
+  openclimatefix/nged-substation-forecast that can safely be worked in parallel, then split them
+  between two tracks: mechanical issues this skill implements itself end to end, and issues needing
+  human judgement, which go out as background-task chips the user launches as separate Claude Code
+  sessions. Reads the epic's open sub-issues, verifies each one's file surface against the code,
+  spots issues that are duplicates or near-duplicates and should be folded together, sorts the rest
+  by how much judgement each needs, groups them into slots that share no file, and records the wave
   on the epic so the next run knows its number. Load whenever the user asks what to work on next
   under an epic, says "plan the next wave", "/plan-wave 138", or asks which issues can run in
   parallel. Plans exactly one wave and stops — it does not schedule the whole epic, and it writes
-  no code and no per-issue plan.
+  no per-issue plan for anything it hands to a chip.
 ---
 
 # Plan the next wave of parallel work
 
-The output is a **wave**: between one and five slots, each a single open issue or a group of
-issues folded into one session, that can be worked at the same time by separate Claude Code
-sessions without colliding, plus one chip per slot to launch, plus a comment on the epic recording
-what was dispatched.
+The output is a **wave**: a set of slots, each a single open issue or a group of issues folded
+together, that can be worked at the same time without colliding, plus a comment on the epic
+recording what was dispatched.
+
+Each slot goes to one of two tracks:
+
+- **The agentic track** — mechanical issues, which this skill implements itself, orchestrating
+  sub-agents through plan, review, implement, review and merge without leaving the session.
+- **The chip track** — issues needing human judgement, which go out as `spawn_task` chips the user
+  launches as separate Claude Code sessions, one per slot.
+
+Step 6 decides which track each slot takes, and getting that split right is what makes the wave
+worth planning: putting a judgement call on the agentic track wastes a round of review discovering
+the agent had no authority to make it, and putting a docstring correction on the chip track spends
+a human session on something no human needs to read.
 
 Plan **one wave, then stop.** Do not sketch the waves after it. The epic changes while a wave is
 in flight — under v0.2, planning issues #480 and #496 filed seven new sub-issues between them, and
@@ -33,7 +45,7 @@ Take the epic number from the invocation (`/plan-wave 138`). If the epic is name
 The wave number is what tells this wave's sessions apart from the last one's in the desktop app's
 session list, so it has to be right.
 
-The ledger is a comment on the epic issue, written by step 8 of this skill at the end of every
+The ledger is a comment on the epic issue, written by step 10 of this skill at the end of every
 run. Read the epic's comments and take the highest wave number you find, plus one:
 
 ```bash
@@ -42,7 +54,7 @@ gh issue view <EPIC> --comments
 
 If there are no ledger comments and every sub-issue is open, this is wave 1. If there are no
 ledger comments but sub-issues are already closed, waves have run before this skill existed —
-**ask the human which number to start from**, then seed the ledger in step 8. That is the one
+**ask the human which number to start from**, then seed the ledger in step 10. That is the one
 question worth blocking on, and it is asked once per epic.
 
 ## 2. Check the previous wave has landed
@@ -91,13 +103,15 @@ implemented **together**, by a single agent, rather than dispatched as separate 
   so that planning them separately means re-deriving the same context twice, or risks one session's
   plan silently contradicting the other's while both are in flight.
 
-Fold such issues into a single wave slot: one chip, one session, covering every issue number in the
-group. Say in the wave table why they are grouped rather than run apart. Do not group two issues
-merely because they touch the same file — that is the collision case step 6 already handles by
-serialising or fencing territory. Grouping is for when the issues are not actually separate pieces
-of work, whatever the tracker says.
+Fold such issues into a single wave slot covering every issue number in the group — one chip, or one
+agentic slot, depending on where step 6 puts it. Say in the wave table why they are grouped rather
+than run apart. Do not group two issues merely because they touch the same file — that is the
+collision case step 7 already handles by serialising or fencing territory. Grouping is for when the
+issues are not actually separate pieces of work, whatever the tracker says.
 
-A group counts toward the five-slot ceiling as one slot, not one per issue.
+A group counts as one slot against its track's ceiling, not one per issue. A group whose members
+would land on different tracks belongs on the chip track: if any part of the work needs a human
+judgement, the whole slot does.
 
 ## 5. Map the file surface — by reading the code, not the issue
 
@@ -127,9 +141,45 @@ Watch for surfaces that are easy to miss:
 
 - **Shared test files and fixtures**, which collide as readily as the module under test.
 
-## 6. Build the wave
+## 6. Split the wave between the two tracks
 
-Pick the largest set of slots, up to five, in which **no two slots edit the same file**, subject
+Sort each slot into the agentic track or the chip track. The question is not how *large* the change
+is but how much of it is already decided: an agent can execute a settled decision across fifty
+files, and cannot make an unsettled one in three lines.
+
+A slot goes on the **agentic track** only if every one of these holds:
+
+- **There is one obvious way to do it.** The issue says what to change, not what to decide.
+- **It touches no Patito contract**, and nothing about what gets stored.
+- **It touches no production degradation path** — nothing in `defs/` that decides whether the
+  service degrades or raises.
+- **It needs no retrain, no leaderboard re-run, and invalidates no existing comparison.**
+- **The verification set plus a mutation proof is the whole of the risk.** If the change is right,
+  a green suite and a test watched going red on the bug it exists for say so.
+
+Typical agentic-track work: documentation that disagrees with the code, a docstring contradicting
+its own function, dead code and dead configuration, renames, dependency declarations, a test that
+cannot detect the regression it is named for, a coverage gap on an existing behaviour.
+
+Everything else goes on the **chip track**, and these push a slot there on their own:
+
+- More than one defensible design, or a design question the issue leaves open.
+- A change to a contract, to what is stored, or to the serving path.
+- The issue's own body doubting whether the work is worth doing — deciding to close an issue is a
+  human call.
+- A trade-off between the repo's own rules, where the change buys one principle by spending
+  another.
+
+**When the call is close, use a chip.** The costs are asymmetric: a chip spent on mechanical work
+wastes a session, while a judgement call made agentically lands a decision nobody chose, in `main`,
+with a green suite over it.
+
+Record the track beside each slot in the step 8 table, with the reason in a few words.
+
+## 7. Build the wave
+
+Pick the largest set of slots in which **no two slots edit the same file** — a rule that spans both
+tracks, because an agentic slot and a chip slot collide exactly as readily as two chips. Subject
 to:
 
 - Every dependency from step 3 is respected — both the recorded `blocked by` links and the prose
@@ -144,18 +194,26 @@ to:
 
 Two issues touching the same file in provably separate regions — one editing `@asset(...)`
 decorators while another rewrites an asset body — may share a wave as two separate slots, but only
-if **both** chip prompts name the other's territory and say to stop and ask the human rather than
-edit it. Prefer serialising over relying on that.
+if **both** prompts name the other's territory and say to stop and ask the human rather than edit
+it. Prefer serialising over relying on that.
 
-Prefer fewer, larger-value sessions to five thin ones. Five is a ceiling, not a target: the wave
-costs five plan reviews, and a group from step 4 already buys back one of those five without losing
-coverage.
+**Each track has its own ceiling, for different reasons.**
 
-## 7. Present the wave, then drop the chips
+At most **five chips**, and prefer fewer, larger-value sessions to five thin ones. Five is a
+ceiling rather than a target: each chip costs a human a plan review, and a group from step 4 buys
+back a slot without losing coverage.
 
-Present the wave as a table — issue or group, one-line change, file surface, and what it waits on —
-plus the reason anything obvious was held back. Then drop one chip per slot with `spawn_task` in the
-same reply. A chip is inert until it is clicked, so there is no need to ask first.
+At most **five concurrent sub-agents** on the agentic track, which is a memory limit rather than an
+attention one — running more than that has killed the machine outright. Queue the rest. Tell every
+sub-agent not to retrain a model or materialise a large asset without asking first, because one
+agent doing either while four others run is what exhausts the memory.
+
+## 8. Present the wave, then drop the chips
+
+Present the wave as a table — issue or group, one-line change, **track**, file surface, and what it
+waits on — plus the reason anything obvious was held back. Then drop one chip per **chip-track**
+slot with `spawn_task` in the same reply. A chip is inert until it is clicked, so there is no need
+to ask first. Agentic-track slots get no chip; step 9 runs them.
 
 **Chip title**: `W<n>: <imperative phrase naming what the slot changes> (#<N>)` — for example
 `W4: Tag assets R&D or production (#423)`, or `W4: Merge the duplicate NWP-outage checks (#423,
@@ -194,7 +252,58 @@ Each chip prompt has to stand alone — the session cannot see this conversation
 Set `cwd` to the repository root, and write the `tldr` in plain English with no file paths — it is
 what the user reads in the tooltip.
 
-## 8. Record the wave on the epic
+## 9. Run the agentic track
+
+Stay in this session and orchestrate sub-agents. One issue, one PR. Per slot:
+
+1. **Implement.** One sub-agent, given the issue, the file surface from step 5, the other slots'
+   territory, and the repo's standing rules — the verification set, one line per paragraph in every
+   GitHub body, and the closing-link rule below. It opens the PR with labels and the `JackKelly`
+   assignee, and does not merge.
+
+2. **Review.** A *fresh* sub-agent, given the PR number and none of the implementer's reasoning, so
+   it cannot inherit a wrong premise. Point it at the specific claim most damaging if wrong, and
+   require it to re-run every mutation the PR reports rather than trusting the result. A test the
+   reviewer did not watch go red is a test nobody has shown to work.
+
+3. **Triage yourself.** Reviewer findings are often wrong, and acting on one uncritically is how a
+   correct number gets "corrected" into a wrong one. Verify each finding against the code before
+   acting; reject with a reason in a sentence. Send genuine ones back to the implementer, which
+   still holds the context, rather than starting a new agent.
+
+4. **Merge**, after the guard below.
+
+**End of the wave**, once every agentic slot has merged: two adversarial reviewers over the whole
+wave's combined diff, **in parallel, in separate worktrees**. Parallel is right here because no
+fixes land between them, so both read the same tree and neither anchors the other. They need
+separate worktrees because both mutate code to prove findings, and one reverting the other's
+mutation manufactures fabricated results. Then one sub-agent implements the triaged fixes in a
+single follow-up PR, reviewed like any other before it merges.
+
+This is the opposite of `implement-issue`'s two reviews, which are deliberately **sequential**
+because a triage-and-push step sits between them: its second reviewer must read the fixed tree, or
+the fixes ship unread by anyone.
+
+**The closing-link guard, before every merge.** GitHub registers a closing link whether the keyword
+falls before or after the reference, ignores negations, and the link is sticky once registered —
+editing the text afterwards does not remove it. `closingIssuesReferences` stays empty until the
+merge lands, so it is no evidence at all beforehand. Grep the body and the commits yourself:
+
+```bash
+KW='\b(clos|fix|resolv)[a-z]*\b.{0,60}#[0-9]+|#[0-9]+.{0,60}\b(clos|fix|resolv)[a-z]*\b'
+gh pr view <N> --json body --jq .body | grep -inE "$KW"
+gh pr view <N> --json commits --jq '.commits[]|.messageHeadline+" "+.messageBody' | grep -inE "$KW"
+```
+
+The word boundaries matter: without them `openclimatefix` matches on its own trailing "fix", and a
+guard that fires on every PR stops being read. After merging, check each referenced issue's state.
+
+**Tell every implementing sub-agent to merge `main` into its branch as its last act before
+reporting**, then re-run the full verification set on the merged tree. Slots run concurrently
+against a moving base, and a branch that was current when its agent started routinely is not by the
+time it finishes.
+
+## 10. Record the wave on the epic
 
 Post one comment on the epic. It is the ledger step 1 reads next time, and the record of which
 issues belonged to which wave:
@@ -208,13 +317,23 @@ which were grouped into one slot and why — what each slot waits on, and which 
 held back and why. Open it with the Claude Code attribution line every GitHub body written by
 Claude carries, and do not hard-wrap it — see the `github-issue-pr-workflow` skill for both rules.
 
-Then stop. Do not plan the wave after this one, and do not write per-issue plans — each session
-does its own under `plan-issue`, in its own worktree, with whatever adversarial reviews that
-issue's size warrants.
+The comment also records which track each slot took, so the next run can see what the split looked
+like and whether it held.
 
-**Why the collision rule is the whole design:** these sessions branch from `main` and merge back
-independently, with no coordination between them and no shared context. Everything else — the
-worktree isolation, the one-plan-per-branch rule, the fresh-reviewer requirement — already holds
-per session. The only failure this scheduling can prevent is two sessions rewriting the same lines
-from different premises, so the file surface is what the wave is built on, and a wave of three
-that cannot collide beats a wave of five that might.
+Then stop. Do not plan the wave after this one, and do not write per-issue plans for chip slots —
+each of those sessions writes its own under `plan-issue`, in its own worktree, with whatever
+adversarial reviews that issue's size warrants.
+
+**Why the collision rule is the whole design:** every slot branches from `main` and merges back
+independently, with no coordination and no shared context — chip sessions cannot see each other,
+and sub-agents on the agentic track cannot see each other either. Everything else — the worktree
+isolation, the one-plan-per-branch rule, the fresh-reviewer requirement — already holds per slot.
+The only failure this scheduling can prevent is two slots rewriting the same lines from different
+premises, so the file surface is what the wave is built on, and a wave of three that cannot collide
+beats a wave of five that might.
+
+**Why the track split earns its step:** the two tracks fail in opposite directions, so the cost of
+a misplacement depends entirely on which way it goes. A mechanical issue on the chip track is
+merely wasteful — a human reads a plan for a docstring fix. A judgement call on the agentic track
+is worse than wasteful: the agent will make the call, defend it fluently, pass every check, and
+land a decision nobody chose. That asymmetry is why the close calls go to chips.
