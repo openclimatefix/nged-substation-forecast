@@ -133,12 +133,12 @@ four-hour retry budget that covers the 3h25m this republication took.
 
 Three caveats, without which the window would be worth more than it is:
 
-- **The deployment had no telemetry at all, so nothing on AWS *could* have alerted.** The box
-  started serving with the 18:00 UTC slot on 15 July and no code was pushed to it afterwards, while
-  the earliest Sentry commit of any kind — the failure hook, the check-in and the freshness warning
-  all arrived in the same week — lands on `main` on 21 July. Whatever was deployed therefore
-  predates Sentry entirely: the missed-check-in monitor never existed on that box, and the alarm
-  that did surface the missed run came from newer code running on a laptop.
+- **The deployment had no telemetry at all, so nothing on AWS *could* have alerted.** The earliest
+  Sentry commit of any kind — the failure hook, the check-in and the freshness warning all arrived
+  in the same week — lands on `main` on 21 July, six days after the box was deployed and never
+  updated. Whatever was running there therefore predates Sentry entirely: the missed-check-in
+  monitor never existed on that box, and the alarm that did surface the missed run came from newer
+  code running on a laptop.
   `live_forecasts_are_healthy`, the check that reads each slot's rows back and counts missed NWP
   runs, landed later still. The four degraded slots were reconstructable only because
   `nwp_init_time` travels on every forecast row: the degradation was recoverable from the data, but
@@ -167,16 +167,15 @@ Three things make the next stretch better evidence than the last. `live_forecast
 reads each succeeding slot's rows back and reports missed NWP runs, so a slot forecasting from
 stale inputs is recorded as degraded rather than passing unremarked. A wholly-missing NWP variable
 is now retried for four hours instead of failing, which is what would have made the 9 August
-intervention unnecessary — that run was republished after 3h25m, comfortably inside the budget. And
-the deployment carries Sentry, which v0.1's never did, so an `ecmwf_ens` run that *does* exhaust
-its retries now reports itself from AWS rather than waiting for somebody to run the code on a
-laptop.
+intervention unnecessary. And the deployment carries Sentry, which v0.1's never did, so an
+`ecmwf_ens` run that *does* exhaust its retries reports itself from AWS rather than waiting for
+somebody to run the code on a laptop.
 
-What still would not reach us is the degraded *slot*. `live_forecasts_are_healthy` returns its
-warning to Dagster's Checks view and sends nothing to Sentry, and the slot's check-in reports the
+What still would not reach us is the degraded *slot*, where nothing failed. Dagster runs no check
+for an asset that raised, so this is the succeeding-run case: `live_forecasts_are_healthy` returns
+its warning to the Checks view and sends nothing to Sentry, and the slot's check-in reports the
 service healthy regardless, so a degraded run looks like a good one from outside — the gap at
-[#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501). A slot whose run
-raised is checked by nothing at all.
+[#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501).
 
 ## See also
 

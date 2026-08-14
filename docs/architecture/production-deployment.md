@@ -172,8 +172,9 @@ of *runs*, never an age in hours: we ingest one ECMWF run a day and forecast fou
 healthy NWP is anywhere between 12 and 30 hours old and any absolute age threshold tight enough to
 catch an outage would fire on two slots in four every day.
 
-The care goes into the other half of that subtraction: the freshest run that *ought* to exist by
-now. It is derived from a deadline — how long after a run's `init_time` a healthy ingest should
+The count is a subtraction — how many daily runs separate the freshest run on disk from the
+freshest that ought to exist by now — and all the care goes into that second term. It is derived
+from a deadline — how long after a run's `init_time` a healthy ingest should
 have landed it — rather than from the publication time, because what matters is when the run
 reaches *our* disk. The deadline therefore has to clear `ecmwf_ens_schedule`'s 08:30 UTC start plus
 that asset's retry ladder — eight retries at 30 minutes, plus a download on each attempt, for the
@@ -215,9 +216,9 @@ The exception is the dividing line, and it is exact rather than a convention: an
 carries one, a warning event never does. **But an error event does not mean the run died.** Only
 `sentry_capture_failure` reports a failed run; `report_asset_degradation` and
 `report_check_degradation` fire precisely because their caller caught the exception and carried on,
-as the mechanisms below describe. Nor are those two cases exclusive: both degradation senders are
-called part-way through an asset that still has a Delta write ahead of it, so a later failure puts
-a degradation event and a run-failure event on the same run. The `fault_category:run_failed` tag is
+as the mechanisms below describe. Nor are those two cases exclusive: where a degradation sender is
+called from inside an asset that still has a Delta write ahead of it, a later failure puts a
+degradation event and a run-failure event on the same run. The `fault_category:run_failed` tag is
 what separates them, which is why the routing below — and
 [Operating the live service](../live_service/operations.md) — triages on that tag rather than on
 the level. **Read the tag, never the level**, whenever the question is whether to tell a human now.
