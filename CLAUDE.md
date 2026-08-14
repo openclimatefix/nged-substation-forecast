@@ -234,6 +234,10 @@ that come up constantly when editing `defs/`:
   training run poisons every comparison built on it.
 - **When a capability could live in the training loop or in the production service, put it in the
   training loop.** Keep the serving path close to "load a model, call `predict`".
+- **Make the telemetry name the fault.** An exception a warning path swallows still has to reach
+  Sentry, tagged with whatever an alert rule routes on, and its message has to name the series, the
+  run or the asset at fault rather than only the type of error. The operator reads the alert, not
+  the logs.
 
 Full rationale, the degradation ladder and the numbered rules:
 [`docs/design-philosophy/inherent-stability.md`](docs/design-philosophy/inherent-stability.md). The
