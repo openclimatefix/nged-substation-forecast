@@ -170,8 +170,7 @@ The same check carries the **missed daily NWP run count**, because the second wa
 quietly wrong is to be built from an increasingly ancient weather run. It is deliberately a count
 of *runs*, never an age in hours: we ingest one ECMWF run a day and forecast four times a day, so
 healthy NWP is anywhere between 12 and 30 hours old and any absolute age threshold tight enough to
-catch an outage would fire on two slots in four every day. Why a count rather than an age is
-[rule 5](../design-philosophy/inherent-stability.md#the-rules).
+catch an outage would fire on two slots in four every day.
 
 The care goes into the other half of that subtraction: the freshest run that *ought* to exist by
 now. It is derived from a deadline — how long after a run's `init_time` a healthy ingest should
@@ -213,20 +212,21 @@ so the difference has to be legible in the event itself.
 | **Something degraded** | `warning` | a message and its context | nothing threw; an input is late, stale or thin, and the forecast carried on | `report_power_freshness` |
 
 The exception is the dividing line, and it is exact rather than a convention: an error event always
-carries one, a warning event never does. **An error event does not mean the run died.** Only
-`sentry_capture_failure` reports a failed run; the other two exist precisely because their callers
-caught the exception and carried on. Nor are the two exclusive: both degradation senders are called
-part-way through an asset that still has a Delta write ahead of it, so a later failure puts a
-degradation event and a run-failure event on the same run. `fault_category:run_failed` is what
-tells them apart, which is why the routing below — and
+carries one, a warning event never does. **But an error event does not mean the run died.** Only
+`sentry_capture_failure` reports a failed run; `report_asset_degradation` and
+`report_check_degradation` fire precisely because their caller caught the exception and carried on,
+as the mechanisms below describe. Nor are those two cases exclusive: both degradation senders are
+called part-way through an asset that still has a Delta write ahead of it, so a later failure puts
+a degradation event and a run-failure event on the same run. The `fault_category:run_failed` tag is
+what separates them, which is why the routing below — and
 [Operating the live service](../live_service/operations.md) — triages on that tag rather than on
-the level.
+the level. **Read the tag, never the level**, whenever the question is whether to tell a human now.
 
 **Both kinds must be delivered.** A late NWP run is not our fault and does not stop the forecast,
 and we still have to hear about it, because only a human can ask Dynamical.org what happened;
 silence is reserved for a healthy service, not for a degraded one. That is
-[rule 6](../design-philosophy/inherent-stability.md#the-rules), and the two sides of it are
-unevenly built. Three senders cover the broke side; the degraded side has one,
+[rule 4](../design-philosophy/inherent-stability.md#the-rules), and the two sides of it are
+unevenly built: every sender but one covers the broke side, and the degraded side has only
 `report_power_freshness`, which is why most of the degradation our checks detect is invisible from
 outside Dagster
 ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)).

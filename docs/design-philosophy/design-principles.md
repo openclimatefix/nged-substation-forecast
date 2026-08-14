@@ -91,7 +91,8 @@ another; all three are required, and two of the three are still to be built. Wha
 who reads it, is set out in
 [Three audiences, three channels](inherent-stability.md#three-audiences-three-channels). A Sentry
 event says whether we broke or an input degraded, and both kinds have to be delivered — see
-[Two kinds of Sentry event](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
+[Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence),
+which defines the two kinds.
 
 *Without it:* every wobble in an upstream feed becomes an outage — the service raises at 06:00
 because one meter went quiet, NGED open their dashboard to a gap instead of a forecast, and a

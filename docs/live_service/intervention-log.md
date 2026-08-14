@@ -133,11 +133,12 @@ four-hour retry budget that covers the 3h25m this republication took.
 
 Three caveats, without which the window would be worth more than it is:
 
-- **The deployment had no telemetry at all, so nothing on AWS *could* have alerted.** v0.1.0 was
-  tagged on 15 July and the box was deployed from it that day; Sentry — the failure hook, the
-  check-in and the freshness warning alike — reached `main` on 21 July, and no code was pushed to
-  the box afterwards. The missed-check-in monitor therefore never existed there, and the alarm that
-  did surface the missed run came from newer code running on a laptop.
+- **The deployment had no telemetry at all, so nothing on AWS *could* have alerted.** The box
+  started serving with the 18:00 UTC slot on 15 July and no code was pushed to it afterwards, while
+  the earliest Sentry commit of any kind — the failure hook, the check-in and the freshness warning
+  all arrived in the same week — lands on `main` on 21 July. Whatever was deployed therefore
+  predates Sentry entirely: the missed-check-in monitor never existed on that box, and the alarm
+  that did surface the missed run came from newer code running on a laptop.
   `live_forecasts_are_healthy`, the check that reads each slot's rows back and counts missed NWP
   runs, landed later still. The four degraded slots were reconstructable only because
   `nwp_init_time` travels on every forecast row: the degradation was recoverable from the data, but
@@ -173,10 +174,8 @@ laptop.
 
 What still would not reach us is the degraded *slot*. `live_forecasts_are_healthy` returns its
 warning to Dagster's Checks view and sends nothing to Sentry, and the slot's check-in reports the
-service healthy regardless, so a degraded run looks like a good one from outside. Nothing about
-`WARN` severity forces that — `power_data_is_fresh` warns *and* sends a Sentry event through
-`report_power_freshness` — it is simply not wired up on this path
-([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)). A slot whose run
+service healthy regardless, so a degraded run looks like a good one from outside — the gap at
+[#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501). A slot whose run
 raised is checked by nothing at all.
 
 ## See also
