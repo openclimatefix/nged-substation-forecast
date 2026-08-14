@@ -16,16 +16,20 @@ single-run mode keeps them for its caller to filter before predicting (as ``live
 does), so the replay side applies that same filter here. If a future change diverges the two
 modes, this fails.
 
-Scope note: this test exercises the **weather, time, power-lag, and weather-rolling** features.
-Weather/time features depend on the bulk-vs-single-run NWP join; power lags are included because
-both modes now source them from the same dense observed-power series (Phase 1.5 / Option B), so
-they are identical too. A weather rolling mean is included to lock the cross-mode invariant for
-rolling aggregations: single-run mode pads each ``(ts, nwp_init_time, member)`` group with
+Scope note: this test exercises the **weather, time, power-lag, weather-lag, and weather-rolling**
+features. Weather/time features depend on the bulk-vs-single-run NWP join; power lags are included
+because both modes now source them from the same dense observed-power series (Phase 1.5 / Option
+B), so they are identical too. A weather rolling mean is included to lock the cross-mode invariant
+for rolling aggregations: single-run mode pads each ``(ts, nwp_init_time, member)`` group with
 out-of-window null-weather rows, which a *null-skipping* aggregation (mean/min/max/std/median/sum)
 ignores — so values match bulk. This test guards against a future switch to a row-count-dependent
-aggregation (``.len()``) that would silently diverge. The fixture's power series extends back
-before each NWP window (the pre-window history) so that an in-window power lag resolves to a
-genuine observed value rather than being nullified or reaching off the edge of the data.
+aggregation (``.len()``) that would silently diverge. A weather lag is included, over
+**overlapping** NWP windows, so the dual-strategy join's freshest-run (analysis-proxy) selection
+sees genuine multi-run candidates rather than a single one by construction — a non-overlapping
+fixture can't tell a real freshest-run selection apart from a degenerate one that only ever has
+one choice. The fixture's power series extends back before each NWP window (the pre-window
+history) so that an in-window power lag resolves to a genuine observed value rather than being
+nullified or reaching off the edge of the data.
 """
 
 from datetime import datetime, timedelta
@@ -37,6 +41,7 @@ from ml_core.features.tabular_feature_engineer import _engineer_features
 from polars.testing import assert_frame_equal
 
 _DELAY_HOURS = 6
+_WINDOW_HOURS = 27  # > 24h between daily runs, so consecutive runs' windows overlap by 3h.
 _NWP_RUNS = [
     datetime(2024, 1, 1, 0, 0),
     datetime(2024, 1, 2, 0, 0),
@@ -50,6 +55,7 @@ _FEATURES = {
     "local_time_of_day_sin",
     "local_time_of_day_cos",
     "power_lag_3h",
+    "temperature_2m_lag_7h",
     "temperature_2m_rolling_mean_3h",
 }
 _COMPARE_COLS = [
@@ -66,22 +72,25 @@ _COMPARE_COLS = [
     "local_time_of_day_sin",
     "local_time_of_day_cos",
     "power_lag_3h",
+    "temperature_2m_lag_7h",
     "temperature_2m_rolling_mean_3h",
 ]
 _SORT_COLS = ["time_series_id", "power_fcst_init_time", "valid_time", "ensemble_member"]
 
 
 def _run_valid_times(run_init: datetime) -> list[datetime]:
-    """A non-overlapping 00:00–12:00 half-hourly window for each daily run.
+    """A half-hourly window for each daily run, deliberately overlapping the next run's start.
 
     Starting at the run's own init_time (like real ECMWF ENS) gives every run a full
     ``_DELAY_HOURS`` of hindcast valid times before its derived power_fcst_init_time. Those
     rows must feed window features (weather rolling means) as predecessors on both sides even
-    though they are dropped from the compared output. Non-overlapping windows mean each
-    (time_series_id, valid_time) appears in exactly one run, which keeps the bulk and
-    single-run row sets directly comparable.
+    though they are dropped from the compared output. ``_WINDOW_HOURS`` exceeds the 24h gap
+    between daily runs, so a (time_series_id, valid_time) in the overlap can appear in two runs —
+    this is what makes the weather-lag freshest-run selection choose between genuine multi-run
+    candidates rather than a single one by construction.
     """
-    return [run_init + timedelta(minutes=30 * i) for i in range(25)]  # 00:00 .. 12:00 inclusive
+    steps = int(_WINDOW_HOURS * 2) + 1  # half-hourly steps, 00:00 .. _WINDOW_HOURS:00 inclusive
+    return [run_init + timedelta(minutes=30 * i) for i in range(steps)]
 
 
 def _power_observation_times(run_init: datetime) -> list[datetime]:
@@ -90,7 +99,7 @@ def _power_observation_times(run_init: datetime) -> list[datetime]:
     Crucially this includes the pre-window history (init .. init + delay) so that a power lag on
     an in-window row reaches back to a genuine observed value instead of being nullified.
     """
-    return [run_init + timedelta(minutes=30 * i) for i in range(25)]  # 00:00 .. 12:00 inclusive
+    return _run_valid_times(run_init)
 
 
 def _build_fixtures() -> tuple[
@@ -155,6 +164,14 @@ def test_bulk_and_single_run_features_are_identical() -> None:
             nwp=nwp,
             power_fcst_init_time=run + timedelta(hours=_DELAY_HOURS),
             nwp_init_time=run,
+            # Must match bulk mode's nwp_publication_delay_hours: select_analysis_proxy's
+            # available_at cut uses this to gate which runs it treats as published, and this
+            # test's own power_fcst_init_time = nwp_init_time + _DELAY_HOURS derivation is only
+            # self-consistent if the same delay is used everywhere. Leaving this on the default
+            # (9h) instead of _DELAY_HOURS (6h) would make the row's own run look "not yet
+            # published" by this test's own power_fcst_init_time — exactly the mismatch the
+            # nwp_publication_delay_hours docstring warns callers about.
+            nwp_publication_delay_hours=_DELAY_HOURS,
         ).collect()
         # Keep only rows the NWP run actually covers (single-run mode is power-centric and
         # emits null-weather rows for valid_times outside this run's window), and only
@@ -169,10 +186,12 @@ def test_bulk_and_single_run_features_are_identical() -> None:
         )
     single_run = pl.concat(single_run_parts)
 
-    # 12 of each run's 25 half-hourly steps survive: the 12 negative-lead steps and the lead-0
-    # step land at or before the derived power_fcst_init_time, and bulk mode drops those
-    # undeliverable hindcast rows after computing features on the full window.
-    assert len(bulk) == len(_NWP_RUNS) * len(_MEMBERS) * 12
+    # Every run's hindcast steps (lead 0 .. _DELAY_HOURS inclusive, half-hourly) land at or before
+    # its own derived power_fcst_init_time, and bulk mode drops those undeliverable rows after
+    # computing features on the full window — only the remaining, later steps survive.
+    hindcast_steps_per_run = _DELAY_HOURS * 2 + 1
+    deliverable_steps_per_run = len(_run_valid_times(_NWP_RUNS[0])) - hindcast_steps_per_run
+    assert len(bulk) == len(_NWP_RUNS) * len(_MEMBERS) * deliverable_steps_per_run
     # Guard: no fan-out. The row count above already catches one, but only because it is pinned
     # to an exact expected value; state the invariant directly so that loosening the count later
     # cannot quietly take the fan-out guard with it.

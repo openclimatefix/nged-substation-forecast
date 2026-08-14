@@ -9,7 +9,7 @@ from contracts.power_schemas import (
     PowerTimeSeries,
     TimeSeriesMetadata,
 )
-from ml_core.features._lags import _apply_power_lag, _nullify_leaky_lags
+from ml_core.features._lags import _apply_power_lag, _apply_weather_lag, _nullify_leaky_lags
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
 from ml_core.features._parsed_features import (
     STATIC_FEATURE_REGISTRY,
@@ -23,6 +23,7 @@ from ml_core.features.tabular_feature_engineer import (
     _local_utc_offset_minutes,
 )
 from pydantic import ValidationError
+from weather_utils import NWP_PUBLICATION_DELAY_HOURS
 
 
 def test_apply_power_lag_with_source():
@@ -757,8 +758,10 @@ def test_engineer_features_raises_when_nwp_init_time_given_without_power_fcst_in
 def test_engineer_features_weather_lag_leakage_prevention():
     # Create dummy data to verify weather lag leakage prevention
     valid_time = datetime(2026, 6, 11, 12, 0)
-    power_fcst_init_time = datetime(2026, 6, 10, 6, 0)
     nwp_init_time = datetime(2026, 6, 10, 0, 0)
+    # power_fcst_init_time must clear select_analysis_proxy's default publication_delay
+    # (NWP_PUBLICATION_DELAY_HOURS) for run 1 to count as "available" for the freshest-run join.
+    power_fcst_init_time = nwp_init_time + timedelta(hours=NWP_PUBLICATION_DELAY_HOURS)
 
     # NWP data has two runs:
     # 1. Run initialized at 2026-06-10 00:00:00 (the one we should use)
@@ -819,6 +822,139 @@ def test_engineer_features_weather_lag_leakage_prevention():
 
     # Verify that temperature_2m_lag_36h is 8.0 (from freshest run)
     assert engineered["temperature_2m_lag_36h"][0] == 8.0
+
+
+def test_engineer_features_weather_lag_freshest_run_reaches_older_run_only_data():
+    """The freshest-run branch must resolve to a value that only an OLDER run holds.
+
+    A fixture where the same-run and freshest-run branches happen to agree can't tell "always
+    same-run" apart from the real dual-strategy join. Here the row's own run (T1) has no
+    coverage at all at the lag's target_time, so the same-run join legitimately misses (null);
+    only the older run (T0) has real data there, so the freshest-run branch must reach past T1
+    to find it.
+    """
+    power_fcst_init_time = datetime(2026, 6, 11, 6, 0)
+    nwp_init_time = datetime(2026, 6, 11, 0, 0)  # T1: the row's own run
+    older_run_init_time = datetime(2026, 6, 10, 0, 0)  # T0: an earlier run
+    valid_time = datetime(2026, 6, 11, 12, 0)
+    # lag=24h -> target_time = 2026-06-10 12:00: before power_fcst_init_time (freshest-run
+    # branch), and T1 carries no row there at all, so only T0 can answer it.
+    target_time = valid_time - timedelta(hours=24)
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1", "ts1"],
+            "valid_time": [target_time, valid_time],
+            "ensemble_member": [0, 0],
+            "init_time": [older_run_init_time, nwp_init_time],
+            "temperature_2m": [8.0, 99.0],  # T0 at target_time; T1's own (unrelated) row
+        }
+    )
+    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    engineered = _engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=nwp_df.lazy(),
+        selected_features={"temperature_2m_lag_24h"},
+        power_fcst_init_time=power_fcst_init_time,
+        nwp_init_time=nwp_init_time,
+    ).collect()
+
+    assert engineered["temperature_2m_lag_24h"][0] == 8.0
+
+
+def test_engineer_features_single_run_freshest_run_excludes_unpublished_nwp_run():
+    """The single-run availability gate must reject a run not yet published by power_fcst_init_time.
+
+    Three runs carry a value at the same lag target_time: T0, legitimately available by
+    power_fcst_init_time; T1, the row's own run (nwp_init_time), with no row at target_time so
+    the same-run branch cannot answer and the freshest-run branch is exercised; and T2, fresher
+    than T1 but with ``init_time + publication_delay`` still after power_fcst_init_time — not yet
+    published. Without the ``available_at``/``publication_delay`` cut on ``select_analysis_proxy``
+    in single-run mode, the freshest-run join picks up T2's decoy value; with it, T2 is excluded
+    and T0 answers instead.
+    """
+    power_fcst_init_time = datetime(2026, 6, 11, 6, 0)
+    nwp_init_time = datetime(2026, 6, 11, 0, 0)  # T1: the row's own run
+    older_run_init_time = datetime(2026, 6, 10, 0, 0)  # T0: legitimately available
+    too_fresh_init_time = datetime(2026, 6, 11, 3, 0)  # T2: fresher than T1, not yet published
+    valid_time = datetime(2026, 6, 11, 12, 0)
+    # lag=24h -> target_time = 2026-06-10 12:00: before power_fcst_init_time (freshest-run
+    # branch), and T1 carries no row there at all, so only T0 or T2 can answer it.
+    target_time = valid_time - timedelta(hours=24)
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1", "ts1", "ts1"],
+            "valid_time": [target_time, valid_time, target_time],
+            "ensemble_member": [0, 0, 0],
+            "init_time": [older_run_init_time, nwp_init_time, too_fresh_init_time],
+            "temperature_2m": [8.0, 99.0, 999.0],  # T0 legit; T1's unrelated row; T2 decoy
+        }
+    )
+    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    engineered = _engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=nwp_df.lazy(),
+        selected_features={"temperature_2m_lag_24h"},
+        power_fcst_init_time=power_fcst_init_time,
+        nwp_init_time=nwp_init_time,
+    ).collect()
+
+    assert engineered["temperature_2m_lag_24h"][0] == 8.0
+
+
+def test_apply_weather_lag_boundary_uses_same_run_at_exact_lead():
+    """At target_time == power_fcst_init_time, the boundary belongs to the same-run branch.
+
+    The row's own run is available by construction at exactly this instant — bulk mode derives
+    power_fcst_init_time = nwp_init_time + delay, the instant that run becomes usable — so `>=`
+    routes the boundary through the same-run join rather than the freshest-run join. Pins the
+    same-run value at a target_time deliberately given a *different* freshest-run value, so the
+    two branches are distinguishable at the boundary rather than coincidentally equal.
+    """
+    power_fcst_init_time = datetime(2023, 1, 2, 6, 0)
+    nwp_init_time = datetime(2023, 1, 2, 0, 0)
+    target_time = power_fcst_init_time  # exactly on the boundary
+    valid_time = target_time + timedelta(hours=3)  # lag_hours=3h -> target_time as above
+
+    engineered_features_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"],
+            "nwp_init_time": [nwp_init_time],
+            "ensemble_member": [0],
+            "valid_time": [valid_time],
+            "power_fcst_init_time": [power_fcst_init_time],
+        }
+    )
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"],
+            "nwp_init_time": [nwp_init_time],
+            "ensemble_member": [0],
+            "valid_time": [target_time],
+            "temperature_2m": [11.0],  # same-run value
+        }
+    )
+    historical_weather_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"],
+            "valid_time": [target_time],
+            "temperature_2m": [22.0],  # freshest-run value, deliberately different
+        }
+    )
+
+    lag_feat = LagFeature.from_str("temperature_2m_lag_3h")
+    result = _apply_weather_lag(
+        engineered_features_df.lazy(), nwp_df.lazy(), lag_feat, historical_weather_df.lazy()
+    ).collect()
+
+    assert result["temperature_2m_lag_3h"][0] == 11.0
 
 
 def test_engineer_features_power_lag_nullification_end_to_end():

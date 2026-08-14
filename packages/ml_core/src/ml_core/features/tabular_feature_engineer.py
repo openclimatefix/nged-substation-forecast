@@ -21,7 +21,7 @@ Nullify Leaky Lags Rationale:
 """
 
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import patito as pt
 import polars as pl
@@ -198,13 +198,32 @@ def _engineer_features(
             "Weather lag features require the NWP control member (ensemble_member == 0) "
             "to build historical weather, but no such rows were found in the NWP data."
         )
-    historical_weather = (
-        select_analysis_proxy(
+    if processed_nwp is None or not weather_lags:
+        historical_weather = None
+    elif power_fcst_init_time is not None:
+        # Single-run mode: gate the freshest-run (analysis-proxy) selection to runs available by
+        # this row's own power_fcst_init_time. This is the mode carrying the real risk: a caller
+        # can pass a wide multi-run `nwp` frame alongside an arbitrary explicit
+        # power_fcst_init_time, and without this cut nothing stops the freshest-run join from
+        # picking up a run that would not actually have been available yet.
+        historical_weather = select_analysis_proxy(
+            processed_nwp,
+            group_key="time_series_id",
+            init_time_col="nwp_init_time",
+            available_at=power_fcst_init_time,
+            publication_delay=timedelta(hours=nwp_publication_delay_hours),
+        )
+    else:
+        # Bulk mode: no available_at cut, deliberately. historical_weather is built once, globally,
+        # here — before every row gets its own derived power_fcst_init_time — so there is no single
+        # scalar cutoff to give it. None is needed either: for a hindcast target (valid_time <=
+        # that row's own power_fcst_init_time), the only causally-eligible runs are the row's own
+        # run or an earlier one, because an NWP run's earliest valid_time is its own init_time — a
+        # later run can never hold a valid_time that early. This is the invariant to re-check if
+        # this ever needs to become row-aware.
+        historical_weather = select_analysis_proxy(
             processed_nwp, group_key="time_series_id", init_time_col="nwp_init_time"
         )
-        if processed_nwp is not None and weather_lags
-        else None
-    )
 
     if power_fcst_init_time is None:
         raw_data = _join_nwp_bulk_mode(
