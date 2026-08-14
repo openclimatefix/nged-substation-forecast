@@ -128,7 +128,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
                 "nged_s3_paths",
                 {
                     "All JSON files on S3": list_of_all_json_files,
-                    "Files larger than 1kB": list_of_large_json_files,
+                    "Files above the size threshold": list_of_large_json_files,
                     "Files with new data": list_of_new_json_files,
                 },
             )
