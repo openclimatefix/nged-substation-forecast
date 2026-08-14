@@ -287,6 +287,26 @@ def test_apply_local_time_features():
     assert result["local_utc_offset_minutes"].dtype == pl.Int16
 
 
+def test_apply_local_time_features_non_london_timezone():
+    """The ``local_timezone`` argument, not a hard-coded ``Europe/London``, drives the features.
+
+    Mirrors ``test_local_utc_offset_minutes_is_faithful``'s choice of ``Asia/Kolkata`` (a fixed
+    UTC+5:30 offset, no DST) to pin that the zone actually threads through from
+    ``_apply_local_time_features`` down to ``_local_utc_offset_minutes``, rather than only the
+    latter being zone-agnostic.
+    """
+    df = pl.DataFrame({"valid_time": [datetime(2023, 1, 10, 12, 0)]})  # 17:30 IST.
+
+    result = _apply_local_time_features(df.lazy(), local_timezone="Asia/Kolkata").collect()
+
+    assert result["local_utc_offset_minutes"].to_list() == [330]
+    # local_time_of_day_sin for 17:30 is sin(17.5/24 * 2pi); local_time_of_day_cos is the cos.
+    assert result["local_time_of_day_sin"][0] == pytest.approx(-0.991445, abs=1e-5)
+    assert result["local_time_of_day_cos"][0] == pytest.approx(-0.130526, abs=1e-5)
+    # 2023-01-10 is a Tuesday in both UTC and IST — the offset does not cross a date boundary here.
+    assert result["local_day_of_week"].to_list() == ["Tuesday"]
+
+
 def test_apply_local_time_features_dst_transitions():
     """Exercise the two UK DST transition instants themselves, not just GMT/BST in general.
 
