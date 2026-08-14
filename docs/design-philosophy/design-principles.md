@@ -69,7 +69,11 @@ If data inputs are disrupted, the forecast gets less certain instead of stopping
 always does the best it can with whatever data it has, rather than blowing up; raising is reserved
 for states that are our own bug. The plan is to deliver that through the **model itself** — an ML
 model that can, at least partially, handle missing inputs — rather than through fallback logic
-wrapped around a model that assumes complete data.
+wrapped around a model that assumes complete data. (Note that this decision to
+"never stop" will not be appropriate for energy-forecasting systems where an uncertain forecast
+might be more harmful than *no* forecast. But, in Flexpectation, there are strong arguments that
+our forecast will *always* be better than NGED's incumbent baseline, even when we have no live
+data.)
 
 Degrading is only half the principle: **we must be notified that the forecast degraded.** Three
 channels carry that — the widened uncertainty band on the forecast row, a `power_forecast_warnings`
@@ -77,13 +81,9 @@ row naming which feed degraded and since when, and a Sentry event for the data f
 act on, such as a missed daily ECMWF run that says Dynamical.org is having problems. Each answers a
 different question and none substitutes for another; all three are required. What each is for, and
 who reads it, is set out in
-[Three audiences, three channels](inherent-stability.md#three-audiences-three-channels).
-
-(Note that this decision to
-"never stop" will not be appropriate for energy-forecasting systems where an uncertain forecast
-might be more harmful than *no* forecast. But, in Flexpectation, there are strong arguments that
-our forecast will *always* be better than NGED's incumbent baseline, even when we have no live
-data.)
+[Three audiences, three channels](inherent-stability.md#three-audiences-three-channels). A Sentry
+event says whether we broke or an input degraded, and both kinds have to be delivered — see
+[Two kinds of Sentry event](inherent-stability.md#two-kinds-of-sentry-event).
 
 *Without it:* every wobble in an upstream feed becomes an outage — the service raises at 06:00
 because one meter went quiet, NGED open their dashboard to a gap instead of a forecast, and a
