@@ -194,8 +194,13 @@ def test_init_sentry_survives_a_malformed_dsn(caplog: pytest.LogCaptureFixture) 
     """
     with caplog.at_level(logging.ERROR, logger="nged_substation_forecast._sentry"):
         _sentry.init_sentry(_settings(sentry_dsn="not-a-dsn"))
-    assert any(r.levelno == logging.ERROR for r in caplog.records)
-    assert any(r.exc_info is not None for r in caplog.records)  # traceback attached
+    # One record must carry all three: a message naming what failed, ERROR level, and the
+    # traceback. Asserting them separately would pass on three different records. The message
+    # matters here because it is the only signal a malformed DSN ever produces.
+    assert any(
+        "Sentry SDK" in r.message and r.levelno == logging.ERROR and r.exc_info is not None
+        for r in caplog.records
+    )
 
 
 def test_send_forecast_checkin_is_noop_when_flag_off(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -241,8 +246,12 @@ def test_send_forecast_checkin_swallows_and_logs_on_send_error(
     monkeypatch.setattr(_sentry, "capture_checkin", boom)
     with caplog.at_level(logging.ERROR, logger="nged_substation_forecast._sentry"):
         _sentry.send_forecast_checkin(_settings(sentry_monitor_forecasts=True))
-    assert any(r.levelno == logging.ERROR for r in caplog.records)
-    assert any(r.exc_info is not None for r in caplog.records)  # traceback attached
+    # One record must carry all three: a message naming what failed, ERROR level, and the
+    # traceback. Asserting them separately would pass on three different records.
+    assert any(
+        "heartbeat" in r.message and r.levelno == logging.ERROR and r.exc_info is not None
+        for r in caplog.records
+    )
 
 
 def test_failure_hook_captures_the_real_exception(monkeypatch: pytest.MonkeyPatch) -> None:
