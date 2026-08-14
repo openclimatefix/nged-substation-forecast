@@ -4876,20 +4876,8 @@ dependencies = [
     { name = "polars" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-]
-
 [package.metadata]
 requires-dist = [{ name = "polars", specifier = ">=1.38.1" }]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest-cov" },
-]
 
 [[package]]
 name = "websockets"
