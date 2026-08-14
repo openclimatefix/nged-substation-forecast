@@ -65,24 +65,35 @@ principle behind it is a claim we are merely hoping comes true.
 
 ### 1 — The power forecast never stops
 
-If data inputs are disrupted, the forecast gets less certain instead of stopping — and should say
-so in the forecast itself, through wider uncertainty bands (band-widening is designed but not yet
-built — see [Widening bands](inherent-stability.md#widening-bands-the-in-band-signal)). The
-forecast always does the best it can with whatever data it has, rather than blowing up; raising
-is reserved for states that are our own bug. The plan is to deliver that through the **model
-itself** — an ML model that can, at least partially, handle missing inputs — rather than through
-fallback logic wrapped around a model that assumes complete data. (Note that this decision to
+If data inputs are disrupted, the forecast gets less certain instead of stopping. The forecast
+always does the best it can with whatever data it has, rather than blowing up; raising is reserved
+for states that are our own bug. The plan is to deliver that through the **model itself** — an ML
+model that can, at least partially, handle missing inputs — rather than through fallback logic
+wrapped around a model that assumes complete data. (Note that this decision to
 "never stop" will not be appropriate for energy-forecasting systems where an uncertain forecast
 might be more harmful than *no* forecast. But, in Flexpectation, there are strong arguments that
 our forecast will *always* be better than NGED's incumbent baseline, even when we have no live
 data.)
+
+Degrading is only half the principle: **we must be notified that the forecast degraded.** Three
+channels carry that — a widened uncertainty band on the forecast row (designed, not yet built 🚧 —
+see [Widening bands](inherent-stability.md#widening-bands-the-in-band-signal)), a
+`power_forecast_warnings` row naming which feed degraded and since when (not yet built 🚧), and a
+Sentry event for the data failures a human can act on, such as a missed daily ECMWF run that says
+Dynamical.org is having problems. Each answers a different question and none substitutes for
+another; all three are required, and two of the three are still to be built. What each is for, and
+who reads it, is set out in
+[Three audiences, three channels](inherent-stability.md#three-audiences-three-channels). A Sentry
+event says whether we broke or an input degraded, and both kinds have to be delivered — see
+[Two kinds of Sentry event](inherent-stability.md#two-kinds-of-sentry-event).
 
 *Without it:* every wobble in an upstream feed becomes an outage — the service raises at 06:00
 because one meter went quiet, NGED open their dashboard to a gap instead of a forecast, and a
 developer spends the morning re-running a pipeline whose only real problem was a missing input.
 
 *Decided:* every asset check in the repo is non-blocking `WARN`; there is deliberately no
-`ERROR`-severity check anywhere.
+`ERROR`-severity check anywhere. Non-blocking never means non-notifying: a check that detects
+degradation must still send a Sentry event, without failing the run it is warning about.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
