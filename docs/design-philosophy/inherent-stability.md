@@ -214,6 +214,12 @@ appear nowhere else.
     [coupling-through-data-at-rest
     principle](design-principles.md#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status),
     in imperative form.)*
+12. **Make the telemetry name the fault.** An exception a warning path swallows still has to reach
+    Sentry, tagged with whatever an alert rule routes on, and its message has to name the series,
+    the run or the asset at fault rather than only the type of error. The operator reads the alert,
+    not the logs. *(The [self-explaining-telemetry
+    principle](design-principles.md#16-a-failure-names-its-own-cause-in-the-telemetry), in
+    imperative form.)*
 
 ## Where complexity should live
 

@@ -68,8 +68,14 @@ principle behind it is a claim we are merely hoping comes true.
 If data inputs are disrupted, the forecast gets less certain instead of stopping — and should say
 so in the forecast itself, through wider uncertainty bands (band-widening is designed but not yet
 built — see [Widening bands](inherent-stability.md#widening-bands-the-in-band-signal)). The
-forecast always does the best it can with whatever data it has, rather than blowing up; raising
-is reserved for states that are our own bug. The plan is to deliver that through the **model
+forecast always does the best it can with whatever data it has, rather than blowing up. That
+covers errors in the **upstream data**, and only those. An error in **our own code** — an empty
+promoted model, a contract violation, a join that has fanned out — gets the opposite posture: fail
+as early as possible, and confine the failure to the one partition it happened in ([principle 10
+("*every write is atomic and idempotent, and every failure is confined to one
+partition*")](#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition)).
+Degrading around our own bug would deliver a wrong forecast and bury its cause. The plan is to
+deliver the never-stop half through the **model
 itself** — an ML model that can, at least partially, handle missing inputs — rather than through
 fallback logic wrapped around a model that assumes complete data. (Note that this decision to
 "never stop" will not be appropriate for energy-forecasting systems where an uncertain forecast
@@ -82,7 +88,9 @@ because one meter went quiet, NGED open their dashboard to a gap instead of a fo
 developer spends the morning re-running a pipeline whose only real problem was a missing input.
 
 *Decided:* every asset check in the repo is non-blocking `WARN`; there is deliberately no
-`ERROR`-severity check anywhere.
+`ERROR`-severity check anywhere — while `PowerForecast.validate` still hard-fails a whole slot on a
+duplicated primary key, because a duplicated forecast row takes a bug of ours rather than a bad
+input.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
@@ -605,6 +613,42 @@ frozen into the archive cannot be varied by an experiment.
 *Detail:* [NWP variable conventions](../architecture/nwp-variable-conventions.md),
 [Storage formats](../architecture/performance.md#storage-formats-measured-not-assumed).
 
+### 16 — A failure names its own cause in the telemetry
+
+When something goes wrong, the cause should be legible from the Sentry event and from what Dagster
+shows, rather than reconstructed by trawling logs. The standard to aim at is `rustc`'s diagnostics:
+name the thing that broke, say where, and leave the reader in no doubt what to do next. That makes
+each event a design surface rather than a by-product — its tags decide whether an alert rule can
+route it, its fingerprint decides whether a stall recurring hourly is one issue or twenty-four, and
+its message decides whether the operator can act without opening a shell on the box. Two things make
+this load-bearing rather than good manners. [Principle 1 ("*the power forecast never
+stops*")](#1-the-power-forecast-never-stops) makes failure quiet by design, so the telemetry is
+often the only thing that speaks at all; and under the preferred post-NIA operating model the reader
+of the alert is a non-expert at NGED holding the runbooks and nothing else.
+
+*Without it:* the alert says a run failed. The operator opens Dagster, finds the run, reads the
+step's logs, and works out from a stack trace which time series, which weather run or which of our
+own assumptions actually broke — the out-of-hours archaeology
+[T1.1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) says will never be needed.
+
+*Decided:* every Sentry sender carries a tag an alert rule can route on, including the failure
+hook's positive `fault_category:run_failed` marker rather than a rule phrased as "error level, and
+neither degradation tag is set", which would misclassify silently the day a fifth sender is added;
+an asset check that swallows its own exception still reports it through `report_check_degradation`,
+because log capture is off and the `ERROR` log alone would reach nobody; the stale-power event names
+each late series and how late it is (`series 12: 48.5h late`), carries the true count in an `n_late`
+tag so a truncated list cannot make a large stall look small, and is fingerprinted per environment
+so an hourly-repeating stall stays one issue; and `power_forecast_warnings` carries a
+`warning_source`, because a warning is only actionable if it names whose feed broke.
+
+*Serves:* [Hypothesis 1: a service that mostly runs
+itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — specifically T1.1,
+interventions per quarter, and T1.4, operability by a non-expert.
+
+*Detail:* [Send telemetry to Sentry, and alarm on
+absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence),
+[Three audiences, three channels](inherent-stability.md#three-audiences-three-channels).
+
 ## Deliberately absent
 
 We have **no availability service-level objective (SLO) and no error
@@ -721,8 +765,8 @@ left as decoration — the same discipline the hypotheses page applies to its th
 
 **Before copying a principle into another system, check the assumption it is a bet on.** Most of the
 list is portable as-is — strict contracts, one execution path, identically-scored experiments,
-provenance, atomic and idempotent writes, and measure-don't-assume are close to unconditional good
-practice, and
+provenance, atomic and idempotent writes, self-explaining telemetry, and measure-don't-assume are
+close to unconditional good practice, and
 cheap experiments are too for any project that is doing research rather than only operating a fixed
 model.
 [Principle 1 ("*the power forecast never stops*")](#1-the-power-forecast-never-stops) is the
