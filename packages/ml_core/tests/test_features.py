@@ -924,7 +924,7 @@ def test_engineer_features_bulk_mode_derives_power_fcst_init_time():
     """In bulk mode, power_fcst_init_time must equal nwp_init_time + nwp_publication_delay_hours."""
     nwp_init_time = datetime(2023, 1, 1, 0, 0)
     valid_time = datetime(2023, 1, 1, 12, 0)
-    nwp_publication_delay_hours = 9  # non-default to confirm the parameter is used
+    nwp_publication_delay_hours = 3  # non-default to confirm the parameter is used
 
     nwp_df = pl.DataFrame(
         {
