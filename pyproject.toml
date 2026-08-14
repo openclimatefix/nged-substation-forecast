@@ -31,6 +31,7 @@ dependencies = [
     "patito",
     "polars>=1.0.0",
     "pyarrow",
+    "pydantic",
     "pyyaml",
     "sentry-sdk>=2.66,<3",
     "xgboost_forecaster",
