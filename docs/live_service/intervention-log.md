@@ -90,44 +90,61 @@ empty log with no stated period is indistinguishable from a log nobody kept.
 
 | Period | Version | Scope | Interventions | Scores T1.1? |
 |---|---|---|---|---|
-| 2026-07-15 18:00 UTC → ongoing | v0.1 | 32 time series, 6-hourly `live_forecasts` on AWS | 0 | No — pre-v1.0 |
+| 2026-07-15 18:00 UTC → 2026-08-13 19:00 UTC | v0.1 | 32 time series, 6-hourly `live_forecasts` on AWS | 0 | No — pre-v1.0 |
+| 2026-08-14 00:00 UTC → ongoing | v0.2 | 6-hourly `live_forecasts` on AWS, every slot checked by `live_forecasts_are_healthy` | 0 | No — pre-v1.0 |
 
-Figures below are stated as of **06:00 UTC on 7 August 2026**. Every count in this section moves
+Figures below are stated as of **06:00 UTC on 14 August 2026**. Every count in this section moves
 within the day, so the as-of instant is part of the measurement rather than a formality.
 
-### v0.1 on AWS, from 2026-07-15
+### v0.1 on AWS, 2026-07-15 to 2026-08-13
 
-The first `live_forecasts` run on AWS was the 18:00 UTC slot on 15 July 2026. That is 22 days and
-12 hours at the time of writing (7th August 2026) — 91 consecutive 6-hourly forecast slots, and 22
-daily `ecmwf_ens` runs — with **zero interventions and zero observed failures**. Every expected
-forecast exists.
+The first `live_forecasts` run on AWS was the 18:00 UTC slot on 15 July 2026, and the last was the
+18:00 UTC slot on 13 August 2026, an hour before the v0.1 stack was retired at roughly 19:00 UTC
+that evening to make way for v0.2. That is a window of 29 days and 1 hour, over which the schedule
+called for 117 consecutive 6-hourly forecast slots and a daily `ecmwf_ens` run, with **zero
+interventions and zero observed failures**.
 
-The VM was deployed once, on 15 July, and has not been touched since: no code has been pushed to
-AWS during the period, and the next deployment will be v0.2. So the period is genuinely unattended
-rather than quietly maintained.
+The VM was deployed once, on 15 July, and was not touched again until it was retired: no code was
+pushed to AWS during the period. So the window is genuinely unattended rather than quietly
+maintained.
 
 *Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` in the
 `power_forecasts` Delta table across the period, cross-checked against the Dagster run history and
-the Sentry missed-check-in monitor, which never alarmed.
+the Sentry missed-check-in monitor, which never alarmed. That count was last run on 7 August, when
+it matched the 91 slots the schedule called for by then; the final 26 slots of the window are
+recorded here on the strength of the Dagster run history and the silent monitor alone, and the
+distinct-`power_fcst_init_time` count still needs re-running over the closed window.
 
 Three caveats, without which the number would be worth less than it looks:
 
 - **"Zero observed failures" is a weaker claim than "zero failures".** v0.1 implemented very little
   failure detection: `live_forecasts_are_healthy` — the check that reads each slot's rows back and
-  reports missed NWP runs — landed in v0.2, after this window closed. What is
+  reports missed NWP runs — arrives with v0.2, after this window closed. What is
   genuinely verified is that every scheduled slot produced output, not that nothing degraded
   quietly on the way. A silently-stale input is precisely the failure mode this stack is built to
   make visible, and at v0.1 it would not yet be visible.
-- **Twenty-two days is short, and this is the easy case.** v0.1 is 32 time series and one ECMWF run
+- **A month is short, and this is the easy case.** v0.1 is 32 time series and one ECMWF run
   per day. The dominant cause T1.1 predicts — an upstream contract change — may simply not have
-  happened yet in a window this short. A quiet three weeks is consistent both with "the design
+  happened yet in a window this short. A quiet four weeks is consistent both with "the design
   works" and with "nothing has been thrown at it".
 - **It does not score.** The window opens at v1.0, [as above](#the-scoring-window-opens-at-v10).
 
 So what this is, stated plainly: **weak, non-scoring evidence for H1, drawn from a window the
 scoring rule excludes and gathered with detection too thin to see quiet degradation.** The deployed
-stack served every scheduled slot for 22 days without a human touching it. That is worth recording,
+stack served every scheduled slot for 29 days without a human touching it. That is worth recording,
 and it is not worth more than that.
+
+### v0.2 on AWS, from 2026-08-14
+
+v0.2 was deployed on the evening of 13 August 2026, replacing the v0.1 stack at roughly 19:00 UTC.
+Its first `live_forecasts` run was the 00:00 UTC slot on 14 August 2026, which is where this period
+starts. The deployment itself is a deliberate upgrade, so it is not an intervention and has no row
+in [the log](#the-log).
+
+The window is too young to say anything about yet. What is different from v0.1, and what makes the
+next stretch worth more than the last one, is that `live_forecasts_are_healthy` now reads each
+slot's rows back and reports missed NWP runs — so a slot that produces output from stale inputs is
+visible rather than silent, and the first caveat above no longer applies from here on.
 
 ## See also
 
