@@ -263,9 +263,15 @@ present):
   two well-separated GB landmarks. This is what fixes the hexagon↔(lat, lon) geography the `convert`
   tests delegate.
 
-`test_ecmwf_ens_network.py` (network-gated, above) composes all three against the live catalog and is
-the only layer that can catch *future upstream drift* — a change in Dynamical.org's own conventions
-that the committed slice, frozen at capture time, cannot.
+`test_ecmwf_ens_network.py` (network-gated, above) runs the full open → download → convert pipeline
+against the live catalog, but only re-checks *orientation and bounds*: descending latitude, longitude
+in [-180, 180], the slice landing on the requested box, the expected variable names, and a
+physical-range sanity check on temperature. It does not re-check the value↔(lat, lon) mapping —
+neither the ravel-alignment mutation the synthetic `convert` test guards nor the hexagon↔(lat, lon)
+geography the geo landmark test guards, since both are value-agnostic (index alignment, not a value
+comparison) and so are already fully proven offline. What only this test can catch is *future
+upstream drift* — a change in Dynamical.org's own conventions that the committed slice, frozen at
+capture time, cannot.
 
 ## Marimo notebooks bind every name their cells reference
 

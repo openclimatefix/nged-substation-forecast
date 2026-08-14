@@ -516,6 +516,22 @@ def test_compute_metrics_single_member_ensemble_degenerates_gracefully():
     assert _metric_value(result, "picp", metric_param="p10_p90") == 0.0
 
 
+def test_compute_metrics_picp_boundary_is_inclusive():
+    """PICP counts the actual as covered when it exactly equals a band bound.
+
+    A single-member forecast that exactly matches the actual makes every empirical quantile —
+    and so both p10-p90 band bounds — coincide with the actual value. Whether that boundary
+    counts as covered is a modelling choice (``pl.Expr.is_between`` defaults to
+    ``closed="both"``), not free-floating behaviour, so pin it here: PICP must be 1.0, not 0.0.
+    """
+    times = [_utc(2022, 1, 1, 0, 0)]
+    actuals = _make_actuals(1, times, [10.0])
+    forecasts = _make_cv_forecasts(1, times, [10.0])  # exact hit: bounds coincide with actual
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
+
+    assert _metric_value(result, "picp", metric_param="p10_p90") == 1.0
+
+
 def test_compute_metrics_perfect_forecast_scores_finite_zero_spread_skill():
     """A perfect deterministic forecast (RMSE = 0, spread = 0) scores 0, never NaN.
 
