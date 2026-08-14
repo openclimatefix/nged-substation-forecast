@@ -685,6 +685,52 @@ def test_metrics_leaderboard_skips_fold_ids_the_cv_config_does_not_define(
     assert materialisation.metadata["skipped_fold_ids"].value == "['live']"
 
 
+def _append_smoke_test_fold_rows(forecasts_path: str) -> None:
+    """Copy the produced forecasts into a ``fold_id="smoke_test"`` partition of the same table.
+
+    Unlike ``fold_id="live"``, ``smoke_test`` genuinely is a fold in ``conf/cv/default.yaml`` —
+    it is just declared ``leaderboard: false``, so it must be excluded from leaderboard scope the
+    same way ``"live"`` is.
+    """
+    smoke_test = pl.read_delta(forecasts_path).with_columns(fold_id=pl.lit("smoke_test"))
+    write_deltalake(
+        table_or_uri=forecasts_path,
+        data=smoke_test.to_arrow(),
+        mode="append",
+        partition_by=["experiment_name", "fold_id"],
+    )
+
+
+def test_metrics_leaderboard_skips_smoke_test_fold(
+    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+) -> None:
+    """Leaderboard scope skips ``smoke_test`` even though the CV config defines that fold.
+
+    This is the case that discriminates the fix from the bug it replaces:
+    ``smoke_test`` *is* present in ``CvConfig.fold_ids`` (every fold), so a check against that
+    property lets it through to the parent-run average. It is absent from
+    ``CvConfig.leaderboard_fold_ids`` (leaderboard folds only, since ``smoke_test`` is declared
+    ``leaderboard: false``), so a check against that property correctly skips it — unlike
+    ``fold_id="live"``, which both properties skip identically, since the CV config has no entry
+    for ``"live"`` at all.
+    """
+    _run_cv_pipeline(dagster_instance)
+    _append_smoke_test_fold_rows(str(file_mlflow_env["forecasts"]))
+
+    result = materialize(
+        [metrics],
+        run_config=RunConfig(ops={"metrics": MetricsConfig(evaluation_scope="leaderboard")}),
+        instance=dagster_instance,
+    )
+    assert result.success
+
+    fm = pl.read_delta(str(file_mlflow_env["metrics"]))
+    assert set(fm["fold_id"].unique().to_list()) == {FOLD_ID}
+
+    (materialisation,) = result.asset_materializations_for_node("metrics")
+    assert materialisation.metadata["skipped_fold_ids"].value == "['smoke_test']"
+
+
 def test_metrics_ad_hoc_scores_fold_ids_the_cv_config_does_not_define(
     file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
 ) -> None:

@@ -956,11 +956,12 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     Dagster retries and safe across processes; see "Cross-process run resolution" in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/>.
 
-    ``power_forecasts`` also holds the live service's output under ``fold_id="live"``. Leaderboard
-    scope skips any ``fold_id`` the CV config does not define, naming them in a warning and in the
+    ``power_forecasts`` also holds the live service's output under ``fold_id="live"`` and any
+    non-leaderboard dev fold such as ``smoke_test``. Leaderboard scope skips any ``fold_id`` that
+    is not a leaderboard fold in the CV config, naming them in a warning and in the
     ``skipped_fold_ids`` output metadata, because it dates its evaluation window from that config
-    and has none for them. Use ``evaluation_scope="ad_hoc"`` to score live rows: it takes the
-    window from the rows themselves.
+    and has none for them. Use ``evaluation_scope="ad_hoc"`` to score live or dev-fold rows: it
+    takes the window from the rows themselves.
 
     Args:
         context: Dagster execution context; used for logging and ``add_output_metadata``.
@@ -997,16 +998,19 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     # `live_forecasts` writes its output to this same table under `fold_id="live"`, so an
     # unfiltered leaderboard run — which the operator guide tells you to launch, leaving
     # `fold_id` null to score every fold — discovers a group the CV config has never heard of.
-    # Leaderboard scope dates its window from that config, so those rows have no window to be
-    # scored against; skip them rather than fail the whole run on the first one. Ad-hoc scope
-    # takes its window from the rows themselves and is the supported way to score live output.
+    # The same table also holds any non-leaderboard dev fold (e.g. `smoke_test`), which the CV
+    # config does define but which is not part of the leaderboard's evaluation protocol. Either
+    # way, leaderboard scope dates its window from the config's leaderboard folds, so those rows
+    # have no window to be scored against; skip them rather than fail the whole run on the first
+    # one. Ad-hoc scope takes its window from the rows themselves and is the supported way to
+    # score live output or dev folds.
     skipped_fold_ids: list[str] = []
     if config.evaluation_scope == "leaderboard":
-        configured_fold_ids = set(_cv_config.fold_ids)
+        configured_fold_ids = set(_cv_config.leaderboard_fold_ids)
         skipped_fold_ids = sorted({fold for _, fold in groups if fold not in configured_fold_ids})
         if skipped_fold_ids:
             context.log.warning(
-                f"Skipping {skipped_fold_ids} — not folds in the CV config "
+                f"Skipping {skipped_fold_ids} — not leaderboard folds in the CV config "
                 f"({sorted(configured_fold_ids)}), so leaderboard scope has no evaluation window "
                 'for them. Score these with evaluation_scope="ad_hoc", which dates its window '
                 "from the forecast rows themselves."
