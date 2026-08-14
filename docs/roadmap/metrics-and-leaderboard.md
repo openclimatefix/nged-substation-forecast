@@ -985,5 +985,7 @@ NWP?"). Example tags:
 | `switching_event_detection` | none, simple_statistical |
 | `pre_training` | none, ERA5 |
 
-> Estimating **cost savings (£)** attributable to each forecasting approach, per leaderboard row, is
-> a 🔬 v2 stretch goal.
+> Every leaderboard row also carries two **cost savings (£)** figures — one for flexibility
+> procurement, one for curtailment — designed in
+> [Estimating the money a better forecast saves](cost-savings-metrics.md). They are deliberately
+> rough proxies, not a cost analysis.

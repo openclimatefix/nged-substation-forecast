@@ -97,6 +97,7 @@ nav:
   - Roadmap:
       - Overview: roadmap/index.md
       - Capacity Estimation: roadmap/capacity-estimation.md
+      - Cost-Savings Metrics: roadmap/cost-savings-metrics.md
       - Data Sources: roadmap/data-sources.md
       - Delivery Tables: roadmap/delivery-tables.md
       - Engineering Health: roadmap/engineering-health.md

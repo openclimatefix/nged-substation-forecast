@@ -508,7 +508,8 @@ not in MLflow is still one Polars filter away in Delta.
 
 - **Cost-loss economic value curves** — the fully decision-theoretic summary of exceedance
   skill: for each ratio of "cost of acting on a warning" to "loss if an unwarned exceedance
-  occurs", how much of a perfect forecast's value does this model capture? This is the natural
-  bridge to the 🔬 v2 stretch goal of estimating **cost savings (£)** per leaderboard row
-  ([Grouping the results](../roadmap/metrics-and-leaderboard.md#grouping-the-results)); until
-  then it is an ad-hoc analysis.
+  occurs", how much of a perfect forecast's value does this model capture? We do not compute
+  these, because the loss term is a number NGED do not hold in usable form; the
+  [cost-savings metrics](../roadmap/cost-savings-metrics.md) reach the same comparison by holding
+  every model to equal risk and comparing what each spends. The curves remain a useful ad-hoc
+  analysis if that loss figure ever firms up.

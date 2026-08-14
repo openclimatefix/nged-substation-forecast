@@ -24,6 +24,9 @@ Technical plans change as we learn more — treat this as a best-estimate, not a
   forecasts, sign conventions, and worked examples.
 - [Metrics & leaderboard](metrics-and-leaderboard.md) — cross-fold validation protocol, evaluation
   metrics, horizon time-slices, and leaderboard grouping tags.
+- [Estimating the money a better forecast saves](cost-savings-metrics.md) — the two £ leaderboard
+  metrics (flexibility procurement and curtailment), the equal-risk method that avoids needing a
+  price for a network breach, their limitations, and the open questions for NGED.
 - [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
   weather datasets (ECMWF ENS, ERA5, CM SAF).
 - [Live service](live-service.md) — the v0.1 deployment: the `live_forecasts` inference
@@ -110,6 +113,10 @@ AWS — see [Live service](live-service.md).
   items in [Metrics & leaderboard](metrics-and-leaderboard.md))
 - Time-slice filters: nowcasting (0–6 h), day-ahead (6–36 h), medium range (Day 2–7), extended range (Day 8–14), peak events (top 5%)
 - Baseline forecasters (persistence + climatology) so leaderboard scores are interpretable
+- **Cost-savings metrics (£)** — two figures per leaderboard row, for flexibility procurement and
+  for curtailment, scored against manual review and against a perfect forecast; see
+  [Estimating the money a better forecast saves](cost-savings-metrics.md). Expected to be the
+  metrics NGED read first, so they land early in this milestone.
 - Production monitoring of the live service (`production_monitoring` metrics scope)
 - **Failure-scenario evaluation** — the evaluation machinery must precede the v0.5 experiments it
   is meant to judge, or v0.5 picks a champion blind to how it behaves when inputs degrade:
@@ -367,7 +374,6 @@ delivery of the v2 live service)*
 
 - Forecast *unmetered* solar and wind power at each primary substation
 - Disaggregate additional DERs (price-sensitive assets like batteries) from substation power flow
-- Estimate cost savings (£) attributable to each forecasting approach in the leaderboard
 - Build a REST API on top of the Delta Lake delivery mechanism (purely additive — see [when a REST API would earn its keep](../architecture/forecast-delivery.md#when-would-a-rest-api-earn-its-keep))
 
 ---
