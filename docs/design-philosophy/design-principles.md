@@ -256,8 +256,8 @@ is already
 geography-neutral](../architecture/adapting-to-another-geography.md#what-is-already-geography-neutral)
 — which also records, from an assessment made against a real brief, exactly where this principle
 is *not* yet honoured: the place-specific assumptions do sit in one thin layer (mostly the
-`contracts` package), but two hard-coded `"Europe/London"` literals sit outside it, which is
-precisely the leak the principle exists to prevent.
+`contracts` package), but a hard-coded `"Europe/London"` literal in the dashboard's axis titles
+sits outside it, which is precisely the leak the principle exists to prevent.
 
 ### 6 — The whole system must be exercisable on one laptop
 

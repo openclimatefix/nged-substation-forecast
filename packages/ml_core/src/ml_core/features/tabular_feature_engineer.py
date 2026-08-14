@@ -10,9 +10,12 @@ Architecture/Flow:
     data (power, weather, metadata), then executes the instructions.
 
 Lazy Evaluation:
-    The entire pipeline is lazy. ``_engineer_features`` returns a ``pt.LazyFrame[AllFeatures]``
-    and never calls ``.collect()``. The only eager operations are ``collect_schema()`` calls,
-    which inspect the query plan without executing it.
+    The pipeline stays lazy from input to output: ``_engineer_features`` returns a
+    ``pt.LazyFrame[AllFeatures]`` without collecting the result. Two eager operations are the
+    exceptions, and neither reads the full table. ``collect_schema()`` inspects the query plan's
+    column names and dtypes without executing it. The NWP control-member check calls
+    ``.collect()`` on a frame already cut to ``.limit(1)``, so the eager read is bounded to at
+    most one row rather than the table — that bound is what makes collecting here acceptable.
 
 Nullify Leaky Lags Rationale:
     ``_nullify_leaky_lags`` (in ``_lags.py``) is called at the end of the pipeline to enforce
@@ -22,6 +25,7 @@ Nullify Leaky Lags Rationale:
 
 import math
 from datetime import datetime, timedelta
+from typing import Final
 
 import patito as pt
 import polars as pl
@@ -39,6 +43,14 @@ from ml_core.features._nwp import (
 )
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, ParsedFeatures
 from ml_core.features.feature_engineer import FeatureEngineer
+
+DEFAULT_LOCAL_TIMEZONE: Final[str] = "Europe/London"
+"""IANA zone the local-time features (time of day, day of week, UTC offset) are computed in.
+
+Every caller in this repo forecasts Great Britain, so nothing overrides it today — but it is a
+parameter, not a literal buried in the function body, so a future caller forecasting another
+region can pass its own zone without editing this module.
+"""
 
 
 def _attach_nearest_nwp_cell(
@@ -77,11 +89,13 @@ class TabularFeatureEngineer(FeatureEngineer):
         power_fcst_init_time: datetime | None = None,
         nwp_init_time: datetime | None = None,
         nwp_publication_delay_hours: int = NWP_PUBLICATION_DELAY_HOURS,
+        local_timezone: str = DEFAULT_LOCAL_TIMEZONE,
     ) -> pt.LazyFrame[AllFeatures]:
         """Map each NWP cell to its nearest time series, then run the tabular feature pipeline.
 
         See :meth:`FeatureEngineer.engineer` for the argument and operating-mode contract, and
-        ``_engineer_features`` in this module for the pipeline itself.
+        ``_engineer_features`` in this module for the pipeline itself — including
+        ``local_timezone``, the IANA zone the local-time features are computed in.
         """
         nwp_per_time_series = _attach_nearest_nwp_cell(nwp, time_series_metadata)
         return _engineer_features(
@@ -92,6 +106,7 @@ class TabularFeatureEngineer(FeatureEngineer):
             power_fcst_init_time=power_fcst_init_time,
             nwp_init_time=nwp_init_time,
             nwp_publication_delay_hours=nwp_publication_delay_hours,
+            local_timezone=local_timezone,
         )
 
 
@@ -103,6 +118,7 @@ def _engineer_features(
     power_fcst_init_time: datetime | None = None,
     nwp_init_time: datetime | None = None,
     nwp_publication_delay_hours: int = NWP_PUBLICATION_DELAY_HOURS,
+    local_timezone: str = DEFAULT_LOCAL_TIMEZONE,
 ) -> pt.LazyFrame[AllFeatures]:
     """Engineer features.
 
@@ -152,6 +168,8 @@ def _engineer_features(
         nwp_publication_delay_hours: The delay in hours between the initialization time
             of the NWP forecast and when it becomes publicly available. Used only when
             nwp_init_time is None and power_fcst_init_time is not None.
+        local_timezone: IANA zone the local-time features (time of day, day of week, UTC
+            offset) are computed in. Defaults to ``DEFAULT_LOCAL_TIMEZONE``.
     """
     if nwp_init_time is not None and power_fcst_init_time is None:
         raise ValueError(
@@ -260,6 +278,7 @@ def _engineer_features(
         observed_power_lf=power_lf,
         processed_nwp=processed_nwp,
         historical_weather=historical_weather,
+        local_timezone=local_timezone,
     )
     if power_fcst_init_time is None and nwp_lf is not None:
         # Bulk mode with NWP: drop hindcast rows (each NWP run's first
@@ -311,6 +330,7 @@ def _apply_post_join_features(
     observed_power_lf: pl.LazyFrame,
     processed_nwp: pl.LazyFrame | None = None,
     historical_weather: pl.LazyFrame | None = None,
+    local_timezone: str = DEFAULT_LOCAL_TIMEZONE,
 ) -> pl.LazyFrame:
     """Applies requested features dynamically based on parsed feature configurations.
 
@@ -325,11 +345,12 @@ def _apply_post_join_features(
             fan-out when overlapping NWP runs replicate a ``valid_time``.
         processed_nwp: The processed NWP frame, required for weather lag features.
         historical_weather: The freshest-run weather frame, required for weather lag features.
+        local_timezone: IANA zone the local-time features are computed in, when requested.
     """
     engineered_lf = raw_data
 
     if parsed_features.time_features:
-        engineered_lf = _apply_local_time_features(engineered_lf)
+        engineered_lf = _apply_local_time_features(engineered_lf, local_timezone=local_timezone)
 
     if parsed_features.static_features:
         exprs = [STATIC_FEATURE_REGISTRY[f] for f in parsed_features.static_features]
@@ -413,7 +434,9 @@ def _local_utc_offset_minutes(local_time: pl.Expr) -> pl.Expr:
     return offset.dt.total_minutes().cast(pl.Int16)
 
 
-def _apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
+def _apply_local_time_features(
+    lf: pl.LazyFrame, local_timezone: str = DEFAULT_LOCAL_TIMEZONE
+) -> pl.LazyFrame:
     """Applies local time features (time of day, day of week, time of year) to the LazyFrame.
 
     Why local time? Energy consumption patterns are driven by human behavior, which follows
@@ -422,6 +445,8 @@ def _apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
 
     Args:
         lf: The LazyFrame containing a 'valid_time' column in UTC.
+        local_timezone: IANA zone to convert ``valid_time`` into before deriving the local-time
+            features. Defaults to ``DEFAULT_LOCAL_TIMEZONE``.
 
     Returns:
         A LazyFrame with new local time features.
@@ -429,7 +454,7 @@ def _apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
     lf = lf.with_columns(
         local_time=pl.col("valid_time")
         .dt.replace_time_zone("UTC")
-        .dt.convert_time_zone("Europe/London")
+        .dt.convert_time_zone(local_timezone)
     )
 
     lf = lf.with_columns(local_utc_offset_minutes=_local_utc_offset_minutes(pl.col("local_time")))
