@@ -219,8 +219,14 @@ def _engineer_features(
         # scalar cutoff to give it. None is needed either: for a hindcast target (valid_time <=
         # that row's own power_fcst_init_time), the only causally-eligible runs are the row's own
         # run or an earlier one, because an NWP run's earliest valid_time is its own init_time — a
-        # later run can never hold a valid_time that early. This is the invariant to re-check if
-        # this ever needs to become row-aware.
+        # later run can never hold a valid_time that early. That alone rules out a later run
+        # holding an earlier target, but not a run initialised between the row's own run and its
+        # derived power_fcst_init_time (= nwp_init_time + nwp_publication_delay_hours): closing
+        # that gap needs the run cadence to exceed the delay. We ingest exactly one ECMWF ENS run
+        # per day, and NWP_PUBLICATION_DELAY_HOURS is 9, so no run falls strictly between a row's
+        # own run and its power_fcst_init_time. This is the invariant to re-check if this ever
+        # needs to become row-aware, or if a second daily run or a delay past 24 hours is
+        # introduced.
         historical_weather = select_analysis_proxy(
             processed_nwp, group_key="time_series_id", init_time_col="nwp_init_time"
         )
