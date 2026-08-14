@@ -183,6 +183,26 @@ def test_init_sentry_disables_log_to_event_capture(monkeypatch: pytest.MonkeyPat
     assert logging_integrations[0]._handler is None
 
 
+def test_init_sentry_survives_a_malformed_dsn(caplog: pytest.LogCaptureFixture) -> None:
+    """A malformed DSN must not stop the Dagster code location from loading — a typo in one
+    environment variable would otherwise take down the whole service (no schedule, no forecasts),
+    with Sentry itself unreachable so the only signal is the missed-check-in alarm hours later.
+
+    Uses a real DSN string that genuinely makes ``sentry_sdk.init`` raise ``BadDsn``, rather than
+    monkeypatching ``init`` to raise, so this pins the actual failure mode instead of passing even
+    if real DSN parsing were fine.
+    """
+    with caplog.at_level(logging.ERROR, logger="nged_substation_forecast._sentry"):
+        _sentry.init_sentry(_settings(sentry_dsn="not-a-dsn"))
+    # One record must carry all three: a message naming what failed, ERROR level, and the
+    # traceback. Asserting them separately would pass on three different records. The message
+    # matters here because it is the only signal a malformed DSN ever produces.
+    assert any(
+        "Sentry SDK" in r.message and r.levelno == logging.ERROR and r.exc_info is not None
+        for r in caplog.records
+    )
+
+
 def test_send_forecast_checkin_is_noop_when_flag_off(monkeypatch: pytest.MonkeyPatch) -> None:
     """``sentry_monitor_forecasts`` False (the default) ⇒ no check-in is sent."""
     calls: list[dict[str, Any]] = []
@@ -210,6 +230,28 @@ def test_send_forecast_checkin_uses_given_slug(monkeypatch: pytest.MonkeyPatch) 
         _settings(sentry_monitor_forecasts=True), monitor_slug="live-forecasts-test"
     )
     assert calls[0]["monitor_slug"] == "live-forecasts-test"
+
+
+def test_send_forecast_checkin_swallows_and_logs_on_send_error(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """This runs after ``live_forecasts`` has already committed its Delta write, so a raise here
+    would leave the run reported as failed on a run that in fact produced everything. There is no
+    input that reliably makes the real ``capture_checkin`` call fail offline, so the sender is
+    monkeypatched to raise instead (unlike the DSN test above, which needs a real failure mode)."""
+
+    def boom(*_: Any, **__: Any) -> None:
+        raise RuntimeError("sentry down")
+
+    monkeypatch.setattr(_sentry, "capture_checkin", boom)
+    with caplog.at_level(logging.ERROR, logger="nged_substation_forecast._sentry"):
+        _sentry.send_forecast_checkin(_settings(sentry_monitor_forecasts=True))
+    # One record must carry all three: a message naming what failed, ERROR level, and the
+    # traceback. Asserting them separately would pass on three different records.
+    assert any(
+        "heartbeat" in r.message and r.levelno == logging.ERROR and r.exc_info is not None
+        for r in caplog.records
+    )
 
 
 def test_failure_hook_captures_the_real_exception(monkeypatch: pytest.MonkeyPatch) -> None:

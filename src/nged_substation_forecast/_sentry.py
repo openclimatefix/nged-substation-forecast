@@ -98,7 +98,15 @@ def init_sentry(settings: Settings) -> None:
 
     A no-op when ``settings.sentry_dsn`` is empty (the default), so nothing is sent from laptops
     or CI unless a DSN is explicitly configured. Called once per process at import of the Dagster
-    definitions module, so it runs in the daemon, the webserver, and every run worker.
+    definitions module, so it runs in the daemon, the webserver, and every run worker. Never
+    raises: a malformed DSN must not stop the Dagster code location from loading, or the daemon
+    runs no schedule and no forecast is produced at all — the worst possible outcome for a typo in
+    one environment variable, and one Sentry itself cannot alert on. ``sentry_sdk.init`` raises
+    ``BadDsn`` early in ``Client.__init__``, during DSN parsing, before any global state is
+    touched, so a caught failure leaves the SDK with a ``NonRecordingClient``
+    (``is_active() == False``) — identical to never having called ``init`` at all. Every other
+    sender in this module already treats an inactive/uninitialised client as a silent no-op, so
+    none of them needs extra guarding as a consequence of this one being guarded.
 
     Log-to-event capture is deliberately switched off: passing a ``LoggingIntegration`` with
     ``event_level=None`` overrides the SDK's default integration (whose default ``event_level`` is
@@ -115,13 +123,18 @@ def init_sentry(settings: Settings) -> None:
     """
     if not settings.sentry_dsn:
         return
-    sentry_sdk.init(
-        dsn=settings.sentry_dsn,
-        environment=settings.sentry_environment,
-        traces_sample_rate=settings.sentry_traces_sample_rate,
-        send_default_pii=False,
-        integrations=[LoggingIntegration(event_level=None)],
-    )
+    try:
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.sentry_environment,
+            traces_sample_rate=settings.sentry_traces_sample_rate,
+            send_default_pii=False,
+            integrations=[LoggingIntegration(event_level=None)],
+        )
+    except Exception:
+        # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
+        # with the traceback rather than swallowing.
+        logger.exception("Failed to initialise the Sentry SDK")
 
 
 FAULT_CATEGORY_TAG: Final[str] = "fault_category"
@@ -258,7 +271,10 @@ def send_forecast_checkin(
     A no-op unless ``settings.sentry_monitor_forecasts`` is set (True only on the always-on
     production box), so a laptop never registers a monitor environment that Sentry would then mark
     as missed. Sends a single ``OK`` check-in — never ``in_progress`` or ``error`` — so the alarm
-    fires purely on the *absence* of a heartbeat.
+    fires purely on the *absence* of a heartbeat. Never raises: this runs after ``live_forecasts``
+    has already committed its Delta write, so a raise here would leave the run reported as failed
+    while the rows it produced sit committed — the run looking like it produced nothing when it in
+    fact produced everything.
 
     Args:
         settings: The project settings carrying ``sentry_monitor_forecasts`` and the environment.
@@ -267,11 +283,16 @@ def send_forecast_checkin(
     """
     if not settings.sentry_monitor_forecasts:
         return
-    capture_checkin(
-        monitor_slug=monitor_slug,
-        status=MonitorStatus.OK,
-        monitor_config=LIVE_FORECAST_MONITOR_CONFIG,
-    )
+    try:
+        capture_checkin(
+            monitor_slug=monitor_slug,
+            status=MonitorStatus.OK,
+            monitor_config=LIVE_FORECAST_MONITOR_CONFIG,
+        )
+    except Exception:
+        # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
+        # with the traceback rather than swallowing.
+        logger.exception("Failed to send the live-forecasts heartbeat check-in to Sentry")
 
 
 POWER_DATA_STALE_FINGERPRINT: Final[str] = "nged-power-data-stale"
