@@ -113,6 +113,12 @@ class Nwp(pt.Model):
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
     """
 
+    # `dtype=pl.String` (not `Enum`, which Delta cannot store) means an out-of-vocabulary value is
+    # no longer physically inexpressible the way it was under `Enum` — a plain `str` column can
+    # hold any string at construction time, with no error. The `constraints=` check below is now
+    # the *only* defence, and it fires at `Nwp.validate()`, not at construction: a frame built and
+    # never validated can carry an unrecognised `nwp_model_id` all the way through. Every current
+    # caller validates, so this is latent rather than live today.
     nwp_model_id: str = pt.Field(
         dtype=pl.String,
         constraints=pl.col("nwp_model_id").is_in([model.name for model in NwpModelId]),

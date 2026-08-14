@@ -79,15 +79,29 @@ def write_nwp(
     *same* partition at once contend and the loser raises ``CommitFailedError``; disjoint
     partitions do not.
 
-    ``schema_mode="overwrite"`` is passed on every write, not just to migrate an old table:
-    confirmed empirically (``deltalake`` 1.6.2) that it updates only the table's *logical* schema
-    (the ``_delta_log`` metadata) to match the incoming frame's dtypes, and leaves every other
-    partition's physical Parquet bytes untouched — a later read at the new logical dtype is
-    correct and lossless even for a partition still physically stored at an older, narrower dtype.
-    Since ``nwp``'s input is always an already-validated ``pt.DataFrame[Nwp]``, carrying the full
-    column set at the *current* contract's dtypes, the only way this can ever change the table's
-    schema is a deliberate future ``Nwp`` dtype change like this one — it cannot silently drop a
-    column.
+    ``schema_mode="overwrite"`` is passed on every write, not just to migrate an old table. This
+    safety claim holds only for a **widening** contract change, which is the only kind this
+    function has been used for so far: confirmed empirically (``deltalake`` 1.6.2) that widening
+    updates only the table's *logical* schema (the ``_delta_log`` metadata) to match the incoming
+    frame's dtypes, and leaves every other partition's physical Parquet bytes untouched — a later
+    read at the new logical dtype is correct and lossless even for a partition still physically
+    stored at an older, narrower dtype. Since ``nwp``'s input is always an already-validated
+    ``pt.DataFrame[Nwp]``, carrying the full column set at the *current* contract's dtypes, the
+    only way this can ever change the table's schema is a deliberate future ``Nwp`` dtype change
+    like this one — it cannot silently drop a column.
+
+    A **narrowing** contract change is a different, worse failure mode, also confirmed
+    empirically: the write that narrows a column succeeds silently — ``schema_mode="overwrite"``
+    accepts it at write time — and the table is left with a logical schema that its own,
+    previously-written partitions can no longer safely satisfy. Nothing fails until a *later* read
+    of the whole table (by anyone, not necessarily the writer that broke it), which then raises
+    ``SchemaError: incoming dtype cannot safely cast to target dtype`` — a confusing error far
+    removed from its cause, especially if further partitions land on the bad schema before anyone
+    reads across all of them. Without ``schema_mode="overwrite"``, delta-rs instead auto-widens
+    the incoming (narrower) data up to the table's existing (wider) schema at write time, and the
+    table stays readable throughout. This is an accepted, disclosed risk of leaving the flag on
+    permanently, not a defect: nothing in this contract's own dtype-widening history has ever
+    narrowed a column, and there is no guard against a future change that does.
 
     Args:
         nwp: Validated, non-empty NWP rows for a single ``(nwp_model_id, init_time)`` partition.
