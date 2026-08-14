@@ -1,4 +1,4 @@
-"""Tests for compute_metrics() and build_mlflow_aggregate_metrics()."""
+"""Tests for compute_effective_capacity(), compute_metrics(), build_mlflow_aggregate_metrics()."""
 
 import math
 from datetime import UTC, datetime, timedelta
@@ -16,6 +16,7 @@ from contracts.power_schemas import (
 from ml_core.metrics import (
     NoOverlappingActualsError,
     build_mlflow_aggregate_metrics,
+    compute_effective_capacity,
     compute_metrics,
 )
 from polars.testing import assert_frame_equal
@@ -94,6 +95,58 @@ def _make_metadata(
             }
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# compute_effective_capacity tests
+# ---------------------------------------------------------------------------
+
+
+def test_compute_effective_capacity_p99_and_latest_time():
+    """One row per series: P99(|power|) as `effective_capacity_mw`, `time` is the latest obs."""
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30), _utc(2022, 1, 1, 1, 0)]
+    power_lf = _make_actuals(1, times, [5.0, 5.0, 5.0])
+    result = compute_effective_capacity(power_lf)
+    assert result["time_series_id"].to_list() == [1]
+    assert result["effective_capacity_mw"].to_list() == pytest.approx([5.0])
+    assert result["time"][0] == times[-1]
+
+
+def test_compute_effective_capacity_uses_absolute_value():
+    """Negative power contributes its magnitude, not a negative capacity."""
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    power_lf = _make_actuals(1, times, [-3.0, -3.0])
+    result = compute_effective_capacity(power_lf)
+    assert result["effective_capacity_mw"].to_list() == pytest.approx([3.0])
+
+
+def test_compute_effective_capacity_ignores_nulls():
+    """Null power observations are excluded from the P99 and don't shift `time`."""
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30), _utc(2022, 1, 1, 1, 0)]
+    df = pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1, 1], dtype=pl.Int32),
+            "time": pl.Series(times, dtype=pl.Datetime("us", "UTC")),
+            "power": pl.Series([4.0, 4.0, None], dtype=pl.Float32),
+        }
+    )
+    power_lf = pt.LazyFrame.from_existing(df.lazy()).set_model(PowerTimeSeries)
+    result = compute_effective_capacity(power_lf)
+    assert result["effective_capacity_mw"].to_list() == pytest.approx([4.0])
+    assert result["time"][0] == times[1]
+
+
+def test_compute_effective_capacity_drops_non_positive_series():
+    """A series whose P99 is zero (e.g. all-zero power) is dropped, not emitted as capacity 0."""
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    zero_series = _make_actuals(1, times, [0.0, 0.0])
+    live_series = _make_actuals(2, times, [6.0, 6.0])
+    power_lf = pt.LazyFrame.from_existing(
+        pl.concat([zero_series.collect().lazy(), live_series.collect().lazy()])
+    ).set_model(PowerTimeSeries)
+    result = compute_effective_capacity(power_lf)
+    assert result["time_series_id"].to_list() == [2]
+    assert result["effective_capacity_mw"].to_list() == pytest.approx([6.0])
 
 
 # ---------------------------------------------------------------------------
