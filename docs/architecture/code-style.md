@@ -261,7 +261,10 @@ confusing failure:
   like the Python 2 syntax that Python 3 rejected for years, but
   [PEP 758](https://peps.python.org/pep-0758/) made it legal in Python 3.14. Parentheses are still
   required to bind the exception to a name: `except (OSError, ValueError) as err:`.
-- Leverage Sentry for observability in production-like code.
+- Leverage Sentry for observability in production-like code, and make each event name the fault:
+  the tag an alert rule routes on, and a message naming the series, the run or the asset that broke
+  rather than only the type of error. See [design principle
+  16](../design-philosophy/design-principles.md#16-a-failure-names-its-own-cause-in-the-telemetry).
 - Validate data at boundaries using data contracts.
 
 Production code is bound by a stronger rule about *when* to raise at all, summarised in

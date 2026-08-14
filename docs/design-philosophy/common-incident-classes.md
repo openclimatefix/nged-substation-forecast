@@ -27,8 +27,8 @@ makes the live-forecast asset **raise** rather than degrade — one of three har
 [failure-modes table](inherent-stability.md#failure-modes), and the only one tracked to change
 ([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)). The other two stay
 deliberate raises: an empty or unloadable promoted model is a promotion bug rather than a data
-outage, and a duplicated forecast primary key means malformed input has fanned a join out, which
-rule 2 rejects at the contract boundary rather than delivering. The NWP gap is tracked, and the fix is deliberately sequenced behind training
+outage, and a duplicated forecast primary key means one of our own joins has fanned out, which
+`PowerForecast.validate` rejects at the contract boundary rather than delivering. The NWP gap is tracked, and the fix is deliberately sequenced behind training
 the model against realistic outages, so that a degraded forecast is measured rather than merely
 produced.
 

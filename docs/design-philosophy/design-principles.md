@@ -66,10 +66,16 @@ principle behind it is a claim we are merely hoping comes true.
 ### 1 — The power forecast never stops
 
 If data inputs are disrupted, the forecast gets less certain instead of stopping. The forecast
-always does the best it can with whatever data it has, rather than blowing up; raising is reserved
-for states that are our own bug. The plan is to deliver that through the **model itself** — an ML
-model that can, at least partially, handle missing inputs — rather than through fallback logic
-wrapped around a model that assumes complete data. (Note that this decision to
+always does the best it can with whatever data it has, rather than blowing up. That covers errors
+in the **upstream data**, and only those. An error in **our own code** — an empty promoted model, a
+contract violation, a join that has fanned out — gets the opposite posture: fail as early as
+possible, because degrading around our own bug would deliver a wrong forecast and bury its cause.
+How far such a failure then spreads is a different axis, and the business of
+[principle 10 ("*every write is atomic and idempotent, and every failure is confined to one
+partition*")](#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition)
+rather than of this one. The plan is to deliver graceful degradation through the **model itself** —
+an ML model that can, at least partially, handle missing inputs — rather than through fallback
+logic wrapped around a model that assumes complete data. (Note that this decision to
 "never stop" will not be appropriate for energy-forecasting systems where an uncertain forecast
 might be more harmful than *no* forecast. But, in Flexpectation, there are strong arguments that
 our forecast will *always* be better than NGED's incumbent baseline, even when we have no live
@@ -93,7 +99,13 @@ developer spends the morning re-running a pipeline whose only real problem was a
 
 *Decided:* every asset check in the repo is non-blocking `WARN`; there is deliberately no
 `ERROR`-severity check anywhere. Non-blocking never means non-notifying: a check that detects
-degradation must still send a Sentry event, without failing the run it is warning about.
+degradation must still send a Sentry event, without failing the run it is warning about. On the
+other side of the line, `PowerForecast.validate` hard-fails a whole slot on a duplicated primary
+key, because only a bug of ours can duplicate a forecast row: every NWP write replaces its
+partition, so the duplication cannot come from the data at rest. One production raise is not yet on
+the right side of that line: a sustained NWP outage still fails `live_forecasts` rather than
+degrading to a weather-blind forecast
+([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)).
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
@@ -616,6 +628,45 @@ frozen into the archive cannot be varied by an experiment.
 *Detail:* [NWP variable conventions](../architecture/nwp-variable-conventions.md),
 [Storage formats](../architecture/performance.md#storage-formats-measured-not-assumed).
 
+### 16 — A failure names its own cause in the telemetry
+
+When something goes wrong, the cause should be legible from the Sentry event and from what Dagster
+shows, rather than reconstructed by trawling logs. The standard to aim at is `rustc`'s diagnostics:
+name the thing that broke, and say where. That makes
+each event a design surface rather than a by-product — its tags decide whether an alert rule can
+route it, its fingerprint decides whether a stall recurring hourly is one issue or twenty-four, and
+its message decides whether the operator can act without opening a shell on the box. Two things make
+this load-bearing rather than good manners. [Principle 1 ("*the power forecast never
+stops*")](#1-the-power-forecast-never-stops) makes failure quiet by design, so the telemetry is
+often the only thing that speaks at all; and under the operating model preferred once this
+project's funding ends, the reader of the alert is a non-expert at NGED holding the runbooks and
+nothing else.
+
+*Without it:* the alert says a run failed. The operator opens Dagster, finds the run, reads the
+step's logs, and works out from a stack trace which time series, which weather run or which of our
+own assumptions actually broke — an hour per incident, and a cause recorded in the [intervention
+log](../live_service/intervention-log.md) that is a guess.
+
+*Decided:* every Sentry *event* sender carries a tag an alert rule can route on, including the
+failure hook's positive `fault_category:run_failed` marker rather than a rule phrased as "error
+level, and neither degradation tag is set", which would misclassify silently the day a fifth sender
+is added; an asset check that swallows its own exception still reports it through
+`report_check_degradation`, because log capture is off and the `ERROR` log alone would reach
+nobody; and the stale-power event names the worst late series and how late each is (`series 12:
+48.5h late`), caps that list so a whole-feed stall cannot attach thousands of rows, carries the true
+count in an `n_late` tag so the cap cannot make a large stall look small, and is fingerprinted per
+environment so an hourly-repeating stall stays one issue.
+
+*Serves:* [Hypothesis 1: a service that mostly runs
+itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — specifically T1.4,
+operability by a non-expert, and T1.1's cause taxonomy, which is only as good as what the telemetry
+says caused the failure.
+
+*Detail:* [Send telemetry to Sentry, and alarm on
+absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence),
+[Two kinds of Sentry event](inherent-stability.md#two-kinds-of-sentry-event),
+[Three audiences, three channels](inherent-stability.md#three-audiences-three-channels).
+
 ## Deliberately absent
 
 We have **no availability service-level objective (SLO) and no error
@@ -732,8 +783,9 @@ left as decoration — the same discipline the hypotheses page applies to its th
 
 **Before copying a principle into another system, check the assumption it is a bet on.** Most of the
 list is portable as-is — strict contracts, one execution path, identically-scored experiments,
-provenance, atomic and idempotent writes, and measure-don't-assume are close to unconditional good
-practice, and
+provenance, atomic and idempotent writes, telemetry that names its own cause, and
+measure-don't-assume are
+close to unconditional good practice, and
 cheap experiments are too for any project that is doing research rather than only operating a fixed
 model.
 [Principle 1 ("*the power forecast never stops*")](#1-the-power-forecast-never-stops) is the
