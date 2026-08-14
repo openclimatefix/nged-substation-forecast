@@ -2,9 +2,11 @@
 
 This roadmap outlines the planned order of development toward the v1.0 live forecast release
 (January 2027) and beyond. This page was last substantially revised **July 2026**, following a full codebase
-review and a reprioritisation (decided 2026-07-01): **the top priority is getting *any* v0.1
-forecast running on AWS** — scientific-improvement work waits until the live service is running.
-Technical plans change as we learn more — treat this as a best-estimate, not a guarantee.
+review and a reprioritisation (decided 2026-07-01) that made **getting *any* forecast running on
+AWS** the top priority over scientific-improvement work. That shipped as v0.1 in July 2026; the
+live service is now on v0.2 (deployed 13 August 2026), and work continues on the milestones below
+toward v1.0. Technical plans change as we learn more — treat this as a best-estimate, not a
+guarantee.
 
 > For how this page relates to GitHub issues, `docs/architecture/`, and the rest of the docs —
 > and which place to put new planning content — see the
@@ -29,7 +31,7 @@ Technical plans change as we learn more — treat this as a best-estimate, not a
   price for a network breach, their limitations, and the open questions for NGED.
 - [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
   weather datasets (ECMWF ENS, ERA5, CM SAF).
-- [Live service](live-service.md) — the v0.1 deployment: the `live_forecasts` inference
+- [Live service](live-service.md) — the AWS deployment: the `live_forecasts` inference
   asset, the champion-model container, the costed AWS architecture options, and production
   monitoring.
 - [Handover to NGED](handover.md) — the preferred post-NIA operating model (NGED runs the
@@ -65,7 +67,8 @@ GitHub epic issue.
 ## v0.1 — "Naive" MVP (internal only)
 
 *Epic: [#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137) — deploy the
-naive forecast on AWS. **✅ Shipped July 2026** (`v0.1.0`) — running on AWS.*
+naive forecast on AWS. **✅ Shipped July 2026** (`v0.1.0`), superseded on AWS by v0.2 on
+13 August 2026.*
 
 **Goal**: A simple XGBoost forecast that lets us test infrastructure end-to-end and establish a
 baseline. Intentionally does not detect switching events or estimate effective capacity — hence
@@ -79,14 +82,26 @@ AWS — see [Live service](live-service.md).
 
 ## v0.2 — Code Quality & Documentation
 
-*Epic: [#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)*
+*Epic: [#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138) — code
+quality, reproducibility and observability hardening. **✅ Shipped 13 August 2026** (`v0.2.0`) —
+running on AWS.*
 
 - More unit tests, including scientific-rigor tests (CV-windowing no-lookahead,
-  leaderboard-fairness, determinism)
+  leaderboard-fairness, determinism) ✅
+  ([#62](https://github.com/openclimatefix/nged-substation-forecast/issues/62); no-lookahead and
+  determinism are exercised by `test_nullify_leaky_lags`,
+  `test_engineer_features_weather_lag_leakage_prevention` and
+  `test_random_seed_makes_training_deterministic`, alongside new package coverage for
+  `dynamical_data` ([#163](https://github.com/openclimatefix/nged-substation-forecast/issues/163))
+  and `geo` ([#164](https://github.com/openclimatefix/nged-substation-forecast/issues/164)))
 - CI on GitHub (ruff + ty + pytest on every PR) ✅ (per-PR gate + nightly network tests; see
   [Testing → Continuous integration](../architecture/testing.md#continuous-integration))
-- Improve documentation
-- Verify daylight savings time handling is correct
+- Improve documentation ✅
+  ([#139](https://github.com/openclimatefix/nged-substation-forecast/issues/139))
+- Verify daylight savings time handling is correct ✅
+  ([#84](https://github.com/openclimatefix/nged-substation-forecast/issues/84);
+  `test_apply_local_time_features_dst_transitions` covers both the spring-forward and fall-back
+  transition instants)
 - Reproducibility stamping: git SHA + Delta table versions on every MLflow run ✅ (implemented in
   `ml_core._repro`; every MLflow run carries the stamp)
 - Drop Hydra in favour of plain YAML + importlib + pydantic ✅ (`contracts.config_schemas` owns the

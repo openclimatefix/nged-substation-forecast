@@ -1,10 +1,10 @@
 # XGBoost improvements ("quick wins")
 
-> **Status: 🚧 Planned (v0.5) — deferred until v0.1 is live on AWS.** Epic:
+> **Status: 🚧 Planned (v0.5).** Epic:
 > [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145); the Tier-1
 > quick wins are [#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230).
-> Getting *any* forecast live ([Live service](live-service.md)) takes priority over forecast
-> quality.
+> The live service is running ([Live service](live-service.md), now on v0.2); forecast-quality
+> work follows once v0.3 and v0.4 land.
 
 Quick wins to make XGBoost a strong baseline before the advanced approaches land — explicitly
 *not* deep ML work ("little point in spending ages on the ML model before we have good capacity
@@ -480,10 +480,9 @@ per-type sets (solar features for PV, turbine features for wind, holidays for de
 
 Full data cleaning is roadmap v0.4, but training on stuck meters and false zeros actively
 teaches the model wrong targets *today* (quality issues are ~10%+ of some series). Cheap
-interim: drop training rows whose target sits inside a detected stuck window (rolling std ≈ 0;
-`DataQualitySettings.stuck_std_threshold` already exists) or an isolated exact-zero run.
-Cleaning only the *training* target is much lower-risk than cleaning delivered data, and it
-protects every subsequent experiment from learning artefacts.
+interim: drop training rows whose target sits inside a detected stuck window (rolling std ≈ 0)
+or an isolated exact-zero run. Cleaning only the *training* target is much lower-risk than
+cleaning delivered data, and it protects every subsequent experiment from learning artefacts.
 
 ### Effective (smoothed) temperature and degree-day features
 

@@ -1,4 +1,4 @@
-"""Inspect the three baseline-export parquets produced by ``scripts/export_forecasts_for_alex.py``.
+"""Inspect the three baseline-export parquets produced by ``scripts/export_baseline_forecasts.py``.
 
 For a chosen time series it overlays observed power against the forecast (ensemble mean, p50, and
 the p10-p90 band), plots the observed-minus-expected residual (the raw material for switching-event

@@ -1098,6 +1098,7 @@ version = "0.2.0"
 source = { editable = "packages/dashboard" }
 dependencies = [
     { name = "altair" },
+    { name = "anywidget" },
     { name = "contracts" },
     { name = "deltalake" },
     { name = "geoarrow-pyarrow" },
@@ -1120,6 +1121,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "altair", specifier = ">=6.0.0" },
+    { name = "anywidget" },
     { name = "contracts", editable = "packages/contracts" },
     { name = "deltalake" },
     { name = "geoarrow-pyarrow", specifier = ">=0.2.0" },
@@ -2586,6 +2588,7 @@ version = "0.2.0"
 source = { editable = "packages/ml_core" }
 dependencies = [
     { name = "contracts" },
+    { name = "deltalake" },
     { name = "mlflow-skinny" },
     { name = "patito" },
     { name = "polars" },
@@ -2596,6 +2599,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "contracts", editable = "packages/contracts" },
+    { name = "deltalake" },
     { name = "mlflow-skinny" },
     { name = "patito" },
     { name = "polars", specifier = ">=1.0.0" },
@@ -2842,7 +2846,6 @@ name = "nged-substation-forecast"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
-    { name = "altair" },
     { name = "contracts" },
     { name = "dagster" },
     { name = "dagster-aws" },
@@ -2855,13 +2858,10 @@ dependencies = [
     { name = "ml-core" },
     { name = "mlflow-skinny" },
     { name = "nged-data" },
-    { name = "obstore" },
     { name = "patito" },
-    { name = "plotting" },
     { name = "polars" },
     { name = "pyarrow" },
     { name = "pyyaml" },
-    { name = "requests" },
     { name = "sentry-sdk" },
     { name = "xgboost-forecaster" },
 ]
@@ -2886,7 +2886,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "altair", specifier = ">=6.0.0" },
     { name = "contracts", editable = "packages/contracts" },
     { name = "dagster", specifier = ">=1.12.11" },
     { name = "dagster-aws", specifier = ">=0.28.11" },
@@ -2899,13 +2898,10 @@ requires-dist = [
     { name = "ml-core", editable = "packages/ml_core" },
     { name = "mlflow-skinny" },
     { name = "nged-data", editable = "packages/nged_data" },
-    { name = "obstore" },
     { name = "patito" },
-    { name = "plotting", editable = "packages/plotting" },
     { name = "polars", specifier = ">=1.0.0" },
     { name = "pyarrow" },
     { name = "pyyaml" },
-    { name = "requests", specifier = ">=2.31.0" },
     { name = "sentry-sdk", specifier = ">=2.66,<3" },
     { name = "xgboost-forecaster", editable = "packages/xgboost_forecaster" },
 ]
@@ -4880,20 +4876,8 @@ dependencies = [
     { name = "polars" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-]
-
 [package.metadata]
 requires-dist = [{ name = "polars", specifier = ">=1.38.1" }]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest-cov" },
-]
 
 [[package]]
 name = "websockets"

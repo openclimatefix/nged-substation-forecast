@@ -427,5 +427,12 @@ def test_nwp_rows_are_clipped_to_the_plotted_window() -> None:
 
 
 def test_chart_renders_to_html() -> None:
+    """``to_html()`` walks a different Altair code path from the ``.to_dict()`` calls elsewhere in
+    this module: it must produce a genuine, self-contained document that wires the spec up to
+    Vega-Embed, not merely a spec dict that happens to be well-formed. The spec's own field names
+    (e.g. ``"ensemble_member"``) are already pinned nineteen times over by those ``.to_dict()``
+    tests, so this one checks only what is specific to the HTML path.
+    """
     html = _build().to_html()
-    assert "ensemble_member" in html
+    assert html.startswith("<!DOCTYPE html>")
+    assert "vegaEmbed(" in html

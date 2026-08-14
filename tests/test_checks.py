@@ -1435,7 +1435,9 @@ def test_live_forecasts_check_degrades_on_a_malformed_meta_json(env: Path) -> No
     directory = Path(settings.production_model_path)
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "meta.json").write_text(
-        json.dumps({"trained_time_series_ids": "12", "model_params": {"experiment_name": None}})
+        json.dumps(
+            {"trained_time_series_ids": "12", "model_params": {"experiment_name": _EXPERIMENT}}
+        )
     )
 
     result = _run_live_check()

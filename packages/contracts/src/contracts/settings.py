@@ -52,38 +52,6 @@ and the caveat for wheels installed outside a workspace checkout.
 """
 
 
-class DataQualitySettings(BaseSettings):
-    """Settings for data quality thresholds in substation flow processing.
-
-    These thresholds are used to identify problematic telemetry data:
-
-    - `stuck_std_threshold`: When the rolling standard deviation falls below this value
-      (across `stuck_window_periods`), the sensor is likely stuck. We replace such
-      values with null to preserve the temporal grid. A value of 0.01 MW was chosen
-      because substations with normal operation typically have much higher variability.
-
-    - `max_mw_threshold`: Active power above this value is considered physically
-      unrealistic for primary substations in the NGED portfolio. A threshold of 150 MW
-      was chosen because typical primary substations operate in the tens of MW range,
-      and values exceeding 100 MW are extremely rare anomalies.
-
-    - `min_mw_threshold`: Active power below this value is potentially erroneous
-      (negative values can occur at times of high renewable generation). A threshold of
-      -50.0 MW was chosen to allow for reverse power flow during high renewable
-      generation periods while still catching implausible extreme negative values.
-
-    Centralizing these in Settings allows them to be configurable per environment
-    (dev/staging/prod) while preventing logic drift between asset checks and data
-    cleaning steps. All code that references these thresholds should import them from
-    here, not define them locally.
-    """
-
-    stuck_std_threshold: float = 0.01
-    stuck_window_periods: int = 48  # Each period is 30 minutes.
-    max_mw_threshold: float = 150.0
-    min_mw_threshold: float = -50.0
-
-
 class Settings(BaseSettings):
     """Configuration settings for the NGED substation forecast project."""
 
@@ -96,11 +64,6 @@ class Settings(BaseSettings):
             " MLFLOW_TRACKING_URI environment variable accordingly, which MLflow will"
             " automatically pick up."
         ),
-    )
-
-    data_quality: DataQualitySettings = Field(
-        default_factory=DataQualitySettings,
-        description="Configurable thresholds for data quality checks.",
     )
 
     # Credentials for NGED's *source* bucket, which lives in NGED's AWS account. Empty by default,

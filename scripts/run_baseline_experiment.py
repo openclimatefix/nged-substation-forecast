@@ -168,7 +168,7 @@ def main() -> None:
         _run_pipeline(instance)
 
     _report_metrics()
-    print("\nDone. Now run: uv run python scripts/export_forecasts_for_alex.py")
+    print("\nDone. Now run: uv run python scripts/export_baseline_forecasts.py")
 
 
 if __name__ == "__main__":

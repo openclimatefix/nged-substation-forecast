@@ -1,22 +1,36 @@
 # NGED JSON Data
 
-This package handles the ingestion and processing of NGED's new JSON data format.
+This package reads NGED's telemetry JSON files from S3, parses them into the `PowerTimeSeries`
+and `TimeSeriesMetadata` schemas (see `contracts`), and writes them to Delta Lake and Parquet.
 
-## Key Components
+## Public surface
 
-- `load_nged_json`: Loads and parses NGED JSON files.
-- `clean_power_time_series`: Cleans power data, including filtering out "stuck" sensors based on daily variance and insane values.
-- `append_to_delta`: Appends cleaned data to a Delta table, ensuring no duplicates.
-- `upsert_metadata`: Upserts metadata to a Parquet file.
+- `list_timeseries_json_files(store)` — lists the timeseries JSON files on NGED's S3 bucket,
+  parsing `time_series_id`, `start_time` and `end_time` out of each file's path.
+- `remove_small_files_from_listing(file_listing, size_threshold_bytes=520)` — drops files too
+  small to carry any readings, so `download_and_parse_files` never fetches and parses one only
+  to discard the result.
+- `download_and_parse_files(store, paths_df)` — downloads and parses each listed file, returning
+  a `DownloadAndParseResult` of `metadata` (`TimeSeriesMetadata`), `power_time_series`
+  (`PowerTimeSeries`) and `n_implausible_power_rows_dropped`. Raises `NoNewData` if none of the
+  listed files yielded any metadata or power rows.
+- `select_new_rows(time_series, delta_path, storage_options=None)` — filters `time_series` down
+  to rows newer than what the `power_time_series` Delta table at `delta_path` already holds, per
+  `time_series_id`.
+- `time_series_coverage(delta_path, storage_options=None)` — the earliest and latest observation
+  `time` on disk for each `time_series_id` in the `power_time_series` Delta table.
+- `upsert_metadata(new_metadata, metadata_path, storage_options=None)` — merges a
+  `TimeSeriesMetadata` snapshot into the stored metadata Parquet file, keeping the newest values
+  per `time_series_id` and rewriting the file only if something changed.
 
-## Data Quality
+## Data quality
 
-NGED provides data every 6 hours via JSON files on S3. The data has several known quality issues that are handled during ingestion:
-
-- **Stuck values**: Detected by computing the standard deviation over a 24-hour rolling window; periods where std is below a threshold are removed.
-- **Outliers / invalid values**: Isolated zeros in non-zero time series and values beyond a threshold number of standard deviations from the mean are removed.
-- **Early ramp-up period**: The first ~two months of each time series are typically low quality (meter calibration period) and are discarded.
+`download_and_parse_files` drops rows whose `time` is malformed — outside the plausible
+datetime range, null, or not aligned to the top or bottom of the hour — via
+`PowerTimeSeries.drop_implausible_rows`, and reports how many as
+`n_implausible_power_rows_dropped`. No other cleaning happens during ingestion.
 
 ## Usage
 
-This package is used by the `power_time_series_and_metadata` Dagster asset in `src/nged_substation_forecast/defs/assets.py`.
+This package is used by the `power_time_series_and_metadata` Dagster asset in
+`src/nged_substation_forecast/defs/assets.py`.
