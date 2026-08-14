@@ -10,14 +10,13 @@ are forced to pick different runs.
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
 
 import patito as pt
 import polars as pl
 import pytest
 from _nwp_test_data import nwp_records, write_test_nwp
 from contracts.ml_schemas import AllFeatures
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.weather_schemas import Nwp
 from dagster import (
@@ -28,7 +27,6 @@ from dagster import (
     materialize,
 )
 from ml_core.base_forecaster import write_trained_metadata
-from ml_core.features import TabularFeatureEngineer
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 from nged_substation_forecast.defs import production_assets
@@ -461,27 +459,29 @@ def test_live_power_history_covers_the_longest_selected_power_lag(
     ``LIVE_POWER_HISTORY`` too short to cover a real lag feature is invisible to them —
     ``conf/model/xgboost.yaml`` selects ``power_lag_336h``, and shrinking the window from 15 days
     to 1 hour leaves every other test in this file green. This test trains on ``power_lag_336h``
-    directly and pins that the frame ``live_forecasts`` hands to ``predict`` carries no nulls in
-    that column for a genuine forecast row.
+    directly and spies on ``XGBoostForecaster.predict`` to capture the exact frame
+    ``live_forecasts`` hands it — the frame *after* production's own
+    ``valid_time > power_fcst_init_time`` / ``ensemble_member is not null`` filter runs, so this
+    test observes that filter's real output rather than re-deriving it — and pins that the
+    captured frame carries no nulls in that column.
     """
-    captured: list[pt.LazyFrame] = []
-    real_engineer = TabularFeatureEngineer.engineer
+    captured: list[pt.LazyFrame[AllFeatures]] = []
+    real_predict = XGBoostForecaster.predict
 
-    def _spy_engineer(self: TabularFeatureEngineer, **kwargs: Any) -> pt.LazyFrame:
-        result = real_engineer(self, **kwargs)
-        captured.append(result)
-        return result
+    def _spy_predict(
+        self: XGBoostForecaster, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
+    ) -> pt.DataFrame[PowerForecast]:
+        captured.append(data)
+        return real_predict(self, data, fold_id=fold_id)
 
-    monkeypatch.setattr(TabularFeatureEngineer, "engineer", _spy_engineer)
+    monkeypatch.setattr(XGBoostForecaster, "predict", _spy_predict)
 
     _write_power_with_long_history(str(tmp_path / "NGED" / "power_time_series.delta"))
     _save_model_trained_on_power_lag(tmp_path / "production_model")
 
     assert _materialize(dagster_instance, "live").success
 
-    (features_lf,) = captured
-    genuine = features_lf.filter(
-        pl.col("valid_time") > _POWER_FCST_INIT_TIME, pl.col("ensemble_member").is_not_null()
-    ).collect()
+    (predicted_from,) = captured
+    genuine = predicted_from.collect()
     assert genuine.height > 0
     assert genuine["power_lag_336h"].null_count() == 0
