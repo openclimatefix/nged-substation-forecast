@@ -58,8 +58,8 @@ $$
 
 where $V_{i,t}$ is the volume the model would have bought (or curtailed) for time series $i$ in
 half-hour $t$, and $N_{i,t}$ is the volume that turned out to be needed. Measuring unmet *energy*
-rather than counting missed events matters: at a p99 limit the events are rare, and a count of them
-is too noisy to rank models by.
+rather than counting missed events matters: exceedances of the limit are rare by construction, and
+a count of them is too noisy to rank models by.
 
 **$\tau$ is calibrated on training folds only.** Tuning it on the fold being scored would let a
 model see its own future, and every pound of the resulting "saving" would be lookahead.
@@ -142,26 +142,23 @@ experiment.
 ## Choosing the limit
 
 Real network limits move with ambient temperature, with how long an overload lasts, with season and
-with switching state, so no single number is correct. We use a **synthetic limit** — a percentile
-of each series' own full observation history, for the same full-history stability reason the
-[NMAE denominator](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity) uses — and
-report the metric at **both the 95th and 99th percentiles**, labelled `hist_p95` and `hist_p99`.
+with switching state, so no single number is correct. We use a **synthetic limit**: the **95th
+percentile of each series' own full observation history**, for the same full-history stability
+reason the [NMAE denominator](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
+uses. Its label is `historical_p95`, kept distinct from the forecast-quantile label `p95` — one is
+a fixed power level derived from history, the other a level of the forecast distribution.
+
+This is the same single rung the [tail and exceedance
+metrics](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
+use, so the leaderboard carries one threshold concept rather than several. We chose the 95th over
+the 99th because 99th-percentile exceedances are rare enough that the resulting numbers may be too
+noisy to separate models — but NGED talked in terms of the 99th, so
+[question 6](#questions-for-nged) puts the choice back to them.
 
 NGED offered real firm and flex capacities for the trial area, and we want them — for the case
-studies below, and to check that the synthetic limits land somewhere sensible. They cannot replace
-the synthetic limit for ranking, because a real rating that was never breached during the scoring
-window produces zero exceedance events, and no model can be graded on events that never happened.
-
-The 99th percentile is the better stand-in for a network close to its limit only at winter peak.
-The 95th exists because 99th-percentile exceedances may be too rare to separate models, and that is
-a question for data rather than assumption. If the two rank models identically we keep the 99th
-alone.
-
-**This ladder differs from the one the tail and exceedance metrics use** (the 90th and 98th
-percentiles, `hist_p90` / `hist_p98`). NGED endorsed the 95th/99th for procurement decisions; the
-older rungs were our own choice, made before that conversation. Two ladders on one leaderboard is
-not a good end state and [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254)
-should reconcile them.
+studies below, and to check that the synthetic limit lands somewhere sensible. They cannot replace
+it for ranking, because a real rating that was never breached during the scoring window produces
+zero exceedance events, and no model can be graded on events that never happened.
 
 ## What these numbers do not capture
 
@@ -187,9 +184,9 @@ should reconcile them.
 - **Ensemble size limits how finely $\tau$ can be tuned.** Manual review has 13 analogues, so its
   quantiles come in coarse steps; a 51-member ensemble is far finer. Models of different ensemble
   size cannot be landed on exactly the same risk.
-- **Costs are per fold, and folds are seasonal.** A 99th-percentile limit concentrates exceedances
-  at winter peak, so annualising a fold that does not span a whole year is meaningless. A fold with
-  no exceedance at all leaves the unmet fraction undefined.
+- **Costs are per fold, and folds are seasonal.** The limit concentrates exceedances at winter
+  peak, so annualising a fold that does not span a whole year is meaningless. A fold with no
+  exceedance at all leaves the unmet fraction undefined.
 - **Nothing is validated against real spend**, except at the trial-area sites that sit in an actual
   flexibility zone. There are a couple, and they are the case studies that tell us whether these
   numbers are the right order of magnitude.
@@ -211,7 +208,10 @@ should reconcile them.
    procured-versus-needed volumes for a single zone would anchor it.
 5. **Is the 95th percentile of the 13 analogues the operating point** you actually work from, and
    what reliability do you target — how much genuinely-needed flexibility may go unbought?
-6. **Which trial-area sites have curtailable generation**, which sit in a real flexibility zone with
+6. **Is the 95th percentile the right limit to score against?** You talked in terms of the 99th. We
+   went with the 95th because 99th-percentile exceedances look too rare to rank models cleanly, but
+   the choice is yours to overrule.
+7. **Which trial-area sites have curtailable generation**, which sit in a real flexibility zone with
    procurement history we can use as a case study, and can we have the firm and flex capacities?
 
 ## Implementation details (deleted when this ships)
@@ -219,12 +219,11 @@ should reconcile them.
 - Two functions in `packages/ml_core/src/ml_core/metrics.py`, sharing a private helper taking the
   limit, the price and the direction. They consume the same ensemble-member rows as the existing
   quantile metrics.
-- **This needs a `Metrics` contract change, to be agreed before it is written**: `METRIC_NAMES`
-  gains `flex_procurement_cost_gbp`, `curtailment_cost_gbp` and `unmet_fraction`, and
-  `METRIC_PARAMS` gains `hist_p95` / `hist_p99`. The `hist_` prefix is not decoration — bare
-  `"p95"` and `"p99"` already exist in `QUANTILE_METRIC_PARAMS` meaning *forecast* quantiles, and
-  the tail-metric design chose the prefix precisely to keep a history-derived power level distinct
-  from a level of the forecast distribution.
+- **This needs a `Metrics` contract change, still to be reviewed and agreed when we implement**:
+  `METRIC_NAMES` gains `flex_procurement_cost_gbp`, `curtailment_cost_gbp` and `unmet_fraction`,
+  and `METRIC_PARAMS` gains `historical_p95`. The prefix is not decoration — bare `"p95"` already
+  exists in `QUANTILE_METRIC_PARAMS` meaning a *forecast* quantile, and a history-derived power
+  level has to stay distinct from a level of the forecast distribution.
 - Costs are stored **per `time_series_id`**, summed over time only, so they fit the existing primary
   key; the portfolio headline is their sum. Only $\tau$ and the unmet target are pooled across
   series.

@@ -440,20 +440,19 @@ their scoring properties**, and state plainly that they are a proxy — these me
 "skill near a fixed line standing where the limit typically lives", not operational breach
 prediction:
 
-- **The threshold ladder: the P90 and P98 of each series' full observation history** (of
-  power in the constraint-side direction — see below). Labels `hist_p90` / `hist_p98` in
-  `metric_param`, deliberately distinct from forecast-quantile labels like `p95`: one names a
-  fixed power level derived from history, the other a level of the forecast distribution. The
-  two rungs give a "busy periods" and a "genuinely extreme" read without exploding the key
-  count.
+- **The threshold: the P95 of each series' full observation history** (of power in the
+  constraint-side direction — see below), the rung NGED endorsed. Its label in `metric_param`
+  is `historical_p95`, deliberately distinct from the forecast-quantile label `p95`: one names
+  a fixed power level derived from history, the other a level of the forecast distribution.
+  The prefix is spelled out rather than shortened to `hist_`, which reads as "histogram".
 
 - **Why historical quantiles rather than the physical ratings:** ratings are not available
   for every series; a rating that is never breached in a 12-month validation window yields
   *zero events* — and a warning system cannot be graded on events that never happen; and
   per-series ratings sit at wildly different points of each series' distribution, breaking
-  cross-series comparability. Full-history quantile thresholds guarantee every series a
-  scoreable event rate (~10% and ~2% by construction), are identical in meaning across
-  series, and are stable across CV folds for the same reason the
+  cross-series comparability. A full-history quantile threshold guarantees every series a
+  scoreable event rate (~5% by construction), is identical in meaning across series, and is
+  stable across CV folds for the same reason the
   [effective-capacity denominator](../roadmap/metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
   is computed over the full history.
 
