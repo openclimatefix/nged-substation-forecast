@@ -235,12 +235,13 @@ in the run config dialog before launching.
    partition columns (`experiment_name` / `fold_id`) are `String`, matching what delta-rs stores,
    so the predicates push straight into the Delta scan: naming an experiment/fold prunes to just
    that partition rather than reading the whole (unbounded) table.
-2. In `leaderboard` scope, drops any group whose `fold_id` is not defined in the CV config, naming
-   the dropped ids in a warning and in the asset's `skipped_fold_ids` metadata. The live service
-   writes to this same table under `fold_id="live"`, so an unfiltered leaderboard run finds it;
-   leaderboard scope dates its evaluation window from the CV config and has none for those rows.
-   To score live output, run the asset with `evaluation_scope="ad_hoc"`, which takes the window
-   from the forecast rows themselves.
+2. In `leaderboard` scope, drops any group whose `fold_id` is not a leaderboard fold in the CV
+   config, naming the dropped ids in a warning and in the asset's `skipped_fold_ids` metadata. The
+   live service writes to this same table under `fold_id="live"`, and a non-leaderboard dev fold
+   such as `smoke_test` lands there too, so an unfiltered leaderboard run finds both; leaderboard
+   scope dates its evaluation window from the CV config's leaderboard folds and has none for those
+   rows. To score live output or a dev fold, run the asset with `evaluation_scope="ad_hoc"`, which
+   takes the window from the forecast rows themselves.
 3. Discovers the matching `(experiment_name, fold_id)` groups, then loads and scores **one group at
    a time** — peak memory is a single fold, not the entire matched population. (A whole fold is
    the *coarsest* chunk Polars can safely materialise: fine at V1 scale, but a V2-scale fold will
