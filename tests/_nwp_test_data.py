@@ -97,9 +97,19 @@ def write_test_nwp(path: str, records: list[dict]) -> None:
     declares (never the raw ints a hand-rolled sentinel could hide behind), and calls
     ``Nwp.validate`` so a dtype or range mistake in ``records`` raises here — loudly, and before
     the frame ever reaches the CV pipeline the caller's test is exercising — rather than silently
-    training and scoring a model on data the contract would reject. Partitioned by
-    ``(nwp_model_id, init_time)``, matching the layout ``delta_store.nwp.write_nwp`` produces for
-    the real table.
+    training and scoring a model on data the contract would reject.
+
+    This can't simply call ``delta_store.nwp.write_nwp``: that function also rounds every
+    continuous variable to a 13-bit significand, which would silently perturb some of this
+    fixture's hand-picked values (measured: ``pressure_surface`` 101000.0 -> 100992.0,
+    ``pressure_reduced_to_mean_sea_level`` 101500.0 -> 101504.0, ``precipitation_surface`` rounds
+    too), and applies writer properties (compression level, encoding) that exist to optimise the
+    real table's on-disk size, not to serve a test fixture. Those two are deliberately *not*
+    shared. What *is* shared with ``write_nwp`` — the ``(nwp_model_id, init_time)`` partitioning
+    and the Enum-to-String strip delta-rs requires for ``nwp_model_id`` — is hand-copied below
+    because ``write_nwp`` doesn't expose it as an importable constant; a change to that layout
+    silently going stale here is caught by
+    ``tests/test_nwp_test_data.py::test_partition_layout_matches_write_nwp``, not by construction.
     """
     df = pl.DataFrame(records).cast(
         {
@@ -116,6 +126,8 @@ def write_test_nwp(path: str, records: list[dict]) -> None:
     # Strip the Patito model before reverting nwp_model_id to String: delta-rs cannot store an
     # Enum column, matching how `delta_store.nwp.write_nwp` prepares the real table for disk.
     prepared = pl.DataFrame._from_pydf(validated._df).cast({"nwp_model_id": pl.String})
+    # `partition_by` hand-copies `delta_store.nwp.write_nwp`'s layout — see the docstring above
+    # for why this can't just call `write_nwp`, and `test_nwp_test_data.py` for the drift guard.
     write_deltalake(
         table_or_uri=path, data=prepared.to_arrow(), partition_by=["nwp_model_id", "init_time"]
     )
