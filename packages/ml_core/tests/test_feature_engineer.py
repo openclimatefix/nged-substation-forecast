@@ -1,11 +1,13 @@
 """Unit tests for the FeatureEngineer strategy and its nearest-cell NWP spatial join."""
 
+import inspect
 from datetime import datetime
 
 import patito as pt
 import polars as pl
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import Nwp
+from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE, FeatureEngineer
 from ml_core.features.tabular_feature_engineer import (
     TabularFeatureEngineer,
     _attach_nearest_nwp_cell,
@@ -209,3 +211,49 @@ def test_tabular_feature_engineer_threads_local_timezone() -> None:
     # power observation; every row shares the same valid_time, so every offset is 330.
     assert set(result["local_utc_offset_minutes"].to_list()) == {330}
     assert result.height == 2
+
+
+def test_tabular_feature_engineer_default_local_timezone_is_london() -> None:
+    """Calling ``engineer()`` with no ``local_timezone`` must default production to Europe/London.
+
+    Every production and CV call site (``production_assets.py``, ``cv_assets.py``) calls
+    ``engineer()`` without passing ``local_timezone``, so this is the value they all actually get
+    — and it is invisible to every other test in this module, which passes ``local_timezone``
+    explicitly. British Summer Time gives a UTC+1 offset in June, so the correct default
+    (``Europe/London``) yields ``local_utc_offset_minutes == 60``; a wrong default (e.g.
+    ``Asia/Kolkata``'s fixed +5:30) would silently produce ``330`` instead, with every other test
+    in the suite still green.
+    """
+    valid_time = datetime(2024, 6, 1, 12, 0)
+    power = pt.LazyFrame.from_existing(
+        pl.DataFrame({"time_series_id": [1], "time": [valid_time], "power": [100.0]}).lazy()
+    ).set_model(PowerTimeSeries)
+
+    result = (
+        TabularFeatureEngineer()
+        .engineer(
+            selected_features={"local_utc_offset_minutes"},
+            power_time_series=power,
+            time_series_metadata=_metadata_two_series(),
+            nwp=_nwp_two_cells(),
+        )
+        .collect()
+    )
+
+    assert set(result["local_utc_offset_minutes"].to_list()) == {60}
+
+
+def test_feature_engineer_abc_declares_local_timezone_parameter() -> None:
+    """``local_timezone`` is part of the ``FeatureEngineer`` interface, not just the one subclass.
+
+    Inspects the *abstract* method's own signature, deliberately not a concrete instance assigned
+    to a ``FeatureEngineer``-typed variable: ``ty`` narrows a declared-``FeatureEngineer`` receiver
+    back to the concrete ``TabularFeatureEngineer`` on assignment, so a test written that way would
+    still type-check even if ``local_timezone`` were deleted from the ABC — silently passing both
+    pytest and ``ty``. Reading ``FeatureEngineer.engineer``'s signature directly has no such
+    loophole: a future ``FeatureEngineer`` implementation for another region can only be relied on
+    to accept ``local_timezone`` if the interface itself declares it.
+    """
+    parameters = inspect.signature(FeatureEngineer.engineer).parameters
+    assert "local_timezone" in parameters
+    assert parameters["local_timezone"].default == DEFAULT_LOCAL_TIMEZONE

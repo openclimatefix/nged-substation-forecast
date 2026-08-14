@@ -31,22 +31,29 @@ def _patch_delta_table(monkeypatch: pytest.MonkeyPatch, raw_init_times: set[str]
 
 
 @pytest.mark.parametrize(
-    "raw_value",
+    ("raw_value", "expected"),
     [
-        "2026-07-04 00:00:00.000000",  # delta-rs' current rendering: always six fractional digits
-        "2026-07-04 00:00:00",  # a hypothetical future delta-rs release dropping trailing zeros
+        # delta-rs' current rendering: always six fractional digits.
+        ("2026-07-04 00:00:00.000000", datetime(2026, 7, 4, 0, 0, tzinfo=UTC)),
+        # A hypothetical future delta-rs release dropping trailing zeros.
+        ("2026-07-04 00:00:00", datetime(2026, 7, 4, 0, 0, tzinfo=UTC)),
+        # An offset-carrying rendering: must be *converted* to the same instant, not relabelled.
+        # ``.replace(tzinfo=UTC)`` would wrongly yield 2026-07-04 00:00:00+00:00 here.
+        ("2026-07-04 00:00:00+02:00", datetime(2026, 7, 3, 22, 0, tzinfo=UTC)),
     ],
 )
 def test_available_nwp_init_times_parses_both_fractional_second_renderings(
-    monkeypatch: pytest.MonkeyPatch, raw_value: str
+    monkeypatch: pytest.MonkeyPatch, raw_value: str, expected: datetime
 ) -> None:
     """Must survive either spelling delta-rs might emit for a whole-second ``init_time``.
 
     ``datetime.strptime``'s ``%f`` directive requires at least one fractional digit, so it would
     raise on the second rendering; ``datetime.fromisoformat`` (what the code uses) accepts both.
+    An offset-carrying string is not one delta-rs emits today, but the parser must convert it to
+    the correct UTC instant rather than silently relabelling its wall-clock digits as UTC.
     """
     _patch_delta_table(monkeypatch, {raw_value})
 
     result = production_assets._available_nwp_init_times(Settings())
 
-    assert result == [datetime(2026, 7, 4, 0, 0, tzinfo=UTC)]
+    assert result == [expected]

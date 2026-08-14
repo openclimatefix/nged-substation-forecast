@@ -35,9 +35,10 @@ cannot drift apart.
 
 ## Features (`selected_features`)
 
-`selected_features` is a list of strings. Registration only checks that it is a list of
-strings — a typo'd top-level key (e.g. `selected_featuers`) is rejected there, by pydantic's
-`extra="forbid"` on `BaseForecasterConfig`. The individual strings inside the list are not
+`selected_features` is a set of strings, written in the YAML as a list. Registration only checks
+that it is a list of strings coercible to that set — a typo'd top-level key (e.g.
+`selected_featuers`) is rejected there, by pydantic's `extra="forbid"` on `BaseForecasterConfig`.
+The individual strings inside the list are not
 parsed until training runs: the feature engineering pipeline
 (`ml_core.features._parsed_features.ParsedFeatures.from_strings`) parses each one into a typed
 descriptor and raises `ValueError` on any unrecognised or forbidden name, so a typo'd feature

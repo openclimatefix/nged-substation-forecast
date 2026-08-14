@@ -585,6 +585,33 @@ def test_compute_metrics_picp_boundary_is_inclusive():
     assert _metric_value(result, "picp", metric_param="p10_p90") == 1.0
 
 
+def test_compute_metrics_picp_distinguishes_bands():
+    """Each band's PICP comes from its own quantile pair, not one pair shared by every band.
+
+    101 members evenly spaced 0..100 give every ``DELIVERY_QUANTILES`` level ``q`` an exact
+    empirical quantile of ``100*q`` (linear interpolation lands on an integer member for every
+    level in that tuple), so each band's bounds are exactly its own p-labels: ``p35_p65`` =
+    [35, 65], ``p20_p80`` = [20, 80]. An actual of 30 sits inside ``p20_p80`` but outside
+    ``p35_p65``. Every other PICP assertion in this file uses only ``p10_p90``, with an actual
+    that is inside every band, outside every band, or on every bound — so a mutation that scored
+    every band's PICP off one shared pair (e.g. always the widest, ``p1_p99``) would still pass
+    them all. This is the one case that catches that: it requires two bands' PICPs to differ.
+    """
+    times = [_utc(2022, 1, 1, 0, 0)]
+    actuals = _make_actuals(1, times, [30.0])
+    forecasts = _make_ensemble_forecasts(1, times, [[float(m) for m in range(101)]])
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [100.0]))
+
+    assert _metric_value(result, "picp", metric_param="p20_p80") == 1.0
+    assert _metric_value(result, "picp", metric_param="p35_p65") == 0.0
+    assert math.isclose(
+        _metric_value(result, "interval_width", metric_param="p20_p80"), 60.0, rel_tol=1e-6
+    )
+    assert math.isclose(
+        _metric_value(result, "interval_width", metric_param="p35_p65"), 30.0, rel_tol=1e-6
+    )
+
+
 def test_compute_metrics_perfect_forecast_scores_finite_zero_spread_skill():
     """A perfect deterministic forecast (RMSE = 0, spread = 0) scores 0, never NaN.
 

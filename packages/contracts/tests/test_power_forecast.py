@@ -2,8 +2,20 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import patito as pt
+import polars as pl
 import pytest
 from contracts.power_schemas import PowerForecast
+
+
+def test_power_forecast_power_fcst_is_float32():
+    """``power_fcst`` must stay ``Float32`` — the dtype ``delta_store`` writes and rounds.
+
+    ``packages/delta_store/tests/test_power_forecasts.py`` exercises the write path and would
+    catch a widened dtype too, but only there — nothing inside `contracts` itself pins the dtype
+    this schema declares, so a `contracts`-only change could widen it with every test in this
+    package still green.
+    """
+    assert PowerForecast.dtypes["power_fcst"] == pl.Float32
 
 
 def test_power_forecast_validation():
