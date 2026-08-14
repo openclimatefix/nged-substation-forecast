@@ -55,10 +55,11 @@ def _apply_weather_lag(
 ) -> pl.LazyFrame:
     """Applies a weather lag using a dual-strategy time-aware join.
 
-    - If target_time > power_fcst_init_time (in the NWP forecast window), uses the exact same
-      NWP run (nwp_init_time) and ensemble member as the weather used for valid_time.
-    - If target_time <= power_fcst_init_time (in the past), uses the freshest NWP run
-      (control member, ensemble 0) for that target time.
+    - If target_time >= power_fcst_init_time (in the NWP forecast window, including the
+      boundary), uses the exact same NWP run (nwp_init_time) and ensemble member as the weather
+      used for valid_time.
+    - If target_time < power_fcst_init_time (in the past), uses the freshest NWP run (control
+      member, ensemble 0) for that target time.
 
     Args:
         engineered_features_lf: The in-progress feature frame this helper attaches one lag
@@ -75,7 +76,7 @@ def _apply_weather_lag(
         target_time=pl.col("valid_time") - pl.duration(hours=lag_feature.hours)
     )
 
-    # Join 1: Same-Run Join (for target_time > power_fcst_init_time)
+    # Join 1: Same-Run Join (for target_time >= power_fcst_init_time)
     right_same_lf = nwp_lf.select(
         "time_series_id",
         "nwp_init_time",
@@ -90,7 +91,7 @@ def _apply_weather_lag(
         how="left",
     )
 
-    # Join 2: Freshest-Run Join (for target_time <= power_fcst_init_time)
+    # Join 2: Freshest-Run Join (for target_time < power_fcst_init_time)
     right_freshest_lf = historical_weather_lf.select(
         "time_series_id",
         pl.col("valid_time").alias("target_time"),
@@ -99,7 +100,13 @@ def _apply_weather_lag(
     lf_joined = lf_joined.join(right_freshest_lf, on=["time_series_id", "target_time"], how="left")
 
     return lf_joined.with_columns(
-        pl.when(pl.col("target_time") > pl.col("power_fcst_init_time"))
+        # >= rather than >: at target_time == power_fcst_init_time the row's own run is already
+        # available (bulk mode derives power_fcst_init_time = nwp_init_time + delay, exactly the
+        # instant that run becomes usable), and no fresher run can be available at that instant
+        # either — so the boundary belongs to the same-run branch, not the freshest-run one. This
+        # changes no output today (see the explanatory comment on the historical_weather
+        # construction in tabular_feature_engineer.py); it is defence in depth.
+        pl.when(pl.col("target_time") >= pl.col("power_fcst_init_time"))
         .then(pl.col(f"{lag_feature.string_repr}_same_run"))
         .otherwise(pl.col(f"{lag_feature.string_repr}_freshest_run"))
         .alias(lag_feature.string_repr)
