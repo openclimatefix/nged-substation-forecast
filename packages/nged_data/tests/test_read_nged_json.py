@@ -4,14 +4,42 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from nged_data.read_nged_json import _extract_power_time_series, _extract_time_series_metadata
+from nged_data.read_nged_json import (
+    _camel_to_snake,
+    _extract_power_time_series,
+    _extract_time_series_metadata,
+)
 
 
 @pytest.mark.parametrize(
-    ("filename", "expected_time_series_id", "expected_name", "expected_units", "expected_h3"),
+    (
+        "filename",
+        "expected_time_series_id",
+        "expected_name",
+        "expected_units",
+        "expected_h3",
+        "expected_area_center_lat",
+        "expected_area_center_lon",
+    ),
     [
-        ("TimeSeries_10.json", 10, "SPILSBY 33 11kV S STN", "MW", 599423199024775167),
-        ("TimeSeries_11.json", 11, "INGOLDMELLS 33 11kV S STN", "MVA", 599422966022799359),
+        (
+            "TimeSeries_10.json",
+            10,
+            "SPILSBY 33 11kV S STN",
+            "MW",
+            599423199024775167,
+            53.16901628579017,
+            0.1034432744480572,
+        ),
+        (
+            "TimeSeries_11.json",
+            11,
+            "INGOLDMELLS 33 11kV S STN",
+            "MVA",
+            599422966022799359,
+            53.17889721242274,
+            0.3222337410952147,
+        ),
     ],
 )
 def test_nged_json_to_metadata_df_and_time_series_df(
@@ -20,6 +48,8 @@ def test_nged_json_to_metadata_df_and_time_series_df(
     expected_name: str,
     expected_units: str,
     expected_h3: int,
+    expected_area_center_lat: float,
+    expected_area_center_lon: float,
 ):
     file_path = Path(__file__).parent / "data" / filename
 
@@ -46,6 +76,30 @@ def test_nged_json_to_metadata_df_and_time_series_df(
     assert metadata_df["substation_type"].item() == "Primary"
     assert "POLYGON" in metadata_df["area_wkt"].item()
     assert metadata_df["h3_res_5"].item() == expected_h3
+    # The field is pl.Float32, so the cast value differs from the raw JSON float above this
+    # precision; compare against the raw value with pytest.approx rather than the cast one.
+    assert metadata_df["area_center_lat"].item() == pytest.approx(expected_area_center_lat)
+    assert metadata_df["area_center_lon"].item() == pytest.approx(expected_area_center_lon)
+
+
+@pytest.mark.parametrize(
+    ("camel_str", "expected_snake_str"),
+    [
+        ("Area_WKT", "area_wkt"),
+        ("Area_CenterLat", "area_center_lat"),
+        ("Area_CenterLon", "area_center_lon"),
+        ("Area_GeometryType", "area_geometry_type"),
+        ("TimeSeriesId", "time_series_id"),
+        ("SubstationNumber", "substation_number"),
+    ],
+)
+def test_camel_to_snake_collapses_double_underscore(camel_str: str, expected_snake_str: str):
+    """`Area_CenterLat` etc. already have an underscore before the CamelCase substitution runs.
+
+    That used to leave a double underscore (`area__center_lat`) that never matched the contract's
+    single-underscore `area_center_lat` field.
+    """
+    assert _camel_to_snake(camel_str) == expected_snake_str
 
 
 def test_nged_json_to_metadata_df_and_time_series_df_invalid_json():
