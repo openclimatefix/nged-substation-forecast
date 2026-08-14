@@ -84,10 +84,15 @@ the **PR body** and the **commit messages**, and neither is reliably visible in
 `closingIssuesReferences` beforehand. Read the text yourself:
 
 ```bash
-KW='(clos|fix|resolv)[a-z]*.{0,60}#[0-9]+|#[0-9]+.{0,60}(clos|fix|resolv)'
+KW='\b(clos|fix|resolv)[a-z]*\b.{0,60}#[0-9]+|#[0-9]+.{0,60}\b(clos|fix|resolv)[a-z]*\b'
 gh pr view <N> --json body --jq .body | grep -inE "$KW"
 git log origin/main..HEAD --format='%B' | grep -inE "$KW"
 ```
+
+The word boundaries are load-bearing: without them `openclimatefix` matches on its own trailing
+"fix", so every body carrying a GitHub URL near a `#number` looks like a hit, and a guard that
+fires on every PR stops being read. They cost nothing in coverage — every keyword GitHub honours
+is a standalone word.
 
 **`closingIssuesReferences` proves nothing before the merge.** It stays `[]` right up to the point
 the merge lands and only then fills in. A PR body reading "tracked in issue \#593, which this does

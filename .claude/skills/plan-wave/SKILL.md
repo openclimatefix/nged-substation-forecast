@@ -23,7 +23,9 @@ recording what was dispatched.
 Each slot goes to one of two tracks:
 
 - **The agentic track** — mechanical issues, which this skill implements itself, orchestrating
-  sub-agents through plan, review, implement, review and merge without leaving the session.
+  sub-agents through implement, review, triage and merge without leaving the session. There is no
+  planning sub-agent: a slot only qualifies for this track because its design is already settled,
+  so there is nothing left for a plan to decide.
 - **The chip track** — issues needing human judgement, which go out as `spawn_task` chips the user
   launches as separate Claude Code sessions, one per slot.
 
@@ -154,8 +156,9 @@ A slot goes on the **agentic track** only if every one of these holds:
 - **It touches no production degradation path** — nothing in `defs/` that decides whether the
   service degrades or raises.
 - **It needs no retrain, no leaderboard re-run, and invalidates no existing comparison.**
-- **The verification set plus a mutation proof is the whole of the risk.** If the change is right,
-  a green suite and a test watched going red on the bug it exists for say so.
+- **The verification set is the whole of the risk**, and where the slot touches behaviour, a test
+  watched going red on the bug it exists for. A prose-only slot satisfies this on the verification
+  set alone — there is nothing to mutate.
 
 Typical agentic-track work: documentation that disagrees with the code, a docstring contradicting
 its own function, dead code and dead configuration, renames, dependency declarations, a test that
