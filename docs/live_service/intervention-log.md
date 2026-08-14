@@ -165,10 +165,13 @@ inputs is recorded as degraded rather than passing unremarked. And a wholly-miss
 now retried for four hours instead of failing, which is what would have made the 9 August
 intervention unnecessary.
 
-Both narrow the first caveat above without closing it. The check is `WARN` and non-blocking, so it
-colours the slot in the Dagster Checks view and alerts nobody; a slot whose run raised fails
-outright rather than being checked; and the 9 August alarm reached us from a laptop rather than
-from AWS, which nothing in v0.2 changes.
+Both narrow the first caveat above without closing it. A degraded slot is recorded but not
+announced: `live_forecasts_are_healthy` returns its warning to Dagster's Checks view and sends
+nothing to Sentry, and the slot's check-in still reports the service healthy, so a degraded run
+looks like a good one from outside. Nothing about `WARN` severity forces that — `power_data_is_fresh`
+warns *and* raises a Sentry event through `report_power_freshness` — it is simply not wired up on
+this path. A slot whose run raised is checked by nothing at all, and the 9 August alarm reached us
+from a laptop rather than from AWS, which nothing in v0.2 changes.
 
 ## See also
 
