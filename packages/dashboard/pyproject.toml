@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "altair>=6.0.0",
+    "anywidget",
     "contracts",
     "deltalake",
     "lonboard>=0.13.0",

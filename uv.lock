@@ -1098,6 +1098,7 @@ version = "0.2.0"
 source = { editable = "packages/dashboard" }
 dependencies = [
     { name = "altair" },
+    { name = "anywidget" },
     { name = "contracts" },
     { name = "deltalake" },
     { name = "geoarrow-pyarrow" },
@@ -1120,6 +1121,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "altair", specifier = ">=6.0.0" },
+    { name = "anywidget" },
     { name = "contracts", editable = "packages/contracts" },
     { name = "deltalake" },
     { name = "geoarrow-pyarrow", specifier = ">=0.2.0" },
@@ -2586,6 +2588,7 @@ version = "0.2.0"
 source = { editable = "packages/ml_core" }
 dependencies = [
     { name = "contracts" },
+    { name = "deltalake" },
     { name = "mlflow-skinny" },
     { name = "patito" },
     { name = "polars" },
@@ -2596,6 +2599,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "contracts", editable = "packages/contracts" },
+    { name = "deltalake" },
     { name = "mlflow-skinny" },
     { name = "patito" },
     { name = "polars", specifier = ">=1.0.0" },
