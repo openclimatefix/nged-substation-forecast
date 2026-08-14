@@ -2,7 +2,7 @@
 
 How NGED assembles different kinds of forecast from the "Lego blocks" OCF delivers.
 
-> **Status: 🚧 Planned.** The normalised [−1, +1] forecast is planned for **v0.1**, scaled by the
+> **Status: 🚧 Planned.** The normalised [−1, +1] forecast is planned for **v0.5**, scaled by the
 > static P99 capacity
 > ([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246); the code still
 > forecasts raw MW/MVA today — see
