@@ -708,7 +708,7 @@ serving through an MLflow outage would need to be designed (tracked in
 
 ## See also
 
-- [Live service roadmap](../roadmap/live-service.md) — the full v0.1 design, including the
+- [Live service roadmap](../roadmap/live-service.md) — the full live-service design, including the
   costed AWS architecture options behind the accepted architecture (small control-plane box +
   `EcsRunLauncher`) and its implementation workstreams.
 - [AWS Running Costs](aws-costs.md) — what this architecture costs to run: the v1 estimate as

@@ -107,8 +107,8 @@ Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206) (done)
 
-> **Status: ✅ Built and running.** The accepted option below was deployed on AWS for v0.1
-> (`v0.1.0`) and now serves v0.2 (`v0.2.0`), unchanged; the bring-up is documented in
+> **Status: ✅ Built and running.** The accepted option below runs on AWS as v0.2 (`v0.2.0`) —
+> the same architecture v0.1 (`v0.1.0`) used, unchanged; the bring-up is documented in
 > [Setting up the live service on AWS](../live_service/aws.md). The costed comparison and the
 > rejected alternatives are kept below as the durable record of the decision. The
 > [access-phasing](#access-phasing) Stages 2–3 and the future-work items (MLflow server, dev
@@ -497,9 +497,9 @@ Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 > **Status: ✅ Infrastructure built and running.** ECR, the two IAM roles, the Fargate
 > task definition, the always-on EC2 control-plane box (`EcsRunLauncher`, Postgres-in-Docker,
-> schedules, Tailscale, Marimo), and S3 were all stood up by hand for v0.1 and documented
-> step-by-step in [Setting up the live service on AWS](../live_service/aws.md); the same
-> infrastructure now serves v0.2. The items further down are what remains 🚧 after v0.1.
+> schedules, Tailscale, Marimo), and S3 run in production, serving v0.2 — stood up by hand and
+> documented step-by-step in [Setting up the live service on AWS](../live_service/aws.md). The
+> items further down are what remains 🚧 after v0.1.
 
 Built for v0.1 (see the [runbook](../live_service/aws.md) for the exact console steps):
 
@@ -524,8 +524,10 @@ Still 🚧 after v0.1:
 
 - **A bigger backtest task definition** (e.g. 8 vCPU / 32 GB) — the live 4 vCPU / 16 GB
   definition exists; right-size it after a week of CloudWatch metrics.
-- **Alerting** ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)):
-  basic per-task failure alerting (a failed run → email). Decided 2026-07-14: prefer **portable
+- **Per-task failure email alerting** (a failed run → SNS → email) — Sentry error telemetry and
+  the missed-check-in alarm already shipped in
+  [#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63); this is the one
+  piece of alerting still open. Decided 2026-07-14: prefer **portable
   alerting logic over AWS-native glue** (no EventBridge rules) — the checks should be plain code
   that runs end-to-end on a laptop or any cloud, with only the thin notification edge (SNS,
   SMTP, …) being platform-specific. Under the accepted option, Dagster's own run-failure sensors

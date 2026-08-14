@@ -86,14 +86,14 @@ AWS — see [Live service](live-service.md).
 quality, reproducibility and observability hardening. **✅ Shipped 13 August 2026** (`v0.2.0`) —
 running on AWS.*
 
-- More unit tests, including scientific-rigor tests (CV-windowing no-lookahead,
-  leaderboard-fairness, determinism) ✅
-  ([#62](https://github.com/openclimatefix/nged-substation-forecast/issues/62); no-lookahead and
-  determinism are exercised by `test_nullify_leaky_lags`,
-  `test_engineer_features_weather_lag_leakage_prevention` and
+- More unit tests, including feature-level lag-leakage and training-determinism tests ✅
+  ([#62](https://github.com/openclimatefix/nged-substation-forecast/issues/62); exercised by
+  `test_nullify_leaky_lags`, `test_engineer_features_weather_lag_leakage_prevention` and
   `test_random_seed_makes_training_deterministic`, alongside new package coverage for
   `dynamical_data` ([#163](https://github.com/openclimatefix/nged-substation-forecast/issues/163))
-  and `geo` ([#164](https://github.com/openclimatefix/nged-substation-forecast/issues/164)))
+  and `geo` ([#164](https://github.com/openclimatefix/nged-substation-forecast/issues/164))). The
+  CV-windowing no-lookahead and leaderboard-fairness guardrail tests remain unwritten — see
+  [Engineering health](engineering-health.md#scientific-rigor-tests-and-cleanup)
 - CI on GitHub (ruff + ty + pytest on every PR) ✅ (per-PR gate + nightly network tests; see
   [Testing → Continuous integration](../architecture/testing.md#continuous-integration))
 - Improve documentation ✅
