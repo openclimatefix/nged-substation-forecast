@@ -133,12 +133,16 @@ four-hour retry budget that covers the 3h25m this republication took.
 
 Three caveats, without which the window would be worth more than it is:
 
-- **Nothing alerted us from AWS.** The Sentry alarm that surfaced the missed run came from the
-  pre-v0.2 code running on a laptop, not from the deployed stack, and the missed-check-in monitor
-  never fired. `live_forecasts_are_healthy` — the check that reads each slot's rows back and
-  reports missed NWP runs — landed in v0.2, after this window closed. The four degraded slots were
-  reconstructable only because `nwp_init_time` travels on every forecast row. So the degradation
-  was recoverable from the data, but nothing in the deployment announced it.
+- **The deployment had no telemetry at all, so nothing on AWS *could* have alerted.** The earliest
+  Sentry commit of any kind — the failure hook, the check-in and the freshness warning all arrived
+  in the same week — lands on `main` on 21 July, six days after the box was deployed and never
+  updated. Whatever was running there therefore predates Sentry entirely: the missed-check-in
+  monitor never existed on that box, and the alarm that did surface the missed run came from newer
+  code running on a laptop.
+  `live_forecasts_are_healthy`, the check that reads each slot's rows back and counts missed NWP
+  runs, landed later still. The four degraded slots were reconstructable only because
+  `nwp_init_time` travels on every forecast row: the degradation was recoverable from the data, but
+  nothing in the deployment announced it.
 - **A month is short, and this is the easy case.** v0.1 is 28 time series and one ECMWF run
   per day. The dominant cause T1.1 predicts — an upstream contract change — did not happen in a
   window this short; a partial publication is a milder fault than a changed schema.
@@ -159,19 +163,19 @@ in [the log](#the-log).
 v0.2 forecasts 31 time series, three more than v0.1, under the promoted model
 `xgboost_cv_0003`. The 00:00 and 06:00 UTC slots on 14 August both carry all 31.
 
-Two things make the next stretch better evidence than the last. `live_forecasts_are_healthy` reads
-each succeeding slot's rows back and reports missed NWP runs, so a slot forecasting from stale
-inputs is recorded as degraded rather than passing unremarked. And a wholly-missing NWP variable is
-now retried for four hours instead of failing, which is what would have made the 9 August
-intervention unnecessary.
+Three things make the next stretch better evidence than the last. `live_forecasts_are_healthy`
+reads each succeeding slot's rows back and reports missed NWP runs, so a slot forecasting from
+stale inputs is recorded as degraded rather than passing unremarked. A wholly-missing NWP variable
+is now retried for four hours instead of failing, which is what would have made the 9 August
+intervention unnecessary. And the deployment carries Sentry, which v0.1's never did, so an
+`ecmwf_ens` run that *does* exhaust its retries reports itself from AWS rather than waiting for
+somebody to run the code on a laptop.
 
-Both narrow the first caveat above without closing it. A degraded slot is recorded but not
-announced: `live_forecasts_are_healthy` returns its warning to Dagster's Checks view and sends
-nothing to Sentry, and the slot's check-in still reports the service healthy, so a degraded run
-looks like a good one from outside. Nothing about `WARN` severity forces that — `power_data_is_fresh`
-warns *and* raises a Sentry event through `report_power_freshness` — it is simply not wired up on
-this path. A slot whose run raised is checked by nothing at all, and the 9 August alarm reached us
-from a laptop rather than from AWS, which nothing in v0.2 changes.
+What still would not reach us is the degraded *slot*, where nothing failed. Dagster runs no check
+for an asset that raised, so this is the succeeding-run case: `live_forecasts_are_healthy` returns
+its warning to the Checks view and sends nothing to Sentry, and the slot's check-in reports the
+service healthy regardless, so a degraded run looks like a good one from outside — the gap at
+[#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501).
 
 ## See also
 
