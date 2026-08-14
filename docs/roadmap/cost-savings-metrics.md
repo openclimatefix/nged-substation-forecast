@@ -4,17 +4,18 @@
 > [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6); issue:
 > [#606](https://github.com/openclimatefix/nged-substation-forecast/issues/606). This page is the
 > plan for two leaderboard metrics that express forecast skill in pounds. It is written to be read
-> by anyone numerate. See the [roadmap index](index.md) for status conventions.
+> by anyone numerate. Everything attributed to NGED below comes from a meeting in July 2026 and is
+> flagged for them to confirm. See the [roadmap index](index.md) for status conventions.
 
 ## Read this first: these pounds rank models, they do not cost anything
 
 These metrics put a **£** figure against every model we train. That figure rests on an invented
-network limit and a single average price per megawatt-hour, so it is a **rough proxy**: not a cost
-analysis, not a business case, and not quotable as either. Its one job is to rank forecasts on the
-axis NGED care about, turning "this model has a lower threshold-weighted continuous ranked
-probability score" into "this model would have spent less to keep the network within limits". We
-use pounds rather than a unitless score because the parameters genuinely are prices, and because a
-pound figure is the only forecast-quality number most readers can act on.
+network limit and a couple of average prices, so it is a **rough proxy**: not a cost analysis, not
+a business case, and not quotable as either. Its one job is to rank forecasts on the axis NGED
+care about, turning "this model has a lower threshold-weighted continuous ranked probability score"
+into "this model would have spent less to keep the network within limits". We use pounds rather
+than a unitless score because the parameters genuinely are prices, and because pounds are what the
+decisions these forecasts feed are actually made in.
 
 ## Two savings, measured separately
 
@@ -23,12 +24,12 @@ different beneficiaries. We compute them as **two metrics, reported as two numbe
 them up:
 
 1. **Flexibility procurement.** NGED pay flexible customers to reduce demand when a site risks
-   running beyond its limit. They are risk-averse and knowingly over-procure. A sharper forecast
-   buys less flexibility for the same security. This is money NGED spend.
+   running beyond its limit. They told us they are risk-averse and knowingly over-procure. A
+   sharper forecast buys less flexibility for the same security. This is money NGED spend.
 2. **Curtailment of generation.** Generators are curtailed to keep exports within network limits.
    Curtailment avoided is generation sold. Who this saves money *for* — NGED, or the connected
-   generator under a non-firm connection — is [question 3](#questions-for-nged) below, and it
-   changes how the number should be read.
+   generator under a non-firm connection — is [question 3](#questions-for-nged), and it changes how
+   the number should be read.
 
 A third saving — the engineer-hours freed by replacing a manual review of time-series plots with an
 automated forecast — is real, but it is **not a leaderboard metric**: it is identical for every
@@ -44,8 +45,8 @@ figure NGED hold in a form we can use.
 So we invert the question. **Models are aimed at equal safety, and we compare what each one spends
 to get there.** Each model may be as conservative as it likes, and we tune that conservatism until
 it leaves the same small amount of risk unaddressed. Then the only thing left to compare is cost.
-This matches NGED's account of the problem: they are not trying to avoid a breach they currently
-suffer, they are trying to stop over-buying to avoid one.
+This matches what NGED described: the problem is not a breach they currently suffer, it is
+over-buying to avoid one.
 
 The knob is the **procurement quantile** $\tau$ — how far up its own forecast distribution a model
 looks when deciding to act. A timid model uses a high $\tau$, buys a lot, and is rarely caught out.
@@ -58,53 +59,67 @@ $$
 
 where $V_{i,t}$ is the volume the model would have bought (or curtailed) for time series $i$ in
 half-hour $t$, and $N_{i,t}$ is the volume that turned out to be needed. Measuring unmet *energy*
-rather than counting missed events matters: exceedances of the limit are rare by construction, and
-a count of them is too noisy to rank models by.
+rather than counting missed events matters: exceedances are rare by construction, and a count of
+them is too noisy to rank models by.
 
-**$\tau$ is calibrated on training folds only.** Tuning it on the fold being scored would let a
-model see its own future, and every pound of the resulting "saving" would be lookahead.
+**$\tau$ is calibrated on the training window of the leaderboard fold, never on the validation
+window it is scored on** — otherwise a model sees its own future and every pound of the "saving" is
+lookahead. That has a price: the training window is data the model was fitted to, so its residuals
+are smaller than they will be out of sample, $\tau$ comes out too low, and every model
+under-procures on the scored window. The model that overfits hardest gains most from this.
 
-**Equal risk is a target, not a guarantee, and this is the design's main weakness.** Because $\tau$
-is fixed in advance, what a model *realises* on the scored fold is whatever its tail calibration
-delivers there. An underdispersed model overshoots the target, spends less, and can top the
-leaderboard while being materially less safe. The **realised out-of-sample unmet fraction is
-therefore reported beside every cost, and a cost read without it is meaningless.** Two models are
-only comparable on cost when their realised unmet fractions are close.
+**Equal risk is therefore a target, not a guarantee, and this is the design's main weakness.** What
+a model *realises* on the scored window is whatever its tail calibration delivers there. A model
+that overshoots the target spends less and can top the leaderboard while being materially less
+safe. The **realised out-of-sample unmet fraction is reported beside every cost, and a cost read
+without it is meaningless.** Two models are only comparable on cost when their realised unmet
+fractions are close.
+
+## What the volumes cost
+
+Flexibility is bought in two parts, and the distinction is the whole point of these metrics.
+**Availability** is paid on every megawatt-hour held ready, whether or not it is called;
+**utilisation** is paid only on what is actually dispatched. Over-procurement therefore costs the
+*availability* price on the excess, not the far larger utilisation price:
+
+$$
+C = p_{\text{avail}} \sum_{i,t} V_{i,t} \;+\; p_{\text{util}} \sum_{i,t} \min(V_{i,t},\, N_{i,t})
+$$
+
+The second term is nearly identical for every model — it is set by what the network actually
+needed — so the ranking is carried by the first. Charging one blended price against all procured
+volume would overstate the cost of over-procurement several times over. Both prices are
+configuration, and [question 1](#questions-for-nged) asks NGED for them.
 
 ## Metric 1 — flexibility procurement cost
 
-For time series $i$ and half-hour $t$, with **limit** $L_i$ and flexibility price $p_{\text{flex}}$
-(£/MWh):
+For time series $i$ and half-hour $t$, with demand-side limit $L_i$:
 
 | Quantity | Definition |
 |---|---|
 | Volume procured | $V_{i,t} = \max(0,\; \hat q_{i,t}(\tau) - L_i) \times 0.5$ MWh |
 | Volume needed | $N_{i,t} = \max(0,\; y_{i,t} - L_i) \times 0.5$ MWh |
-| Cost | $C = p_{\text{flex}} \sum_{i,t} V_{i,t}$ |
 
-$\hat q_{i,t}(\tau)$ is the model's $\tau$-quantile forecast, $y_{i,t}$ the observed power measured
-in the **constraint-side direction** for that series (below), and $\times 0.5$ converts MW held for
-a half-hour into MWh.
+$\hat q_{i,t}(\tau)$ is the model's $\tau$-quantile forecast, $y_{i,t}$ the observed power, and
+$\times 0.5$ converts MW held for a half-hour into MWh.
 
-**Worked example.** A primary substation whose limit sits at 28 MW, on one winter evening
-half-hour. Manual review forecasts 31 MW, so it procures $(31 - 28) \times 0.5 = 1.5$ MWh. Demand
-turns out to be 28.6 MW, so only 0.3 MWh was needed. At £750/MWh that half-hour cost £1,125, of
-which £225 was useful. A model forecasting 29.0 MW procures 0.5 MWh — £375, saving £750 in that
-half-hour. The metric sums this over every half-hour and every series.
+**Worked example.** A substation whose limit sits at 30 MW, on one winter evening half-hour, with
+availability at £75/MWh and utilisation at £750/MWh (both placeholders). Manual review forecasts 33
+MW, so it procures $(33 - 30) \times 0.5 = 1.5$ MWh. Demand turns out to be 30.6 MW, so 0.3 MWh was
+needed. It pays £112.50 availability and £225 utilisation. A model forecasting 31.0 MW procures 0.5
+MWh, pays £37.50 and the same £225 — saving £75. The metric sums this over every half-hour and
+every series.
 
 ## Metric 2 — curtailment cost
 
-Identical arithmetic on the export side, with the export limit $E_i$ and the curtailment price
-$p_{\text{curt}}$ (£/MWh of network access). $V_{i,t}$ is the volume curtailed, $N_{i,t}$ the
-volume that needed curtailing, and the cost is $p_{\text{curt}} \sum_{i,t} V_{i,t}$.
+Identical arithmetic on the export side, with the export-side limit and the curtailment price
+$p_{\text{curt}}$ (£/MWh of network access) charged against total volume curtailed, since curtailed
+generation is lost whether or not the constraint was real.
 
 **Worked example.** A generation-dominated feeder with an export limit of 8.5 MW. The forecast at
 its calibrated quantile says 9.6 MW, so 0.55 MWh is curtailed; actual export is 8.7 MW, so 0.1 MWh
 needed curtailing. At £100/MWh that is £55 against £10 of real constraint — £45 of generation
 curtailed for nothing.
-
-The two ship as **two functions returning two numbers**, sharing a private helper, because their
-prices, limits, direction and beneficiaries differ.
 
 ### Which direction is the constraint on?
 
@@ -114,8 +129,13 @@ flows towards end-users; at a customer's meter, positive means the customer is *
 plus battery sites that both charge and discharge. Constraint-side direction is therefore resolved
 **per `time_series_type`**, reusing the mapping the [tail and exceedance
 metrics](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
-already need, with the ambiguous types confirmed by NGED. Applying one global rule would silently
-score £0 for every generator meter in the trial area.
+already need, with the ambiguous types confirmed by NGED.
+
+A series constrained in both directions gets **a limit in each**, so the threshold is one scalar
+per `(time_series_id, direction)` rather than per series alone. Each metric is computed only where
+its direction is constrained: a demand primary with no connected generation gets no curtailment
+cost, and a solar meter gets no flexibility procurement cost. Applying one global rule instead
+would silently score £0 for every generator meter in the trial area.
 
 ## What each number is compared against
 
@@ -124,82 +144,93 @@ half-hours:
 
 - **Manual review** — NGED's method today: the 13-analogue ensemble, read off a plot, taking the
   95th percentile if a single number is needed ([the incumbent
-  forecast](../background/nged-incumbent-forecast.md); we have not confirmed with NGED that the
-  95th percentile is what they use, and [question 5](#questions-for-nged) asks). It is scored at
-  that **actual operating point, not calibrated to the common risk target**, because the point is
-  to measure what NGED do today. Its realised unmet fraction is therefore an output — the number
-  that says what risk level they currently work to — and the saving against it mixes a change in
-  spend with a change in risk. Both are reported; neither is meaningful alone.
-- **Perfect forecast** — truth used as the forecast, held to the **same unmet target** as every
-  model. This is the floor: the least that can be spent at that risk level. Holding it to zero
-  unmet instead would let a calibrated model spend less than "perfect" and score above 100% of the
-  available saving.
+  forecast](../background/nged-incumbent-forecast.md); we have not confirmed that the 95th
+  percentile is what they use, and [question 5](#questions-for-nged) asks). It is scored at that
+  **actual operating point, not calibrated to the common risk target**, because the point is to
+  measure what NGED do today. Its realised unmet fraction is therefore an output — the number
+  saying what risk level they currently work to — and the saving against it mixes a change in spend
+  with a change in risk. Both are reported; neither means much alone.
+- **Perfect forecast** — the least that can be spent while leaving no more than the target fraction
+  $u$ unmet. Truth is not a distribution, so there is no quantile to calibrate: the floor is the
+  cost of procuring exactly $(1-u)N_{i,t}$ in every half-hour, put straight through the same price
+  formula. Setting it at zero unmet instead would put it *above* a model calibrated to 5%, and
+  models would routinely score over 100% of the available saving.
 
 The headline is *"£X less than manual review, which is Y% of the £Z a perfect forecast would
-save"*, always alongside the realised unmet fractions. Both metrics are computed for every
-experiment.
+save"*, always alongside the realised unmet fractions. Note that a model whose realised unmet
+fraction overshoots the target can still exceed 100%; that is a signal to read the risk column, not
+a bug.
 
 ## Choosing the limit
 
 Real network limits move with ambient temperature, with how long an overload lasts, with season and
-with switching state, so no single number is correct. We use a **synthetic limit**: the **95th
-percentile of each series' own full observation history**, for the same full-history stability
-reason the [NMAE denominator](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
-uses. Its label is `historical_p95`, kept distinct from the forecast-quantile label `p95` — one is
-a fixed power level derived from history, the other a level of the forecast distribution.
+with switching state, so no single number is correct — the fuller version of this caveat is in
+[the threshold-choice
+discussion](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived).
+We use a **synthetic limit**: the **99th percentile of each series' own full observation history**,
+in the constrained direction, labelled `historical_p99` to keep it distinct from the
+forecast-quantile label `p99` — one is a fixed power level derived from history, the other a level
+of the forecast distribution.
 
-This is the same single rung the [tail and exceedance
+This is the rung NGED described ("set capacity at the 99th percentile, and assume everything is
+slightly overloaded in winter"), and it is the same single rung the [tail and exceedance
 metrics](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
-use, so the leaderboard carries one threshold concept rather than several. We chose the 95th over
-the 99th because 99th-percentile exceedances are rare enough that the resulting numbers may be too
-noisy to separate models — but NGED talked in terms of the 99th, so
-[question 6](#questions-for-nged) puts the choice back to them.
+use, so the leaderboard carries one threshold concept rather than several. The percentile sets the
+absolute size of every £ figure on this page — a lower rung would multiply them — which is another
+reason to read these numbers as a ranking instrument rather than a total.
 
-NGED offered real firm and flex capacities for the trial area, and we want them — for the case
-studies below, and to check that the synthetic limit lands somewhere sensible. They cannot replace
-it for ranking, because a real rating that was never breached during the scoring window produces
-zero exceedance events, and no model can be graded on events that never happened.
+Where NGED supply a real firm or flex rating we will compute the same metrics against it, as a
+case study. A rating never breached during the scored window is not useless here — procurement
+volume is driven by the *forecast* crossing the limit, so models still rank — but the unmet
+fraction goes undefined, and ratings are not available for every series and sit at different points
+of each series' distribution, so they cannot carry the cross-series leaderboard.
 
 ## What these numbers do not capture
 
-- **The limits are invented.** A percentile of history is not a network rating. Sites that are
-  genuinely unconstrained get a limit anyway, and are scored as though flexibility were bought
-  there.
+- **The limit is invented, and fitted on the scored window.** A percentile of history is not a
+  network rating, and it is computed over the full history including the months being scored. It is
+  model-independent, so it cannot favour one entrant, but it is not an out-of-sample quantity.
 - **The history is already post-intervention.** At a genuinely constrained site the metered power
   reflects flexibility that *was* dispatched and generation that *was* curtailed. So $N$ understates
   true need, and the percentile limit derived from that same history is itself shaped by the
   interventions we are pricing.
-- **The risk target binds only in-sample**, as set out above; the realised unmet fraction is the
-  guard against this and must be read with every cost.
-- **Unmet energy is pooled across series and half-hours.** A model can hit the 5% target by
-  covering the largest site well and abandoning many small ones, and 5% concentrated in one deep
-  breach is far worse operationally than the same 5% spread thinly. Harm grows faster than depth;
-  equalising energy does not equalise harm. The per-series distribution of unmet energy is reported
-  for this reason.
-- **The prices are single averages.** One £/MWh figure stands in for a tendered market with
-  availability payments, utilisation payments, zone-by-zone clearing prices and finite liquidity.
+- **Ten trial-area sites cannot see direction at all.** They are metered in MVA, which reports the
+  magnitude of flow, so reverse power flow appears as a *rise* rather than a sign change (see
+  [data quality](../background/data-quality.md)). At those sites an export event would be billed as
+  demand-side procurement, and multiplying MVA by half an hour gives MVAh, which is not the
+  megawatt-hour a flexibility price is quoted against.
+- **The risk target binds only in-sample**, and $\tau$ is fitted on data the model was trained on,
+  which biases it in the direction that flatters the saving.
+- **Unmet energy is pooled across series and half-hours.** A model can hit the 5% target by covering
+  the largest site well and abandoning many small ones, and 5% concentrated in one deep breach is
+  far worse operationally than the same 5% spread thinly. Harm grows faster than depth; equalising
+  energy does not equalise harm. The per-series distribution of unmet energy is reported for this
+  reason.
+- **The prices are single averages.** Two numbers stand in for a tendered market with zone-by-zone
+  clearing prices and finite liquidity.
 - **Procurement is not per-half-hour.** NGED tender flexibility ahead, in blocks and windows. Our
   arithmetic assumes perfectly granular buying, which flatters every model equally but overstates
   the achievable saving.
 - **Ensemble size limits how finely $\tau$ can be tuned.** Manual review has 13 analogues, so its
   quantiles come in coarse steps; a 51-member ensemble is far finer. Models of different ensemble
   size cannot be landed on exactly the same risk.
-- **Costs are per fold, and folds are seasonal.** The limit concentrates exceedances at winter
-  peak, so annualising a fold that does not span a whole year is meaningless. A fold with no
-  exceedance at all leaves the unmet fraction undefined.
+- **Costs are per fold, and folds are seasonal.** The limit concentrates exceedances at winter peak,
+  so annualising a fold that does not span a whole year is meaningless, and a fold with no
+  exceedance leaves the unmet fraction undefined.
 - **Nothing is validated against real spend**, except at the trial-area sites that sit in an actual
   flexibility zone. There are a couple, and they are the case studies that tell us whether these
   numbers are the right order of magnitude.
 - **Asset failure and outage costs are excluded.** NGED identified outage quantification as
   valuable but harder; it is not in this design.
-- **Over-procurement has a deliberate component.** NGED over-buy partly to stimulate the
-  flexibility market and to support their capital programme. That portion is policy, not forecast
-  error, and a better forecast should not be credited with removing it.
+- **Over-procurement has a deliberate component.** NGED told us they over-buy partly to stimulate
+  the flexibility market and to support their capital programme. That portion is policy, not
+  forecast error, and a better forecast should not be credited with removing it.
 
 ## Questions for NGED
 
-1. **Flexibility price** — is £500–1000/MWh right for dispatched flexibility, which published
-   dataset should we take it from, and does it cover availability payments as well as utilisation?
+1. **Flexibility prices** — what are the availability and utilisation rates separately, and which
+   published dataset should we take them from? The split matters more than the level:
+   over-procurement is charged at the availability rate, so it sets the whole ranking.
 2. **Curtailment price** — is £100/MWh of network access right, and is the £2M saved last year on
    the same basis, so we can check our totals against it?
 3. **Who bears the curtailment cost** — NGED, or the generator under a non-firm connection? This
@@ -208,30 +239,32 @@ zero exceedance events, and no model can be graded on events that never happened
    procured-versus-needed volumes for a single zone would anchor it.
 5. **Is the 95th percentile of the 13 analogues the operating point** you actually work from, and
    what reliability do you target — how much genuinely-needed flexibility may go unbought?
-6. **Is the 95th percentile the right limit to score against?** You talked in terms of the 99th. We
-   went with the 95th because 99th-percentile exceedances look too rare to rank models cleanly, but
-   the choice is yours to overrule.
-7. **Which trial-area sites have curtailable generation**, which sit in a real flexibility zone with
-   procurement history we can use as a case study, and can we have the firm and flex capacities?
+6. **Which trial-area sites have curtailable generation**, which are constrained on export as well
+   as demand, which sit in a real flexibility zone with procurement history we can use as a case
+   study, and can we have the firm and flex capacities?
 
 ## Implementation details (deleted when this ships)
 
 - Two functions in `packages/ml_core/src/ml_core/metrics.py`, sharing a private helper taking the
-  limit, the price and the direction. They consume the same ensemble-member rows as the existing
+  limit, the prices and the direction. They consume the same ensemble-member rows as the existing
   quantile metrics.
 - **This needs a `Metrics` contract change, still to be reviewed and agreed when we implement**:
   `METRIC_NAMES` gains `flex_procurement_cost_gbp`, `curtailment_cost_gbp` and `unmet_fraction`,
-  and `METRIC_PARAMS` gains `historical_p95`. The prefix is not decoration — bare `"p95"` already
-  exists in `QUANTILE_METRIC_PARAMS` meaning a *forecast* quantile, and a history-derived power
-  level has to stay distinct from a level of the forecast distribution.
+  and `METRIC_PARAMS` gains a `historical_p99` label per constrained direction. Bare `"p99"`
+  already exists in `QUANTILE_METRIC_PARAMS` meaning a *forecast* quantile, so a history-derived
+  power level has to stay distinct from a level of the forecast distribution.
+- **Two things the design needs to store have nowhere to live in `Metrics` today**: the number of
+  half-hours a cost row covers (without it, totals cannot be compared across folds of unequal
+  length) and the calibrated $\tau$ (which says how conservative a model had to be to reach the
+  common risk target, and is interpretable on its own). Both need resolving with the contract
+  change.
 - Costs are stored **per `time_series_id`**, summed over time only, so they fit the existing primary
-  key; the portfolio headline is their sum. Only $\tau$ and the unmet target are pooled across
-  series.
-- Costs are sums over time, unlike every other metric in the table, so a row must record the number
-  of half-hours it covers or the totals cannot be compared across folds of unequal length.
-- The calibrated $\tau$ is worth storing: it says how conservative a model had to be to reach the
-  common risk target, which is interpretable on its own.
-- Prices, the risk target and the limit percentiles are configuration, not constants in code, so
+  key. Only $\tau$ and the unmet target are pooled across series.
+- **`_log_metrics_to_mlflow` aggregates with `mean()`**, which is right for every metric that exists
+  today and wrong for these: the portfolio headline is a *sum* over series, and pooled
+  `unmet_fraction` is $\sum N$-weighted, not an unweighted mean that a tiny site can dominate. The
+  MLflow aggregation needs a per-metric rule before these land.
+- Prices, the risk target and the limit percentile are configuration, not constants in code, so
   NGED's answers can be applied without a retrain.
 - Scored on a single lead-time slice (`day_ahead` until we know when the procurement decision is
   actually made) rather than all horizons pooled.

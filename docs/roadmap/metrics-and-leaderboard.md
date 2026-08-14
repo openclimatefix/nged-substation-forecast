@@ -645,17 +645,19 @@ reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
   "70% chance of rain" forecast; the most *decision-legible* number, scoring exactly the
   warning NGED acts on.
 
-All three fit the existing `Metrics` schema — `metric_param` carries the threshold or quantile
-label — so there is no schema change.
+All three fit the existing `Metrics` shape — `metric_param` carries the threshold or quantile
+label — but they need a contract change to get there: `METRIC_NAMES` has no `twcrps` or `brier`
+entry, and `METRIC_PARAMS` no `historical_p99`, and both fields are `pl.Enum`.
 
 **Thresholds: static, per-series, quantile-derived.** A substation's true limit is not a
 single number (ratings vary with ambient temperature; transformers tolerate short overloads,
 so exceedance *duration* matters; switching changes what a feeder carries — NGED's own limit
 line is a time-varying "Flex Profile"). We deliberately do not model any of that for scoring.
-Each series gets one static threshold — the P95 of its full observation history, in the series
+Each series gets one static threshold — the P99 of its full observation history, in the series
 type's constraint-side direction (high load for demand; reverse power flow for generation) —
 chosen because it guarantees every series a scoreable event rate, means the same thing across
-series, and stays stable across CV folds. NGED endorsed the P95; it is the same rung the
+series, and stays stable across CV folds. NGED described setting capacity at the 99th percentile
+when we discussed this in July 2026; it is the same rung the
 [cost-savings metrics](cost-savings-metrics.md#choosing-the-limit) use, so the leaderboard
 carries one threshold concept rather than several. Physical firm/flex ratings, where NGED
 supplies them, feed ad-hoc case studies and dashboard overlays instead: a rating that is never
@@ -678,7 +680,7 @@ before/after instruments for Phases C and D.
 
 #### Implementation details — tail & exceedance metrics (deleted when this ships)
 
-- **Thresholds:** compute a per-series `historical_p95` scalar from the full observation
+- **Thresholds:** compute a per-series `historical_p99` scalar from the full observation
   history alongside (or within) the `effective_capacity` asset — same full-history stability
   rationale, same join shape (`time_series_id`-only). Constraint-side direction resolved per
   `time_series_type`; confirm the mapping with NGED for ambiguous types (BESS charges *and*
@@ -691,7 +693,7 @@ before/after instruments for Phases C and D.
 - **Brier score:** exceedance probability = member fraction above the threshold; outcome
   indicator from `y`; squared difference, averaged.
 - **MLflow allowlist:** extend `_MLFLOW_LOGGED_PARAMETRIC` with a small headline subset (e.g.
-  `twcrps@historical_p95`, exceedance rate at p95, `brier@historical_p95`); decide the exact set at
+  `twcrps@historical_p99`, exceedance rate at p95, `brier@historical_p99`); decide the exact set at
   implementation time and keep it small — everything is in Delta regardless.
 - **Peak-events diagnostic slice:** one more named population filter on the shared mechanism
   (with the Tricky-days filter), flagged in the leaderboard UI as diagnostic-only.

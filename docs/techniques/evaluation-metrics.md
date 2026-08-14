@@ -371,9 +371,9 @@ $$
 
 Because it reuses the fair form, twCRPS inherits CRPS's one crucial comparability property:
 it is unbiased across ensemble sizes, so the 13-member `nged_incumbent` and the 51-member ML
-models can be compared on it directly. It is computed per threshold in the
-[per-series threshold ladder](#choosing-the-thresholds-static-per-series-quantile-derived),
-with `metric_param` carrying the threshold label.
+models can be compared on it directly. It is computed against the [per-series
+threshold](#choosing-the-thresholds-static-per-series-quantile-derived), with `metric_param`
+carrying the threshold label.
 
 ### Exceedance rate of the upper delivery quantiles
 
@@ -440,18 +440,19 @@ their scoring properties**, and state plainly that they are a proxy — these me
 "skill near a fixed line standing where the limit typically lives", not operational breach
 prediction:
 
-- **The threshold: the P95 of each series' full observation history** (of power in the
-  constraint-side direction — see below), the rung NGED endorsed. Its label in `metric_param`
-  is `historical_p95`, deliberately distinct from the forecast-quantile label `p95`: one names
-  a fixed power level derived from history, the other a level of the forecast distribution.
-  The prefix is spelled out rather than shortened to `hist_`, which reads as "histogram".
+- **The threshold: the P99 of each series' full observation history** (of power in the
+  constraint-side direction — see below), the rung NGED described when we discussed this in
+  July 2026. Its label in `metric_param` is `historical_p99`, deliberately distinct from the
+  forecast-quantile label `p99`: one names a fixed power level derived from history, the other
+  a level of the forecast distribution. The prefix is spelled out rather than shortened to
+  `hist_`, which reads as "histogram".
 
 - **Why historical quantiles rather than the physical ratings:** ratings are not available
   for every series; a rating that is never breached in a 12-month validation window yields
   *zero events* — and a warning system cannot be graded on events that never happen; and
   per-series ratings sit at wildly different points of each series' distribution, breaking
   cross-series comparability. A full-history quantile threshold guarantees every series a
-  scoreable event rate (~5% by construction), is identical in meaning across series, and is
+  scoreable event rate (~1% by construction), is identical in meaning across series, and is
   stable across CV folds for the same reason the
   [effective-capacity denominator](../roadmap/metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
   is computed over the full history.
