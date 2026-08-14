@@ -46,6 +46,11 @@ class PowerTimeSeries(pt.Model):
         description=(
             "Average power (MW or MVA) over the preceding 30-minute period. Unit defined in "
             "TimeSeriesMetadata."
+            " Sign convention depends on `time_series_type`: for substations, positive means"
+            " power flowing towards end-users and negative means excess generation flowing back"
+            " into the grid; for customer meters (generators), positive means the customer is"
+            " generating power sent to NGED's grid and negative means the customer is consuming"
+            " power."
         ),
     )
 
@@ -382,8 +387,11 @@ class PowerForecast(pt.Model):
         description=(
             "The power forecast itself in units of MW (active power) or MVA (apparent power)."
             " The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`."
-            """ Positive values mean "power sent to NGED's grid","""
-            """ and negative values mean "power drawn from NGED's grid"."""
+            " Sign convention depends on `time_series_type`: for substations, positive means"
+            " power flowing towards end-users and negative means excess generation flowing back"
+            " into the grid; for customer meters (generators), positive means the customer is"
+            " generating power sent to NGED's grid and negative means the customer is consuming"
+            " power."
             " Rows read back from the internal `power_forecasts` Delta table carry reduced"
             " precision: values are rounded to a 13-bit significand at write time"
             " (max relative error 2^-13 ≈ 1.2e-4, far below forecast error) to aid compression;"
