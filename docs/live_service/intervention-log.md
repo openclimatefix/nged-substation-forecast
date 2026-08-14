@@ -78,10 +78,9 @@ the plainest possible case of the selective reading these hypotheses exist to pr
 
 ## The log
 
-*No interventions recorded yet.*
-
 | Date | Trigger | Cause | Minutes | Runbook? | Notes |
 |---|---|---|---|---|---|
+| 2026-08-13 19:56 | Sentry alarm — but from the pre-v0.2 code on a laptop, not from AWS | `upstream-outage` | <5 | yes | Dynamical.org first published the 2026-08-09 00Z ECMWF run with a variable wholly missing, and v0.1 treated that as fatal, so the partition was re-materialised by hand. Four forecast slots ran on the previous day's run in the meantime. [#493](https://github.com/openclimatefix/nged-substation-forecast/pull/493) added the retry that covers it |
 
 ## Periods covered
 
@@ -90,44 +89,86 @@ empty log with no stated period is indistinguishable from a log nobody kept.
 
 | Period | Version | Scope | Interventions | Scores T1.1? |
 |---|---|---|---|---|
-| 2026-07-15 18:00 UTC → ongoing | v0.1 | 32 time series, 6-hourly `live_forecasts` on AWS | 0 | No — pre-v1.0 |
+| 2026-07-15 18:00 UTC → 2026-08-14 00:00 UTC | v0.1 | 28 time series, 6-hourly `live_forecasts` on AWS | 1 | No — pre-v1.0 |
+| 2026-08-14 00:00 UTC → ongoing | v0.2 | 31 time series, 6-hourly `live_forecasts` on AWS, with `live_forecasts_are_healthy` reporting on each slot | 0 | No — pre-v1.0 |
 
-Figures below are stated as of **06:00 UTC on 7 August 2026**. Every count in this section moves
+Figures below are stated as of **07:00 UTC on 14 August 2026**. Every count in this section moves
 within the day, so the as-of instant is part of the measurement rather than a formality.
 
-### v0.1 on AWS, from 2026-07-15
+### v0.1 on AWS, 2026-07-15 to 2026-08-13
 
-The first `live_forecasts` run on AWS was the 18:00 UTC slot on 15 July 2026. That is 22 days and
-12 hours at the time of writing (7th August 2026) — 91 consecutive 6-hourly forecast slots, and 22
-daily `ecmwf_ens` runs — with **zero interventions and zero observed failures**. Every expected
-forecast exists.
+The first `live_forecasts` run on AWS was the 18:00 UTC slot on 15 July 2026, and the last was the
+18:00 UTC slot on 13 August 2026, an hour before the v0.1 stack was retired at roughly 19:00 UTC
+that evening to make way for v0.2. Over that window the schedule called for 117 consecutive
+6-hourly forecast slots, and **every one of them produced a forecast for all 28 time series**. One
+ECMWF run was lost and one human intervention was needed, both described below.
 
-The VM was deployed once, on 15 July, and has not been touched since: no code has been pushed to
-AWS during the period, and the next deployment will be v0.2. So the period is genuinely unattended
-rather than quietly maintained.
+The VM was deployed once, on 15 July, and no code was pushed to AWS until it was retired. The one
+operator action in the window was the NWP backfill logged above, so the period is close to
+unattended but not entirely so.
 
-*Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` in the
-`power_forecasts` Delta table across the period, cross-checked against the Dagster run history and
-the Sentry missed-check-in monitor, which never alarmed.
+*Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` and
+`experiment_name = "xgboost_cv_0001"` — v0.1's promoted model — in the `power_forecasts` Delta
+table on S3. All 117 scheduled slots are present, every consecutive pair is exactly six hours
+apart, and all 28 time series appear in every one of the 117.
 
-Three caveats, without which the number would be worth less than it looks:
+### The 9 August ECMWF run, and what it shows
 
-- **"Zero observed failures" is a weaker claim than "zero failures".** v0.1 implemented very little
-  failure detection: `live_forecasts_are_healthy` — the check that reads each slot's rows back and
-  reports missed NWP runs — landed in v0.2, after this window closed. What is
-  genuinely verified is that every scheduled slot produced output, not that nothing degraded
-  quietly on the way. A silently-stale input is precisely the failure mode this stack is built to
-  make visible, and at v0.1 it would not yet be visible.
-- **Twenty-two days is short, and this is the easy case.** v0.1 is 32 time series and one ECMWF run
-  per day. The dominant cause T1.1 predicts — an upstream contract change — may simply not have
-  happened yet in a window this short. A quiet three weeks is consistent both with "the design
-  works" and with "nothing has been thrown at it".
+Dynamical.org publishes each ECMWF run as roughly 40 separate Icechunk commits, so a run can be
+readable and incomplete at the same time. The 2026-08-09 00Z run was first published with a weather
+variable wholly missing, and repaired 3 hours 25 minutes later. v0.1 treated a wholly-missing
+variable as fatal, so its `ecmwf_ens` run failed and no partition was written for 9 August. The
+partition was re-materialised by hand on 13 August at 19:56 UTC.
+
+The forecast did not stop. Four slots — 2026-08-09 12:00 UTC through 2026-08-10 06:00 UTC — ran on
+the 8 August 00Z run instead, at 36, 42, 48 and 54 hours old against the 12–30 hours a healthy slot
+sees. Every other slot in the window used NWP no older than 30 hours.
+
+That is [Principle 1](../design-philosophy/design-principles.md) — the power forecast never stops —
+working in production rather than on paper, and it is the more interesting result on this page. A
+missing input degraded the forecast instead of stopping it, and the degradation was bounded and
+visible after the fact. v0.2 closes the gap that made the intervention necessary at all: a
+wholly-missing variable is now a retryable "not ready yet" rather than a fatal error, with a
+four-hour retry budget that covers the 3h25m this republication took.
+
+Three caveats, without which the window would be worth more than it is:
+
+- **Nothing alerted us from AWS.** The Sentry alarm that surfaced the missed run came from the
+  pre-v0.2 code running on a laptop, not from the deployed stack, and the missed-check-in monitor
+  never fired. `live_forecasts_are_healthy` — the check that reads each slot's rows back and
+  reports missed NWP runs — landed in v0.2, after this window closed. The four degraded slots were
+  reconstructable only because `nwp_init_time` travels on every forecast row. So the degradation
+  was recoverable from the data, but nothing in the deployment announced it.
+- **A month is short, and this is the easy case.** v0.1 is 28 time series and one ECMWF run
+  per day. The dominant cause T1.1 predicts — an upstream contract change — did not happen in a
+  window this short; a partial publication is a milder fault than a changed schema.
 - **It does not score.** The window opens at v1.0, [as above](#the-scoring-window-opens-at-v10).
 
 So what this is, stated plainly: **weak, non-scoring evidence for H1, drawn from a window the
-scoring rule excludes and gathered with detection too thin to see quiet degradation.** The deployed
-stack served every scheduled slot for 22 days without a human touching it. That is worth recording,
-and it is not worth more than that.
+scoring rule excludes.** The deployed stack served all 117 scheduled slots over 29 days, absorbed
+one lost NWP run by degrading rather than stopping, and cost a human about a minute. That is worth
+recording, and it is not worth more than that.
+
+### v0.2 on AWS, from 2026-08-14
+
+v0.2 was deployed on the evening of 13 August 2026, replacing the v0.1 stack at roughly 19:00 UTC.
+Its first `live_forecasts` run was the 00:00 UTC slot on 14 August 2026, which is where this period
+starts. The deployment itself is a deliberate upgrade, so it is not an intervention and has no row
+in [the log](#the-log).
+
+v0.2 forecasts 31 time series, three more than v0.1, under the promoted model
+`xgboost_cv_0003`. The 00:00 and 06:00 UTC slots on 14 August both carry all 31.
+
+Two things make the next stretch better evidence than the last. `live_forecasts_are_healthy` reads
+each succeeding slot's rows back and reports missed NWP runs, so a slot forecasting from stale
+inputs is recorded as degraded rather than passing unremarked. And a wholly-missing NWP variable is
+now retried for four hours instead of failing, which is what would have made the 9 August
+intervention unnecessary.
+
+Both narrow the first caveat above without closing it. The check is `WARN` and non-blocking, so it
+colours the slot in the Dagster Checks view and alerts nobody; a slot whose run raised fails
+outright rather than being checked; and the 9 August alarm reached us from a laptop rather than
+from AWS, which nothing in v0.2 changes.
 
 ## See also
 
