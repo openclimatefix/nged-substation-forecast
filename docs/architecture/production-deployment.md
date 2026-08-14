@@ -170,9 +170,20 @@ The same check carries the **missed daily NWP run count**, because the second wa
 quietly wrong is to be built from an increasingly ancient weather run. It is deliberately a count
 of *runs*, never an age in hours: we ingest one ECMWF run a day and forecast four times a day, so
 healthy NWP is anywhere between 12 and 30 hours old and any absolute age threshold tight enough to
-catch an outage would fire on two slots in four every day. The reasoning, and why the "expected
-freshest run" deadline is 14 hours rather than the publication time, is in
-[Inherent Stability → Three audiences, three channels](../design-philosophy/inherent-stability.md#three-audiences-three-channels).
+catch an outage would fire on two slots in four every day. Why a count rather than an age is
+[rule 5](../design-philosophy/inherent-stability.md#the-rules).
+
+The care goes into the other half of that subtraction: the freshest run that *ought* to exist by
+now. It is derived from a deadline — how long after a run's `init_time` a healthy ingest should
+have landed it — rather than from the publication time, because what matters is when the run
+reaches *our* disk. The deadline therefore has to clear `ecmwf_ens_schedule`'s 08:30 UTC start plus
+that asset's retry ladder — eight retries at 30 minutes, plus a download on each attempt, for the
+failure mode that is only detectable after downloading — so it sits at 14 hours. The consequence is
+a one-run leniency at the 12:00 slot, where today's run has landed but is not yet *demanded*: a
+download that fails today is reported from the 18:00 slot onwards rather than six hours earlier.
+That is the right way round to be wrong. A tighter deadline would buy those six hours at the price
+of a false alarm on every morning the download merely ran slowly, which is the failure mode
+counting runs exists to avoid.
 
 Two design points follow the `power_data_is_fresh` pattern deliberately. The check is **WARN** and
 **non-blocking**, like every other check in the repo — a degraded slot is still the best forecast
@@ -192,6 +203,33 @@ Dagster does not run a check whose asset op failed — and that case is already 
 lost. What the check adds is exactly the quiet half.
 
 ## Send telemetry to Sentry, and alarm on absence
+
+Sentry carries both "we broke" and "the weather feed is late", and they need different responses,
+so the difference has to be legible in the event itself.
+
+| | Level | Carries | Means | Sent by |
+|---|---|---|---|---|
+| **Something broke** | `error` | an exception | our code, or something it depends on, could not do its job | `sentry_capture_failure`, `report_asset_degradation`, `report_check_degradation` |
+| **Something degraded** | `warning` | a message and its context | nothing threw; an input is late, stale or thin, and the forecast carried on | `report_power_freshness` |
+
+The exception is the dividing line, and it is exact rather than a convention: an error event always
+carries one, a warning event never does. **An error event does not mean the run died.** Only
+`sentry_capture_failure` reports a failed run; the other two exist precisely because their callers
+caught the exception and carried on. Nor are the two exclusive: both degradation senders are called
+part-way through an asset that still has a Delta write ahead of it, so a later failure puts a
+degradation event and a run-failure event on the same run. `fault_category:run_failed` is what
+tells them apart, which is why the routing below — and
+[Operating the live service](../live_service/operations.md) — triages on that tag rather than on
+the level.
+
+**Both kinds must be delivered.** A late NWP run is not our fault and does not stop the forecast,
+and we still have to hear about it, because only a human can ask Dynamical.org what happened;
+silence is reserved for a healthy service, not for a degraded one. That is
+[rule 6](../design-philosophy/inherent-stability.md#the-rules), and the two sides of it are
+unevenly built. Three senders cover the broke side; the degraded side has one,
+`report_power_freshness`, which is why most of the degradation our checks detect is invisible from
+outside Dagster
+([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)).
 
 Three independent Sentry mechanisms live in `nged_substation_forecast._sentry`, all active
 in every Dagster process (daemon, webserver, and each Fargate run worker) only when a `SENTRY_DSN`
