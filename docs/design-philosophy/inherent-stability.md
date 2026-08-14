@@ -1,8 +1,11 @@
 # Inherent Stability
 
 > **We never stop forecasting power. When an input goes missing or stale, the forecast degrades
-> gracefully instead of stopping: it becomes less certain, and it says so, through wider uncertainty
-> bands. Wherever possible, that stability should be an inherent property of the system's design,
+> gracefully instead of stopping: it becomes less certain, and it says so — through wider
+> uncertainty bands to whoever reads the forecast, a warning row naming the feed at fault, and a
+> Sentry event when a human can do something about it — the first two of those three are designed
+> and not yet built. Wherever possible, that stability should be
+> an inherent property of the system's design,
 > rather than something bolted on afterwards by post-processing and `if-then-else` branches in the
 > production service.**
 
@@ -131,24 +134,29 @@ band of regimes.
 ## Failure modes
 
 What breaks, what the system does about it, and whether anyone is alerted. "Today" describes the
-code as it stands; "intended" describes where this principle takes it.
+code as it stands; "intended" describes where this principle takes it. The alert column names which
+of the [two kinds of Sentry event](#two-kinds-of-sentry-event) fires — **error** when something
+threw, **warning** when an input degraded and nothing did. Two rows reach a human by another route
+entirely: the missed-check-in alarm, and the promotion runs an operator watches at the launchpad.
+No production row should read "not yet": a degradation nobody is told about is a silent failure,
+and the rows that do are the ones still to be wired up.
 
 | Failure | Today | Intended | Human alerted? |
 |---|---|---|---|
-| One or two daily NWP runs missed | `live_forecasts` selects the freshest run present as of the forecast time, so an older run is used through the normal path; `live_forecasts_are_healthy` warns with the count of missed runs | Unchanged | No |
-| NWP stale but still covering the horizon | Forecast produced from an increasingly ancient run; `nwp_init_time` is on every row and `live_forecasts_are_healthy` warns with the missed-run count, but the forecast itself looks as confident as a fresh one | Bands widen with the regime; `STALE NWP` warning row 🚧 | No |
-| A slot produces no rows, or unusable ones, while the asset still succeeds | `live_forecasts_are_healthy` warns, naming the row count, the invalid rows and any trained series that went missing | Unchanged | No |
-| NWP absent, or too old to cover the horizon | **Hard failure** — the asset raises and NGED gets nothing (tracked to change in [#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) | Weather-blind forecast, wide bands, warning row 🚧 | No |
-| Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns and names the late series | Unchanged, plus regime-appropriate band widening 🚧 | No |
-| A meter reporting detectably wrong values | Partly detected at ingest; see [Missing versus wrong](#missing-versus-wrong) | Treated as missing, which routes it into the always-output path 🚧 | No |
-| A whole ECMWF slice corrupt | Landed; `nwp_has_no_unexpected_nulls` warns, naming the slice | Unchanged | No |
-| A whole ECMWF weather variable absent | `Nwp.validate` rejects it; `ecmwf_ens` turns each rejection into a retry for up to 4h, and once those are exhausted it manifests downstream as a missed run | Unchanged | No |
-| The promoted model is empty or unloadable | **Hard failure** — the asset raises | Unchanged: this is a promotion bug, not a data outage | Yes, next business day |
-| The `TimeSeriesMetadata` roster is unreadable, or has lost rows for trained series | Live inference does not read the roster: each series' location comes from the promoted model's own frozen copy of the rows it trained against, so the forecast is unchanged. The hourly ingest contains the upsert failure and records `metadata_upsert_failed` | Unchanged | No |
-| A duplicated forecast row reaches the model output — a join fanning out, which takes a bug of ours rather than duplicated data at rest, since every NWP write replaces its partition | **Hard failure** — `PowerForecast.validate` raises on the duplicated primary key and NGED gets nothing for that slot | Unchanged: writing a silently duplicated forecast would corrupt the delivered table and every metric computed from it | Yes, next business day |
-| A model is promoted whose saved config this code can no longer rebuild — a feature name it does not recognise, or a `model_params` key it no longer declares | `promoted_model` refuses it before replacing the model on disk, so the outgoing champion stays and keeps forecasting | Unchanged | Yes, at promotion time |
-| The run named for promotion holds no model at all — usually a mistyped or stale run id | `promoted_model` fails on the download, again before replacing the model on disk, so the outgoing champion stays and keeps forecasting | Unchanged | Yes, at promotion time |
-| The service is not running at all | Sentry missed-check-in alarm fires from outside the deployment | Unchanged | Yes, next business day |
+| One or two daily NWP runs missed | `live_forecasts` selects the freshest run present as of the forecast time, so an older run is used through the normal path; `live_forecasts_are_healthy` warns with the count of missed runs | Unchanged, plus a Sentry **warning** carrying the missed-run count 🚧 | Yes — **error**, when the `ecmwf_ens` run that should have landed the missing NWP failed, which is the usual cause. The check's own missed-run count does not reach Sentry 🚧 ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
+| NWP stale but still covering the horizon | Forecast produced from an increasingly ancient run; `nwp_init_time` is on every row and `live_forecasts_are_healthy` warns with the missed-run count, but the forecast itself looks as confident as a fresh one | Bands widen with the regime; `STALE NWP` warning row and a Sentry **warning** 🚧 | Yes — **error**, when the `ecmwf_ens` run that should have landed the missing NWP failed, which is the usual cause. The check's own missed-run count does not reach Sentry 🚧 ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
+| A slot produces no rows, or unusable ones, while the asset still succeeds | `live_forecasts_are_healthy` warns, naming the row count, the invalid rows and any trained series that went missing | Unchanged, plus a Sentry **warning** 🚧 | Not yet 🚧 ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
+| NWP absent, or too old to cover the horizon | **Hard failure** — the asset raises and NGED gets nothing (tracked to change in [#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) | Weather-blind forecast, wide bands, warning row, and the alert drops from **error** to **warning** because nothing of ours has broken 🚧 | Yes — **error**, from the failed run |
+| Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns, names the late series and sends a Sentry warning event | Unchanged, plus regime-appropriate band widening 🚧 | Yes — **warning** |
+| A meter reporting detectably wrong values | Malformed timestamps are dropped at ingest, but wrong *values* are not yet detected; see [Missing versus wrong](#missing-versus-wrong) | Treated as missing, which routes it into the always-output path, and warned on like any other missing input 🚧 | Not yet 🚧 — ingest drops malformed timestamps but detects no wrong *values*, so there is nothing yet to warn about |
+| A whole ECMWF slice corrupt | Landed; `nwp_has_no_unexpected_nulls` warns, naming the slice | Unchanged, plus a Sentry **warning** once the slice count is large 🚧 | Not yet 🚧 ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
+| A whole ECMWF weather variable absent | `Nwp.validate` rejects it; `ecmwf_ens` turns each rejection into a retry for up to 4h, and once those are exhausted it manifests downstream as a missed run | Unchanged | Yes — **error**, once the retries are exhausted and the run fails |
+| The promoted model is empty or unloadable | **Hard failure** — the asset raises | Unchanged: this is a promotion bug, not a data outage | Yes — **error**, next business day |
+| The `TimeSeriesMetadata` roster is unreadable, or has lost rows for trained series | Live inference does not read the roster: each series' location comes from the promoted model's own frozen copy of the rows it trained against, so the forecast is unchanged. The hourly ingest contains the upsert failure, records `metadata_upsert_failed` and sends a Sentry error event through `report_asset_degradation` | Unchanged | Yes — **error**, if the upsert raised. A roster that merely lost rows raises nothing and alerts nobody: the last stored values for the missing series stand indefinitely 🚧 |
+| A duplicated forecast row reaches the model output — a join fanning out, which takes a bug of ours rather than duplicated data at rest, since every NWP write replaces its partition | **Hard failure** — `PowerForecast.validate` raises on the duplicated primary key and NGED gets nothing for that slot | Unchanged: writing a silently duplicated forecast would corrupt the delivered table and every metric computed from it | Yes — **error**, next business day |
+| A model is promoted whose saved config this code can no longer rebuild — a feature name it does not recognise, or a `model_params` key it no longer declares | `promoted_model` refuses it before replacing the model on disk, so the outgoing champion stays and keeps forecasting | Unchanged | Yes — the operator is watching the launchpad. No Sentry event: `promoted_model` is materialised by hand, outside the scheduled jobs the failure hook is attached to |
+| The run named for promotion holds no model at all — usually a mistyped or stale run id | `promoted_model` fails on the download, again before replacing the model on disk, so the outgoing champion stays and keeps forecasting | Unchanged | Yes — the operator is watching the launchpad, as above. No Sentry event |
+| The service is not running at all | Sentry missed-check-in alarm fires from outside the deployment | Unchanged | Yes — the missed-check-in alarm, next business day |
 | Any of the above during model R&D | Fails fast | Unchanged — see [R&D fails the other way](#rd-fails-the-other-way) | n/a |
 
 Nothing here is a 2am page. The uptime posture that makes that acceptable is argued in
@@ -174,15 +182,22 @@ appear nowhere else.
    imperative form.)*
 3. **Treat detectably-wrong input as missing, not as data** — see
    [Missing versus wrong](#missing-versus-wrong).
-4. **Signal degradation in-band first.** The uncertainty band is the only number the consumer is
-   certain to read. Side channels — warning tables, checks, Sentry — supplement it; they never
-   substitute for it.
+4. **Signal degradation on all three channels, in-band first.** The uncertainty band is the only
+   number the consumer is certain to read, so it comes first — but the warning table and Sentry are
+   required too, not optional extras, and none of the three substitutes for another. A degradation
+   nobody is told about is a silent failure however gracefully the forecast carried on. *(The
+   [never-stop principle](design-principles.md#1-the-power-forecast-never-stops), in imperative
+   form.)*
 5. **Measure degradation in missed runs and absent inputs, never in raw hours of age.** Healthy NWP
    is between 12 and 30 hours old depending on the slot, so an absolute age threshold is either a
    daily false alarm or a magic number silently coupled to the ingest schedule — and either way it
    cannot say how many runs are missing.
-6. **Asset checks warn; they do not block.** `AssetCheckSeverity.WARN` with `blocking=False` is the
-   house pattern, and there is deliberately no `ERROR`-severity check anywhere in the repo.
+6. **Asset checks warn; they do not block — but warning is not the same as staying quiet.**
+   `AssetCheckSeverity.WARN` with `blocking=False` is the house pattern, and there is deliberately
+   no `ERROR`-severity check anywhere in the repo. Non-blocking never means non-notifying: a check
+   that finds degradation must still send a Sentry event, without failing the run it is warning
+   about. *(The [never-stop principle](design-principles.md#1-the-power-forecast-never-stops), in
+   imperative form.)*
 7. **Never let the warning path be able to fail the thing it is warning about.** A bug in a warning
    function that raises would convert fail-open into fail-closed at exactly the wrong moment, which
    is why `report_power_freshness` never raises and why every asset check — the standalone
@@ -214,10 +229,11 @@ appear nowhere else.
     [coupling-through-data-at-rest
     principle](design-principles.md#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status),
     in imperative form.)*
-12. **Make the telemetry name the fault.** An exception a warning path swallows still has to reach
-    Sentry, tagged with whatever an alert rule routes on, and its message has to name the series,
-    the run or the asset at fault rather than only the type of error. The operator reads the alert,
-    not the logs. *(The [names-its-own-cause
+12. **Make the telemetry name the fault.** Whatever reaches Sentry — a swallowed exception, a
+    degradation warning — carries the tag an alert rule routes on, and names the series, the run or
+    the asset at fault rather than only the type of error. Rule 4 says the signal has to be sent;
+    this one says it has to be legible when it arrives, because the operator reads the alert rather
+    than the logs. *(The [names-its-own-cause
     principle](design-principles.md#16-a-failure-names-its-own-cause-in-the-telemetry), in
     imperative form.)*
 
@@ -301,8 +317,10 @@ A stale forecast **looks identical to a fresh one**. Staleness columns and warni
 channels: they require the consumer to go and look. Uncertainty bands are not. A forecast whose
 P5–P95 spread has doubled has already told the consumer to be more cautious, through the only number
 they were going to read anyway. The system reports its own degradation through the same mechanism it
-uses to do its job, which means **no separate monitoring system has to work for the safety property
-to hold**.
+uses to do its job, which means **the consumer-facing safety property does not depend on a separate
+monitoring system working**. That is an argument for the band being first and unconditional, not an
+argument against the other two channels: they answer questions the band cannot, and
+[rule 4](#the-rules) requires all three.
 
 Two caveats. `XGBoostConfig.objective` currently defaults to `reg:squarederror`, so today's model is
 a point forecast; quantile output
@@ -333,13 +351,23 @@ here: nothing else says clear-sky is what we fall back *to*.
 |---|---|---|
 | **Forecast users** (NGED) | "How much should I trust *this row*?" | In-band: quantile spread, plus `nwp_init_time`, already on the row |
 | **Data providers** | "Is *your* feed broken, and since when?" | Aggregated and **attributable**: `power_forecast_warnings`, the freshness check's late-series table, the live check's missed-NWP-run count, the NWP quality check's upstream grid-point null rate |
-| **Us, the developers** | "Is *our* system at fault?" | Out-of-band: Sentry, plus the missed-check-in alarm |
+| **Us, the developers** | "Does anyone need to *do* something, and is it us?" | Out-of-band: Sentry, plus the missed-check-in alarm. Both kinds of event arrive here — our own faults and the upstream problems only a human can chase — and the level says which (see [Two kinds of Sentry event](#two-kinds-of-sentry-event)) |
 
 Inherent stability creates a specific hazard for the third channel: **a system that always succeeds
 looks identical to a system that is not running at all.** Both produce zero failures. That is why
 the [Sentry missed-check-in alarm](../live_service/sentry.md), firing from outside the deployment,
 is load-bearing rather than belt-and-braces — it is the one piece of active monitoring this design
 cannot do without.
+
+That alarm fires on *absence*, though, and the developer channel is only half wired for the other
+case: a run that succeeds on degraded inputs. `power_data_is_fresh` sends a Sentry event when power
+data goes stale, but `live_forecasts_are_healthy` and the three per-run `ecmwf_ens` checks send one
+only when the check itself cannot evaluate — never when it evaluates fine and finds the degradation
+it exists to find. Separately, the check-in is not conditional on health: it is sent from the asset
+body after a successful write, before any check runs, so a degraded slot reports the service
+healthy. [Issue #501](https://github.com/openclimatefix/nged-substation-forecast/issues/501) tracks
+the first of those; the second is deliberate, because the alarm is meant to fire purely on the
+absence of a heartbeat.
 
 For the provider channel, a warning is only actionable if it names *whose* NWP and *which* run,
 which is why `power_forecast_warnings` carries a `warning_source` field
@@ -369,6 +397,40 @@ download that fails today is reported from the 18:00 slot onwards rather than si
 That is the right way round to be wrong. A tighter deadline would buy those six hours at the price
 of a false alarm on every morning the download merely ran slowly, which is precisely the failure
 mode this whole section exists to avoid.
+
+### Two kinds of Sentry event
+
+Sentry carries both "we broke" and "the weather feed is late", and they need different responses,
+so the difference has to be legible in the event itself.
+
+| | Level | Carries | Means | Sent by |
+|---|---|---|---|---|
+| **Something broke** | `error` | an exception | our code, or something it depends on, could not do its job | `sentry_capture_failure`, `report_asset_degradation`, `report_check_degradation` |
+| **Something degraded** | `warning` | a message and its context | nothing threw; an input is late, stale or thin, and the forecast carried on | `report_power_freshness` |
+
+The exception is the dividing line, and it is exact rather than a convention: an error event always
+carries one, a warning event never does.
+
+**An error event does not mean the run died.** Only `sentry_capture_failure` reports a failed run;
+`report_asset_degradation` and `report_check_degradation` exist precisely because their callers
+caught the exception and carried on. The level says an exception was thrown, not that the forecast
+stopped. The two are not exclusive either — both senders are called part-way through an asset that
+still has a Delta write ahead of it, so a later failure puts a degradation event and a run-failure
+event on the same run. `fault_category:run_failed` is what tells them apart, which is why
+[Operating the live service](../live_service/operations.md) triages on that tag rather than on the
+level.
+
+**Both kinds must be delivered.** A late NWP run is not our fault and does not stop the forecast,
+and we still have to hear about it, because only a human can ask Dynamical.org what happened.
+Silence is reserved for a healthy service, not for a degraded one.
+
+The two are unevenly built. Three senders cover the broke side; the degraded side has one,
+`report_power_freshness`, which is why most of the degradation our checks detect is invisible from
+outside Dagster — [issue #501](https://github.com/openclimatefix/nged-substation-forecast/issues/501).
+
+Alongside these sits the [missed-check-in alarm](#three-audiences-three-channels), which is neither:
+it is not an event we send at all, but Sentry noticing that an expected heartbeat did not arrive.
+That is what covers the case no in-process sender can — the service not running.
 
 ### Missingness in learned models
 

@@ -12,13 +12,21 @@ from typing import Final
 
 import polars as pl
 
-NWP_PUBLICATION_DELAY_HOURS: Final[int] = 6
-"""Default delay between an NWP run's ``init_time`` and when it becomes publicly available.
+NWP_PUBLICATION_DELAY_HOURS: Final[int] = 9
+"""Hours after an NWP run's ``init_time`` before we treat that run as usable.
 
-A run initialised at ``init_time`` cannot be used to reconstruct the analysis at an as-of time
-earlier than ``init_time + NWP_PUBLICATION_DELAY_HOURS`` — this is the delay
-``select_analysis_proxy`` applies for its optional ``available_at`` leakage cut, and the same delay
-the feature pipeline uses to derive ``power_fcst_init_time`` from ``nwp_init_time``.
+This models when a run reaches *our* disk, not when Dynamical publish it. Dynamical publish each
+00Z run between 08:05 and 08:20 UTC, and ``ecmwf_ens_schedule`` downloads it at 08:30 UTC, so a 00Z
+run is ours from roughly 08:30 — 8.5 hours. Nine is the nearest whole hour at or after that.
+
+``select_analysis_proxy`` applies it for the optional ``available_at`` leakage cut; the feature
+pipeline uses it to derive ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode; and
+``select_nwp_init_time`` uses it to reconstruct availability for ``"replay"`` backfills.
+
+Two bounds constrain the value, given one 00Z run a day and forecast slots at 00/06/12/18 UTC. The
+06:00 slot must *not* see that morning's run, which has not landed yet, so the value must exceed 6.
+The 12:00 slot *must* see it, so the value must not exceed 12. Both bounds move if
+``ecmwf_ens_schedule``'s start time changes.
 """
 
 NWP_ANALYSIS_MEMBER: Final[int] = 0

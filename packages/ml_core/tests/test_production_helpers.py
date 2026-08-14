@@ -22,6 +22,7 @@ from ml_core._production_helpers import (
     load_forecaster_from_dir,
     select_nwp_init_time,
 )
+from weather_utils import NWP_PUBLICATION_DELAY_HOURS
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 _POWER_FCST_INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
@@ -47,21 +48,50 @@ def test_live_picks_freshest_run_at_or_before_power_fcst_init_time() -> None:
 
 
 def test_replay_picks_freshest_run_at_or_before_delayed_cutoff() -> None:
-    available = [
-        _POWER_FCST_INIT_TIME - timedelta(hours=24),
-        _POWER_FCST_INIT_TIME - timedelta(hours=6),
-        _POWER_FCST_INIT_TIME,
-    ]
-    # Replay cutoff is power_fcst_init_time - 6h (the default delay): the run exactly there
-    # qualifies, not the run at power_fcst_init_time itself.
-    assert select_nwp_init_time(
-        available, power_fcst_init_time=_POWER_FCST_INIT_TIME, availability_mode="replay"
-    ) == _POWER_FCST_INIT_TIME - timedelta(hours=6)
+    # Derived from the constant rather than hard-coded, so changing the delay cannot leave this
+    # test asserting a superseded cutoff.
+    cutoff = _POWER_FCST_INIT_TIME - timedelta(hours=NWP_PUBLICATION_DELAY_HOURS)
+    available = [cutoff - timedelta(hours=24), cutoff, _POWER_FCST_INIT_TIME]
+    # The run exactly at the cutoff qualifies; the run at power_fcst_init_time itself does not.
+    assert (
+        select_nwp_init_time(
+            available, power_fcst_init_time=_POWER_FCST_INIT_TIME, availability_mode="replay"
+        )
+        == cutoff
+    )
+
+
+@pytest.mark.parametrize(
+    ("slot_hour", "expected_run_day_offset"),
+    [(0, -1), (6, -1), (12, 0), (18, 0)],
+    ids=["00:00", "06:00", "12:00", "18:00"],
+)
+def test_replay_reconstructs_the_run_that_had_genuinely_landed(
+    slot_hour: int, expected_run_day_offset: int
+) -> None:
+    """Replay must pick the run that was really on disk, at every one of the four slots.
+
+    Ground truth: we ingest one 00Z run a day and ``ecmwf_ens_schedule`` downloads it at 08:30 UTC,
+    so day D's run is ours from 08:30. The 00:00 and 06:00 slots therefore still see D-1's run; the
+    12:00 and 18:00 slots see D's. The 06:00 case is the one a too-small delay gets wrong, by
+    handing the slot a run that had not landed yet.
+    """
+    day = datetime(2026, 7, 4, tzinfo=UTC)
+    available = [day + timedelta(days=offset) for offset in (-2, -1, 0)]
+
+    picked = select_nwp_init_time(
+        available,
+        power_fcst_init_time=day + timedelta(hours=slot_hour),
+        availability_mode="replay",
+    )
+
+    assert picked == day + timedelta(days=expected_run_day_offset)
 
 
 def test_live_and_replay_diverge_when_a_fresher_run_exists_within_the_delay_window() -> None:
-    """The whole point of the two modes: a run inside (power_fcst_init_time-6h,
-    power_fcst_init_time] is live-only visible."""
+    """The whole point of the two modes: a run inside
+    ``(power_fcst_init_time - NWP_PUBLICATION_DELAY_HOURS, power_fcst_init_time]`` is
+    live-only visible."""
     available = [
         _POWER_FCST_INIT_TIME - timedelta(hours=24),
         _POWER_FCST_INIT_TIME - timedelta(hours=1),

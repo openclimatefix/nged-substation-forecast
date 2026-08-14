@@ -65,17 +65,15 @@ principle behind it is a claim we are merely hoping comes true.
 
 ### 1 — The power forecast never stops
 
-If data inputs are disrupted, the forecast gets less certain instead of stopping — and should say
-so in the forecast itself, through wider uncertainty bands (band-widening is designed but not yet
-built — see [Widening bands](inherent-stability.md#widening-bands-the-in-band-signal)). The
-forecast always does the best it can with whatever data it has, rather than blowing up. That
-covers errors in the **upstream data**, and only those. An error in **our own code** — an empty
-promoted model, a contract violation, a join that has fanned out — gets the opposite posture: fail
-as early as possible, because degrading around our own bug would deliver a wrong forecast and bury
-its cause. How far such a failure then spreads is a different axis, and the business of
+If data inputs are disrupted, the forecast gets less certain instead of stopping. The forecast
+always does the best it can with whatever data it has, rather than blowing up. That covers errors
+in the **upstream data**, and only those. An error in **our own code** — an empty promoted model, a
+contract violation, a join that has fanned out — gets the opposite posture: fail as early as
+possible, because degrading around our own bug would deliver a wrong forecast and bury its cause.
+How far such a failure then spreads is a different axis, and the business of
 [principle 10 ("*every write is atomic and idempotent, and every failure is confined to one
 partition*")](#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition)
-rather than of this one. The plan is to deliver the never-stop half through the **model itself** —
+rather than of this one. The plan is to deliver graceful degradation through the **model itself** —
 an ML model that can, at least partially, handle missing inputs — rather than through fallback
 logic wrapped around a model that assumes complete data. (Note that this decision to
 "never stop" will not be appropriate for energy-forecasting systems where an uncertain forecast
@@ -83,16 +81,30 @@ might be more harmful than *no* forecast. But, in Flexpectation, there are stron
 our forecast will *always* be better than NGED's incumbent baseline, even when we have no live
 data.)
 
+Degrading is only half the principle: **we must be notified that the forecast degraded.** Three
+channels carry that — a widened uncertainty band on the forecast row (designed, not yet built 🚧 —
+see [Widening bands](inherent-stability.md#widening-bands-the-in-band-signal)), a
+`power_forecast_warnings` row naming which feed degraded and since when (not yet built 🚧), and a
+Sentry event for the data failures a human can act on, such as a missed daily ECMWF run that says
+Dynamical.org is having problems. Each answers a different question and none substitutes for
+another; all three are required, and two of the three are still to be built. What each is for, and
+who reads it, is set out in
+[Three audiences, three channels](inherent-stability.md#three-audiences-three-channels). A Sentry
+event says whether we broke or an input degraded, and both kinds have to be delivered — see
+[Two kinds of Sentry event](inherent-stability.md#two-kinds-of-sentry-event).
+
 *Without it:* every wobble in an upstream feed becomes an outage — the service raises at 06:00
 because one meter went quiet, NGED open their dashboard to a gap instead of a forecast, and a
 developer spends the morning re-running a pipeline whose only real problem was a missing input.
 
 *Decided:* every asset check in the repo is non-blocking `WARN`; there is deliberately no
-`ERROR`-severity check anywhere — while `PowerForecast.validate` hard-fails a whole slot on a
-duplicated primary key, because only a bug of ours can duplicate a forecast row: every NWP write
-replaces its partition, so the duplication cannot come from the data at rest. One production raise
-is not yet on the right side of the line this principle draws: a sustained NWP outage still fails
-`live_forecasts` rather than degrading to a weather-blind forecast
+`ERROR`-severity check anywhere. Non-blocking never means non-notifying: a check that detects
+degradation must still send a Sentry event, without failing the run it is warning about. On the
+other side of the line, `PowerForecast.validate` hard-fails a whole slot on a duplicated primary
+key, because only a bug of ours can duplicate a forecast row: every NWP write replaces its
+partition, so the duplication cannot come from the data at rest. One production raise is not yet on
+the right side of that line: a sustained NWP outage still fails `live_forecasts` rather than
+degrading to a weather-blind forecast
 ([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)).
 
 *Serves:* [Hypothesis 1: a service that mostly runs
@@ -652,6 +664,7 @@ says caused the failure.
 
 *Detail:* [Send telemetry to Sentry, and alarm on
 absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence),
+[Two kinds of Sentry event](inherent-stability.md#two-kinds-of-sentry-event),
 [Three audiences, three channels](inherent-stability.md#three-audiences-three-channels).
 
 ## Deliberately absent
