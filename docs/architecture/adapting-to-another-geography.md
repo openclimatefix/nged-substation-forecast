@@ -1205,7 +1205,7 @@ More is geography-neutral than we expected. None of the following would need to 
 
 - **The weather source.** `dynamical_data` reads the
   `ecmwf-ifs-ens-forecast-15-day-0-25-degree` catalogue
-  ([`download.py:62`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/packages/dynamical_data/src/dynamical_data/ecmwf_ens/download.py)),
+  ([`download.py:87`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/packages/dynamical_data/src/dynamical_data/ecmwf_ens/download.py)),
   which is global. The spatial bounds are not hard-coded: they are derived at runtime from the
   minimum and maximum latitude/longitude of whatever H3 grid is passed in, so changing the boundary
   changes the download automatically. The one stated limitation — the slice fails across the
@@ -1221,7 +1221,7 @@ More is geography-neutral than we expected. None of the following would need to 
 - **Feature engineering.** The tabular pipeline is vectorised across time series — `time_series_id`
   is only a join and grouping key — and, importantly, **lags and rolling windows are expressed as
   durations, not as counts of half-hour periods** (`pl.duration(hours=…)`,
-  `rolling(period="…h")`). That single decision removes most of what would otherwise make a change
+  `rolling_mean_by(window_size="…h")`). That single decision removes most of what would otherwise make a change
   of reporting interval painful.
 - **The model interface.** `BaseForecaster` already documents that an implementation may hold "one
   sub-model per series, a single model spanning many series, or anything in between", so moving to a
@@ -1233,16 +1233,16 @@ All of it sits in a thin layer, and most of it sits in `contracts`.
 
 | Assumption | Where | Consequence for India |
 |---|---|---|
-| Latitude bounded to 49–61°N, longitude to −9–2°E | `contracts/power_schemas.py:154-162` | Validation **hard-fails** on any Indian coordinate. |
-| `licence_area` is `Enum(["EMids"])` | `contracts/power_schemas.py:136` | The tightest single lock. |
-| `substation_type` is the GB DNO voltage taxonomy (`BSP`, `GSP`, `Primary`, …) | `contracts/power_schemas.py:148` | Indian secondary substations do not map onto it. |
-| `units` is `Enum(["MW", "MVA"])` | `contracts/power_schemas.py:131` | Probably fine, but should be checked against the Indian feed. |
+| Latitude bounded to 49–61°N, longitude to −9–2°E | `contracts/power_schemas.py:234-245` | Validation **hard-fails** on any Indian coordinate. |
+| `licence_area` is `Enum(["EMids"])` | `contracts/power_schemas.py:210` | The tightest single lock. |
+| `substation_type` is the GB DNO voltage taxonomy (`BSP`, `GSP`, `Primary`, …) | `contracts/power_schemas.py:225` | Indian secondary substations do not map onto it. |
+| `units` is `Enum(["MW", "MVA"])` | `contracts/power_schemas.py:203` | Probably fine, but should be checked against the Indian feed. |
 | `LIST_OF_TIME_SERIES_TYPES` — 22 NGED categories, re-exported as the `AllFeatures` enum | `contracts/power_schemas.py` | Propagates into the ML schema. |
-| Power bounded to ±1000 MW; `max_mw_threshold` / `min_mw_threshold` sized to GB primaries | `contracts/power_schemas.py`, `contracts/settings.py` | Secondary substations are far smaller; thresholds are meaningless as set. |
+| Power bounded to ±1000 MW | `contracts/power_schemas.py:44-45` | A broad plausibility bound rather than a network-tier threshold — secondary substations sit well inside it, so it needs no change for India. |
 | The GB outline | `geo/great_britain/load.py` | Add a sibling region loader; swap one import in `defs/assets.py`. |
-| `"Europe/London"` as a bare string literal in the feature engineer | `ml_core/features/tabular_feature_engineer.py`, in `_apply_local_time_features` | Drives every local-time feature in the champion feature set. |
+| `DEFAULT_LOCAL_TIMEZONE = "Europe/London"`, overridable via the `local_timezone` parameter on `FeatureEngineer.engineer()` | `ml_core/features/feature_engineer.py:21` | Overridable, but the value still lives in general-purpose `ml_core` code rather than `contracts`, so it remains an instance of the leak. |
 | `DISPLAY_TIME_ZONE = "Europe/London"`, asserted in the dashboard's axis titles | `dashboard/forecast_chart.py:40` | Display only, but it is a second hard-coded timezone. |
-| H3 resolution 5 (~253 km² per cell) chosen for GB, and reached for via a **private** import from the ingest package | `defs/assets.py:40,141` | The NWP grid resolution currently lives inside `nged_data`; see the `PowerIngest` note [below](#how-we-would-structure-it). |
+| H3 resolution 5 (~253 km² per cell), chosen for GB, in `ECMWF_ENS_H3_RESOLUTION` | `contracts/weather_schemas.py:71`, imported at `defs/assets.py:19,221` | Already a public `contracts` constant rather than a private import from the ingest package; still sized for GB's area, so it belongs in a future `RegionProfile` — see the note [below](#how-we-would-structure-it). |
 | `nged_s3_bucket_url` / `_access_key` / `_secret` are named for one specific data provider | `contracts/settings.py` | Cosmetic: they default to empty and only the ingest asset reads them, so a deployment with no NGED bucket runs fine — but a second provider needs its own settings, not these renamed. |
 
 The UTC-offset feature is **not** one of these British assumptions.
@@ -1265,11 +1265,10 @@ The list is narrower than it first appears, because of the duration-based lag de
 
 | Assumption | Where |
 |---|---|
-| `validate()` **raises** unless every timestamp has `minute ∈ {0, 30}` | `contracts/power_schemas.py:48` |
-| Field descriptions declaring a "30-minute observation period" | `contracts/power_schemas.py:18,25` |
-| `stuck_window_periods = 48` (i.e. 24 hours at 30 minutes) | `contracts/settings.py` |
-| NWP upsampled to `interval="30m"` | `ml_core/features/_nwp.py:121` |
-| The live forecast spine, both its start offset and its step | `ml_core/_production_helpers.py:112,115` |
+| `validate()` **raises** unless every timestamp has `minute ∈ {0, 30}` | `contracts/power_schemas.py:82` |
+| Field descriptions declaring a "30-minute observation period" | `contracts/power_schemas.py:35,47` |
+| NWP upsampled to `interval="30m"` | `ml_core/features/_nwp.py:126` |
+| The live forecast spine, both its start offset and its step | `ml_core/production_helpers.py:122,125` |
 | A row-count guard assuming "51 members × 14 days × 48 half-hours" | `dashboard/forecast_chart.py` |
 
 The one piece of real design work here is the **feature grammar**: lags are parsed from strings
@@ -1307,7 +1306,7 @@ trial cannot defer is the 15-minute resolution work, because that is entry cost 
 **One model per substation stops working.** This is the 40× axis. `XGBoostForecaster.train`
 collects the whole population into memory and then loops over `group_by("time_series_id")` in
 Python, holding every booster in RAM; `save()` then writes one `.ubj` file per series
-([`forecaster.py:124`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py)).
+([`forecaster.py:130,216`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py)).
 That is fine for 32 series and already strained at 2,500. At 100,000 it is a non-starter, which
 forces the **global model** — already planned as
 [Global model per `time_series_type`](../roadmap/xgboost-improvements.md) (issue
@@ -1317,7 +1316,7 @@ static per-series features, batched training — are exactly what an Indian depl
 anyway.
 
 **The storage partitioning needs rework.** `power_time_series` partitions by `time_series_id`
-([`assets.py:115`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/src/nged_substation_forecast/defs/assets.py)),
+([`assets.py:196`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/src/nged_substation_forecast/defs/assets.py)),
 which would mean 100,000 Hive directories and a small-file explosion on every append; it would need
 a date-based partition instead. `power_forecasts` partitions only by `(experiment_name, fold_id)`,
 with no time or series axis. At 100,000 sites a single full-ensemble run is roughly 100,000
@@ -1667,10 +1666,11 @@ the single most expensive mistake available here. Instead, promote geography to 
   British assumptions *visible* rather than implicit.
 - `nged_data` becomes one of several ingest packages behind a small **`PowerIngest`** protocol whose
   contract is "emit `PowerTimeSeries` and `TimeSeriesMetadata`". Only three modules import
-  `nged_data` today, so the boundary is nearly clean already — with one wrinkle worth fixing on its
-  own merits: `defs/assets.py:40` imports the **private** `_H3_RESOLUTION` out of the ingest package
-  and feeds it to the H3 grid builder, so the NWP spatial resolution currently lives inside the
-  DNO-specific ingest code. That constant belongs in the `RegionProfile`.
+  `nged_data` today, so the boundary is nearly clean already. The wrinkle this page used to flag
+  here — `defs/assets.py` importing a **private** `_H3_RESOLUTION` out of the ingest package — is
+  already fixed: it is now the public `ECMWF_ENS_H3_RESOLUTION`, defined in
+  `contracts.weather_schemas` and imported from there. It is still sized for GB's area rather than
+  India's, so that constant belongs in the `RegionProfile`.
 - `geo/great_britain/` becomes a small region registry.
 - Two Dagster code locations over one set of shared packages.
 
@@ -1715,9 +1715,9 @@ not win. The correct move is to leave the British assumptions hard-coded and *le
 is a large part of what makes them legible — and to pay the refactoring cost only once there is a
 second consumer to amortise it against.
 
-The one exception is the private `_H3_RESOLUTION` import, described above. It is not really a
-portability concern — it is an ordinary code-quality item that happened to surface here — so it can
-be fixed on its own merits whenever convenient, independently of anything on this page.
+This page used to carve out one exception — a private `_H3_RESOLUTION` import that was an ordinary
+code-quality item rather than a portability concern. That import is fixed now: the constant is
+`ECMWF_ENS_H3_RESOLUTION`, public, in `contracts.weather_schemas`. No exception remains.
 
 **What would change our mind:**
 
