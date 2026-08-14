@@ -1,17 +1,21 @@
 """Shared NWP test data for the root integration tests.
 
 The several ``live_forecasts`` / CV / metrics integration tests each build a synthetic ``Nwp``
-frame; the physical-unit constants below were byte-identical across all of them, so they live
-here, as does ``half_hours``, which every one of them needs to place valid times correctly
-relative to the publication delay. The per-test *writers* (which differ in init-times, cells, and
-ensemble members) stay local to each test file. Importable by bare name via the
-``pythonpath = ["tests"]`` pytest setting.
+frame. ``half_hours``, ``NWP_CONTINUOUS_COL_VALUES``, ``nwp_records`` and ``write_test_nwp`` live
+here because they were byte-identical, or identical but for one parameter, across the test modules
+that used to define them locally. What genuinely differs per test file is *which* cells, days,
+member sets and (for a run initialised before the day it forecasts into) explicit ``init_time``
+values get combined into one fixture — that selection is what stays local to each test file, as a
+thin ``_write_nwp(path)`` wrapper around ``nwp_records`` and ``write_test_nwp``. Importable by bare
+name via the ``pythonpath = ["tests"]`` pytest setting.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
 import polars as pl
+from contracts.weather_schemas import NWP_MODEL_ID_DTYPE, Nwp
+from deltalake import write_deltalake
 from weather_utils import NWP_PUBLICATION_DELAY_HOURS
 
 NWP_CONTINUOUS_COL_VALUES: Final[dict[str, float]] = {
@@ -30,6 +34,11 @@ NWP_CONTINUOUS_COL_VALUES: Final[dict[str, float]] = {
 }
 """Physically plausible Float32 constants, one per continuous ``Nwp`` variable."""
 
+_PTYPE_INTRODUCED: Final[datetime] = datetime(2024, 11, 12, tzinfo=UTC)
+"""``categorical_precipitation_type_surface`` must be null on or before this ``init_time`` and
+populated after it — see ``Nwp._check_variables_that_were_introduced_after_start_of_dataset``.
+``nwp_records`` sets the column to satisfy this so its output passes ``Nwp.validate``."""
+
 
 def half_hours(day: datetime) -> pl.Series:
     """Half-hourly valid times inside a 00Z run's forecast window, after the publication delay.
@@ -42,4 +51,65 @@ def half_hours(day: datetime) -> pl.Series:
     first = day.replace(hour=0) + timedelta(hours=NWP_PUBLICATION_DELAY_HOURS + 1)
     return pl.datetime_range(
         first, first + timedelta(hours=2), interval="30m", time_zone="UTC", eager=True
+    )
+
+
+def nwp_records(
+    cell: int,
+    day: datetime,
+    members: tuple[int, ...],
+    init_time: datetime | None = None,
+) -> list[dict]:
+    """Synthetic, contract-valid ``Nwp`` rows for one (cell, day, members) combination.
+
+    One row per (member, valid_time in ``half_hours(day)``), all sharing ``init_time``.
+    ``init_time`` defaults to ``day`` at 00Z; pass it explicitly for a run that was initialised
+    on an earlier day and forecasts into ``day`` (e.g. to exercise an NWP-lookback window).
+    """
+    resolved_init_time = init_time if init_time is not None else day.replace(hour=0)
+    ptype = None if resolved_init_time <= _PTYPE_INTRODUCED else 0
+    records = []
+    for member in members:
+        for valid_time in half_hours(day):
+            record = {
+                "nwp_model_id": "ECMWF_ENS_0_25_degree",
+                "init_time": resolved_init_time,
+                "valid_time": valid_time,
+                "ensemble_member": member,
+                "h3_index": cell,
+                "categorical_precipitation_type_surface": ptype,
+            }
+            record.update(NWP_CONTINUOUS_COL_VALUES)
+            records.append(record)
+    return records
+
+
+def write_test_nwp(path: str, records: list[dict]) -> None:
+    """Validate synthetic ``Nwp`` rows against the contract, then write them to a Delta table.
+
+    Casts every continuous weather variable to the physical-unit ``Float32`` the ``Nwp`` contract
+    declares (never the raw ints a hand-rolled sentinel could hide behind), and calls
+    ``Nwp.validate`` so a dtype or range mistake in ``records`` raises here — loudly, and before
+    the frame ever reaches the CV pipeline the caller's test is exercising — rather than silently
+    training and scoring a model on data the contract would reject. Partitioned by
+    ``(nwp_model_id, init_time)``, matching the layout ``delta_store.nwp.write_nwp`` produces for
+    the real table.
+    """
+    df = pl.DataFrame(records).cast(
+        {
+            "nwp_model_id": NWP_MODEL_ID_DTYPE,
+            "init_time": pl.Datetime("us", "UTC"),
+            "valid_time": pl.Datetime("us", "UTC"),
+            "ensemble_member": pl.UInt8,
+            "h3_index": pl.UInt64,
+            "categorical_precipitation_type_surface": pl.UInt8,
+            **dict.fromkeys(NWP_CONTINUOUS_COL_VALUES, pl.Float32),
+        }
+    )
+    validated = Nwp.validate(df)
+    # Strip the Patito model before reverting nwp_model_id to String: delta-rs cannot store an
+    # Enum column, matching how `delta_store.nwp.write_nwp` prepares the real table for disk.
+    prepared = pl.DataFrame._from_pydf(validated._df).cast({"nwp_model_id": pl.String})
+    write_deltalake(
+        table_or_uri=path, data=prepared.to_arrow(), partition_by=["nwp_model_id", "init_time"]
     )

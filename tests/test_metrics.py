@@ -18,6 +18,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -25,7 +26,7 @@ import mlflow
 import patito as pt
 import polars as pl
 import pytest
-from _nwp_test_data import half_hours
+from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.power_schemas import (
     LIST_OF_TIME_SERIES_TYPES,
@@ -44,9 +45,11 @@ from nged_substation_forecast.defs.cv_assets import (
     metrics,
     trained_cv_model,
 )
-from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
 pytestmark = pytest.mark.integration
+
+RegisterExperiment = Callable[[DagsterInstance, str], None]
+"""Type of the ``register_experiment`` fixture (``tests/conftest.py``)."""
 
 FOLD_ID = "mid_2025_to_mid_2026"
 EXPERIMENT_NAME = "exp_metrics_smoke"
@@ -57,21 +60,6 @@ _TS1_CELL = 10
 _TRAIN_DAY = datetime(2024, 6, 1, tzinfo=UTC)
 _VAL_DAY = datetime(2025, 8, 1, tzinfo=UTC)
 _VAL_MEMBERS = (0, 1, 2)
-
-_NWP_CONTINUOUS_COLS = (
-    "temperature_2m",
-    "dew_point_temperature_2m",
-    "wind_speed_10m",
-    "wind_direction_10m",
-    "wind_speed_100m",
-    "wind_direction_100m",
-    "pressure_surface",
-    "pressure_reduced_to_mean_sea_level",
-    "geopotential_height_500hpa",
-    "downward_long_wave_radiation_flux_surface",
-    "downward_short_wave_radiation_flux_surface",
-    "precipitation_surface",
-)
 
 
 def _write_power_with_actuals(path: str) -> None:
@@ -90,39 +78,11 @@ def _write_power_with_actuals(path: str) -> None:
     ).write_delta(path)
 
 
-def _nwp_records(cell: int, day: datetime, members: tuple[int, ...]) -> list[dict]:
-    records = []
-    init_time = day.replace(hour=0)
-    for member in members:
-        for valid_time in half_hours(day):
-            record = {
-                "nwp_model_id": "ECMWF_ENS_0_25_degree",
-                "init_time": init_time,
-                "valid_time": valid_time,
-                "ensemble_member": member,
-                "h3_index": cell,
-                "categorical_precipitation_type_surface": None,
-            }
-            record.update(dict.fromkeys(_NWP_CONTINUOUS_COLS, 2000))
-            records.append(record)
-    return records
-
-
 def _write_nwp(path: str) -> None:
-    records = _nwp_records(_TS1_CELL, _TRAIN_DAY, (0,)) + _nwp_records(
+    records = nwp_records(_TS1_CELL, _TRAIN_DAY, (0,)) + nwp_records(
         _TS1_CELL, _VAL_DAY, _VAL_MEMBERS
     )
-    df = pl.DataFrame(records).cast(
-        {
-            "init_time": pl.Datetime("us", "UTC"),
-            "valid_time": pl.Datetime("us", "UTC"),
-            "ensemble_member": pl.UInt8,
-            "h3_index": pl.UInt64,
-            "categorical_precipitation_type_surface": pl.UInt8,
-            **dict.fromkeys(_NWP_CONTINUOUS_COLS, pl.Int16),
-        }
-    )
-    write_deltalake(table_or_uri=path, data=df.to_arrow())
+    write_test_nwp(path, records)
 
 
 def _write_metadata(path: Path) -> None:
@@ -198,23 +158,6 @@ def _base_env(
     }
 
 
-def _register(instance: DagsterInstance) -> None:
-    result = register_experiment_job.execute_in_process(
-        run_config=RunConfig(
-            ops={
-                "register_experiment": RegisterExperimentConfig(
-                    experiment_name=EXPERIMENT_NAME,
-                    base_model_config="conf/model/xgboost.yaml",
-                    config_overrides={"selected_features": ["temperature_2m"], "n_estimators": 5},
-                    run_mode="full_cv",
-                )
-            }
-        ),
-        instance=instance,
-    )
-    assert result.success
-
-
 def _metrics_run_config(scope: str = "leaderboard") -> RunConfig:
     return RunConfig(
         ops={
@@ -242,13 +185,17 @@ def file_mlflow_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str
     return _base_env(tmp_path, monkeypatch, tracking_uri)
 
 
-def _run_cv_pipeline(instance: DagsterInstance, materialise_capacity: bool = True) -> None:
+def _run_cv_pipeline(
+    instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    materialise_capacity: bool = True,
+) -> None:
     """Register, train, and predict for the leaderboard fold.
 
     Also materialises ``effective_capacity`` (the NMAE denominator ``metrics`` now requires) unless
     ``materialise_capacity`` is False — used by the test that asserts ``metrics`` fails without it.
     """
-    _register(instance)
+    register_experiment(instance, EXPERIMENT_NAME)
     assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
     assert materialize([cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance).success
     if materialise_capacity:
@@ -258,8 +205,9 @@ def _run_cv_pipeline(instance: DagsterInstance, materialise_capacity: bool = Tru
 def test_metrics_leaderboard_writes_forecast_metrics_delta(
     file_mlflow_env: dict[str, Path],
     dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
-    _run_cv_pipeline(dagster_instance)
+    _run_cv_pipeline(dagster_instance, register_experiment)
     assert materialize(
         [metrics], run_config=_metrics_run_config("leaderboard"), instance=dagster_instance
     ).success
@@ -288,8 +236,9 @@ def test_metrics_leaderboard_writes_forecast_metrics_delta(
 def test_metrics_leaderboard_logs_to_mlflow(
     file_mlflow_env: dict[str, Path],
     dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
-    _run_cv_pipeline(dagster_instance)
+    _run_cv_pipeline(dagster_instance, register_experiment)
     assert materialize(
         [metrics], run_config=_metrics_run_config("leaderboard"), instance=dagster_instance
     ).success
@@ -319,9 +268,11 @@ def test_metrics_leaderboard_logs_to_mlflow(
 
 
 def test_metrics_is_idempotent(
-    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
-    _run_cv_pipeline(dagster_instance)
+    _run_cv_pipeline(dagster_instance, register_experiment)
 
     assert materialize(
         [metrics], run_config=_metrics_run_config("leaderboard"), instance=dagster_instance
@@ -345,10 +296,12 @@ def _read_metric(metrics_path: Path, metric_name: str) -> float:
 
 
 def test_metrics_raises_without_effective_capacity(
-    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """The metrics asset requires the effective_capacity table, and fails cleanly without it."""
-    _run_cv_pipeline(dagster_instance, materialise_capacity=False)
+    _run_cv_pipeline(dagster_instance, register_experiment, materialise_capacity=False)
 
     result = materialize(
         [metrics],
@@ -362,6 +315,7 @@ def test_metrics_raises_without_effective_capacity(
 def test_metrics_nmae_denominator_is_effective_capacity(
     file_mlflow_env: dict[str, Path],
     dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """NMAE is MAE divided by the series' full-history effective_capacity_mw.
 
@@ -369,7 +323,7 @@ def test_metrics_nmae_denominator_is_effective_capacity(
     frame directly), this proves the *asset* reads the materialised effective_capacity Delta table
     and uses that table's value as the denominator.
     """
-    _run_cv_pipeline(dagster_instance)
+    _run_cv_pipeline(dagster_instance, register_experiment)
     assert materialize(
         [metrics], run_config=_metrics_run_config("leaderboard"), instance=dagster_instance
     ).success
@@ -553,9 +507,11 @@ def test_score_forecast_group_per_series_batches(
 
 
 def test_metrics_ad_hoc_no_mlflow_logging(
-    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
-    _run_cv_pipeline(dagster_instance)
+    _run_cv_pipeline(dagster_instance, register_experiment)
     assert materialize(
         [metrics], run_config=_metrics_run_config("ad_hoc"), instance=dagster_instance
     ).success
@@ -609,7 +565,9 @@ def test_population_filter_prunes_partitions(tmp_path: Path) -> None:
 
 
 def test_metrics_no_filter_scores_every_group(
-    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """A default (no-filter) ``metrics`` run scores every ``(experiment_name, fold_id)`` group.
 
@@ -617,7 +575,7 @@ def test_metrics_no_filter_scores_every_group(
     experiment so two groups exist on disk, then run ``metrics`` with the default
     ``PopulationFilter()`` (no filter) and assert both groups land in ``forecast_metrics``.
     """
-    _run_cv_pipeline(dagster_instance)
+    _run_cv_pipeline(dagster_instance, register_experiment)
 
     # Duplicate the produced forecasts under a second experiment so two groups exist on disk.
     forecasts_path = str(file_mlflow_env["forecasts"])
@@ -660,7 +618,9 @@ def _append_live_fold_rows(forecasts_path: str) -> None:
 
 
 def test_metrics_leaderboard_skips_fold_ids_the_cv_config_does_not_define(
-    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """An unfiltered leaderboard run ignores ``fold_id="live"`` instead of failing on it.
 
@@ -668,7 +628,7 @@ def test_metrics_leaderboard_skips_fold_ids_the_cv_config_does_not_define(
     ``"live"``. Before this was handled the run raised ``KeyError`` — after paying for the
     group's full per-series scoring, and on the first group, since ``"live"`` sorts first.
     """
-    _run_cv_pipeline(dagster_instance)
+    _run_cv_pipeline(dagster_instance, register_experiment)
     _append_live_fold_rows(str(file_mlflow_env["forecasts"]))
 
     result = materialize(
@@ -702,7 +662,9 @@ def _append_smoke_test_fold_rows(forecasts_path: str) -> None:
 
 
 def test_metrics_leaderboard_skips_smoke_test_fold(
-    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """Leaderboard scope skips ``smoke_test`` even though the CV config defines that fold.
 
@@ -714,7 +676,7 @@ def test_metrics_leaderboard_skips_smoke_test_fold(
     ``fold_id="live"``, which both properties skip identically, since the CV config has no entry
     for ``"live"`` at all.
     """
-    _run_cv_pipeline(dagster_instance)
+    _run_cv_pipeline(dagster_instance, register_experiment)
     _append_smoke_test_fold_rows(str(file_mlflow_env["forecasts"]))
 
     result = materialize(
@@ -732,14 +694,16 @@ def test_metrics_leaderboard_skips_smoke_test_fold(
 
 
 def test_metrics_ad_hoc_scores_fold_ids_the_cv_config_does_not_define(
-    file_mlflow_env: dict[str, Path], dagster_instance: DagsterInstance
+    file_mlflow_env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """Ad-hoc scope is the supported way to score live rows, so it must not skip them.
 
     It takes the evaluation window from the forecast rows themselves rather than the CV config,
     so a ``fold_id`` the config has never heard of is no obstacle.
     """
-    _run_cv_pipeline(dagster_instance)
+    _run_cv_pipeline(dagster_instance, register_experiment)
     _append_live_fold_rows(str(file_mlflow_env["forecasts"]))
 
     assert materialize(
@@ -791,7 +755,10 @@ def _wait_for_mlflow_server(
 
 
 def test_full_stack_real_mlflow_server(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """Full-stack test: real HTTP MLflow server + artifact round-trip + tag resolution.
 
@@ -842,7 +809,7 @@ def test_full_stack_real_mlflow_server(
         mlflow.set_tracking_uri(tracking_uri)
 
         paths = _base_env(tmp_path, monkeypatch, tracking_uri)
-        _register(dagster_instance)
+        register_experiment(dagster_instance, EXPERIMENT_NAME)
 
         # Train — uploads model artifacts to the real server.
         assert materialize(

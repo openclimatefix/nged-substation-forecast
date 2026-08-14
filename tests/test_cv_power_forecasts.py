@@ -7,6 +7,7 @@ and assert the forecasts land in the ``power_forecasts`` Delta table — stamped
 and written idempotently so a re-materialisation does not duplicate rows.
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,16 +16,20 @@ import numpy as np
 import polars as pl
 import pyarrow.parquet as pq
 import pytest
-from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES, half_hours
+from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
-from dagster import DagsterInstance, RunConfig, materialize
+from dagster import DagsterInstance, materialize
+from delta_store.power_forecasts import POWER_FCST_SIGNIFICAND_BITS
+from delta_store.precision import FLOAT32_SIGNIFICAND_BITS
 from deltalake import write_deltalake
 from mlflow.tracking import MlflowClient
 
 from nged_substation_forecast.defs.cv_assets import cv_power_forecasts, trained_cv_model
-from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
 pytestmark = pytest.mark.integration
+
+RegisterExperiment = Callable[[DagsterInstance, str], None]
+"""Type of the ``register_experiment`` fixture (``tests/conftest.py``)."""
 
 FOLD_ID = "mid_2025_to_mid_2026"
 EXPERIMENT_NAME = "exp_predict_smoke"
@@ -49,40 +54,12 @@ def _write_power(path: str) -> None:
     ).write_delta(path)
 
 
-def _nwp_records(cell: int, day: datetime, members: tuple[int, ...]) -> list[dict]:
-    records = []
-    init_time = day.replace(hour=0)
-    for member in members:
-        for valid_time in half_hours(day):
-            record = {
-                "nwp_model_id": "ECMWF_ENS_0_25_degree",
-                "init_time": init_time,
-                "valid_time": valid_time,
-                "ensemble_member": member,
-                "h3_index": cell,
-                "categorical_precipitation_type_surface": None,
-            }
-            record.update(NWP_CONTINUOUS_COL_VALUES)
-            records.append(record)
-    return records
-
-
 def _write_nwp(path: str) -> None:
     """Training NWP (control member) plus validation NWP across the ensemble, both in ts1's cell."""
-    records = _nwp_records(_TS1_CELL, _TRAIN_DAY, (0,)) + _nwp_records(
+    records = nwp_records(_TS1_CELL, _TRAIN_DAY, (0,)) + nwp_records(
         _TS1_CELL, _VAL_DAY, _VAL_MEMBERS
     )
-    df = pl.DataFrame(records).cast(
-        {
-            "init_time": pl.Datetime("us", "UTC"),
-            "valid_time": pl.Datetime("us", "UTC"),
-            "ensemble_member": pl.UInt8,
-            "h3_index": pl.UInt64,
-            "categorical_precipitation_type_surface": pl.UInt8,
-            **dict.fromkeys(NWP_CONTINUOUS_COL_VALUES, pl.Float32),
-        }
-    )
-    write_deltalake(table_or_uri=path, data=df.to_arrow())
+    write_test_nwp(path, records)
 
 
 def _write_metadata(path: Path) -> None:
@@ -128,33 +105,16 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     return {"forecasts": str(forecasts_path)}
 
 
-def _register(instance: DagsterInstance) -> None:
-    result = register_experiment_job.execute_in_process(
-        run_config=RunConfig(
-            ops={
-                "register_experiment": RegisterExperimentConfig(
-                    experiment_name=EXPERIMENT_NAME,
-                    base_model_config="conf/model/xgboost.yaml",
-                    config_overrides={"selected_features": ["temperature_2m"], "n_estimators": 5},
-                    # full_cv so the leaderboard fold's partition (FOLD_ID) is registered; this test
-                    # drives that fold's window and synthetic data, not the smoke_test fold.
-                    run_mode="full_cv",
-                )
-            }
-        ),
-        instance=instance,
-    )
-    assert result.success
-
-
 def _read_forecasts(env: dict[str, str]) -> pl.DataFrame:
     return pl.read_delta(env["forecasts"])
 
 
 def test_cv_power_forecasts_predicts_validation_fold(
-    env: dict[str, str], dagster_instance: DagsterInstance
+    env: dict[str, str],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
-    _register(dagster_instance)
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
     ).success
@@ -189,7 +149,9 @@ def test_cv_power_forecasts_predicts_validation_fold(
 
 
 def test_cv_power_forecasts_storage_format(
-    env: dict[str, str], dagster_instance: DagsterInstance
+    env: dict[str, str],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """The written parquet files carry the compression-oriented storage format end-to-end.
 
@@ -198,7 +160,7 @@ def test_cv_power_forecasts_storage_format(
     rounded to ``POWER_FCST_SIGNIFICAND_BITS``. The format itself is unit-tested in
     ``packages/delta_store/tests/``; this asserts the real asset actually uses it.
     """
-    _register(dagster_instance)
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
     ).success
@@ -230,22 +192,25 @@ def test_cv_power_forecasts_storage_format(
         )["key"]
         assert sort_key.is_sorted()
 
-    # power_fcst is rounded to a 13-bit significand: the low 11 fraction bits of every finite
+    # power_fcst is rounded to POWER_FCST_SIGNIFICAND_BITS: the low fraction bits of every finite
     # value are zero, yet the values were not destroyed outright. (The synthetic fixture's
     # constant NWP features make every prediction near-identical, so don't assert on value
     # diversity — the fixture trains on power ≈ 100, so surviving values must be in that
     # ballpark.)
+    zeroed_low_bits = FLOAT32_SIGNIFICAND_BITS - POWER_FCST_SIGNIFICAND_BITS
     stored = _read_forecasts(env)["power_fcst"].to_numpy()
     assert np.isfinite(stored).all()
     # np.dtype(np.uint32), not a bare np.uint32 — see the `ty-workarounds` skill.
-    assert (stored.view(np.dtype(np.uint32)) & np.uint32((1 << 11) - 1) == 0).all()
+    assert (stored.view(np.dtype(np.uint32)) & np.uint32((1 << zeroed_low_bits) - 1) == 0).all()
     assert (np.abs(stored) > 50).all()
 
 
 def test_cv_power_forecasts_is_idempotent(
-    env: dict[str, str], dagster_instance: DagsterInstance
+    env: dict[str, str],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
-    _register(dagster_instance)
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
     ).success
@@ -263,13 +228,16 @@ def test_cv_power_forecasts_is_idempotent(
 
 
 def test_cv_power_forecasts_fails_loudly_when_a_trained_series_loses_its_metadata(
-    env: dict[str, str], dagster_instance: DagsterInstance, tmp_path: Path
+    env: dict[str, str],
+    dagster_instance: DagsterInstance,
+    tmp_path: Path,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """The metadata parquet can change between training and scoring, so check again at predict.
 
     The check in `trained_cv_model` cannot cover this: the parquet is re-read here.
     """
-    _register(dagster_instance)
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
     ).success
