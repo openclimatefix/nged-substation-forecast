@@ -45,10 +45,14 @@ The blocks are:
 
 ## Sign convention
 
-- **Substations**: positive = power flowing **towards end-users**; negative = excess generation
-  flowing **backwards into the grid**.
-- **Customer meters (generators)**: positive = the customer is **generating** power sent to NGED's
-  grid; negative = the customer is **consuming** power.
+Sign convention depends on `substation_type` in `TimeSeriesMetadata`, whose five values (`BSP`,
+`EHV Customer`, `GSP`, `HV Customer`, `Primary`) partition into two behavioural cases:
+
+- **Substations** (`BSP`, `GSP`, `Primary`): positive = power flowing **towards end-users**;
+  negative = excess generation flowing **backwards into the grid**.
+- **Customer meters** (`EHV Customer`, `HV Customer`): positive = the customer is **sending**
+  power to NGED's grid; negative = the customer is **drawing** power from it. A customer meter can
+  sit at a demand site or a generation site, so this case is not "generators only".
 
 ---
 

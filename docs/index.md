@@ -12,9 +12,7 @@ Each forecast is:
 - **14-day horizon**, half-hourly temporal resolution
 - Refreshed **every 6 hours**
 - **In MW (active power) or MVA (apparent power)** — the unit is given per `time_series_id` in `TimeSeriesMetadata`
-- **Sign convention** depends on the time series type:
-    - *Substations*: positive = power flowing towards end-users; negative = excess generation flowing back into the grid
-    - *Customer meters (generators)*: positive = generator sending power to NGED's grid; negative = customer consuming power
+- **Sign convention** depends on `substation_type` — see [Sign convention](roadmap/forecast-building-blocks.md#sign-convention)
 
 ## Scope
 
