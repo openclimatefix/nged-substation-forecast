@@ -81,7 +81,7 @@ corrected by machinery bolted on around it.
 ## NGED's incumbent forecast is the floor
 
 Even in the worst case, when we have _no_ fresh data, we hope to still be able to provide a better
-power forecast that NGED's incumbent forecast, with appropriate confidence bands. This is what
+power forecast than NGED's incumbent forecast, with appropriate confidence bands. This is what
 allows us to claim that we should _always_ be able to produce a power forecast, even when "blind".
 
 [NGED's incumbent forecast](../background/nged-incumbent-forecast.md) assembles 13 historical
@@ -118,8 +118,8 @@ suite to score against it. Until both exist, treat the claim as the thing we are
 | 3 | No NWP *and* no recent power | Calendar + climatology + year-old history. Converges toward *being* the incumbent |
 | 4 | Nothing at all | Physical envelope (clear-sky) + climatology. Very wide bands, still bounded and still true |
 
-Rung 4 matters because it demonstrates that there is no input state in which we have nothing true to
-say: clear-sky irradiance needs only latitude, longitude and time.
+Rung 4 matters because it demonstrates that there is no input state in which we have nothing true
+to say — see [The physical envelope](#the-physical-envelope).
 
 Rungs are counted in **missed NWP runs**, never in hours of staleness. That is
 [rule 5](#the-rules), and
@@ -151,16 +151,16 @@ rather than the event level, because that is what decides whether anybody is tol
 | **nobody is told 🚧** | No Sentry event is sent. Each cell says where the fault does show up instead — usually Dagster's Checks view, which only helps somebody who already went to look — and what the silence costs |
 | **n/a** | Not a production path |
 
-Note that **run failed** and **digest** are both `error`-level events, which is exactly why the
-level cannot be the discriminator — see
+**run failed** and **digest** are both `error`-level events, which is exactly why the level cannot
+be the discriminator — see
 [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
-**No production row should read "nobody is told"**: a degradation nobody is told about is a silent
-failure, and the rows that do are the ones still to be wired up.
+**No production row should read "nobody is told"** — that is [rule 4](#the-rules), and the rows
+that do are the ones still to be wired up.
 
 | Failure | Today | Intended | Human alerted? |
 |---|---|---|---|
 | One or two daily NWP runs missed | `live_forecasts` selects the freshest run present as of the forecast time, so an older run is used through the normal path; `live_forecasts_are_healthy` warns with the count of missed runs | Unchanged, plus a Sentry **warning** carrying the missed-run count 🚧 | **run failed** — from the `ecmwf_ens` run that should have landed the missing NWP, which is the usual cause. For the degraded forecast itself, **nobody is told** 🚧: `live_forecasts_are_healthy` counts the missed runs into Dagster's Checks view and, when it evaluates successfully, sends no event, so a slot built on a hole somebody else's run left behind announces itself to no one ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
-| NWP stale but still covering the horizon | Forecast produced from an increasingly ancient run; `nwp_init_time` is on every row and `live_forecasts_are_healthy` warns with the missed-run count, but the forecast itself looks as confident as a fresh one | Bands widen with the regime; `STALE NWP` warning row and a Sentry **warning** 🚧 | **run failed** — from the `ecmwf_ens` run that should have landed the missing NWP, which is the usual cause. For the degraded forecast itself, **nobody is told** 🚧: `live_forecasts_are_healthy` counts the missed runs into Dagster's Checks view and, when it evaluates successfully, sends no event, so a slot built on a hole somebody else's run left behind announces itself to no one ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
+| NWP stale but still covering the horizon | Forecast produced from an increasingly ancient run; `nwp_init_time` is on every row and `live_forecasts_are_healthy` warns with the missed-run count, but the forecast itself looks as confident as a fresh one | Bands widen with the regime; `STALE NWP` warning row and a Sentry **warning** 🚧 | **run failed**, then **nobody is told** 🚧 — the same path as the row above: the missed `ecmwf_ens` run reports itself, the forecast degraded by it does not |
 | A slot produces no rows, or unusable ones, while the asset still succeeds | `live_forecasts_are_healthy` warns, naming the row count, the invalid rows and any trained series that went missing | Unchanged, plus a Sentry **warning** 🚧 | **nobody is told** 🚧 — `live_forecasts_are_healthy` names the row count and the missing series in Dagster's Checks view and, when it evaluates successfully, sends no event, so an empty or unusable slot is silent unless somebody opens the UI ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
 | NWP absent, or too old to cover the horizon | **Hard failure** — the asset raises and NGED gets nothing (tracked to change in [#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) | Weather-blind forecast, wide bands, warning row, and the alert drops from **run failed** to a degradation event, because nothing of ours has broken 🚧 | **run failed** |
 | Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns, names the late series and sends a Sentry warning event | Unchanged, plus regime-appropriate band widening 🚧 | **warning** |
@@ -254,9 +254,6 @@ appear nowhere else.
     imperative form.)*
 
 ## Where complexity should live
-
-> **When a capability can be built into the training loop or into the production service, build it
-> into the training loop.**
 
 The service runs unattended at 06:00 on the day the inputs are strangest. Training runs in front of
 a human who can read the traceback and re-run it. Complexity in the two places therefore carries
@@ -465,13 +462,10 @@ setting them side by side, because the differences are less instructive than wha
 | **Dense network with value + mask channels** (the fixed-width fallback) | **Flagged**: an explicit mask channel beside each value, so "zero" and "unknown" stay distinguishable. GRU-D is the standard precedent, decaying the last observation toward an empirical mean | The learned decay target | Same training-distribution limit, and it spends model capacity representing absence that the token-set form gets for free |
 | **Physical forward model** | **No representation needed**: the model is defined for every input state | A physical prior — the clear-sky envelope of rung 4 | It only covers what the physics covers; it cannot supply the learned residual on top |
 
-Read down the last column and the point is not that one representation wins. It is that the first
-three share a single failure mode: **a learned model handles the missingness it was trained on, and
-nothing else.** Choosing a better representation of absence changes how gracefully the model can
-express "I do not know", but it does not, on its own, teach the model what a real outage looks like.
-Only the physical model is exempt, and only because it never learned anything to begin with. This is
-why the failure-scenario suite is load-bearing for every row of that table rather than a
-nice-to-have for one of them.
+The last column is the point: the first three share a single failure mode — **a learned model
+handles the missingness it was trained on, and nothing else** — and only the physical model is
+exempt, because it never learned anything to begin with. That is why the failure-scenario suite is
+load-bearing for every row rather than a nice-to-have for one.
 
 Three consequences for models we have not built yet, recorded here because they are design
 constraints rather than roadmap items:
@@ -526,8 +520,6 @@ if any data is retrievable". The two contexts have different costs of being wron
 | Cost of no output | High — a user is waiting | Nil — rerun it |
 | Cost of a quietly-degraded output | Moderate, **if** flagged in the data | High — silently poisons a model and every comparison built on it |
 | Correct posture | Fail-operational: degrade and declare | Fail-fast: refuse to proceed |
-
-> **Fail in the direction where being wrong is cheapest to recover from.**
 
 This is not the same axis as Dagster's WARN-versus-ERROR severity. R&D lives in the
 cross-validation and training assets, so the remaining mechanism to build is a strict-mode flag on
