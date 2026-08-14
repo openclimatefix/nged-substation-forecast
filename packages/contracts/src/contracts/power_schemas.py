@@ -402,10 +402,10 @@ class PowerForecast(pt.Model):
             " see `delta_store.power_forecasts`."
             # PLANNED: We intend to change `power_fcst` to a normalised value in the range
             # [-1, +1] (which NGED multiplies by a capacity to recover MW/MVA), per the
-            # delivery-contract design agreed with NGED in the Milestone 1 report.
-            # For this very early version we forecast raw MW/MVA because we are not yet
-            # estimating capacity; we will switch to the scaled value once capacity estimation
-            # lands (roadmap v0.7).
+            # delivery-contract design agreed with NGED in the Milestone 1 report. The switch is
+            # planned for v0.5, using the static P99 `effective_capacity` estimate that already
+            # exists — the same scalar the `metrics` pipeline already divides by for NMAE — so it
+            # no longer needs to wait for a time-varying capacity estimate.
         ),
     )
 
