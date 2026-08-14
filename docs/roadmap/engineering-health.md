@@ -2,16 +2,18 @@
 
 > **Status: 🚧 Planned.** Tooling, reproducibility, and rigour improvements from the 2026-07
 > codebase review that don't change forecast behaviour. Each section is an independent,
-> roughly one-PR piece of work; sections are deleted as they ship. Mostly the v0.2 epic
-> [#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138):
-> rigor tests [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229).
-> NWP ingestion checks
-> [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) have shipped —
-> as-built in
+> roughly one-PR piece of work; sections are deleted as they ship. The v0.2 epic
+> [#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138) has shipped in
+> full, including the NWP ingestion checks
+> [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) — as-built in
 > [Known ECMWF ENS data-quality issues](../architecture/ecmwf-ens-known-issues.md#an-incomplete-run-tolerated-and-reported)
-> — and so has the Hydra removal
+> — and the Hydra removal
 > [#228](https://github.com/openclimatefix/nged-substation-forecast/issues/228), as-built in
-> [Model configuration](../ml_experimentation/model-configuration.md).
+> [Model configuration](../ml_experimentation/model-configuration.md). The one section still on
+> this page, the scientific-rigor tests
+> [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229), now belongs to
+> the v0.3 epic
+> [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6).
 > Task ordering lives in the GitHub Project board.
 
 ## Scientific-rigor tests and cleanup

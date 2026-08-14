@@ -107,8 +107,8 @@ Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206) (done)
 
-> **Status: ✅ Built and running.** The accepted option below was deployed on AWS for v0.1
-> (`v0.1.0`) and now serves v0.2 (`v0.2.0`), unchanged; the bring-up is documented in
+> **Status: ✅ Built and running.** The accepted option below runs on AWS as v0.2 (`v0.2.0`) —
+> the same architecture v0.1 (`v0.1.0`) used, unchanged; the bring-up is documented in
 > [Setting up the live service on AWS](../live_service/aws.md). The costed comparison and the
 > rejected alternatives are kept below as the durable record of the decision. The
 > [access-phasing](#access-phasing) Stages 2–3 and the future-work items (MLflow server, dev
@@ -497,9 +497,9 @@ Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 > **Status: ✅ Infrastructure built and running.** ECR, the two IAM roles, the Fargate
 > task definition, the always-on EC2 control-plane box (`EcsRunLauncher`, Postgres-in-Docker,
-> schedules, Tailscale, Marimo), and S3 were all stood up by hand for v0.1 and documented
-> step-by-step in [Setting up the live service on AWS](../live_service/aws.md); the same
-> infrastructure now serves v0.2. The items further down are what remains 🚧 after v0.1.
+> schedules, Tailscale, Marimo), and S3 run in production, serving v0.2 — stood up by hand and
+> documented step-by-step in [Setting up the live service on AWS](../live_service/aws.md). The
+> items further down are what remains 🚧 after v0.1.
 
 Built for v0.1 (see the [runbook](../live_service/aws.md) for the exact console steps):
 
