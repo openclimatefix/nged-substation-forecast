@@ -113,18 +113,26 @@ def _process_file_listing(
 
 def remove_small_files_from_listing(
     file_listing: pt.DataFrame[_ProcessedFileListing],
-    size_threshold_bytes: int = 1000,
+    size_threshold_bytes: int = 520,
 ) -> pt.DataFrame[_ProcessedFileListing]:
-    """Remove files that are too small.
+    """Remove files too small to carry any readings.
 
-    This is used to remove NGED JSON files that have no `data` field.
+    This is used to skip NGED JSON files that have no `data` field, so `download_and_parse_files`
+    never has to fetch and parse them only to discard the result. It is an optimisation, not a
+    correctness requirement: `download_and_parse_files` already tolerates a null `data` field.
 
-    Typical files sizes for NGED JSON files:
-        -  486 bytes: no `data` and no `WKT`.
-        - 2011 bytes: 12 timesteps in `data` and no `WKT`.
-        - 4328 bytes: no `data` but a large `WKT` string.
+    `size_threshold_bytes` defaults to 520, derived from the real files on NGED's S3: a WKT-less
+    file with zero readings tops out at 488 bytes, and one with a single reading starts at 556
+    bytes, so 520 sits in the gap between them. WKT-bearing (Primary substation) files run far
+    larger — zero-reading examples measured between 4,405 and 20,148 bytes — so the WKT-less
+    floor is the binding constraint on the threshold.
     """
-    return file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
+    n_files_before_filter = file_listing.height
+    filtered = file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
+    log.info(
+        f"Files retained after the size filter: {filtered.height} out of {n_files_before_filter=}"
+    )
+    return filtered
 
 
 class NoNewData(Exception):
