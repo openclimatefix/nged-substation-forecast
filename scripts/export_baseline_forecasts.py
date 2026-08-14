@@ -23,7 +23,7 @@ units), left-joined from the ``power_time_series`` table so residuals can be com
 
 Run from a checkout where ``.env`` resolves (in a worktree, ``.env`` must be symlinked):
 
-    uv run python scripts/export_forecasts_for_alex.py \
+    uv run python scripts/export_baseline_forecasts.py \
         --experiment-name xgboost_no_power_lags \
         --fold-id mid_2025_to_mid_2026
 """
