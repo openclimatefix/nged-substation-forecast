@@ -197,5 +197,5 @@ feeding a runbook rather than any paging or failover machinery.
 
 OCF delivers forecasts as **Delta Lake tables on AWS S3**, updated every 6 hours. Delta Lake provides ACID transactions, meaning NGED never reads an incomplete forecast. (Why Delta Lake rather than a REST API? See [Forecast Delivery](../architecture/forecast-delivery.md).) The tables are designed as "building blocks" that NGED can combine to construct:
 
-* A **Normal Operation Forecast** (MW or MVA): the [−1, +1] forecast multiplied by the site's nominal capacity. Assumes the grid is in a normal running arrangement with all generators at full unconstrained capacity.
-* A **Prevailing Conditions Forecast** (MW or MVA): the [−1, +1] forecast multiplied by the most recently observed effective capacity, reflecting current switching state and any reduced generator capacity.
+* A **Normal Operation Forecast** (MW or MVA): the `power_forecast` table delivers this today — its `power_fcst` column is already in MW (active power) or MVA (apparent power), with the unit given per time series in `TimeSeriesMetadata`. Assumes the grid is in a normal running arrangement with all generators at full unconstrained capacity.
+* A **Prevailing Conditions Forecast** (MW or MVA): planned. It will combine the forecast with the most recently observed effective capacity, reflecting current switching state and any reduced generator capacity — see [Forecast building blocks](../roadmap/forecast-building-blocks.md).
