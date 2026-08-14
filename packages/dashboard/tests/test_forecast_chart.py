@@ -113,6 +113,16 @@ def test_shade_weekends_false_omits_the_band_layer() -> None:
     assert "weekends" not in " ".join(spec["title"]["subtitle"])
 
 
+def test_shade_weekends_true_adds_subtitle_note() -> None:
+    """The default (``shade_weekends=True``) must advertise the band it draws, not just draw it.
+
+    The false-direction sibling above pins the band layer's absence; this pins the subtitle note
+    that says why a band is there when it is, which nothing else in this file checks.
+    """
+    spec = _build(shade_weekends=True).to_dict()
+    assert "Shaded: weekends" in " ".join(spec["title"]["subtitle"])
+
+
 def test_weekend_bands_sit_at_wall_midnights_clipped_to_window() -> None:
     spec = _build().to_dict()
     bands = spec["datasets"][spec["layer"][0]["data"]["name"]]

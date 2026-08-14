@@ -342,7 +342,7 @@ class Settings(BaseSettings):
         )
         # NGED-facing delivery tables derive from data_path_delivery instead, so a new delivery
         # table can't silently land in the internal bucket by inheriting the default derivation.
-        # `power_forecasts` and `effective_capacity` are two of the five tables in NGED's stable
+        # `power_forecast` and `effective_capacity` are two of the five tables in NGED's stable
         # delivery contract; see
         # <https://openclimatefix.github.io/nged-substation-forecast/architecture/forecast-delivery/#securing-it>
         # for the rest and why they live in a separate bucket.

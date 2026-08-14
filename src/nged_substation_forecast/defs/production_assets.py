@@ -159,22 +159,33 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     )
 
 
+def _parse_utc_init_time(value: str) -> datetime:
+    """Parse one partition-value ``init_time`` string into a tz-aware UTC datetime.
+
+    delta-rs renders our own writes as naive ``"YYYY-MM-DD HH:MM:SS[.ffffff]"`` strings, so the
+    common case just attaches UTC. An offset-carrying string is handled separately —
+    ``.replace(tzinfo=UTC)`` would silently *relabel* it to the wrong instant rather than convert
+    it, and nothing upstream guarantees delta-rs never renders one.
+    """
+    parsed = datetime.fromisoformat(value)
+    return parsed.astimezone(UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
 def _available_nwp_init_times(settings: Settings) -> list[datetime]:
     """Return the distinct ``init_time``s present in the ``nwp`` Delta table.
 
     Reads only Delta partition metadata (``DeltaTable.partitions()``, no data scan) and parses
-    the ``init_time`` partition values — naive ``"YYYY-MM-DD HH:MM:SS[.ffffff]"`` strings on disk
-    — into tz-aware UTC datetimes. Uses ``datetime.fromisoformat`` rather than a fixed
-    ``strptime`` pattern so a delta-rs rendering that drops the fractional seconds (whole-second
-    ``init_time``s have no fractional part to keep) parses the same as one that keeps them —
-    ``strptime``'s ``%f`` requires at least one fractional digit and would raise on that
-    rendering.
+    the ``init_time`` partition values into tz-aware UTC datetimes via ``_parse_utc_init_time``.
+    Uses ``datetime.fromisoformat`` rather than a fixed ``strptime`` pattern so a delta-rs
+    rendering that drops the fractional seconds (whole-second ``init_time``s have no fractional
+    part to keep) parses the same as one that keeps them — ``strptime``'s ``%f`` requires at
+    least one fractional digit and would raise on that rendering.
     """
     delta_table = DeltaTable(
         settings.nwp_data_path, storage_options=typeddict_to_dict(settings.storage_options)
     )
     raw_values = {partition["init_time"] for partition in delta_table.partitions()}
-    return [datetime.fromisoformat(value).replace(tzinfo=UTC) for value in raw_values]
+    return [_parse_utc_init_time(value) for value in raw_values]
 
 
 class LiveForecastsConfig(Config):
@@ -199,13 +210,10 @@ class LiveForecastsConfig(Config):
             # back 16 * 6h = 4 days, not 16 days. This is a lineage-only safety margin (it decides
             # what the Dagster UI graph and a `--with upstream` materialisation consider a parent,
             # not what live_forecasts actually reads): comfortably more than the ~30h a healthy
-            # NWP run is ever stale (see checks._NWP_RUN_EXPECTED_ON_DISK_BY), so it still covers
-            # several consecutive missed daily runs before live_forecasts_are_healthy's missed-run
-            # check would already have alarmed. It is deliberately unrelated to MAX_NWP_LEAD (16
-            # *days*, in defs._engineering_inputs): that bounds how far back an init_time can be
-            # and still cover a future valid_time window, for callers that scan a range of NWP
-            # runs. live_forecasts instead joins a single run picked by select_nwp_init_time, so
-            # MAX_NWP_LEAD's range-based pruning never applies here.
+            # NWP run is ever stale — the 00Z run lands around 08:30 UTC (see
+            # schedules.ecmwf_ens_schedule), so the 06:00 slot still uses the previous day's run, a
+            # worst case of 30h — so it still covers several consecutive missed daily runs before
+            # live_forecasts_are_healthy's missed-run check would already have alarmed.
             partition_mapping=TimeWindowPartitionMapping(start_offset=-16, end_offset=0),
         ),
         "power_time_series_and_metadata",
