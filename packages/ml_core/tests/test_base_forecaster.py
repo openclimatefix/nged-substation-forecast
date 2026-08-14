@@ -1,7 +1,7 @@
 """Tests for the MLflow model-artifact plumbing, against file-based MLflow.
 
 Covers ``BaseForecaster.save_to_mlflow``/``load_from_mlflow`` and the third function that touches
-the same archive layout, ``ml_core._production_helpers.fetch_model_artifacts`` — they are tested
+the same archive layout, ``ml_core.production_helpers.fetch_model_artifacts`` — they are tested
 together here because they share one on-the-wire format and one fake forecaster.
 
 That fake (rather than a concrete model) keeps the tests focused on the shared behaviour —
@@ -23,7 +23,6 @@ import pytest
 from contracts.config_schemas import class_target
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast, TimeSeriesMetadata
-from ml_core._production_helpers import fetch_model_artifacts
 from ml_core.base_forecaster import (
     TRAINED_METADATA_FILENAME,
     BaseForecaster,
@@ -31,6 +30,7 @@ from ml_core.base_forecaster import (
     _archive_model_dir,
     load_trained_metadata,
 )
+from ml_core.production_helpers import fetch_model_artifacts
 from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 

@@ -68,7 +68,7 @@ deployment bakes into its container image at build time.
 **What the asset does:**
 
 1. Downloads that run's saved model artifacts from MLflow
-   (`ml_core._production_helpers.fetch_model_artifacts`) into a temporary directory.
+   (`ml_core.production_helpers.fetch_model_artifacts`) into a temporary directory.
 2. Checks the downloaded model's saved config against the running code, and **fails the
    materialisation if this code could not load that model** — because a feature name no longer
    parses (the offending feature is named), or because `model_params` carry a hyper-parameter this

@@ -11,7 +11,7 @@ experiments on the leaderboard.
 
 The fold definitions live in `conf/cv/default.yaml` and are read by every experiment, so all
 models are scored on the **same** folds (apples-to-apples). The fold windowing in
-`ml_core._cv_helpers` is generic over arbitrary `train_start/train_end/val_start/val_end` dates, so
+`ml_core.cv_helpers` is generic over arbitrary `train_start/train_end/val_start/val_end` dates, so
 changing the fold set is a config edit, not a code change.
 
 ---

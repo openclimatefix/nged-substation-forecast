@@ -139,7 +139,7 @@ def _download_and_unpack_model(run_id: str, work_dir: Path, remedy: str) -> Path
     """Download an MLflow run's model archive into ``work_dir`` and unpack it.
 
     Shared by ``BaseForecaster.load_from_mlflow`` and
-    ``ml_core._production_helpers.fetch_model_artifacts``, the two readers of a run's saved
+    ``ml_core.production_helpers.fetch_model_artifacts``, the two readers of a run's saved
     model, so the archive layout is defined in exactly one place.
 
     The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
@@ -269,7 +269,7 @@ class BaseForecaster(ABC):
     """The config class ``load`` rebuilds from a saved ``model_params`` mapping.
 
     A subclass's ``load`` must build its config through this attribute rather than naming its
-    config class again, so the class ``ml_core._production_helpers._check_meta_is_servable``
+    config class again, so the class ``ml_core.production_helpers._check_meta_is_servable``
     validates a saved config against is always the class ``load`` uses.
     """
 
@@ -318,7 +318,7 @@ class BaseForecaster(ABC):
         - The saved directory must contain a ``meta.json`` with a ``model_class`` field — the
           fully-qualified ``{module}.{qualname}`` of the concrete subclass (e.g.
           ``"xgboost_forecaster.forecaster.XGBoostForecaster"``) — so that production inference
-          (``ml_core._production_helpers.load_forecaster_from_dir``) can reconstruct the correct
+          (``ml_core.production_helpers.load_forecaster_from_dir``) can reconstruct the correct
           class from a plain model directory with no other context (issue #221).
         - ``path`` must be cleared first, so that saving over a directory holding a *larger*
           model's files leaves none of them behind. Merging instead of replacing is how a dropped
@@ -327,7 +327,7 @@ class BaseForecaster(ABC):
 
         The clearing requirement makes ``path`` the model's to own while it saves, so anything a
         caller left there is gone afterwards. (Depositing a file *after* a save is fine, and is how
-        ``_production_helpers.fetch_model_artifacts`` puts ``promotion.json`` beside the model.)
+        ``production_helpers.fetch_model_artifacts`` puts ``promotion.json`` beside the model.)
         """
 
     @classmethod

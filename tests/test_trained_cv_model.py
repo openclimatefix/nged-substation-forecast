@@ -18,8 +18,8 @@ from contracts.ml_schemas import EligibleTimeSeries
 from contracts.settings import Settings
 from dagster import DagsterInstance, materialize
 from deltalake import write_deltalake
-from ml_core._production_helpers import fetch_model_artifacts
 from ml_core.base_forecaster import load_trained_metadata
+from ml_core.production_helpers import fetch_model_artifacts
 from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
 from xgboost_forecaster.forecaster import XGBoostForecaster

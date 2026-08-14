@@ -24,8 +24,8 @@ from typing import Final
 
 import patito as pt
 import polars as pl
-from contracts._uri import ObjectStoreOptions
 from contracts.typing_utils import typeddict_to_dict
+from contracts.uri import ObjectStoreOptions
 from contracts.weather_schemas import Nwp
 from deltalake import WriterProperties, write_deltalake
 

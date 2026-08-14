@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 from contracts.config_schemas import CvConfig, CvFoldConfig
-from ml_core._cv_helpers import flatten_config
+from ml_core.cv_helpers import flatten_config
 from pydantic import ValidationError
 from xgboost_forecaster import XGBoostConfig, XGBoostForecaster
 

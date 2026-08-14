@@ -1,4 +1,4 @@
-"""Unit tests for the reproducibility provenance helpers (`ml_core._repro`).
+"""Unit tests for the reproducibility provenance helpers (`ml_core.repro`).
 
 These exercise real ``git`` subprocesses in throwaway repos and real Delta tables in ``tmp_path``
 — no MLflow and no network — so they run in the default (non-integration) suite.
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import polars as pl
 from deltalake import write_deltalake
-from ml_core._repro import (
+from ml_core.repro import (
     ABSENT,
     UNKNOWN,
     get_delta_versions,

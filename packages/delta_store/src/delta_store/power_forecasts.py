@@ -15,9 +15,9 @@ from typing import Final
 
 import patito as pt
 import polars as pl
-from contracts._uri import ObjectStoreOptions
 from contracts.power_schemas import PowerForecast
 from contracts.typing_utils import typeddict_to_dict
+from contracts.uri import ObjectStoreOptions
 from deltalake import ColumnProperties, WriterProperties, write_deltalake
 
 from delta_store.precision import round_to_significand_bits

@@ -1,7 +1,7 @@
 """Cross-validation Dagster assets.
 
 These assets implement the experiment-independent, fold-partitioned CV layer. Each asset is a
-thin orchestration shell delegating its logic to the pure helpers in ``ml_core._cv_helpers`` so
+thin orchestration shell delegating its logic to the pure helpers in ``ml_core.cv_helpers`` so
 the logic stays fast to unit-test and the assets stay readable.
 """
 
@@ -13,11 +13,6 @@ from typing import Final
 import mlflow
 import patito as pt
 import polars as pl
-from contracts._uri import (
-    ObjectStoreOptions,
-    delta_table_exists,
-    if_local_path_then_make_parent_dir,
-)
 from contracts.config_schemas import load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
 from contracts.power_schemas import (
@@ -28,6 +23,11 @@ from contracts.power_schemas import (
 )
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
+from contracts.uri import (
+    ObjectStoreOptions,
+    delta_table_exists,
+    if_local_path_then_make_parent_dir,
+)
 from dagster import (
     AssetExecutionContext,
     Config,
@@ -37,18 +37,11 @@ from dagster import (
 )
 from delta_store.power_forecasts import write_power_forecasts
 from deltalake import write_deltalake
-from ml_core._cv_helpers import (
+from ml_core.cv_helpers import (
     date_to_utc_datetime,
     eligible_time_series_ids,
     parse_cv_partition_key,
 )
-from ml_core._mlflow_runs import (
-    get_or_create_experiment,
-    get_or_create_fold_run,
-    get_or_create_parent_run,
-    load_experiment_forecaster,
-)
-from ml_core._repro import MlflowTags, provenance_tags
 from ml_core.metrics import (
     NoOverlappingActualsError,
     build_mlflow_aggregate_metrics,
@@ -56,6 +49,13 @@ from ml_core.metrics import (
     compute_metrics,
     enrich_metrics_rows,
 )
+from ml_core.mlflow_runs import (
+    get_or_create_experiment,
+    get_or_create_fold_run,
+    get_or_create_parent_run,
+    load_experiment_forecaster,
+)
+from ml_core.repro import MlflowTags, provenance_tags
 from nged_data.storage import time_series_coverage
 
 from nged_substation_forecast.defs._engineering_inputs import (

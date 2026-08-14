@@ -230,7 +230,7 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
     """Load the production model from a plain disk directory (no MLflow at inference time).
 
     Reads ``meta.json`` and resolves ``model_class`` via ``contracts.config_schemas.import_class``
-    (the same mechanism ``ml_core._mlflow_runs.load_experiment_forecaster`` uses), then calls the
+    (the same mechanism ``ml_core.mlflow_runs.load_experiment_forecaster`` uses), then calls the
     concrete subclass's ``load(path)``.
 
     The forecaster returned is one this code can actually serve, not merely one it could

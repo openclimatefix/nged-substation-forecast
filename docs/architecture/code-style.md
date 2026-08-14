@@ -77,7 +77,7 @@ self-documenting type is practical. Reach for:
 
 Constraining `dict` *keys* to a `Literal` alias (`dict[TableNameType, str]`) is worthwhile for a
 closed vocabulary and works with bidirectional inference when callers pass dict literals.
-`packages/ml_core/src/ml_core/_repro.py` is the worked example. Don't force it where no honest
+`packages/ml_core/src/ml_core/repro.py` is the worked example. Don't force it where no honest
 stricter type exists — a genuinely heterogeneous or open-ended dict stays `dict[str, str]`.
 
 **All constants must be marked with the maximally "constant" type**, e.g.

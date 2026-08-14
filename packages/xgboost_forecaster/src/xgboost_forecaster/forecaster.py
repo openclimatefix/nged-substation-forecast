@@ -232,7 +232,7 @@ class XGBoostForecaster(BaseForecaster):
         the directory — decides the population, because a model's population is the model's own
         frozen record and not a directory listing (issue #197). A directory can hold files this
         model did not write: ``ml_core.base_forecaster.save_to_mlflow`` adds a
-        ``time_series_metadata.parquet`` and ``ml_core._production_helpers.fetch_model_artifacts``
+        ``time_series_metadata.parquet`` and ``ml_core.production_helpers.fetch_model_artifacts``
         a ``promotion.json``, and a hand-assembled directory can hold anything. Globbing would let
         such a file enlarge the population, silently scoring a series with a model that was never
         trained for it and breaking the train==predict invariant (see
