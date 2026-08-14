@@ -129,7 +129,7 @@ Two feature names are **forbidden** and raise `ValueError` at parse time:
 - **`valid_time`** — an index column; use time features (e.g. `local_time_of_day_sin`) instead.
 
 **Power lags** are automatically nullified by the feature engineering pipeline when the lag is
-shorter than or equal to the forecast lead time. For example, `power_lag_2h` would leak
+shorter than or equal to the forecast lead time. For example, `power_lag_1h` would leak
 observed power into a 1-hour-ahead forecast, so its value is set to `null` for those rows. The
 model sees a null and treats it as a missing value (XGBoost handles nulls natively). This
 nullification happens per-row in `_nullify_leaky_lags()`, not at config time — the feature name

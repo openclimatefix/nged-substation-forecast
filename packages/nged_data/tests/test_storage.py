@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -10,10 +11,34 @@ from nged_data.storage import (
     _process_file_listing,
     _ProcessedFileListing,
     _RawFileListItem,
+    remove_small_files_from_listing,
     select_new_rows,
     time_series_coverage,
     upsert_metadata,
 )
+
+
+def _file_listing(filesize_bytes: list[int]) -> pt.DataFrame[_ProcessedFileListing]:
+    """Build a minimal, valid `_ProcessedFileListing` frame with the given file sizes.
+
+    `remove_small_files_from_listing` only reads `filesize_bytes`, so every other column is a
+    fixed placeholder.
+    """
+    n = len(filesize_bytes)
+    raw = pl.DataFrame(
+        {
+            "path": [f"timeseries/0_1/TimeSeries_1_{i}.json" for i in range(n)],
+            "filesize_bytes": pl.Series(filesize_bytes, dtype=pl.Int64),
+            "time_series_id": pl.Series([1] * n, dtype=pl.Int32),
+            "start_time": pl.Series([datetime(2026, 1, 1, tzinfo=UTC)] * n).cast(
+                UTC_DATETIME_DTYPE
+            ),
+            "end_time": pl.Series([datetime(2026, 1, 1, 6, tzinfo=UTC)] * n).cast(
+                UTC_DATETIME_DTYPE
+            ),
+        }
+    )
+    return pt.DataFrame(raw).set_model(_ProcessedFileListing).validate()
 
 
 def test_upsert_metadata_new_file(tmp_path: Path):
@@ -484,3 +509,50 @@ def test_parse_file_listing_invalid():
     # If the regex fails, the columns will be null, and validation should fail.
     with pytest.raises(pt.exceptions.DataFrameValidationError):
         _process_file_listing(raw_file_listing)
+
+
+def test_remove_small_files_from_listing_keeps_one_reading_file():
+    """A one-reading, WKT-less file is 556 bytes (measured on real NGED S3 downloads) and must
+    survive the default filter. It did not survive the old 1000-byte default — see
+    ``test_remove_small_files_from_listing_drops_one_reading_file_at_the_old_threshold``."""
+    file_listing = _file_listing([556])
+
+    result = remove_small_files_from_listing(file_listing)
+
+    assert result.height == 1
+    _ProcessedFileListing.validate(result)  # schema must survive filtering
+
+
+def test_remove_small_files_from_listing_drops_one_reading_file_at_the_old_threshold():
+    """Regression pin for the defect this change fixes: the old 1000-byte default dropped a
+    556-byte one-reading file. Kept so the fix cannot silently regress back to the old default."""
+    file_listing = _file_listing([556])
+
+    result = remove_small_files_from_listing(file_listing, size_threshold_bytes=1000)
+
+    assert result.height == 0
+
+
+def test_remove_small_files_from_listing_drops_genuinely_empty_file():
+    """A genuinely empty, WKT-less file is 430-488 bytes (measured on real NGED S3 downloads) and
+    must still be dropped by the default filter."""
+    file_listing = _file_listing([430, 488])
+
+    result = remove_small_files_from_listing(file_listing)
+
+    assert result.height == 0
+
+
+def test_remove_small_files_from_listing_logs_dropped_count(
+    caplog: pytest.LogCaptureFixture,
+):
+    """The number of files retained/dropped must be logged at INFO, or the loss stays invisible."""
+    file_listing = _file_listing([430, 556])
+
+    with caplog.at_level(logging.INFO, logger="nged_data.storage"):
+        remove_small_files_from_listing(file_listing)
+
+    assert any(
+        "1 out of n_files_before_filter=2" in r.message and r.levelno == logging.INFO
+        for r in caplog.records
+    )

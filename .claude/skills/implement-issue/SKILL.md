@@ -113,6 +113,9 @@ front — a report back after step 1 is not finished work.
     git worktree add --detach .claude/worktrees/mutate-<branch-name> <branch-name>
     ```
 
+    Keep this worktree (and its `uv sync`) here, not under `/tmp` — see CLAUDE.md, "never create a
+    `uv venv` ... under `/tmp`".
+
     Brief it to take each behavioural claim the diff makes, introduce the smallest bug that
     breaks that claim, run the tests covering it, then revert the bug before trying the next
     one. Mutations worth naming: flip a comparison or a boolean, swap two join keys, drop a

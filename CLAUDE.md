@@ -35,6 +35,15 @@ hook.
 with `monkeypatch`, network-gated tests, the moto S3 reset-per-test rule, and the Patito assertion
 house style — are documented on the **[Testing](docs/architecture/testing.md)** page.
 
+**Never create a `uv venv` or run `uv sync` with a target under `/tmp`.** `/tmp` on this machine is
+tmpfs, a different filesystem from `~/.cache/uv`, so uv can't hardlink packages from its cache
+across that boundary and silently falls back to a full byte-for-byte copy per package — costing
+real RAM instead of the near-zero marginal cost a same-filesystem venv gets. This has been seen to
+exhaust the tmpfs quota mid-install and abandon the venv half-built. The session scratchpad
+directory is under `/tmp` too, so it has the same problem — put throwaway venvs (a
+mutation-testing worktree, a version-bisection scratch build, a one-off repro) on the home
+partition instead, e.g. a worktree under `.claude/worktrees/`.
+
 ## Skills
 
 Detail that only matters while you are touching one specific thing lives in

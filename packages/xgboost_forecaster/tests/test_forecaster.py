@@ -78,7 +78,11 @@ def test_train_creates_one_booster_per_ts_id() -> None:
 def test_predict_output_schema() -> None:
     df = _make_df()
     lf = pt.LazyFrame.from_existing(df.lazy())
-    result = _trained(df).predict(lf)
+    # experiment_name is deliberately distinct from XGBoostForecaster.MODEL_NAME ("xgboost"), so
+    # an implementation that sourced the two model-family columns from the config instead of the
+    # class constants would fail here.
+    experiment_name = "distinct_experiment"
+    result = _trained(df, experiment_name=experiment_name).predict(lf)
 
     assert len(result) == len(df)
     assert result["power_fcst"].dtype == pl.Float32
@@ -86,6 +90,12 @@ def test_predict_output_schema() -> None:
     assert result["power_fcst_model_version"].dtype == pl.Int16
     # ml_flow_experiment_id=None → every row is null
     assert result["ml_flow_experiment_id"].is_null().all()
+
+    # Model-family identity comes from the class constants, not the config.
+    assert (result["power_fcst_model_name"] == XGBoostForecaster.MODEL_NAME).all()
+    assert (result["power_fcst_model_version"] == XGBoostForecaster.MODEL_VERSION).all()
+    # Experiment identity comes from the config, and stays distinct from model-family identity.
+    assert (result["experiment_name"] == experiment_name).all()
 
 
 def test_predict_with_mlflow_experiment_id() -> None:

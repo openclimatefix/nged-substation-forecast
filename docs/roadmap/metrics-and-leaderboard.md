@@ -456,7 +456,7 @@ and nothing is logged to the leaderboard MLflow runs.
 > for PICP (`p10_p90`). The `metrics` Dagster asset computes every ✅ metric above and writes
 > per-series rows to `forecast_metrics` Delta (partitioned by `experiment_name, fold_id`), with
 > per-fold and mean-across-folds aggregates logged to MLflow — see
-> [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-8-materialise-metrics).
+> [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-9-materialise-metrics).
 
 **Every metric above is also broken out by named population-filter slices**, which appear as
 extra leaderboard columns. Most are legitimate ranking columns, because the filter is fixed by
