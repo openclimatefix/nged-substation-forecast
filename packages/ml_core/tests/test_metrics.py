@@ -149,6 +149,22 @@ def test_compute_effective_capacity_drops_non_positive_series():
     assert result["effective_capacity_mw"].to_list() == pytest.approx([6.0])
 
 
+def test_compute_effective_capacity_is_the_99th_percentile_not_the_mean():
+    """A skewed series distinguishes P99 from mean() and from quantile(0.01).
+
+    50 observations at 1.0 MW plus one spike at 50.0 MW (51 total). Polars' default "nearest"
+    interpolation puts quantile(0.99) exactly on the spike (50.0), while mean() (~1.96) and
+    quantile(0.01) (1.0) fall far short of it. A fixture of constant power per series — as every
+    other test in this module uses — can't tell `quantile(0.99)` apart from either, because on a
+    constant series they all equal the same value.
+    """
+    times = [_utc(2022, 1, 1, 0, 0) + timedelta(minutes=30 * i) for i in range(51)]
+    power = [1.0] * 50 + [50.0]
+    power_lf = _make_actuals(1, times, power)
+    result = compute_effective_capacity(power_lf)
+    assert result["effective_capacity_mw"].to_list() == pytest.approx([50.0])
+
+
 # ---------------------------------------------------------------------------
 # compute_metrics tests
 # ---------------------------------------------------------------------------

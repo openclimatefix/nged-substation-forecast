@@ -107,9 +107,11 @@ def write_test_nwp(path: str, records: list[dict]) -> None:
     real table's on-disk size, not to serve a test fixture. Those two are deliberately *not*
     shared. What *is* shared with ``write_nwp`` — the ``(nwp_model_id, init_time)`` partitioning
     and the Enum-to-String strip delta-rs requires for ``nwp_model_id`` — is hand-copied below
-    because ``write_nwp`` doesn't expose it as an importable constant; a change to that layout
-    silently going stale here is caught by
-    ``tests/test_nwp_test_data.py::test_partition_layout_matches_write_nwp``, not by construction.
+    because ``write_nwp`` doesn't expose it as an importable constant. A change to the partition
+    *column names* going stale here is caught by
+    ``tests/test_nwp_test_data.py::test_partition_layout_matches_write_nwp``, which compares only
+    ``partition_columns``; a drift in the Enum-to-String strip itself is not covered by that test
+    and would surface only as a write failure.
     """
     df = pl.DataFrame(records).cast(
         {

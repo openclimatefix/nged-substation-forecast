@@ -89,6 +89,17 @@ def test_power_fcst_rounded_to_significand_bits(tmp_path: Path) -> None:
     assert (stored.view(np.dtype(np.uint32)) & discarded == 0).all()
 
 
+def test_the_power_fcst_significand_bits_is_thirteen() -> None:
+    """Pins the literal, not a value derived from the constant.
+
+    ``test_power_fcst_rounded_to_significand_bits`` above computes its tolerance *from*
+    ``POWER_FCST_SIGNIFICAND_BITS``, so it stays green no matter what the constant is set to.
+    ``PowerForecast.power_fcst``'s description asserts "max relative error 2^-13" in prose that a
+    changed constant would leave silently wrong.
+    """
+    assert POWER_FCST_SIGNIFICAND_BITS == 13
+
+
 def test_replace_partition_then_append(tmp_path: Path) -> None:
     table = tmp_path / "power_forecasts"
     partition = ("exp_storage_test", "smoke_test")

@@ -44,6 +44,7 @@ from deltalake import write_deltalake
 from nged_substation_forecast import _sentry
 from nged_substation_forecast.defs import checks
 from nged_substation_forecast.defs.checks import (
+    LIVE_FORECAST_HORIZON,
     LiveForecastHealthResult,
     LiveForecastRows,
     PowerFreshnessResult,
@@ -119,6 +120,13 @@ def test_the_production_staleness_threshold_is_twenty_four_hours() -> None:
         threshold=checks._POWER_DATA_STALENESS_THRESHOLD,
     )
     assert result.late["time_series_id"].to_list() == [8]
+
+
+def test_the_live_forecast_horizon_is_fourteen_days() -> None:
+    """Pins the literal, not a value derived from the constant. ``_MIN_HORIZON_HOURS`` is
+    computed *from* ``LIVE_FORECAST_HORIZON`` (``checks.py``), so the truncated-horizon threshold
+    moves with the constant and a test built the same way could never catch a wrong value."""
+    assert timedelta(days=14) == LIVE_FORECAST_HORIZON
 
 
 def test_never_reported_ids_flagged_from_roster() -> None:

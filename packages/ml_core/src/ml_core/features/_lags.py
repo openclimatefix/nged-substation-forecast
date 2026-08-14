@@ -104,8 +104,10 @@ def _apply_weather_lag(
         # available (bulk mode derives power_fcst_init_time = nwp_init_time + delay, exactly the
         # instant that run becomes usable), and no fresher run can be available at that instant
         # either — so the boundary belongs to the same-run branch, not the freshest-run one. This
-        # changes no output today (see the explanatory comment on the historical_weather
-        # construction in tabular_feature_engineer.py); it is defence in depth.
+        # changes output for every non-control ensemble member at that boundary: the freshest-run
+        # branch is `select_analysis_proxy`, which keeps only `ensemble_member == 0`, so a `>`
+        # boundary would read member 5's own row where `>=` reads member 0's. It is inconsequential
+        # today only because `conf/model/xgboost.yaml` selects no weather-lag features.
         pl.when(pl.col("target_time") >= pl.col("power_fcst_init_time"))
         .then(pl.col(f"{lag_feature.string_repr}_same_run"))
         .otherwise(pl.col(f"{lag_feature.string_repr}_freshest_run"))

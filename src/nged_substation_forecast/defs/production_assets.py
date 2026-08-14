@@ -269,9 +269,13 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     ``write_power_forecasts``'s ``replace_predicate_extra``, so re-running a 6-hourly slot (or
     replaying one) never duplicates rows or wipes the rest of the ``"live"`` fold.
 
-    Note: weather-lag features would go null at live time (only one NWP run is loaded here) —
-    none are in the current champion config, but a future feature change touching weather lags
-    should trip over this consciously.
+    Note: only one NWP run is loaded here, and "live" availability applies no publication delay,
+    so a weather-lag feature goes null only when that run is closer than
+    ``NWP_PUBLICATION_DELAY_HOURS`` to ``power_fcst_init_time`` — e.g. the 06:00 slot, when only
+    that morning's run has landed — and is populated at every other slot; see
+    ``test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh``. None are in the
+    current champion config, but a future feature change touching weather lags should trip over
+    this consciously.
     """
     settings = Settings()
     power_fcst_init_time = context.partition_time_window.end

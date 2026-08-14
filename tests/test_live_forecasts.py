@@ -456,10 +456,11 @@ def test_live_power_history_covers_the_longest_selected_power_lag(
     selects.
 
     Every other test in this file trains its fixture model on ``{"temperature_2m"}``, so a
-    ``LIVE_POWER_HISTORY`` too short to cover a real lag feature is invisible to them —
-    ``conf/model/xgboost.yaml`` selects ``power_lag_336h``, and shrinking the window from 15 days
-    to 1 hour leaves every other test in this file green. This test trains on ``power_lag_336h``
-    directly and spies on ``XGBoostForecaster.predict`` to capture the exact frame
+    ``LIVE_POWER_HISTORY`` too short to cover a real lag feature is invisible to them — the real
+    model config, ``conf/model/xgboost.yaml``, selects ``power_lag_336h`` as of writing, and
+    shrinking the window from 15 days to 1 hour leaves every other test in this file green. This
+    test hard-codes that same lag rather than reading the YAML, trains a fixture model on it
+    directly, and spies on ``XGBoostForecaster.predict`` to capture the exact frame
     ``live_forecasts`` hands it — the frame *after* production's own
     ``valid_time > power_fcst_init_time`` / ``ensemble_member is not null`` filter runs, so this
     test observes that filter's real output rather than re-deriving it — and pins that the
@@ -485,3 +486,110 @@ def test_live_power_history_covers_the_longest_selected_power_lag(
     genuine = predicted_from.collect()
     assert genuine.height > 0
     assert genuine["power_lag_336h"].null_count() == 0
+
+
+def _save_model_trained_on_weather_lag(path: Path, lag_hours: int) -> None:
+    """A tiny real ``XGBoostForecaster`` selecting a weather lag feature, trained on ts1 only."""
+    times = [datetime(2025, 1, 1, hour, tzinfo=UTC) for hour in (0, 1, 2)]
+    feature_name = f"temperature_2m_lag_{lag_hours}h"
+    train_df = pl.DataFrame(
+        {
+            "time_series_id": [1, 1, 1],
+            "valid_time": times,
+            "time_series_type": ["Primary"] * 3,
+            "power_fcst_init_time": times,
+            "power": [10.0, 12.0, 11.0],
+            feature_name: [9.0, 11.0, 10.5],
+        }
+    )
+    train_data = pt.LazyFrame.from_existing(train_df.lazy()).set_model(AllFeatures)
+    config = XGBoostConfig(
+        selected_features={feature_name}, experiment_name="live_test", n_estimators=5
+    )
+    forecaster = XGBoostForecaster(config)
+    forecaster.train(train_data, time_series_ids=[1])
+    forecaster.save(path)
+    write_trained_metadata(
+        model_dir=path, time_series_metadata=_metadata_for((1,), (_TRAINED_CELL,))
+    )
+
+
+@pytest.mark.parametrize(
+    ("gap_hours", "expect_null"),
+    [
+        pytest.param(6, True, id="6h_gap_below_the_publication_delay"),
+        pytest.param(9, False, id="9h_gap_at_the_publication_delay"),
+    ],
+)
+def test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh(
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    tmp_path: Path,
+    gap_hours: int,
+    expect_null: bool,
+) -> None:
+    """Pins today's asymmetry between "live" availability and the single-run publication-delay cut.
+
+    ``live_forecasts`` selects its one NWP run in ``"live"`` availability mode, which applies no
+    modelled delay — any run genuinely present in the Delta table qualifies. But the single-run
+    analysis-proxy inside ``_engineer_features`` still gates its freshest-run join with the
+    ``NWP_PUBLICATION_DELAY_HOURS`` (9h) ``available_at`` cut. When the selected run is closer
+    than 9 hours to ``power_fcst_init_time`` — as at the 06:00 slot, when only that morning's run
+    has landed — the cut excludes the run entirely from the freshest-run join and a weather lag
+    targeting an earlier time goes null; a run 9 hours or further back passes the cut and the lag
+    is populated. This pins the behaviour as it stands, not as a design endorsement: whether
+    "live" mode should apply the same delay is a serving-path semantic decision, tracked
+    separately from this test.
+    """
+    gap = timedelta(hours=gap_hours)
+    power_fcst_init_time = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
+    partition_key = "2026-07-04-00:00"  # window start; window end (= power_fcst_init_time) is 6h on
+    nwp_init = power_fcst_init_time - gap
+    forecast_valid_time = power_fcst_init_time + timedelta(minutes=30)
+    target_time = forecast_valid_time - gap  # == nwp_init + 30 min: inside the run's own coverage
+
+    nged_path = tmp_path / "NGED"
+    nged_path.mkdir()
+    production_model_path = tmp_path / "production_model"
+
+    monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
+    monkeypatch.setenv("NWP_DATA_PATH", str(tmp_path / "NWP"))
+    monkeypatch.setenv("POWER_FORECASTS_DATA_PATH", str(tmp_path / "power_forecasts"))
+    monkeypatch.setenv("PRODUCTION_MODEL_PATH", str(production_model_path))
+
+    _write_power_for(str(nged_path / "power_time_series.delta"), (1,))
+    records = nwp_records(
+        _TRAINED_CELL,
+        nwp_init,
+        (0,),
+        init_time=nwp_init,
+        valid_times=[target_time, forecast_valid_time],
+    )
+    write_test_nwp(str(tmp_path / "NWP"), records)
+    _save_model_trained_on_weather_lag(production_model_path, gap_hours)
+
+    captured: list[pt.LazyFrame[AllFeatures]] = []
+    real_predict = XGBoostForecaster.predict
+
+    def _spy_predict(
+        self: XGBoostForecaster, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
+    ) -> pt.DataFrame[PowerForecast]:
+        captured.append(data)
+        return real_predict(self, data, fold_id=fold_id)
+
+    monkeypatch.setattr(XGBoostForecaster, "predict", _spy_predict)
+
+    result = materialize(
+        [live_forecasts],
+        partition_key=partition_key,
+        run_config=RunConfig(ops={"live_forecasts": LiveForecastsConfig(availability_mode="live")}),
+        instance=dagster_instance,
+    )
+    assert result.success
+
+    (predicted_from,) = captured
+    genuine = predicted_from.collect()
+    assert genuine.height > 0
+    lag_col = f"temperature_2m_lag_{gap_hours}h"
+    lag_is_entirely_null = genuine[lag_col].null_count() == genuine.height
+    assert lag_is_entirely_null == expect_null

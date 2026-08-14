@@ -9,3 +9,4 @@
 ::: contracts.ml_schemas
 ::: contracts.config_schemas
 ::: contracts.settings
+::: contracts.uri
