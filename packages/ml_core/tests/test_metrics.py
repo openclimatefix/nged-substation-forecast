@@ -112,14 +112,27 @@ def test_compute_metrics_returns_metrics_schema():
 
 
 def test_compute_metrics_mae_correctness():
-    """MAE should equal mean absolute error of (fcst - actual)."""
+    """MAE, RMSE and MBE are mutually distinguishable, so this test cannot pass by accident.
+
+    Errors +3, −1 give mae = 2.0, rmse = sqrt(5) ≈ 2.236, mbe = 1.0 — three different values,
+    so a metric mixed up with one of the others (RMSE swapped for MAE, say) fails here even
+    though errors of equal magnitude (as in a symmetric +2/−2 fixture) would not reveal it.
+    """
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
-    # errors: +2, -2 → MAE = 2.0
-    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])
+    # errors: +3, -1
+    forecasts = _make_cv_forecasts(1, times, [13.0, 9.0])
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
-    mae_row = result.filter((pl.col("metric_name") == "mae") & (pl.col("horizon_slice") == "all"))
-    assert math.isclose(mae_row["metric_value"][0], 2.0, rel_tol=1e-5)
+
+    def _metric(metric_name: str) -> float:
+        row = result.filter(
+            (pl.col("metric_name") == metric_name) & (pl.col("horizon_slice") == "all")
+        )
+        return float(row["metric_value"][0])
+
+    assert math.isclose(_metric("mae"), 2.0, rel_tol=1e-5)
+    assert math.isclose(_metric("rmse"), math.sqrt(5.0), rel_tol=1e-5)
+    assert math.isclose(_metric("mbe"), 1.0, rel_tol=1e-5)
 
 
 def test_compute_metrics_mbe_sign():
