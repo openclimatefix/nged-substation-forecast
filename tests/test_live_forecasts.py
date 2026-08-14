@@ -10,11 +10,12 @@ are forced to pick different runs.
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import patito as pt
 import polars as pl
 import pytest
-from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
+from _nwp_test_data import nwp_records, write_test_nwp
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
@@ -26,8 +27,8 @@ from dagster import (
     RunConfig,
     materialize,
 )
-from deltalake import write_deltalake
 from ml_core.base_forecaster import write_trained_metadata
+from ml_core.features import TabularFeatureEngineer
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 from nged_substation_forecast.defs import production_assets
@@ -67,41 +68,12 @@ realistic *reach*, which ``live_forecasts_are_healthy`` checks: a slot whose row
 hours ahead is an undeliverable forecast however well-formed each row is."""
 
 
-def _nwp_records(cell: int, init_time: datetime, members: tuple[int, ...]) -> list[dict]:
-    records = []
-    for member in members:
-        for valid_time in _VALID_TIMES:
-            record = {
-                "nwp_model_id": "ECMWF_ENS_0_25_degree",
-                "init_time": init_time,
-                "valid_time": valid_time,
-                "ensemble_member": member,
-                "h3_index": cell,
-                "categorical_precipitation_type_surface": None,
-            }
-            record.update(NWP_CONTINUOUS_COL_VALUES)
-            records.append(record)
-    return records
-
-
 def _write_nwp(path: str) -> None:
     """Two runs for the trained series' cell: the day-earlier run and the same-day run."""
-    records = _nwp_records(_TRAINED_CELL, _DAY_EARLIER_RUN, _MEMBERS) + _nwp_records(
-        _TRAINED_CELL, _SAME_DAY_RUN, _MEMBERS
-    )
-    df = pl.DataFrame(records).cast(
-        {
-            "init_time": pl.Datetime("us", "UTC"),
-            "valid_time": pl.Datetime("us", "UTC"),
-            "ensemble_member": pl.UInt8,
-            "h3_index": pl.UInt64,
-            "categorical_precipitation_type_surface": pl.UInt8,
-            **dict.fromkeys(NWP_CONTINUOUS_COL_VALUES, pl.Float32),
-        }
-    )
-    write_deltalake(
-        table_or_uri=path, data=df.to_arrow(), partition_by=["nwp_model_id", "init_time"]
-    )
+    records = nwp_records(
+        _TRAINED_CELL, _DAY_EARLIER_RUN, _MEMBERS, valid_times=_VALID_TIMES
+    ) + nwp_records(_TRAINED_CELL, _SAME_DAY_RUN, _MEMBERS, valid_times=_VALID_TIMES)
+    write_test_nwp(path, records)
 
 
 def _write_power(path: str) -> None:
@@ -429,3 +401,87 @@ def test_the_roster_cannot_thin_or_fail_a_live_slot(
     roster.write_bytes(b"not a parquet file")
     assert _materialize(dagster_instance, "live").success
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
+
+
+def _write_power_with_long_history(path: str) -> None:
+    """Half-hourly power for ts1 reaching back past the champion config's longest lag (336h).
+
+    ``LIVE_POWER_HISTORY`` (15 days) must cover this so ``power_lag_336h`` is non-null for every
+    genuine forecast row; a window too short leaves the lag null and the champion silently
+    degraded. 340h clears the 336h lag with a margin.
+    """
+    times = pl.datetime_range(
+        _POWER_FCST_INIT_TIME - timedelta(hours=340),
+        _POWER_FCST_INIT_TIME,
+        interval="30m",
+        time_zone="UTC",
+        eager=True,
+    )
+    rows = [{"time_series_id": 1, "time": t, "power": 100.0 + i} for i, t in enumerate(times)]
+    pl.DataFrame(rows).sort("time").cast(
+        {"time_series_id": pl.Int32, "time": pl.Datetime("us", "UTC"), "power": pl.Float32}
+    ).write_delta(path, mode="overwrite", delta_write_options={"partition_by": "time_series_id"})
+
+
+def _save_model_trained_on_power_lag(path: Path) -> None:
+    """A tiny real ``XGBoostForecaster`` selecting ``power_lag_336h``, trained on ts1 only."""
+    times = [datetime(2025, 1, 1, hour, tzinfo=UTC) for hour in (0, 1, 2)]
+    train_df = pl.DataFrame(
+        {
+            "time_series_id": [1, 1, 1],
+            "valid_time": times,
+            "time_series_type": ["Primary"] * 3,
+            "power_fcst_init_time": times,
+            "power": [10.0, 12.0, 11.0],
+            "power_lag_336h": [9.0, 11.0, 10.5],
+        }
+    )
+    train_data = pt.LazyFrame.from_existing(train_df.lazy()).set_model(AllFeatures)
+    config = XGBoostConfig(
+        selected_features={"power_lag_336h"}, experiment_name="live_test", n_estimators=5
+    )
+    forecaster = XGBoostForecaster(config)
+    forecaster.train(train_data, time_series_ids=[1])
+    forecaster.save(path)
+    write_trained_metadata(
+        model_dir=path, time_series_metadata=_metadata_for((1,), (_TRAINED_CELL,))
+    )
+
+
+def test_live_power_history_covers_the_longest_selected_power_lag(
+    env: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    tmp_path: Path,
+) -> None:
+    """``LIVE_POWER_HISTORY`` must reach back far enough for the longest power lag a real model
+    selects.
+
+    Every other test in this file trains its fixture model on ``{"temperature_2m"}``, so a
+    ``LIVE_POWER_HISTORY`` too short to cover a real lag feature is invisible to them —
+    ``conf/model/xgboost.yaml`` selects ``power_lag_336h``, and shrinking the window from 15 days
+    to 1 hour leaves every other test in this file green. This test trains on ``power_lag_336h``
+    directly and pins that the frame ``live_forecasts`` hands to ``predict`` carries no nulls in
+    that column for a genuine forecast row.
+    """
+    captured: list[pt.LazyFrame] = []
+    real_engineer = TabularFeatureEngineer.engineer
+
+    def _spy_engineer(self: TabularFeatureEngineer, **kwargs: Any) -> pt.LazyFrame:
+        result = real_engineer(self, **kwargs)
+        captured.append(result)
+        return result
+
+    monkeypatch.setattr(TabularFeatureEngineer, "engineer", _spy_engineer)
+
+    _write_power_with_long_history(str(tmp_path / "NGED" / "power_time_series.delta"))
+    _save_model_trained_on_power_lag(tmp_path / "production_model")
+
+    assert _materialize(dagster_instance, "live").success
+
+    (features_lf,) = captured
+    genuine = features_lf.filter(
+        pl.col("valid_time") > _POWER_FCST_INIT_TIME, pl.col("ensemble_member").is_not_null()
+    ).collect()
+    assert genuine.height > 0
+    assert genuine["power_lag_336h"].null_count() == 0

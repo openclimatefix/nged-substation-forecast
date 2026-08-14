@@ -171,8 +171,8 @@ def test_load_engineering_inputs_filters_ensemble_members(env: None) -> None:
 def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     env: None,
 ) -> None:
-    """NWP is pruned to the requested series' H3 cells, over an ``init_time`` range that reaches
-    back ``MAX_NWP_LEAD`` before the window."""
+    """NWP is pruned to the requested series' H3 cells and ``valid_time`` window, over an
+    ``init_time`` range that reaches back ``MAX_NWP_LEAD`` before the window."""
     settings = Settings()
     train_start = _TRAIN_START
     train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=UTC)
@@ -211,6 +211,34 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     # The run initialised before the window still reaches it: init_time_start defaults to
     # window_start - MAX_NWP_LEAD, not to window_start.
     assert _EARLY_INIT_TIME in nwp_ts1.collect()["init_time"].unique().to_list()
+
+    # valid_time bounds narrow independently of the init_time partition prune. Both queries below
+    # pass explicit init_time_start/init_time_end wide enough to keep every partition in scope, so
+    # only the valid_time filter can be responsible for what each one excludes.
+    _, nwp_early_window_only = load_engineering_inputs(
+        settings,
+        time_series_ids=[1, 2],
+        metadata=_load_roster(settings, [1, 2]),
+        window_start=_TRAIN_START,
+        window_end=_TRAIN_START + timedelta(hours=13),
+        init_time_start=_EARLY_INIT_TIME,
+        init_time_end=train_end,
+    )
+    # ts2's in-window (June) cell sits well inside [init_time_start, init_time_end], so only the
+    # valid_time <= window_end filter can be keeping its rows out of this narrow April window.
+    assert nwp_early_window_only.collect()["h3_index"].unique().to_list() == [_TS1_CELL]
+
+    _, nwp_after_early_cluster = load_engineering_inputs(
+        settings,
+        time_series_ids=[1],
+        metadata=_load_roster(settings, [1]),
+        window_start=_TRAIN_START + timedelta(hours=13),
+        window_end=train_end,
+        init_time_start=_EARLY_INIT_TIME,
+    )
+    # _EARLY_INIT_TIME's partition is still in scope, but its valid times (04-01 10:00-12:00) fall
+    # before this window's start, so only the valid_time >= window_start filter can drop them.
+    assert _EARLY_INIT_TIME not in nwp_after_early_cluster.collect()["init_time"].unique().to_list()
 
 
 def _fold_run(client: MlflowClient) -> Run:

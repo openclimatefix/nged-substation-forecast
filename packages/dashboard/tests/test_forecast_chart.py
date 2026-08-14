@@ -63,6 +63,7 @@ def _actuals(history: timedelta = PLOT_HISTORY) -> pl.LazyFrame:
 
 def _build(
     *,
+    members: tuple[int, ...] = (0, 1, 2),
     shade_weekends: bool = True,
     show_forecast: bool = True,
     show_actuals: bool = True,
@@ -70,7 +71,7 @@ def _build(
     history: timedelta = PLOT_HISTORY,
 ) -> LayerChart:
     return build_view_forecast_chart(
-        _forecasts((0, 1, 2)),
+        _forecasts(members),
         _actuals(history),
         power_fcst_init_time=INIT_TIME,
         units="MW",
@@ -230,6 +231,20 @@ def test_show_flags_toggle_the_forecast_and_actuals_layers() -> None:
     # weekend bands, lag line, init rule — the y-axis title comes from the lag layer alone.
     assert len(only_lags["layer"]) == 3
     assert only_lags["layer"][1]["encoding"]["y"]["title"] == "Power (MW)"
+
+
+def test_a_realistic_ensemble_size_does_not_hit_altairs_row_limit() -> None:
+    """A real ECMWF ENS ensemble (51 members) over the full horizon is ~34k rows for the ensemble
+    layer alone — well past Altair's 5000-row default guard.
+
+    Every other test in this file uses 3 members, so a regression that dropped
+    ``alt.data_transformers.disable_max_rows()`` in ``build_view_forecast_chart`` would go
+    unnoticed by them: Altair only counts rows at serialisation, so this has to call ``.to_dict()``
+    (as every other test here does) rather than just constructing the chart object.
+    """
+    spec = _build(members=tuple(range(51))).to_dict()
+    ensemble_rows = spec["datasets"][spec["layer"][1]["data"]["name"]]
+    assert len(ensemble_rows) > 5_000
 
 
 def _nwp(members: tuple[int, ...] = (0, 1, 2)) -> pl.LazyFrame:

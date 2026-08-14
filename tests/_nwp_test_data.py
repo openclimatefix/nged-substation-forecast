@@ -10,6 +10,7 @@ thin ``_write_nwp(path)`` wrapper around ``nwp_records`` and ``write_test_nwp``.
 name via the ``pythonpath = ["tests"]`` pytest setting.
 """
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Final
 
@@ -59,18 +60,23 @@ def nwp_records(
     day: datetime,
     members: tuple[int, ...],
     init_time: datetime | None = None,
+    valid_times: Sequence[datetime] | None = None,
 ) -> list[dict]:
     """Synthetic, contract-valid ``Nwp`` rows for one (cell, day, members) combination.
 
-    One row per (member, valid_time in ``half_hours(day)``), all sharing ``init_time``.
-    ``init_time`` defaults to ``day`` at 00Z; pass it explicitly for a run that was initialised
-    on an earlier day and forecasts into ``day`` (e.g. to exercise an NWP-lookback window).
+    One row per (member, valid_time), all sharing ``init_time``. ``valid_times`` defaults to
+    ``half_hours(day)``; pass it explicitly for a fixture whose valid times need to span multiple
+    days, e.g. to give a forecast a realistic multi-day horizon rather than the couple of hours
+    ``half_hours`` produces. ``init_time`` defaults to ``day`` at 00Z; pass it explicitly for a run
+    that was initialised on an earlier day and forecasts into ``day`` (e.g. to exercise an
+    NWP-lookback window).
     """
     resolved_init_time = init_time if init_time is not None else day.replace(hour=0)
+    resolved_valid_times = valid_times if valid_times is not None else half_hours(day)
     ptype = None if resolved_init_time <= _PTYPE_INTRODUCED else 0
     records = []
     for member in members:
-        for valid_time in half_hours(day):
+        for valid_time in resolved_valid_times:
             record = {
                 "nwp_model_id": "ECMWF_ENS_0_25_degree",
                 "init_time": resolved_init_time,
