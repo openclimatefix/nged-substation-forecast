@@ -103,7 +103,7 @@ def init_sentry(settings: Settings) -> None:
     runs no schedule and no forecast is produced at all — the worst possible outcome for a typo in
     one environment variable, and one Sentry itself cannot alert on. ``sentry_sdk.init`` raises
     ``BadDsn`` early in ``Client.__init__``, during DSN parsing, before any global state is
-    touched, so a caught failure leaves the SDK with a ``NonRecordingClient``
+    touched, so catching that failure leaves the SDK with a ``NonRecordingClient``
     (``is_active() == False``) — identical to never having called ``init`` at all. Every other
     sender in this module already treats an inactive/uninitialised client as a silent no-op, so
     none of them needs extra guarding as a consequence of this one being guarded.
