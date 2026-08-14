@@ -4,18 +4,21 @@ description: >-
   Work out the next wave of GitHub issues under an epic in
   openclimatefix/nged-substation-forecast that can safely be planned and implemented in parallel,
   then dispatch them as background-task chips the user launches as separate Claude Code sessions.
-  Reads the epic's open sub-issues, verifies each one's file surface against the code, groups
-  between one and five that share no file, and records the wave on the epic so the next run knows
-  its number. Load whenever the user asks what to work on next under an epic, says "plan the next
-  wave", "/plan-wave 138", or asks which issues can run in parallel. Plans exactly one wave and
-  stops — it does not schedule the whole epic, and it writes no code and no per-issue plan.
+  Reads the epic's open sub-issues, verifies each one's file surface against the code, spots issues
+  that are duplicates or near-duplicates and should be folded into one session instead of run
+  apart, groups the rest between one and five wave slots that share no file, and records the wave
+  on the epic so the next run knows its number. Load whenever the user asks what to work on next
+  under an epic, says "plan the next wave", "/plan-wave 138", or asks which issues can run in
+  parallel. Plans exactly one wave and stops — it does not schedule the whole epic, and it writes
+  no code and no per-issue plan.
 ---
 
 # Plan the next wave of parallel work
 
-The output is a **wave**: between one and five open issues under the epic that can be worked at
-the same time by separate Claude Code sessions without colliding, plus one chip per issue to
-launch, plus a comment on the epic recording what was dispatched.
+The output is a **wave**: between one and five slots, each a single open issue or a group of
+issues folded into one session, that can be worked at the same time by separate Claude Code
+sessions without colliding, plus one chip per slot to launch, plus a comment on the epic recording
+what was dispatched.
 
 Plan **one wave, then stop.** Do not sketch the waves after it. The epic changes while a wave is
 in flight — under v0.2, planning issues #480 and #496 filed seven new sub-issues between them, and
@@ -30,7 +33,7 @@ Take the epic number from the invocation (`/plan-wave 138`). If the epic is name
 The wave number is what tells this wave's sessions apart from the last one's in the desktop app's
 session list, so it has to be right.
 
-The ledger is a comment on the epic issue, written by step 7 of this skill at the end of every
+The ledger is a comment on the epic issue, written by step 8 of this skill at the end of every
 run. Read the epic's comments and take the highest wave number you find, plus one:
 
 ```bash
@@ -39,7 +42,7 @@ gh issue view <EPIC> --comments
 
 If there are no ledger comments and every sub-issue is open, this is wave 1. If there are no
 ledger comments but sub-issues are already closed, waves have run before this skill existed —
-**ask the human which number to start from**, then seed the ledger in step 7. That is the one
+**ask the human which number to start from**, then seed the ledger in step 8. That is the one
 question worth blocking on, and it is asked once per epic.
 
 ## 2. Check the previous wave has landed
@@ -75,9 +78,31 @@ Most dependencies in this repo are *not* recorded that way. They are prose insid
 on #496 landing", "this should be settled first", "not part of #228" — and those bind just as
 tightly. Collect them as you read.
 
-## 4. Map the file surface — by reading the code, not the issue
+## 4. Decide which issues belong in one session
 
-For each candidate, name the files and the functions it will edit. **Verify each one against the
+Not every candidate is its own session. While reading in step 3, watch for issues that should be
+implemented **together**, by a single agent, rather than dispatched as separate parallel chips:
+
+- **Duplicates.** Two issues describing the same change, filed separately — often because a design
+  discussion forked, or because whoever filed the second one did not find the first. Dispatching
+  both wastes a wave slot and risks two competing PRs for the same diff.
+- **Issues too entangled to plan apart.** One issue's design decision determines the other's — a
+  schema change and every caller it breaks, a helper being introduced and its first real usage —
+  so that planning them separately means re-deriving the same context twice, or risks one session's
+  plan silently contradicting the other's while both are in flight.
+
+Fold such issues into a single wave slot: one chip, one session, covering every issue number in the
+group. Say in the wave table why they are grouped rather than run apart. Do not group two issues
+merely because they touch the same file — that is the collision case step 6 already handles by
+serialising or fencing territory. Grouping is for when the issues are not actually separate pieces
+of work, whatever the tracker says.
+
+A group counts toward the five-slot ceiling as one slot, not one per issue.
+
+## 5. Map the file surface — by reading the code, not the issue
+
+For each wave slot (a single issue, or a group from step 4), name the files and the functions it
+will edit — for a group, map the combined surface once. **Verify each one against the
 code**, because an issue's account of where something lives is a claim, and claims go stale: #505
 discussed the corruption signal entirely in terms of `dynamical_data`'s
 `convert_to_polars.py`, but `assess_nwp_quality` and `NwpQualityReport` are in
@@ -102,9 +127,10 @@ Watch for surfaces that are easy to miss:
 
 - **Shared test files and fixtures**, which collide as readily as the module under test.
 
-## 5. Build the wave
+## 6. Build the wave
 
-Pick the largest set, up to five, in which **no two issues edit the same file**, subject to:
+Pick the largest set of slots, up to five, in which **no two slots edit the same file**, subject
+to:
 
 - Every dependency from step 3 is respected — both the recorded `blocked by` links and the prose
   ones.
@@ -117,35 +143,40 @@ Pick the largest set, up to five, in which **no two issues edit the same file**,
   session should not feel obliged to plan around it.
 
 Two issues touching the same file in provably separate regions — one editing `@asset(...)`
-decorators while another rewrites an asset body — may share a wave, but only if **both** chip
-prompts name the other's territory and say to stop and ask the human rather than edit it. Prefer
-serialising over relying on that.
+decorators while another rewrites an asset body — may share a wave as two separate slots, but only
+if **both** chip prompts name the other's territory and say to stop and ask the human rather than
+edit it. Prefer serialising over relying on that.
 
 Prefer fewer, larger-value sessions to five thin ones. Five is a ceiling, not a target: the wave
-costs five plan reviews.
+costs five plan reviews, and a group from step 4 already buys back one of those five without losing
+coverage.
 
-## 6. Present the wave, then drop the chips
+## 7. Present the wave, then drop the chips
 
-Present the wave as a table — issue, one-line change, file surface, and what it waits on — plus
-the reason anything obvious was held back. Then drop one chip per issue with `spawn_task` in the
+Present the wave as a table — issue or group, one-line change, file surface, and what it waits on —
+plus the reason anything obvious was held back. Then drop one chip per slot with `spawn_task` in the
 same reply. A chip is inert until it is clicked, so there is no need to ask first.
 
-**Chip title**: `W<n>: <imperative phrase naming what the issue changes> (#<N>)` — for example
-`W4: Tag assets R&D or production (#423)`. Under 60 characters. This deliberately departs from
-`spawn_task`'s "start with a verb" convention, and from the `Planning:` prefix in `plan-issue`
-step 1a: the chip title becomes the spawned session's title, the app's auto-titling already adds
-"planning" to it, and the sidebar is too narrow to spend characters saying so twice.
+**Chip title**: `W<n>: <imperative phrase naming what the slot changes> (#<N>)` — for example
+`W4: Tag assets R&D or production (#423)`, or `W4: Merge the duplicate NWP-outage checks (#423,
+#431)` for a group. Under 60 characters. This deliberately departs from `spawn_task`'s "start with
+a verb" convention, and from the `Planning:` prefix in `plan-issue` step 1a: the chip title becomes
+the spawned session's title, the app's auto-titling already adds "planning" to it, and the sidebar
+is too narrow to spend characters saying so twice.
 
 Each chip prompt has to stand alone — the session cannot see this conversation — and carries:
 
-1. The issue number, the wave number, and `/plan-wave`'s standing instruction: run
-   `/plan-issue <N>` first, and let it size the issue — if it writes a plan, write no code until a
-   human approves that plan; if it sizes the issue simple, go straight on to `implement-issue`.
+1. The issue number (or, for a group, every issue number in it and why they were folded together),
+   the wave number, and `/plan-wave`'s standing instruction: run `/plan-issue <N>` first — for a
+   group, starting from whichever issue is most complete and saying how the others in the group are
+   being resolved (folded into the same change, or closed as a duplicate) — and let it size the
+   work; if it writes a plan, write no code until a human approves that plan; if it sizes the work
+   simple, go straight on to `implement-issue`.
 
 2. An instruction to keep the `W<n>:` prefix when `plan-issue` step 1a asks it to state a session
    title, so the session does not retitle itself out of the wave.
 
-3. **The file surface from step 4**, including any correction to what the issue body claims. This
+3. **The file surface from step 5**, including any correction to what the issue body claims. This
    is the most valuable thing in the prompt: it saves the session the search, and it stops the
    session inheriting a wrong location from the issue.
 
@@ -163,7 +194,7 @@ Each chip prompt has to stand alone — the session cannot see this conversation
 Set `cwd` to the repository root, and write the `tldr` in plain English with no file paths — it is
 what the user reads in the tooltip.
 
-## 7. Record the wave on the epic
+## 8. Record the wave on the epic
 
 Post one comment on the epic. It is the ledger step 1 reads next time, and the record of which
 issues belonged to which wave:
@@ -172,10 +203,10 @@ issues belonged to which wave:
 gh issue comment <EPIC> --body-file <path>
 ```
 
-The comment states the wave number, the date, the issues dispatched with a phrase each, what each
-one waits on, and which open sub-issues were held back and why. Open it with the Claude Code
-attribution line every GitHub body written by Claude carries, and do not hard-wrap it — see the
-`github-issue-pr-workflow` skill for both rules.
+The comment states the wave number, the date, the issues dispatched with a phrase each — noting
+which were grouped into one slot and why — what each slot waits on, and which open sub-issues were
+held back and why. Open it with the Claude Code attribution line every GitHub body written by
+Claude carries, and do not hard-wrap it — see the `github-issue-pr-workflow` skill for both rules.
 
 Then stop. Do not plan the wave after this one, and do not write per-issue plans — each session
 does its own under `plan-issue`, in its own worktree, with whatever adversarial reviews that

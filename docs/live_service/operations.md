@@ -286,8 +286,10 @@ raising with Dynamical.org. Only a variable empty in *every* slice is rejected a
 the time you read it.** Everything short of a wholly-empty variable lands, so
 `n_whole_null_h3_slices` is not merely informational — it is the sole signal distinguishing a run
 that lost two slices from one that lost nearly all of them, and both land looking equally green.
-Nothing downstream consumes it: no training filter, no metric, and no Sentry alert, because
-Sentry fires on a failed *run* and a WARN check is not one. Correcting a badly-degraded run means
+Nothing downstream consumes it: no training filter, no metric, and no Sentry alert. That last one
+is an omission rather than a limit — a warning check can raise a Sentry event without failing its
+run, which is exactly what `power_data_is_fresh` does through `report_power_freshness`; this check
+simply does not do it. Correcting a badly-degraded run means
 re-materialising its partition by hand, once the upstream data is fixed. So if this count is ever
 large rather than a handful, treat it as an incident to act on deliberately — the pipeline will not
 act on it for you. Making a large count escalate is tracked in
