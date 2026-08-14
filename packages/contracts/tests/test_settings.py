@@ -3,7 +3,7 @@ import sys
 from typing import cast
 
 import pytest
-from contracts.settings import DataQualitySettings, Settings, get_settings
+from contracts.settings import Settings, get_settings
 from pydantic import ValidationError
 
 
@@ -20,16 +20,8 @@ def _isolate_settings_from_ambient_config(monkeypatch: pytest.MonkeyPatch) -> No
     # cast: SettingsConfigDict is a TypedDict, whose per-key value types don't unify with
     # monkeypatch.setitem's Mapping[K, V] signature.
     monkeypatch.setitem(cast("dict[str, object]", Settings.model_config), "env_file", None)
-    for settings_cls in (Settings, DataQualitySettings):
-        for field_name in settings_cls.model_fields:
-            monkeypatch.delenv(field_name.upper(), raising=False)
-
-
-def test_data_quality_settings_defaults():
-    settings = DataQualitySettings()
-    assert settings.stuck_std_threshold == 0.01
-    assert settings.max_mw_threshold == 150.0
-    assert settings.min_mw_threshold == -50.0
+    for field_name in Settings.model_fields:
+        monkeypatch.delenv(field_name.upper(), raising=False)
 
 
 def test_settings_validation_invalid_url():

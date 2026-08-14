@@ -1238,7 +1238,6 @@ All of it sits in a thin layer, and most of it sits in `contracts`.
 | `substation_type` is the GB DNO voltage taxonomy (`BSP`, `GSP`, `Primary`, …) | `contracts/power_schemas.py:148` | Indian secondary substations do not map onto it. |
 | `units` is `Enum(["MW", "MVA"])` | `contracts/power_schemas.py:131` | Probably fine, but should be checked against the Indian feed. |
 | `LIST_OF_TIME_SERIES_TYPES` — 22 NGED categories, re-exported as the `AllFeatures` enum | `contracts/power_schemas.py` | Propagates into the ML schema. |
-| Power bounded to ±1000 MW; `max_mw_threshold` / `min_mw_threshold` sized to GB primaries | `contracts/power_schemas.py`, `contracts/settings.py` | Secondary substations are far smaller; thresholds are meaningless as set. |
 | The GB outline | `geo/great_britain/load.py` | Add a sibling region loader; swap one import in `defs/assets.py`. |
 | `"Europe/London"` as a bare string literal in the feature engineer | `ml_core/features/tabular_feature_engineer.py`, in `_apply_local_time_features` | Drives every local-time feature in the champion feature set. |
 | `DISPLAY_TIME_ZONE = "Europe/London"`, asserted in the dashboard's axis titles | `dashboard/forecast_chart.py:40` | Display only, but it is a second hard-coded timezone. |
@@ -1267,7 +1266,6 @@ The list is narrower than it first appears, because of the duration-based lag de
 |---|---|
 | `validate()` **raises** unless every timestamp has `minute ∈ {0, 30}` | `contracts/power_schemas.py:48` |
 | Field descriptions declaring a "30-minute observation period" | `contracts/power_schemas.py:18,25` |
-| `stuck_window_periods = 48` (i.e. 24 hours at 30 minutes) | `contracts/settings.py` |
 | NWP upsampled to `interval="30m"` | `ml_core/features/_nwp.py:121` |
 | The live forecast spine, both its start offset and its step | `ml_core/_production_helpers.py:112,115` |
 | A row-count guard assuming "51 members × 14 days × 48 half-hours" | `dashboard/forecast_chart.py` |

@@ -480,10 +480,9 @@ per-type sets (solar features for PV, turbine features for wind, holidays for de
 
 Full data cleaning is roadmap v0.4, but training on stuck meters and false zeros actively
 teaches the model wrong targets *today* (quality issues are ~10%+ of some series). Cheap
-interim: drop training rows whose target sits inside a detected stuck window (rolling std ≈ 0;
-`DataQualitySettings.stuck_std_threshold` already exists) or an isolated exact-zero run.
-Cleaning only the *training* target is much lower-risk than cleaning delivered data, and it
-protects every subsequent experiment from learning artefacts.
+interim: drop training rows whose target sits inside a detected stuck window (rolling std ≈ 0)
+or an isolated exact-zero run. Cleaning only the *training* target is much lower-risk than
+cleaning delivered data, and it protects every subsequent experiment from learning artefacts.
 
 ### Effective (smoothed) temperature and degree-day features
 
