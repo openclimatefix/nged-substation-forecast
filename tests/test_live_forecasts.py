@@ -16,7 +16,9 @@ import polars as pl
 import pytest
 from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
 from contracts.ml_schemas import AllFeatures
-from contracts.power_schemas import TimeSeriesMetadata
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.settings import Settings
+from contracts.weather_schemas import Nwp
 from dagster import (
     AssetCheckSeverity,
     DagsterInstance,
@@ -28,6 +30,7 @@ from deltalake import write_deltalake
 from ml_core.base_forecaster import write_trained_metadata
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
+from nged_substation_forecast.defs import production_assets
 from nged_substation_forecast.defs.checks import live_forecasts_are_healthy
 from nged_substation_forecast.defs.production_assets import LiveForecastsConfig, live_forecasts
 
@@ -210,10 +213,47 @@ def test_live_and_replay_select_different_nwp_runs(
 
 
 def test_only_trained_time_series_are_forecast(
-    env: dict[str, str], dagster_instance: DagsterInstance
+    env: dict[str, str], monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
+    """The live population is the model's trained population, narrowed before feature engineering.
+
+    ``_write_power`` writes history for both series 1 and 2, but only series 1 has a trained
+    booster. Spies on ``load_engineering_inputs`` to pin that ``live_forecasts`` passes it
+    ``forecaster.trained_time_series_ids`` rather than every series with power data — checking the
+    final output alone would pass even without that filter, because ``XGBoostForecaster.predict``
+    also skips any series its own booster dict has nothing for.
+    """
+    captured: list[list[int]] = []
+    real_load_engineering_inputs = production_assets.load_engineering_inputs
+
+    def _spy_load_engineering_inputs(
+        settings: Settings,
+        *,
+        time_series_ids: list[int],
+        metadata: pt.DataFrame[TimeSeriesMetadata],
+        window_start: datetime,
+        window_end: datetime,
+        ensemble_members: list[int] | None = None,
+        init_time_start: datetime | None = None,
+        init_time_end: datetime | None = None,
+    ) -> tuple[pt.LazyFrame[PowerTimeSeries], pt.LazyFrame[Nwp]]:
+        captured.append(time_series_ids)
+        return real_load_engineering_inputs(
+            settings,
+            time_series_ids=time_series_ids,
+            metadata=metadata,
+            window_start=window_start,
+            window_end=window_end,
+            ensemble_members=ensemble_members,
+            init_time_start=init_time_start,
+            init_time_end=init_time_end,
+        )
+
+    monkeypatch.setattr(production_assets, "load_engineering_inputs", _spy_load_engineering_inputs)
+
     assert _materialize(dagster_instance, "live").success
 
+    assert captured == [[1]]
     forecasts = _read_forecasts(env)
     assert set(forecasts["time_series_id"].unique().to_list()) == {1}
 

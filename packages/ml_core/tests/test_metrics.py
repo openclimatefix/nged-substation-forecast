@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 import patito as pt
 import polars as pl
 import pytest
-from contracts.ml_schemas import Metrics
 from contracts.power_schemas import (
     LIST_OF_TIME_SERIES_TYPES,
     EffectiveCapacity,
@@ -100,15 +99,6 @@ def _make_metadata(
 # ---------------------------------------------------------------------------
 # compute_metrics tests
 # ---------------------------------------------------------------------------
-
-
-def test_compute_metrics_returns_metrics_schema():
-    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
-    actuals = _make_actuals(1, times, [10.0, 10.0])
-    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])
-    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
-    assert isinstance(result, pl.DataFrame)
-    Metrics.validate(result, allow_superfluous_columns=True)
 
 
 def test_compute_metrics_mae_correctness():

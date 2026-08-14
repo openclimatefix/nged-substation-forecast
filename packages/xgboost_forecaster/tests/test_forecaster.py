@@ -147,12 +147,20 @@ def test_save_creates_one_ubj_per_ts_id(tmp_path: Path) -> None:
 
 
 def test_selected_features_round_trips_through_save_load(tmp_path: Path) -> None:
-    extra_features = {"local_time_of_day_sin", "local_time_of_day_cos"}
+    """A ``selected_features`` narrower than the module default must survive save/load unchanged.
+
+    Every other save/load test in this module trains with the full ``_FEATURES`` set, so a save
+    path that silently fell back to that default instead of writing the configured value would
+    pass them all; picking a proper (non-default) subset here is what forces the real value
+    through the round trip.
+    """
+    restricted_features = {"local_time_of_day_sin"}
+    assert restricted_features < _FEATURES  # a genuine subset, not the module default
     df = _make_df()
-    forecaster = _trained(df, selected_features=extra_features)
+    forecaster = _trained(df, selected_features=restricted_features)
     forecaster.save(tmp_path / "m")
     loaded = XGBoostForecaster.load(tmp_path / "m")
-    assert loaded.model_params.selected_features == extra_features
+    assert loaded.model_params.selected_features == restricted_features
 
 
 def test_predict_stamps_experiment_name() -> None:
