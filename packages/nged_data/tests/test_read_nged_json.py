@@ -91,13 +91,16 @@ def test_nged_json_to_metadata_df_and_time_series_df(
         ("Area_GeometryType", "area_geometry_type"),
         ("TimeSeriesId", "time_series_id"),
         ("SubstationNumber", "substation_number"),
+        ("foo__bar", "foo__bar"),
     ],
 )
-def test_camel_to_snake_collapses_double_underscore(camel_str: str, expected_snake_str: str):
-    """`Area_CenterLat` etc. already have an underscore before the CamelCase substitution runs.
+def test_camel_to_snake_does_not_duplicate_an_existing_separator(
+    camel_str: str, expected_snake_str: str
+):
+    """An underscore already in the input is not duplicated by the CamelCase substitution.
 
-    That used to leave a double underscore (`area__center_lat`) that never matched the contract's
-    single-underscore `area_center_lat` field.
+    `Area_CenterLat` etc. already have an underscore before the CamelCase substitution runs
+    (produced by `unnest("Area", separator="_")`); it must survive unchanged.
     """
     assert _camel_to_snake(camel_str) == expected_snake_str
 
