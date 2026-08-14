@@ -35,10 +35,13 @@ cannot drift apart.
 
 ## Features (`selected_features`)
 
-`selected_features` is a list of strings. The feature engineering pipeline
-(`ml_core.features._parsed_features.ParsedFeatures.from_strings`) parses each string into a
-typed descriptor at registration time and raises `ValueError` immediately on any unrecognised or
-forbidden name.
+`selected_features` is a list of strings. Registration only checks that it is a list of
+strings — a typo'd top-level key (e.g. `selected_featuers`) is rejected there, by pydantic's
+`extra="forbid"` on `BaseForecasterConfig`. The individual strings inside the list are not
+parsed until training runs: the feature engineering pipeline
+(`ml_core.features._parsed_features.ParsedFeatures.from_strings`) parses each one into a typed
+descriptor and raises `ValueError` on any unrecognised or forbidden name, so a typo'd feature
+name (e.g. `tempurature_2m`) surfaces only then, not at registration.
 
 ### Power lags
 

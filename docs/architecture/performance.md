@@ -123,8 +123,7 @@ The rules that follow:
   V2-scale table wouldn't just OOM, its row accounting would be wrong.
 * Tables past the cap today: **NWP** (~5.9B rows). **`power_forecasts`** will pass it at V2 scale
   (~1 trillion rows — see [forecast delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data)).
-  The one code path that must be re-chunked before then is the `metrics` asset, which currently
-  collects a whole `(experiment_name, fold_id)` group of `power_forecasts` at once and discovers
-  groups via a full-table `unique()` — fine at V1 (≤ ~414M rows/fold), but a V2 fold is tens of
-  billions of rows, so scoring will need to chunk within a fold (e.g. by `valid_time` window or
-  `time_series_id` batch) for RAM reasons anyway; the index cap makes it correctness-critical too.
+  The `metrics` asset discovers `(experiment_name, fold_id)` groups via a streaming `unique()`
+  scan, then scores each group in batches of four `time_series_id` values at a time, so peak
+  memory is one batch, never a whole fold or the whole matched population — the same chunking
+  that keeps the row-index cap out of reach.

@@ -252,11 +252,11 @@ in the run config dialog before launching.
    scope dates its evaluation window from the CV config's leaderboard folds and has none for those
    rows. To score live output or a dev fold, run the asset with `evaluation_scope="ad_hoc"`, which
    takes the window from the forecast rows themselves.
-3. Discovers the matching `(experiment_name, fold_id)` groups, then loads and scores **one group at
-   a time** — peak memory is a single fold, not the entire matched population. (A whole fold is
-   the *coarsest* chunk Polars can safely materialise: fine at V1 scale, but a V2-scale fold will
-   need sub-fold chunking — see
-   [The other hard ceiling: Polars' 32-bit row index](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index).)
+3. Discovers the matching `(experiment_name, fold_id)` groups, then scores each group in batches of
+   four `time_series_id` values at a time — peak memory is one batch, never a whole fold or the
+   entire matched population. See
+   [The other hard ceiling: Polars' 32-bit row index](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index)
+   for why this chunking also keeps the row-index cap out of reach at V2 scale.
    For each group:
    a. Calls `compute_metrics()` — joins observed power, collapses each forecast run's ensemble
       members into per-timestamp quantities, and computes the deterministic metrics

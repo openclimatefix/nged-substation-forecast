@@ -116,12 +116,12 @@ filter on `fold_id` to select the population you need. See
 | `power_fcst` | `float32` | OCF's power forecast. **In this early version** the value is in physical units (MW for active power, MVA for apparent power). Sign convention depends on `substation_type` — see [Sign convention](forecast-building-blocks.md#sign-convention). |
 
 > **🚧 Planned change — normalise `power_fcst` to [−1, +1]
-> ([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246), v0.1).** The
+> ([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246), v0.5).** The
 > delivery contract is a normalised forecast in the range **[−1, +1]**, which NGED multiplies by a
 > capacity to obtain MW/MVA (see [forecast building blocks](forecast-building-blocks.md)). The code
 > still forecasts raw MW/MVA, but now that the static P99 `effective_capacity` estimate exists
 > there is no need to wait for dynamic capacity estimation: the switch to [−1, +1] is planned for
-> **v0.1**. This is also noted in a comment on the `PowerForecast.power_fcst` field in
+> **v0.5**. This is also noted in a comment on the `PowerForecast.power_fcst` field in
 > `power_schemas.py`.
 
 ### Representation 2 — percentiles 🚧
