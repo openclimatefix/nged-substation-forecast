@@ -191,9 +191,6 @@ def download_and_parse_files(
                         f"The 'data' field is 'null' in {path=}. This is expected behaviour if"
                         " NGED's meter reported no values for the period covered by the JSON file."
                     )
-                    # TODO: Maybe we need a way to stop our system from downloading files with no
-                    # data in them, every time we run. Maybe filter out JSON files below a certain
-                    # filesize???
                 else:
                     raise
             else:
