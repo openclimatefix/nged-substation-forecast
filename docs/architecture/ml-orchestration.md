@@ -98,8 +98,8 @@ looks immutable — is unsound here, because a CV fold run is **reused** across 
 of its partition (see "Cross-process run resolution" above), so the same run ID can legitimately
 hold a different model after re-training. The key would not be unique for its contents, and
 keeping such a cache honest would need write-side invalidation in `save_to_mlflow`: machinery
-serving no consumer, because production inference makes no MLflow call on the runtime path at all
-for v0.1 — the champion model is baked directly into the container image at build time and loaded
+serving no consumer, because production inference makes no MLflow call on the runtime path at
+all — the champion model is baked directly into the container image at build time and loaded
 via the subclass's own `load`.
 
 If a future consumer does need to keep serving through an MLflow outage, adding a cache scoped to

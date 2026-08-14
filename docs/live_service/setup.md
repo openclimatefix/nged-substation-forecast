@@ -46,7 +46,7 @@ is part of the S3-backed data plane**. Each item belongs to the laptop/CV workfl
 container image, not to shared storage:
 
 - **Promoted production model** — distributed via the **container image**, not shared storage: the
-  v0.1 deployment bakes the champion into the image at build time and loads it with a plain disk
+  live deployment bakes the champion into the image at build time and loads it with a plain disk
   `load()` (see
   [Production Deployment — Design](../architecture/production-deployment.md),
   [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)). This local

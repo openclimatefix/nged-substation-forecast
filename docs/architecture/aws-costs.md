@@ -49,8 +49,8 @@ account to read the delivery bucket. It is made up of:
 | Weekly re-training (planned; ephemeral GPU instance) | ~£1 |
 | Backtests | ~£0.65 per run, as needed |
 
-The weekly re-train row is a *planned* addition rather than an as-built cost: v0.1 bakes a
-frozen champion model into the image, and any re-training still happens on a laptop. Once the
+The weekly re-train row is a *planned* addition rather than an as-built cost: the live deployment
+bakes a frozen champion model into the image, and any re-training still happens on a laptop. Once the
 weekly re-train moves to AWS, the arithmetic stays small: the v1 model trains in ~10 minutes
 on a laptop, so budgeting ~30 minutes of `g4dn.xlarge` (1× T4 GPU, 4 vCPU / 16 GB;
 \$0.615/hr → £0.46/hr on-demand) per weekly run — instance provisioning and data reads
