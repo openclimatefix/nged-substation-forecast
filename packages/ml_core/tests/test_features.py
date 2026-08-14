@@ -865,6 +865,50 @@ def test_engineer_features_weather_lag_freshest_run_reaches_older_run_only_data(
     assert engineered["temperature_2m_lag_24h"][0] == 8.0
 
 
+def test_engineer_features_single_run_freshest_run_excludes_unpublished_nwp_run():
+    """The single-run availability gate must reject a run not yet published by power_fcst_init_time.
+
+    Three runs carry a value at the same lag target_time: T0, legitimately available by
+    power_fcst_init_time; T1, the row's own run (nwp_init_time), with no row at target_time so
+    the same-run branch cannot answer and the freshest-run branch is exercised; and T2, fresher
+    than T1 but with ``init_time + publication_delay`` still after power_fcst_init_time — not yet
+    published. Without the ``available_at``/``publication_delay`` cut on ``select_analysis_proxy``
+    in single-run mode, the freshest-run join picks up T2's decoy value; with it, T2 is excluded
+    and T0 answers instead.
+    """
+    power_fcst_init_time = datetime(2026, 6, 11, 6, 0)
+    nwp_init_time = datetime(2026, 6, 11, 0, 0)  # T1: the row's own run
+    older_run_init_time = datetime(2026, 6, 10, 0, 0)  # T0: legitimately available
+    too_fresh_init_time = datetime(2026, 6, 11, 3, 0)  # T2: fresher than T1, not yet published
+    valid_time = datetime(2026, 6, 11, 12, 0)
+    # lag=24h -> target_time = 2026-06-10 12:00: before power_fcst_init_time (freshest-run
+    # branch), and T1 carries no row there at all, so only T0 or T2 can answer it.
+    target_time = valid_time - timedelta(hours=24)
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1", "ts1", "ts1"],
+            "valid_time": [target_time, valid_time, target_time],
+            "ensemble_member": [0, 0, 0],
+            "init_time": [older_run_init_time, nwp_init_time, too_fresh_init_time],
+            "temperature_2m": [8.0, 99.0, 999.0],  # T0 legit; T1's unrelated row; T2 decoy
+        }
+    )
+    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    engineered = _engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=nwp_df.lazy(),
+        selected_features={"temperature_2m_lag_24h"},
+        power_fcst_init_time=power_fcst_init_time,
+        nwp_init_time=nwp_init_time,
+    ).collect()
+
+    assert engineered["temperature_2m_lag_24h"][0] == 8.0
+
+
 def test_apply_weather_lag_boundary_uses_same_run_at_exact_lead():
     """At target_time == power_fcst_init_time, the boundary belongs to the same-run branch.
 
