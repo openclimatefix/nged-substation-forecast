@@ -43,6 +43,7 @@ def _save_trained_model_to_mlflow(
     experiment_name: str,
     n_estimators: int,
     selected_features: set[str] | None = None,
+    time_series_ids: tuple[int, ...] = (1,),
 ) -> str:
     """Train a tiny real ``XGBoostForecaster`` on synthetic data and save it to a new MLflow run.
 
@@ -51,19 +52,21 @@ def _save_trained_model_to_mlflow(
     same ``save_to_mlflow`` mechanism ``trained_cv_model`` uses.
 
     Every requested feature gets a synthetic column to train against, so a caller can save a model
-    whose feature vocabulary the current code does not recognise.
+    whose feature vocabulary the current code does not recognise. Trains one Booster per id in
+    ``time_series_ids``, so a caller can vary the trained population between two saved runs.
     """
     features = selected_features or {"temperature_2m"}
     times = [datetime(2025, 1, 1, hour, tzinfo=UTC) for hour in (0, 1, 2)]
+    n_ts = len(time_series_ids)
     spine = {
-        "time_series_id": [1, 1, 1],
-        "valid_time": times,
-        "time_series_type": ["Primary"] * 3,
-        "power_fcst_init_time": times,
-        "power": [10.0, 12.0, 11.0],
+        "time_series_id": [ts_id for ts_id in time_series_ids for _ in times],
+        "valid_time": times * n_ts,
+        "time_series_type": ["Primary"] * (len(times) * n_ts),
+        "power_fcst_init_time": times * n_ts,
+        "power": [10.0, 12.0, 11.0] * n_ts,
     }
     # Spine last, so a feature sharing a spine column's name cannot overwrite it with floats.
-    train_df = pl.DataFrame({name: [5.0, 6.0, 7.0] for name in features} | spine)
+    train_df = pl.DataFrame({name: [5.0, 6.0, 7.0] * n_ts for name in features} | spine)
     train_data = pt.LazyFrame.from_existing(train_df.lazy()).set_model(AllFeatures)
     config = XGBoostConfig(
         selected_features=features,
@@ -71,7 +74,7 @@ def _save_trained_model_to_mlflow(
         n_estimators=n_estimators,
     )
     forecaster = XGBoostForecaster(config)
-    forecaster.train(train_data, time_series_ids=[1])
+    forecaster.train(train_data, time_series_ids=list(time_series_ids))
 
     experiment_id = mlflow.create_experiment(experiment_name)
     with mlflow.start_run(experiment_id=experiment_id) as run:
@@ -82,8 +85,8 @@ def _save_trained_model_to_mlflow(
     metadata = pt.DataFrame(
         pl.DataFrame(
             {
-                "time_series_id": pl.Series([1], dtype=pl.Int32),
-                "h3_res_5": pl.Series([10], dtype=pl.UInt64),
+                "time_series_id": pl.Series(list(time_series_ids), dtype=pl.Int32),
+                "h3_res_5": pl.Series([10] * n_ts, dtype=pl.UInt64),
             }
         )
     ).set_model(TimeSeriesMetadata)
@@ -123,8 +126,18 @@ def test_promoted_model_promotes_and_populates_directory(
 def test_re_promotion_replaces_the_model(
     env: dict[str, str], dagster_instance: DagsterInstance
 ) -> None:
-    first_run_id = _save_trained_model_to_mlflow("promo_test_v1", n_estimators=5)
-    second_run_id = _save_trained_model_to_mlflow("promo_test_v2", n_estimators=7)
+    """Promoting a smaller second model must not leave the first model's booster files behind.
+
+    The first run trains series 1 and 2; the second trains only series 1 — so a merge of the
+    destination directory, rather than a replace, would leave series 2's ``.ubj`` file on disk
+    undetected.
+    """
+    first_run_id = _save_trained_model_to_mlflow(
+        "promo_test_v1", n_estimators=5, time_series_ids=(1, 2)
+    )
+    second_run_id = _save_trained_model_to_mlflow(
+        "promo_test_v2", n_estimators=7, time_series_ids=(1,)
+    )
 
     model_dir = Path(env["production_model_path"])
 
@@ -137,6 +150,7 @@ def test_re_promotion_replaces_the_model(
     ).success
     first_meta = json.loads((model_dir / "meta.json").read_text())
     assert first_meta["model_params"]["experiment_name"] == "promo_test_v1"
+    assert (model_dir / "2.ubj").exists()
 
     assert materialize(
         [promoted_model],
@@ -147,6 +161,7 @@ def test_re_promotion_replaces_the_model(
     ).success
     second_meta = json.loads((model_dir / "meta.json").read_text())
     assert second_meta["model_params"]["experiment_name"] == "promo_test_v2"
+    assert not (model_dir / "2.ubj").exists()
 
     promotion = json.loads((model_dir / "promotion.json").read_text())
     assert promotion["mlflow_run_id"] == second_run_id
@@ -155,12 +170,25 @@ def test_re_promotion_replaces_the_model(
 def test_promoted_model_refuses_a_model_with_an_unparseable_feature(
     env: dict[str, str], dagster_instance: DagsterInstance
 ) -> None:
-    """Promoting a model trained before a feature rename fails, leaving nothing behind on disk.
+    """Promoting a model trained before a feature rename fails, leaving the champion untouched.
 
     ``promotable_model_runs`` lists every fold run ever trained, so an operator picking by eye off
-    that table can reach a run this code no longer parses.
+    that table can reach a run this code no longer parses. The champion promoted before that
+    attempt must still be servable afterwards: the refusal has to happen before the destination
+    directory is touched, not merely before it is populated.
     """
-    run_id = _save_trained_model_to_mlflow(
+    good_run_id = _save_trained_model_to_mlflow("stale_vocabulary_champion", n_estimators=5)
+    assert materialize(
+        [promoted_model],
+        run_config=RunConfig(
+            ops={"promoted_model": PromotedModelConfig(mlflow_run_id=good_run_id)}
+        ),
+        instance=dagster_instance,
+    ).success
+    model_dir = Path(env["production_model_path"])
+    champion_meta = json.loads((model_dir / "meta.json").read_text())
+
+    bad_run_id = _save_trained_model_to_mlflow(
         experiment_name="stale_vocabulary",
         n_estimators=5,
         selected_features={"local_utc_offset"},
@@ -169,11 +197,13 @@ def test_promoted_model_refuses_a_model_with_an_unparseable_feature(
     with pytest.raises(ValueError, match="local_utc_offset"):
         materialize(
             [promoted_model],
-            run_config=RunConfig(ops={"promoted_model": PromotedModelConfig(mlflow_run_id=run_id)}),
+            run_config=RunConfig(
+                ops={"promoted_model": PromotedModelConfig(mlflow_run_id=bad_run_id)}
+            ),
             instance=dagster_instance,
         )
 
-    assert not Path(env["production_model_path"]).exists()
+    assert json.loads((model_dir / "meta.json").read_text()) == champion_meta
 
 
 def test_promotable_model_runs_lists_fold_run_candidates(
