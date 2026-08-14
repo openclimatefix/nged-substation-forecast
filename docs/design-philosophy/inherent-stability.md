@@ -174,9 +174,12 @@ appear nowhere else.
    imperative form.)*
 3. **Treat detectably-wrong input as missing, not as data** — see
    [Missing versus wrong](#missing-versus-wrong).
-4. **Signal degradation in-band first.** The uncertainty band is the only number the consumer is
-   certain to read. Side channels — warning tables, checks, Sentry — supplement it; they never
-   substitute for it.
+4. **Signal degradation on all three channels, in-band first.** The uncertainty band is the only
+   number the consumer is certain to read, so it comes first — but the warning table and Sentry are
+   required too, not optional extras, and none of the three substitutes for another. A degradation
+   nobody is told about is a silent failure however gracefully the forecast carried on. *(The
+   [never-stop principle](design-principles.md#1-the-power-forecast-never-stops), in imperative
+   form.)*
 5. **Measure degradation in missed runs and absent inputs, never in raw hours of age.** Healthy NWP
    is between 12 and 30 hours old depending on the slot, so an absolute age threshold is either a
    daily false alarm or a magic number silently coupled to the ingest schedule — and either way it
@@ -334,6 +337,12 @@ looks identical to a system that is not running at all.** Both produce zero fail
 the [Sentry missed-check-in alarm](../live_service/sentry.md), firing from outside the deployment,
 is load-bearing rather than belt-and-braces — it is the one piece of active monitoring this design
 cannot do without.
+
+That alarm fires on *absence*, though, and the developer channel is only half wired for the other
+case: a run that succeeds on degraded inputs. `power_data_is_fresh` raises a Sentry event for stale
+power data, but `live_forecasts_are_healthy` and the per-run NWP quality checks report only to
+Dagster, so a degraded slot still sends a healthy check-in.
+[Issue #501](https://github.com/openclimatefix/nged-substation-forecast/issues/501) tracks that.
 
 For the provider channel, a warning is only actionable if it names *whose* NWP and *which* run,
 which is why `power_forecast_warnings` carries a `warning_source` field

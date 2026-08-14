@@ -65,13 +65,27 @@ principle behind it is a claim we are merely hoping comes true.
 
 ### 1 — The power forecast never stops
 
-If data inputs are disrupted, the forecast gets less certain instead of stopping — and should say
-so in the forecast itself, through wider uncertainty bands (band-widening is designed but not yet
-built — see [Widening bands](inherent-stability.md#widening-bands-the-in-band-signal)). The
+If data inputs are disrupted, the forecast gets less certain instead of stopping. The
 forecast always does the best it can with whatever data it has, rather than blowing up; raising
 is reserved for states that are our own bug. The plan is to deliver that through the **model
 itself** — an ML model that can, at least partially, handle missing inputs — rather than through
-fallback logic wrapped around a model that assumes complete data. (Note that this decision to
+fallback logic wrapped around a model that assumes complete data.
+
+Degrading is only half the principle: **we must be notified that the forecast degraded.** Three
+channels carry that, each answering a different question, and none substitutes for another —
+see [Three audiences, three channels](inherent-stability.md#three-audiences-three-channels).
+
+- **Wider uncertainty bands on the forecast itself**, so whoever reads a row can tell how much to
+  trust it. Designed, not yet built — see
+  [Widening bands](inherent-stability.md#widening-bands-the-in-band-signal).
+- **A row in `power_forecast_warnings`**, naming which feed degraded and since when, so a data
+  provider's problem is attributable to that provider. Not yet built — see
+  [Delivery tables](../roadmap/delivery-tables.md#table-2-power_forecast_warnings).
+- **A Sentry event, for data failures a human can help with** — no NWP downloaded for over a day,
+  say, which says Dynamical.org is having problems and somebody should look. Partly built:
+  `power_data_is_fresh` sends one, the other warning checks do not.
+
+(Note that this decision to
 "never stop" will not be appropriate for energy-forecasting systems where an uncertain forecast
 might be more harmful than *no* forecast. But, in Flexpectation, there are strong arguments that
 our forecast will *always* be better than NGED's incumbent baseline, even when we have no live
@@ -82,7 +96,8 @@ because one meter went quiet, NGED open their dashboard to a gap instead of a fo
 developer spends the morning re-running a pipeline whose only real problem was a missing input.
 
 *Decided:* every asset check in the repo is non-blocking `WARN`; there is deliberately no
-`ERROR`-severity check anywhere.
+`ERROR`-severity check anywhere. Non-blocking never means non-notifying — a check that detects
+degradation still has to raise a Sentry event, it just must not fail the run.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
