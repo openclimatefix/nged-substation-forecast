@@ -90,7 +90,7 @@ _MLFLOW_LOGGED_PARAMETRIC: Final[frozenset[tuple[str, str]]] = frozenset(
 Metrics with ``metric_param="all"`` are always logged; parametric metrics are restricted to
 this headline subset to keep the MLflow leaderboard legible. The key count depends on how
 many distinct ``time_series_type`` values the scored population spans (each adds a per-type
-key family): 132 keys for the V1 trial area's ~6 types, versus ~340 if every parametric
+key family): 144 keys for the V1 trial area's seven types, versus ~380 if every parametric
 metric were logged. The full 13-quantile / 6-band detail is always queryable in the
 ``forecast_metrics`` Delta table.
 """

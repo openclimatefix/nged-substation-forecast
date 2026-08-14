@@ -479,8 +479,8 @@ To keep the leaderboard legible, parametric metrics are
 restricted in MLflow to a **headline subset**: `pinball_loss` at p10/p50/p90 and `picp` /
 `interval_width` at p10_p90 (the allowlist is `_MLFLOW_LOGGED_PARAMETRIC` in
 `ml_core.metrics`). The exact key count scales with how many distinct `time_series_type`
-values the scored population spans (each adds a per-type key family): 132 keys for the V1
-trial area's six types, versus roughly 340 if every quantile and band were logged. Anything
+values the scored population spans (each adds a per-type key family): 144 keys for the V1
+trial area's seven types, versus roughly 380 if every quantile and band were logged. Anything
 not in MLflow is still one Polars filter away in Delta.
 
 ## What is deliberately *not* here
