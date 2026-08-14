@@ -8,6 +8,7 @@ on:
       - 'docs/**'      # Only run if you change the docs
       - 'mkdocs.yml'
       - 'src/**'       # Or if you change the source code (for mkdocstrings)
+      - 'packages/**'  # Most of the API reference is generated from packages/, not src/
   # Lets us re-deploy by hand from the Actions tab. GitHub drops queued events during an Actions
   # outage and never backfills them, so a merge that lands mid-outage silently never publishes.
   workflow_dispatch:
@@ -21,17 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
 
       - name: Install Python and Dependencies
-        run: |
-          uv python install 3.12
-          uv sync --dev
+        run: uv sync --dev
 
       - name: Build and Deploy to GitHub Pages
         run: uv run mkdocs gh-deploy --force

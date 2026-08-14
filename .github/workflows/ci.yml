@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Installs the Python version pinned in .python-version; no setup-python step needed.
+      # Resolves and downloads an interpreter satisfying requires-python; no setup-python step needed.
       - name: Set up uv
         uses: astral-sh/setup-uv@v9.0.0
         with:
