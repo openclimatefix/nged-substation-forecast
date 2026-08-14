@@ -90,10 +90,10 @@ empty log with no stated period is indistinguishable from a log nobody kept.
 
 | Period | Version | Scope | Interventions | Scores T1.1? |
 |---|---|---|---|---|
-| 2026-07-15 18:00 UTC → 2026-08-13 19:00 UTC | v0.1 | 32 time series, 6-hourly `live_forecasts` on AWS | 0 | No — pre-v1.0 |
-| 2026-08-14 00:00 UTC → ongoing | v0.2 | 6-hourly `live_forecasts` on AWS, every slot checked by `live_forecasts_are_healthy` | 0 | No — pre-v1.0 |
+| 2026-07-15 18:00 UTC → 2026-08-13 19:00 UTC | v0.1 | 28 time series, 6-hourly `live_forecasts` on AWS | 0 | No — pre-v1.0 |
+| 2026-08-14 00:00 UTC → ongoing | v0.2 | 31 time series, 6-hourly `live_forecasts` on AWS, every slot checked by `live_forecasts_are_healthy` | 0 | No — pre-v1.0 |
 
-Figures below are stated as of **06:00 UTC on 14 August 2026**. Every count in this section moves
+Figures below are stated as of **08:00 UTC on 14 August 2026**. Every count in this section moves
 within the day, so the as-of instant is part of the measurement rather than a formality.
 
 ### v0.1 on AWS, 2026-07-15 to 2026-08-13
@@ -102,18 +102,17 @@ The first `live_forecasts` run on AWS was the 18:00 UTC slot on 15 July 2026, an
 18:00 UTC slot on 13 August 2026, an hour before the v0.1 stack was retired at roughly 19:00 UTC
 that evening to make way for v0.2. That is a window of 29 days and 1 hour, over which the schedule
 called for 117 consecutive 6-hourly forecast slots and a daily `ecmwf_ens` run, with **zero
-interventions and zero observed failures**.
+interventions and zero observed failures**. Every expected forecast exists.
 
 The VM was deployed once, on 15 July, and was not touched again until it was retired: no code was
 pushed to AWS during the period. So the window is genuinely unattended rather than quietly
 maintained.
 
-*Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` in the
-`power_forecasts` Delta table across the period, cross-checked against the Dagster run history and
-the Sentry missed-check-in monitor, which never alarmed. That count was last run on 7 August, when
-it matched the 91 slots the schedule called for by then; the final 26 slots of the window are
-recorded here on the strength of the Dagster run history and the silent monitor alone, and the
-distinct-`power_fcst_init_time` count still needs re-running over the closed window.
+*Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` and
+`experiment_name = "xgboost_cv_0001"` — v0.1's promoted model — in the `power_forecasts` Delta
+table on S3. All 117 scheduled slots are present, every consecutive pair is exactly six hours
+apart, and all 28 time series appear in every one of the 117. Cross-checked against the Dagster run
+history and the Sentry missed-check-in monitor, which never alarmed.
 
 Three caveats, without which the number would be worth less than it looks:
 
@@ -123,7 +122,7 @@ Three caveats, without which the number would be worth less than it looks:
   genuinely verified is that every scheduled slot produced output, not that nothing degraded
   quietly on the way. A silently-stale input is precisely the failure mode this stack is built to
   make visible, and at v0.1 it would not yet be visible.
-- **A month is short, and this is the easy case.** v0.1 is 32 time series and one ECMWF run
+- **A month is short, and this is the easy case.** v0.1 is 28 time series and one ECMWF run
   per day. The dominant cause T1.1 predicts — an upstream contract change — may simply not have
   happened yet in a window this short. A quiet four weeks is consistent both with "the design
   works" and with "nothing has been thrown at it".
@@ -140,6 +139,9 @@ v0.2 was deployed on the evening of 13 August 2026, replacing the v0.1 stack at 
 Its first `live_forecasts` run was the 00:00 UTC slot on 14 August 2026, which is where this period
 starts. The deployment itself is a deliberate upgrade, so it is not an intervention and has no row
 in [the log](#the-log).
+
+v0.2 forecasts 31 time series, three more than v0.1, under the promoted model
+`xgboost_cv_0003`. The 00:00 and 06:00 UTC slots on 14 August both carry all 31.
 
 The window is too young to say anything about yet. What is different from v0.1, and what makes the
 next stretch worth more than the last one, is that `live_forecasts_are_healthy` now reads each
