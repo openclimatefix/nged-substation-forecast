@@ -193,7 +193,7 @@ emulator is registered and prints the one-time fix
 
 > Note that, during the smoke test, **Dagster is EXPECTED halt with the exception**
 > `_internal.TableNotFoundError: Local path
-"/app/.venv/data/NWP" does not exist or you don't have access!`. That is correct behaviour.
+"/app/data/NWP" does not exist or you don't have access!`. That is correct behaviour.
 
 The script builds the image tagged with the promoted model's run id, runs it offline, and prints
 the container log with a pass/fail summary. (The smoke test's one-shot run uses a hard-coded,
