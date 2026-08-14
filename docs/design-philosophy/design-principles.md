@@ -76,10 +76,12 @@ our forecast will *always* be better than NGED's incumbent baseline, even when w
 data.)
 
 Degrading is only half the principle: **we must be notified that the forecast degraded.** Three
-channels carry that — the widened uncertainty band on the forecast row, a `power_forecast_warnings`
-row naming which feed degraded and since when, and a Sentry event for the data failures a human can
-act on, such as a missed daily ECMWF run that says Dynamical.org is having problems. Each answers a
-different question and none substitutes for another; all three are required. What each is for, and
+channels carry that — a widened uncertainty band on the forecast row (designed, not yet built 🚧 —
+see [Widening bands](inherent-stability.md#widening-bands-the-in-band-signal)), a
+`power_forecast_warnings` row naming which feed degraded and since when (not yet built 🚧), and a
+Sentry event for the data failures a human can act on, such as a missed daily ECMWF run that says
+Dynamical.org is having problems. Each answers a different question and none substitutes for
+another; all three are required, and two of the three are still to be built. What each is for, and
 who reads it, is set out in
 [Three audiences, three channels](inherent-stability.md#three-audiences-three-channels). A Sentry
 event says whether we broke or an input degraded, and both kinds have to be delivered — see
