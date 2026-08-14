@@ -93,7 +93,7 @@ def _process_file_listing(
             # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json  # noqa: E501 — the arrows above must stay aligned with the real key.
             regex_captures=(
                 pl.col("path").str.extract_groups(
-                    r"/(?<start_time>\d+)_(?<end_time>\d+)/TimeSeries_(?<time_series_id>\d{1,2})"
+                    r"/(?<start_time>\d+)_(?<end_time>\d+)/TimeSeries_(?<time_series_id>\d+)_"
                 )
             )
         )

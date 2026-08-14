@@ -321,10 +321,29 @@ _EXAMPLE_OBJECT_KEY = (
 """One real NGED object key, whose embedded epoch-millisecond window and id the parser extracts."""
 
 
-def test_parse_file_listing_valid():
+@pytest.mark.parametrize(
+    ("object_key", "expected_time_series_id"),
+    [
+        pytest.param(_EXAMPLE_OBJECT_KEY, 23, id="two_digit_id"),
+        pytest.param(
+            "timeseries/1774512000000_1774533600000/"
+            "TimeSeries_237_20260326T080000Z_20260326T140000Z.json",
+            237,
+            id="three_digit_id",
+        ),
+        pytest.param(
+            "timeseries/1774512000000_1774533600000/"
+            "TimeSeries_2372_20260326T080000Z_20260326T140000Z.json",
+            2372,
+            id="four_digit_id",
+        ),
+    ],
+)
+def test_parse_file_listing_valid(object_key: str, expected_time_series_id: int):
+    """The id capture group must not truncate above 99 (regression for the unanchored regex)."""
     raw_file_listing: list[_RawFileListItem] = [
         {
-            "path": _EXAMPLE_OBJECT_KEY,
+            "path": object_key,
             "filesize_bytes": 1024,
         }
     ]
@@ -332,8 +351,8 @@ def test_parse_file_listing_valid():
     result = _process_file_listing(raw_file_listing)
 
     assert result.height == 1
-    assert result["time_series_id"][0] == 23
-    assert result["path"][0] == _EXAMPLE_OBJECT_KEY
+    assert result["time_series_id"][0] == expected_time_series_id
+    assert result["path"][0] == object_key
     assert result["filesize_bytes"][0] == 1024
     assert result["start_time"][0] == datetime(2026, 3, 26, 8, 0, 0, tzinfo=UTC)
     assert result["end_time"][0] == datetime(2026, 3, 26, 14, 0, 0, tzinfo=UTC)
