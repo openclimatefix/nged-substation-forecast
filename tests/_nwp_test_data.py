@@ -1,13 +1,12 @@
 """Shared NWP test data for the root integration tests.
 
 The several ``live_forecasts`` / CV / metrics integration tests each build a synthetic ``Nwp``
-frame; the physical-unit constants below were byte-identical across all of them, so they live
-here, as does ``half_hours``, which every one of them needs to place valid times correctly
-relative to the publication delay. ``nwp_records`` builds contract-valid rows for one (cell, day,
-members) combination, and ``write_test_nwp`` validates them against ``Nwp`` and writes them
-partitioned the way ``delta_store.nwp.write_nwp`` writes the real table — so a synthetic NWP
-fixture cannot silently diverge from what disk actually holds. The per-test *writers* (which
-differ in init-times, cells, and ensemble members) stay local to each test file. Importable by bare
+frame. ``half_hours``, ``NWP_CONTINUOUS_COL_VALUES``, ``nwp_records`` and ``write_test_nwp`` live
+here because they were byte-identical, or identical but for one parameter, across the test modules
+that used to define them locally. What genuinely differs per test file is *which* cells, days,
+member sets and (for a run initialised before the day it forecasts into) explicit ``init_time``
+values get combined into one fixture — that selection is what stays local to each test file, as a
+thin ``_write_nwp(path)`` wrapper around ``nwp_records`` and ``write_test_nwp``. Importable by bare
 name via the ``pythonpath = ["tests"]`` pytest setting.
 """
 

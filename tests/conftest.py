@@ -3,13 +3,23 @@
 The repo-root ``conftest.py`` (one level up) owns the ``--run-network`` gate; this one scopes
 its fixtures to the ``tests/`` directory only, so nothing here touches the ``packages/*/tests``
 unit suites.
+
+Shared helpers live here as *fixtures*, not as plain functions a test module imports by name.
+A test module can import ``tests/_nwp_test_data.py`` (a normal, uniquely-named module) by bare
+name via the ``pythonpath = ["tests"]`` pytest setting, but ``conftest`` is not a unique name —
+this repo also has a root-level ``conftest.py`` — so ``from conftest import ...`` is ambiguous
+outside pytest's own module loading: ``ty`` resolves it to the *root* ``conftest.py`` and reports
+an unresolved import. Fixture injection sidesteps the ambiguity entirely, since a test module
+never has to import ``conftest`` by name to use one.
 """
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import pytest
-from dagster import DagsterInstance
+from dagster import DagsterInstance, RunConfig
+
+from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
 
 @pytest.fixture
@@ -34,6 +44,40 @@ def dagster_instance() -> Iterator[DagsterInstance]:
     """
     with DagsterInstance.ephemeral() as instance:
         yield instance
+
+
+@pytest.fixture
+def register_experiment() -> Callable[[DagsterInstance, str], None]:
+    """Return a callable that registers a full-CV experiment for its leaderboard fold.
+
+    Every CV integration test in this suite (``trained_cv_model``, ``cv_power_forecasts``,
+    ``metrics``) registers ``run_mode="full_cv"`` rather than ``"smoke_test"``, because each one
+    drives the leaderboard fold's (``FOLD_ID``) window and synthetic data specifically. A fixture
+    that returns a callable, rather than a plain module-level function, so every caller reaches
+    it the same way — pytest injection — with no ``from conftest import ...`` (see the module
+    docstring for why that import is ambiguous).
+    """
+
+    def _register(instance: DagsterInstance, experiment_name: str) -> None:
+        result = register_experiment_job.execute_in_process(
+            run_config=RunConfig(
+                ops={
+                    "register_experiment": RegisterExperimentConfig(
+                        experiment_name=experiment_name,
+                        base_model_config="conf/model/xgboost.yaml",
+                        config_overrides={
+                            "selected_features": ["temperature_2m"],
+                            "n_estimators": 5,
+                        },
+                        run_mode="full_cv",
+                    )
+                }
+            ),
+            instance=instance,
+        )
+        assert result.success
+
+    return _register
 
 
 @pytest.fixture(autouse=True)

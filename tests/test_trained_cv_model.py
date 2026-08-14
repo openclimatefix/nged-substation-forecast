@@ -6,16 +6,17 @@ artifact round-trips from MLflow and that training honoured the fold's eligible 
 inclusive training window.
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import mlflow
 import polars as pl
 import pytest
-from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES, half_hours
+from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.settings import Settings
-from dagster import DagsterInstance, RunConfig, materialize
+from dagster import DagsterInstance, materialize
 from deltalake import write_deltalake
 from ml_core._production_helpers import fetch_model_artifacts
 from ml_core.base_forecaster import load_trained_metadata
@@ -25,9 +26,11 @@ from xgboost_forecaster.forecaster import XGBoostForecaster
 
 from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
 from nged_substation_forecast.defs.cv_assets import _load_roster, trained_cv_model
-from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
 pytestmark = pytest.mark.integration
+
+RegisterExperiment = Callable[[DagsterInstance, str], None]
+"""Type of the ``register_experiment`` fixture (``tests/conftest.py``)."""
 
 FOLD_ID = "mid_2025_to_mid_2026"
 EXPERIMENT_NAME = "exp_smoke"
@@ -84,35 +87,12 @@ def _write_nwp(path: str) -> None:
       forecasting into its first day. Only the ``MAX_NWP_LEAD`` lookback keeps these, so their
       absence means the lookback has gone.
     """
-    records = []
-    for cell, day, init_time in (
-        (_TS1_CELL, _IN_WINDOW, _IN_WINDOW.replace(hour=0)),
-        (_TS2_CELL, _IN_WINDOW, _IN_WINDOW.replace(hour=0)),
-        (_TS1_CELL, _TRAIN_START, _EARLY_INIT_TIME),
-    ):
-        for valid_time in half_hours(day):
-            for member in _NWP_ENSEMBLE_MEMBERS:
-                record = {
-                    "nwp_model_id": "ECMWF_ENS_0_25_degree",
-                    "init_time": init_time,
-                    "valid_time": valid_time,
-                    "ensemble_member": member,
-                    "h3_index": cell,
-                    "categorical_precipitation_type_surface": None,
-                }
-                record.update(NWP_CONTINUOUS_COL_VALUES)
-                records.append(record)
-    df = pl.DataFrame(records).cast(
-        {
-            "init_time": pl.Datetime("us", "UTC"),
-            "valid_time": pl.Datetime("us", "UTC"),
-            "ensemble_member": pl.UInt8,
-            "h3_index": pl.UInt64,
-            "categorical_precipitation_type_surface": pl.UInt8,
-            **dict.fromkeys(NWP_CONTINUOUS_COL_VALUES, pl.Float32),
-        }
+    records = (
+        nwp_records(_TS1_CELL, _IN_WINDOW, _NWP_ENSEMBLE_MEMBERS)
+        + nwp_records(_TS2_CELL, _IN_WINDOW, _NWP_ENSEMBLE_MEMBERS)
+        + nwp_records(_TS1_CELL, _TRAIN_START, _NWP_ENSEMBLE_MEMBERS, init_time=_EARLY_INIT_TIME)
     )
-    write_deltalake(table_or_uri=path, data=df.to_arrow())
+    write_test_nwp(path, records)
 
 
 def _write_metadata(path: Path) -> None:
@@ -164,25 +144,6 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _write_nwp(str(tmp_path / "NWP"))
     _write_metadata(nged_path / "metadata.parquet")
     _write_eligible(str(tmp_path / "eligible"))
-
-
-def _register(instance: DagsterInstance) -> None:
-    result = register_experiment_job.execute_in_process(
-        run_config=RunConfig(
-            ops={
-                "register_experiment": RegisterExperimentConfig(
-                    experiment_name=EXPERIMENT_NAME,
-                    base_model_config="conf/model/xgboost.yaml",
-                    config_overrides={"selected_features": ["temperature_2m"], "n_estimators": 5},
-                    # full_cv so the leaderboard fold's partition (FOLD_ID) is registered; this test
-                    # drives that fold's window and synthetic data, not the smoke_test fold.
-                    run_mode="full_cv",
-                )
-            }
-        ),
-        instance=instance,
-    )
-    assert result.success
 
 
 def test_load_engineering_inputs_filters_ensemble_members(env: None) -> None:
@@ -265,9 +226,12 @@ def _fold_run(client: MlflowClient) -> Run:
 
 
 def test_trained_cv_model_trains_and_saves_to_mlflow(
-    env: None, dagster_instance: DagsterInstance, tmp_path: Path
+    env: None,
+    dagster_instance: DagsterInstance,
+    tmp_path: Path,
+    register_experiment: RegisterExperiment,
 ) -> None:
-    _register(dagster_instance)
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
 
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
@@ -299,7 +263,9 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(
 
 
 def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
-    env: None, dagster_instance: DagsterInstance
+    env: None,
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """The same ``(experiment, fold)`` partition materialises twice, updating the counters.
 
@@ -313,7 +279,7 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
     # First pass: only ts1 is eligible.
     _write_eligible(eligible_path, (1,))
 
-    _register(dagster_instance)
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
     ).success
@@ -342,7 +308,9 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
 
 
 def test_trained_cv_model_fails_loudly_when_no_eligible_series(
-    env: None, dagster_instance: DagsterInstance
+    env: None,
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """With no eligible series for the fold, the asset must fail loudly, not silently succeed."""
     # Replace the eligible table so this fold has no rows (only an unrelated fold), mirroring an
@@ -362,7 +330,7 @@ def test_trained_cv_model_fails_loudly_when_no_eligible_series(
         partition_by=["fold_id"],
     )
 
-    _register(dagster_instance)
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
     result = materialize(
         [trained_cv_model],
         partition_key=PARTITION_KEY,
@@ -377,7 +345,9 @@ def test_trained_cv_model_fails_loudly_when_no_eligible_series(
 
 
 def test_trained_cv_model_fails_loudly_when_an_eligible_series_has_no_metadata(
-    env: None, dagster_instance: DagsterInstance
+    env: None,
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
 ) -> None:
     """R&D fails fast: a CV run must not quietly train fewer series than its population names.
 
@@ -387,7 +357,7 @@ def test_trained_cv_model_fails_loudly_when_an_eligible_series_has_no_metadata(
     """
     _write_eligible(str(Settings().eligible_time_series_data_path), time_series_ids=(1, 2, 9))
 
-    _register(dagster_instance)
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
     result = materialize(
         [trained_cv_model],
         partition_key=PARTITION_KEY,
