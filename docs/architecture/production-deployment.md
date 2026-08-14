@@ -604,8 +604,9 @@ A schedule tick launches one job run, which becomes one Fargate task, and every 
 job's selection executes inside that single task — so a tiny asset only pays for a task of its
 own if it has a schedule of its own (the one-off `h3_grid_weights`, materialised by hand, never
 does). The question is therefore about the recurring scheduled runs, and only one of them is
-genuinely tiny: the hourly NGED telemetry poll — which, because NGED publishes new files only
-roughly every 5 hours, spends most of its ticks discovering there is nothing to do.
+genuinely tiny: the hourly NGED telemetry poll — which, because NGED publishes new files at
+irregular, several-hours-apart intervals, spends most of its ticks discovering there is nothing
+to do.
 
 **Why we rejected it.** Five reasons:
 

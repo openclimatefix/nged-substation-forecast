@@ -114,7 +114,7 @@ let the model learn horizon-dependent biases).
 | `nwp_lead_time_hours` | Hours between `nwp_init_time` and `valid_time` |
 | `ensemble_member` | ECMWF ensemble member index (0–50) |
 | `time_series_id` | Substation identifier (integer) |
-| `time_series_type` | Substation type (categorical string) |
+| `time_series_type` | Asset category, e.g. `PV`, `Wind`, `Disaggregated Demand` (categorical string) |
 | `power_fcst_init_time` | When the forecast was issued |
 | `nwp_init_time` | When the NWP model ran |
 

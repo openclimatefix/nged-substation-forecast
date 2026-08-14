@@ -124,8 +124,9 @@ curtailed for nothing.
 ### Which direction is the constraint on?
 
 There is no single sign rule. This repo carries two conventions — at a substation, positive power
-flows towards end-users; at a customer's meter, positive means the customer is *generating* (see
-[sign convention](forecast-building-blocks.md#sign-convention)) — and the trial area contains both,
+flows towards end-users; at a customer's meter, positive means the customer is *exporting* to
+NGED's grid (see [sign convention](forecast-building-blocks.md#sign-convention)) — and the trial
+area contains both,
 plus battery sites that both charge and discharge. Constraint-side direction is therefore resolved
 **per `time_series_type`**, reusing the mapping the [tail and exceedance
 metrics](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)

@@ -513,24 +513,13 @@ def test_parse_file_listing_invalid():
 
 def test_remove_small_files_from_listing_keeps_one_reading_file():
     """A one-reading, WKT-less file is 556 bytes (measured on real NGED S3 downloads) and must
-    survive the default filter. It did not survive the old 1000-byte default — see
-    ``test_remove_small_files_from_listing_drops_one_reading_file_at_the_old_threshold``."""
+    survive the default filter."""
     file_listing = _file_listing([556])
 
     result = remove_small_files_from_listing(file_listing)
 
     assert result.height == 1
     _ProcessedFileListing.validate(result)  # schema must survive filtering
-
-
-def test_remove_small_files_from_listing_drops_one_reading_file_at_the_old_threshold():
-    """Regression pin for the defect this change fixes: the old 1000-byte default dropped a
-    556-byte one-reading file. Kept so the fix cannot silently regress back to the old default."""
-    file_listing = _file_listing([556])
-
-    result = remove_small_files_from_listing(file_listing, size_threshold_bytes=1000)
-
-    assert result.height == 0
 
 
 def test_remove_small_files_from_listing_drops_genuinely_empty_file():

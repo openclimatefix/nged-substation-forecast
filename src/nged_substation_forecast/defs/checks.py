@@ -126,9 +126,9 @@ row order in the late-series table (never-reported series listed before merely-s
 _POWER_DATA_STALENESS_THRESHOLD: Final[timedelta] = timedelta(hours=24)
 """A ``time_series_id`` is 'late' if its most recent observation is older than this.
 
-NGED publishes roughly every 6 hours and our pipeline back-fills gaps automatically once the
-feed recovers, so 24 hours is comfortably past normal jitter while still catching a genuine
-multi-slot stall the same day."""
+NGED publishes at irregular, several-hours-apart intervals and our pipeline back-fills gaps
+automatically once the feed recovers, so 24 hours is comfortably past normal jitter while still
+catching a genuine multi-slot stall the same day."""
 
 _KNOWN_DEAD_TIME_SERIES_IDS: Final[tuple[int, ...]] = (33,)
 """Series ``power_data_is_fresh`` stops warning about, because we already know they are dead.

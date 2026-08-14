@@ -101,10 +101,11 @@ at v1 scale come to **~£2–4/month in total**:
   vacuums. Grows ~40 GB/year as daily NWP partitions accumulate.
 - **S3 requests — ~£1–2/month.** Delta Lake is request-heavy (transaction-log JSON reads,
   checkpoints, many small parquet GETs per scan). The materialisation count is ~33/day, most of
-  it the 24 hourly `power_time_series_and_metadata` ingests — each a small incremental append
-  rather than a full-table scan — so request volume grows more slowly than the materialisation
-  count. A generous 2–3 M GET (£0.00031/1k) + 150–250 k PUT/COPY/POST/LIST (£0.0040/1k) per
-  month lands at roughly £1.20–1.90, a small line item.
+  it the 24 hourly `power_time_series_and_metadata` ticks. NGED publishes new telemetry at
+  irregular, several-hours-apart intervals, so only around 4–5 of those ticks find new data and
+  append; the rest cost a bucket LIST and a Delta-log read with no PUT, so request volume grows
+  more slowly than the materialisation count. A generous 2–3 M GET (£0.00031/1k) + 150–250 k
+  PUT/COPY/POST/LIST (£0.0040/1k) per month lands at roughly £1.20–1.90, a small line item.
 - **Data transfer — ≈£0/month.** Ingress is free (the daily NWP download from Dynamical
   costs nothing on the AWS side); S3 ↔ Fargate/EC2 traffic within eu-west-2 is free;
   internet egress (the Tailscale-tunnelled Dagster UI and Marimo dashboard) is a few

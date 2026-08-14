@@ -108,9 +108,6 @@ def _extract_power_time_series(df: pl.DataFrame, time_series_id: int) -> Extract
 
 def _camel_to_snake(camel_str: str) -> str:
     """Converts a CamelCase string to snake_case."""
-    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", camel_str)
-    s2 = re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
-    # A string already containing an underscore (e.g. "Area_CenterLat", produced by the
-    # `unnest("Area", separator="_")` above) collects a second one from the substitutions above,
-    # so collapse repeats before returning.
-    return re.sub("_+", "_", s2)
+    s1 = re.sub("([^_])([A-Z][a-z]+)", r"\1_\2", camel_str)
+    s2 = re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1)
+    return s2.lower()

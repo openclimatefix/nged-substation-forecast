@@ -95,10 +95,11 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     This raw data will later be consumed by downstream cleaning assets to prepare
     it for forecasting models.
 
-    WHY UNPARTITIONED? Because NGED's JSON files are published roughly every 5 hours, and so
-    the start time changes every day. And because we don't want people to have to spin up
-    thousands of Dagster runs (one per partition) when first backfilling. It's much more efficient
-    to just check what's available on NGED's S3 bucket and append to our local Delta table.
+    WHY UNPARTITIONED? Because NGED's JSON files land at irregular, several-hours-apart intervals
+    with no fixed schedule, so the start time changes every day. And because we don't want people
+    to have to spin up thousands of Dagster runs (one per partition) when first backfilling. It's
+    much more efficient to just check what's available on NGED's S3 bucket and append to our
+    local Delta table.
     """
     settings = Settings()
     delta_path = settings.power_time_series_data_path

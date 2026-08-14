@@ -113,7 +113,7 @@ filter on `fold_id` to select the population you need. See
 | Field | Data type | Notes |
 |---|---|---|
 | `ensemble_member` | `int8` | ID of the NWP ensemble member driving this forecast. ECMWF ENS has 51 members. |
-| `power_fcst` | `float32` | OCF's power forecast. **In this early version** the value is in physical units (MW for active power, MVA for apparent power). Sign convention depends on `time_series_type` — see [Sign convention](forecast-building-blocks.md#sign-convention). |
+| `power_fcst` | `float32` | OCF's power forecast. **In this early version** the value is in physical units (MW for active power, MVA for apparent power). Sign convention depends on `substation_type` — see [Sign convention](forecast-building-blocks.md#sign-convention). |
 
 > **🚧 Planned change — normalise `power_fcst` to [−1, +1]
 > ([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246), v0.1).** The
