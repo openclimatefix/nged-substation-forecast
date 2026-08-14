@@ -45,6 +45,18 @@ tests: Polars row counts wrapping past 2³² rows, in
   package-level `tests/conftest.py`. `packages/dynamical_data/tests/conftest.py` is the example:
   it builds synthetic Xarray datasets that two test modules share. The only repo-root `conftest.py`
   holds cross-package pytest plumbing, not fixtures — currently the network-test gate below.
+- **A factory shared *across* packages goes in the root `tests/` directory, not in any one
+  package's `tests/`.** The root `pyproject.toml` sets `pythonpath = ["tests"]` for the whole
+  `uv run pytest` session, so every module placed at the top level of `tests/` is importable by
+  bare name from any test suite in the repo — `packages/delta_store/tests`,
+  `packages/ml_core/tests`, and the root `tests/` alike — the same mechanism
+  `tests/_nwp_test_data.py` already relies on for the root integration tests. Putting a
+  cross-package factory inside one specific package's `tests/` and importing it from another
+  package's suite would work by accident of that package being installed, but it reads as a
+  dependency of the *package under test* on another package's test code, which is backwards; the
+  root `tests/` directory carries no such implication because it is not itself a workspace member.
+  A factory production code needs (not just tests) still belongs in `contracts` or another
+  library package, never here.
 - **Mock with pytest's `monkeypatch` fixture, not `unittest.mock`.** Patch environment variables
   (`monkeypatch.setenv`), object attributes, and module-level functions
   (`monkeypatch.setattr(some_module, "open", fake_open)`) through the built-in fixture. For S3,
