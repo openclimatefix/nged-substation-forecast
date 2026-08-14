@@ -25,7 +25,7 @@ import mlflow
 import patito as pt
 import polars as pl
 import pytest
-from _nwp_test_data import half_hours
+from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.power_schemas import (
     LIST_OF_TIME_SERIES_TYPES,
@@ -58,21 +58,6 @@ _TRAIN_DAY = datetime(2024, 6, 1, tzinfo=UTC)
 _VAL_DAY = datetime(2025, 8, 1, tzinfo=UTC)
 _VAL_MEMBERS = (0, 1, 2)
 
-_NWP_CONTINUOUS_COLS = (
-    "temperature_2m",
-    "dew_point_temperature_2m",
-    "wind_speed_10m",
-    "wind_direction_10m",
-    "wind_speed_100m",
-    "wind_direction_100m",
-    "pressure_surface",
-    "pressure_reduced_to_mean_sea_level",
-    "geopotential_height_500hpa",
-    "downward_long_wave_radiation_flux_surface",
-    "downward_short_wave_radiation_flux_surface",
-    "precipitation_surface",
-)
-
 
 def _write_power_with_actuals(path: str) -> None:
     """Power for ts1 in both the training window and the validation window.
@@ -90,39 +75,11 @@ def _write_power_with_actuals(path: str) -> None:
     ).write_delta(path)
 
 
-def _nwp_records(cell: int, day: datetime, members: tuple[int, ...]) -> list[dict]:
-    records = []
-    init_time = day.replace(hour=0)
-    for member in members:
-        for valid_time in half_hours(day):
-            record = {
-                "nwp_model_id": "ECMWF_ENS_0_25_degree",
-                "init_time": init_time,
-                "valid_time": valid_time,
-                "ensemble_member": member,
-                "h3_index": cell,
-                "categorical_precipitation_type_surface": None,
-            }
-            record.update(dict.fromkeys(_NWP_CONTINUOUS_COLS, 2000))
-            records.append(record)
-    return records
-
-
 def _write_nwp(path: str) -> None:
-    records = _nwp_records(_TS1_CELL, _TRAIN_DAY, (0,)) + _nwp_records(
+    records = nwp_records(_TS1_CELL, _TRAIN_DAY, (0,)) + nwp_records(
         _TS1_CELL, _VAL_DAY, _VAL_MEMBERS
     )
-    df = pl.DataFrame(records).cast(
-        {
-            "init_time": pl.Datetime("us", "UTC"),
-            "valid_time": pl.Datetime("us", "UTC"),
-            "ensemble_member": pl.UInt8,
-            "h3_index": pl.UInt64,
-            "categorical_precipitation_type_surface": pl.UInt8,
-            **dict.fromkeys(_NWP_CONTINUOUS_COLS, pl.Int16),
-        }
-    )
-    write_deltalake(table_or_uri=path, data=df.to_arrow())
+    write_test_nwp(path, records)
 
 
 def _write_metadata(path: Path) -> None:
