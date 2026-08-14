@@ -199,8 +199,6 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
   [data quality](../background/data-quality.md)). At those sites an export event would be billed as
   demand-side procurement, and multiplying MVA by half an hour gives MVAh, which is not the
   megawatt-hour a flexibility price is quoted against.
-- **The risk target binds only in-sample**, and $\tau$ is fitted on data the model was trained on,
-  which biases it in the direction that flatters the saving.
 - **Unmet energy is pooled across series and half-hours.** A model can hit the 5% target by covering
   the largest site well and abandoning many small ones, and 5% concentrated in one deep breach is
   far worse operationally than the same 5% spread thinly. Harm grows faster than depth; equalising
@@ -229,8 +227,7 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
 ## Questions for NGED
 
 1. **Flexibility prices** — what are the availability and utilisation rates separately, and which
-   published dataset should we take them from? The split matters more than the level:
-   over-procurement is charged at the availability rate, so it sets the whole ranking.
+   published dataset should we take them from?
 2. **Curtailment price** — is £100/MWh of network access right, and is the £2M saved last year on
    the same basis, so we can check our totals against it?
 3. **Who bears the curtailment cost** — NGED, or the generator under a non-firm connection? This
