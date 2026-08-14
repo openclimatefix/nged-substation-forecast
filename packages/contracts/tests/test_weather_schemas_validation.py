@@ -245,6 +245,39 @@ def test_lead0_deaccumulated_nulls_are_allowed() -> None:
     assert assess_nwp_quality(validated).is_healthy
 
 
+@pytest.mark.parametrize(
+    ("column", "bad_value"),
+    [
+        ("temperature_2m", 150.0),  # exceeds le=100
+        ("temperature_2m", -150.0),  # exceeds ge=-100
+        ("wind_direction_10m", 400.0),  # exceeds le=360
+        ("wind_direction_10m", -10.0),  # exceeds ge=0
+    ],
+)
+def test_out_of_range_continuous_weather_var_is_fatal(column: str, bad_value: float) -> None:
+    """A continuous variable outside its physical range must fail ingest.
+
+    Guards `Nwp`'s declared `ge`/`le` bounds from inside the package that owns them: a widened
+    range (e.g. `temperature_2m`'s `le=100` relaxed to `le=10000`, or `wind_direction_10m`'s
+    `le=360` relaxed to `le=3600`) would otherwise pass every test in this file undetected.
+    """
+    df = _nwp_slice(overrides={column: [bad_value, bad_value, bad_value]})
+    with pytest.raises(pt.exceptions.DataFrameValidationError):
+        _validate(df)
+
+
+def test_continuous_weather_vars_are_stored_as_float32() -> None:
+    """`Nwp`'s continuous variables are declared `Float32`, the physical-unit dtype the on-disk
+    Delta table stores (see the `Nwp` docstring). Pins the literal dtype, not one derived from the
+    model, so a field's declared dtype widening to `Float64` fails here rather than only
+    downstream — as measured, such a change causes 26 failures elsewhere and none inside
+    `contracts`.
+    """
+    validated = _validate(_nwp_slice())
+    for var in sorted(Nwp.continuous_var_names()):
+        assert validated[var].dtype == pl.Float32, var
+
+
 def test_categorical_precipitation_type_surface_validation() -> None:
     # Test case 1: Valid data (all null before 2024-11-12, not null after)
     df_valid = pl.DataFrame(

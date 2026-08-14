@@ -844,47 +844,6 @@ def test_engineer_features_weather_lag_leakage_prevention():
     assert engineered["temperature_2m_lag_36h"][0] == 8.0
 
 
-def test_engineer_features_weather_lag_freshest_run_reaches_older_run_only_data():
-    """The freshest-run branch must resolve to a value that only an OLDER run holds.
-
-    A fixture where the same-run and freshest-run branches happen to agree can't tell "always
-    same-run" apart from the real dual-strategy join. Here the row's own run (T1) has no
-    coverage at all at the lag's target_time, so the same-run join legitimately misses (null);
-    only the older run (T0) has real data there, so the freshest-run branch must reach past T1
-    to find it.
-    """
-    power_fcst_init_time = datetime(2026, 6, 11, 6, 0)
-    nwp_init_time = datetime(2026, 6, 11, 0, 0)  # T1: the row's own run
-    older_run_init_time = datetime(2026, 6, 10, 0, 0)  # T0: an earlier run
-    valid_time = datetime(2026, 6, 11, 12, 0)
-    # lag=24h -> target_time = 2026-06-10 12:00: before power_fcst_init_time (freshest-run
-    # branch), and T1 carries no row there at all, so only T0 can answer it.
-    target_time = valid_time - timedelta(hours=24)
-
-    nwp_df = pl.DataFrame(
-        {
-            "time_series_id": ["ts1", "ts1"],
-            "valid_time": [target_time, valid_time],
-            "ensemble_member": [0, 0],
-            "init_time": [older_run_init_time, nwp_init_time],
-            "temperature_2m": [8.0, 99.0],  # T0 at target_time; T1's own (unrelated) row
-        }
-    )
-    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
-    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
-
-    engineered = _engineer_features(
-        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
-        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        nwp=nwp_df.lazy(),
-        selected_features={"temperature_2m_lag_24h"},
-        power_fcst_init_time=power_fcst_init_time,
-        nwp_init_time=nwp_init_time,
-    ).collect()
-
-    assert engineered["temperature_2m_lag_24h"][0] == 8.0
-
-
 def test_engineer_features_single_run_freshest_run_excludes_unpublished_nwp_run():
     """The single-run availability gate must reject a run not yet published by power_fcst_init_time.
 

@@ -1350,7 +1350,8 @@ so the byte reduction would land nearer the 4× than the 51×. That needs measur
 documented in
 [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32-bit-row-index), row counts
 silently wrap past 2³² rows, and materialising a single frame of ≥2³² rows is unsupported outright.
-At V2 the cap affects one code path (the `metrics` asset's whole-fold collect). Here, **a single
+At V2 the cap affects one code path (`power_forecasts`, whose accumulated writes pass the cap at
+V2 scale, ~1 trillion rows/year). Here, **a single
 run's 6.9 billion forecast rows exceed the 4.29-billion cap on their own**, so the output of one
 inference run could not be materialised as one frame at all. Chunking the write is not an
 optimisation at this scale; it is a precondition.

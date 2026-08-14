@@ -97,6 +97,17 @@ def test_continuous_vars_rounded_to_significand_bits(tmp_path: Path) -> None:
         assert (stored.view(np.dtype(np.uint32)) & discarded == 0).all(), var
 
 
+def test_the_nwp_significand_bits_is_thirteen() -> None:
+    """Pins the literal, not a value derived from the constant.
+
+    ``test_continuous_vars_rounded_to_significand_bits`` above computes its tolerance *from*
+    ``NWP_SIGNIFICAND_BITS``, so it stays green no matter what the constant is set to. The
+    ``power_forecasts`` sibling significand constant carries a matching relative-error claim in
+    ``PowerForecast.power_fcst``'s description that a changed constant would leave silently wrong.
+    """
+    assert NWP_SIGNIFICAND_BITS == 13
+
+
 def test_successive_runs_create_separate_partitions(tmp_path: Path) -> None:
     table = tmp_path / "nwp"
     n = 4

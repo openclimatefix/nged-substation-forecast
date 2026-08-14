@@ -217,12 +217,13 @@ def test_tabular_feature_engineer_default_local_timezone_is_london() -> None:
     """Calling ``engineer()`` with no ``local_timezone`` must default production to Europe/London.
 
     Every production and CV call site (``production_assets.py``, ``cv_assets.py``) calls
-    ``engineer()`` without passing ``local_timezone``, so this is the value they all actually get
-    — and it is invisible to every other test in this module, which passes ``local_timezone``
-    explicitly. British Summer Time gives a UTC+1 offset in June, so the correct default
-    (``Europe/London``) yields ``local_utc_offset_minutes == 60``; a wrong default (e.g.
-    ``Asia/Kolkata``'s fixed +5:30) would silently produce ``330`` instead, with every other test
-    in the suite still green.
+    ``engineer()`` without passing ``local_timezone`` as of writing, so a wrong default would
+    reach them silently. This test pins only the parameter's default value, not those call sites
+    themselves, and it is invisible to every other test in this module, which passes
+    ``local_timezone`` explicitly. British Summer Time gives a UTC+1 offset in June, so the
+    correct default (``Europe/London``) yields ``local_utc_offset_minutes == 60``; a wrong
+    default (e.g. ``Asia/Kolkata``'s fixed +5:30) would silently produce ``330`` instead, with
+    every other test in the suite still green.
     """
     valid_time = datetime(2024, 6, 1, 12, 0)
     power = pt.LazyFrame.from_existing(

@@ -156,9 +156,13 @@ def _engineer_features(
 
             Must be None when power_fcst_init_time is None (bulk mode).
 
-        nwp_publication_delay_hours: The delay in hours between the initialization time
-            of the NWP forecast and when it becomes publicly available. Used only when
-            nwp_init_time is None and power_fcst_init_time is not None.
+        nwp_publication_delay_hours: Hours after an NWP run's ``nwp_init_time`` before it is
+            usable — disk arrival, not upstream publication; see
+            ``weather_utils.analysis_proxy.NWP_PUBLICATION_DELAY_HOURS`` for what drives the
+            default and its derivation. Used throughout, not only in one mode: it derives
+            ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode, derives
+            ``nwp_init_time`` when it is omitted in single-run mode, and gates the single-run
+            analysis-proxy's ``available_at`` cut.
         local_timezone: IANA zone the local-time features (time of day, day of week, UTC
             offset) are computed in. Defaults to ``DEFAULT_LOCAL_TIMEZONE``.
     """
