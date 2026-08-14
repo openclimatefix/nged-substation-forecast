@@ -615,7 +615,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
 class PopulationFilter(Config):
     """Typed filter over ``power_forecasts`` rows to score.
 
-    Every field is tabulated with a worked example under "Step 8 — Materialise ``metrics``":
+    Every field is tabulated with a worked example under "Step 9 — Materialise ``metrics``":
     <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/>
 
     All fields default to ``None`` (= no filter on that dimension). A mistyped field name is a
@@ -668,7 +668,7 @@ class PopulationFilter(Config):
 class MetricsConfig(Config):
     """Run config for the ``metrics`` asset.
 
-    Filled in from the Dagster run-config dialog; see "Step 8 — Materialise ``metrics``":
+    Filled in from the Dagster run-config dialog; see "Step 9 — Materialise ``metrics``":
     <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/>
     """
 
