@@ -2,8 +2,8 @@
 
 How to go from raw data to a trained, MLflow-tracked model using the Dagster pipeline.
 
-The pipeline has two layers. The **data layer** (steps 1–4) is built once and refreshed as new
-data arrives; it is shared by all experiments. The **experiment layer** (steps 5–8) is repeated
+The pipeline has two layers. The **data layer** (steps 1–5) is built once and refreshed as new
+data arrives; it is shared by all experiments. The **experiment layer** (steps 6–9) is repeated
 for each new model or hyperparameter configuration — see [Model configuration](model-configuration.md)
 for how to choose features and set hyperparameters.
 
@@ -51,9 +51,19 @@ Eligibility is a function of data coverage only — it is independent of any mod
 so every experiment is scored on the identical population for a given fold. **Do not skip this
 step before training.**
 
+## Step 5 — Materialise `effective_capacity`
+
+**Trigger:** Materialise (unpartitioned). Re-materialise whenever step 1 has pulled in enough new
+telemetry to shift a series' full-history P99.
+
+Reads the full `power_time_series` Delta and writes one row per `time_series_id` to the
+`effective_capacity` Delta table: the 99th percentile of `abs(power)` over the series' entire
+observed history. This is the NMAE denominator the `metrics` asset (step 9) reads — materialise it
+before running `metrics`, or that step raises `FileNotFoundError`.
+
 ---
 
-## Step 5 — Launch `register_experiment_job`
+## Step 6 — Launch `register_experiment_job`
 
 **Trigger:** Dagster UI → Jobs → `register_experiment_job` → "Launch run". Fill in the
 `RegisterExperimentConfig` fields in the run config dialog:
@@ -100,10 +110,10 @@ un-trained, and `trained_cv_model` reads the config back from the experiment's `
 mid-flight would change what later folds train on. The refusal happens before anything is
 written, so a rejected re-registration leaves the experiment exactly as it was.
 
-## Step 6 — Materialise `trained_cv_model`
+## Step 7 — Materialise `trained_cv_model`
 
 **Trigger:** Materialise the partition `"{experiment_name}__{fold_id}"`, e.g.
-`"xgboost_smoke_test__smoke_test"`. The partition only appears after step 5 has run.
+`"xgboost_smoke_test__smoke_test"`. The partition only appears after step 6 has run.
 
 **What the asset does:**
 
@@ -152,7 +162,7 @@ Experiment "xgboost_smoke_test"
 
 ---
 
-## Step 7 — Materialise `cv_power_forecasts`
+## Step 8 — Materialise `cv_power_forecasts`
 
 **Trigger:** Materialise the same `"{experiment_name}__{fold_id}"` partition (it depends on
 `trained_cv_model`).
@@ -217,7 +227,7 @@ for the production workflow.
 
 ---
 
-## Step 8 — Materialise `metrics`
+## Step 9 — Materialise `metrics`
 
 **Trigger:** Materialise (unpartitioned — not tied to a single fold). Fill in `MetricsConfig`
 in the run config dialog before launching.
@@ -268,7 +278,7 @@ in the run config dialog before launching.
    `picp`/`interval_width` at p10_p90) — the full 13-quantile / 6-band detail stays in the
    `forecast_metrics` Delta table.
 
-After step 8, the MLflow run structure looks like this:
+After step 9, the MLflow run structure looks like this:
 
 ```text
 Experiment "xgboost_smoke_test"
@@ -342,7 +352,7 @@ source for the experiment's config.
    the experiment and training fold 2. Reading from MLflow guarantees every fold of the same
    experiment trains on exactly the config that was registered, no matter when it runs. The tag
    is immutable in turn: re-registering the experiment name under a changed config is refused
-   rather than re-pointing it (see step 5 above).
+   rather than re-pointing it (see step 6 above).
 
 2. **Process independence.** Each `trained_cv_model` materialisation is a separate Dagster
    process. There is no live handle to pass between the job and the asset; the MLflow experiment

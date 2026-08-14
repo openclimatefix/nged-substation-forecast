@@ -68,11 +68,11 @@ same-shaped workload in
 
 ### Workload model
 
-Live cadence: `ecmwf_ens` 1/day (daily 00Z partition), `power_time_series_and_metadata` 4/day,
-`live_forecasts` 4/day (6-hourly partitions), the monitoring `metrics(production_monitoring)`
-step ~4/day (planned —
+Live cadence: `ecmwf_ens` 1/day (daily 00Z partition), `power_time_series_and_metadata` 24/day
+(hourly, at :55 past the hour), `live_forecasts` 4/day (6-hourly partitions), the monitoring
+`metrics(production_monitoring)` step ~4/day (planned —
 [#224](https://github.com/openclimatefix/nged-substation-forecast/issues/224)) →
-**~13 materialisations/day ≈ 395/month**. This cadence ingests only ECMWF ENS and
+**~33 materialisations/day ≈ 1,000/month**. This cadence ingests only ECMWF ENS and
 the NGED power feed today; a near-real-time ERA5/ERA5T ingest would join it *only if* live capacity
 estimation is made to depend on ERA5 — a new external dependency we may prefer to avoid by
 [keeping ERA5 offline](../roadmap/capacity-estimation.md#irradiance-inputs). A backtest
@@ -99,17 +99,22 @@ at v1 scale come to **~£2–4/month in total**:
   [How big is Flexpectation's power forecast data?](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data))
   — at £0.018/GB-month → ~£1.80/month, plus headroom for Delta version history between
   vacuums. Grows ~40 GB/year as daily NWP partitions accumulate.
-- **S3 requests — ~£0.50–1.50/month.** Delta Lake is request-heavy (transaction-log JSON
-  reads, checkpoints, many small parquet GETs per scan), but ~13 materialisations/day is
-  tiny volume: a generous 1–2 M GET (£0.00031/1k) + 100–200 k PUT/COPY/POST/LIST
-  (£0.0040/1k) per month lands well under £1.50.
+- **S3 requests — ~£1–2/month.** Delta Lake is request-heavy (transaction-log JSON reads,
+  checkpoints, many small parquet GETs per scan). The materialisation count is ~33/day, most of
+  it the 24 hourly `power_time_series_and_metadata` ingests — each a small incremental append
+  rather than a full-table scan — so request volume grows more slowly than the materialisation
+  count. A generous 2–3 M GET (£0.00031/1k) + 150–250 k PUT/COPY/POST/LIST (£0.0040/1k) per
+  month lands at roughly £1.20–1.90, a small line item.
 - **Data transfer — ≈£0/month.** Ingress is free (the daily NWP download from Dynamical
   costs nothing on the AWS side); S3 ↔ Fargate/EC2 traffic within eu-west-2 is free;
   internet egress (the Tailscale-tunnelled Dagster UI and Marimo dashboard) is a few
   GB/month, inside AWS's account-wide 100 GB/month free egress allowance (£0.067/GB
   beyond).
-- **Everything else — pennies.** ECR image storage and CloudWatch Logs ingestion for ~700
-  task runs/month are each well under £0.50/month.
+- **Everything else — pennies.** ECR image storage and CloudWatch Logs ingestion for ~1,000
+  task runs/month — one Fargate task per schedule tick, matching the ~1,000 materialisations/month
+  above (see
+  [Production Deployment — Design](production-deployment.md#running-the-data-ingest-runs-on-the-control-plane-vm))
+  — are each well under £0.50/month.
 
 ## v2 scale (~2,500 time series): projected ~£70–140/month
 
