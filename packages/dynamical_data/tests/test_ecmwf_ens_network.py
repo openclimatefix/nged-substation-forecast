@@ -12,11 +12,14 @@ dtypes, and physical units. If Dynamical ever delivers latitude ascending, longi
 or temperature in Kelvin, the offline tests stay green because the fixture and the code share the
 same (now-wrong) assumption. Only a run against real data can catch that — which is what this does.
 
-See also the offline orientation test
-``test_convert_to_polars.py::test_convert_maps_each_grid_point_to_its_own_lat_lon`` (proves
-``convert`` preserves the value↔lat/lon pairing) and
-``geo/tests/test_h3.py::test_grid_weights_preserve_geographic_orientation`` (proves the H3→lat/lon
-labels are geographically right). This test composes both against the genuine dataset.
+This test re-checks orientation and bounds on real data (descending latitude, longitude range, the
+slice landing on the requested box, variable names, and a physical-range sanity check on
+temperature). It does not re-check the value↔(lat, lon) mapping — that is value-agnostic index
+alignment, already fully proven offline by
+``test_convert_to_polars.py::test_convert_maps_each_grid_point_to_its_own_lat_lon`` (``convert``
+preserves the value↔lat/lon pairing) and
+``geo/tests/test_h3.py::test_grid_weights_preserve_geographic_orientation`` (the H3→lat/lon labels
+are geographically right).
 """
 
 from datetime import UTC, datetime, timedelta

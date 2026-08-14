@@ -344,6 +344,18 @@ def test_nwp_chart_horizontal_geometry_matches_the_power_chart() -> None:
         assert spec["layer"][-1]["encoding"]["color"]["legend"]["orient"] == "top"
 
 
+def test_nwp_shade_weekends_false_omits_the_band_layer() -> None:
+    """Mirrors ``test_shade_weekends_false_omits_the_band_layer`` for the NWP panel.
+
+    ``view_forecasts.py`` drives both panels' ``shade_weekends`` from the same
+    ``weekend_shading`` checkbox, so the NWP panel's ``False`` branch is reachable whenever a
+    user unticks it — it just isn't exercised by any pytest call site.
+    """
+    spec = _build_nwp(shade_weekends=False).to_dict()
+    assert len(spec["layer"]) == 2  # ensemble members, init-time rule
+    assert all(layer["mark"]["type"] != "rect" for layer in spec["layer"])
+
+
 def test_nwp_chart_plots_each_member_with_the_units_on_the_y_axis() -> None:
     spec = _build_nwp().to_dict()
     ensemble = spec["layer"][1]
