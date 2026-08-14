@@ -524,8 +524,10 @@ Still 🚧 after v0.1:
 
 - **A bigger backtest task definition** (e.g. 8 vCPU / 32 GB) — the live 4 vCPU / 16 GB
   definition exists; right-size it after a week of CloudWatch metrics.
-- **Alerting** ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)):
-  basic per-task failure alerting (a failed run → email). Decided 2026-07-14: prefer **portable
+- **Per-task failure email alerting** (a failed run → SNS → email) — Sentry error telemetry and
+  the missed-check-in alarm already shipped in
+  [#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63); this is the one
+  piece of alerting still open. Decided 2026-07-14: prefer **portable
   alerting logic over AWS-native glue** (no EventBridge rules) — the checks should be plain code
   that runs end-to-end on a laptop or any cloud, with only the thin notification edge (SNS,
   SMTP, …) being platform-specific. Under the accepted option, Dagster's own run-failure sensors
