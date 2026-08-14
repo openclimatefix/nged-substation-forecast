@@ -13,7 +13,7 @@ import polars.selectors as cs
 import xarray as xr
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.geo_schemas import H3GridWeights
-from contracts.weather_schemas import NWP_MODEL_ID_DTYPE, Nwp, NwpModelId
+from contracts.weather_schemas import Nwp, NwpModelId
 
 _CONTRIBUTING_WEIGHT_SUFFIX: Final[str] = "__contributing_weight"
 """Suffix of the per-variable renormalisation denominator built by the H3 aggregation.
@@ -60,7 +60,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
                 lat_grid=lat_grid_raveled,
                 lon_grid=lon_grid_raveled,
             ).with_columns(
-                ensemble_member=pl.lit(ensemble_member).cast(pl.UInt8),
+                ensemble_member=pl.lit(ensemble_member).cast(pl.Int8),
                 valid_time=pl.lit(ds_chunk["valid_time"].values).cast(UTC_DATETIME_DTYPE),
             )
             dfs.append(df)
@@ -68,8 +68,12 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     df = (
         pl.concat(dfs)
         .with_columns(
-            nwp_model_id=pl.lit(NwpModelId.ECMWF_ENS_0_25_degree.name).cast(NWP_MODEL_ID_DTYPE),
+            nwp_model_id=pl.lit(NwpModelId.ECMWF_ENS_0_25_degree.name).cast(pl.String),
             init_time=pl.lit(ds["init_time"].values).cast(UTC_DATETIME_DTYPE),
+            # h3_grid.h3_index (H3GridWeights, joined in above) is UInt64 — that contract is out
+            # of this change's scope — but Nwp.h3_index is Int64, so it needs an explicit cast
+            # here rather than at H3GridWeights's boundary.
+            h3_index=pl.col("h3_index").cast(pl.Int64),
             wind_speed_10m=_calc_wind_speed(height="10m"),
             wind_speed_100m=_calc_wind_speed(height="100m"),
             wind_direction_10m=_calc_wind_direction(height="10m"),
@@ -122,7 +126,7 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
     # if they look the same.
     nwp_df = pl.DataFrame(data_dict).with_columns(
         pl.col(numeric_vars).fill_nan(None),
-        pl.col(categorical_vars).fill_nan(None).cast(pl.UInt8),
+        pl.col(categorical_vars).fill_nan(None).cast(pl.Int16),
     )
 
     joined = h3_grid.join(

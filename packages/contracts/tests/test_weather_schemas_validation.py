@@ -266,6 +266,46 @@ def test_out_of_range_continuous_weather_var_is_fatal(column: str, bad_value: fl
         _validate(df)
 
 
+@pytest.mark.parametrize("bad_value", [300, -1])
+def test_out_of_range_categorical_precipitation_type_is_fatal(bad_value: int) -> None:
+    """`categorical_precipitation_type_surface` widened from `UInt8` to `Int16` (needed so the
+    documented `255` "Missing" sentinel survives the write path), so its `0-255` range is no
+    longer implied by the dtype alone and must be enforced by explicit `ge`/`le` bounds instead.
+    New coverage: a `UInt8` column made an out-of-range value physically inexpressible, so this
+    test never previously existed."""
+    df = _nwp_slice(overrides={"categorical_precipitation_type_surface": [bad_value] * 3})
+    with pytest.raises(pt.exceptions.DataFrameValidationError):
+        _validate(df)
+
+
+def test_unrecognised_nwp_model_id_is_fatal() -> None:
+    """`nwp_model_id` widened from `Enum` to `String` (Delta cannot store `Enum`/`Categorical`),
+    so its vocabulary is no longer enforced by the dtype and must be enforced by an explicit
+    `constraints=` field instead. New coverage: the `Enum` dtype previously made an unrecognised
+    model id un-constructible with a cast error, rather than a validation error."""
+    df = _nwp_slice(overrides={"nwp_model_id": ["NOT_A_REAL_MODEL"] * 3})
+    with pytest.raises(pt.exceptions.DataFrameValidationError):
+        _validate(df)
+
+
+def test_check_unique_allows_same_key_different_model_rows() -> None:
+    """`_check_unique` must check `nwp_model_id` alongside the other four primary-key columns —
+    `Nwp`'s own class docstring already documents `nwp_model_id` as part of the key. Checking
+    fewer columns is *stricter*, not more lenient: it would wrongly reject two rows that agree on
+    `(init_time, valid_time, ensemble_member, h3_index)` but differ in `nwp_model_id` — exactly
+    the row shape a second ingested NWP model produces.
+
+    Calls `_check_unique` directly rather than through `Nwp.validate()`: once the vocabulary
+    constraint above is in place, only one `nwp_model_id` value is legal, so a two-model frame
+    cannot pass the full validation pipeline at all.
+    """
+    df = _nwp_slice(h3_indices=(100,), overrides={"nwp_model_id": ["ECMWF_ENS_0_25_degree"]})
+    other_model = _nwp_slice(h3_indices=(100,), overrides={"nwp_model_id": ["A_SECOND_MODEL"]})
+    combined = pt.DataFrame(_nwp_run(df, other_model)).set_model(Nwp).cast()
+
+    Nwp._check_unique(combined)  # does not raise
+
+
 def test_continuous_weather_vars_are_stored_as_float32() -> None:
     """`Nwp`'s continuous variables are declared `Float32`, the physical-unit dtype the on-disk
     Delta table stores (see the `Nwp` docstring). Pins the literal dtype, not one derived from the

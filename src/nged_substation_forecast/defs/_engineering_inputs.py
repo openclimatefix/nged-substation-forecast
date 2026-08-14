@@ -56,7 +56,9 @@ def load_engineering_inputs(
       prune partitions.
     - ``ensemble_member``: applied at the scan so we never decode the ~50 discarded members; the
       member-early sort (``delta_store.nwp.NWP_SORT_COLS``) additionally lets Parquet row-group
-      stats skip most of each partition outright for this predicate — see
+      stats skip most of each partition outright for this predicate, provided the predicate
+      reaches the Parquet scan unchanged — which requires ``Nwp``'s declared ``ensemble_member``
+      dtype to match what's physically on disk. See
       <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
     - ``h3_index``: restricted to the cells the requested series sit in. There is a *many-to-one*
       relationship between ``time_series_id`` and ``h3_index`` (one NWP cell covers several series),

@@ -515,7 +515,7 @@ def test_convert_categorical_precipitation_type(
     df = convert(ds=ds, h3_grid=h3)
 
     assert df.height == 1
-    assert df["categorical_precipitation_type_surface"].dtype == pl.UInt8
+    assert df["categorical_precipitation_type_surface"].dtype == pl.Int16
     assert df["categorical_precipitation_type_surface"].item() == 2
 
 

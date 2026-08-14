@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Final
 
 import polars as pl
-from contracts.weather_schemas import NWP_MODEL_ID_DTYPE, Nwp
+from contracts.weather_schemas import Nwp
 from deltalake import write_deltalake
 from weather_utils import NWP_PUBLICATION_DELAY_HOURS
 
@@ -105,31 +105,26 @@ def write_test_nwp(path: str, records: list[dict]) -> None:
     ``pressure_reduced_to_mean_sea_level`` 101500.0 -> 101504.0, ``precipitation_surface`` rounds
     too), and applies writer properties (compression level, encoding) that exist to optimise the
     real table's on-disk size, not to serve a test fixture. Those two are deliberately *not*
-    shared. What *is* shared with ``write_nwp`` — the ``(nwp_model_id, init_time)`` partitioning
-    and the Enum-to-String strip delta-rs requires for ``nwp_model_id`` — is hand-copied below
-    because ``write_nwp`` doesn't expose it as an importable constant. A change to the partition
-    *column names* going stale here is caught by
+    shared. What *is* shared with ``write_nwp`` — the ``(nwp_model_id, init_time)`` partitioning —
+    is hand-copied below because ``write_nwp`` doesn't expose it as an importable constant. A
+    change to the partition *column names* going stale here is caught by
     ``tests/test_nwp_test_data.py::test_partition_layout_matches_write_nwp``, which compares only
-    ``partition_columns``; a drift in the Enum-to-String strip itself is not covered by that test
-    and would surface only as a write failure.
+    ``partition_columns``.
     """
     df = pl.DataFrame(records).cast(
         {
-            "nwp_model_id": NWP_MODEL_ID_DTYPE,
+            "nwp_model_id": pl.String,
             "init_time": pl.Datetime("us", "UTC"),
             "valid_time": pl.Datetime("us", "UTC"),
-            "ensemble_member": pl.UInt8,
-            "h3_index": pl.UInt64,
-            "categorical_precipitation_type_surface": pl.UInt8,
+            "ensemble_member": pl.Int8,
+            "h3_index": pl.Int64,
+            "categorical_precipitation_type_surface": pl.Int16,
             **dict.fromkeys(NWP_CONTINUOUS_COL_VALUES, pl.Float32),
         }
     )
     validated = Nwp.validate(df)
-    # Strip the Patito model before reverting nwp_model_id to String: delta-rs cannot store an
-    # Enum column, matching how `delta_store.nwp.write_nwp` prepares the real table for disk.
-    prepared = pl.DataFrame._from_pydf(validated._df).cast({"nwp_model_id": pl.String})
     # `partition_by` hand-copies `delta_store.nwp.write_nwp`'s layout — see the docstring above
     # for why this can't just call `write_nwp`, and `test_nwp_test_data.py` for the drift guard.
     write_deltalake(
-        table_or_uri=path, data=prepared.to_arrow(), partition_by=["nwp_model_id", "init_time"]
+        table_or_uri=path, data=validated.to_arrow(), partition_by=["nwp_model_id", "init_time"]
     )

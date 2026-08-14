@@ -642,7 +642,7 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
     scattered = _make_nwp(init_time, n=3).with_columns(
         init_time=pl.lit(init_time),
         valid_time=pl.lit(init_time + timedelta(hours=3)),
-        ensemble_member=pl.lit(0, dtype=pl.UInt8),
+        ensemble_member=pl.lit(0, dtype=pl.Int8),
         precipitation_surface=pl.Series([0.001, None, 0.001], dtype=pl.Float32),
     )
     # `object` cannot be inlined in place of this stub: the real function is called with

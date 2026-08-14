@@ -43,8 +43,6 @@ class NwpModelId(StrEnum):
     ECMWF_ENS_0_25_degree = auto()
 
 
-NWP_MODEL_ID_DTYPE = pl.Enum([model.name for model in NwpModelId])
-
 ECMWF_ENS_ENSEMBLE_MEMBERS: Final[frozenset[int]] = frozenset(range(51))
 """The ensemble members every ECMWF IFS ENS run carries: the control member plus 50 perturbed
 members, indexed 0-50 by Dynamical.org (matching `Nwp.ensemble_member`, which is 0-based).
@@ -115,8 +113,15 @@ class Nwp(pt.Model):
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
     """
 
+    # `dtype=pl.String` (not `Enum`, which Delta cannot store) means an out-of-vocabulary value is
+    # no longer physically inexpressible the way it was under `Enum` — a plain `str` column can
+    # hold any string at construction time, with no error. The `constraints=` check below is now
+    # the *only* defence, and it fires at `Nwp.validate()`, not at construction: a frame built and
+    # never validated can carry an unrecognised `nwp_model_id` all the way through. Every current
+    # caller validates, so this is latent rather than live today.
     nwp_model_id: str = pt.Field(
-        dtype=NWP_MODEL_ID_DTYPE,
+        dtype=pl.String,
+        constraints=pl.col("nwp_model_id").is_in([model.name for model in NwpModelId]),
         description="Which NWP model produced this row (e.g. 'ECMWF_ENS_0_25_degree').",
     )
 
@@ -143,12 +148,12 @@ class Nwp(pt.Model):
     )
 
     ensemble_member: int = pt.Field(
-        dtype=pl.UInt8,
+        dtype=pl.Int8,
         description="Ensemble member index (0-based).",
     )
 
     h3_index: int = pt.Field(
-        dtype=pl.UInt64,
+        dtype=pl.Int64,
         description=(
             "H3 cell index, at `ECMWF_ENS_H3_RESOLUTION` (every NWP model shares it today)."
         ),
@@ -272,7 +277,9 @@ class Nwp(pt.Model):
     )
 
     categorical_precipitation_type_surface: int | None = pt.Field(
-        dtype=pl.UInt8,
+        dtype=pl.Int16,
+        ge=0,
+        le=255,
         description=(
             "This field is always NaN for init_times on and before 2024-11-12, and populated from"
             " the 2024-11-13 00Z run onwards (confirmed by direct inspection of the source data)."
@@ -410,12 +417,15 @@ class Nwp(pt.Model):
     @classmethod
     def _check_unique(cls, dataframe: pt.DataFrame[Self]) -> None:
         if (
-            dataframe.select(["init_time", "valid_time", "ensemble_member", "h3_index"])
+            dataframe.select(
+                ["nwp_model_id", "init_time", "valid_time", "ensemble_member", "h3_index"]
+            )
             .is_duplicated()
             .any()
         ):
             raise ValueError(
-                "Duplicate entries found for (init_time, valid_time, ensemble_member, h3_index)."
+                "Duplicate entries found for "
+                "(nwp_model_id, init_time, valid_time, ensemble_member, h3_index)."
             )
 
     @classmethod
