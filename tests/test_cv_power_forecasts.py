@@ -15,7 +15,7 @@ import numpy as np
 import polars as pl
 import pyarrow.parquet as pq
 import pytest
-from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
+from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES, half_hours
 from contracts.ml_schemas import EligibleTimeSeries
 from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
@@ -38,17 +38,11 @@ _VAL_DAY = datetime(2025, 8, 1, tzinfo=UTC)  # inside val window [2025-07-01, 20
 _VAL_MEMBERS = (0, 1, 2)  # stands in for the full 51-member ensemble in this synthetic fixture
 
 
-def _half_hours(day: datetime) -> pl.Series:
-    return pl.datetime_range(
-        day.replace(hour=6), day.replace(hour=8), interval="30m", time_zone="UTC", eager=True
-    )
-
-
 def _write_power(path: str) -> None:
     """Observed power for ts1 in the training window (the validation forecast needs no actuals)."""
     rows = [
         {"time_series_id": 1, "time": t, "power": 100.0 + i}
-        for i, t in enumerate(_half_hours(_TRAIN_DAY))
+        for i, t in enumerate(half_hours(_TRAIN_DAY))
     ]
     pl.DataFrame(rows).cast(
         {"time_series_id": pl.Int32, "time": pl.Datetime("us", "UTC"), "power": pl.Float32}
@@ -59,7 +53,7 @@ def _nwp_records(cell: int, day: datetime, members: tuple[int, ...]) -> list[dic
     records = []
     init_time = day.replace(hour=0)
     for member in members:
-        for valid_time in _half_hours(day):
+        for valid_time in half_hours(day):
             record = {
                 "nwp_model_id": "ECMWF_ENS_0_25_degree",
                 "init_time": init_time,

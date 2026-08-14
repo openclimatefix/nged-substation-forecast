@@ -12,7 +12,7 @@ from pathlib import Path
 import mlflow
 import polars as pl
 import pytest
-from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES
+from _nwp_test_data import NWP_CONTINUOUS_COL_VALUES, half_hours
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.settings import Settings
 from dagster import DagsterInstance, RunConfig, materialize
@@ -55,15 +55,7 @@ def _write_power(path: str) -> None:
     rows = [
         {"time_series_id": ts, "time": t, "power": 100.0 + i}
         for ts, day in ((1, _IN_WINDOW), (2, _AFTER_TRAIN_END))
-        for i, t in enumerate(
-            pl.datetime_range(
-                day.replace(hour=6),
-                day.replace(hour=8),
-                interval="30m",
-                time_zone="UTC",
-                eager=True,
-            )
-        )
+        for i, t in enumerate(half_hours(day))
     ]
     pl.DataFrame(rows).cast(
         {"time_series_id": pl.Int32, "time": pl.Datetime("us", "UTC"), "power": pl.Float32}
@@ -98,9 +90,7 @@ def _write_nwp(path: str) -> None:
         (_TS2_CELL, _IN_WINDOW, _IN_WINDOW.replace(hour=0)),
         (_TS1_CELL, _TRAIN_START, _EARLY_INIT_TIME),
     ):
-        for valid_time in pl.datetime_range(
-            day.replace(hour=6), day.replace(hour=8), interval="30m", time_zone="UTC", eager=True
-        ):
+        for valid_time in half_hours(day):
             for member in _NWP_ENSEMBLE_MEMBERS:
                 record = {
                     "nwp_model_id": "ECMWF_ENS_0_25_degree",
