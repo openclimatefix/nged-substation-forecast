@@ -2846,7 +2846,6 @@ name = "nged-substation-forecast"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
-    { name = "altair" },
     { name = "contracts" },
     { name = "dagster" },
     { name = "dagster-aws" },
@@ -2859,13 +2858,10 @@ dependencies = [
     { name = "ml-core" },
     { name = "mlflow-skinny" },
     { name = "nged-data" },
-    { name = "obstore" },
     { name = "patito" },
-    { name = "plotting" },
     { name = "polars" },
     { name = "pyarrow" },
     { name = "pyyaml" },
-    { name = "requests" },
     { name = "sentry-sdk" },
     { name = "xgboost-forecaster" },
 ]
@@ -2890,7 +2886,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "altair", specifier = ">=6.0.0" },
     { name = "contracts", editable = "packages/contracts" },
     { name = "dagster", specifier = ">=1.12.11" },
     { name = "dagster-aws", specifier = ">=0.28.11" },
@@ -2903,13 +2898,10 @@ requires-dist = [
     { name = "ml-core", editable = "packages/ml_core" },
     { name = "mlflow-skinny" },
     { name = "nged-data", editable = "packages/nged_data" },
-    { name = "obstore" },
     { name = "patito" },
-    { name = "plotting", editable = "packages/plotting" },
     { name = "polars", specifier = ">=1.0.0" },
     { name = "pyarrow" },
     { name = "pyyaml" },
-    { name = "requests", specifier = ">=2.31.0" },
     { name = "sentry-sdk", specifier = ">=2.66,<3" },
     { name = "xgboost-forecaster", editable = "packages/xgboost_forecaster" },
 ]

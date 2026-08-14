@@ -16,7 +16,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
-    "altair>=6.0.0",
     "contracts",
     "dagster>=1.12.11",
     "dagster-aws>=0.28.11",
@@ -29,13 +28,10 @@ dependencies = [
     "ml_core",
     "mlflow-skinny",
     "nged_data",
-    "obstore",
     "patito",
-    "plotting",
     "polars>=1.0.0",
     "pyarrow",
     "pyyaml",
-    "requests>=2.31.0",
     "sentry-sdk>=2.66,<3",
     "xgboost_forecaster",
 ]
