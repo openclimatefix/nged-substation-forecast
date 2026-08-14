@@ -21,7 +21,7 @@ reasoning stays auditable. The step-by-step *how-to* is
 `trained_cv_model`, `cv_power_forecasts`, and `metrics` are separate Dagster assets running in
 **separate processes** (and, for retries, at separate times). An MLflow run handle cannot cross
 a process boundary, so the assets **discover and resume runs by tag** through three idempotent
-get-or-create helpers in `ml_core._mlflow_runs`:
+get-or-create helpers in `ml_core.mlflow_runs`:
 
 - `get_or_create_experiment(experiment_name)` — wraps `mlflow.get_experiment_by_name`.
 - `get_or_create_parent_run(experiment_id)` — `search_runs` for `tags.cv_role = 'parent'`.
@@ -54,7 +54,7 @@ temporary directory and loads from there; there is no local-disk cache.
 model trained against, which production inference locates its series by — then packs the whole
 directory into a single `model.tar.gz` and logs that one file to the run's artifact root.
 `load_from_mlflow` and the production download path
-(`ml_core._production_helpers.fetch_model_artifacts`) each unpack it into a temporary directory.
+(`ml_core.production_helpers.fetch_model_artifacts`) each unpack it into a temporary directory.
 Subclass `save`/`load` never see the archive: they stay directory-based and MLflow-free, so the
 Docker bake path (`load_forecaster_from_dir`) is unaffected.
 

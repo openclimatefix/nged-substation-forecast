@@ -14,9 +14,9 @@ from typing import ClassVar, Final, Literal, Self
 import patito as pt
 import polars as pl
 
-from contracts._uri import ObjectStoreOptions
 from contracts.settings import get_settings
 from contracts.typing_utils import typeddict_to_dict
+from contracts.uri import ObjectStoreOptions
 
 from .common import UTC_DATETIME_DTYPE, check_datetime_bounds
 

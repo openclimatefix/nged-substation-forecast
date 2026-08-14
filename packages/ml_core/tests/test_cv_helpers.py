@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime
 
 import polars as pl
 from contracts.config_schemas import CvFoldConfig
-from ml_core._cv_helpers import (
+from ml_core.cv_helpers import (
     _subtract_months,
     date_to_utc_datetime,
     eligible_time_series_ids,

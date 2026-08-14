@@ -29,10 +29,10 @@ from datetime import UTC, datetime, timedelta
 import patito as pt
 import polars as pl
 import pytest
-from contracts._uri import object_exists
 from contracts.power_schemas import PowerForecast, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
+from contracts.uri import object_exists
 from contracts.weather_schemas import Nwp
 from delta_store.nwp import write_nwp
 from delta_store.power_forecasts import write_power_forecasts

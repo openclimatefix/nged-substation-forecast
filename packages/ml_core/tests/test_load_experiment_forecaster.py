@@ -4,7 +4,7 @@ from pathlib import Path
 
 import mlflow
 import pytest
-from ml_core._mlflow_runs import get_or_create_experiment, load_experiment_forecaster
+from ml_core.mlflow_runs import get_or_create_experiment, load_experiment_forecaster
 from mlflow.tracking import MlflowClient
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 

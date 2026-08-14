@@ -1,4 +1,4 @@
-"""Unit tests for ``ml_core._production_helpers``.
+"""Unit tests for ``ml_core.production_helpers``.
 
 ``select_nwp_init_time`` and ``build_live_power_frame`` take an injected clock and no wall-clock
 reads, so they are exercised directly with fixed datetimes. ``load_forecaster_from_dir`` is
@@ -17,7 +17,7 @@ import polars as pl
 import pytest
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries
-from ml_core._production_helpers import (
+from ml_core.production_helpers import (
     build_live_power_frame,
     load_forecaster_from_dir,
     select_nwp_init_time,

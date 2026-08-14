@@ -397,7 +397,7 @@ need a retirement path that cannot lose results.
 - MLflow: log the same aggregates to a **dedicated `production_monitoring` MLflow experiment**
   — never to the golden leaderboard — as **time-series points** (MLflow metric
   timestamp/step), one persistent run per window resolved by tag (mirroring the
-  `_mlflow_runs` get-or-create convention), so MLflow charts live performance over time (e.g.
+  `mlflow_runs` get-or-create convention), so MLflow charts live performance over time (e.g.
   trailing-7d NMAE per `time_series_type`). Stamp `mlflow_run_id` on the Delta rows as the
   cross-link.
 - Note: evaluating "the last 24h of production" scores forecasts whose `valid_time` has already

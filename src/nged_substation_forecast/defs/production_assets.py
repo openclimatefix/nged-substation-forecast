@@ -3,7 +3,7 @@
 New file (``defs/cv_assets.py`` is already ~900 lines): ``promoted_model`` (manually-triggered
 promotion of a champion model to local disk) and ``live_forecasts`` (the 6-hourly inference asset
 that reads it). Both stay thin shells over the pure/IO-light helpers in
-``ml_core._production_helpers``.
+``ml_core.production_helpers``.
 """
 
 import json
@@ -14,10 +14,10 @@ from typing import Final
 import mlflow
 import patito as pt
 import polars as pl
-from contracts._uri import if_local_path_then_make_parent_dir
 from contracts.ml_schemas import AllFeatures
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
+from contracts.uri import if_local_path_then_make_parent_dir
 from dagster import (
     AssetDep,
     AssetExecutionContext,
@@ -30,15 +30,15 @@ from dagster import (
 )
 from delta_store.power_forecasts import write_power_forecasts
 from deltalake import DeltaTable
-from ml_core._mlflow_runs import list_promotable_runs
-from ml_core._production_helpers import (
+from ml_core.base_forecaster import load_trained_metadata
+from ml_core.mlflow_runs import list_promotable_runs
+from ml_core.production_helpers import (
     AvailabilityModeType,
     build_live_power_frame,
     fetch_model_artifacts,
     load_forecaster_from_dir,
     select_nwp_init_time,
 )
-from ml_core.base_forecaster import load_trained_metadata
 
 from nged_substation_forecast._sentry import send_forecast_checkin
 from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
@@ -125,7 +125,7 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     Manually triggered from the Dagster UI launchpad with ``mlflow_run_id`` set to the champion
     fold's run id — materialise ``promotable_model_runs`` first and copy the id from its output
     metadata table if you don't have it to hand. Downloads that run's saved model artifacts to
-    ``Settings.production_model_path`` (via ``ml_core._production_helpers.fetch_model_artifacts``,
+    ``Settings.production_model_path`` (via ``ml_core.production_helpers.fetch_model_artifacts``,
     which replaces the directory atomically), then reads back ``meta.json`` to report provenance.
     ``live_forecasts`` reads this directory with a plain disk load — never MLflow.
 

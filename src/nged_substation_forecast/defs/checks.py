@@ -63,10 +63,10 @@ from pathlib import Path
 from typing import Any, Final
 
 import polars as pl
-from contracts._uri import ObjectStoreOptions, delta_table_exists, object_exists
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
+from contracts.uri import ObjectStoreOptions, delta_table_exists, object_exists
 from dagster import (
     AssetCheckExecutionContext,
     AssetCheckResult,

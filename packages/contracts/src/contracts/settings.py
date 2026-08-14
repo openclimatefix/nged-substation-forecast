@@ -11,7 +11,7 @@ import obstore
 from pydantic import AnyHttpUrl, Field, TypeAdapter, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from contracts._uri import ObjectStoreOptions, uri_join
+from contracts.uri import ObjectStoreOptions, uri_join
 
 url_adapter = TypeAdapter(AnyHttpUrl)
 
@@ -278,7 +278,7 @@ class Settings(BaseSettings):
         default="",
         description=(
             "Directory holding the current production model, written by the promoted_model"
-            " asset (ml_core._production_helpers.fetch_model_artifacts) and read by"
+            " asset (ml_core.production_helpers.fetch_model_artifacts) and read by"
             " live_forecasts via a plain BaseForecaster disk load — no MLflow at inference"
             " time. Later COPY'd into the container image at build time (issue #222)."
         ),

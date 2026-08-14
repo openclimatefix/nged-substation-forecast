@@ -59,7 +59,7 @@ testing strategy remain unwritten, plus general cleanup.
   codebase review) into `cv_assets.py` / `production_assets.py` / `metric_assets.py`. The
   [`live_forecasts` work](live-service.md#the-live_forecasts-asset) already starts
   `production_assets.py`; move the `metrics` asset and its helpers into `metric_assets.py`
-  here. Pure logic stays in `ml_core._cv_helpers`.
+  here. Pure logic stays in `ml_core.cv_helpers`.
 
 **Part 3 — docs freshness pass.** The permanent-docs migration from the old `dagster_plan.md`
 is already done (July 2026): `docs/architecture/ml-orchestration.md` and

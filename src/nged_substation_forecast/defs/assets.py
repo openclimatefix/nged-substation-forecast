@@ -10,11 +10,11 @@ from typing import Any, Final, Self
 
 import patito as pt
 import polars as pl
-from contracts._uri import if_local_path_then_make_parent_dir
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
+from contracts.uri import if_local_path_then_make_parent_dir
 from contracts.weather_schemas import (
     ECMWF_ENS_H3_RESOLUTION,
     Nwp,

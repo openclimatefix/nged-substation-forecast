@@ -463,7 +463,7 @@ even if it would otherwise qualify today.
 The "researcher downloads artifacts" step above is a manually-triggered Dagster asset,
 `promoted_model` (config `mlflow_run_id`), rather than a bare script — promotion becomes a
 materialisation, giving an audit trail and lineage for free. The download logic itself
-(`ml_core._production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper, so
+(`ml_core.production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper, so
 nothing about this decision couples it to Dagster.
 
 **The image build is hermetic and depends on the asset only through the filesystem.** A

@@ -1,4 +1,4 @@
-"""Unit tests for the local-or-remote URI helpers in ``contracts._uri``.
+"""Unit tests for the local-or-remote URI helpers in ``contracts.uri``.
 
 Covers the local-filesystem behaviour (the remote ``s3://`` behaviour is exercised end-to-end
 against a moto server in ``tests/test_s3_data_paths.py``).
@@ -7,7 +7,7 @@ against a moto server in ``tests/test_s3_data_paths.py``).
 from pathlib import Path
 
 import polars as pl
-from contracts._uri import (
+from contracts.uri import (
     delta_table_exists,
     if_local_path_then_make_parent_dir,
     is_remote_uri,

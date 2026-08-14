@@ -103,7 +103,7 @@ running on AWS.*
   `test_apply_local_time_features_dst_transitions` covers both the spring-forward and fall-back
   transition instants)
 - Reproducibility stamping: git SHA + Delta table versions on every MLflow run ✅ (implemented in
-  `ml_core._repro`; every MLflow run carries the stamp)
+  `ml_core.repro`; every MLflow run carries the stamp)
 - Drop Hydra in favour of plain YAML + importlib + pydantic ✅ (`contracts.config_schemas` owns the
   `_target_` round-trip; dropping the two dependencies also unpinned `antlr4-python3-runtime`,
   which had been breaking Dagster's asset-selection strings)

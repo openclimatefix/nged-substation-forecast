@@ -23,8 +23,8 @@ import subprocess
 from pathlib import Path
 from typing import Final, Literal
 
-from contracts._uri import ObjectStoreOptions
 from contracts.typing_utils import typeddict_to_dict
+from contracts.uri import ObjectStoreOptions
 from deltalake import DeltaTable
 
 logger = logging.getLogger(__name__)

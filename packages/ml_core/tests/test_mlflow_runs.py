@@ -4,7 +4,7 @@ from pathlib import Path
 
 import mlflow
 import pytest
-from ml_core._mlflow_runs import (
+from ml_core.mlflow_runs import (
     get_or_create_experiment,
     get_or_create_fold_run,
     get_or_create_parent_run,

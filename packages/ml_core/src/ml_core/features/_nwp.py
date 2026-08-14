@@ -11,7 +11,7 @@ from contracts.common import UTC_DATETIME_DTYPE
 from contracts.weather_schemas import Nwp
 
 # Re-export shim: the canonical definition lives in ``weather_utils`` (the analysis-proxy
-# availability cut owns it), but the join helpers here and ``_production_helpers`` /
+# availability cut owns it), but the join helpers here and ``production_helpers`` /
 # ``feature_engineer`` still import it from this module.
 from weather_utils import NWP_PUBLICATION_DELAY_HOURS
 
