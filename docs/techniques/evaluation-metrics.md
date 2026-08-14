@@ -371,9 +371,9 @@ $$
 
 Because it reuses the fair form, twCRPS inherits CRPS's one crucial comparability property:
 it is unbiased across ensemble sizes, so the 13-member `nged_incumbent` and the 51-member ML
-models can be compared on it directly. It is computed per threshold in the
-[per-series threshold ladder](#choosing-the-thresholds-static-per-series-quantile-derived),
-with `metric_param` carrying the threshold label.
+models can be compared on it directly. It is computed against the [per-series
+threshold](#choosing-the-thresholds-static-per-series-quantile-derived), with `metric_param`
+carrying the threshold label.
 
 ### Exceedance rate of the upper delivery quantiles
 
@@ -440,20 +440,20 @@ their scoring properties**, and state plainly that they are a proxy — these me
 "skill near a fixed line standing where the limit typically lives", not operational breach
 prediction:
 
-- **The threshold ladder: the P90 and P98 of each series' full observation history** (of
-  power in the constraint-side direction — see below). Labels `hist_p90` / `hist_p98` in
-  `metric_param`, deliberately distinct from forecast-quantile labels like `p95`: one names a
-  fixed power level derived from history, the other a level of the forecast distribution. The
-  two rungs give a "busy periods" and a "genuinely extreme" read without exploding the key
-  count.
+- **The threshold: the P99 of each series' full observation history** (of power in the
+  constraint-side direction — see below), the rung NGED described when we discussed this in
+  July 2026. Its label in `metric_param` is `historical_p99`, deliberately distinct from the
+  forecast-quantile label `p99`: one names a fixed power level derived from history, the other
+  a level of the forecast distribution. The prefix is spelled out rather than shortened to
+  `hist_`, which reads as "histogram".
 
 - **Why historical quantiles rather than the physical ratings:** ratings are not available
   for every series; a rating that is never breached in a 12-month validation window yields
   *zero events* — and a warning system cannot be graded on events that never happen; and
   per-series ratings sit at wildly different points of each series' distribution, breaking
-  cross-series comparability. Full-history quantile thresholds guarantee every series a
-  scoreable event rate (~10% and ~2% by construction), are identical in meaning across
-  series, and are stable across CV folds for the same reason the
+  cross-series comparability. A full-history quantile threshold guarantees every series a
+  scoreable event rate (~1% by construction), is identical in meaning across series, and is
+  stable across CV folds for the same reason the
   [effective-capacity denominator](../roadmap/metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
   is computed over the full history.
 
@@ -479,8 +479,8 @@ To keep the leaderboard legible, parametric metrics are
 restricted in MLflow to a **headline subset**: `pinball_loss` at p10/p50/p90 and `picp` /
 `interval_width` at p10_p90 (the allowlist is `_MLFLOW_LOGGED_PARAMETRIC` in
 `ml_core.metrics`). The exact key count scales with how many distinct `time_series_type`
-values the scored population spans (each adds a per-type key family): 132 keys for the V1
-trial area's six types, versus roughly 340 if every quantile and band were logged. Anything
+values the scored population spans (each adds a per-type key family): 144 keys for the V1
+trial area's seven types, versus roughly 380 if every quantile and band were logged. Anything
 not in MLflow is still one Polars filter away in Delta.
 
 ## What is deliberately *not* here
@@ -508,7 +508,8 @@ not in MLflow is still one Polars filter away in Delta.
 
 - **Cost-loss economic value curves** — the fully decision-theoretic summary of exceedance
   skill: for each ratio of "cost of acting on a warning" to "loss if an unwarned exceedance
-  occurs", how much of a perfect forecast's value does this model capture? This is the natural
-  bridge to the 🔬 v2 stretch goal of estimating **cost savings (£)** per leaderboard row
-  ([Grouping the results](../roadmap/metrics-and-leaderboard.md#grouping-the-results)); until
-  then it is an ad-hoc analysis.
+  occurs", how much of a perfect forecast's value does this model capture? We do not compute
+  these, because the loss term is a number NGED do not hold in usable form; the
+  [cost-savings metrics](../roadmap/cost-savings-metrics.md) reach the same comparison by holding
+  every model to equal risk and comparing what each spends. The curves remain a useful ad-hoc
+  analysis if that loss figure ever firms up.

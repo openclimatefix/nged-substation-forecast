@@ -645,17 +645,21 @@ reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
   "70% chance of rain" forecast; the most *decision-legible* number, scoring exactly the
   warning NGED acts on.
 
-All three fit the existing `Metrics` schema — `metric_param` carries the threshold or quantile
-label — so there is no schema change.
+All three fit the existing `Metrics` shape — `metric_param` carries the threshold or quantile
+label — but they need a contract change to get there: `METRIC_NAMES` has no `twcrps` or `brier`
+entry, and `METRIC_PARAMS` no `historical_p99`, and both fields are `pl.Enum`.
 
 **Thresholds: static, per-series, quantile-derived.** A substation's true limit is not a
 single number (ratings vary with ambient temperature; transformers tolerate short overloads,
 so exceedance *duration* matters; switching changes what a feeder carries — NGED's own limit
 line is a time-varying "Flex Profile"). We deliberately do not model any of that for scoring.
-Each series gets two static thresholds — the P90 and P98 of its full observation history, in
-the series type's constraint-side direction (high load for demand; reverse power flow for
-generation) — chosen because they guarantee every series a scoreable event rate, mean the same
-thing across series, and stay stable across CV folds. Physical firm/flex ratings, where NGED
+Each series gets one static threshold — the P99 of its full observation history, in the series
+type's constraint-side direction (high load for demand; reverse power flow for generation) —
+chosen because it guarantees every series a scoreable event rate, means the same thing across
+series, and stays stable across CV folds. NGED described setting capacity at the 99th percentile
+when we discussed this in July 2026; it is the same rung the
+[cost-savings metrics](cost-savings-metrics.md#choosing-the-limit) use, so the leaderboard
+carries one threshold concept rather than several. Physical firm/flex ratings, where NGED
 supplies them, feed ad-hoc case studies and dashboard overlays instead: a rating that is never
 breached in the validation window yields zero events, and a warning system cannot be graded on
 events that never happen. The full rationale, and the explicit "this is a proxy" caveat, live
@@ -676,20 +680,20 @@ before/after instruments for Phases C and D.
 
 #### Implementation details — tail & exceedance metrics (deleted when this ships)
 
-- **Thresholds:** compute per-series `hist_p90` / `hist_p98` scalars from the full observation
+- **Thresholds:** compute a per-series `historical_p99` scalar from the full observation
   history alongside (or within) the `effective_capacity` asset — same full-history stability
   rationale, same join shape (`time_series_id`-only). Constraint-side direction resolved per
   `time_series_type`; confirm the mapping with NGED for ambiguous types (BESS charges *and*
   discharges).
 - **twCRPS:** transform members and observation with `pl.max_horizontal(col, threshold)` and
   reuse the existing fair-CRPS expression (sorted-member identity, Float64 accumulation)
-  verbatim, once per threshold rung.
+  verbatim.
 - **Exceedance rates:** compare `y` against the already-computed empirical quantile columns
   for p80, p90, p95, p98, p99 — one boolean mean per level.
 - **Brier score:** exceedance probability = member fraction above the threshold; outcome
   indicator from `y`; squared difference, averaged.
 - **MLflow allowlist:** extend `_MLFLOW_LOGGED_PARAMETRIC` with a small headline subset (e.g.
-  `twcrps@hist_p98`, exceedance rate at p95, `brier@hist_p98`); decide the exact set at
+  `twcrps@historical_p99`, exceedance rate at p95, `brier@historical_p99`); decide the exact set at
   implementation time and keep it small — everything is in Delta regardless.
 - **Peak-events diagnostic slice:** one more named population filter on the shared mechanism
   (with the Tricky-days filter), flagged in the leaderboard UI as diagnostic-only.
@@ -985,5 +989,7 @@ NWP?"). Example tags:
 | `switching_event_detection` | none, simple_statistical |
 | `pre_training` | none, ERA5 |
 
-> Estimating **cost savings (£)** attributable to each forecasting approach, per leaderboard row, is
-> a 🔬 v2 stretch goal.
+> Every leaderboard row also carries two **cost savings (£)** figures — one for flexibility
+> procurement, one for curtailment — designed in
+> [Estimating the money a better forecast saves](cost-savings-metrics.md). They are deliberately
+> rough proxies, not a cost analysis.
