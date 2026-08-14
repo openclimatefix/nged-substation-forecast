@@ -175,3 +175,37 @@ def test_tabular_feature_engineer_single_run_params_reach_engineer_features() ->
     assert_frame_equal(
         via_engineer.sort("time_series_id"), direct.sort("time_series_id"), check_dtypes=False
     )
+
+
+def test_tabular_feature_engineer_threads_local_timezone() -> None:
+    """``local_timezone`` reaches the local-time features through the public ``engineer()`` call.
+
+    Unlike ``test_apply_local_time_features_non_london_timezone`` in ``test_features.py``, which
+    calls the bottom-most helper directly, this goes through ``TabularFeatureEngineer.engineer()``
+    — the composition point every production call site uses
+    (``forecaster.feature_engineer.engineer(...)``). ``local_timezone`` passes through two
+    intermediate layers (``_engineer_features``, then ``_apply_post_join_features``) before
+    reaching ``_apply_local_time_features``; a dropped passthrough at either layer would silently
+    revert every caller to ``Europe/London`` while the direct-call unit test kept passing.
+    """
+    valid_time = datetime(2024, 6, 1, 12, 0)  # 17:30 in Asia/Kolkata (fixed UTC+5:30, no DST).
+    power = pt.LazyFrame.from_existing(
+        pl.DataFrame({"time_series_id": [1], "time": [valid_time], "power": [100.0]}).lazy()
+    ).set_model(PowerTimeSeries)
+
+    result = (
+        TabularFeatureEngineer()
+        .engineer(
+            selected_features={"local_utc_offset_minutes"},
+            power_time_series=power,
+            time_series_metadata=_metadata_two_series(),
+            nwp=_nwp_two_cells(),
+            local_timezone="Asia/Kolkata",
+        )
+        .collect()
+    )
+
+    # Bulk mode is NWP-centric, so both cells' time series appear even though only ts1 has a
+    # power observation; every row shares the same valid_time, so every offset is 330.
+    assert set(result["local_utc_offset_minutes"].to_list()) == {330}
+    assert result.height == 2

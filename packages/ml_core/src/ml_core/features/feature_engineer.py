@@ -9,6 +9,7 @@ a different ``FeatureEngineer``.
 
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Final
 
 import patito as pt
 from contracts.ml_schemas import AllFeatures
@@ -16,6 +17,14 @@ from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import Nwp
 
 from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
+
+DEFAULT_LOCAL_TIMEZONE: Final[str] = "Europe/London"
+"""IANA zone the local-time features (time of day, day of week, UTC offset) are computed in.
+
+Defined here, on the interface, rather than inside ``TabularFeatureEngineer``, so a future
+``FeatureEngineer`` forecasting another region can override it through the same ``engineer()``
+call every production call site already uses — not just through the one implementation.
+"""
 
 
 class FeatureEngineer(ABC):
@@ -32,6 +41,7 @@ class FeatureEngineer(ABC):
         power_fcst_init_time: datetime | None = None,
         nwp_init_time: datetime | None = None,
         nwp_publication_delay_hours: int = NWP_PUBLICATION_DELAY_HOURS,
+        local_timezone: str = DEFAULT_LOCAL_TIMEZONE,
     ) -> pt.LazyFrame[AllFeatures]:
         """Engineer features for training/inference.
 
@@ -59,6 +69,7 @@ class FeatureEngineer(ABC):
                 mode. See ``_engineer_features``.
             nwp_publication_delay_hours: Delay used to derive whichever of
                 ``power_fcst_init_time``/``nwp_init_time`` is not supplied.
+            local_timezone: IANA zone the local-time features are computed in.
 
         Returns:
             A lazy ``AllFeatures`` frame, ready to hand to ``BaseForecaster.train``/``predict``.

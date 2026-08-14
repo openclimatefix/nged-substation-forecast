@@ -25,7 +25,6 @@ Nullify Leaky Lags Rationale:
 
 import math
 from datetime import datetime, timedelta
-from typing import Final
 
 import patito as pt
 import polars as pl
@@ -42,15 +41,7 @@ from ml_core.features._nwp import (
     _upsample_nwp_to_half_hourly,
 )
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, ParsedFeatures
-from ml_core.features.feature_engineer import FeatureEngineer
-
-DEFAULT_LOCAL_TIMEZONE: Final[str] = "Europe/London"
-"""IANA zone the local-time features (time of day, day of week, UTC offset) are computed in.
-
-Every caller in this repo forecasts Great Britain, so nothing overrides it today — but it is a
-parameter, not a literal buried in the function body, so a future caller forecasting another
-region can pass its own zone without editing this module.
-"""
+from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE, FeatureEngineer
 
 
 def _attach_nearest_nwp_cell(

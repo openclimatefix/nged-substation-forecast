@@ -256,8 +256,11 @@ is already
 geography-neutral](../architecture/adapting-to-another-geography.md#what-is-already-geography-neutral)
 — which also records, from an assessment made against a real brief, exactly where this principle
 is *not* yet honoured: the place-specific assumptions do sit in one thin layer (mostly the
-`contracts` package), but a hard-coded `"Europe/London"` literal in the dashboard's axis titles
-sits outside it, which is precisely the leak the principle exists to prevent.
+`contracts` package), but two hard-coded `"Europe/London"` defaults sit outside it — the
+dashboard's `DISPLAY_TIME_ZONE` and `ml_core`'s `DEFAULT_LOCAL_TIMEZONE` — which is precisely the
+leak the principle exists to prevent. `ml_core`'s default reaches `FeatureEngineer.engineer()` as
+an overridable parameter, but the value itself still lives in general-purpose `ml_core` code
+rather than in `contracts`, so it remains an instance of the leak.
 
 ### 6 — The whole system must be exercisable on one laptop
 
