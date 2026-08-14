@@ -11,8 +11,8 @@ counterpart.
 land (so far: the `live_forecasts` and `promoted_model` assets, local 6-hourly automation, the
 container build/verify runbook, the AWS bring-up runbook, and Sentry telemetry with the
 missed-check-in alarm; still to come: production monitoring, and per-task failure-email alerting).
-Once the whole v0.1 epic ships, the roadmap page is deleted and this section is the sole home for
-how the live service works.
+Once production monitoring lands and its design is promoted, the roadmap page is deleted and this
+section is the sole home for how the live service works.
 
 This is distinct from [ML Experimentation](../ml_experimentation/index.md): that area covers
 training and backtesting candidate models against historical data; this area covers picking one

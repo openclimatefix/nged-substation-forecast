@@ -1,6 +1,6 @@
 # Setting up the live service on AWS
 
-Every step to stand up the v0.1 live service on AWS, in order, ending with the full stack
+Every step to stand up the live service on AWS, in order, ending with the full stack
 running unattended: data tables on S3 (Simple Storage Service, AWS's object store), the champion
 model baked into a container image, an always-on control-plane box running Dagster behind
 Tailscale, and 6-hourly forecasts executing on ephemeral Fargate (AWS's serverless container

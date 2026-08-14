@@ -356,8 +356,8 @@ completeness — and is likewise a warning, never a failure.
 
 Production forecasts run as ephemeral Fargate tasks, dispatched by the always-on Dagster
 control plane described [above](#run-the-dagster-control-plane-continuously-on-one-small-vm).
-An ephemeral container has no persistent disk and, for v0.1, no MLflow tracking server to reach
-— so production inference needs some way to get a model without depending on either.
+An ephemeral container has no persistent disk and no MLflow tracking server to reach — so
+production inference needs some way to get a model without depending on either.
 
 The champion model is therefore baked into the image at build time and loaded via a plain
 `save`/`load` — no MLflow, run ID, or cache involved at runtime. The model directory is
@@ -384,8 +384,8 @@ feature, not a limitation.
 This is deliberately simpler than depending on `BaseForecaster.load_from_mlflow` at runtime (the
 mechanism the CV pipeline already uses — see
 [ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-cache)):
-v0.1 has no MLflow tracking server to reach from the runtime container in the first place, so
-there is nothing to cache or fail over from.
+the live deployment has no MLflow tracking server to reach from the runtime container in the
+first place, so there is nothing to cache or fail over from.
 
 **Future work:** once production wants to pick up a new champion without a rebuild + redeploy
 (e.g. after the [XGBoost quick wins](../roadmap/xgboost-improvements.md) start landing
