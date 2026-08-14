@@ -14,9 +14,11 @@ from pathlib import Path
 import numpy as np
 import patito as pt
 import polars as pl
+import pyarrow as pa
 import pyarrow.parquet as pq
 from contracts.weather_schemas import Nwp
 from delta_store.nwp import NWP_SIGNIFICAND_BITS, NWP_SORT_COLS, write_nwp
+from deltalake import write_deltalake
 
 _T0 = datetime(2025, 6, 1, tzinfo=UTC)
 
@@ -127,7 +129,7 @@ def test_successive_runs_create_separate_partitions(tmp_path: Path) -> None:
     assert collected.height == 2 * n
     assert collected.filter(pl.col("init_time") == t1).height == n
     assert collected.schema["temperature_2m"] == pl.Float32
-    assert collected.schema["nwp_model_id"] == pl.Enum(["ECMWF_ENS_0_25_degree"])
+    assert collected.schema["nwp_model_id"] == pl.String
 
 
 def test_rewriting_a_run_replaces_only_its_own_partition(tmp_path: Path) -> None:
@@ -147,3 +149,84 @@ def test_rewriting_a_run_replaces_only_its_own_partition(tmp_path: Path) -> None
     assert after.filter(pl.col("init_time") != replaced).equals(
         before.filter(pl.col("init_time") != replaced)
     ), "the replace predicate reached beyond its own (nwp_model_id, init_time) partition"
+
+
+def test_scan_pushes_filters_into_the_parquet_scan(tmp_path: Path) -> None:
+    """A filter on ``ensemble_member``, ``h3_index`` or ``nwp_model_id`` through the production
+    read path (``Nwp.scan_delta(...).filter(...)``) must push all the way into the Parquet scan —
+    it should appear inside a ``SELECTION`` line in ``.explain()``, not as a ``FILTER`` node sitting
+    above a ``WITH_COLUMNS`` cast. The latter shape means every row is decoded before the filter
+    ever runs, defeating row-group pruning.
+
+    Fails on `main` today: reproduced directly — today's `explain()` shows no `SELECTION` line for
+    any of these three columns, because ``Nwp``'s then-declared dtypes (``UInt8``/``UInt64``/
+    ``Enum``) don't match what's physically on disk, so ``Nwp.scan_delta``'s cast is not a no-op
+    and sits between the scan and the filter.
+    """
+    table = tmp_path / "nwp"
+    write_nwp(_make_nwp(), table)
+
+    for column, value in (
+        ("ensemble_member", 0),
+        ("h3_index", 100),
+        ("nwp_model_id", "ECMWF_ENS_0_25_degree"),
+    ):
+        plan = Nwp.scan_delta(table).filter(pl.col(column) == value).explain()
+        assert "SELECTION" in plan, f"{column}: predicate pushdown lost — plan:\n{plan}"
+
+
+def test_categorical_ptype_missing_sentinel_round_trips(tmp_path: Path) -> None:
+    """``categorical_precipitation_type_surface``'s own field description names ``255``
+    ("Missing") as a legitimate value, but the pre-fix ``UInt8``-declared column couldn't survive
+    it: ``write_deltalake`` raised ``Cast error: Can't cast value 255 to type Int8`` for any value
+    ``>= 128``. Fails on `main` today for the identical reason."""
+    table = tmp_path / "nwp"
+    n = 3
+    nwp = _make_nwp(n).with_columns(
+        categorical_precipitation_type_surface=pl.lit(255, dtype=pl.Int16)
+    )
+
+    write_nwp(nwp, table)
+
+    collected = Nwp.scan_delta(table).collect()
+    assert collected["categorical_precipitation_type_surface"].to_list() == [255] * n
+
+
+def test_scan_reads_correctly_across_old_narrow_and_new_wide_physical_partitions(
+    tmp_path: Path,
+) -> None:
+    """No data rewrite is needed for the ``categorical_precipitation_type_surface`` widening
+    (``UInt8``/physical ``int8`` -> ``Int16``/physical ``int16``): ``write_nwp``'s permanent
+    ``schema_mode="overwrite"`` updates only the table's *logical* schema, and delta-rs promotes
+    each Parquet file's physical type to the table's current logical type on read — it does not
+    require every file to already agree.
+
+    Simulates a partition written before this dtype change (physically ``int8``, built directly
+    rather than through ``write_nwp`` since that function only ever writes the current, ``int16``
+    physical layout now) alongside one written after (physically ``int16``, via the real
+    ``write_nwp``), and checks the whole table reads back correctly with no error. New coverage,
+    not a `main`-failing regression in the strict sense — it guards the "no rewrite is needed"
+    claim from silently rotting.
+    """
+    table = tmp_path / "nwp"
+    n = 3
+    old_init_time = _T0
+    new_init_time = _T0 + timedelta(days=1)
+
+    old_arrow = _make_nwp(n, init_time=old_init_time).to_arrow()
+    narrowed_schema = old_arrow.schema.set(
+        old_arrow.schema.get_field_index("categorical_precipitation_type_surface"),
+        pa.field("categorical_precipitation_type_surface", pa.int8()),
+    )
+    write_deltalake(
+        table_or_uri=table,
+        data=old_arrow.cast(narrowed_schema),
+        mode="overwrite",
+        partition_by=["nwp_model_id", "init_time"],
+    )
+
+    write_nwp(_make_nwp(n, init_time=new_init_time), table)
+
+    collected = Nwp.scan_delta(table).collect()
+    assert collected.height == 2 * n
+    assert collected["categorical_precipitation_type_surface"].to_list() == [1] * (2 * n)

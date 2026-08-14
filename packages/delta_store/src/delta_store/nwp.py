@@ -45,8 +45,11 @@ it's about compressing near-duplicate ensemble values; here it's about row-group
 Sorting ``ensemble_member`` early means each ~1M-row Parquet row group spans only a handful of
 member values instead of all ~51, so a single-member predicate (the control-member read every
 training run does) can skip most row groups via min/max stats instead of decoding the whole
-partition. Measured on a real 29-day/9-cell/control-member read: ~5x faster and ~5x less peak
-memory than the previous ``valid_time``-first sort, for a ~2% storage cost."""
+partition — provided that predicate reaches the Parquet scan unchanged, which requires
+``Nwp.scan_delta``'s cast to be a no-op (see the ``Nwp.ensemble_member`` field). The speed and
+storage cost of this ordering versus a ``valid_time``-first sort need re-measuring against real
+production data; the old figures predate a period where that cast was not a no-op and are not
+restored here."""
 
 NWP_WRITER_PROPERTIES: Final[WriterProperties] = WriterProperties(
     compression="ZSTD", compression_level=3
@@ -76,6 +79,16 @@ def write_nwp(
     *same* partition at once contend and the loser raises ``CommitFailedError``; disjoint
     partitions do not.
 
+    ``schema_mode="overwrite"`` is passed on every write, not just to migrate an old table:
+    confirmed empirically (``deltalake`` 1.6.2) that it updates only the table's *logical* schema
+    (the ``_delta_log`` metadata) to match the incoming frame's dtypes, and leaves every other
+    partition's physical Parquet bytes untouched — a later read at the new logical dtype is
+    correct and lossless even for a partition still physically stored at an older, narrower dtype.
+    Since ``nwp``'s input is always an already-validated ``pt.DataFrame[Nwp]``, carrying the full
+    column set at the *current* contract's dtypes, the only way this can ever change the table's
+    schema is a deliberate future ``Nwp`` dtype change like this one — it cannot silently drop a
+    column.
+
     Args:
         nwp: Validated, non-empty NWP rows for a single ``(nwp_model_id, init_time)`` partition.
         table_uri: Path or URI of the ``nwp`` Delta table.
@@ -90,17 +103,13 @@ def write_nwp(
         }
     ).sort(*NWP_SORT_COLS)
 
-    # Strip the Patito model before the dict-cast: `nwp_model_id` is declared `Enum` for
-    # in-memory type safety, but delta-rs can't store `Enum`/`Categorical` (see the "Delta Lake
-    # dictionary-encoded columns" gotcha in the `polars-patito-gotchas` skill). A dict-cast on a
-    # *model-bearing* frame would silently swallow the mapping and revert other columns to the
-    # model's declared dtypes instead — strip first so this is a plain-Polars cast.
-    prepared = pl.DataFrame._from_pydf(rounded._df).cast({"nwp_model_id": pl.String}).to_arrow()
+    prepared = rounded.to_arrow()
 
     write_deltalake(
         table_or_uri=table_uri,
         data=prepared,
         mode="overwrite",
+        schema_mode="overwrite",
         predicate=(
             f"nwp_model_id = '{nwp.item(0, 'nwp_model_id')}' "
             f"AND init_time = '{nwp.item(0, 'init_time').isoformat()}'"
