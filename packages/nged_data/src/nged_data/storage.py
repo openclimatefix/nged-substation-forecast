@@ -126,6 +126,12 @@ def remove_small_files_from_listing(
     bytes, so 520 sits in the gap between them. WKT-bearing (Primary substation) files run far
     larger — zero-reading examples measured between 4,405 and 20,148 bytes — so the WKT-less
     floor is the binding constraint on the threshold.
+
+    That 68-byte gap comes from V1's 33 series, and it is narrow enough that V2's ~2,500 series
+    want re-measuring before this default is trusted there. Two things would close it: a populated
+    `information` field, which `TimeSeriesMetadata` records as always null in the V1 trial area,
+    would push a zero-reading file above 520; and a substation name shorter than any in V1 would
+    pull a one-reading file below it. Re-run the measurement rather than assume the gap survives.
     """
     n_files_before_filter = file_listing.height
     filtered = file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
