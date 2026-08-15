@@ -70,9 +70,12 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
         .with_columns(
             nwp_model_id=pl.lit(NwpModelId.ECMWF_ENS_0_25_degree.name).cast(pl.String),
             init_time=pl.lit(ds["init_time"].values).cast(UTC_DATETIME_DTYPE),
-            # h3_grid.h3_index (H3GridWeights, joined in above) is UInt64 — that contract is out
-            # of this change's scope — but Nwp.h3_index is Int64, so it needs an explicit cast
-            # here rather than at H3GridWeights's boundary.
+            # h3_grid.h3_index (H3GridWeights, joined in above) is UInt64 — that contract is
+            # Parquet-backed, so it never had Delta's no-unsigned-integer constraint — but
+            # Nwp.h3_index is Int64, so it needs an explicit cast here rather than at
+            # H3GridWeights's boundary. The narrowing loses nothing at any resolution: H3 reserves
+            # bit 63 of every index as zero, so no H3 value reaches the bit a signed Int64 gives
+            # up. See Nwp.h3_index in contracts.weather_schemas for the full argument.
             h3_index=pl.col("h3_index").cast(pl.Int64),
             wind_speed_10m=_calc_wind_speed(height="10m"),
             wind_speed_100m=_calc_wind_speed(height="100m"),

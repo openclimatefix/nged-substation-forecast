@@ -152,6 +152,20 @@ class Nwp(pt.Model):
         description="Ensemble member index (0-based).",
     )
 
+    # `Int64`, not `UInt64`, because Delta has no unsigned integer types: the column is stored as
+    # `int64` whatever we declare, and declaring `UInt64` only bought a cast in `scan_delta` that
+    # stopped Polars pushing `h3_index` filters into the Parquet scan.
+    #
+    # Signed is safe for the whole H3 index space, not just the values we happen to store. H3
+    # reserves bit 63 of its 64-bit index as always zero — it is not a value bit in any index mode
+    # (cell, directed edge, vertex) at any resolution — so every H3 index is below 2**63, which is
+    # exactly the range a signed `Int64` covers. A cell index sets mode bits 59-62 to 1 and so tops
+    # out around 2**60, well inside that. Sampling every resolution 0-15 agrees: the largest index
+    # seen is ~6.5e17 against `Int64`'s ~9.2e18 ceiling, and bit 63 is never set.
+    #
+    # The guarantee does not depend on the resolution, so raising or lowering
+    # `ECMWF_ENS_H3_RESOLUTION`, or giving a future NWP model its own resolution (issue 114),
+    # cannot overflow this column. Resolution lives in bits 52-55 and leaves bit 63 alone.
     h3_index: int = pt.Field(
         dtype=pl.Int64,
         description=(
