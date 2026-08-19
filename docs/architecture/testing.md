@@ -141,7 +141,7 @@ tests: Polars row counts wrapping past 2³² rows, in
 
 ## Running the suite in parallel
 
-A plain `uv run pytest` — no file or node id and no `-n` of its own — runs under `pytest-xdist`
+A plain `uv run pytest` — no path or node id and no `-n` of its own — runs under `pytest-xdist`
 with one worker process per physical CPU core (`-n auto`; `pytest-xdist` counts physical, not
 logical, cores when `psutil` is installed). The flag is added by the `tests/_pytest_autoinject.py`
 plugin, loaded via `-p _pytest_autoinject` in `addopts`, rather than a static `addopts` entry naming
@@ -154,23 +154,15 @@ worker's captured-off stdout never reaches the controller, so parallelising a `-
 silently drop the output `-s` exists to show — exactly the debug-print step of the "single test"
 loop this plugin otherwise protects. The plugin reads pytest's own parsed `known_args_namespace`
 rather than hand-scanning the raw argument list, so every pytest flag that takes a value (`-W`,
-`-o`, `--deselect`, …) is handled correctly, not just the ones the plugin happens to name — with one
-narrow exception: a value-taking option added by a *conftest* (as opposed to a builtin or another
-plugin) is not yet known to pytest at the point this plugin's hook runs, so its value could still be
-misread as a positional target. This repo's one custom option, `--run-network`, takes no value, so
-it doesn't trigger this.
+`-o`, `--deselect`, …) is handled correctly, not just the ones the plugin happens to name (see the
+plugin's own docstring for the one narrow exception).
 
 The auto-injection can't be a `pytest_load_initial_conftests` hook in the root `conftest.py`
 itself — that hook fires as part of loading the root `conftest.py`, so a hookimpl defined inside it
 is never registered in time to run for that same call. `tests/_pytest_autoinject.py` is only
 importable as a bare-name `-p` plugin because the root `tests/` directory is on `pythonpath` (see
 [Fixtures and mocking](#fixtures-and-mocking)); removing that ini setting breaks every invocation
-loudly, with an `ImportError` at startup, rather than silently falling back to serial. `-p` plugins
-load (`consider_preparse`) before entry-point plugins like `pytest-xdist` do
-(`load_setuptools_entrypoints`), and pytest re-parses the command line a third time right before
-`pytest_load_initial_conftests` fires — which is what makes `-n`/`--numprocesses` and `capture`
-visible on `known_args_namespace` by the time this plugin's hook runs, despite `-p
-_pytest_autoinject` loading first.
+loudly, with an `ImportError` at startup, rather than silently falling back to serial.
 
 The root `conftest.py` caps `OMP_NUM_THREADS` and `POLARS_MAX_THREADS` at 4 for the whole session,
 set as plain module-level code rather than inside `pytest_configure`: Polars reads
@@ -220,11 +212,9 @@ uv run pytest --run-network              # whole suite, network tests included
 uv run pytest --run-network -m network   # only the network tests
 ```
 
-`-m network` alone names no file or node id, so the nightly CI job's `uv run pytest --run-network -m
+`-m network` alone names no path or node id, so the nightly CI job's `uv run pytest --run-network -m
 network` (currently one test) still runs under `-n auto` — pure worker start-up overhead for a
-single-test selection, and an accepted side effect of treating `-m` as "not a target" (see [Running
-the suite in parallel](#running-the-suite-in-parallel)) rather than a reason to special-case this one
-workflow.
+single-test selection (see [Running the suite in parallel](#running-the-suite-in-parallel)).
 
 `packages/dynamical_data/tests/test_ecmwf_ens_network.py` is the canonical example: it drives the
 real `open → download → convert` pipeline against the Dynamical.org ECMWF ENS catalog and asserts

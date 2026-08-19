@@ -17,24 +17,12 @@ from collections.abc import Iterable
 
 import pytest
 
-# `OMP_NUM_THREADS`/`POLARS_MAX_THREADS` must be set here, at import time, not inside
-# `pytest_configure` below. Polars reads `POLARS_MAX_THREADS` once, the first time it is imported,
-# and `tests/conftest.py` (loaded as one of the initial conftests, before `pytest_configure` runs)
-# imports the Dagster defs module, which imports Polars transitively — so a `pytest_configure`-time
-# set is already too late and silently caps nothing in the controller process. Confirmed: moving
-# the two lines here changes `polars.thread_pool_size()` from 32 (uncapped) to 4 (capped) in an
-# otherwise-serial run.
-#
-# The cap exists for the same reason `pytest-xdist` (see `addopts` in `pyproject.toml`, and the
-# `_pytest_autoinject` plugin in `tests/` that adds `-n auto`) is worth having at all: Polars and
-# XGBoost each default to spawning one thread per logical core, so with one worker *process* per
-# physical core too, the suite oversubscribes the machine by core-count². Measured on this repo's
-# 32-thread workstation: removing the caps made the full suite run in 95s with 4755 threads and a
-# load average of 201, versus 21-24s capped. The cap is 4, not 1: production code runs uncapped,
-# and a worker capped at 4 threads is closer to what a production job actually spawns than a worker
-# capped at 1 — and on this workstation the two capped values tie on wall-clock, so there is no
-# speed cost to picking the more representative one. Set here rather than left to each developer's
-# shell so a plain `uv run pytest` gets the fast path everywhere, including CI.
+# Must be set here, at import time, not inside `pytest_configure` below: Polars reads
+# `POLARS_MAX_THREADS` once, the first time it is imported, and `tests/conftest.py` (loaded as one
+# of the initial conftests, before `pytest_configure` runs) imports Polars transitively via the
+# Dagster defs module. See [Running the suite in
+# parallel](https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#running-the-suite-in-parallel)
+# for why the cap exists and why it's 4, not 1.
 os.environ["OMP_NUM_THREADS"] = "4"
 os.environ["POLARS_MAX_THREADS"] = "4"
 

@@ -6,7 +6,7 @@ the whole suite does. That's a good trade for the full suite, but a bad one for 
 loop CLAUDE.md documents (`uv run pytest path/to/test_foo.py::test_bar`), where it would be pure
 overhead spread across workers for one test.
 
-So: add `-n auto` only when the invocation names no explicit file or node id, i.e. a plain
+So: add `-n auto` only when the invocation names no explicit path or node id, i.e. a plain
 `uv run pytest` (or one already carrying its own `-n`, which is left alone). A `-k`/`-m` selection
 does *not* suppress the injection — a filtered run can still be many tests, and is worth
 parallelising the same as an unfiltered one. `-s`/`--capture=no` does suppress it: under xdist a
