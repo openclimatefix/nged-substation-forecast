@@ -66,12 +66,12 @@ _CONTINUOUS_BASE_VALUES = {
 def _moto_server() -> Iterator[str]:
     """Start one in-process moto S3 server for the module (no boto3, no Docker).
 
-    Passing ``port=0`` lets the OS assign a free ephemeral port at the moment the server itself
-    binds it, so there is no probe-close-rebind window in which another process — another
-    ``pytest-xdist`` worker running this same fixture, most plausibly — can grab that port first.
-    ``get_host_and_port()`` reads back the port the server actually bound after ``start()``.
+    Bound to loopback only, on ``port=0``: the OS assigns a free ephemeral port at the moment the
+    server itself binds it, so a concurrent caller of this fixture — another ``pytest-xdist``
+    worker, most plausibly — can never be handed that same port. ``get_host_and_port()`` reads back
+    the port the server actually bound after ``start()``.
     """
-    server = ThreadedMotoServer(ip_address="127.0.0.1", port=0)
+    server = ThreadedMotoServer(ip_address="127.0.0.1", port=0, verbose=False)
     server.start()
     try:
         _, port = server.get_host_and_port()
