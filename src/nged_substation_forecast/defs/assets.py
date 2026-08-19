@@ -356,10 +356,20 @@ _UPSTREAM_PER_VARIABLE_SCHEMA: Final[TableSchema] = TableSchema(
         ),
         AssetCheckSpec(name=_NWP_COMPLETENESS_CHECK_NAME, asset="ecmwf_ens", blocking=False),
     ],
-    # The `pool="ECMWF"` works in conjunction with the Dagster instance configuration
-    # (e.g., in `dagster.yaml`) to limit the number of times this asset can be run
-    # concurrently. This is crucial because downloading ECMWF data is memory-intensive.
-    # See: https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
+    # `pool="ECMWF"` caps how many partitions of this asset run at once, in conjunction with
+    # the Dagster instance configuration: `concurrency: pools: default_limit` in `dagster.yaml`,
+    # or a per-pool limit set with `dagster instance concurrency set ECMWF <n>`. The deployed
+    # limit is 4. See:
+    # https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
+    #
+    # What the cap protects is the download, not memory: the conversion holds one
+    # `(lead_time, ensemble_member)` slice at a time, and on AWS the `EcsRunLauncher` gives every
+    # run its own Fargate task, so concurrent partitions never share an address space. Each
+    # partition does run `download_ecmwf_ens_data`'s thread pool, though, so the fetches
+    # Dynamical.org sees at once are this limit multiplied by that pool's `max_workers`, and
+    # issue #276 measured 13 concurrent fetches self-contending into multi-minute stragglers.
+    # The two knobs move together: if per-partition download times grow a long tail, lower
+    # `max_workers` rather than treating the tail as an upstream problem.
     pool="ECMWF",
 )
 def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:

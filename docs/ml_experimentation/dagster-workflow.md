@@ -34,9 +34,10 @@ of your training window). Use "Materialise all" or select a date range in the Da
 Downloads the 00Z ECMWF ENS run for each partition date, converts it to a Polars DataFrame, and
 writes it to `nwp_data.delta` (partitioned by `[nwp_model_id, init_time]`) as physical-unit
 `Float32` rounded to a 13-bit significand at write time by `delta_store.nwp`. Each run replaces its
-own partition, so re-materialising a date range you have already ingested is safe. The `pool="ECMWF"` concurrency limit prevents OOM errors when
-backfilling — Dagster schedules downloads one at a time if you materialise many partitions at
-once.
+own partition, so re-materialising a date range you have already ingested is safe. The
+`pool="ECMWF"` concurrency limit caps how many partitions download at once, so materialising a
+long date range queues the downloads rather than starting all of them: four run at a time, and
+each of those runs four concurrent fetches of its own.
 
 ## Step 4 — Materialise `eligible_time_series`
 
