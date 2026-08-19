@@ -135,6 +135,23 @@ tests: Polars row counts wrapping past 2³² rows, in
   that built it returns, so a missing `instance=` can still pass green until something pins the
   frame holding it.
 
+## Running the suite in parallel
+
+A plain `uv run pytest` — no file or node id, no `-n`/`-k`/`-m` of its own — runs under
+`pytest-xdist` with one worker process per CPU core (`-n auto`), added by a
+`pytest_load_initial_conftests` hook in the root `conftest.py` rather than a static `addopts`
+entry: the hook can see the invocation before adding the flag, so a targeted run
+(`uv run pytest path/to/test_foo.py::test_bar`) stays serial instead of paying worker start-up cost
+for one test. An invocation that already passes its own `-n` is left alone.
+
+The same `conftest.py` also caps `OMP_NUM_THREADS` and `POLARS_MAX_THREADS` at 1 for the whole
+session. XGBoost and Polars each default to a thread pool sized to the machine's core count, so
+without the cap, `-n auto`'s one-process-per-core plus each process's own full-width thread pool
+oversubscribes the machine by core-count² and every worker's threads fight the others for the same
+cores — measured on a 16-core box, `-n auto` alone made the suite *slower* than serial (82s vs
+40s). Capping each worker to one thread turns that into process-level parallelism only, which
+brought the same run to 23s.
+
 ## Warnings are errors
 
 `[tool.pytest.ini_options] filterwarnings` in `pyproject.toml` starts with `error`, so **any**
