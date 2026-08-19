@@ -44,19 +44,23 @@ tests: Polars row counts wrapping past 2³² rows, in
   — is shared across more than one test module *within a single package*, put it in a
   package-level `tests/conftest.py`. `packages/dynamical_data/tests/conftest.py` is the example:
   it builds synthetic Xarray datasets that two test modules share. The only repo-root `conftest.py`
-  holds cross-package pytest plumbing, not fixtures — currently the network-test gate below.
+  holds cross-package pytest plumbing, not fixtures — the network-test gate below, Sentry DSN
+  neutralisation, and the `OMP_NUM_THREADS`/`POLARS_MAX_THREADS` caps described in
+  [Running the suite in parallel](#running-the-suite-in-parallel).
 - **A factory shared *across* packages goes in the root `tests/` directory, not in any one
   package's `tests/`.** The root `pyproject.toml` sets `pythonpath = ["tests"]` for the whole
   `uv run pytest` session, so every module placed at the top level of `tests/` is importable by
   bare name from any test suite in the repo — `packages/delta_store/tests`,
   `packages/ml_core/tests`, and the root `tests/` alike — the same mechanism
-  `tests/_nwp_test_data.py` already relies on for the root integration tests. Putting a
-  cross-package factory inside one specific package's `tests/` and importing it from another
-  package's suite would work by accident of that package being installed, but it reads as a
-  dependency of the *package under test* on another package's test code, which is backwards; the
-  root `tests/` directory carries no such implication because it is not itself a workspace member.
-  A factory production code needs (not just tests) still belongs in `contracts` or another
-  library package, never here.
+  `tests/_nwp_test_data.py` already relies on for the root integration tests, and the mechanism
+  `tests/_pytest_autoinject.py` (see [Running the suite in
+  parallel](#running-the-suite-in-parallel)) relies on to be loadable as a pytest plugin by bare
+  name. Putting a cross-package factory inside one specific package's `tests/` and importing it
+  from another package's suite would work by accident of that package being installed, but it
+  reads as a dependency of the *package under test* on another package's test code, which is
+  backwards; the root `tests/` directory carries no such implication because it is not itself a
+  workspace member. A factory production code needs (not just tests) still belongs in `contracts`
+  or another library package, never here.
 - **Mock with pytest's `monkeypatch` fixture, not `unittest.mock`.** Patch environment variables
   (`monkeypatch.setenv`), object attributes, and module-level functions
   (`monkeypatch.setattr(some_module, "open", fake_open)`) through the built-in fixture. For S3,
@@ -137,20 +141,43 @@ tests: Polars row counts wrapping past 2³² rows, in
 
 ## Running the suite in parallel
 
-A plain `uv run pytest` — no file or node id, no `-n`/`-k`/`-m` of its own — runs under
-`pytest-xdist` with one worker process per CPU core (`-n auto`), added by a
-`pytest_load_initial_conftests` hook in the root `conftest.py` rather than a static `addopts`
-entry: the hook can see the invocation before adding the flag, so a targeted run
+A plain `uv run pytest` — no path or node id and no `-n` of its own — runs under `pytest-xdist`
+with one worker process per physical CPU core (`-n auto`; `pytest-xdist` counts physical, not
+logical, cores when `psutil` is installed). The flag is added by the `tests/_pytest_autoinject.py`
+plugin, loaded via `-p _pytest_autoinject` in `addopts`, rather than a static `addopts` entry naming
+`-n auto` directly: the plugin can see the invocation before adding the flag, so a targeted run
 (`uv run pytest path/to/test_foo.py::test_bar`) stays serial instead of paying worker start-up cost
-for one test. An invocation that already passes its own `-n` is left alone.
+for one test. An invocation that already passes its own `-n` is left alone; a `-k`/`-m` selection is
+not treated as a target and still runs in parallel, since a filtered run can still be many tests.
+`-s`/`--capture=no` *is* treated as a reason to stay serial, unlike `-k`/`-m`: under xdist a
+worker's captured-off stdout never reaches the controller, so parallelising a `-s` run would
+silently drop the output `-s` exists to show — exactly the debug-print step of the "single test"
+loop this plugin otherwise protects. The plugin reads pytest's own parsed `known_args_namespace`
+rather than hand-scanning the raw argument list, so every pytest flag that takes a value (`-W`,
+`-o`, `--deselect`, …) is handled correctly, not just the ones the plugin happens to name (see the
+plugin's own docstring for the one narrow exception).
 
-The same `conftest.py` also caps `OMP_NUM_THREADS` and `POLARS_MAX_THREADS` at 1 for the whole
-session. XGBoost and Polars each default to a thread pool sized to the machine's core count, so
-without the cap, `-n auto`'s one-process-per-core plus each process's own full-width thread pool
-oversubscribes the machine by core-count² and every worker's threads fight the others for the same
-cores — measured on a 16-core box, `-n auto` alone made the suite *slower* than serial (82s vs
-40s). Capping each worker to one thread turns that into process-level parallelism only, which
-brought the same run to 23s.
+The auto-injection can't be a `pytest_load_initial_conftests` hook in the root `conftest.py`
+itself — that hook fires as part of loading the root `conftest.py`, so a hookimpl defined inside it
+is never registered in time to run for that same call. `tests/_pytest_autoinject.py` is only
+importable as a bare-name `-p` plugin because the root `tests/` directory is on `pythonpath` (see
+[Fixtures and mocking](#fixtures-and-mocking)); removing that ini setting breaks every invocation
+loudly, with an `ImportError` at startup, rather than silently falling back to serial.
+
+The root `conftest.py` caps `OMP_NUM_THREADS` and `POLARS_MAX_THREADS` at 4 for the whole session,
+set as plain module-level code rather than inside `pytest_configure`: Polars reads
+`POLARS_MAX_THREADS` once, the first time it's imported, and `tests/conftest.py` — loaded as one of
+the initial conftests, before `pytest_configure` runs — imports the Dagster defs module, which
+imports Polars transitively. A `pytest_configure`-time set is already too late and silently caps
+nothing in the process running the tests directly (a serial run, or the `-n auto` controller
+process; xdist workers still pick up the cap, inherited via the environment at their own start-up).
+XGBoost and Polars each default to a thread pool sized to the machine's core count, so without the
+cap, `-n auto`'s one-process-per-core plus each process's own full-width thread pool oversubscribes
+the machine by core-count² and every worker's threads fight the others for the same cores —
+measured on a 32-thread workstation, removing the caps made the full suite run in 95s with 4755
+threads and a load average of 201, versus 21-24s capped. The cap is 4 rather than 1 because it costs
+nothing in wall-clock on that workstation while matching production more closely, where a single job
+runs with no thread cap at all.
 
 ## Warnings are errors
 
@@ -184,6 +211,10 @@ never touches the network. Run them explicitly — the nightly CI job (see
 uv run pytest --run-network              # whole suite, network tests included
 uv run pytest --run-network -m network   # only the network tests
 ```
+
+`-m network` alone names no path or node id, so the nightly CI job's `uv run pytest --run-network -m
+network` (currently one test) still runs under `-n auto` — pure worker start-up overhead for a
+single-test selection (see [Running the suite in parallel](#running-the-suite-in-parallel)).
 
 `packages/dynamical_data/tests/test_ecmwf_ens_network.py` is the canonical example: it drives the
 real `open → download → convert` pipeline against the Dynamical.org ECMWF ENS catalog and asserts
