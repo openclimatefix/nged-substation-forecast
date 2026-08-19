@@ -17,6 +17,12 @@ from collections.abc import Iterable
 
 import pytest
 
+# Enables the `pytester` fixture (`tests/test_pytest_autoinject.py`), which spawns real pytest
+# subprocesses to test the `tests/_pytest_autoinject.py` plugin end to end. `pytester` is a builtin
+# pytest plugin that isn't loaded by default, and `pytest_plugins` is only honoured in the rootdir
+# conftest.py, not in a package-level one.
+pytest_plugins = ["pytester"]
+
 
 def pytest_configure(config: pytest.Config) -> None:
     """Neutralise any real ``SENTRY_DSN``, and cap per-process thread pools, for the whole session.

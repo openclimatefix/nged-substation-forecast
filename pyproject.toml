@@ -326,7 +326,9 @@ addopts = "--import-mode=importlib -p _pytest_autoinject"
 python_files = ["test_*.py", "*_test.py", "packages/notebooks/plot_missing_NWP_data.py"]
 # Put the root `tests/` dir on sys.path so its integration tests can import shared, non-fixture
 # test data (e.g. `_nwp_test_data`) by bare name — importlib mode does not add each test file's
-# own directory to sys.path the way prepend mode does.
+# own directory to sys.path the way prepend mode does. This is also load-bearing for the `-p
+# _pytest_autoinject` entry in `addopts` above: `-p` resolves a bare module name against sys.path,
+# and `tests/_pytest_autoinject.py` is only importable as `_pytest_autoinject` because of this line.
 pythonpath = ["tests"]
 # `error` first: any warning not explicitly excepted below fails the test that raised it, so a
 # deprecation in our own code is caught by the PR that introduces it instead of accumulating in the
