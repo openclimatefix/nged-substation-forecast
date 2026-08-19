@@ -313,9 +313,10 @@ docstring-code-line-length = 100
 # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>. The gate lives
 # in a hook, not in an `addopts` `-m "not network"`, because any caller-supplied `-m` would
 # silently override it.
-# A full-suite run adds `-n auto` (pytest-xdist) itself, via a `pytest_load_initial_conftests` hook
-# in the root conftest.py — see that hook's docstring for why it isn't a plain `addopts` entry.
-addopts = "--import-mode=importlib"
+# A full-suite run adds `-n auto` (pytest-xdist) itself, via the `tests/_pytest_autoinject.py`
+# plugin loaded below — see that module's docstring for why it isn't a plain `addopts` entry, and
+# why it can't be a `pytest_load_initial_conftests` hook in the root conftest.py instead.
+addopts = "--import-mode=importlib -p _pytest_autoinject"
 # The first two patterns are pytest's default, restated because naming any pattern replaces the
 # default list. The notebook is named as well because a marimo notebook is an ordinary Python file
 # that pytest can collect, and this one holds a `test_*` function exercising its chart-building

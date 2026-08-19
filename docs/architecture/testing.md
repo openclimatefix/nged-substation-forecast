@@ -138,19 +138,24 @@ tests: Polars row counts wrapping past 2³² rows, in
 ## Running the suite in parallel
 
 A plain `uv run pytest` — no file or node id, no `-n`/`-k`/`-m` of its own — runs under
-`pytest-xdist` with one worker process per CPU core (`-n auto`), added by a
-`pytest_load_initial_conftests` hook in the root `conftest.py` rather than a static `addopts`
-entry: the hook can see the invocation before adding the flag, so a targeted run
-(`uv run pytest path/to/test_foo.py::test_bar`) stays serial instead of paying worker start-up cost
-for one test. An invocation that already passes its own `-n` is left alone.
+`pytest-xdist` with one worker process per physical CPU core (`-n auto`; `pytest-xdist` counts
+physical, not logical, cores when `psutil` is installed). The flag is added by the
+`tests/_pytest_autoinject.py` plugin, loaded via `-p _pytest_autoinject` in `addopts`, rather than
+a static `addopts` entry naming `-n auto` directly: the plugin can see the invocation before adding
+the flag, so a targeted run (`uv run pytest path/to/test_foo.py::test_bar`) stays serial instead of
+paying worker start-up cost for one test. An invocation that already passes its own `-n` is left
+alone. The auto-injection can't be a `pytest_load_initial_conftests` hook in the root `conftest.py`
+itself — that hook fires as part of loading the root `conftest.py`, so a hookimpl defined inside it
+is never registered in time to run for that same call.
 
-The same `conftest.py` also caps `OMP_NUM_THREADS` and `POLARS_MAX_THREADS` at 1 for the whole
-session. XGBoost and Polars each default to a thread pool sized to the machine's core count, so
-without the cap, `-n auto`'s one-process-per-core plus each process's own full-width thread pool
-oversubscribes the machine by core-count² and every worker's threads fight the others for the same
-cores — measured on a 16-core box, `-n auto` alone made the suite *slower* than serial (82s vs
-40s). Capping each worker to one thread turns that into process-level parallelism only, which
-brought the same run to 23s.
+The root `conftest.py` caps `OMP_NUM_THREADS` and `POLARS_MAX_THREADS` at 4 for the whole session.
+XGBoost and Polars each default to a thread pool sized to the machine's core count, so without the
+cap, `-n auto`'s one-process-per-core plus each process's own full-width thread pool oversubscribes
+the machine by core-count² and every worker's threads fight the others for the same cores —
+measured on a 32-thread workstation, removing the caps made the full suite run in 95s with 4755
+threads and a load average of 201, versus 21-24s capped. The cap is 4 rather than 1 because it costs
+nothing in wall-clock on that workstation while matching production more closely, where a single job
+runs with no thread cap at all.
 
 ## Warnings are errors
 
