@@ -148,19 +148,37 @@ plugin, loaded via `-p _pytest_autoinject` in `addopts`, rather than a static `a
 `-n auto` directly: the plugin can see the invocation before adding the flag, so a targeted run
 (`uv run pytest path/to/test_foo.py::test_bar`) stays serial instead of paying worker start-up cost
 for one test. An invocation that already passes its own `-n` is left alone; a `-k`/`-m` selection is
-not treated as a target and still runs in parallel, since a filtered run can still be many tests. The
-plugin reads pytest's own parsed `known_args_namespace` rather than hand-scanning the raw argument
-list, so every pytest flag that takes a value (`-W`, `-o`, `--deselect`, …) is handled correctly, not
-just the ones the plugin happens to name.
+not treated as a target and still runs in parallel, since a filtered run can still be many tests.
+`-s`/`--capture=no` *is* treated as a reason to stay serial, unlike `-k`/`-m`: under xdist a
+worker's captured-off stdout never reaches the controller, so parallelising a `-s` run would
+silently drop the output `-s` exists to show — exactly the debug-print step of the "single test"
+loop this plugin otherwise protects. The plugin reads pytest's own parsed `known_args_namespace`
+rather than hand-scanning the raw argument list, so every pytest flag that takes a value (`-W`,
+`-o`, `--deselect`, …) is handled correctly, not just the ones the plugin happens to name — with one
+narrow exception: a value-taking option added by a *conftest* (as opposed to a builtin or another
+plugin) is not yet known to pytest at the point this plugin's hook runs, so its value could still be
+misread as a positional target. This repo's one custom option, `--run-network`, takes no value, so
+it doesn't trigger this.
 
 The auto-injection can't be a `pytest_load_initial_conftests` hook in the root `conftest.py`
 itself — that hook fires as part of loading the root `conftest.py`, so a hookimpl defined inside it
 is never registered in time to run for that same call. `tests/_pytest_autoinject.py` is only
 importable as a bare-name `-p` plugin because the root `tests/` directory is on `pythonpath` (see
 [Fixtures and mocking](#fixtures-and-mocking)); removing that ini setting breaks every invocation
-loudly, with an `ImportError` at startup, rather than silently falling back to serial.
+loudly, with an `ImportError` at startup, rather than silently falling back to serial. `-p` plugins
+load (`consider_preparse`) before entry-point plugins like `pytest-xdist` do
+(`load_setuptools_entrypoints`), and pytest re-parses the command line a third time right before
+`pytest_load_initial_conftests` fires — which is what makes `-n`/`--numprocesses` and `capture`
+visible on `known_args_namespace` by the time this plugin's hook runs, despite `-p
+_pytest_autoinject` loading first.
 
-The root `conftest.py` caps `OMP_NUM_THREADS` and `POLARS_MAX_THREADS` at 4 for the whole session.
+The root `conftest.py` caps `OMP_NUM_THREADS` and `POLARS_MAX_THREADS` at 4 for the whole session,
+set as plain module-level code rather than inside `pytest_configure`: Polars reads
+`POLARS_MAX_THREADS` once, the first time it's imported, and `tests/conftest.py` — loaded as one of
+the initial conftests, before `pytest_configure` runs — imports the Dagster defs module, which
+imports Polars transitively. A `pytest_configure`-time set is already too late and silently caps
+nothing in the process running the tests directly (a serial run, or the `-n auto` controller
+process; xdist workers still pick up the cap, inherited via the environment at their own start-up).
 XGBoost and Polars each default to a thread pool sized to the machine's core count, so without the
 cap, `-n auto`'s one-process-per-core plus each process's own full-width thread pool oversubscribes
 the machine by core-count² and every worker's threads fight the others for the same cores —
@@ -201,6 +219,12 @@ never touches the network. Run them explicitly — the nightly CI job (see
 uv run pytest --run-network              # whole suite, network tests included
 uv run pytest --run-network -m network   # only the network tests
 ```
+
+`-m network` alone names no file or node id, so the nightly CI job's `uv run pytest --run-network -m
+network` (currently one test) still runs under `-n auto` — pure worker start-up overhead for a
+single-test selection, and an accepted side effect of treating `-m` as "not a target" (see [Running
+the suite in parallel](#running-the-suite-in-parallel)) rather than a reason to special-case this one
+workflow.
 
 `packages/dynamical_data/tests/test_ecmwf_ens_network.py` is the canonical example: it drives the
 real `open → download → convert` pipeline against the Dynamical.org ECMWF ENS catalog and asserts

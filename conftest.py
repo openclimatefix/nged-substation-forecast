@@ -17,15 +17,30 @@ from collections.abc import Iterable
 
 import pytest
 
-# Enables the `pytester` fixture (`tests/test_pytest_autoinject.py`), which spawns real pytest
-# subprocesses to test the `tests/_pytest_autoinject.py` plugin end to end. `pytester` is a builtin
-# pytest plugin that isn't loaded by default, and `pytest_plugins` is only honoured in the rootdir
-# conftest.py, not in a package-level one.
-pytest_plugins = ["pytester"]
+# `OMP_NUM_THREADS`/`POLARS_MAX_THREADS` must be set here, at import time, not inside
+# `pytest_configure` below. Polars reads `POLARS_MAX_THREADS` once, the first time it is imported,
+# and `tests/conftest.py` (loaded as one of the initial conftests, before `pytest_configure` runs)
+# imports the Dagster defs module, which imports Polars transitively — so a `pytest_configure`-time
+# set is already too late and silently caps nothing in the controller process. Confirmed: moving
+# the two lines here changes `polars.thread_pool_size()` from 32 (uncapped) to 4 (capped) in an
+# otherwise-serial run.
+#
+# The cap exists for the same reason `pytest-xdist` (see `addopts` in `pyproject.toml`, and the
+# `_pytest_autoinject` plugin in `tests/` that adds `-n auto`) is worth having at all: Polars and
+# XGBoost each default to spawning one thread per logical core, so with one worker *process* per
+# physical core too, the suite oversubscribes the machine by core-count². Measured on this repo's
+# 32-thread workstation: removing the caps made the full suite run in 95s with 4755 threads and a
+# load average of 201, versus 21-24s capped. The cap is 4, not 1: production code runs uncapped,
+# and a worker capped at 4 threads is closer to what a production job actually spawns than a worker
+# capped at 1 — and on this workstation the two capped values tie on wall-clock, so there is no
+# speed cost to picking the more representative one. Set here rather than left to each developer's
+# shell so a plain `uv run pytest` gets the fast path everywhere, including CI.
+os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["POLARS_MAX_THREADS"] = "4"
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Neutralise any real ``SENTRY_DSN``, and cap per-process thread pools, for the whole session.
+    """Neutralise any real ``SENTRY_DSN`` for the whole session.
 
     A developer's ``.env`` carries a live Sentry DSN (see the Sentry setup how-to), and pydantic
     reads it into ``Settings.sentry_dsn``. Importing the Dagster definitions module — which several
@@ -40,22 +55,8 @@ def pytest_configure(config: pytest.Config) -> None:
     in pydantic-settings), so every ``Settings`` built during the session sees an empty DSN and
     ``init_sentry`` stays a no-op. This runs before collection imports any test module, so it lands
     ahead of the import-time ``init_sentry`` call.
-
-    ``OMP_NUM_THREADS``/``POLARS_MAX_THREADS`` are capped for the same reason `pytest-xdist` (see
-    ``addopts`` in ``pyproject.toml``, and the ``_pytest_autoinject`` plugin in ``tests/`` that adds
-    `-n auto`) is worth having at all: Polars and XGBoost each default to spawning one thread per
-    logical core, so with one worker *process* per physical core too, the suite oversubscribes the
-    machine by core-count². Measured on this repo's 32-thread workstation: removing the caps made
-    the full suite run in 95s with 4755 threads and a load average of 201, versus 21-24s capped.
-    The cap is 4, not 1: production code runs uncapped, and a worker capped at 4 threads is closer
-    to what a production job actually spawns than a worker capped at 1 — and on this workstation
-    the two capped values tie on wall-clock, so there is no speed cost to picking the more
-    representative one. Set here rather than left to each developer's shell so a plain
-    `uv run pytest` gets the fast path everywhere, including CI.
     """
     os.environ["SENTRY_DSN"] = ""
-    os.environ["OMP_NUM_THREADS"] = "4"
-    os.environ["POLARS_MAX_THREADS"] = "4"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
