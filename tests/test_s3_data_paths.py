@@ -21,7 +21,6 @@ exercising it here would only add a 3-minute stall, not real signal.
 Marked ``integration``; skipped automatically if ``moto`` is not installed.
 """
 
-import socket
 import urllib.request
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -63,19 +62,19 @@ _CONTINUOUS_BASE_VALUES = {
 }
 
 
-def _free_port() -> int:
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
-
-
 @pytest.fixture(scope="module")
 def _moto_server() -> Iterator[str]:
-    """Start one in-process moto S3 server for the module (no boto3, no Docker)."""
-    port = _free_port()
-    server = ThreadedMotoServer(port=port)
+    """Start one in-process moto S3 server for the module (no boto3, no Docker).
+
+    Bound to loopback only, on ``port=0``: the OS assigns a free ephemeral port at the moment the
+    server itself binds it, so a concurrent caller of this fixture — another ``pytest-xdist``
+    worker, most plausibly — can never be handed that same port. ``get_host_and_port()`` reads back
+    the port the server actually bound after ``start()``.
+    """
+    server = ThreadedMotoServer(ip_address="127.0.0.1", port=0, verbose=False)
     server.start()
     try:
+        _, port = server.get_host_and_port()
         yield f"http://127.0.0.1:{port}"
     finally:
         server.stop()
