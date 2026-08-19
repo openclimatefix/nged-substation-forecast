@@ -59,6 +59,7 @@ dev = [
     # dashboard is a leaf marimo app that nothing depends on at runtime, so it is a dev
     # dependency purely so `uv sync` installs it and `uv run pytest` can collect its tests.
     "dashboard",
+    "pytest-xdist>=3.6.1",
 ]
 
 [project.urls]
@@ -312,6 +313,8 @@ docstring-code-line-length = 100
 # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>. The gate lives
 # in a hook, not in an `addopts` `-m "not network"`, because any caller-supplied `-m` would
 # silently override it.
+# A full-suite run adds `-n auto` (pytest-xdist) itself, via a `pytest_load_initial_conftests` hook
+# in the root conftest.py — see that hook's docstring for why it isn't a plain `addopts` entry.
 addopts = "--import-mode=importlib"
 # The first two patterns are pytest's default, restated because naming any pattern replaces the
 # default list. The notebook is named as well because a marimo notebook is an ordinary Python file

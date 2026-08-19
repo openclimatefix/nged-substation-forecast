@@ -19,7 +19,7 @@ import pytest
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Neutralise any real ``SENTRY_DSN`` for the whole test session.
+    """Neutralise any real ``SENTRY_DSN``, and cap per-process thread pools, for the whole session.
 
     A developer's ``.env`` carries a live Sentry DSN (see the Sentry setup how-to), and pydantic
     reads it into ``Settings.sentry_dsn``. Importing the Dagster definitions module — which several
@@ -34,8 +34,43 @@ def pytest_configure(config: pytest.Config) -> None:
     in pydantic-settings), so every ``Settings`` built during the session sees an empty DSN and
     ``init_sentry`` stays a no-op. This runs before collection imports any test module, so it lands
     ahead of the import-time ``init_sentry`` call.
+
+    ``OMP_NUM_THREADS``/``POLARS_MAX_THREADS`` are capped at 1 for the same reason `pytest-xdist`
+    (see ``addopts`` in ``pyproject.toml``) is worth having at all: Polars and XGBoost each default
+    to spawning one thread per logical core, so with `-n auto` spinning up one worker *process* per
+    core too, the suite oversubscribes the machine by core-count², and every worker's thread pool
+    fights the others for the same cores. Measured on a 16-core box: `-n auto` alone made the suite
+    *slower* than serial (82s vs 40s); adding these caps brought it to 23s — process-level
+    parallelism replaces thread-level parallelism instead of stacking on top of it. Set here rather
+    than left to each developer's shell so a plain `uv run pytest` gets the fast path everywhere,
+    including CI.
     """
     os.environ["SENTRY_DSN"] = ""
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["POLARS_MAX_THREADS"] = "1"
+
+
+def pytest_load_initial_conftests(args: list[str]) -> None:
+    """Parallelise a full-suite run with `pytest-xdist`; leave a targeted run serial.
+
+    This can't be a plain `addopts = "-n auto"` because worker start-up (each of `-n auto`'s ~8
+    workers importing the whole Dagster/Polars/XGBoost/MLflow stack) costs a few seconds flat,
+    paid whether one test runs or all 751 do. That's a good trade for the full suite — it drops
+    from ~44s to ~24s — but a bad one for the "single test" loop CLAUDE.md documents alongside it
+    (`uv run pytest path/to/test_foo.py::test_bar`), which this measured at 5.3s serial vs 9.4s
+    parallel: pure overhead with only one test to spread across workers.
+
+    So: add `-n auto` only when the invocation names no explicit file or node id, i.e. a plain
+    `uv run pytest` (or one already carrying its own `-n`/`-k`/`-m`, which is left alone). Modifying
+    `args` in place here is the standard way to inject options conditionally, before pytest's own
+    argument parsing runs — an `addopts` string is static and can't see the invocation first.
+    """
+    has_explicit_target = any(not arg.startswith("-") for arg in args)
+    has_explicit_numprocesses = any(
+        arg == "-n" or arg.startswith(("-n=", "--numprocesses")) for arg in args
+    )
+    if not has_explicit_target and not has_explicit_numprocesses:
+        args[:0] = ["-n", "auto"]
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
