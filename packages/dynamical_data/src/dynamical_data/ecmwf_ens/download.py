@@ -143,6 +143,10 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
     # straggle for minutes, making the whole download 600s+. Capping at 4 removed the stragglers
     # entirely and cut a real download from 645s to 22.5s.
     #
+    # 4 is the cap *per partition*, not per machine: `ecmwf_ens` runs up to its `ECMWF` pool limit
+    # of partitions at once (4, set in `dagster.yaml`), so the fetches in flight against
+    # Dynamical.org are the product of the two. Lower this cap before raising that limit.
+    #
     # This is a recent regression, not a pre-existing property of the download: Dagster's run
     # history shows per-partition downloads holding a steady ~48-54s right up to 2026-06-30
     # 12:26 UTC, then every run afterwards (2026-07-01 onwards) taking 3-12 min. That boundary

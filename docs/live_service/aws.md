@@ -1109,7 +1109,10 @@ run_launcher:
 
 concurrency:
   pools:
-    default_limit: 1  # Used to limit concurrency of the ecmwf_ens asset.
+    # Caps how many `ecmwf_ens` partitions run at once. The limit applies to every pool,
+    # because Dagster's YAML takes no per-pool limits — those are set with
+    # `dagster instance concurrency set <pool> <n>` and live in the instance database.
+    default_limit: 4
 
 run_monitoring:
   # Without this, a crashed/killed run can leak its concurrency-pool slot (e.g. the pool

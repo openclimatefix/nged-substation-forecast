@@ -130,9 +130,9 @@ def assess_upstream_grid_point_nulls(
             the instantaneous ones, where lead-0 is an ordinary step and a null in it means what a
             null in any other step means.
     """
-    # Selected per variable rather than once on `ds`: this runs inside `ecmwf_ens`, whose ECMWF
-    # concurrency pool exists because the download is memory-intensive, and slicing the whole
-    # dataset would copy all thirteen downloaded variables to read three.
+    # Selected per variable rather than once on `ds`: this runs inside `ecmwf_ens` while the
+    # whole downloaded run is still held in memory, and slicing the whole dataset would copy all
+    # thirteen downloaded variables to read three.
     beyond_lead_0 = ds.lead_time > _LEAD_0
     rows = []
     for name in sorted(variables):
