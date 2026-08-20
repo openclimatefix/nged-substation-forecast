@@ -1,0 +1,3213 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../capacity-estimation/">
+      
+      
+        <link rel="next" href="../data-sources/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Cost-Savings Metrics - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#estimating-the-money-a-better-forecast-saves" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Cost-Savings Metrics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent Stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Incident Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and Scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP Variable Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/adapting-to-another-geography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Could this codebase forecast another country? (not planned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-Savings Metrics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-Savings Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#read-this-first-these-pounds-rank-models-they-do-not-cost-anything" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read this first: these pounds rank models, they do not cost anything
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-savings-measured-separately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two savings, measured separately
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-shared-idea-same-risk-then-compare-the-spend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The shared idea: same risk, then compare the spend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-volumes-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the volumes cost
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metric-1-flexibility-procurement-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric 1 — flexibility procurement cost
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metric-2-curtailment-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric 2 — curtailment cost
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metric 2 — curtailment cost">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which-direction-is-the-constraint-on" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which direction is the constraint on?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-each-number-is-compared-against" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each number is compared against
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-the-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the limit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-these-numbers-do-not-capture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What these numbers do not capture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#questions-for-nged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Questions for NGED
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-details-deleted-when-this-ships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation details (deleted when this ships)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training History (ERA5)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#read-this-first-these-pounds-rank-models-they-do-not-cost-anything" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read this first: these pounds rank models, they do not cost anything
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-savings-measured-separately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two savings, measured separately
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-shared-idea-same-risk-then-compare-the-spend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The shared idea: same risk, then compare the spend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-volumes-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the volumes cost
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metric-1-flexibility-procurement-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric 1 — flexibility procurement cost
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metric-2-curtailment-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric 2 — curtailment cost
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metric 2 — curtailment cost">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which-direction-is-the-constraint-on" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which direction is the constraint on?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-each-number-is-compared-against" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each number is compared against
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-the-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the limit
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-these-numbers-do-not-capture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What these numbers do not capture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#questions-for-nged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Questions for NGED
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-details-deleted-when-this-ships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation details (deleted when this ships)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="estimating-the-money-a-better-forecast-saves">Estimating the money a better forecast saves</h1>
+<blockquote>
+<p><strong>Status: 🚧 Planned (v0.3).</strong> Epic:
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/6">#6</a>; issue:
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/606">#606</a>. This page is the
+plan for two leaderboard metrics that express forecast skill in pounds. It is written to be read
+by anyone numerate. Everything attributed to NGED below comes from a meeting in July 2026 and is
+flagged for them to confirm. See the <a href="../">roadmap index</a> for status conventions.</p>
+</blockquote>
+<h2 id="read-this-first-these-pounds-rank-models-they-do-not-cost-anything">Read this first: these pounds rank models, they do not cost anything</h2>
+<p>These metrics put a <strong>£</strong> figure against every model we train. That figure rests on an invented
+network limit and a couple of average prices, so it is a <strong>rough proxy</strong>: not a cost analysis, not
+a business case, and not quotable as either. Its one job is to rank forecasts on the axis NGED
+care about, turning "this model has a lower threshold-weighted continuous ranked probability score"
+into "this model would have spent less to keep the network within limits". We use pounds rather
+than a unitless score because the parameters genuinely are prices, and because pounds are what the
+decisions these forecasts feed are actually made in.</p>
+<h2 id="two-savings-measured-separately">Two savings, measured separately</h2>
+<p>A better forecast creates value through two different mechanisms, with different prices and
+different beneficiaries. We compute them as <strong>two metrics, reported as two numbers</strong>, and never add
+them up:</p>
+<ol>
+<li><strong>Flexibility procurement.</strong> NGED pay flexible customers to reduce demand when a site risks
+   running beyond its limit. They told us they are risk-averse and knowingly over-procure. A
+   sharper forecast buys less flexibility for the same security. This is money NGED spend.</li>
+<li><strong>Curtailment of generation.</strong> Generators are curtailed to keep exports within network limits.
+   Curtailment avoided is generation sold. Who this saves money <em>for</em> — NGED, or the connected
+   generator under a non-firm connection — is <a href="#questions-for-nged">question 3</a>, and it changes how
+   the number should be read.</li>
+</ol>
+<p>A third saving — the engineer-hours freed by replacing a manual review of time-series plots with an
+automated forecast — is real, but it is <strong>not a leaderboard metric</strong>: it is identical for every
+model we train, so it cannot rank them. It belongs in the project's final report, priced in
+engineer-hours.</p>
+<h2 id="the-shared-idea-same-risk-then-compare-the-spend">The shared idea: same risk, then compare the spend</h2>
+<p>The textbook way to price a forecast charges it for what goes wrong: £X per action taken, £Y per
+limit breach nobody saw coming. We cannot do that, because £Y — the cost of a breach — is not a
+figure NGED hold in a form we can use.</p>
+<p>So we invert the question. <strong>Models are aimed at equal safety, and we compare what each one spends
+to get there.</strong> Each model may be as conservative as it likes, and we tune that conservatism until
+it leaves the same small amount of risk unaddressed. Then the only thing left to compare is cost.
+This matches what NGED described: the problem is not a breach they currently suffer, it is
+over-buying to avoid one.</p>
+<p>The knob is the <strong>procurement quantile</strong> <span class="arithmatex">\(\tau\)</span> — how far up its own forecast distribution a model
+looks when deciding to act. A timid model uses a high <span class="arithmatex">\(\tau\)</span>, buys a lot, and is rarely caught out.
+Calibration picks each model's <span class="arithmatex">\(\tau\)</span> so that its <strong>unmet fraction</strong> — the share of
+genuinely-needed megawatt-hours it failed to cover — hits a common target (5% to begin with):</p>
+<div class="arithmatex">\[
+\text{unmet fraction} = \frac{\sum_{i,t} \max(0,\; N_{i,t} - V_{i,t})}{\sum_{i,t} N_{i,t}}
+\]</div>
+<p>where <span class="arithmatex">\(V_{i,t}\)</span> is the volume the model would have bought (or curtailed) for time series <span class="arithmatex">\(i\)</span> in
+half-hour <span class="arithmatex">\(t\)</span>, and <span class="arithmatex">\(N_{i,t}\)</span> is the volume that turned out to be needed. Measuring unmet <em>energy</em>
+rather than counting missed events matters: exceedances are rare by construction, and a count of
+them is too noisy to rank models by.</p>
+<p><strong><span class="arithmatex">\(\tau\)</span> is calibrated on the training window of the leaderboard fold, never on the validation
+window it is scored on</strong> — otherwise a model sees its own future and every pound of the "saving" is
+lookahead. That has a price: the training window is data the model was fitted to, so its residuals
+are smaller than they will be out of sample, <span class="arithmatex">\(\tau\)</span> comes out too low, and every model
+under-procures on the scored window. The model that overfits hardest gains most from this.</p>
+<p><strong>Equal risk is therefore a target, not a guarantee, and this is the design's main weakness.</strong> What
+a model <em>realises</em> on the scored window is whatever its tail calibration delivers there. A model
+that overshoots the target spends less and can top the leaderboard while being materially less
+safe. The <strong>realised out-of-sample unmet fraction is reported beside every cost, and a cost read
+without it is meaningless.</strong> Two models are only comparable on cost when their realised unmet
+fractions are close.</p>
+<h2 id="what-the-volumes-cost">What the volumes cost</h2>
+<p>Flexibility is bought in two parts, and the distinction is the whole point of these metrics.
+<strong>Availability</strong> is paid on every megawatt-hour held ready, whether or not it is called;
+<strong>utilisation</strong> is paid only on what is actually dispatched. Over-procurement therefore costs the
+<em>availability</em> price on the excess, not the far larger utilisation price:</p>
+<div class="arithmatex">\[
+C = p_{\text{avail}} \sum_{i,t} V_{i,t} \;+\; p_{\text{util}} \sum_{i,t} \min(V_{i,t},\, N_{i,t})
+\]</div>
+<p>The second term is nearly identical for every model — it is set by what the network actually
+needed — so the ranking is carried by the first. Charging one blended price against all procured
+volume would overstate the cost of over-procurement several times over. Both prices are
+configuration, and <a href="#questions-for-nged">question 1</a> asks NGED for them.</p>
+<h2 id="metric-1-flexibility-procurement-cost">Metric 1 — flexibility procurement cost</h2>
+<p>For time series <span class="arithmatex">\(i\)</span> and half-hour <span class="arithmatex">\(t\)</span>, with demand-side limit <span class="arithmatex">\(L_i\)</span>:</p>
+<table>
+<thead>
+<tr>
+<th>Quantity</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Volume procured</td>
+<td><span class="arithmatex">\(V_{i,t} = \max(0,\; \hat q_{i,t}(\tau) - L_i) \times 0.5\)</span> MWh</td>
+</tr>
+<tr>
+<td>Volume needed</td>
+<td><span class="arithmatex">\(N_{i,t} = \max(0,\; y_{i,t} - L_i) \times 0.5\)</span> MWh</td>
+</tr>
+</tbody>
+</table>
+<p><span class="arithmatex">\(\hat q_{i,t}(\tau)\)</span> is the model's <span class="arithmatex">\(\tau\)</span>-quantile forecast, <span class="arithmatex">\(y_{i,t}\)</span> the observed power, and
+<span class="arithmatex">\(\times 0.5\)</span> converts MW held for a half-hour into MWh.</p>
+<p><strong>Worked example.</strong> A substation whose limit sits at 30 MW, on one winter evening half-hour, with
+availability at £75/MWh and utilisation at £750/MWh (both placeholders). Manual review forecasts 33
+MW, so it procures <span class="arithmatex">\((33 - 30) \times 0.5 = 1.5\)</span> MWh. Demand turns out to be 30.6 MW, so 0.3 MWh was
+needed. It pays £112.50 availability and £225 utilisation. A model forecasting 31.0 MW procures 0.5
+MWh, pays £37.50 and the same £225 — saving £75. The metric sums this over every half-hour and
+every series.</p>
+<h2 id="metric-2-curtailment-cost">Metric 2 — curtailment cost</h2>
+<p>Identical arithmetic on the export side, with the export-side limit and the curtailment price
+<span class="arithmatex">\(p_{\text{curt}}\)</span> (£/MWh of network access) charged against total volume curtailed, since curtailed
+generation is lost whether or not the constraint was real.</p>
+<p><strong>Worked example.</strong> A generation-dominated feeder with an export limit of 8.5 MW. The forecast at
+its calibrated quantile says 9.6 MW, so 0.55 MWh is curtailed; actual export is 8.7 MW, so 0.1 MWh
+needed curtailing. At £100/MWh that is £55 against £10 of real constraint — £45 of generation
+curtailed for nothing.</p>
+<h3 id="which-direction-is-the-constraint-on">Which direction is the constraint on?</h3>
+<p>There is no single sign rule. This repo carries two conventions — at a substation, positive power
+flows towards end-users; at a customer's meter, positive means the customer is <em>exporting</em> to
+NGED's grid (see <a href="../forecast-building-blocks/#sign-convention">sign convention</a>) — and the trial
+area contains both,
+plus battery sites that both charge and discharge. Constraint-side direction is therefore resolved
+<strong>per <code>time_series_type</code></strong>, reusing the mapping the <a href="../metrics-and-leaderboard/#tail-exceedance-metrics-scoring-the-question-nged-actually-asks">tail and exceedance
+metrics</a>
+already need, with the ambiguous types confirmed by NGED.</p>
+<p>A series constrained in both directions gets <strong>a limit in each</strong>, so the threshold is one scalar
+per <code>(time_series_id, direction)</code> rather than per series alone. Each metric is computed only where
+its direction is constrained: a demand primary with no connected generation gets no curtailment
+cost, and a solar meter gets no flexibility procurement cost. Applying one global rule instead
+would silently score £0 for every generator meter in the trial area.</p>
+<h2 id="what-each-number-is-compared-against">What each number is compared against</h2>
+<p>Every model's cost is reported beside two reference points, computed on the same series and
+half-hours:</p>
+<ul>
+<li><strong>Manual review</strong> — NGED's method today: the 13-analogue ensemble, read off a plot, taking the
+  95th percentile if a single number is needed (<a href="../../background/nged-incumbent-forecast/">the incumbent
+  forecast</a>; we have not confirmed that the 95th
+  percentile is what they use, and <a href="#questions-for-nged">question 5</a> asks). It is scored at that
+  <strong>actual operating point, not calibrated to the common risk target</strong>, because the point is to
+  measure what NGED do today. Its realised unmet fraction is therefore an output — the number
+  saying what risk level they currently work to — and the saving against it mixes a change in spend
+  with a change in risk. Both are reported; neither means much alone.</li>
+<li><strong>Perfect forecast</strong> — the least that can be spent while leaving no more than the target fraction
+  <span class="arithmatex">\(u\)</span> unmet. Truth is not a distribution, so there is no quantile to calibrate: the floor is the
+  cost of procuring exactly <span class="arithmatex">\((1-u)N_{i,t}\)</span> in every half-hour, put straight through the same price
+  formula. Setting it at zero unmet instead would put it <em>above</em> a model calibrated to 5%, and
+  models would routinely score over 100% of the available saving.</li>
+</ul>
+<p>The headline is <em>"£X less than manual review, which is Y% of the £Z a perfect forecast would
+save"</em>, always alongside the realised unmet fractions. Note that a model whose realised unmet
+fraction overshoots the target can still exceed 100%; that is a signal to read the risk column, not
+a bug.</p>
+<h2 id="choosing-the-limit">Choosing the limit</h2>
+<p>Real network limits move with ambient temperature, with how long an overload lasts, with season and
+with switching state, so no single number is correct — the fuller version of this caveat is in
+<a href="../../techniques/evaluation-metrics/#choosing-the-thresholds-static-per-series-quantile-derived">the threshold-choice
+discussion</a>.
+We use a <strong>synthetic limit</strong>: the <strong>99th percentile of each series' own full observation history</strong>,
+in the constrained direction, labelled <code>historical_p99</code> to keep it distinct from the
+forecast-quantile label <code>p99</code> — one is a fixed power level derived from history, the other a level
+of the forecast distribution.</p>
+<p>This is the rung NGED described ("set capacity at the 99th percentile, and assume everything is
+slightly overloaded in winter"), and it is the same single rung the <a href="../metrics-and-leaderboard/#tail-exceedance-metrics-scoring-the-question-nged-actually-asks">tail and exceedance
+metrics</a>
+use, so the leaderboard carries one threshold concept rather than several. The percentile sets the
+absolute size of every £ figure on this page — a lower rung would multiply them — which is another
+reason to read these numbers as a ranking instrument rather than a total.</p>
+<p>Where NGED supply a real firm or flex rating we will compute the same metrics against it, as a
+case study. A rating never breached during the scored window is not useless here — procurement
+volume is driven by the <em>forecast</em> crossing the limit, so models still rank — but the unmet
+fraction goes undefined, and ratings are not available for every series and sit at different points
+of each series' distribution, so they cannot carry the cross-series leaderboard.</p>
+<h2 id="what-these-numbers-do-not-capture">What these numbers do not capture</h2>
+<ul>
+<li><strong>The limit is invented, and fitted on the scored window.</strong> A percentile of history is not a
+  network rating, and it is computed over the full history including the months being scored. It is
+  model-independent, so it cannot favour one entrant, but it is not an out-of-sample quantity.</li>
+<li><strong>The history is already post-intervention.</strong> At a genuinely constrained site the metered power
+  reflects flexibility that <em>was</em> dispatched and generation that <em>was</em> curtailed. So <span class="arithmatex">\(N\)</span> understates
+  true need, and the percentile limit derived from that same history is itself shaped by the
+  interventions we are pricing.</li>
+<li><strong>Ten trial-area sites cannot see direction at all.</strong> They are metered in MVA, which reports the
+  magnitude of flow, so reverse power flow appears as a <em>rise</em> rather than a sign change (see
+  <a href="../../background/data-quality/">data quality</a>). At those sites an export event would be billed as
+  demand-side procurement, and multiplying MVA by half an hour gives MVAh, which is not the
+  megawatt-hour a flexibility price is quoted against.</li>
+<li><strong>Unmet energy is pooled across series and half-hours.</strong> A model can hit the 5% target by covering
+  the largest site well and abandoning many small ones, and 5% concentrated in one deep breach is
+  far worse operationally than the same 5% spread thinly. Harm grows faster than depth; equalising
+  energy does not equalise harm. The per-series distribution of unmet energy is reported for this
+  reason.</li>
+<li><strong>The prices are single averages.</strong> Two numbers stand in for a tendered market with zone-by-zone
+  clearing prices and finite liquidity.</li>
+<li><strong>Procurement is not per-half-hour.</strong> NGED tender flexibility ahead, in blocks and windows. Our
+  arithmetic assumes perfectly granular buying, which flatters every model equally but overstates
+  the achievable saving.</li>
+<li><strong>Ensemble size limits how finely <span class="arithmatex">\(\tau\)</span> can be tuned.</strong> Manual review has 13 analogues, so its
+  quantiles come in coarse steps; a 51-member ensemble is far finer. Models of different ensemble
+  size cannot be landed on exactly the same risk.</li>
+<li><strong>Costs are per fold, and folds are seasonal.</strong> The limit concentrates exceedances at winter peak,
+  so annualising a fold that does not span a whole year is meaningless, and a fold with no
+  exceedance leaves the unmet fraction undefined.</li>
+<li><strong>Nothing is validated against real spend</strong>, except at the trial-area sites that sit in an actual
+  flexibility zone. There are a couple, and they are the case studies that tell us whether these
+  numbers are the right order of magnitude.</li>
+<li><strong>Asset failure and outage costs are excluded.</strong> NGED identified outage quantification as
+  valuable but harder; it is not in this design.</li>
+<li><strong>Over-procurement has a deliberate component.</strong> NGED told us they over-buy partly to stimulate
+  the flexibility market and to support their capital programme. That portion is policy, not
+  forecast error, and a better forecast should not be credited with removing it.</li>
+</ul>
+<h2 id="questions-for-nged">Questions for NGED</h2>
+<ol>
+<li><strong>Flexibility prices</strong> — what are the availability and utilisation rates separately, and which
+   published dataset should we take them from?</li>
+<li><strong>Curtailment price</strong> — is £100/MWh of network access right, and is the £2M saved last year on
+   the same basis, so we can check our totals against it?</li>
+<li><strong>Who bears the curtailment cost</strong> — NGED, or the generator under a non-firm connection? This
+   decides whether metric 2 measures NGED's saving or the connected customer's.</li>
+<li><strong>How much do you currently over-procure?</strong> The entire saving is measured against this. Even
+   procured-versus-needed volumes for a single zone would anchor it.</li>
+<li><strong>Is the 95th percentile of the 13 analogues the operating point</strong> you actually work from, and
+   what reliability do you target — how much genuinely-needed flexibility may go unbought?</li>
+<li><strong>Which trial-area sites have curtailable generation</strong>, which are constrained on export as well
+   as demand, which sit in a real flexibility zone with procurement history we can use as a case
+   study, and can we have the firm and flex capacities?</li>
+</ol>
+<h2 id="implementation-details-deleted-when-this-ships">Implementation details (deleted when this ships)</h2>
+<ul>
+<li>Two functions in <code>packages/ml_core/src/ml_core/metrics.py</code>, sharing a private helper taking the
+  limit, the prices and the direction. They consume the same ensemble-member rows as the existing
+  quantile metrics.</li>
+<li><strong>This needs a <code>Metrics</code> contract change, still to be reviewed and agreed when we implement</strong>:
+  <code>METRIC_NAMES</code> gains <code>flex_procurement_cost_gbp</code>, <code>curtailment_cost_gbp</code> and <code>unmet_fraction</code>,
+  and <code>METRIC_PARAMS</code> gains a <code>historical_p99</code> label per constrained direction. Bare <code>"p99"</code>
+  already exists in <code>QUANTILE_METRIC_PARAMS</code> meaning a <em>forecast</em> quantile, so a history-derived
+  power level has to stay distinct from a level of the forecast distribution.</li>
+<li><strong>Two things the design needs to store have nowhere to live in <code>Metrics</code> today</strong>: the number of
+  half-hours a cost row covers (without it, totals cannot be compared across folds of unequal
+  length) and the calibrated <span class="arithmatex">\(\tau\)</span> (which says how conservative a model had to be to reach the
+  common risk target, and is interpretable on its own). Both need resolving with the contract
+  change.</li>
+<li>Costs are stored <strong>per <code>time_series_id</code></strong>, summed over time only, so they fit the existing primary
+  key. Only <span class="arithmatex">\(\tau\)</span> and the unmet target are pooled across series.</li>
+<li><strong><code>_log_metrics_to_mlflow</code> aggregates with <code>mean()</code></strong>, which is right for every metric that exists
+  today and wrong for these: the portfolio headline is a <em>sum</em> over series, and pooled
+  <code>unmet_fraction</code> is <span class="arithmatex">\(\sum N\)</span>-weighted, not an unweighted mean that a tiny site can dominate. The
+  MLflow aggregation needs a per-metric rule before these land.</li>
+<li>Prices, the risk target and the limit percentile are configuration, not constants in code, so
+  NGED's answers can be applied without a retrain.</li>
+<li>Scored on a single lead-time slice (<code>day_ahead</code> until we know when the procurement decision is
+  actually made) rather than all horizons pooled.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

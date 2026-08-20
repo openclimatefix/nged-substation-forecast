@@ -1,0 +1,3218 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../design-principles/">
+      
+      
+        <link rel="next" href="../inherent-stability/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Engineering Hypotheses - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#engineering-hypotheses" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Engineering Hypotheses
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Hypotheses
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-claims-in-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The claims, in brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h1-a-service-that-mostly-runs-itself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H1 — a service that mostly runs itself
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h2-a-hundred-experiments-per-person-in-a-peak-month" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H2 — a hundred experiments per person in a peak month
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h3-one-click-promotion-and-one-click-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H3 — one-click promotion, and one-click rollback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h4-it-runs-for-pocket-money" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H4 — it runs for pocket money
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h5-scale-without-redesign" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H5 — scale without redesign
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-tests-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The tests, at a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-hypotheses-rather-than-aims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why hypotheses rather than aims
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-intervention-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The intervention log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recording-a-falsification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording a falsification
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent Stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Incident Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and Scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP Variable Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/adapting-to-another-geography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Could this codebase forecast another country? (not planned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-Savings Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training History (ERA5)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-claims-in-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The claims, in brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h1-a-service-that-mostly-runs-itself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H1 — a service that mostly runs itself
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h2-a-hundred-experiments-per-person-in-a-peak-month" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H2 — a hundred experiments per person in a peak month
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h3-one-click-promotion-and-one-click-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H3 — one-click promotion, and one-click rollback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h4-it-runs-for-pocket-money" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H4 — it runs for pocket money
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#h5-scale-without-redesign" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H5 — scale without redesign
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-tests-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The tests, at a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-hypotheses-rather-than-aims" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why hypotheses rather than aims
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-intervention-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The intervention log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#recording-a-falsification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recording a falsification
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="engineering-hypotheses">Engineering Hypotheses</h1>
+<p>This page states what we claim Flexpectation's engineering will achieve, how each claim is tested,
+and what would falsify it. It is deliberately written as a set of <strong>hypotheses with numbers</strong>
+rather than a set of aims — <a href="#why-hypotheses-rather-than-aims">why we framed it that way</a> is argued
+below, after the claims themselves.</p>
+<p>Its counterpart is the <a href="../design-principles/">design principles</a> list — the
+bets we are making in order to achieve the hypotheses below. The relationship between the two, and
+the admission test it implies, are stated on that page.</p>
+<h2 id="the-claims-in-brief">The claims, in brief</h2>
+<p><strong>H<em>n</em></strong> is a hypothesis; <strong>T<em>n.m</em></strong> is its <em>m</em>th <strong>test</strong>. These labels are cited from issues and
+from NIA reports, so <strong>append, never renumber</strong>.</p>
+<p>There are five claims below. The <a href="#the-tests-at-a-glance">table of tests and thresholds</a> follows
+them.</p>
+<h2 id="h1-a-service-that-mostly-runs-itself">H1 — a service that mostly runs itself</h2>
+<blockquote>
+<p>Manual attention is needed only when an upstream input format changes. The service degrades
+gracefully and legibly, it propagates uncertainty faithfully, and a non-expert can run it day to
+day from the runbooks alone.</p>
+</blockquote>
+<p>The design that is meant to deliver this is <a href="../inherent-stability/">Inherent Stability</a>.
+The background argument for <em>why</em> leniency is affordable is
+<a href="../../background/requirements/#uptime-lenient-by-design">Uptime: lenient by design</a> — but note that
+this is a defensive argument (an outage does not cost much) whereas H1 is a stronger positive claim
+(interventions will be rare). The positive claim is the one actually in dispute, and a sceptic is
+not moved by "it's fine when it breaks".</p>
+<p>Mobile telecoms is where that positive claim already holds, in an environment far noisier than any
+input this project depends on. A phone call crossing between cell towers rides a radio channel
+disrupted by multipath fading, interference and a lift shaft blocking the signal outright, and it
+degrades to a choppy few seconds rather than dropping — with nobody watching a dashboard per call.
+Forward error correction and packet-loss concealment absorb that corruption structurally, which is
+the same shape of claim H1 is making about the forecast: build the tolerance into the system so
+that nobody has to operate it awake. The analogy has a real limit, worth stating rather than
+glossing over: telecoms mostly reconstructs the <em>exact</em> signal, through redundancy and
+retransmission, where we have no retransmission to reach for — a gap in yesterday's telemetry is
+simply gone, not resendable — so our recovery is a wider uncertainty band, not a recovered fact.
+What the analogy proves is narrower than "the two systems work the same way"; it proves that a
+system living in continuous, heavy corruption can still run unattended, which is the part of H1 a
+sceptic doubts.</p>
+<p><strong>T1.1 — Operability.</strong> Interventions per quarter, classified by cause, counted from the
+<a href="#the-intervention-log">intervention log</a>. The headline quote says "only"; the test operationalises
+that at ≥90% so a single fluke cannot falsify the claim on its own. "Zero out-of-hours" means no
+intervention is ever needed outside normal working hours — the posture that makes
+next-business-day recovery honest.</p>
+<p>Pre-v1.0 periods are recorded in the
+<a href="../../live_service/intervention-log/#periods-covered">intervention log</a>, with their caveats, and do
+not score.</p>
+<p><strong>T1.2 — Graceful degradation.</strong> Run the failure-scenario suite across every time series and check
+two things: that a forecast is emitted at all, and that it still beats <code>nged_incumbent</code> at rungs 0–2
+of the <a href="../inherent-stability/#the-degradation-ladder">degradation ladder</a>. Blocked on
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/147">#147</a>, which builds the
+baseline to compare against.</p>
+<p><strong>T1.3 — Faithful uncertainty.</strong> PICP and pinball loss computed per degradation regime, from the
+leaderboard's scenario dimension. This is the sharpest test we have, and it needs no new metric —
+only the scenario dimension, which is the same machinery T1.2 uses. The tolerance is pre-registered
+at ±5 percentage points (a nominal 90% interval must achieve 85–95% coverage in every regime);
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/443">#443</a> may tighten it before
+the first scoring, but any change must be recorded here.</p>
+<p><strong>T1.4 — Operability by a non-expert.</strong> Day-to-day operation by an NGED operator, from the runbooks
+alone, is largely a consequence of the rest of H1 rather than a separate property: a service that
+needs attention only when an upstream format changes is most of the way there already, because the
+set of situations the operator must ever handle is small enough to enumerate. That enumeration
+exists as the <strong>operator contract</strong> in
+<a href="../../roadmap/handover/#1-the-operator-contract">Handover to NGED</a> — ten or fewer actions
+the operator is ever expected to take. What this test adds on top of T1.1 is that those few are
+<em>written down well enough to follow</em>, which is a documentation claim resting on an engineering one.
+The measurement: during the
+<a href="../../roadmap/handover/#6-game-days-and-in-person-training">game days</a>, the operator recovers from
+each scripted failure — NWP feed broken, disk full, daemon killed, credential expired, forecast
+slot missed — unaided, using only the runbooks. An exercise that needs OCF intervention is a
+falsification of T1.4 for that exercise, and a documentation bug to fix. Stating it as a test is
+what turns the game days into a measurement rather than purely a training exercise.</p>
+<h2 id="h2-a-hundred-experiments-per-person-in-a-peak-month">H2 — a hundred experiments per person in a peak month</h2>
+<blockquote>
+<p>When experimentation is the active workstream, one person can register at least 100 leaderboard
+experiments in a month.</p>
+</blockquote>
+<p><strong>Why a hundred, rather than "as many as we can manage"?</strong> Because a low hit rate is the normal
+condition of ML research, and it makes throughput the denominator of everything else. John Jumper,
+who shared the 2024 Nobel Prize in Chemistry for his work on AlphaFold, puts the share of research
+ideas that fail at around 90%, and treats that rate as an ordinary and necessary feature of doing
+research rather than as evidence of doing it badly — his answer to <em>How important is failure in
+research?</em> in his <a href="https://www.nobelprize.org/prizes/chemistry/2024/jumper/interview/">Nobel Week
+interview</a> (recorded 6 December
+2024; that section starts at 14:12). If roughly one idea in ten survives contact with the data then
+ten attempts is simply the price of one result, and a team that can run five experiments a month is
+not doing research ten times more slowly than a team that can run fifty. It is answering a
+different, much smaller set of questions.</p>
+<p>The sharper consequence is that throughput changes <em>which</em> ideas are worth attempting, not merely
+how quickly they are worked through. When an experiment is expensive, a speculative idea has to
+clear a far higher bar of prior plausibility than a safe one before it is worth the cost — so the
+wild ideas are the first to be cut, and they are exactly where the large wins live, because an idea
+everybody already expects to work is rarely worth much. Cheap failure is what makes a
+low-probability, high-payoff attempt rational. That is why the corresponding design principle is expressed as a
+<em>cost</em> rule — <a href="../design-principles/#4-an-experiment-must-be-cheap-to-try-and-cheap-to-abandon">an experiment must be cheap to try, and cheap to
+abandon</a> —
+rather than as a speed one.</p>
+<p><strong>And an idea is not scored just once.</strong> Because H1 claims graceful degradation, a serious
+candidate has to be evaluated not only on complete data but across a range of data outages — a dead meter, a
+missed NWP run, a feed that has gone stale, several at once — which is exactly what T1.2 and T1.3
+measure. One idea therefore costs a handful of evaluations rather than one, and the multiplier is
+unforgiving in the wrong direction: when a scenario sweep is expensive, it quietly shrinks to the
+one or two cases somebody had time for, and the failure modes that were too costly to test are
+precisely the ones the service will meet unattended at 3am. Throughput is what keeps the awkward
+scenarios in the evaluation rather than in the backlog.</p>
+<p><strong>And the research here is broad as well as deep.</strong> Flexpectation is an unusually research-heavy
+forecasting project: alongside forecast skill itself sit
+<a href="../../background/switching-events/">detecting switching events</a> and reconstructing the demand that
+would have been metered without them,
+<a href="../../roadmap/capacity-estimation/">estimating the effective capacity</a> of metered generators, and
+<a href="../../roadmap/disaggregation/">disaggregating</a> unmetered PV and wind from a substation's net load —
+each an open question in its own right, each with its own pile of attempts that will not work. A
+hundred experiments in a month is not one question examined a hundred ways; it is several distinct
+questions each getting enough attempts to reach an answer worth reporting. The project-specific
+statement of this is
+<a href="../../background/requirements/#ml-experimentation-at-scale">ML experimentation at scale</a>: nearly
+every objective in the brief is an open research question, and we hold far more ideas than we can
+try at once.</p>
+<p><strong>T2.1 — Experiment throughput.</strong> Registered leaderboard experiments per person per month, taken
+from MLflow run timestamps. Two framing choices are deliberate.</p>
+<p>It is a <strong>peak</strong> claim. There will be months spent hardening the production service or writing
+documentation, and a quiet month is not a falsification — the claim is about what the machinery
+allows when we lean on it.</p>
+<p>And it is <strong>count-only</strong>. A single N-configuration sweep can inflate the number, and we accept
+that, because a simple count that MLflow already records beats a "decision-grade experiments"
+qualifier that would need a human-effort log to measure. If the threshold is ever met only by
+config sweeps, that will be obvious from reading the runs, and the fix is to <em>append a T2.2</em> then —
+never to redefine T2.1.</p>
+<h2 id="h3-one-click-promotion-and-one-click-rollback">H3 — one-click promotion, and one-click rollback</h2>
+<blockquote>
+<p>Moving the leaderboard winner into production, or reverting it, is a single command each way.</p>
+</blockquote>
+<p><strong>One command is not the same as one leap of faith, and that distinction is the substance of this
+hypothesis.</strong> A promotion mechanism is only worth having if it is <em>safe</em> to use; a fast route to
+production that nobody trusts enough to press is no better than a slow one. What makes a
+single-command promotion defensible is everything that will have happened by the time the command
+becomes available to run:</p>
+<ul>
+<li><strong>The candidate was scored against every model already on the board, identically.</strong> The same
+  population, the same folds, the same metric definitions, held constant by construction rather
+  than by discipline — the <em>every experiment is scored identically</em> principle. So "it won" is a
+  claim about the model rather than about the conditions it happened to be measured under.</li>
+<li><strong>The code that scored well is the code that serves.</strong> Research runs on the production pipeline,
+  behind the same data contracts and the same test suite, so nothing is re-implemented between the
+  measurement and the deployment — the <em>one execution path from research to production</em> principle.
+  This removes the single largest source of promotion risk in a conventional setup, which is that
+  the thing measured and the thing deployed are two different pieces of code.</li>
+<li><strong>It will have been measured against degradation, not only against clean history.</strong> Once the
+  failure-scenario suite exists (T1.2 and T1.3), a candidate is scored with inputs missing and
+  stale as well as complete — the class of behaviour a backtest on tidy history cannot see. This is
+  the part of the safety argument that is still to be built, and it is deliberately listed as a
+  test rather than assumed.</li>
+<li><strong>The way back is also one command.</strong> T3.2 is not the optional half of this hypothesis: a
+  promotion is only as safe as its reversal is cheap.</li>
+</ul>
+<p>Speed, then, is a <em>consequence</em> of the rigour rather than a trade against it. A promotion gated
+behind a week of manual checking would not be safer — it would be the same evidence, gathered more
+slowly and less repeatably, with the added risk that a hand-run check is skipped under deadline
+pressure.</p>
+<p><strong>T3.1 — Promotion effort.</strong> Commands required to get from "the leaderboard says X won" to "X is
+serving", following the runbook. The mechanism already exists (the <code>promoted_model</code> asset — see
+<a href="../../architecture/production-deployment/#promote-the-champion-via-a-dagster-asset-not-a-script">Production Deployment</a>);
+what is missing is a runbook that pins down what counts as one command.</p>
+<p><strong>T3.2 — Rollback effort.</strong> Commands required to get from "X is serving" back to the previous
+champion. Promotion without rollback is not safe at any speed, and rollback is the damping half of
+<a href="../inherent-stability/#the-rules">inherent stability</a> — so this is not the optional
+half of H3.</p>
+<h2 id="h4-it-runs-for-pocket-money">H4 — it runs for pocket money</h2>
+<blockquote>
+<p>The whole running service costs under £50/month at v1 scale and under £200/month at v2 scale.</p>
+</blockquote>
+<p>This is probably the most transferable finding of the set, and it is an answer, independent of H1's,
+to the worry that a service like this must carry heavy operational overhead. The estimates it is pinned to are in
+<a href="../../architecture/aws-costs/">AWS Running Costs</a>: ~£25–35/month at v1 and a projected ~£70–140/month
+at v2. The thresholds sit above those estimates deliberately, so that the hypothesis is a claim
+about the architecture rather than a restatement of the spreadsheet.</p>
+<p><strong>T4.1 and T4.2 — Cost.</strong> Read the monthly AWS bill. No per-experiment instrumentation is needed:
+training today runs on laptops, the planned weekly AWS retrain is bounded at ~£1/month, and a
+backtest on AWS is bounded at well under £1 per run at v1 scale — all inside the bill either way.</p>
+<h2 id="h5-scale-without-redesign">H5 — scale without redesign</h2>
+<blockquote>
+<p>The architecture goes from 32 to ~2,500 time series without structural change.</p>
+</blockquote>
+<p>This is the central engineering bet of the project. It is what justifies building the v2
+architecture during v1 rather than prototyping first and rewriting later, and it is only truly
+resolvable at v2 — which is an argument for writing it down now, while the prediction still costs
+something to make.</p>
+<p><strong>T5.1 — Scale without redesign.</strong> The test passes if, at v2, no change has been forced by scale
+alone to the data contracts, the asset graph, or the storage layout. Changes to configuration, partition counts and
+machine sizes do not count against it; a new table, a changed schema, or a restructured asset graph
+does.</p>
+<h2 id="the-tests-at-a-glance">The tests, at a glance</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Test</th>
+<th>Threshold</th>
+<th>Resolvable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T1.1</td>
+<td>Operability</td>
+<td>≥90% of interventions caused by an upstream format change; zero out-of-hours</td>
+<td>~2 quarters of v1.0</td>
+</tr>
+<tr>
+<td>T1.2</td>
+<td>Graceful degradation</td>
+<td>Every series emits a forecast; beats <code>nged_incumbent</code> at rungs 0–2</td>
+<td>v0.3, after <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/147">#147</a></td>
+</tr>
+<tr>
+<td>T1.3</td>
+<td>Faithful uncertainty</td>
+<td>PICP within ±5 percentage points of nominal in every degradation regime (tolerance provisional until <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/443">#443</a>)</td>
+<td>v0.5</td>
+</tr>
+<tr>
+<td>T1.4</td>
+<td>Operability by a non-expert</td>
+<td>Every game-day exercise recovered from the runbooks alone</td>
+<td>Handover phase</td>
+</tr>
+<tr>
+<td>T2.1</td>
+<td>Experiment throughput</td>
+<td>≥100 registered experiments per person, in a peak month</td>
+<td>v0.5</td>
+</tr>
+<tr>
+<td>T3.1</td>
+<td>Promotion effort</td>
+<td>≤1 command</td>
+<td>v0.3</td>
+</tr>
+<tr>
+<td>T3.2</td>
+<td>Rollback effort</td>
+<td>≤1 command</td>
+<td>v0.3</td>
+</tr>
+<tr>
+<td>T4.1</td>
+<td>Cost at v1 scale</td>
+<td>≤£50/month for the whole running service</td>
+<td>v1.0, from the AWS bill</td>
+</tr>
+<tr>
+<td>T4.2</td>
+<td>Cost at v2 scale</td>
+<td>≤£200/month for the whole running service</td>
+<td>v2</td>
+</tr>
+<tr>
+<td>T5.1</td>
+<td>Scale without redesign</td>
+<td>No structural change forced by going from 32 to ~2,500 series</td>
+<td>v2</td>
+</tr>
+</tbody>
+</table>
+<h2 id="why-hypotheses-rather-than-aims">Why hypotheses rather than aims</h2>
+<p>Three reasons.</p>
+<p><strong>NIA funding is for transferable learning, including negative results.</strong> A pre-registered
+threshold that we then miss is a publishable finding; an aim that we quietly fall short of is not.
+Six report issues (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/128">#128</a>,
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/130">#130</a>,
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/131">#131</a>,
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/132">#132</a>,
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/135">#135</a>,
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/156">#156</a>) are the natural
+consumers.</p>
+<p><strong>It converts arguments into measurements.</strong> Several of the claims above — particularly the ones
+about operational burden — are genuinely disputed, and a document that argues one side persuades
+nobody. A number that resolves itself is a better outcome, and pre-registering one signals
+confidence in a way that prose cannot.</p>
+<p><strong>It forces the measurement artefacts to exist in advance.</strong> Most of these tests need something
+built before they can be scored: a baseline forecaster and a scenario suite, plus the
+<a href="../../live_service/intervention-log/">intervention log</a>, which is the one already in place.
+Writing the hypothesis first is what puts those on the roadmap early enough to be useful.</p>
+<p>The commitment this entails is real: a hypothesis without a number is an aim wearing a lab coat.
+Each one above has a threshold and a window, and we must be willing to record a falsification.</p>
+<h2 id="the-intervention-log">The intervention log</h2>
+<p><strong>T1.1 is the only test on this page that cannot be measured retrospectively.</strong> Every other test can
+be reconstructed later: T1.2 and T1.3 are computed by re-running the scenario suite and the
+leaderboard, T2.1 comes from MLflow timestamps that live forever, T3.1 and T3.2 can be counted
+whenever the runbooks exist, T4.1 and T4.2 come from billing history, and T1.4 and T5.1 are
+measured at events that have not happened yet. But "how many times did a human have to intervene,
+and why?" is unrecoverable unless it is recorded as it happens.</p>
+<p>Three rules keep that measurement honest.</p>
+<p>The artefact is deliberately cheap — an append-only log with the date, the trigger, a cause
+category, the human-minutes spent, and whether a runbook already existed — so there is no excuse for
+not keeping it. It lives at
+<a href="../../live_service/intervention-log/">Live Service → Intervention log</a>, and the
+<a href="../../live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled">operations runbook</a>
+tells the operator to append to it.</p>
+<p>But its <strong>measurement window opens at v1.0</strong>. Interventions during v0.2–v0.9, while the system is
+being actively rebuilt, are development churn, and counting them would spuriously falsify the
+≥90%-upstream threshold. Log everything from day one — the pre-v1.0 entries still feed the cause
+taxonomy — but score T1.1 only from v1.0 onward.</p>
+<p>The cause taxonomy is the substance of the test, since T1.1 predicts that essentially every entry
+falls into "upstream format or contract change".</p>
+<h2 id="recording-a-falsification">Recording a falsification</h2>
+<p>If a test fails, the result is recorded here rather than quietly dropped: the threshold stays, and
+the hypothesis gains a short note saying what was measured, when, and what we think the cause was.
+A falsified engineering hypothesis is one of the more useful things this project can hand to the
+next DNO that tries it.</p>
+<p>Five hypotheses is the sensible ceiling. Each one carries a measurement cost, and a page of thirty
+claims nobody scores is worse than a handful that are actually resolved.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

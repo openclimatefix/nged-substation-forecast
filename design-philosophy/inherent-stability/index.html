@@ -1,0 +1,3881 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../engineering-hypotheses/">
+      
+      
+        <link rel="next" href="../common-incident-classes/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Inherent Stability - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#inherent-stability" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Inherent Stability
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent Stability
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent Stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-inherent-stability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is "inherent stability"?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ngeds-incumbent-forecast-is-the-floor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NGED's incumbent forecast is the floor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-degradation-ladder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The degradation ladder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failure-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-complexity-should-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where complexity should live
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mechanisms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mechanisms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mechanisms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-versus-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing versus wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-directions-and-their-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default directions, and their limit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#widening-bands-the-in-band-signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Widening bands: the in-band signal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-physical-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The physical envelope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#three-audiences-three-channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three audiences, three channels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missingness-in-learned-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missingness in learned models
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What this is not
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What this is not">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#not-postels-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not Postel's law
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-blast-radius" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not blast radius
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rd-fails-the-other-way" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R&amp;D fails the other way
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Incident Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and Scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP Variable Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/adapting-to-another-geography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Could this codebase forecast another country? (not planned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-Savings Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training History (ERA5)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-inherent-stability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is "inherent stability"?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ngeds-incumbent-forecast-is-the-floor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NGED's incumbent forecast is the floor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-degradation-ladder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The degradation ladder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#failure-modes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure modes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-complexity-should-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where complexity should live
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mechanisms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mechanisms
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mechanisms">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-versus-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing versus wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-directions-and-their-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default directions, and their limit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#widening-bands-the-in-band-signal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Widening bands: the in-band signal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-physical-envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The physical envelope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#three-audiences-three-channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three audiences, three channels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missingness-in-learned-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missingness in learned models
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-is-not" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What this is not
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What this is not">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#not-postels-law" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not Postel's law
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-blast-radius" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not blast radius
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rd-fails-the-other-way" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        R&amp;D fails the other way
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="inherent-stability">Inherent Stability</h1>
+<blockquote>
+<p><strong>We never stop forecasting power. When an input goes missing or stale, the forecast degrades
+gracefully instead of stopping: it becomes less certain, and it says so — through wider
+uncertainty bands to whoever reads the forecast, a warning row naming the feed at fault, and a
+Sentry event when a human can do something about it — the first two of those three are designed
+and not yet built. Wherever possible, that stability should be
+an inherent property of the system's design,
+rather than something bolted on afterwards by post-processing and <code>if-then-else</code> branches in the
+production service.</strong></p>
+</blockquote>
+<p>This page argues in full the first and largest of the project's
+<a href="../design-principles/">design principles</a>: how Flexpectation behaves when its inputs degrade. It is
+the <em>how</em> behind <a href="../engineering-hypotheses/#h1-a-service-that-mostly-runs-itself">H1</a> — the
+hypothesis that the service mostly runs itself. <a href="#the-rules">The rules</a> below are the
+fine-grained form of the never-stop, complexity-offline and strict-contracts principles in that
+list.</p>
+<p><strong>The model does the work, not a fallback path.</strong> A central mechanism behind everything below is
+that the ML model itself is built to keep producing a sensible forecast when some of its inputs are
+missing — rather than a chain of fallbacks wrapped around a model that assumes complete data. That
+is already partly true: the gradient-boosted trees we run today <em>route</em> missing features instead of
+requiring them to be filled in, so a forecast still comes out when a feature drops away. But the
+model has not yet been <strong>trained</strong> against realistic outages, which is what turns "it still produces
+a number" into "it still produces a number worth trusting". Much of what follows — the degradation
+ladder, the widening bands, the failure-scenario suite — exists to make that one design choice work;
+the mechanics are in <a href="#default-directions-and-their-limit">Default directions, and their limit</a> and
+<a href="#missingness-in-learned-models">Missingness in learned models</a>.</p>
+<p><strong>Scope.</strong> The principle and the mechanisms that already exist are described here. Mechanisms that
+are designed but not yet built are <strong>linked, not copied</strong> — they live in
+<a href="../../roadmap/"><code>docs/roadmap/</code></a> until they ship, and duplicating them here would make this
+page a roadmap mirror that rots. Sections carry the usual status markers: ✅ implemented,
+🚧 designed but not built.</p>
+<h2 id="what-is-inherent-stability">What is "inherent stability"?</h2>
+<p>If you have ever built and ridden a simple "soap box" cart, you will know that the steering is
+worryingly unstable: you have to fight it constantly to keep the cart going straight. Let go of the
+steering ropes and the wheels whip hard left or hard right, probably ending in a crash. The machine
+is trying to hurt you! It is inherently <em>unstable</em>, and it requires constant, active control to keep
+it safe.</p>
+<p><img alt="A boy riding a homemade soap box cart: a plank on four small wheels, with a string running forward
+to the pivoting front axle" src="../soapbox-cart.jpg" /></p>
+<p><em>A soap box cart, 1950. The whole steering mechanism is a front axle that pivots under the plank,
+pulled left or right by the length of string in the rider's hand. That pivot is vertical, so nothing
+returns the axle to centre. Photo from the
+<a href="https://commons.wikimedia.org/wiki/File:Zeepkist_(1950).jpg">Nationaal Archief</a>, resized, used
+under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>.</em></p>
+<p>A proper car's steering is the stark contrast. Its front wheels do not pivot about a vertical axis,
+as the cart's do. Each one turns about a <strong>kingpin</strong> — the pin at the outer end of the axle, which
+carries the steering knuckle the wheel is bolted to — and that pin is deliberately <em>tilted</em>, both
+backwards (the <strong>castor angle</strong>) and inwards (<strong>kingpin inclination</strong>). The backward tilt is the
+important one here: it makes the steering axis meet the road slightly ahead of the point where the
+tyre actually touches it, which leaves each wheel trailing behind its own pivot, exactly like the
+castor on an office chair or the front wheel of a bicycle.</p>
+<p><img alt="The front axle of a vintage car: a solid beam axle with the kingpin and steering knuckle at the
+wheel end, connected by a track rod" src="../car-front-axle-kingpin.jpg" /></p>
+<p><em>The same job done properly: a car's front axle, with the kingpin and steering knuckle at the wheel
+end and the track rod running across to the other wheel. The tilt built into that pin is what makes
+the steering self-centring. Photo by Dr.-Ing. S. Wetzel of an exhibit in the August Horch Museum,
+Zwickau, <a href="https://commons.wikimedia.org/wiki/File:VorAchseHorchZwickau.jpg">via Wikimedia Commons</a>,
+resized, copyrighted free use.</em></p>
+<p>The effect has a name: <strong>self-aligning torque</strong>. Any deviation from straight-ahead generates a force
+that pulls the wheel back towards the centre, and the vehicle-level property it produces is called
+<strong>directional stability</strong>. Let go of the steering wheel and it returns to centre on its own. No
+sensor measures that error and no controller corrects it: the geometry is chosen so that the physics
+does the work. The machine is trying to keep you safe, not through lots of active control, but by
+its very shape.</p>
+<p>That is what we want from the forecasting service. Wherever we can manage it, sensible behaviour
+under disturbance should fall out of how the system is built, rather than being watched for and
+corrected by machinery bolted on around it.</p>
+<h2 id="ngeds-incumbent-forecast-is-the-floor">NGED's incumbent forecast is the floor</h2>
+<p>Even in the worst case, when we have <em>no</em> fresh data, we hope to still be able to provide a better
+power forecast than NGED's incumbent forecast, with appropriate confidence bands. This is what
+allows us to claim that we should <em>always</em> be able to produce a power forecast, even when "blind".</p>
+<p><a href="../../background/nged-incumbent-forecast/">NGED's incumbent forecast</a> assembles 13 historical
+analogues at the same time-of-day on the same weekday — 6 from the last 6 weeks, 7 from 49–55 weeks
+back — and reads them as an ensemble. No weather, no ML, no holiday alignment, no load-growth
+scaling.</p>
+<p>Two of its properties set our floor. It <strong>consumes no NWP</strong>, so an NWP outage does not degrade it at
+all — which makes an NWP outage the hard test for us. And it <strong>survives a power-data outage</strong>,
+because the 49–55-week-old analogues are indifferent to recent staleness. The incumbent already
+embodies this philosophy, which is why it is the right thing to measure ourselves against, and it
+gives a far better failure criterion than any arbitrary staleness threshold:</p>
+<blockquote>
+<p><strong>We should only fail when we can no longer beat the incumbent.</strong></p>
+</blockquote>
+<p>The consequence, once verified, is the strongest claim on this page:</p>
+<blockquote>
+<p><strong>At our worst we degrade to roughly the incumbent. At our best we beat it substantially. There is
+no state in which NGED is worse off than they are today.</strong></p>
+</blockquote>
+<p>That is currently an <em>intention</em>, not a measured fact. Making it measurable needs the
+<code>nged_incumbent</code> baseline
+(<a href="../../roadmap/metrics-and-leaderboard/#the-headline-baseline-nged_incumbent">Metrics &amp; Leaderboard → The headline baseline</a>,
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/147">#147</a>) and a failure-scenario
+suite to score against it. Until both exist, treat the claim as the thing we are trying to earn.</p>
+<h2 id="the-degradation-ladder">The degradation ladder</h2>
+<table>
+<thead>
+<tr>
+<th>Rung</th>
+<th>Available inputs</th>
+<th>Expected behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Everything fresh</td>
+<td>Best skill; narrowest bands</td>
+</tr>
+<tr>
+<td>1</td>
+<td>One or two daily NWP runs missed</td>
+<td>Slightly worse; bands widen slightly</td>
+</tr>
+<tr>
+<td>2</td>
+<td>No NWP for days or weeks</td>
+<td>Weather-blind: lags, calendar, per-series structure. <strong>Should still beat the incumbent</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>No NWP <em>and</em> no recent power</td>
+<td>Calendar + climatology + year-old history. Converges toward <em>being</em> the incumbent</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Nothing at all</td>
+<td>Physical envelope (clear-sky) + climatology. Very wide bands, still bounded and still true</td>
+</tr>
+</tbody>
+</table>
+<p>Rung 4 matters because it demonstrates that there is no input state in which we have nothing true
+to say — see <a href="#the-physical-envelope">The physical envelope</a>.</p>
+<p>Rungs are counted in <strong>missed NWP runs</strong>, never in hours of staleness. That is
+<a href="#the-rules">rule 5</a>, and
+<a href="#three-audiences-three-channels">Three audiences, three channels</a> explains why raw age cannot be
+a health signal.</p>
+<p>Three related words are used deliberately across these pages. A <strong>regime</strong> is one cell of the
+input-availability grid — NWP × telemetry × metadata,
+<a href="#missingness-in-learned-models">ten to twenty realistic combinations</a>. A <strong>scenario</strong> is a regime's
+named, versioned realisation in the failure-scenario suite. A <strong>rung</strong> of this ladder is a severity
+band of regimes.</p>
+<h2 id="failure-modes">Failure modes</h2>
+<p>What breaks, what the system does about it, and whether anyone is alerted. "Today" describes the
+code as it stands; "intended" describes where this principle takes it.</p>
+<p>The alert column uses a fixed vocabulary rather than prose, so that two rows describing the same
+chain of events cannot quietly answer the question differently. The tokens follow the <em>routing</em>
+rather than the event level, because that is what decides whether anybody is told:</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>What reaches a human</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>run failed</strong></td>
+<td>A Sentry event tagged <code>fault_category:run_failed</code> — the run died, and the alert rule notifies whoever is on for the next business day</td>
+</tr>
+<tr>
+<td><strong>digest</strong></td>
+<td>A Sentry event from a degradation sender — the run carried on, so it is routed to a digest rather than a notification</td>
+</tr>
+<tr>
+<td><strong>warning</strong></td>
+<td>A Sentry <code>warning</code> event from <code>report_power_freshness</code>, which has its own alert rule</td>
+</tr>
+<tr>
+<td><strong>check-in</strong></td>
+<td>The missed-check-in alarm, raised by Sentry from outside the deployment</td>
+</tr>
+<tr>
+<td><strong>operator</strong></td>
+<td>No event: a human is already watching, because they started the run by hand</td>
+</tr>
+<tr>
+<td><strong>nobody is told 🚧</strong></td>
+<td>No Sentry event is sent. Each cell says where the fault does show up instead — usually Dagster's Checks view, which only helps somebody who already went to look — and what the silence costs</td>
+</tr>
+<tr>
+<td><strong>n/a</strong></td>
+<td>Not a production path</td>
+</tr>
+</tbody>
+</table>
+<p><strong>run failed</strong> and <strong>digest</strong> are both <code>error</code>-level events, which is exactly why the level cannot
+be the discriminator — see
+<a href="../../architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence">Send telemetry to Sentry</a>.
+<strong>No production row should read "nobody is told"</strong> — that is <a href="#the-rules">rule 4</a>, and the rows
+that do are the ones still to be wired up.</p>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Today</th>
+<th>Intended</th>
+<th>Human alerted?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One or two daily NWP runs missed</td>
+<td><code>live_forecasts</code> selects the freshest run present as of the forecast time, so an older run is used through the normal path; <code>live_forecasts_are_healthy</code> warns with the count of missed runs</td>
+<td>Unchanged, plus a Sentry <strong>warning</strong> carrying the missed-run count 🚧</td>
+<td><strong>run failed</strong> — from the <code>ecmwf_ens</code> run that should have landed the missing NWP, which is the usual cause. For the degraded forecast itself, <strong>nobody is told</strong> 🚧: <code>live_forecasts_are_healthy</code> counts the missed runs into Dagster's Checks view and, when it evaluates successfully, sends no event, so a slot built on a hole somebody else's run left behind announces itself to no one (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/501">#501</a>)</td>
+</tr>
+<tr>
+<td>NWP stale but still covering the horizon</td>
+<td>Forecast produced from an increasingly ancient run; <code>nwp_init_time</code> is on every row and <code>live_forecasts_are_healthy</code> warns with the missed-run count, but the forecast itself looks as confident as a fresh one</td>
+<td>Bands widen with the regime; <code>STALE NWP</code> warning row and a Sentry <strong>warning</strong> 🚧</td>
+<td><strong>run failed</strong>, then <strong>nobody is told</strong> 🚧 — the same path as the row above: the missed <code>ecmwf_ens</code> run reports itself, the forecast degraded by it does not</td>
+</tr>
+<tr>
+<td>A slot produces no rows, or unusable ones, while the asset still succeeds</td>
+<td><code>live_forecasts_are_healthy</code> warns, naming the row count, the invalid rows and any trained series that went missing</td>
+<td>Unchanged, plus a Sentry <strong>warning</strong> 🚧</td>
+<td><strong>nobody is told</strong> 🚧 — <code>live_forecasts_are_healthy</code> names the row count and the missing series in Dagster's Checks view and, when it evaluates successfully, sends no event, so an empty or unusable slot is silent unless somebody opens the UI (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/501">#501</a>)</td>
+</tr>
+<tr>
+<td>NWP absent, or too old to cover the horizon</td>
+<td><strong>Hard failure</strong> — the asset raises and NGED gets nothing (tracked to change in <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/446">#446</a>)</td>
+<td>Weather-blind forecast, wide bands, warning row, and the alert drops from <strong>run failed</strong> to a degradation event, because nothing of ours has broken 🚧</td>
+<td><strong>run failed</strong></td>
+</tr>
+<tr>
+<td>Telemetry stalled for one series</td>
+<td>Forecast still produced from the model's other features; <code>power_data_is_fresh</code> warns, names the late series and sends a Sentry warning event</td>
+<td>Unchanged, plus regime-appropriate band widening 🚧</td>
+<td><strong>warning</strong></td>
+</tr>
+<tr>
+<td>A meter reporting detectably wrong values</td>
+<td>Malformed timestamps are dropped at ingest, but wrong <em>values</em> are not yet detected; see <a href="#missing-versus-wrong">Missing versus wrong</a></td>
+<td>Treated as missing, which routes it into the always-output path, and warned on like any other missing input 🚧</td>
+<td><strong>nobody is told</strong> 🚧, and nothing detects the fault either: ingest rejects a value outside <code>PowerTimeSeries</code>' range, but nothing looks for a value that is in range and still wrong, so there is not yet a warning to send</td>
+</tr>
+<tr>
+<td>A whole ECMWF slice corrupt</td>
+<td>Landed; <code>nwp_has_no_unexpected_nulls</code> warns, naming the slice</td>
+<td>Unchanged, plus a Sentry <strong>warning</strong> once the slice count is large 🚧</td>
+<td><strong>nobody is told</strong> 🚧 — <code>nwp_has_no_unexpected_nulls</code> names the slice in Dagster's Checks view and, when it evaluates successfully, sends no event, so the size of the loss reaches nobody (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/501">#501</a>)</td>
+</tr>
+<tr>
+<td>A whole ECMWF weather variable absent</td>
+<td><code>Nwp.validate</code> rejects it; <code>ecmwf_ens</code> turns each rejection into a retry for up to 4h, and once those are exhausted it manifests downstream as a missed run</td>
+<td>Unchanged</td>
+<td><strong>run failed</strong> — once the retries are exhausted</td>
+</tr>
+<tr>
+<td>The promoted model is empty or unloadable</td>
+<td><strong>Hard failure</strong> — the asset raises</td>
+<td>Unchanged: this is a promotion bug, not a data outage</td>
+<td><strong>run failed</strong></td>
+</tr>
+<tr>
+<td>The <code>TimeSeriesMetadata</code> roster is unreadable, or has lost rows for trained series</td>
+<td>Live inference does not read the roster: each series' location comes from the promoted model's own frozen copy of the rows it trained against, so the forecast is unchanged. The hourly ingest contains the upsert failure, records <code>metadata_upsert_failed</code> and sends a Sentry error event through <code>report_asset_degradation</code></td>
+<td>Unchanged</td>
+<td><strong>digest</strong> — if the upsert raised, via <code>report_asset_degradation</code>. A roster that merely <em>lost rows</em> raises nothing at all, so <strong>nobody is told</strong> 🚧: the freshness check reads the roster only to decide what to watch, so a series that vanishes from it is quietly no longer watched, and the last stored values for it stand indefinitely</td>
+</tr>
+<tr>
+<td>A duplicated forecast row reaches the model output — a join fanning out, which takes a bug of ours rather than duplicated data at rest, since every NWP write replaces its partition</td>
+<td><strong>Hard failure</strong> — <code>PowerForecast.validate</code> raises on the duplicated primary key and NGED gets nothing for that slot</td>
+<td>Unchanged: writing a silently duplicated forecast would corrupt the delivered table and every metric computed from it</td>
+<td><strong>run failed</strong></td>
+</tr>
+<tr>
+<td>A model is promoted whose saved config this code can no longer rebuild — a feature name it does not recognise, or a <code>model_params</code> key it no longer declares</td>
+<td><code>promoted_model</code> refuses it before replacing the model on disk, so the outgoing champion stays and keeps forecasting</td>
+<td>Unchanged</td>
+<td><strong>operator</strong> — <code>promoted_model</code> is materialised by hand, outside the scheduled jobs the failure hook is attached to, so no Sentry event is sent</td>
+</tr>
+<tr>
+<td>The run named for promotion holds no model at all — usually a mistyped or stale run id</td>
+<td><code>promoted_model</code> fails on the download, again before replacing the model on disk, so the outgoing champion stays and keeps forecasting</td>
+<td>Unchanged</td>
+<td><strong>operator</strong> — as above</td>
+</tr>
+<tr>
+<td>The service is not running at all</td>
+<td>Sentry missed-check-in alarm fires from outside the deployment</td>
+<td>Unchanged</td>
+<td><strong>check-in</strong> — next business day</td>
+</tr>
+<tr>
+<td>Any of the above during model R&amp;D</td>
+<td>Fails fast</td>
+<td>Unchanged — see <a href="#rd-fails-the-other-way">R&amp;D fails the other way</a></td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<p>Nothing here is a 2am page. The uptime posture that makes that acceptable is argued in
+<a href="../../background/requirements/#uptime-lenient-by-design">Requirements → Uptime: lenient by design</a>.</p>
+<h2 id="the-rules">The rules</h2>
+<p>These are the imperative form of everything above: the checklist to follow when in doubt while
+changing production code. It is deliberately self-contained, so some of them restate a
+<a href="../design-principles/">design principle</a> rather than adding anything new. Those are marked below —
+if you change one, change its matching principle too. The rest are specific to degradation and
+appear nowhere else.</p>
+<ol>
+<li><strong>In production, never raise because an input is absent or stale.</strong> Degrade, widen the bands, and
+   record the degradation on the row. Reserve raising for states that are our own bug — an empty
+   promoted model, a contract violation — not for the outside world misbehaving. <em>(The
+   <a href="../design-principles/#1-the-power-forecast-never-stops">never-stop principle</a>, in imperative
+   form.)</em></li>
+<li><strong>Be liberal about missing inputs and strict about malformed ones.</strong> Absent data routes into the
+   always-output path; malformed data is rejected at the contract boundary. These are opposite
+   postures and both are deliberate. <em>(The
+   <a href="../design-principles/#7-strict-contracts-at-every-boundary">strict-contracts principle</a>, in
+   imperative form.)</em></li>
+<li><strong>Treat detectably-wrong input as missing, not as data</strong> — see
+   <a href="#missing-versus-wrong">Missing versus wrong</a>.</li>
+<li><strong>Signal degradation on all three channels, in-band first.</strong> The uncertainty band is the only
+   number the consumer is certain to read, so it comes first — but the warning table and Sentry are
+   required too, not optional extras, and none of the three substitutes for another. A degradation
+   nobody is told about is a silent failure however gracefully the forecast carried on. <em>(The
+   <a href="../design-principles/#1-the-power-forecast-never-stops">never-stop principle</a>, in imperative
+   form.)</em></li>
+<li><strong>Measure degradation in missed runs and absent inputs, never in raw hours of age.</strong> Healthy NWP
+   is between 12 and 30 hours old depending on the slot, so an absolute age threshold is either a
+   daily false alarm or a magic number silently coupled to the ingest schedule — and either way it
+   cannot say how many runs are missing.</li>
+<li><strong>Asset checks warn; they do not block — but warning is not the same as staying quiet.</strong>
+   <code>AssetCheckSeverity.WARN</code> with <code>blocking=False</code> is the house pattern, and there is deliberately
+   no <code>ERROR</code>-severity check anywhere in the repo. Non-blocking never means non-notifying: a check
+   that finds degradation must still send a Sentry event, without failing the run it is warning
+   about. <em>(The <a href="../design-principles/#1-the-power-forecast-never-stops">never-stop principle</a>, in
+   imperative form.)</em></li>
+<li><strong>Never let the warning path be able to fail the thing it is warning about.</strong> A bug in a warning
+   function that raises would convert fail-open into fail-closed at exactly the wrong moment, which
+   is why <code>report_power_freshness</code> never raises and why every asset check — the standalone
+   <code>power_data_is_fresh</code> and <code>live_forecasts_are_healthy</code>, and the three per-run checks computed
+   inside <code>ecmwf_ens</code> — runs its whole body under a catch-all. Non-blocking is not enough on its
+   own: Dagster fails a run whose check step <em>errors</em>, whatever its <code>blocking</code> setting, and the
+   scheduled jobs carry a Sentry failure hook — so an unguarded warning path both fails the run and
+   pages. A warning path computed <em>inside</em> an asset must also run <strong>before</strong> that asset's
+   write, not merely under a guard: a bug that raised after the write would leave the rows committed
+   on a run Dagster reports as failed, so the table and the run history disagree about what landed.
+   Ordering decides whether such a bug can land data at all; the guard only decides whether it costs
+   a run.</li>
+<li><strong>When a capability could live in the training loop or in the production service, put it in the
+   training loop.</strong> See <a href="#where-complexity-should-live">Where complexity should live</a>. <em>(The
+   <a href="../design-principles/#2-complexity-belongs-offline-not-in-the-serving-path">complexity-offline
+   principle</a>, in
+   imperative form.)</em></li>
+<li><strong>Fail in the direction where being wrong is cheapest to recover from.</strong> In production that is
+   forward; in model R&amp;D it is backward. See <a href="#rd-fails-the-other-way">R&amp;D fails the other way</a>.</li>
+<li><strong>Damp the corrections.</strong> Bounded retries with backoff, rate limits on retraining and hysteresis
+    on model promotion (the latter two designed but not built 🚧) are as much a part of this
+    principle as the degradation ladder is.</li>
+<li><strong>Never make one production job's run status a precondition for another's.</strong> Couple them through
+    data at rest: read whatever is on disk, note which run it came from, and carry on. A dependency
+    in the <em>lineage</em> graph is fine and useful — it is what lets a developer ask for an asset and its
+    upstreams together on a laptop — but it must never become a runtime gate. A gate turns one
+    failed upstream run into a missing forecast, and a missing forecast is not on the ladder at all:
+    not even rung 4, where the service still emits a very wide but true forecast. <em>(The
+    <a href="../design-principles/#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status">coupling-through-data-at-rest
+    principle</a>,
+    in imperative form.)</em></li>
+<li><strong>Make the telemetry name the fault.</strong> Whatever reaches Sentry — a swallowed exception, a
+    degradation warning — carries the tag an alert rule routes on, and names the series, the run or
+    the asset at fault rather than only the type of error. Rule 4 says the signal has to be sent;
+    this one says it has to be legible when it arrives, because the operator reads the alert rather
+    than the logs. <em>(The <a href="../design-principles/#16-a-failure-names-its-own-cause-in-the-telemetry">names-its-own-cause
+    principle</a>, in
+    imperative form.)</em></li>
+</ol>
+<h2 id="where-complexity-should-live">Where complexity should live</h2>
+<p>The service runs unattended at 06:00 on the day the inputs are strangest. Training runs in front of
+a human who can read the traceback and re-run it. Complexity in the two places therefore carries
+very different risk, and the same reasoning that puts fail-fast in R&amp;D and fail-operational in
+production says the same thing about where code should sit: keep the serving path as close to "load
+a model, call <code>predict</code>" as we can.</p>
+<p>This is descriptive as much as aspirational. <code>promoted_model</code> already copies the champion to local
+disk so that inference makes no MLflow call. Regime-conditional interval calibration has the same
+shape: computed offline, and production does a table lookup.</p>
+<p>Two qualifiers keep it honest.</p>
+<ul>
+<li>
+<p><strong>It is a tie-break, not an override.</strong> A single model spanning every degradation regime may spend
+  capacity on regimes that occur one day in a hundred. Where skill is comparable, prefer the simpler
+  service; where the gap is measured and real, skill wins.</p>
+</li>
+<li>
+<p><strong>It relocates the branch rather than removing it.</strong> A fallback cascade's <code>if</code> is reviewable and
+  directly testable; a model that "handles anything" holds the same branch internally, as a learned
+  default direction, and that can only be measured. The principle is therefore safe to apply only
+  once a failure-scenario suite exists to measure it.</p>
+</li>
+</ul>
+<p>It does not license unbounded training complexity, either: a training harness nobody can run is also
+a production risk, because
+<a href="../engineering-hypotheses/#h2-a-hundred-experiments-per-person-in-a-peak-month">H2</a> and
+<a href="../engineering-hypotheses/#h3-one-click-promotion-and-one-click-rollback">H3</a> depend on retraining
+staying cheap and promotion staying one command.</p>
+<h2 id="mechanisms">Mechanisms</h2>
+<h3 id="missing-versus-wrong">Missing versus wrong</h3>
+<p>"Always output" is not "always trust".</p>
+<ul>
+<li><strong>Absent or stale input</strong> → always produce a forecast. Degrade, widen, declare.</li>
+<li><strong>Detectably wrong input</strong> → do not consume it. Treat it as missing, which routes it back into the
+  always-output path.</li>
+</ul>
+<p>A stuck meter reporting 2.1 MW for 52 hours is not missing data; it is actively misleading, and a
+lag-feature model will propagate it happily. The incumbent has the identical vulnerability.
+<a href="../../background/data-quality/">Data Quality</a> documents both classes empirically — false zeros,
+stuck values and genuinely missing data as separate phenomena — and is the evidence base for this
+distinction.</p>
+<h3 id="default-directions-and-their-limit">Default directions, and their limit</h3>
+<p>XGBoost uses sparsity-aware split finding. At every split it learns not just a threshold but a
+<strong>default direction</strong> for rows where that feature is missing: it tries sending all missing rows
+left, then right, and keeps whichever gives better gain. Missingness is routed, not imputed. This is
+why a leaky lag feature can be nulled rather than the whole row dropped.</p>
+<p>The limit is that the default direction is learned <strong>from the missingness present in the training
+data</strong>. If a feature is never missing during training, XGBoost still picks a direction, but that
+choice was never evaluated against anything. In production, the first time that feature is missing,
+every affected row takes an untested path. So the real guarantee is narrower than "XGBoost handles
+NaN":</p>
+<blockquote>
+<p><strong>XGBoost handles the missingness patterns it saw during training.</strong></p>
+</blockquote>
+<p>Two consequences. First, a model trained with NWP features and run without them does <em>not</em> thereby
+become a weather-blind model — it falls back on arbitrary default directions, so the rung-2 claim
+has to be earned by training for the outage, not assumed. Second, the case where the guarantee
+genuinely holds is narrower than it first looks: routing is only one of three mechanisms that meet
+a null here, and the other two act before the model sees anything. Where it does hold is chiefly
+the lead-0 window, whose nulls are in every training run and do reach the model as nulls; a blocky
+null in the interior of the horizon is bridged into a value before routing ever sees it — see
+<a href="#missingness-in-learned-models">Missingness in learned models</a>.</p>
+<h3 id="widening-bands-the-in-band-signal">Widening bands: the in-band signal</h3>
+<p>A stale forecast <strong>looks identical to a fresh one</strong>. Staleness columns and warning tables are side
+channels: they require the consumer to go and look. Uncertainty bands are not. A forecast whose
+P5–P95 spread has doubled has already told the consumer to be more cautious, through the only number
+they were going to read anyway. The system reports its own degradation through the same mechanism it
+uses to do its job, which means <strong>the consumer-facing safety property does not depend on a separate
+monitoring system working</strong>. That is an argument for the band being first and unconditional, not an
+argument against the other two channels: they answer questions the band cannot, and
+<a href="#the-rules">rule 4</a> requires all three.</p>
+<p>Two caveats. <code>XGBoostConfig.objective</code> currently defaults to <code>reg:squarederror</code>, so today's model is
+a point forecast; quantile output
+(<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/263">#263</a>) is a prerequisite.
+And bands widening <em>correctly</em> under degradation is not automatic even with quantile regression —
+the mechanism we are betting on is regime-conditional conformal calibration, discussed in
+<a href="#missingness-in-learned-models">Missingness in learned models</a>.</p>
+<p>See <a href="../../techniques/probabilistic-forecasting/">Probabilistic Forecasting</a> for how the intervals
+are produced and <a href="../../techniques/evaluation-metrics/">Evaluation Metrics</a> for PICP and interval
+width, which are how we check that the widening is honest rather than merely present.</p>
+<h3 id="the-physical-envelope">The physical envelope</h3>
+<p>Clear-sky irradiance needs only latitude, longitude and time, so as data degrades the forecast can
+relax toward a physical envelope that is always computable — wide, honest, and still bounded by what
+the sky can deliver. That is rung 4.</p>
+<p>Clear-sky irradiance is already a named deliverable of
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/168">#168</a>, designed in
+<a href="../../roadmap/xgboost-improvements/">XGBoost Improvements</a>, with further physics in
+<a href="../../techniques/differentiable-physics/">Differentiable Physics</a>. Only the <strong>floor</strong> framing is new
+here: nothing else says clear-sky is what we fall back <em>to</em>.</p>
+<h3 id="three-audiences-three-channels">Three audiences, three channels</h3>
+<table>
+<thead>
+<tr>
+<th>Audience</th>
+<th>Question</th>
+<th>Channel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Forecast users</strong> (NGED)</td>
+<td>"How much should I trust <em>this row</em>?"</td>
+<td>In-band: quantile spread, plus <code>nwp_init_time</code>, already on the row</td>
+</tr>
+<tr>
+<td><strong>Data providers</strong></td>
+<td>"Is <em>your</em> feed broken, and since when?"</td>
+<td>Aggregated and <strong>attributable</strong>: <code>power_forecast_warnings</code>, the freshness check's late-series table, the live check's missed-NWP-run count, the NWP quality check's upstream grid-point null rate</td>
+</tr>
+<tr>
+<td><strong>Us, the developers</strong></td>
+<td>"Does anyone need to <em>do</em> something, and is it us?"</td>
+<td>Out-of-band: Sentry, plus the missed-check-in alarm. Both kinds of event arrive here — our own faults and the upstream problems only a human can chase — and the <code>fault_category</code> tag says whether anyone needs telling now (see <a href="../../architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence">Send telemetry to Sentry</a>)</td>
+</tr>
+</tbody>
+</table>
+<p>Inherent stability creates a specific hazard for the third channel: <strong>a system that always succeeds
+looks identical to a system that is not running at all.</strong> Both produce zero failures. That is why
+the <a href="../../live_service/sentry/">Sentry missed-check-in alarm</a>, firing from outside the deployment,
+is load-bearing rather than belt-and-braces — it is the one piece of active monitoring this design
+cannot do without.</p>
+<p>That alarm fires on <em>absence</em>, though, and it is not conditional on health: the check-in is sent
+from the asset body after a successful write, before any check runs, so a degraded slot still
+reports the service alive. That is deliberate — the alarm exists to catch a service that stopped —
+but it means the degraded case has to be carried by an event somebody sends, which is
+<a href="#the-rules">rule 6</a> and, today, the gap at
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/501">#501</a>.</p>
+<p>For the provider channel, a warning is only actionable if it names <em>whose</em> NWP and <em>which</em> run,
+which is why <code>power_forecast_warnings</code> carries a <code>warning_source</code> field
+(<a href="../../roadmap/delivery-tables/#table-2-power_forecast_warnings">Delivery tables</a>).</p>
+<p>The provider channel must also count the right thing. We ingest <strong>one ECMWF run per day</strong> — the 00Z
+run, downloaded at 08:30 UTC — and we forecast at 00:00, 06:00, 12:00 and 18:00, so healthy NWP age
+at forecast time ranges from 12 hours at the 12:00 slot to <strong>30 hours at the 06:00 slot</strong>, just
+before the day's download lands. Raw age is therefore not a health signal: 18-hour-old NWP is
+exactly what the 18:00 slot is supposed to use. An absolute age threshold would have to sit in the
+narrow window between the stalest healthy state (30 hours) and the freshest outage state (36 hours —
+one missed run, seen from the 12:00 slot): a magic number that silently goes wrong the moment the
+ingest schedule or the slot times change, and that still cannot say <em>how many</em> runs are missing.
+The signal is <strong>missed runs</strong> — how many
+daily runs are absent between the freshest run on disk and the freshest that ought to exist by now.
+That is zero in every healthy slot, whichever slot it is.</p>
+<p><code>live_forecasts_are_healthy</code> implements exactly that count. How the "ought to exist by now" half is
+derived — and why the deadline it rests on is 14 hours after a run's <code>init_time</code> — is in
+<a href="../../architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check">Read the live forecast back off disk</a>.</p>
+<h3 id="missingness-in-learned-models">Missingness in learned models</h3>
+<p>Our missingness comes in two kinds, and the distinction decides what has to be enumerated.</p>
+<p><strong>Chronic and fine-grained.</strong> Three de-accumulated variables — <code>precipitation_surface</code>,
+<code>downward_short_wave_radiation_flux_surface</code> and <code>downward_long_wave_radiation_flux_surface</code> — are
+legitimately null at lead-0 in <em>every</em> run, and beyond lead-0 carry nulls rooted in corrupt ECMWF
+source accumulation: scattered per-pixel in the ordinary case, occasionally a whole
+<code>(ensemble_member, valid_time)</code> slice. See
+<a href="../../architecture/ecmwf-ens-known-issues/">Known ECMWF ENS Data-Quality Issues</a> for the full account. It is
+present in every run we ingest, so it is in-distribution and needs no scenario.</p>
+<p>Be precise about what "handled" means here, because <em>three</em> different mechanisms are at work and
+only one of them is XGBoost's. <strong>Spatial renormalisation</strong> absorbs most scattered corruption at
+ingest, before it becomes a null at all. <strong>Temporal interpolation</strong> bridges the blocky nulls in the
+interior of the horizon, because <code>_upsample_nwp_to_half_hourly</code> fills interior nulls while
+resampling to the half-hourly grid. <strong>Default-direction routing</strong> takes what is left — the lead-0
+nulls, and a wholly-null slice at the very end of the horizon, since <code>interpolate()</code> leaves
+trailing nulls alone just as it leaves leading ones. Those two are where "XGBoost handles the
+missingness it saw during training" genuinely holds. Which null meets which mechanism is worked
+through in
+<a href="../../architecture/ecmwf-ens-known-issues/#nulls-in-the-de-accumulated-variables-tolerated">Known ECMWF ENS Data-Quality Issues</a>.</p>
+<p><strong>Temporal interpolation is the design point</strong>, because it is imputation, already happening, chosen
+by nobody — which inverts the obvious worry: the risk is not that someone might later "fix" this by
+imputing, it is that the fill already exists and is unbounded, unflagged and unmeasured. Making it
+deliberate is
+<a href="../../roadmap/xgboost-improvements/#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible">a planned experiment</a>.
+Set it against spatial renormalisation, and the contrast is the argument for preferring one: a
+spatial mean over a cell's own grid points at the same step stays inside one member's trajectory
+and one ~250 km² hexagon, whereas a temporal bridge spans 6 to 12 hours of a <em>rate</em> variable.</p>
+<p>The whole-slice case is the awkward member of this bucket and is worth naming as such: it <em>is</em>
+blocky, and it is only chronic in the sense of recurring across runs at low volume. It sits here
+rather than in the episodic bucket because it is a fraction of one member's trajectory rather than
+an outage of an input, and because a model trained across many runs has seen it. But it is the
+point where the two buckets touch, and if these ever became frequent enough to shift a variable's
+distribution, they would belong in an enumerated scenario instead.</p>
+<p><strong>Episodic and coarse-grained.</strong> Missed or stale runs, a wholesale-absent variable, a telemetry
+stall. These are rare or wholly absent from training data, which is exactly why they must be
+enumerated — and the combinatorics stay tractable: NWP {fresh, <em>n</em> runs missed, absent} × telemetry
+{present, partial, absent} × metadata is on the order of ten to twenty realistic regimes, not 2ⁿ. So
+structured, outage-shaped dropout is feasible, and it matches reality far better than element-wise
+random dropout would.</p>
+<p>The ingest gate keeps the two apart, and it draws the line at the point where the two kinds
+genuinely differ. A de-accumulated variable that is null in <em>every</em> slice beyond lead-0 is fatal in
+<code>Nwp.validate</code> — that is an absent column rather than a chronic one, and it would otherwise land as
+silently-broken data — so it manifests downstream as a missed run, which is rung 1 of the ladder.
+Anything short of that, including a whole slice, stays in the chronic bucket and is landed: a null
+pattern the model has seen throughout training is not the catastrophe, an empty column is. Note
+that this is a cliff rather than a tunable fraction — a run one slice short of empty still lands,
+with a warning — which is deliberate, because no honest threshold sits anywhere in between.</p>
+<p><strong>How each model family represents absence.</strong> The mechanisms differ completely, and it is worth
+setting them side by side, because the differences are less instructive than what they share.</p>
+<table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>How absence is represented</th>
+<th>What it falls back to</th>
+<th>Where the guarantee ends</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Gradient-boosted trees</strong> (XGBoost, today)</td>
+<td>Routed, not imputed: every split learns a <strong>default direction</strong> for rows whose feature is missing</td>
+<td>Whichever branch scored better during training</td>
+<td>Only the missingness patterns seen in training. A feature never missing in training still gets a direction, but one that was never evaluated against anything</td>
+</tr>
+<tr>
+<td><strong>Attention encoder over a token set</strong> (possible)</td>
+<td><strong>Structurally absent</strong>: the token is simply not in the set. Attention is permutation-invariant and variable-length, so nothing stands in for it, and masking is used for padding only</td>
+<td>Whatever the remaining tokens support</td>
+<td>Same training-distribution limit. Nothing about the architecture teaches it how an outage <em>behaves</em>; that has to be trained in</td>
+</tr>
+<tr>
+<td><strong>Dense network with value + mask channels</strong> (the fixed-width fallback)</td>
+<td><strong>Flagged</strong>: an explicit mask channel beside each value, so "zero" and "unknown" stay distinguishable. GRU-D is the standard precedent, decaying the last observation toward an empirical mean</td>
+<td>The learned decay target</td>
+<td>Same training-distribution limit, and it spends model capacity representing absence that the token-set form gets for free</td>
+</tr>
+<tr>
+<td><strong>Physical forward model</strong></td>
+<td><strong>No representation needed</strong>: the model is defined for every input state</td>
+<td>A physical prior — the clear-sky envelope of rung 4</td>
+<td>It only covers what the physics covers; it cannot supply the learned residual on top</td>
+</tr>
+</tbody>
+</table>
+<p>The last column is the point: the first three share a single failure mode — <strong>a learned model
+handles the missingness it was trained on, and nothing else</strong> — and only the physical model is
+exempt, because it never learned anything to begin with. That is why the failure-scenario suite is
+load-bearing for every row rather than a nice-to-have for one.</p>
+<p>Three consequences for models we have not built yet, recorded here because they are design
+constraints rather than roadmap items:</p>
+<ul>
+<li>
+<p><strong>Do not zero-fill; remove from the set.</strong> Zero is a meaningful value in physical units — 0 MW,
+  0 W/m² and 0 °C are all real states — so replacing a missing value with zero asserts something
+  false. The token-set alternative, and the dense value-plus-mask fallback, are in
+  <a href="../../techniques/encoders/#handling-missing-inputs-remove-the-token-dont-zero-fill">Encoders → Handling missing inputs</a>.</p>
+</li>
+<li>
+<p><strong>Do not lean on random dropout.</strong> Random dropout simulates data that is missing <em>completely at
+  random</em>, and ours is not — outages correlate with time of day, weather systems and provider
+  incidents — so a random-dropout-trained model surfaces its miscalibration as over-confident bands
+  during a real outage. Use structured, outage-shaped dropout instead; the full argument is in
+  <a href="../../techniques/encoders/#handling-missing-inputs-remove-the-token-dont-zero-fill">Encoders → Handling missing inputs</a>.</p>
+</li>
+<li>
+<p><strong>Physics degrades most gracefully of all.</strong> A physical forward model has a defined output for
+  any input state, so as inputs go missing the answer relaxes toward a physical prior — no
+  branching, no fallback logic. See
+  <a href="../../techniques/differentiable-physics/#graceful-degradation-when-an-input-is-missing">Differentiable Physics → Graceful degradation</a>.</p>
+</li>
+</ul>
+<p>For honest interval widths under degradation, the mechanism is <strong>conformal prediction applied per
+regime</strong>: post-hoc calibration from held-out residuals, which works with XGBoost today and so can
+ship before any PyTorch work exists.</p>
+<h2 id="what-this-is-not">What this is not</h2>
+<h3 id="not-postels-law">Not Postel's law</h3>
+<p>"Be liberal in what you accept" sounds like this principle, but it has fallen out of favour —
+RFC 9413 sets out why — because liberal acceptance is how silent corruption propagates. Our stance
+is sharper:</p>
+<blockquote>
+<p><strong>Liberal about missing inputs. Strict about malformed ones.</strong></p>
+</blockquote>
+<p>The Patito contracts layer is the strict half, and it is what stops inherent stability from decaying
+into "accept anything and hope". See
+<a href="../../architecture/forecast-delivery/#strict-data-contracts-machine-verifiable">Forecast Delivery → Strict data contracts</a>.</p>
+<h3 id="not-blast-radius">Not blast radius</h3>
+<p>Blast radius is a <strong>different axis</strong>: <em>how much</em> fails, not <em>which way</em> it fails. Our daily and
+6-hourly partitioning, and the per-(experiment, fold) partitioning of the experiment layer, are
+blast-radius properties. Both matter; conflating them muddles the prose.</p>
+<h3 id="rd-fails-the-other-way">R&amp;D fails the other way</h3>
+<p>This resolves what would otherwise look like a contradiction between "fail loudly" and "never fail
+if any data is retrievable". The two contexts have different costs of being wrong:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Production</th>
+<th>Model R&amp;D</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cost of no output</td>
+<td>High — a user is waiting</td>
+<td>Nil — rerun it</td>
+</tr>
+<tr>
+<td>Cost of a quietly-degraded output</td>
+<td>Moderate, <strong>if</strong> flagged in the data</td>
+<td>High — silently poisons a model and every comparison built on it</td>
+</tr>
+<tr>
+<td>Correct posture</td>
+<td>Fail-operational: degrade and declare</td>
+<td>Fail-fast: refuse to proceed</td>
+</tr>
+</tbody>
+</table>
+<p>This is not the same axis as Dagster's WARN-versus-ERROR severity. R&amp;D lives in the
+cross-validation and training assets, so the remaining mechanism to build is a strict-mode flag on
+the feature and validation layer 🚧.</p>
+<p>Which assets sit on which side is recorded on the assets themselves, as a <code>layer</code> tag valued
+<code>production</code> or <code>research</code> — see
+<a href="../../architecture/overview/#core-components">Architecture Overview</a>. The tag records which side an
+asset belongs to; it does not assert a posture, and a <code>production</code> asset can still raise: on an
+unloadable promoted model, which is our own bug, and — until
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/446">#446</a> — on absent NWP,
+which is the row this page most wants to change. The asymmetry is also implemented at the telemetry
+layer: the Sentry failure hook is attached to the three scheduled production jobs only.</p>
+<h2 id="vocabulary">Vocabulary</h2>
+<p>Borrowed terms, and how well each one fits.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Origin</th>
+<th>Fit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Graceful degradation</strong></td>
+<td>General</td>
+<td>The plain-English name: lose fidelity, not availability</td>
+</tr>
+<tr>
+<td><strong>Static stability</strong></td>
+<td>AWS Builders' Library, borrowed from vehicle dynamics</td>
+<td>A system keeps working using state it <em>already has</em> when a dependency fails. Exactly <code>live_forecasts</code> reading NWP already on disk</td>
+</tr>
+<tr>
+<td><strong>Fail-operational vs fail-passive</strong></td>
+<td>Avionics autoland; ISO 26262</td>
+<td>The sharpest distinction available. Fail-passive: disengage cleanly and hand back to the human. Fail-operational: keep delivering through the fault. Ours is fail-operational</td>
+</tr>
+<tr>
+<td><strong>Restoring force / damping</strong></td>
+<td>Vehicle and aircraft dynamics</td>
+<td>Static stability is whether a disturbed system's initial tendency is back toward correct; dynamic stability is whether that return settles rather than oscillating. Rule 10 is the damping half</td>
+</tr>
+<tr>
+<td><strong>Blast radius</strong></td>
+<td>SRE</td>
+<td>A different axis — see above</td>
+</tr>
+<tr>
+<td><strong>Bulkhead / circuit breaker</strong></td>
+<td>Nygard, <em>Release It!</em></td>
+<td>The canonical stability-patterns reference</td>
+</tr>
+<tr>
+<td><strong>Stale-while-revalidate</strong></td>
+<td>RFC 5861</td>
+<td>Serve stale while refreshing behind the scenes — the NWP fallback's cousin</td>
+</tr>
+<tr>
+<td><strong>Write-Audit-Publish</strong></td>
+<td>Data engineering</td>
+<td>The <strong>opposite</strong> stance: validate, then block publication on failure. We are deliberately fail-open on freshness</td>
+</tr>
+<tr>
+<td><strong>Postel's law</strong></td>
+<td>RFC 761</td>
+<td>Named only to disown — see above</td>
+</tr>
+</tbody>
+</table>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../engineering-hypotheses/">Engineering Hypotheses</a> — the falsifiable claims this design is
+  meant to deliver, and how each is tested.</li>
+<li><a href="../../background/requirements/#uptime-lenient-by-design">Requirements → Uptime: lenient by design</a>
+  — why an outage costs so little, which is what makes a fail-open posture affordable.</li>
+<li><a href="../../live_service/operations/">Operating the live service</a> — the runbooks that turn a degraded
+  input into a next-business-day fix.</li>
+<li><a href="../../roadmap/delivery-tables/">Delivery tables</a> 🚧 — <code>power_forecast_warnings</code> and
+  <code>asset_health_history</code>, the user-facing half of this principle.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

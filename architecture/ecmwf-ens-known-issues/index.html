@@ -1,0 +1,3385 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../nwp-variable-conventions/">
+      
+      
+        <link rel="next" href="../ml-orchestration/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Known ECMWF ENS Data-Quality Issues - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#known-ecmwf-ens-data-quality-issues" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Known ECMWF ENS Data-Quality Issues
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design Philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent Stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common Incident Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and Scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP Variable Conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-guiding-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guiding principle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spatial-aggregation-is-where-a-grid-points-null-is-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spatial aggregation is where a grid point's null is resolved
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nulls-in-the-de-accumulated-variables-tolerated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nulls in the de-accumulated variables (tolerated)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Nulls in the de-accumulated variables (tolerated)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-populations-counted-separately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two populations, counted separately
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-wholly-missing-variable-and-instantaneous-nulls-fatal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A wholly-missing variable, and instantaneous nulls (fatal)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A wholly-missing variable, and instantaneous nulls (fatal)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-instantaneous-variables-scattered-nulls-counted-on-the-raw-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The instantaneous variables: scattered nulls, counted on the raw grid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-wholly-missing-variable-is-retried-not-failed-outright" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A wholly-missing variable is retried, not failed outright
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-incomplete-run-tolerated-and-reported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An incomplete run (tolerated, and reported)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="An incomplete run (tolerated, and reported)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-can-and-cannot-detect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it can and cannot detect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-the-expected-shape-comes-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the expected shape comes from
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-warns-instead-of-failing-the-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it warns instead of failing the run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#completeness-is-not-part-of-nwpvalidate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Completeness is not part of Nwp.validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shape-metadata-on-every-materialisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shape metadata on every materialisation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#categorical_precipitation_type_surface-before-2024-11-13-historical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        categorical_precipitation_type_surface before 2024-11-13 (historical)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adapting-to-another-geography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Could this codebase forecast another country? (not planned)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-Savings Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training History (ERA5)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-guiding-principle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The guiding principle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spatial-aggregation-is-where-a-grid-points-null-is-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spatial aggregation is where a grid point's null is resolved
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nulls-in-the-de-accumulated-variables-tolerated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nulls in the de-accumulated variables (tolerated)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Nulls in the de-accumulated variables (tolerated)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-populations-counted-separately" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two populations, counted separately
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-wholly-missing-variable-and-instantaneous-nulls-fatal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A wholly-missing variable, and instantaneous nulls (fatal)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="A wholly-missing variable, and instantaneous nulls (fatal)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-instantaneous-variables-scattered-nulls-counted-on-the-raw-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The instantaneous variables: scattered nulls, counted on the raw grid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-wholly-missing-variable-is-retried-not-failed-outright" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A wholly-missing variable is retried, not failed outright
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-incomplete-run-tolerated-and-reported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An incomplete run (tolerated, and reported)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="An incomplete run (tolerated, and reported)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-can-and-cannot-detect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it can and cannot detect
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-the-expected-shape-comes-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the expected shape comes from
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-warns-instead-of-failing-the-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why it warns instead of failing the run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#completeness-is-not-part-of-nwpvalidate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Completeness is not part of Nwp.validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shape-metadata-on-every-materialisation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shape metadata on every materialisation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#categorical_precipitation_type_surface-before-2024-11-13-historical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        categorical_precipitation_type_surface before 2024-11-13 (historical)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="known-ecmwf-ens-data-quality-issues">Known ECMWF ENS data-quality issues</h1>
+<p>This page and <a href="../nwp-variable-conventions/">NWP variable conventions</a> split the subject between
+them:</p>
+<ul>
+<li>
+<p><strong>This page is about <em>upstream</em>.</strong> It covers the ways Dynamical.org's data arrives damaged —
+  corrupt source accumulations, null grid points, incomplete runs — and the ingest policy that
+  decides which of those we reject and which we tolerate. Its subject is data we did not create and
+  cannot fix, so a defect described here is a reason to talk to Dynamical.</p>
+</li>
+<li>
+<p><strong>That page is about <em>us</em>.</strong> It covers how the data that arrives intact is meant to be
+  interpreted, and what our own code does with it. Everything there is a choice this project made,
+  or failed to make deliberately, so a defect described there is a reason to change our code.</p>
+</li>
+</ul>
+<p>We ingest ECMWF IFS ENS from <a href="https://dynamical.org">Dynamical.org</a>. Its data carries a few
+known, recurring quality quirks. This page records what they are, how we tell them apart, and the
+policy the <code>ecmwf_ens</code> ingest applies to each. The policy is implemented in
+<a href="../../api/contracts/"><code>contracts.weather_schemas</code></a>: <code>Nwp.validate</code> is the fatal ingest gate,
+and non-fatal reporters sit behind the asset's three WARN checks — <code>assess_nwp_quality</code> behind
+<code>nwp_has_no_unexpected_nulls</code>, <code>assess_upstream_grid_point_nulls</code> behind
+<code>nwp_instantaneous_variables_have_no_nulls</code>, and <code>assess_nwp_run_completeness</code> behind
+<code>nwp_run_is_complete</code>.</p>
+<h2 id="the-guiding-principle">The guiding principle</h2>
+<p>We reject data that is <em>structurally</em> wrong and tolerate gaps a model can absorb, surfacing those
+as a warning rather than throwing away an otherwise-good run. Which case we are in is decided by
+the <em>variable</em>, so the gate needs no magic thresholds:</p>
+<ul>
+<li>An <strong>instantaneous</strong> variable (temperature, winds, pressures) is never legitimately null, so any
+  null in one is anomalous, and any null is fatal.</li>
+<li>A <strong>de-accumulated</strong> variable (precipitation, the two radiation fluxes) is null by design at
+  lead-0 and carries known upstream corruption beyond it, so its nulls are in-distribution. Every
+  null pattern in one of these is tolerated, with exactly one exception: it is fatal when that
+  variable is null in <strong>every single</strong> <code>(ensemble_member, valid_time)</code> slice beyond lead-0 of the
+  run being ingested — that is, when the column holds no weather anywhere in the run. The test is
+  literally "is anything left?", so a run with 4283 of one variable's 4284 slices empty still
+  lands (with a warning); only 4284 of 4284 fails.</li>
+</ul>
+<p>The gate judges the <strong>H3 cells we store</strong>, not the raw grid points upstream sent us, and the two
+differ because a cell is the area-weighted mean of the ~2.9 grid points that overlap it — see
+<a href="#spatial-aggregation-is-where-a-grid-points-null-is-resolved">the next section</a>. For the numeric
+variables a cell is null only when <em>no</em> grid point contributed a value to it, since a null at one
+of its points is absorbed by the others. So "any null is fatal" is a statement about a cell with
+nothing behind it, and a scattered grid-point null in an instantaneous variable usually never
+reaches the gate at all. One kind of cell is exempt: a cell fed by a single grid point, where that
+point <em>is</em> the cell and one null is still fatal; the V1 grid has 10 such cells out of 1671.</p>
+<p><code>categorical_precipitation_type_surface</code> reaches the same rule by a different route, since a
+category cannot be averaged: its cell takes whichever category covers the most of the cell's area,
+and points that supplied no category are excluded from that ranking rather than competing in it. So
+it too is null only when <em>no</em> point supplied a value, and a null there is fatal for any <code>init_time</code>
+after 2024-11-12.</p>
+<h2 id="spatial-aggregation-is-where-a-grid-points-null-is-resolved">Spatial aggregation is where a grid point's null is resolved</h2>
+<p>We do not store the raw 0.25° grid. <code>convert_nwp_xarray_dataset_to_polars_dataframe</code> aggregates it
+onto H3 cells, each of which is the area-weighted mean of the grid points overlapping it, so a
+grid point's null is resolved before anything on this page ever sees it. On the V1 grid (H3
+resolution 5 over the GB boundary) a cell averages <strong>2.93 grid points</strong>, and only 10 of its 1671
+cells are fed by a single point.</p>
+<p>Each numeric variable is renormalised over the points that actually supplied a value: the weighted
+sum is divided by the <em>contributing</em> weight rather than by 1.0. A null grid point therefore costs
+its own share of each of the ~4.9 cells it feeds, and nothing more. The alternative — dividing by
+1.0 regardless — silently treats an absent point as contributing zero, so the cell comes out low in
+proportion to how much of it went missing. That is the imputation the
+<a href="../../design-philosophy/inherent-stability/#missingness-in-learned-models">never zero-fill rule</a>
+warns about, which is worth saying plainly because it inverts the intuition: renormalising
+<em>replaces</em> an implicit zero-fill with an available-case area mean rather than adding a fill on top
+of clean data, so it leaves the provenance guarantees of
+<a href="../../design-philosophy/design-principles/#9-provenance-travels-with-the-forecast-data">principle 9</a>
+intact. Nothing is fabricated from another time step, another run or another cell.</p>
+<p>Each variable gets its <em>own</em> denominator, rather than one shared across the cell. A shared
+denominator would be simpler and is wrong: it would let a single corrupt variable null every other
+variable in the same cell, which is the amplification described below, applied across variables
+instead of across cells. What per-variable denominators cost is that two variables in one cell can
+end up averaged over different sub-areas of the hexagon. That matters only where a pair is later
+recombined — <code>wind_u_*</code> with <code>wind_v_*</code>, in <code>_calc_wind_speed</code> and <code>_calc_wind_direction</code> — and
+upstream corruption has so far always been co-located across variables, so it is theoretical today.</p>
+<p><code>categorical_precipitation_type_surface</code> cannot be averaged, so the <code>proportion</code> weights are summed
+per category and the category covering most of the cell's area wins. Points that supplied no
+category are excluded from that ranking rather than competing in it — the distinction matters,
+because a mode that counts null as a candidate value nulls a cell whenever the missing points
+outnumber each surviving category, which is a far weaker condition than losing the cell.</p>
+<p>An exact tie is broken on the lowest category code. That is arbitrary, but it has to be
+deterministic: ties are reachable, because two grid points in one cell can carry identical
+<code>proportion</code> weights — 185 of the V1 grid's 1671 cells contain such a pair — and an order-dependent
+answer would drift with Polars' internals. Be aware which way the bias runs: code 0 is "no
+precipitation", so a tied cell leans dry.</p>
+<p>The renormalisation is worth most where the corruption is scattered rather than blocky, which is
+exactly the shape the de-accumulated variables take. Dividing by 1.0 lets a single bad point null
+its whole cell, and because a grid point feeds 4.92 cells on average, that <em>amplifies</em> the
+corruption on its way in.</p>
+<p>Measured on 2025-06-04 00Z — the worst run in the archive by this measure — where 0.014% of
+<code>precipitation_surface</code>'s grid points and 0.009% of
+<code>downward_short_wave_radiation_flux_surface</code>'s arrived null beyond lead-0:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th style="text-align: right;">Null cells in the ingested run</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dividing by 1.0</td>
+<td style="text-align: right;">4,394</td>
+</tr>
+<tr>
+<td>Renormalised</td>
+<td style="text-align: right;">339</td>
+</tr>
+</tbody>
+</table>
+<p>The 339 that remain are cells where <em>every</em> contributing point was corrupt — the corruption is
+spatially clustered, so a scattered null rate of one part in ten thousand still wipes out whole
+cells occasionally. No cell became null that was not null before.</p>
+<p>Keep the magnitude in proportion: across the whole archive (862 runs, 6.24 billion rows) only 12
+runs carry any de-accumulated null beyond the lead-0 floor at all, totalling 6,550 cells. Most of
+the upstream scatter documented above lands outside the small GB box we download. This is
+therefore a correctness fix — the estimator was wrong, and a wholly-uncovered cell was a false
+zero — rather than a change that recovers much data.</p>
+<p>A surviving cell can rest on very little of its own area. <code>compute_h3_grid_weights</code> samples each
+cell with H3 children two resolutions finer by default — 49 of them for a hexagon, 7² — and on the
+V1 grid every <code>proportion</code> comes out an exact multiple of 1/49, so the least a single grid point can
+carry is 2.0% of its cell. 294 of that grid's 1671 cells contain a point at the floor, 572 contain
+one under 5%, and 859 contain one under 10%. A cell reduced to one of those points is stored exactly
+like a fully-covered one: the <code>Nwp</code> contract has no column for the contributing weight, and
+<code>_aggregate_grid_points_to_h3_cells</code> drops it once the division is done.</p>
+<p>A cell where <em>no</em> point contributed is a different case, and it yields <strong>null</strong>, never <code>0.0</code>. That
+distinction is the whole reason the contributing weight is computed rather than assumed: Polars
+sums an all-null group to <code>0.0</code>, which for weather is a physically plausible, in-bounds lie
+(0 °C, 0 Pa, 0 m s⁻¹) that would pass every check on this page.</p>
+<h2 id="nulls-in-the-de-accumulated-variables-tolerated">Nulls in the de-accumulated variables (tolerated)</h2>
+<p>The three de-accumulated variables — <code>precipitation_surface</code>,
+<code>downward_short_wave_radiation_flux_surface</code>, and <code>downward_long_wave_radiation_flux_surface</code> —
+carry nulls beyond the first forecast step. Dynamical de-accumulates these from ECMWF's cumulative
+source fields to instantaneous rates, and the root cause is corrupt source accumulation: some
+<code>(ensemble_member, forecast_step)</code> fields report physically-impossible <em>negative</em> accumulation,
+which the de-accumulation step correctly leaves as null rather than silently clamping corrupt data
+to zero. This is documented and WONTFIX upstream in
+<a href="https://github.com/dynamical-org/reformatters/issues/722">dynamical-org/reformatters#722</a>; a
+looser clamp threshold would only convert visibly-null corrupt data into invisibly-zeroed corrupt
+data.</p>
+<p>Usually the corruption is scattered per-pixel, a few percent of a slice, and most of that is
+absorbed by the spatial aggregation above rather than reaching the stored table as nulls at all.
+Occasionally a whole
+<code>(ensemble_member, valid_time)</code> slice arrives null across the grid: the 2026-08-09 00Z run had
+<code>downward_short_wave_radiation_flux_surface</code> null worldwide for ensemble member 34 at the 354-hour
+and 360-hour steps — 2 of that variable's 4284 <code>(member, step)</code> slices (51 ensemble members × the
+84 steps beyond lead-0).</p>
+<p>Both patterns are tolerated at ingest, for two reasons. First, a tolerated gap is a small,
+isolated part of one member's trajectory, and it is absorbed the same way the scattered corruption
+already is. Be careful with the tempting shorter version of that argument — "these variables are
+null at lead-0 anyway, so models handle their nulls" — because it does not quite transfer. Lead-0
+nulls reach the model <em>as nulls</em> only because they are <em>leading</em>, and <code>_upsample_nwp_to_half_hourly</code>
+interpolates only <em>interior</em> nulls; an interior wholly-null slice is bridged from its neighbouring
+steps, so the model sees a fabricated value instead. Note the span that bridges: losing one native
+step means interpolating between the steps <em>either side</em> of it, so 6 hours in the 3-hourly part of
+the horizon and 12 in the 6-hourly part. That is acceptable, but it is a different claim from "the
+model sees a null and copes" — and it is the reason a <em>spatial</em> average over the same step's
+neighbouring grid points, which is what the aggregation above does to the scattered nulls, is the
+better of the two.</p>
+<p>Which of those two a slice gets depends on where it sits in the horizon, and the dswrf example
+above is the awkward case: 360 h is the <em>last</em> of the 85 steps, and <code>interpolate()</code> leaves trailing
+nulls alone exactly as it leaves leading ones. So that slice is neither absorbed nor bridged — it
+reaches the model as a null, which is benign for a variable that is already null at lead-0 in every
+run, but it is not the "absorbed" case. Second, the
+run that failing would discard is overwhelmingly good. Take that 2026-08-09 run as the worked example: 0.05% of one
+already-nullable variable is not worth the other 4282 slices of that same variable, nor the twelve
+other variables that arrived complete, and rejecting it leaves the live forecast on a run 24 hours
+older. That is exactly the trade
+<a href="../../design-philosophy/design-principles/#7-strict-contracts-at-every-boundary">principle 7</a>
+warns against, in its own words: throwing away an otherwise-good NWP run converts a tolerable
+problem into an outage.</p>
+<p><code>Nwp.validate</code> therefore permits both patterns, and the <code>nwp_has_no_unexpected_nulls</code> asset check
+reports them (WARN, non-blocking), naming the affected <code>(variable, ensemble_member, valid_time)</code>
+slices and counting the wholly-null ones separately from the scattered ones — the two warrant
+different responses even though neither fails the run.</p>
+<h3 id="two-populations-counted-separately">Two populations, counted separately</h3>
+<p><code>nwp_has_no_unexpected_nulls</code> counts nulls at both stages of ingest, and the metadata keys say which
+stage each number came from. The <code>nwp_grid_point</code> keys count the raw 0.25° grid, before the
+aggregation (<a href="../../api/dynamical_data/"><code>assess_upstream_grid_point_nulls</code></a>); the <code>h3_cell</code>
+keys count the cells we store afterwards (<code>assess_nwp_quality</code>). The same grid-point keys appear on
+<code>nwp_instantaneous_variables_have_no_nulls</code>, counting the same raw grid over
+<a href="#the-instantaneous-variables-scattered-nulls-counted-on-the-raw-grid">the other null population</a> —
+the check name says which is which.</p>
+<p>Both are needed because the aggregation deliberately breaks the link between them. Renormalising
+over the contributing grid points is what keeps a scattered upstream null out of the stored cells —
+and it is therefore also what stops a cell count from measuring the feed. A cell count is the
+grid-point rate convolved with our H3 resolution, our grid spacing and our aggregation policy, so a
+change to any of those three moves it without anything upstream having changed. Only the grid-point
+rate answers the provider question in
+<a href="../../design-philosophy/inherent-stability/#three-audiences-three-channels">Three audiences, three channels</a>.</p>
+<p>The two are not comparable as rates: different units over different populations. The grid-point
+denominator is the whole downloaded lat/lon box, including the corner points no H3 cell uses, which
+is what keeps our geometry out of the number. What they do share is the slice filter — both ignore
+lead-0. And <code>null_nwp_grid_point_fraction</code> pools the three de-accumulated variables, so it does not
+equal any single variable's rate: the 2025-06-04 figures above are per-variable, and that run's
+pooled fraction is roughly 0.008%, a little over half the 0.014% quoted for
+<code>precipitation_surface</code>.</p>
+<p>Only the cell count drives the check's <code>passed</code>. The upstream rate is published on every
+materialisation instead, because "is the feed degrading?" is a question about the trend across runs
+that no single run can answer, and the archive offers no threshold that separates a healthy feed
+from a worsening one.</p>
+<h2 id="a-wholly-missing-variable-and-instantaneous-nulls-fatal">A wholly-missing variable, and instantaneous nulls (fatal)</h2>
+<p>Two null patterns <em>do</em> fail ingest:</p>
+<ul>
+<li>
+<p><strong>A null in any instantaneous variable</strong> (temperature, dew point, winds, pressures,
+  geopotential height). These are never legitimately null, so any null is an anomalous structural
+  gap. They stay non-nullable in the <code>Nwp</code> contract, so base validation rejects them. This is the
+  pattern behind the 2026-07-14 run, where a whole forecast step went missing for 50 of 51
+  ensemble members across every variable — reported upstream as
+  <a href="https://github.com/dynamical-org/reformatters/issues/765">dynamical-org/reformatters#765</a>.</p>
+<p>A cell reaches this state only when <em>every</em> grid point feeding it is missing, because of the
+renormalisation described <a href="#spatial-aggregation-is-where-a-grid-points-null-is-resolved">above</a>.
+A blocky failure like 2026-07-14's is caught exactly as before — the whole grid is gone, so
+every cell is empty — while a <em>scattered</em> grid-point null in an instantaneous variable is
+absorbed by the cell's other points, unless it lands on one of the 10 single-point cells, which
+have no others. That is a deliberate trade rather than an oversight: an instantaneous
+variable's nulls have only ever arrived as whole-step dropouts, and losing an entire run over
+one bad pixel is the outage
+<a href="../../design-philosophy/design-principles/#7-strict-contracts-at-every-boundary">principle 7</a>'s
+granularity clause exists to prevent. What it costs is that the <em>gate</em> cannot see scattered
+corruption in a variable that should never carry any, so a separate detector counts it on the
+raw grid instead: the <code>nwp_instantaneous_variables_have_no_nulls</code> check, described
+<a href="#the-instantaneous-variables-scattered-nulls-counted-on-the-raw-grid">below</a>.</p>
+</li>
+<li>
+<p><strong>A de-accumulated variable null in <em>every</em> slice beyond lead-0 of a run</strong> — the column is absent
+  rather than degraded, so <code>Nwp._check_no_wholly_missing_deaccumulated_variable</code> raises
+  <code>NwpVariableWhollyMissing</code>. This is the one place where landing the run is worse than not landing
+  it: an all-null weather column would train and serve silently for the full 15-day horizon,
+  whereas the previous run is stale but complete. The judgement is made per <code>init_time</code>, so a run
+  with an empty column is caught even in a frame that also holds healthy runs.</p>
+</li>
+</ul>
+<p>A run that fails ingest writes nothing (validation runs before the Delta write), so there are no
+partial partitions to clean up.</p>
+<h3 id="the-instantaneous-variables-scattered-nulls-counted-on-the-raw-grid">The instantaneous variables: scattered nulls, counted on the raw grid</h3>
+<p>The gate above judges cells, so it sees an instantaneous variable's corruption only when a whole
+cell goes. The <code>nwp_instantaneous_variables_have_no_nulls</code> check counts the same corruption where it
+arrives, on the raw 0.25° grid, over the nine downloaded variables that are never legitimately null.
+Its <code>passed</code> is false on a single null grid point — a zero threshold, unlike
+<code>nwp_has_no_unexpected_nulls</code>, whose nulls are expected — and it still only WARNs, because by the
+time it runs the aggregation has already absorbed what it counted. What is at stake is whether we
+raise the run with Dynamical.org, not whether we keep it.</p>
+<p>The variable set comes from the download list rather than from the <code>Nwp</code> contract, because the two
+name the winds differently: we download <code>wind_u_10m</code>/<code>wind_v_10m</code> and derive
+<code>wind_speed_10m</code>/<code>wind_direction_10m</code> from them, so a set drawn from the contract would name four
+variables the downloaded dataset does not carry.</p>
+<p>Unlike the de-accumulated count, this one includes <strong>lead-0</strong>: these variables are not null there by
+design, so a null at lead-0 means what a null at any other step means.</p>
+<p>What it cannot see is a null that reached a stored cell, because <code>Nwp.validate</code> rejects that run
+before any check runs. That covers a blocky failure, where every grid point of a cell goes at once,
+and also a scattered null that happens to land on one of the 10 single-point cells. So a run that
+lands with this check red is telling you about absorbed scatter — a pattern this project has never
+yet seen in an instantaneous variable, whose nulls have only ever arrived as whole-step dropouts.</p>
+<h3 id="a-wholly-missing-variable-is-retried-not-failed-outright">A wholly-missing variable is retried, not failed outright</h3>
+<p><code>NwpVariableWhollyMissing</code> is its own exception type because the <code>ecmwf_ens</code> asset <strong>retries</strong> it,
+on the same ladder as a run that is not in the catalog yet: every 30 minutes, up to 8 times. (That
+is <em>at least</em> four hours of waiting — this failure is only detectable after downloading, so each
+of those attempts pays for a download too.)
+Both mean "the upstream run is not ready yet"; they just say it at different points.</p>
+<p>That is worth doing because Dynamical.org publishes each 00Z run as roughly 40 separate Icechunk
+commits between 08:05 and 08:20 UTC, one per worker. A run being written is therefore genuinely
+readable and genuinely incomplete: a variable whose worker has not committed yet reads as
+fill-value null across every member and step, which is precisely this fatal pattern. That covers
+less ground than it sounds, and the limit is worth stating: only 3 of the <code>Nwp</code> contract's 13
+weather variables reach this check at all. Nine are instantaneous and non-nullable, so a
+half-published run also missing one of <em>those</em> is rejected by base Patito validation first and
+fails immediately, with no retry; the thirteenth, <code>categorical_precipitation_type_surface</code>, is
+nullable but has its own historical invariant that rejects an all-null column just as fast. So the
+retry engages when the variables still unwritten are the de-accumulated ones. A <em>defective</em>
+run also gets republished — the 2026-08-09 00Z run was repaired by a second sweep at 11:45 UTC,
+3 hours 25 minutes after its first publication, and well inside the retry budget.</p>
+<p>The retry stays deliberately narrow: it covers these two exceptions and nothing else, so a genuine
+bug still fails immediately rather than retrying for four hours. The partition simply stays
+unmaterialised if every retry is exhausted, until the upstream data is fixed and it is re-run.</p>
+<h2 id="an-incomplete-run-tolerated-and-reported">An incomplete run (tolerated, and reported)</h2>
+<p>The checks above ask whether the rows we received are usable. A separate question is whether we
+received <em>all</em> the rows: a complete ECMWF ENS run is the full cartesian product of <strong>51 ensemble
+members × 85 native forecast steps × every H3 cell in the H3 grid weights</strong>. A run missing an
+ensemble member, or stopping short of the 15-day horizon, is short in a way <code>Nwp.validate</code> cannot
+see — every row it <em>does</em> contain is perfectly well-formed — and would otherwise only surface much
+later as strange training data.</p>
+<p><code>assess_nwp_run_completeness</code> therefore compares the ingested run against that expected shape and
+returns an <code>NwpRunCompletenessReport</code>. The <code>ecmwf_ens</code> asset publishes the report as the
+<code>nwp_run_is_complete</code> asset check, naming exactly which members and which lead times are absent.</p>
+<h3 id="what-it-can-and-cannot-detect">What it can and cannot detect</h3>
+<p>The two detections that bite are a <strong>missing ensemble member</strong> and a <strong>missing forecast step</strong>,
+because both arrive as a short coordinate on the source dataset:
+<code>convert_nwp_xarray_dataset_to_polars_dataframe</code> loops over <code>ds.ensemble_member</code> and <code>ds.lead_time</code>,
+so a short coordinate becomes absent rows and the check names it. An off-grid <code>valid_time</code> — the
+upstream step structure changing under us — is caught the same way.</p>
+<p>The <strong>cell count and the total row count cannot fire through today's converter</strong>, and are there as
+defence-in-depth rather than as live detections. That converter left-joins the NWP values onto the
+H3 grid and then groups by <code>h3_index</code>, so its output always carries exactly the cells the grid
+weights name, and always as a dense cross-product. The row count is what would catch a <em>ragged</em>
+run — every member, step and cell present, but some (member, step, cell) combinations absent —
+which the three marginal counts all miss. Both would start to matter if that converter were ever
+replaced by one that can emit such a frame.</p>
+<p>A dropped <em>grid point</em> is not covered by this check either, and is worth knowing about, because it
+is handled by the aggregation rather than by any check. A point the H3 grid weights name but the
+source dataset does not carry misses the left join, and is then excluded from its cell's
+contributing weight exactly as an upstream null is — so the cell is renormalised over whatever else
+feeds it, and only a cell that loses <em>every</em> one of its points comes out null. That takes either a
+dropped point feeding one of the 10 single-point cells, or enough neighbouring points dropping
+together, which is what a whole missing coordinate slice would look like. The resulting null is
+fatal for the instantaneous variables, so it costs the whole partition and shows up as a missed
+run — a blunt response to a small cause. Relaxing it to a warning and an absent row is tracked in
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/478">issue #478</a>.</p>
+<h3 id="where-the-expected-shape-comes-from">Where the expected shape comes from</h3>
+<ul>
+<li><strong>Ensemble members</strong> — <code>ECMWF_ENS_ENSEMBLE_MEMBERS</code>, the 51 members (control plus 50 perturbed,
+  indexed 0–50) that are a fixed property of the ECMWF IFS ENS configuration.</li>
+<li><strong>Forecast steps</strong> — <code>ECMWF_ENS_LEAD_TIME_HOURS</code>, the 85 native steps: 3-hourly from lead-0 out
+  to 144 h, then 6-hourly out to 360 h (= <code>init_time</code> + 15 days). Expressed as the step <em>structure</em>
+  rather than a bare count of 85, so the constant explains itself and a gap can be named in hours.</li>
+<li><strong>H3 cells</strong> — <strong>not</strong> a constant. The asset passes the distinct cell count of the
+  <code>h3_grid_weights</code> parquet it has already loaded, so the expectation tracks whatever grid we are
+  actually running on. (For the V1 trial area that is 1671 cells, which is why a complete V1
+  partition is ~7.24M rows — see <a href="../performance/">Performance and Scale</a>.)</li>
+</ul>
+<h3 id="why-it-warns-instead-of-failing-the-run">Why it warns instead of failing the run</h3>
+<p>An incomplete run is <strong>absent input, not malformed input</strong>, and the two get opposite treatment
+under <a href="../../design-philosophy/inherent-stability/#the-rules">Inherent Stability</a> — rule 1 says never
+raise because an input is absent, rule 2 says be liberal about missing inputs and strict about
+malformed ones, and rule 6 says asset checks warn rather than block. Concretely, failing the
+partition would discard the 50 members we did get; the live forecast would then fall back on
+<em>yesterday's</em> NWP run, which is a strictly worse degradation than forecasting from a slightly short
+run today. So the run lands, the check WARNs, and the missing pieces are named.</p>
+<p>One asymmetry is worth naming, because it means an <em>instantaneous</em> variable's nulls are judged by
+the shape they arrive in rather than by how much data is lost. The 2026-07-14 outage lost a
+forecast step for 50 of 51 members, but the rows still existed carrying null temperatures —
+<em>malformed</em>, so <code>Nwp.validate</code> rejects that and the day becomes a missed run. The same loss
+arriving as absent <em>rows</em> is this check's territory: a whole <code>ensemble_member</code> or <code>lead_time</code>
+coordinate short on the source dataset, where the rest of the run is kept and the gap is named.
+The de-accumulated variables do not work that way — their nulls are tolerated by volume, up to the
+point where the column is empty — so the asymmetry is confined to the variables that are never
+legitimately null at all. Both postures are on the
+<a href="../../design-philosophy/inherent-stability/#failure-modes">degradation ladder</a>.</p>
+<h3 id="completeness-is-not-part-of-nwpvalidate">Completeness is not part of <code>Nwp.validate</code></h3>
+<p><code>assess_nwp_run_completeness</code> is called from the asset and never from <code>Nwp.validate</code>. Validation
+runs on arbitrary frames — filtered test fixtures, partition-pruned scans, the single-member reads
+that training does — and completeness is false for all of them by construction. It is a property of
+one whole ingested run, so it is asked once, at the one place that holds one.</p>
+<h3 id="shape-metadata-on-every-materialisation">Shape metadata on every materialisation</h3>
+<p>The observed <code>n_ensemble_members</code>, <code>n_valid_times</code>, <code>n_h3_cells</code>, <code>valid_time_min</code> and
+<code>valid_time_max</code> are attached to the materialisation metadata on <em>every</em> run, not only the failing
+ones, so slow drift in the upstream dataset is visible in the Dagster UI's timeline before it ever
+becomes a warning.</p>
+<h2 id="categorical_precipitation_type_surface-before-2024-11-13-historical"><code>categorical_precipitation_type_surface</code> before 2024-11-13 (historical)</h2>
+<p>This variable is all-null for init times on and before 2024-11-12 and populated from the
+2024-11-13 00Z run onwards. <code>Nwp.validate</code> enforces that split as a hard invariant — it is a fixed
+historical fact about the dataset, not a quality quirk, so a violation is always fatal.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
