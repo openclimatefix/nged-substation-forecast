@@ -1,7 +1,7 @@
 # Pin the sign-convention doc prose to the contract (#640)
 
 **Problem:** the power sign convention — what positive/negative `power` means, keyed to
-`substation_type` — is stated as free-text prose in five places: twice inside
+`substation_type` — is stated as free-text prose in four places: twice inside
 `packages/contracts/src/contracts/power_schemas.py` (identical text on `PowerTimeSeries.power` and
 `PowerForecast.power_fcst`), once as the canonical doc statement in
 `docs/roadmap/forecast-building-blocks.md`, and once more, independently worded, in
@@ -10,13 +10,15 @@ one copy can silently drift from the others — and one already has: the contrac
 "**back** into the grid"; `forecast-building-blocks.md` currently says "**backwards** into the
 grid".
 
-**Solution:** extract the rule's four factual atoms (what positive/negative means at a substation,
-what positive/negative means at a customer meter) into four short `Final[str]` constants in
-`power_schemas.py`, build both contract field descriptions from them (removing the existing
-in-contract duplication), add a regression test asserting each atom is a verbatim substring of
-`forecast-building-blocks.md`, and stop `cost-savings-metrics.md` restating the rule at all —
-replace its restatement with a link, matching the pattern `docs/index.md` and
-`docs/roadmap/delivery-tables.md` already use.
+**Solution:** make the wording exist in exactly one place — a new "Sign convention" section in
+`packages/contracts/README.md` — and have `docs/roadmap/forecast-building-blocks.md` pull that
+section in verbatim at build time with the `include-markdown` MkDocs plugin already installed in
+this repo, rather than restating it. The two contract Field descriptions stop carrying their own
+copy of the multi-sentence rule and instead point at that one section (readable locally, since
+it's a file in the same package, and at the published URL). `cost-savings-metrics.md` stops
+restating the rule too, replacing it with a link — matching the pattern `docs/index.md` and
+`docs/roadmap/delivery-tables.md` already use. Drift becomes structurally impossible rather than
+merely detected: there is nothing left to fall out of sync, so no new test is needed.
 
 ## Verdict, size, departures (step 2/3)
 
@@ -27,11 +29,45 @@ replace its restatement with a link, matching the pattern `docs/index.md` and
   code moves. Gets the plan and all four adversarial reviews (two here, two on the diff during
   implementation).
 - **Departure from the issue body:** the issue lists three options (a parsing test, generated
-  prose, or an accepted-drift decision) without preferring one. This plan picks the first,
-  narrowed to checking four short phrases rather than one long paragraph — see "Why four short
-  atoms, not one paragraph" below.
+  prose, or an accepted-drift decision) without preferring one. This plan is closest to the second
+  ("generating the doc prose... so there is a single source text"), except the single source is a
+  README.md fragment rather than the Field description itself — see "Why the README, not the Field
+  description" below.
+- **Revised after the first adversarial review (step 5/6):** the review (recorded in full below)
+  found that this repo already has `mkdocs-include-markdown-plugin` installed and in active use
+  (all seven `docs/api/*/index.md` pages `{% include %}` their package's `README.md`), and that its
+  `start`/`end` fragment arguments make single-sourcing markdown text mechanical with no new test
+  code. The plan below replaces the original four-`Final[str]`-constants-plus-pytest design with
+  this include-based one. See "Review findings and triage" for what was accepted, adjusted, or
+  rejected.
 
 ## What changes, file by file
+
+### `packages/contracts/README.md`
+
+Add a new `## Sign convention` section (after `## Key Data Contracts`, before `## Design
+Principles`), wrapped in HTML comment markers so only the body — not the heading — gets pulled
+into other pages:
+
+```markdown
+## Sign convention
+
+<!-- sign-convention:start -->
+Sign convention depends on `substation_type` in `TimeSeriesMetadata`, whose five values (`BSP`,
+`EHV Customer`, `GSP`, `HV Customer`, `Primary`) partition into two behavioural cases:
+
+- **Substations** (`BSP`, `GSP`, `Primary`): positive = power flowing **towards end-users**;
+  negative = excess generation flowing **back into the grid**.
+- **Customer meters** (`EHV Customer`, `HV Customer`): positive = the customer is **sending**
+  power to NGED's grid; negative = the customer is **drawing** power from it. A customer meter can
+  sit at a demand site or a generation site, so this case is not "generators only".
+<!-- sign-convention:end -->
+```
+
+This is the exact wording currently in `forecast-building-blocks.md`, with the one already-drifted
+word fixed ("backwards" → "back", matching the contract). `docs/api/contracts/index.md` already
+`{% include %}`s the whole of this README, so this section also appears on the published API
+reference page for free.
 
 ### `packages/contracts/src/contracts/power_schemas.py`
 
@@ -45,39 +81,31 @@ embed this identical sentence group inside their Field `description=`:
 > drawing power from it. Those five values are the whole enum, so every series falls into exactly
 > one case.
 
-Add four module-level constants near the top of the file (after the imports, before
-`DropImplausibleRowsResult`):
+Replace that sentence group, in both descriptions, with a one-line pointer:
 
-```python
-SIGN_CONVENTION_SUBSTATION_POSITIVE: Final[str] = "power flowing towards end-users"
-SIGN_CONVENTION_SUBSTATION_NEGATIVE: Final[str] = "excess generation flowing back into the grid"
-SIGN_CONVENTION_CUSTOMER_POSITIVE: Final[str] = "the customer is sending power to NGED's grid"
-SIGN_CONVENTION_CUSTOMER_NEGATIVE: Final[str] = "the customer is drawing power from it"
+```text
+Sign convention depends on `substation_type` in `TimeSeriesMetadata` — see the Sign convention
+section in this package's README.md, also published at
+https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/#sign-convention.
 ```
 
-Rewrite both field descriptions to build the same sentence group from these four constants (an
-f-string interpolating them into the existing surrounding grammar), so the wording is unchanged but
-now has one literal source instead of two. No dtype, constraint, or validation behaviour changes —
-this is a description-text-only refactor.
+Everything else in both descriptions (the unit sentence, the rounding-precision sentence, the
+`PLANNED` comment on `power_fcst`) is unchanged. No dtype, constraint, or validation behaviour
+changes — this is a description-text-only edit.
 
 ### `docs/roadmap/forecast-building-blocks.md` (`## Sign convention`, lines 46–56)
 
-Current text:
+Replace the hand-written bullets with an include of the README fragment:
 
 ```markdown
-- **Substations** (`BSP`, `GSP`, `Primary`): positive = power flowing **towards end-users**;
-  negative = excess generation flowing **backwards into the grid**.
-- **Customer meters** (`EHV Customer`, `HV Customer`): positive = the customer is **sending**
-  power to NGED's grid; negative = the customer is **drawing** power from it. A customer meter can
-  sit at a demand site or a generation site, so this case is not "generators only".
+## Sign convention
+
+{% include-markdown "../../packages/contracts/README.md" start="<!-- sign-convention:start -->" end="<!-- sign-convention:end -->" %}
 ```
 
-Three of the four atoms already appear verbatim as substrings ("power flowing towards end-users",
-"the customer is sending power to NGED's grid", "the customer is drawing power from it"). Fix the
-one that has already drifted: "flowing **backwards into the grid**" →
-"flowing **back into the grid**", so `SIGN_CONVENTION_SUBSTATION_NEGATIVE` is also a verbatim
-substring. No other wording changes — the bullet structure and bold styling stay as they are; only
-the drifted word changes.
+The `#sign-convention` anchor is unchanged (the heading itself stays in this file), so every
+existing link to it — `docs/index.md`, `docs/roadmap/delivery-tables.md`,
+`docs/roadmap/cost-savings-metrics.md` — keeps resolving.
 
 ### `docs/roadmap/cost-savings-metrics.md` (`### Which direction is the constraint on?`, ~line 124)
 
@@ -98,82 +126,80 @@ There is no single sign rule — see [sign convention](forecast-building-blocks.
 — and the trial area contains both conventions,
 ```
 
-This removes the only other free-text restatement in the docs, so no mechanical check is needed for
-this page: a stale link would be caught by the existing `mkdocs build --strict` link-anchor
-validation (`validation.links.anchors: warn` in `mkdocs.yml`, promoted to a hard failure under
-`--strict`), which this change's verification set already runs.
+### Why the README, not the Field description
 
-### New test: `tests/test_sign_convention_docs.py`
+The issue's "generate the doc prose from the contract's field description" option assumes the
+Field description is the natural canonical source. It can't play that role cleanly here: it is a
+plain-text `pt.Field(description=...)` string, so it cannot carry the doc's bulleted, bold-styled
+markdown without either flattening the doc's formatting or teaching the include plugin to convert
+Python string literals to markdown. `packages/contracts/README.md` is already markdown, is already
+included wholesale into the API reference page, and — per its own "Design Principles" section — is
+already "the authoritative account of what the data means" for this package, so moving the
+full-prose canonical copy there (rather than leaving it embedded in a `pt.Field()` call) does not
+relocate authority anywhere new.
 
-A cross-cutting test belongs in the root `tests/` directory (not `packages/contracts/tests/`)
-because it reads a `docs/` file as well as importing `contracts` — see "Where tests and their
-dependencies live" in `docs/architecture/testing.md`.
+## Review findings and triage (steps 5/6)
 
-```python
-from contracts.power_schemas import (
-    SIGN_CONVENTION_CUSTOMER_NEGATIVE,
-    SIGN_CONVENTION_CUSTOMER_POSITIVE,
-    SIGN_CONVENTION_SUBSTATION_NEGATIVE,
-    SIGN_CONVENTION_SUBSTATION_POSITIVE,
-)
-from contracts.settings import PROJECT_ROOT
+The first adversarial review (simplicity) found:
 
-
-def test_forecast_building_blocks_states_the_same_sign_convention_as_the_contract():
-    doc_text = (
-        PROJECT_ROOT / "docs" / "roadmap" / "forecast-building-blocks.md"
-    ).read_text()
-    for atom in (
-        SIGN_CONVENTION_SUBSTATION_POSITIVE,
-        SIGN_CONVENTION_SUBSTATION_NEGATIVE,
-        SIGN_CONVENTION_CUSTOMER_POSITIVE,
-        SIGN_CONVENTION_CUSTOMER_NEGATIVE,
-    ):
-        assert atom in doc_text
-```
-
-Uses `PROJECT_ROOT` (from `contracts.settings`, already regression-tested in
-`packages/contracts/tests/test_project_root.py`) rather than a path relative to `__file__`, so the
-test is robust to the non-editable-install layout that motivated `PROJECT_ROOT` in the first place.
-
-### Why four short atoms, not one paragraph
-
-The contract's field description is one flowing paragraph; the doc's is two markdown bullets with
-bold styling. Forcing them to be byte-identical would mean either flattening the doc into plain
-prose (losing the bullets that make it skimmable) or templating the doc paragraph out of the
-contract string (new tooling — a Jinja include or codegen step — for a two-sentence rule, which is
-disproportionate). Four short exact-wording phrases survive both surrounding styles: the contract
-sentence can say "positive means the customer is sending power to NGED's grid" and the doc bullet
-can say "positive = **the customer is sending power to NGED's grid**" and both still contain the
-same atom verbatim. This is also, concretely, the granularity that would have caught the
-"back"/"backwards" drift already present on `main`.
+1. **Single-source via `include-markdown` instead of pinning two copies together.** *Accepted*,
+   with one adjustment: the review suggested shortening the Field descriptions to "one sentence
+   plus the published-docs URL"; this plan keeps a `substation_type` cross-reference plus a pointer
+   to the local README (not only a URL), because a reader of `power_schemas.py` with no network
+   access can still open `packages/contracts/README.md` in the same package. The review's core
+   point — the multi-sentence rule doesn't need to live in the Field description at all — still
+   holds and is taken.
+2. **mkdocstrings already renders the contract via `show_source: true`, so pointing docs at
+   `docs/api/contracts/index.md` instead might be simpler still.** *Checked and rejected*: `griffe-
+   pydantic` is not installed (confirmed absent from `uv.lock`), so `pt.Field(description=...)`
+   text only appears inside the page's collapsed "Source code" block, not as rendered prose. A
+   reader would have to expand a code block to find the rule. Not simpler in practice.
+3. **The in-contract duplication is arguably out of the issue's scope.** *Accepted as in-scope
+   anyway*: the issue's own problem statement explicitly names "the contract (twice)" as part of
+   what's wrong, so removing it is answering the issue as written, not scope creep — and under the
+   include-based design it costs nothing extra (the two Field descriptions were always going to
+   change to add the pointer).
+4. **Four short `Final[str]` "atom" constants make a weaker regression test than one full-paragraph
+   constant, and can't catch the same-wrong-wording-in-both-places case.** *Moot*: this plan drops
+   the atom/test design entirely in favour of the include, so there is no test whose granularity
+   this critique applies to.
+5. **The new test file (`tests/test_sign_convention_docs.py`) could be one assertion in an existing
+   file instead of a new file.** *Moot*, for the same reason as (4) — no test is added.
+6. **The `cost-savings-metrics.md` change (drop restatement, link only) is proportionate.**
+   *Accepted*, unchanged from the original plan.
 
 ## Design-philosophy check
 
-Pure documentation and test-time-only code — no production asset, no Delta table, no serving path,
-no degradation rule. Runs at test time and doc-authoring time, never in production, so the
-inherent-stability rules (WARN-not-ERROR checks, degrade-don't-raise) don't apply. No principle in
-`design-principles.md` is traded away: this is a size-neutral internal consolidation (four short
-constants replacing one duplicated paragraph), not a new abstraction serving a hypothetical future
-caller.
+Pure documentation — no production asset, no Delta table, no serving path, no degradation rule, no
+new Python code beyond shortening two description strings. Runs at doc-build time, never in
+production, so the inherent-stability rules (WARN-not-ERROR checks, degrade-don't-raise) don't
+apply. No principle in `design-principles.md` is traded away: this removes duplication rather than
+adding an abstraction, and it reuses tooling (`mkdocs-include-markdown-plugin`) already adopted and
+in active use for the same purpose (whole-README includes on every `docs/api/*/index.md` page).
 
 ## Tests
 
-One new test, `test_forecast_building_blocks_states_the_same_sign_convention_as_the_contract`
-(above). **Assertion that fails on `main` today:** before the doc's "backwards" → "back" fix, the
-loop's `assert SIGN_CONVENTION_SUBSTATION_NEGATIVE in doc_text` fails, because
-`SIGN_CONVENTION_SUBSTATION_NEGATIVE = "excess generation flowing back into the grid"` is not a
-substring of the doc's current "...flowing **backwards into the grid**." This is a genuine
-regression test: it pins wording, not structure, so an editor who changes the doc's bullet styling
-freely can, but one who silently reworks what positive/negative *means* cannot.
+No new test. Drift between `forecast-building-blocks.md` and the contract's canonical wording
+becomes structurally impossible: the doc page no longer contains its own copy of the prose to fall
+out of sync, only an include directive that is re-resolved from `packages/contracts/README.md` on
+every build. What replaces a test is `uv run mkdocs build --strict` (already run for any change
+touching links, per the existing verification convention) plus reading the rendered HTML: the
+`include-markdown` plugin logs a `mkdocs.plugins.include_markdown` warning — which `--strict`
+promotes to a build failure — if either the `start` or `end` delimiter string is not found in
+`packages/contracts/README.md`, so a typo'd marker or an accidentally-deleted fragment breaks the
+build rather than silently including nothing or the whole file. This was checked directly against
+the installed plugin's source
+(`.venv/lib/python3.14/site-packages/mkdocs_include_markdown_plugin/{event,logger}.py`), not
+assumed from its documentation.
 
 No existing test needs to change. `packages/contracts/tests/test_power_time_series.py` and
 `test_power_forecast.py` don't currently assert on field-description text (verified by grep before
-writing this plan), so the description-text refactor in `power_schemas.py` doesn't touch them.
+writing this plan), so shortening the two descriptions doesn't touch them.
 
 ## Docs to update
 
-- `docs/roadmap/forecast-building-blocks.md` — one-word fix ("backwards" → "back"), as above.
+- `packages/contracts/README.md` — new `## Sign convention` section, as above.
+- `docs/roadmap/forecast-building-blocks.md` — the section body becomes an include, as above.
 - `docs/roadmap/cost-savings-metrics.md` — drop the restatement, link only, as above.
 - No roadmap status banner or "Implementation details" section applies: this issue isn't tied to a
   milestone page, it's a standalone documentation/tooling issue.
@@ -184,27 +210,32 @@ writing this plan), so the description-text refactor in `power_schemas.py` doesn
 uv run ruff check .
 uv run ruff format . --check
 uv run ty check
-uv run pytest tests/test_sign_convention_docs.py packages/contracts/tests/test_power_time_series.py packages/contracts/tests/test_power_forecast.py
+uv run pytest packages/contracts/tests/test_power_time_series.py packages/contracts/tests/test_power_forecast.py
 uv run pytest   # full suite — this touches a shared contract file
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
-uv run mkdocs build --strict   # this change touches a doc-to-doc link
+uv run mkdocs build --strict
 ```
 
-Read the rendered `cost-savings-metrics.md` HTML after `mkdocs build --strict` to confirm the
-trimmed sentence still reads naturally and the link resolves to the right anchor.
+Read the rendered HTML for `forecast-building-blocks.md`, `cost-savings-metrics.md`, and
+`docs/api/contracts/index.md` after the build: confirm the included Sign convention section renders
+with its bullets and bold styling intact (not collapsed by the include, and not double-included via
+the API page's whole-README include plus its own explicit include, since the API page only includes
+the README once, wholesale), and that the trimmed `cost-savings-metrics.md` sentence still reads
+naturally.
 
 ## Risks and open questions
 
-- **Is substring-matching four short phrases too weak a guarantee?** It cannot catch every kind of
-  drift — e.g., if both the contract and the doc were edited to say the same *wrong* thing, the
-  test would still pass. But that's true of any prose-comparison mechanism that doesn't re-derive
-  meaning from a formal model, and building one for a five-value enum's sign convention is not
-  proportionate. Recommendation: accept this as the residual risk; it's a large improvement over
-  today's "nothing mechanically ties them together" baseline.
+- **Is a plain silent no-op an actual risk if the include tag is written wrong (e.g. wrong relative
+  path to the README)?** No — checked in the plugin source: a missing/unreadable target file raises
+  an exception during the directive's own path resolution (before the start/end matching even
+  runs), which fails the `mkdocs build` outright, strict or not. Only a *wrong delimiter string*
+  degrades to a warning, and that warning is promoted to a failure by `--strict`.
+- **Should the Field-description pointer sentence also appear on `TimeSeriesMetadata.substation_type`
+  itself, since that's the field the rule keys off?** Not proposed here — `substation_type`'s
+  current description ("Substation voltage level / role...") already stays factual and doesn't
+  claim to explain `power`'s sign; adding a forward-reference there would be new scope the issue
+  didn't ask for. Recommendation: leave it.
 - **Should `cost-savings-metrics.md` keep zero restatement, or a one-clause hint (e.g. "(see sign
   convention)")?** The plan proposes a link with no restatement, matching the two pages that
   already do this. Recommendation: keep it consistent with the existing pattern rather than
   inventing a third style.
-- **Should the four atoms also cover `PowerForecast.power_fcst`'s doc restatement, if one existed
-  elsewhere?** Checked: no other doc page restates the rule in its own wording today (`index.md`
-  and `delivery-tables.md` already link-only). Nothing further to cover.
