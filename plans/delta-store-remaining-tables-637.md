@@ -273,3 +273,20 @@ a package README table addition).
    `storage_options` and `delta_write_options` this plan ports across. Still worth the
    regression test (`test_append_partitions_by_time_series_id` above) as a durable guard, not as
    a substitute for this verification.
+
+## Adversarial review outcomes
+
+Both plan reviews ran (this issue is sized complex). Neither found anything to change; nothing was
+rejected because nothing was proposed.
+
+- **Simplicity review**: verified every empirical claim above independently (the `fold_id`
+  emptiness scenario, the `.write_delta()` → `write_deltalake()` equivalence, the exact call-site
+  line numbers) and considered collapsing the four modules into fewer files or a shared generic
+  writer; concluded the four-module, no-new-tuning design is already the simplest one that
+  satisfies the issue, not merely the cautious one.
+- **Correctness/testability review**: independently re-derived every file/line claim, ran the
+  empty-frame partition-clear case live against `deltalake.write_deltalake` to confirm the
+  proposed test would actually catch a regression, checked `inherent-stability.md`'s raise-vs-
+  degrade rule against the production write path, and confirmed the `write_forecast_metrics`
+  argument-order swap is unambiguous and fails loudly (`AttributeError`) if implemented backwards.
+  No factual, logical, or testability defects found.
