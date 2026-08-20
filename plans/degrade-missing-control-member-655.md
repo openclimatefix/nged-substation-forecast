@@ -32,37 +32,21 @@ CV/training — is the right shape.
 
 - The issue asks to "confirm degradation actually reaches all three of the required channels —
   in-band, the warning table, and Sentry — not just doesn't raise." I'm not adding new machinery
-  for any of the three, and I think that's correct rather than a shortfall:
-  - **In-band (wider uncertainty bands):** doesn't exist anywhere in the codebase yet. Today's
-    model is a point forecast (`XGBoostConfig.objective` defaults to `reg:squarederror`);
-    band-widening depends on quantile output ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263))
-    plus regime-conditional conformal calibration, both un-shipped project-wide. The best
-    available substitute — XGBoost's default-direction routing over a nulled feature — already
-    applies here with no new code, and it's the same substitute every other "feature goes null"
-    case in this pipeline relies on today (e.g. the lead-0 window).
-  - **Warning table:** `power_forecast_warnings` is not yet in code anywhere
-    (`docs/roadmap/delivery-tables.md`: "🚧 Planned ... not yet in code"). There is nothing for
-    this change to hook into, and building that table is out of scope for a bug fix in
-    `_engineer_features`.
-  - **Sentry:** a missing control member is already caught and reported one layer upstream, at
-    ingest. `ecmwf_ens` (`assets.py:438`) runs `assess_nwp_run_completeness` on every downloaded
-    run and its `_nwp_completeness_check_result` (`assets.py:519`) turns a missing member — control
-    member included — into a WARN `AssetCheckResult` naming `missing_ensemble_members` in Dagster's
-    Checks view. That's the same "Checks view only, no proactive Sentry push on a WARN pass" level
-    every other non-erroring WARN check in this codebase is at today (see the inherent-stability
-    failure-modes table: most rows read "nobody is told 🚧" for exactly this reason, tracked under
-    [#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)). Wiring
-    WARN-passing checks to Sentry proactively is a cross-cutting gap affecting every check in
-    `checks.py` and `assets.py`, not something specific to this failure mode, so I'm not adding a
-    one-off Sentry call here that the rest of the codebase doesn't have either.
-
-  So "reaches all three channels" is true only in the weakened sense the rest of the codebase is
-  currently held to: in-band via existing null-routing (no quantile bands yet, nowhere), warning
-  surfaced in Dagster Checks at the point the fault actually originates (ingest, not inference), and
-  Sentry only on an evaluation *error*, not on a clean WARN. If a human reviewer wants this issue
-  to also close the general WARN→Sentry gap or build a first slice of `power_forecast_warnings`,
-  that's materially bigger than this bug fix and I'd want it as its own issue — flagged in Risks
-  below rather than folded in silently.
+  for any of them. In-band widening doesn't exist anywhere yet — today's model is a point forecast
+  (`XGBoostConfig.objective` defaults to `reg:squarederror`), and band-widening needs quantile
+  output ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) plus
+  conformal calibration, neither shipped; the nulled feature still gets XGBoost's default-direction
+  routing, the same substitute every other null feature in this pipeline relies on today. The
+  warning table, `power_forecast_warnings`, is not yet in code at all
+  (`docs/roadmap/delivery-tables.md`: "🚧 Planned ... not yet in code"), so there is nothing to
+  hook into. Sentry is already covered one layer upstream: `ecmwf_ens`'s
+  `assess_nwp_run_completeness` (`assets.py:438,519`) turns a missing control member into a WARN
+  `AssetCheckResult` naming `missing_ensemble_members` in Dagster's Checks view at ingest — the same
+  "Checks view only, no proactive Sentry push on a WARN pass" level every other check in
+  `checks.py`/`assets.py` is at today, a gap tracked under
+  [#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501) rather than specific
+  to this failure mode. Closing #501 generally, or building a first slice of
+  `power_forecast_warnings`, is materially bigger than this bug fix; see Risks below.
 
 ## What changes, file by file
 
@@ -125,13 +109,17 @@ one fewer way for `live_forecasts` to need a human to intervene on a 6-hourly ca
 
 **`tests/test_live_forecasts.py`**
 
-- Add an integration test alongside `test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh`,
-  reusing its `_save_model_trained_on_weather_lag` / spy-on-`predict` scaffolding: write NWP records
-  for the selected run with only non-control members (e.g. `ensemble_member=1`, no `0`), materialise
-  `live_forecasts`, and assert (a) the run succeeds — `result.success` — where today it would raise,
-  and (b) the captured pre-predict frame's weather-lag column is entirely null. This is the test
-  that would fail on `main` today (the materialisation currently raises) and is the direct
-  regression test for the issue's failure mode.
+- Add a slim integration test alongside `test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh`:
+  reuse `_save_model_trained_on_weather_lag` to train on a weather lag, write NWP records for the
+  selected run with only non-control members (e.g. `ensemble_member=1`, no `0`), materialise
+  `live_forecasts`, and assert `result.success` — no predict-spy or captured-frame scaffolding,
+  since `test_engineer_features_raises_when_no_control_member_for_weather_lag` in
+  `test_features.py` already pins *which* column goes null and by what mechanism, with no layer
+  between it and `live_forecasts`' own call (`production_assets.py:316` calls `engineer()`
+  directly, nothing wraps the raise). This test's job is narrower: confirm the materialisation
+  itself doesn't fail — the fact that would be false on `main` today. It is also a tripwire for the
+  fan-out gap in "Risks and open questions" below: if that gap ever turned into a real crash rather
+  than a silently-missing row, this is the test that would catch it.
 
 ## Docs to update
 
@@ -155,19 +143,42 @@ uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 
 ## Risks and open questions
 
-1. **Should this issue also add a proactive Sentry event for a WARN-passing completeness check?**
+1. **A missing control member also drops that member's own forecast row, not just its
+   weather-lag history — this issue doesn't reach that.** `_join_nwp_single_run`
+   (`_nwp.py:79-81`) left-joins power onto NWP on `(time_series_id, valid_time, nwp_init_time)`,
+   *not* `ensemble_member`, so the row for `ensemble_member == 0` fans in from whichever NWP rows
+   match — if the control member is wholly absent from the run, no row for it is produced at all
+   (not null: absent). That's a second, separate failure surface from the weather-lag nulling
+   `_apply_weather_lag` handles, and this plan doesn't touch it: the issue is scoped to the raise
+   in `_engineer_features`, and this row-count gap is a pre-existing property of the single-run
+   join, unrelated to the raise being removed. Recommend a follow-up issue rather than folding it
+   in here.
+2. **Should this issue also add a proactive Sentry event for a WARN-passing completeness check?**
    I've argued no (see Departures above) — it's a cross-cutting gap ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501))
    affecting every WARN check in the codebase, not specific to this failure mode, and bolting one
    Sentry call onto `assess_nwp_run_completeness` alone would be an inconsistent, one-off exception
    to how every other check in `checks.py`/`assets.py` behaves today. My recommendation is to leave
    it to #501 and note the connection there. A human reviewer who wants #655 to close that gap for
    this one check specifically should say so.
-2. **Does "single-run mode" ever legitimately want the old fail-fast behaviour?** Single-run mode
+3. **Does "single-run mode" ever legitimately want the old fail-fast behaviour?** Single-run mode
    also covers replay backfills (`select_nwp_init_time`'s `"replay"` availability mode). A backfill
    of a slot with a genuinely broken NWP run would now silently null its weather lags rather than
    raising. I think that's correct — a backfill re-processing the past should behave like the live
    slot it's replaying, not diverge — but flagging it since the issue text focuses on the *live*
    call site specifically.
-3. **Naming:** the issue calls the guard "the NWP control-member check" throughout; I've kept that
+4. **Naming:** the issue calls the guard "the NWP control-member check" throughout; I've kept that
    name in the updated docstring/error message rather than inventing new vocabulary, since it's
    already used in `docs/architecture/performance.md` and the tests.
+
+## First review (simplicity)
+
+A fresh sub-agent verified the core mechanism against the code (no crash path in
+`select_analysis_proxy`, `_apply_weather_lag`, `_upsample_nwp_to_half_hourly` or
+`_select_output_columns` when the control member is absent), confirmed the gate condition is
+already the simplest signal available (both CV call sites omit `power_fcst_init_time`, i.e. call in
+bulk mode), and found the scope cut on in-band/warning-table/Sentry machinery legitimate. Two
+findings taken into the plan above: the "Departures" section was cut from three sub-bulleted
+justifications to one paragraph per the prose-style rule, and the new integration test was slimmed
+to drop redundant predict-spy/frame-capture scaffolding, keeping only the `result.success` check as
+a tripwire. One new risk taken in: the fan-out gap in `_join_nwp_single_run` (risk 1 above) — a
+real, verified, separate failure surface this issue doesn't touch. No findings rejected.
