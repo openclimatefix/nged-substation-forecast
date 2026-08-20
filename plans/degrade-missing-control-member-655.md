@@ -96,16 +96,28 @@ one fewer way for `live_forecasts` to need a human to intervene on a 6-hourly ca
 
 **`packages/ml_core/tests/test_features.py`**
 
-- Change `test_engineer_features_raises_when_no_control_member_for_weather_lag` (currently calls
-  `_engineer_features` with `power_fcst_init_time=datetime(...)`, i.e. single-run mode) to assert
-  the *new* behaviour: no raise, and the weather-lag column comes back entirely null. This is the
-  test that would fail on `main` today (it currently asserts a raise) and passes once the raise is
-  scoped to bulk mode.
+- Rename and rework `test_engineer_features_raises_when_no_control_member_for_weather_lag` (its
+  name asserts a raise, which is no longer true) to assert the *new* behaviour: no raise, and the
+  weather-lag column comes back entirely null. **Fix the fixture's timing, not just the
+  assertion**: today's fixture sets `target_time` (`valid_time - lag_hours`) exactly equal to
+  `power_fcst_init_time`, which `_apply_weather_lag`'s `>=` boundary (`_lags.py:111`) routes to the
+  *same-run* join, not the freshest-run join that consumes `historical_weather` — so the null it
+  observes today is really "no NWP row at that instant", not "no control member". Give the
+  reworked test a `target_time` strictly *before* `power_fcst_init_time`, and keep
+  `nwp_init_time + nwp_publication_delay_hours <= power_fcst_init_time` (the default is 9h) so
+  `select_analysis_proxy`'s `available_at` cut doesn't filter the run out for an unrelated
+  freshness reason — that isolates the null to the one cause this test exists to prove: control
+  member absent, `select_analysis_proxy` filters to `ensemble_member == 0` and returns nothing, so
+  the freshest-run join misses. This is the test that would fail on `main` today (it currently
+  asserts a raise) and, once corrected as above, is the one that actually pins the mechanism this
+  plan's "Solution" section describes.
 - Add `test_engineer_features_raises_in_bulk_mode_when_no_control_member_for_weather_lag`: same
   fixture shape (NWP with only `ensemble_member=1`, a weather-lag feature requested), called with
   `power_fcst_init_time=None` (bulk mode). Asserts the `ValueError` still raises. This is new
   coverage — nothing today distinguishes bulk-mode from single-run-mode for this check, so this
-  test is what would catch a future change accidentally dropping the raise everywhere.
+  test is what would catch a future change accidentally dropping the raise everywhere. The bulk-mode
+  check runs before any join, so this test's fixture timing doesn't need the same care as the one
+  above.
 
 **`tests/test_live_forecasts.py`**
 
@@ -113,9 +125,8 @@ one fewer way for `live_forecasts` to need a human to intervene on a 6-hourly ca
   reuse `_save_model_trained_on_weather_lag` to train on a weather lag, write NWP records for the
   selected run with only non-control members (e.g. `ensemble_member=1`, no `0`), materialise
   `live_forecasts`, and assert `result.success` — no predict-spy or captured-frame scaffolding,
-  since `test_engineer_features_raises_when_no_control_member_for_weather_lag` in
-  `test_features.py` already pins *which* column goes null and by what mechanism, with no layer
-  between it and `live_forecasts`' own call (`production_assets.py:316` calls `engineer()`
+  since the corrected unit test above already pins *which* column goes null and by what mechanism,
+  with no layer between it and `live_forecasts`' own call (`production_assets.py:316` calls `engineer()`
   directly, nothing wraps the raise). This test's job is narrower: confirm the materialisation
   itself doesn't fail — the fact that would be false on `main` today. It is also a tripwire for the
   fan-out gap in "Risks and open questions" below: if that gap ever turned into a real crash rather
@@ -182,3 +193,20 @@ justifications to one paragraph per the prose-style rule, and the new integratio
 to drop redundant predict-spy/frame-capture scaffolding, keeping only the `result.success` check as
 a tripwire. One new risk taken in: the fan-out gap in `_join_nwp_single_run` (risk 1 above) — a
 real, verified, separate failure surface this issue doesn't touch. No findings rejected.
+
+## Second review (correctness and testability)
+
+A second fresh sub-agent independently confirmed the plan's account of `main` (the raise fires
+unconditionally today, both CV call sites are bulk mode, `live_forecasts` is single-run mode),
+found the fix itself fails closed nowhere (`_select_output_columns` checks column names not
+nullability; `XGBoostForecaster` casts null to `NaN`, which XGBoost's default-direction routing
+already handles), and confirmed no missed caller, doc or schema. One real finding taken into the
+plan above: the retooled unit test's original fixture set `target_time` exactly equal to
+`power_fcst_init_time`, which routes to the *same-run* join rather than the freshest-run join that
+actually depends on the control member — so, as first written, that test would have passed for the
+wrong reason (no NWP row at that instant, not "no control member"). The Tests section above now
+specifies the timing fix. Also taken in: renaming the retooled test, since its old name asserts a
+raise that no longer happens. One finding noted but not actioned: the plan doesn't cross-reference
+`inherent-stability.md`'s separate mention of the *different*, already-tracked raise in
+`select_nwp_init_time` (issue #446) — correctly out of scope for #655, and the reviewer agreed it's
+cosmetic rather than a defect, so left as is.
