@@ -107,12 +107,13 @@ All in `tests/test_assets.py`, in the "summary classes (pure, no Dagster)" secti
   deduped, not just `len(df)`), non-empty-without-duplicates, and empty. That's the same coverage
   the old string-parsing path had, exercised the same way, so no test is being weakened by this
   change.
-- Add one new test: **`test_file_listing_summary_n_time_series_ids_survives_at_v2_scale`** (or
-  similar) that builds a `_file_listing` with ~2,500 distinct IDs and asserts `n_time_series_ids ==
-  2500` and that `model_dump()`/`TableRecord(...)` construction succeeds. This is the test that
-  would actually have caught the bug the issue is about — a large ID count flowing through
-  `make_table` → `TableRecord` without blowing up a field meant for display. The existing tests all
-  use 1–3 IDs and wouldn't catch a regression back to rendering the full list at scale.
+- No large-scale (~2,500 ID) test is added. The first draft of this plan proposed one, reasoning
+  it would catch a regression back to rendering the full list at scale — but `.n_unique()` and a
+  plain `int` field have no scale-dependent code path: the fix's whole point is that the *string*
+  rendering (the one thing with scale behaviour) is what's gone. A 2,500-row fixture would exercise
+  the identical count-and-assign path the existing 3-row dedup test already covers, just with a
+  bigger loop, so it would raise the fixture-building cost without raising the odds of catching
+  anything the smaller tests miss. See "What each review changed" below.
 
 ## Docs to update
 
@@ -147,6 +148,17 @@ correctness review: the "current behaviour" account here is a five-line diff eac
 directly readable from the code excerpt above, and the tests it would check are already named
 concretely with the assertion each one pins. Diff-time reviews (in `implement-issue`) get decided
 at implementation time per that skill's own rules.
+
+## What each review changed
+
+**Simplicity review (step 5, run):** confirmed the plan's chosen mechanism (drop the field, plain
+`n_time_series_ids: int`) is already the minimum-diff option — both the truncation alternative and
+keeping `n_time_series_ids` as a `@computed_field` over an excluded `pl.Series` field would add
+more machinery for no extra capability. One finding accepted: the proposed V2-scale test added
+fixture cost without adding coverage, since nothing in the new code path is scale-dependent — cut
+from the "Tests" section above. No findings rejected.
+
+**Correctness review (step 7):** not run — see "Chosen reviews" above.
 
 ## Risks and open questions
 
