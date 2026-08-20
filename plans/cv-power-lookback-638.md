@@ -152,6 +152,42 @@ vs. an inline expression at the two `cv_assets.py` call sites — the reviewer c
 low-stakes toss-up and did not settle it either way. Left as-is (method) per Risk 3 above; not
 worth a second review pass on its own.
 
+## Plan review 2: correctness and testability (ran)
+
+A second fresh sub-agent, briefed only with the issue and the post-review-1 plan, independently
+verified every current-behaviour claim (the loader's filter predicates and `init_time_start`
+default, the CV callers' exact `window_start` values, `_apply_power_lag`'s join), confirmed all
+three proposed tests would genuinely fail on `main` for the stated reason, traced the
+row-count-unchanged claim algebraically through `_join_nwp_bulk_mode` (it holds unconditionally,
+not just for the plan's example fixture, because the NWP `valid_time` floor stays pinned at
+`window_start` regardless of `power_lookback`, so no power row pulled in by the lookback can ever
+match an NWP row and manufacture a spine row), confirmed `_nullify_leaky_lags` is genuinely
+orthogonal to where a lag's source data came from and runs unconditionally over the whole frame, and
+re-verified the "naive widen would corrupt CV" claim directly by reading the NWP-centric join and
+confirming the bulk-mode hindcast filter (`valid_time > power_fcst_init_time`, keyed off each row's
+own derived `power_fcst_init_time`) would **not** catch the spurious early rows a naive widen would
+introduce — it checks a per-row derived value, not `window_start`.
+
+**One real defect found and fixed above**: test 3 (the end-to-end lag test) was originally placed
+in `packages/ml_core/tests/test_features.py`, driving through the private `_engineer_features`. The
+reviewer found `load_engineering_inputs` lives in the root Dagster app
+(`src/nged_substation_forecast/`), that no file under `packages/` imports from the root app
+anywhere in the repo, and that CLAUDE.md's architecture section states packages have no dependency
+on it — so a package-level test reaching for the loader would be the repo's first reverse
+dependency of that kind. Verified independently (`grep` for any `from nged_substation_forecast`
+import anywhere under `packages/`: none). Fixed: moved to `tests/test_trained_cv_model.py`, driven
+through the public `TabularFeatureEngineer().engineer()` entry point (see "Tests" above).
+
+One minor point raised and correctly judged not to need a plan change: `eligible_time_series_ids`
+anchors its coverage check to `val_start`, not `train_start`, so "eligible ⇒ the lookback data is
+on disk" is typically true but not a structural guarantee for every marginally-eligible series.
+Doesn't change the fix's correctness — where the data genuinely doesn't reach back far enough, the
+widened join still correctly returns null (real missing data, not a bug).
+
+No other defects found; every other claim in the plan — the current-behaviour account, the
+join-direction safety argument, the nullification-is-unaffected argument, the caller/doc
+inventory — was independently verified against the code.
+
 ## Design-philosophy check
 
 Both touched assets (`trained_cv_model`, `cv_power_forecasts`) carry the `research` layer tag —
@@ -172,8 +208,11 @@ principle exists to prevent.
 
 ## Tests
 
-All in `packages/ml_core/tests/test_features.py` unless noted; `tests/test_trained_cv_model.py`
-already holds `load_engineering_inputs`-level tests and is where the loader-level test goes.
+Test 1 goes in `packages/ml_core/tests/test_features.py` (where `ParsedFeatures` is already
+tested). Tests 2 and 3 go in `tests/test_trained_cv_model.py`, which already holds
+`load_engineering_inputs`-level tests — not `packages/ml_core/tests/`, since
+`load_engineering_inputs` lives in the root Dagster app and packages have no dependency on it (see
+test 3 below and Plan review 2).
 
 1. **`ParsedFeatures.max_power_lag_hours()`** (`test_features.py`, near
    `test_parsed_features_from_selected_features`): `ParsedFeatures.from_strings({"power_lag_336h",
@@ -193,19 +232,23 @@ already holds `load_engineering_inputs`-level tests and is where the loader-leve
    matching today's behaviour. **Fails on `main`** — `power_lookback` is not a recognised keyword
    argument (`TypeError`).
 
-3. **End-to-end: a lag near the window start is no longer null** (`test_features.py`, near
-   `test_engineer_features_power_lag_nullification_end_to_end`, but exercising the loader +
-   `_engineer_features` together rather than `_engineer_features` alone, since the bug is entirely
-   in what the loader hands to the feature engineer): with observed power extending well before
-   `train_start` and `selected_features={"power_lag_336h"}`, assert the `power_lag_336h` value for
-   a row a few hours after `train_start` is a real (non-null) number equal to the corresponding
-   historical observation when `load_engineering_inputs` is called with the derived
-   `power_lookback`, and is `None` when called with `power_lookback=timedelta(0)` (today's
-   behaviour) — same fixture, two assertions, so the test demonstrates the fix rather than merely
-   the new code path. Also assert the row count of the engineered frame is identical between the
-   two calls, confirming the widened power window adds no spine rows (the NWP-centric-join argument
-   above, made concrete). **Fails on `main`** for the same reason as (2) — `power_lookback` does not
-   exist yet, so the "non-null with lookback" branch cannot be expressed.
+3. **End-to-end: a lag near the window start is no longer null** (`tests/test_trained_cv_model.py`,
+   not `packages/ml_core/tests/test_features.py` — `load_engineering_inputs` lives in the root
+   Dagster app (`src/nged_substation_forecast/`), and no file under `packages/` imports from it
+   anywhere in the repo today; `packages/ml_core` reusable code has no dependency on the root app
+   (CLAUDE.md's Architecture section), so a package-level test reaching for it would be the first
+   reverse dependency of that kind. Drive it through the public `TabularFeatureEngineer().engineer()`
+   entry point, not the private `_engineer_features`, matching how every other root-level test
+   exercises feature engineering): with observed power extending well before `train_start` and
+   `selected_features={"power_lag_336h"}`, assert the `power_lag_336h` value for a row a few hours
+   after `train_start` is a real (non-null) number equal to the corresponding historical observation
+   when `load_engineering_inputs` is called with the derived `power_lookback`, and is `None` when
+   called with `power_lookback=timedelta(0)` (today's behaviour) — same fixture, two assertions, so
+   the test demonstrates the fix rather than merely the new code path. Also assert the row count of
+   the engineered frame is identical between the two calls, confirming the widened power window
+   adds no spine rows (the NWP-centric-join argument above, made concrete). **Fails on `main`** for
+   the same reason as (2) — `power_lookback` does not exist yet, so the "non-null with lookback"
+   branch cannot be expressed.
 
 No new leakage/nullification test is needed: `power_lookback` only ever adds power rows *before*
 `window_start`, which is always in the past relative to any `valid_time` in
