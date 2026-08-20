@@ -1,5 +1,36 @@
 # Move the four remaining Delta writes into `delta_store` (#637)
 
+## Status and how to resume
+
+**No code has been written.** This plan (below) has been through both adversarial plan reviews
+required by its "complex" sizing (see "Adversarial review outcomes" at the end) and both came back
+clean. It is now waiting on **human review of the plan itself** — that review has not happened
+yet.
+
+- **Branch:** `delta-store-remaining-tables-637`, pushed to `origin`.
+- **Worktree:** `.claude/worktrees/delta-store-remaining-tables-637` off the main repo checkout at
+  `/home/jack/dev/nged-substation-forecast`. If that worktree no longer exists when this resumes,
+  recreate it with `git worktree add .claude/worktrees/delta-store-remaining-tables-637
+  delta-store-remaining-tables-637` from the main repo checkout (the branch already exists on
+  `origin`, so no `-b` and no fresh plan needed).
+- **This plan file** lives at `plans/delta-store-remaining-tables-637.md` inside that worktree, and
+  is also attached to the PR for #637 that carries this status note (see the PR body for a link
+  back to this branch, or `gh pr list --search 637 --state open`).
+- **Next step once a human approves this plan:** resume under the `implement-issue` skill at its
+  step 2 (worktree/plan already exist — skip step 1), in the worktree above: implement the "What
+  changes, file by file" section below, run the verification commands, open a PR carrying labels
+  and `JackKelly` as assignee, then run the two diff reviews (`implement-issue`'s own correctness
+  and mutation-testing passes) that "complex" sizing calls for.
+- **Nothing here is time-sensitive** — this is a pure code-organisation move with no external
+  dependency, so it is safe to leave paused indefinitely.
+- **Epic context:** #637 is wave 1 of the v0.2.1 epic (#642). Two other issues were running
+  concurrently in the same wave and are fenced off in "Territory check" below: #638
+  (`trained_cv_model`/`cv_power_forecasts` in `cv_assets.py`) and #639 (the `_BaseSummary`/
+  `_FileListingSummary`/`_PowerTimeSeriesSummary` classes in `assets.py`). #656 and #657 are held
+  back until this PR merges, since they build on the functions this plan moves — check the epic
+  for their current state before resuming, in case either has since landed and shifted a line
+  number or a function signature this plan cites.
+
 ## Problem
 
 `delta_store` exists so a Dagster asset writes a table's physical format once, in one place,
