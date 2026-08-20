@@ -21,6 +21,40 @@ time" item already designed in `docs/roadmap/metrics-and-leaderboard.md`'s PR 2 
 implements that one item now, ahead of the other two items bundled with it there
 (`uses_nwp_ensemble`, `ensemble_member` docs), which are out of scope for #638.
 
+## Status — resume from here
+
+**As of 2026-08-20: planning is complete, both adversarial plan reviews have run and their
+findings are incorporated below. No implementation code has been written. No PR against `main`
+exists yet — only this checkpoint PR, opened as a draft purely to make this plan visible without
+needing the Claude Code conversation that produced it.** The session that wrote this plan was
+interrupted by a workstation shutdown before the human review this skill stops for could happen.
+
+**To resume in a fresh Claude Code session:**
+
+1. Check out the branch (worktree already exists on this machine at
+   `.claude/worktrees/cv-power-lookback-638`; on a different machine, `git fetch origin
+   cv-power-lookback-638 && git worktree add .claude/worktrees/cv-power-lookback-638
+   cv-power-lookback-638`).
+2. Re-read this whole file — it is self-contained and supersedes any summary in the checkpoint PR
+   body or in an old conversation transcript.
+3. **Get the human's answer to "Risks and open questions" item 1 below (the retrain decision)
+   before doing anything else** — that is what this plan stopped on.
+4. Once the plan itself is approved (with or without changes from item 1's answer), hand off to
+   the `implement-issue` skill, **resuming at its step 2** (step 1 — worktree and branch — is
+   already done): implement per "What changes, file by file" below, run the green-before-push
+   verification set, open the real implementation PR (closing #638, with labels and the
+   `JackKelly` assignee), then run whichever of the two diff reviews this **Medium**-sized issue
+   calls for (`implement-issue` step 3's rules — both plan reviews already ran here, so err toward
+   running at least one diff review too unless the diff comes out exactly as this plan describes).
+5. Close or convert this checkpoint PR once the real implementation PR exists, so there is only
+   one open PR for #638 at a time.
+
+Nothing about the design below is provisional or needs re-deriving — both reviews verified the
+correctness-critical claims (the NWP-centric join, why widening `window_start` naively would be a
+bug, the nullification argument) directly against the code, not just against each other's
+reasoning. A fresh session can trust this plan and start implementing once a human has signed off
+on it and on the retrain question.
+
 ## Verdict, size and departures
 
 **Verdict: worth fixing, roughly as described, but not by the mechanism the issue suggests.** The
