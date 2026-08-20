@@ -15,6 +15,35 @@ into a plain field populated directly from `df["time_series_id"].n_unique()`. Th
 aggregate stats the issue names as the fallback (`n_files`/`n_rows`, `start_time`, `end_time`,
 `n_time_series_ids`).
 
+## Status / how to resume
+
+**Paused for human review — no code has been written.** The `/plan-issue 639` session that wrote
+this plan was interrupted (workstation shutdown) before the plan was approved, so this is exactly
+where a fresh session should pick up. Everything below this line is the finished plan output of
+that skill's steps 1–8; nothing is in progress or half-written.
+
+- **Branch:** `drop-time-series-id-list-639`, pushed to `origin`. This PR is opened from it.
+- **Worktree:** `.claude/worktrees/drop-time-series-id-list-639` on the workstation that ran the
+  planning session (see "What changes, file by file" and "Tests" below — everything named there is
+  still unimplemented on this branch, which currently contains only this plan file). A fresh
+  session anywhere else should `git worktree add` (or `git clone` + `git checkout`) this branch
+  rather than assume that path exists.
+- **Reviews already run:** the simplicity review (`plan-issue` step 5) ran and its one accepted
+  finding (cut the proposed V2-scale test) is already folded into the "Tests" section below — see
+  "What each review changed". The correctness review (step 7) was deliberately **not** run; see
+  "Chosen reviews" below for why, and reconsider that call if anything else about the plan changes
+  first.
+- **Next step once a human approves this plan as-is:** resume at `implement-issue` step 2 in the
+  worktree above — the worktree, branch and plan already exist, so there's nothing left of
+  `implement-issue` step 1 to redo. That means: implement the "What changes, file by file" section,
+  run the "Verification commands", open a PR (replacing or updating this one) with the
+  green-before-push set passing, then the diff-time adversarial reviews `implement-issue` calls for.
+- **Next step if the human wants changes first:** edit this plan file directly (it's the same file
+  `implement-issue` will read), or send this session's continuation a message with the requested
+  change before implementation starts. The "Risks and open questions" section below flags the one
+  open judgement call worth resolving before implementation: whether dropping the full ID list is
+  acceptable to whoever debugs ingest issues.
+
 ## Verdict, size and departures
 
 **Worth doing, roughly as described.** The scale problem is real and the two TODOs are the
