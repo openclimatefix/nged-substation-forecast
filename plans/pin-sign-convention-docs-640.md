@@ -1,5 +1,36 @@
 # Pin the sign-convention doc prose to the contract (#640)
 
+## Status — read this first if resuming cold
+
+**Where this stands:** the plan below is finished and has been through both `plan-issue` adversarial
+reviews (simplicity, then correctness/testability — see "Review findings and triage"). **No
+implementation code has been written.** This PR was opened purely to make the plan durable and
+reviewable across a machine shutdown — it is not the usual `implement-issue` PR, and it should stay
+a draft (or otherwise clearly unmerged) until a human has read and approved the plan.
+
+**What's needed next, once approved:** hand this off to the `implement-issue` skill, resuming at its
+step 2 (worktree already exists — see below), which will: make the four file edits under "What
+changes, file by file", run the "Verification commands", open (or reuse) the PR with the diff, run
+the two diff-level adversarial reviews `implement-issue` itself calls for under this issue's
+**Complex** sizing, triage, then stop for human review again before anything is merged.
+
+**Branch:** `pin-sign-convention-docs-640`, pushed to `origin` with the plan as its only commits so
+far (`7bd3ab48`, `733880d4`, `3a586f15`). A local worktree for it exists on this workstation at
+`.claude/worktrees/pin-sign-convention-docs-640` (nested under the bridge session's own worktree at
+the time this was written) — if that local worktree is gone in a future session, `git worktree add
+.claude/worktrees/pin-sign-convention-docs-640 pin-sign-convention-docs-640` recreates it from the
+already-pushed branch; nothing local-only is at risk. No `.env` symlink was created because none was
+found at `/home/jack/dev/python/nged-substation-forecast/.env` when the worktree was set up — check
+whether that's expected before running anything that needs it.
+
+**Flagged for human attention** (also called out inline where they arise): the **Complex** sizing
+call in "Verdict, size, departures"; the departure from all three of the issue's suggested
+mechanisms in favour of a fourth (single-sourcing via `include-markdown`) — "Why the README, not the
+Field description"; the decision to shorten both contract Field descriptions to a pointer rather
+than keep their full prose; and the one accepted residual risk — the `substation_type` enum's
+five-value count isn't mechanically pinned to the new doc fragment — in the last bullet of "Risks
+and open questions".
+
 **Problem:** the power sign convention — what positive/negative `power` means, keyed to
 `substation_type` — is stated as free-text prose in four places: twice inside
 `packages/contracts/src/contracts/power_schemas.py` (identical text on `PowerTimeSeries.power` and
