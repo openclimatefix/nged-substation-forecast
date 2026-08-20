@@ -61,8 +61,13 @@ Sign convention depends on `substation_type` in `TimeSeriesMetadata`, whose five
 - **Customer meters** (`EHV Customer`, `HV Customer`): positive = the customer is **sending**
   power to NGED's grid; negative = the customer is **drawing** power from it. A customer meter can
   sit at a demand site or a generation site, so this case is not "generators only".
+
 <!-- sign-convention:end -->
 ```
+
+The blank line before the end marker is required: `pymarkdown` (`MD032`, lists must be surrounded
+by blank lines) fails without it — checked by running the real linter against this exact block
+during the second adversarial review, not assumed.
 
 This is the exact wording currently in `forecast-building-blocks.md`, with the one already-drifted
 word fixed ("backwards" → "back", matching the contract). `docs/api/contracts/index.md` already
@@ -123,8 +128,17 @@ Replace the restatement with a link-only reference, matching `docs/index.md`'s a
 
 ```markdown
 There is no single sign rule — see [sign convention](forecast-building-blocks.md#sign-convention)
-— and the trial area contains both conventions,
+— and the trial area contains both conventions, plus battery sites that both charge and discharge.
+Constraint-side direction is therefore resolved **per `time_series_type`**, reusing the mapping the
+[tail and exceedance
+metrics](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
+already need, with the ambiguous types confirmed by NGED.
 ```
+
+(Rewrapped in full so the trimmed sentence doesn't leave the next sentence starting mid-paragraph
+on a short dangling line — the original "plus battery sites..." continuation was two lines because
+it followed the now-deleted restatement; folding it into one flowing sentence after the link avoids
+that.)
 
 ### Why the README, not the Field description
 
@@ -168,6 +182,34 @@ The first adversarial review (simplicity) found:
 6. **The `cost-savings-metrics.md` change (drop restatement, link only) is proportionate.**
    *Accepted*, unchanged from the original plan.
 
+The second adversarial review (correctness and testability, run against this revised plan)
+verified every current-state and tooling claim above by reading the actual files and running real
+builds, and found:
+
+7. **The README fragment as originally drafted fails `pymarkdown scan`'s `MD032`** ("lists should
+   be surrounded by blank lines") because the last bullet was immediately followed by
+   `<!-- sign-convention:end -->` with no blank line. *Accepted and fixed*: a blank line now
+   separates the last bullet from the end marker, in the snippet above.
+8. **The trimmed `cost-savings-metrics.md` paragraph left a dangling short line** ("plus battery
+   sites that both charge and discharge" as its own near-empty line, an artefact of deleting the
+   restatement it used to follow). *Accepted and fixed*: the paragraph is now rewrapped in full, in
+   the snippet above.
+9. **`uv run mkdocs build --strict` and the plugin's failure modes were confirmed by actually
+   running them**, including deliberately breaking a delimiter and a path in a scratch copy (not
+   committed). *Accepted as confirming, not changing, the plan* — no edit needed beyond the wording
+   fix in "Tests" acknowledging the two distinct failure modes (warning vs. hard error).
+10. **The `substation_type` enum has five values, and the README fragment's "whose five values...
+    partition into two behavioural cases" isn't tied to `pl.Enum([...])` at
+    `power_schemas.py:225` by anything mechanical** — adding a sixth value would go stale silently.
+    *Acknowledged, not fixed* — see "Risks and open questions": this is a different drift than the
+    one the issue reports (which is about what positive/negative *means*, not how many
+    `substation_type` values there are), and closing it would need a new test, reintroducing the
+    exact test-and-constants machinery the first review's simplification removed. Left as an
+    explicit residual risk rather than silently uncovered.
+11. **The Field description's pointer text and the fact-check on double-inclusion, the docs
+    inventory, and the existing-tests claims were all verified and found accurate** — no changes
+    needed.
+
 ## Design-philosophy check
 
 Pure documentation — no production asset, no Delta table, no serving path, no degradation rule, no
@@ -179,18 +221,22 @@ in active use for the same purpose (whole-README includes on every `docs/api/*/i
 
 ## Tests
 
-No new test. Drift between `forecast-building-blocks.md` and the contract's canonical wording
-becomes structurally impossible: the doc page no longer contains its own copy of the prose to fall
-out of sync, only an include directive that is re-resolved from `packages/contracts/README.md` on
-every build. What replaces a test is `uv run mkdocs build --strict` (already run for any change
-touching links, per the existing verification convention) plus reading the rendered HTML: the
-`include-markdown` plugin logs a `mkdocs.plugins.include_markdown` warning — which `--strict`
-promotes to a build failure — if either the `start` or `end` delimiter string is not found in
-`packages/contracts/README.md`, so a typo'd marker or an accidentally-deleted fragment breaks the
-build rather than silently including nothing or the whole file. This was checked directly against
-the installed plugin's source
-(`.venv/lib/python3.14/site-packages/mkdocs_include_markdown_plugin/{event,logger}.py`), not
-assumed from its documentation.
+No new test. Drift between `forecast-building-blocks.md` and the contract's *positive/negative
+meaning* prose — the specific drift this issue reports — becomes structurally impossible: the doc
+page no longer contains its own copy of that prose to fall out of sync, only an include directive
+re-resolved from `packages/contracts/README.md` on every build. What replaces a test is
+`uv run mkdocs build --strict` (already run for any change touching links, per the existing
+verification convention) plus reading the rendered HTML: the `include-markdown` plugin logs a
+`mkdocs.plugins.include_markdown` warning — which `--strict` promotes to a build failure — if
+either the `start` or `end` delimiter string is not found in `packages/contracts/README.md`, and
+raises a hard `PluginError` (unconditionally, `--strict` or not) if the target file path is wrong.
+Both were checked empirically during the second adversarial review: the review ran real builds
+against deliberately broken delimiters and a deliberately broken path and confirmed each failure
+mode, rather than trusting the plugin's source alone.
+
+This does **not** make every possible drift in the section impossible — see "Risks and open
+questions" for the one gap the second review found (the `substation_type` enum's five-value count),
+which is deliberately left unclosed as out of this issue's scope.
 
 No existing test needs to change. `packages/contracts/tests/test_power_time_series.py` and
 `test_power_forecast.py` don't currently assert on field-description text (verified by grep before
@@ -239,3 +285,11 @@ naturally.
   convention)")?** The plan proposes a link with no restatement, matching the two pages that
   already do this. Recommendation: keep it consistent with the existing pattern rather than
   inventing a third style.
+- **The `substation_type` enum's five-value count isn't mechanically tied to the README fragment**
+  (finding 10 above): if `pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"])` at
+  `power_schemas.py:225` gains a sixth value, "whose five values... partition into two behavioural
+  cases" goes stale with nothing to catch it. Recommendation: accept this as residual risk rather
+  than adding a test for it — it's a different drift than the one #640 reports, the enum's value
+  list already appears as unlinked free text in several other places (e.g.
+  `TimeSeriesMetadata.substation_type`'s own description), and closing every instance of that
+  broader pattern is a larger, separate issue if it's wanted at all.
