@@ -126,6 +126,32 @@ Only power *lag* features are affected by the bug, and only power lags are the t
   trigger for the remaining items, and is independent of whether this fix's own retrain happens
   now or later (see Risks, below).
 
+## Plan review 1: simplicity (ran)
+
+A fresh sub-agent, briefed only with the issue and this plan (not this reasoning), independently
+verified the join-direction argument above by reading `_join_nwp_bulk_mode` and `_apply_power_lag`
+itself, and searched for a simpler design. **No simplification survived.** It confirmed: the naive
+"widen `window_start`" mechanism the issue suggests is a real correctness bug for the CV callers,
+not a style choice; mimicking `live_forecasts`'s full pattern (explicit `init_time_start` +
+post-hoc filter) would cost more code than the dedicated `power_lookback` parameter; per-experiment
+derivation via `ParsedFeatures` is justified specifically because CV runs many concurrent
+experiments (H2) where a single global constant sized for the worst case would multiply wasted
+power-history reads across every one of them, unlike `live_forecasts`'s single promoted champion;
+and pushing the fix down into `_apply_power_lag` would just duplicate the scan/loading logic that
+already lives centrally in `load_engineering_inputs`.
+
+One additional candidate the reviewer considered and rejected on its own: dropping the power scan's
+lower bound entirely (always load full history, no new parameter at all). Rejected because
+`load_engineering_inputs`'s docstring already states a "prune the scan at source" memory discipline,
+and unbounded historical power reads multiplied across "a hundred experiments per person in a peak
+month" (H2) is an avoidable I/O cost the targeted parameter avoids by design — simpler code, but
+trading away a documented discipline for no clear need.
+
+The one open call the plan itself flagged — `max_power_lag_hours()` as a `ParsedFeatures` method
+vs. an inline expression at the two `cv_assets.py` call sites — the reviewer called a genuine,
+low-stakes toss-up and did not settle it either way. Left as-is (method) per Risk 3 above; not
+worth a second review pass on its own.
+
 ## Design-philosophy check
 
 Both touched assets (`trained_cv_model`, `cv_power_forecasts`) carry the `research` layer tag —
