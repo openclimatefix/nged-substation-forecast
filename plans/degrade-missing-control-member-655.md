@@ -1,5 +1,14 @@
 # Degrade instead of raise on missing NWP control member (#655)
 
+**Status: plan complete, both adversarial reviews done and folded in, awaiting human approval.**
+No code has been written. Branch `degrade-missing-control-member-655`, worktree not yet created in
+a fresh session — the `implement-issue` skill's step 1 (worktree setup) already ran for this plan,
+so a session resuming this work should check out this branch into a new worktree (or reuse one if
+still present) and resume `implement-issue` at its step 2 (implement, following the plan below),
+rather than re-running `plan-issue`. The plan needs nothing further from a human beyond a decision
+on the three items in "Risks and open questions" below — everything else here is settled and ready
+to implement as written.
+
 **Problem.** `_engineer_features` (in `tabular_feature_engineer.py`) raises whenever weather-lag
 features are requested and the NWP frame it was handed has no `ensemble_member == 0` (control
 member) rows. `live_forecasts` reaches this on every 6-hourly slot through single-run mode, so a
