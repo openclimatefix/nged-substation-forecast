@@ -736,7 +736,10 @@ Submit to an existing Energy-Arena challenge with a general-purpose model, purel
 signal that our pipeline works against outside scrutiny — cheap, but it tests almost nothing about
 the substation problem. Or use the **propose-challenge workflow** to argue for a distribution-level
 challenge. The last is the only one that would move the field, and it is blocked on the same thing
-everything else is: somebody has to make suitable data public, and it will not be NGED's.
+everything else is: somebody has to make suitable data public. NGED already publish some substation
+data on their Connected Data Portal (<https://connecteddata.nationalgrid.co.uk/>) and have said
+repeatedly that they intend to publish the more rigorously collected telemetry this project uses —
+but that is their announcement to make, not ours.
 
 ### Does it measure what NGED care about?
 
@@ -2010,10 +2013,12 @@ For auditability, since the value of a selective review depends on knowing what 
   2023) for probabilistic PV estimation at customer *and feeder* level, and the NREL Bayesian
   structural time series report for a probabilistic treatment.
 - **Distribution network topology detection** from PMU or high-resolution measurements exists
-  (Cavraro, Arghandeh & von Meier and successors), but assumes synchrophasor-grade data we do not
-  have. One datum worth keeping from it: a utility survey put switching actions at **five to ten per
-  urban distribution substation per year**, which is the only external estimate of the event rate I
-  found.
+  (Cavraro, Arghandeh & von Meier and successors), but assumes synchrophasor-grade data that is not
+  available to this project, whatever NGED holds internally. One datum worth keeping from it, with a
+  caveat: a utility survey put switching actions at **five to ten per urban distribution
+  substation**, but Cavraro et al. state **no time period**, and the later journal version of the
+  same work phrases it as how many *switches* a substation has. Do not quote it as an annual rate —
+  we have no dependable external estimate of the event rate.
 - **Concept-drift detection in load forecasting** generally — PELT-driven drift detection,
   detect-then-adapt, drift-adaptive LSTMs — is a large generic literature. Rejected: it is about
   gradual statistical drift rather than topology step changes, and §8's adaptive-methods discussion
@@ -2077,8 +2082,9 @@ al. (§10c), working with the Dutch DSO Alliander, detect switch events with bin
 statistical process control and use them to filter load estimates.** What remains genuinely open is
 the forecasting side — no paper in this set feeds a detected switching event forward into a demand
 forecast or evaluates the forecast cost of missing one, and the one dataset built for LV benchmarking
-removes affected feeders by construction. A utility survey cited in the topology-detection literature
-puts the event rate at five to ten switching actions per urban distribution substation per year.
+removes affected feeders by construction. A utility survey cited in the topology-detection
+literature reports five to ten switching actions at an urban distribution substation, but states no
+time period, so it does not give us an event rate.
 
 **The community's standardisation effort scores distributions, not decisions.** Energy-Arena's 24
 live challenges use RMSE, the Winkler interval score and CRPS — all whole-distribution or
@@ -2277,9 +2283,10 @@ says where we cannot help.
 | Kleinebrahm et al. 2026 (Energy-Arena) | Open, forward-looking benchmarking with ex-ante submission; challenges can be proposed through a public review queue | We cannot submit — every target is a national or zonal ENTSO-E aggregate, so the platform does not host our problem. What we can do is publish the protocol and metric code, and argue for a distribution-level challenge through the proposal workflow | Low on submission; medium on the proposal route, which is blocked on somebody making suitable data public |
 | Hong, Xie & Black 2019 | Their own list of candidate future competition topics includes net load forecasting with rooftop solar **[from a snippet of the paywalled paper]** | Net demand with unmetered embedded PV is our target, at substation rather than zonal level | Medium |
 
-**Where we cannot help, and should say so.** We cannot open the NGED data, so we cannot supply the
-open real-substation dataset the field most needs — Pinheiro et al. could not either, for the same
-reason. Our trial area is 32 series, which is a case study rather than a population until the
+**Where we cannot help, and should say so.** Publishing the underlying NGED data is NGED's decision
+rather than ours, so we cannot ourselves promise the open real-substation dataset the field most
+needs — Pinheiro et al. could not either. What we can commit to unilaterally is the evaluation
+protocol, the metric code and the leaderboard. Our trial area is 32 series, which is a case study rather than a population until the
 scale-up lands. Ten trial-area sites are metered in MVA, so reverse flow appears as a rise
 rather than a sign change — though Bouman et al. (§10c) recover the sign at Alliander from an
 independently-signed reference series, which may mean those ten are not lost after all. And we are one project with one person on the ML, so the breadth of a competition
@@ -2475,7 +2482,7 @@ unit effort. Only the first five are things I would argue for unprompted.
 | # | Recommendation | Cost | Why this rank |
 |---|---|---|---|
 | 1 | Report empirical coverage and tail-focused calibration diagnostics (worm plots with serial-correlation-aware consistency intervals) beside every headline number | Hours to a day | Both published ways of scoring a tail fail without it — Kaas et al.'s metric is winnable by under-dispersion, and Browell & Fasiolo show tail pinball cannot discriminate |
-| 2 | Peak-aware error: Haben's adjusted *p*-norm (p=4, displacement window w), plus BigDEAL's WMAE for timing and Peak Shape Error for profile, all reported separately from magnitude | ~1–2 days; all three definitions are published in full | The strongest-evidenced item here. Pinheiro et al. adopted the adjusted *p*-norm in a live 96,989-substation DSO system *because* standard metrics reward smoothness; BigDEAL found magnitude ranks least correlated with timing and shape ranks, and nine of thirteen finalists built separate models per track |
+| 2 | Peak-aware error: Haben's adjusted *p*-norm (p=4, displacement window w), plus BigDEAL's WMAE for timing and Peak Shape Error for profile, all reported separately from magnitude | ~1–2 days; all three definitions are published in full | The strongest-evidenced item here. Pinheiro et al. scored the substation models of a live 96,989-substation DSO system with the adjusted *p*-norm *because* standard metrics reward smoothness (the paper does not say the DSO adopted it as an operational metric); BigDEAL found magnitude ranks least correlated with timing and shape ranks, and nine of thirteen finalists built separate models per track |
 | 3 | Report the fraction of series beating a persistence baseline as a headline, beside pooled error | Hours | Pinheiro et al.: only 66–70% of client-owned substations beat a 24-hour-naive forecast. A pooled error hides that entirely, and our small-series population is the analogue |
 | 4 | Per-series Diebold–Mariano tests on the leaderboard | ~1 day | Distinguishes wins-on-average from wins-consistently; used by Browell & Fasiolo, Hertel et al. and others |
 | 5 | Publish the evaluation protocol and metric code | Low, needs an NGED decision | Answers the strongest objection to the whole framing, and costs almost nothing |
