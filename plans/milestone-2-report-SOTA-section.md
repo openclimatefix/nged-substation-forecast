@@ -1,6 +1,6 @@
 # The current state of the art in energy forecasting
 
-Before we discuss the literature, there is a very important caveat to admit up-front: In 2026, no honest review of the energy forecasting literature can claim to reveal the canonical "state of the art"! That is because (almost) all energy forecasting papers measure performance in different ways, against different datasets. It's like an international football tournament where every team plays by different rules, with different size goals.
+Before we discuss the literature, there is a very important caveat to admit up-front: In 2026, no honest narrative review of the energy forecasting literature can claim to reveal the canonical "state of the art"! That is because (almost) all energy forecasting papers measure performance in different ways, against different datasets. It's like an international football tournament where every team plays by different rules, with different size goals.
 
 Energy forecasting researchers have done great work over the years. But, unfortunately, the literature does not tell us how those approaches compare against each other, especially in messy "real world" energy forecasting scenarios. This isn't anyone's fault; it's a systemic failure. And the industry is already aware of this problem, and people are trying to fix it. But, at the time of writing, the literature cannot yet tell us the current state of the art solutions for the problems that NGED cares about.
 
@@ -72,7 +72,7 @@ assumption differ in nearly every row.
 | [Gilbert et al. 2023](https://arxiv.org/abs/2206.11745) | Load, GB | 4 levels, primary substation to household | Day-ahead | Combining forecasts gained **0.0–0.4% averaged over all periods**, but **5.7–9.0% when restricted to peaks** | None at all |
 | [Bouman et al. 2024](https://arxiv.org/abs/2405.16164) | Switch-event and anomaly detection, Netherlands | 180 primary substations | Not a forecast | Annual maximum and minimum load estimates within a 10% margin in 88% and 91% of cases | None |
 | [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | 13 primary substations, plus bulk supply points and 11 kV feeders | 30 min to 10 days | All primary substation models below 10% mean absolute percentage error in calibration except two (13.4% and 19.7%); 94% of 11 kV feeders below 20% | **40-member ICON-EU ensemble to 4 days**, then one deterministic forecast to 10 days |
-| **[Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/)** | **Demand and export at primary substations; net demand at secondary** | **551 primary, 729 secondary substations** | **Day- to week-ahead at primary; week- to month-ahead at secondary** | **About 8% lower mean absolute error of utilisation rate; 83% of the top 10% of demand values captured inside its 5th–95th percentile band; better than a rolling four-week baseline at 8 of 8 near-capacity substations** | **Real forecasts at primary; none at secondary** |
+| **[Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/)** | **Demand and export at primary substations; net demand at secondary** | **551 primary substations with export data, 171 of them modelled; 729 secondary substations** | **Day- to week-ahead at primary; week- to month-ahead at secondary** | **About 8% lower mean absolute error of utilisation rate; 83% of the top 10% of demand values captured inside its 5th–95th percentile band; better than a rolling four-week baseline at 8 of 8 near-capacity substations** | **Real forecasts at primary; none in the published secondary results** |
 
 *Weather column:* "real forecasts" means the forecast that was genuinely available when the forecast
 was made; "actual weather, after the fact" means observations or reanalysis that no forecaster would
@@ -157,16 +157,17 @@ simpler model. Pinheiro et al. (2023) rejected the gradient-boosted tree on both
 interpretability, and kept the generalised additive model. Artificial Forecasting reached the same
 conclusion about gradient-boosted trees when forecasting customer export at primary substations:
 compared against the Bayesian ridge regression they went on to adopt, boosted trees "helped some
-substations but harmed others", so they kept the Bayesian ridge regression. Their deliverable
-reports the direction of that effect but not its size. Artificial Forecasting also tested a temporal
-convolutional network at 729 secondary substations against a linear regression on the last four
-weeks' periodic average: the neural network won by about one percentage point on the peak-focused
-metric its authors treat as primary, lost on the daily-maximum and weekly-maximum metrics, and lost
-on five of six metrics at the 24 substations with the worst data quality. In the BigDEAL
-competition, only four of thirteen finalist teams beat the organisers' benchmark at all. None of
-this says sophisticated models cannot win. It says that in these studies the margin was small, that
-interpretable models stayed competitive, and that data quality and choice of metric mattered at
-least as much as model complexity.
+substations but harmed others", so they kept the Bayesian ridge regression as their default. Their
+deliverable reports the direction of that effect but not its size. Artificial Forecasting also
+tested a temporal convolutional network at 729 secondary substations against a baseline that simply
+averages the last four weeks' periodic values: the neural network won by about one percentage point
+on the peak-focused metric its authors treat as primary, and won on four of the six metrics
+reported, but lost on the daily-maximum and weekly-maximum metrics as measured against actual
+demand, and lost on five of six metrics at the 24 substations with the worst data quality. In the
+BigDEAL competition, only four of thirteen finalist teams beat the organisers' benchmark at all.
+None of this says sophisticated models cannot win. It says that in these studies the margin was
+small, that interpretable models stayed competitive, and that data quality and choice of metric
+mattered at least as much as model complexity.
 
 **2. In every study that measured it, forecast accuracy gets worse as you move down the voltage
 levels.** [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) ran the same models against the
@@ -215,8 +216,8 @@ and root-mean-square error therefore systematically favour smooth forecasts over
 is backwards for a network buying flexibility to keep load below a capacity limit. Two teams reached
 this conclusion independently and acted on it. Pinheiro et al. (2023) scored their substation models
 with Haben's adjusted error, a peak-aware measure, for exactly this reason. Artificial Forecasting
-built a metric over the top 10% of demand values, normalised to transformer rating, and made it the
-primary measure for comparing their models.
+built a metric over the top 10% of demand values and made it the primary measure for comparing their
+models, reporting it both against actual demand and normalised to transformer rating.
 
 **5. A forecast can state its own uncertainty badly, and one scoring choice will not reveal it.**
 [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) scored models on 200 German low-voltage
@@ -246,7 +247,8 @@ Pinheiro et al. (2023), published after that review closed, is a fourth paper us
 forecast — but its inputs are deterministic point forecasts, so the ensemble half of the finding
 survives the largest deployment since. Artificial Forecasting's published secondary-substation
 results use no weather at all, because the weather archive available to them reached only 16 days
-ahead while their forecasts were month-ahead.
+ahead while their forecasts were month-ahead, and a substitute built from the previous year's
+observations at the same time of year made every model slightly worse.
 
 ### Three findings that cut against this project's plan
 
@@ -258,15 +260,15 @@ route around them.
 (2021)](https://arxiv.org/abs/2103.10335) added spatial statistics derived from gridded numerical
 weather prediction to their model of 14 GB grid supply point groups. Those spatial statistics helped
 significantly in two of the 14 regions, hurt significantly in three, and made no measurable
-difference in the remaining nine. Artificial Forecasting bought postcode-level weather forecasts for
-two wind-connected primary substations where their models performed worst, and reported that the
-postcode-level forecasts "did not notably improve model performance", naming better weather data as
-a next step. Neither result says finer weather data never helps — Browell and Fasiolo (2021) found
-that it did help, significantly, at two of their 14 regions. What both results say is that finer
-weather data does not help everywhere, so the interesting question is *where* it helps. That
-question is answerable, and answering it is part of this project: we expect finer weather data to
-matter most where a substation's load is dominated by weather-driven generation or heating, which is
-where NGED most needs the forecast to be right.
+difference in the remaining nine. Artificial Forecasting obtained postcode-level weather forecasts
+for two wind-connected primary substations after their wind-connected models had performed poorly,
+and reported that the postcode-level forecasts "did not notably improve model performance", naming
+better weather data as a next step. Neither result says finer weather data never helps — Browell and
+Fasiolo (2021) found that it did help, significantly, at two of their 14 regions. What both results
+say is that finer weather data does not help everywhere, so the interesting question is *where* it
+helps. That question is answerable, and answering it is part of this project: we expect finer
+weather data to matter most where a substation's load is dominated by weather-driven generation or
+heating, which is where NGED most needs the forecast to be right.
 
 **Weather has bought less than expected at low voltage in the past.** [Haben et al.
 (2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) tested 100 real low-voltage feeders with
@@ -534,8 +536,8 @@ engineers concerned name the gap themselves.
    of acting on a forecast and the loss avoided by acting. That is the right shape for this problem,
    because each substation has its own firm capacity and its own cost of being wrong, so a single
    assumed cost ratio is the thing to avoid. Every published version of it at a distribution
-   network, though, is denominated in energy volumes rather than in money. Faculty's appendix prices
-   a safety margin against under-predicting periods already flagged, and names the exceedance a
+   network, though, is denominated in energy volumes rather than in money. Faculty's report prices a
+   safety margin against under-predicting periods already flagged, and names the exceedance a
    forecast misses entirely as an open item itself.
 
 4. **Keeping switching-contaminated history usable.** Detection has been demonstrated at a real
@@ -547,20 +549,23 @@ engineers concerned name the gap themselves.
    342 UK medium-voltage feeders. A smaller strand rewrites it instead: [Paredes and
    Vargas](https://doi.org/10.1049/iet-gtd.2017.0129) correct six years of hourly data across 169
    real feeders to an "as if never switched" level and report better medium-term forecasts for it,
-   and Artificial Forecasting does the same operationally, rescaling each step-change block onto the
-   level of the most recent one so the history is kept rather than dropped — on the stated grounds
-   that steps of that size "cannot be directly handled even by powerful nonlinear models". Gilbert
-   et al. name adaptive handling of structural breaks as future work. All of this is defensible
-   engineering. What we did not find is the alternative to correcting the target at all: feeding
-   recent observations to the model as residuals against a switching-independent baseline — the
-   difference between what was measured and what a model that ignores topology expected — so that a
-   reading taken while the network was abnormally configured still carries information without a
-   level correction having to be estimated first. Later, at the scale of NGED's full network, the
-   aim is to reconstruct the demand each substation would have metered under its normal running
-   arrangement. A negative result here would still be valuable: evidence that switching cannot be
-   recovered from power data alone would strengthen the case for taking switching labels from
-   operational systems instead — a route Artificial Forecasting has already identified, with work
-   under way on how outage-planning records could feed the model.
+   and Artificial Forecasting does the same in its data-preparation pipeline, rescaling a
+   step-change block onto the level of the most recent one when that block's median falls outside
+   the most recent block's 10th-to-90th-percentile range, so the history is kept rather than
+   dropped. They argue for going further on the grounds that demand changes of an order of
+   magnitude, mostly caused by network reconfigurations, "cannot be directly handled even by
+   powerful nonlinear models like neural networks" — though they add that changes that large are
+   rare at their secondary substations. Gilbert et al. name adaptive handling of structural breaks
+   as future work. All of this is defensible engineering. What we did not find is the alternative to
+   correcting the target at all: feeding recent observations to the model as residuals against a
+   switching-independent baseline — the difference between what was measured and what a model that
+   ignores topology expected — so that a reading taken while the network was abnormally configured
+   still carries information without a level correction having to be estimated first. Later, at the
+   scale of NGED's full network, the aim is to reconstruct the demand each substation would have
+   metered under its normal running arrangement. A negative result here would still be valuable:
+   evidence that switching cannot be recovered from power data alone would strengthen the case for
+   taking switching labels from operational systems instead — a route Artificial Forecasting has
+   already identified, naming the incorporation of planned-outage records in its post-Beta roadmap.
 
 5. **Separating out generation that nobody meters.** Where demand and generation are separated at
    all, the generation is usually metered: Artificial Forecasting models gross demand and customer
@@ -584,14 +589,16 @@ engineers concerned name the gap themselves.
    Taieb et al.](https://doi.org/10.1080/01621459.2020.1736081) give the probabilistic version. That
    constraint carries no information about which substation neighbours which, and an abnormal
    running arrangement invalidates it by construction, which is why it is not sufficient here.
-   Otherwise, information is shared across substations statistically rather than topologically —
-   Artificial Forecasting pools model parameters across six load-profile clusters — and Gilbert et
-   al. forecast four levels of a hierarchy separately before naming exploitation of that hierarchy
-   as future work. SSEN's TRANSITION is the exception that shows the value: it used the connectivity
-   map throughout and ranked that data as being as important as the demand measurements. NGED hold a
-   map of which substations and metered generators connect to which. That makes it possible to
-   forecast a bulk supply point both directly and by summing everything beneath it, and to treat the
-   disagreement between the two answers as a check on both.
+   Otherwise, information is shared across substations statistically rather than topologically — one
+   of the four models Artificial Forecasting tested at secondary substations, a hierarchical
+   Bayesian linear regression, pools its upper-layer parameters across six load-profile clusters,
+   though the model they recommended is trained per substation — and Gilbert et al. forecast four
+   levels of a hierarchy separately before naming exploitation of that hierarchy as future work.
+   SSEN's TRANSITION is the exception that shows the value: it used the connectivity map throughout
+   and ranked that data as being as important as the demand measurements. NGED hold a map of which
+   substations and metered generators connect to which. That makes it possible to forecast a bulk
+   supply point both directly and by summing everything beneath it, and to treat the disagreement
+   between the two answers as a check on both.
 
 7. **Tracking how much generation is actually available.** Turbines go out for repair, inverters
    degrade and sites are curtailed. A substation whose 20 MW wind farm has been limited to 14 MW for
@@ -622,7 +629,8 @@ engineers concerned name the gap themselves.
    forecast installed capacity down to the fraction actually generated over two years, and
    separately found that NESO's national generator-availability signal "almost universally
    substantially improved results" at wind-connected primary substations, while a feature tracking
-   connected generation capacity over time did not help.
+   connected generation capacity over time did not help, which they put down to too few new
+   connections falling inside the training window rather than to the feature itself.
 
     The gap is therefore real but narrower than it first appears. What we found nowhere is the same
     estimate made from a *substation's* net flow, where generation is mixed with demand and there is
@@ -706,15 +714,16 @@ dug out of this literature, but only at that price, and nobody does it routinely
 comparable results in the first place is much cheaper. Neither covers distribution-substation load,
 which is the level NGED acts at, so we intend to follow their protocols where they apply rather than
 invent our own. Some substation data is already public — NGED's [Connected Data
-Portal](https://connecteddata.nationalgrid.co.uk/), and Northern Powergrid's release of five years
-of demand at 486 primary substations — and publishing the telemetry behind our own experiments would
-make the results reproducible by anyone, which is still rare in the substation literature, where
-only 52 of the 221 low-voltage papers reviewed used any open dataset at all. Alongside it we will
-publish the evaluation protocol, the metric definitions and the code that computes them, and a
-leaderboard carrying every experiment we run. Artificial Forecasting is moving the same way, with
-substation-level historical forecasts and model-performance metrics designed into its Open Data
-Portal release, and a shared evaluation protocol between two GB networks would be worth more than
-either alone.
+Portal](https://connecteddata.nationalgrid.co.uk/), and Northern Powergrid's [open data
+portal](https://northernpowergrid.opendatasoft.com/explore/dataset/primary-operational-metering/),
+which publishes half-hourly metering from its primary substations — and publishing the telemetry
+behind our own experiments would make the results reproducible by anyone, which is still rare in the
+substation literature, where only 52 of the 221 low-voltage papers reviewed used any open dataset at
+all. Alongside it we will publish the evaluation protocol, the metric definitions and the code that
+computes them, and a leaderboard carrying every experiment we run. Artificial Forecasting is moving
+the same way, with substation-level historical forecasts and model-performance metrics designed into
+its Open Data Portal release, and a shared evaluation protocol between two GB networks would be
+worth more than either alone.
 
 ## What this review excluded, and why
 
