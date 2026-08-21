@@ -27,8 +27,9 @@ ahead, updated every six hours, with each forecast expressed as a set of quantil
 single number. From 2027 it scales towards roughly 2,500 series across NGED's network. The 14-day
 horizon sits at the edge of what a weather ensemble can supply: [Buizza and Leutbecher
 (2015)](https://doi.org/10.1002/qj.2619) put the lead time at which ECMWF's ensemble stops beating a
-climatological distribution at 16 to 23 days for instantaneous grid-point fields, and shorter for
-surface variables such as the near-surface temperature and irradiance that drive substation load.
+climatological distribution at 16 to 23 days for instantaneous grid-point fields. They measured that
+on upper-air variables and did not assess the near-surface temperature and irradiance that drive
+substation load, for which we would expect a shorter horizon.
 
 Almost every number in this review depends on where in the network it was measured, so it is worth
 fixing the ladder first:
@@ -204,16 +205,18 @@ that beat a naive baseline alongside average error, rather than reporting the av
 procurement.** A forecast that predicts the right peak at the wrong time is penalised twice by mean
 absolute error — once for the peak it predicted that did not happen, and once for the peak that
 happened and it missed. A flat, featureless forecast avoids both penalties. Meteorology named this
-the double penalty decades ago and has a literature of proposed fixes, surveyed by [Gilleland et al.
-(2009)](https://doi.org/10.1175/2009WAF2222269.1); most of those fixes are diagnostics to report
-alongside a conventional score rather than replacements for it, because a score that forgives a
-displacement in time is no longer a proper scoring rule. Mean absolute error and root-mean-square
-error therefore systematically favour smooth forecasts over peaky ones, which is backwards for a
-network buying flexibility to keep load below a capacity limit. Two teams reached this conclusion
-independently and acted on it. Pinheiro et al. (2023) scored their substation models with Haben's
-adjusted error, a peak-aware measure, for exactly this reason. Artificial Forecasting built a metric
-over the top 10% of demand values, normalised to transformer rating, and made it the primary measure
-for comparing their models.
+the double penalty decades ago. [Gilleland et al. (2009)](https://doi.org/10.1175/2009WAF2222269.1)
+survey the proposed fixes for its spatial form, where a forecast with the right size and shape
+scores badly for being slightly displaced in space, and describe most of those fixes as diagnostic
+techniques to run alongside a conventional score rather than as replacements for it. We take the
+same caution over displacement in time: a score that forgives it is generally no longer a proper
+scoring rule, so it belongs beside a proper score rather than instead of one. Mean absolute error
+and root-mean-square error therefore systematically favour smooth forecasts over peaky ones, which
+is backwards for a network buying flexibility to keep load below a capacity limit. Two teams reached
+this conclusion independently and acted on it. Pinheiro et al. (2023) scored their substation models
+with Haben's adjusted error, a peak-aware measure, for exactly this reason. Artificial Forecasting
+built a metric over the top 10% of demand values, normalised to transformer rating, and made it the
+primary measure for comparing their models.
 
 **5. A forecast can state its own uncertainty badly, and one scoring choice will not reveal it.**
 [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) scored models on 200 German low-voltage
@@ -484,15 +487,16 @@ engineers concerned name the gap themselves.
    low-voltage hierarchy". Two further things bear on this gap. The ensemble itself is being
    replaced: [GenCast](https://doi.org/10.1038/s41586-024-08252-9) generates a 15-day global
    ensemble in eight minutes and has greater skill than ECMWF's physics ensemble on 97.2% of the
-   1,320 targets its authors evaluated, wind power production among them, and ECMWF's own
-   machine-learned ensemble, [AIFS-ENS](https://doi.org/10.1038/s44387-026-00073-7), has been
-   operational since 1 July 2025 with 51 members, 6-hourly to 15 days at 31 km resolution, beating
-   the physics ensemble on the majority of variables and lead times. Flexpectation runs on the
-   physics ensemble today and will test a machine-learned ensemble as a substitute. Second,
-   calibrating an ensemble one variable and one grid point at a time destroys the correlation
-   between neighbouring hours and neighbouring places, which is exactly what a load model needs;
-   [Vannitsem et al. (2021)](https://doi.org/10.1175/BAMS-D-19-0308.1) review the methods that put
-   that correlation back.
+   1,320 combinations of variable, lead time and vertical level its authors scored, and separately
+   beats it on a wind-power experiment covering 5,344 wind farm sites; ECMWF's own machine-learned
+   ensemble, [AIFS-ENS](https://doi.org/10.1038/s44387-026-00073-7), has been operational since 1
+   July 2025 with 51 members, 6-hourly to 15 days at 31 km resolution, beating the physics ensemble
+   on the majority of variables and lead times. Flexpectation runs on the physics ensemble today and
+   will test a machine-learned ensemble as a substitute. Second, calibrating an ensemble one
+   variable and one grid point at a time destroys the correlation between neighbouring hours and
+   neighbouring places, which is exactly what a load model needs; [Vannitsem et al.
+   (2021)](https://doi.org/10.1175/BAMS-D-19-0308.1) review the methods that put that correlation
+   back.
 
 2. **The upper tail, not the middle.** NGED's question is "how likely is load to cross this limit?",
    not "what is the most likely load?". Almost everything in this review optimises average accuracy,
@@ -524,15 +528,15 @@ engineers concerned name the gap themselves.
    forecast against 5,495 kWh actually needed, over two eight-day windows at one near-capacity
    substation. Its Beta phase goes further, flagging exceedances of firm capacity from the
    95th-percentile bound and scoring true- and false-positive rates against that threshold. What is
-   still missing is the price at distribution level. Meteorology has priced forecast decisions since
-   [Richardson (2000)](https://doi.org/10.1002/qj.49712656313) computed the relative economic value
-   of the ECMWF ensemble across the whole range of ratios between the cost of acting on a forecast
-   and the loss avoided by acting. That is the right shape for this problem, because each substation
-   has its own firm capacity and its own cost of being wrong, so a single assumed cost ratio is the
-   thing to avoid. Every published version of it at a distribution network, though, is denominated
-   in energy volumes rather than in money. Faculty's appendix prices a safety margin against
-   under-predicting periods already flagged, and names the exceedance a forecast misses entirely as
-   an open item itself.
+   still missing is the price at distribution level. Meteorology has priced forecast decisions this
+   way for decades: [Richardson (2000)](https://doi.org/10.1002/qj.49712656313) computed the
+   relative economic value of the ECMWF ensemble across the whole range of ratios between the cost
+   of acting on a forecast and the loss avoided by acting. That is the right shape for this problem,
+   because each substation has its own firm capacity and its own cost of being wrong, so a single
+   assumed cost ratio is the thing to avoid. Every published version of it at a distribution
+   network, though, is denominated in energy volumes rather than in money. Faculty's appendix prices
+   a safety margin against under-predicting periods already flagged, and names the exceedance a
+   forecast misses entirely as an open item itself.
 
 4. **Keeping switching-contaminated history usable.** Detection has been demonstrated at a real
    network operator, by Bouman et al. (2024), described above. The field then responds in one of two
@@ -596,22 +600,24 @@ engineers concerned name the gap themselves.
    the generator's own instrumentation. For wind, [Dantas and Browell
    (2026)](https://doi.org/10.1002/we.70079) forecast 73 GB wind farms from the ECMWF ensemble and
    hit our problem exactly: the metered-output database they use "does not include information on
-   the farms' available capacity over time", so they estimate a time series of available capacity
-   for each farm from the metered output alone, and normalise each farm's power by it before
-   modelling. That is the method this project proposes, applied at the generator rather than at the
-   substation. They also used a lever we will not have, excluding curtailed half-hours with
-   published bid-acceptance volumes, which exist for transmission-connected wind farms and not for
-   NGED's embedded generators. For solar, the estimate is routinely made from the plant's output
-   rather than its internals: the open-source [RdTools](https://doi.org/10.5281/zenodo.1210316)
-   estimates degradation and soiling from a plant's alternating-current output together with
-   modelled or satellite irradiance, and [Severiano et al.
+   the farms' available capacity over time", so rather than use a nameplate rating they estimate a
+   time series of available capacity for each farm and normalise that farm's power by it before
+   modelling. That is the shape of what this project proposes, applied at the generator rather than
+   at the substation. How they estimate it sits in supplementary material we could not obtain, so we
+   cannot say whether the estimate comes from the metered output alone or leans on outage messages
+   as well. They also used a lever we will not have, excluding curtailed half-hours with published
+   bid-acceptance volumes, which exist for transmission-connected wind farms and not for NGED's
+   embedded generators. For solar, the estimate is routinely made from the plant's output rather
+   than its internals: the open-source [RdTools](https://doi.org/10.5281/zenodo.1210316) estimates
+   degradation and soiling from a plant's alternating-current output together with modelled or
+   satellite irradiance, and [Mendonça Severiano et al.
    (2026)](https://doi.org/10.1016/j.solener.2026.114382) classify underperformance across 1,089
-   systems from the same kind of data — though correctly only 56% of the time when the cause is
-   clipping, which is a warning for the six half-hourly-metered solar farms in the trial area.
-   Fleet-wide priors exist too: [Jordan et al. (2022)](https://doi.org/10.1002/pip.3566) measured a
-   median degradation of 0.48% a year in cooler climates across 1,700 systems, and [Staffell and
-   Green (2014)](https://doi.org/10.1016/j.renene.2013.10.041) inferred a 0.44 percentage-point
-   annual decline in UK onshore wind load factors from regulatory meter readings alone. Artificial
+   systems from inverter data — though correctly only 56% of the time when the cause is clipping,
+   which is a warning for the six half-hourly-metered solar farms in the trial area. Fleet-wide
+   priors exist too: [Jordan et al. (2022)](https://doi.org/10.1002/pip.3566) measured a median
+   degradation of 0.48% a year in cooler climates across 1,700 systems, and [Staffell and Green
+   (2014)](https://doi.org/10.1016/j.renene.2013.10.041) inferred a 0.44 percentage-point annual
+   decline in UK onshore wind load factors from regulatory meter readings alone. Artificial
    Forecasting gets closest at substation level: its Alpha work calibrates each substation's
    forecast installed capacity down to the fraction actually generated over two years, and
    separately found that NESO's national generator-availability signal "almost universally
@@ -663,14 +669,16 @@ into a machine-learning operations framework whose purpose is to make one more e
 free, and each of its three design choices answers a failure mode named in [Sculley et al.
 (2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems)'s
 account of the hidden costs of running machine learning in production. Every experiment is fully
-specified by a config file, which is their configuration debt. It runs through the same pipeline
-that serves production rather than a separate research copy of it, which is their training-serving
-skew. It is tracked automatically from raw data through to result and lands in one comparable
-metrics store, which is their data-dependency debt. That machinery exists and works today; the
-leaderboard view over it is still being built. We know of no published study measuring whether
-working this way actually makes research faster, so "nearly free" is a claim about our own
-experience rather than a finding from the literature. The plan is affordable because the marginal
-experiment is cheap, not because the team is large.
+specified by a config file, which answers what they call configuration debt. It runs through the
+same pipeline that serves production rather than through a separate research copy of it, which keeps
+data preparation from becoming what they call a pipeline jungle — a debt they suggest may have its
+root cause in research and engineering being kept too far apart. It is tracked automatically from
+raw data through to result and lands in one comparable metrics store, which answers what they call
+data-dependency debt. That machinery exists and works today; the leaderboard view over it is still
+being built. We know of no published study measuring whether working this way actually makes
+research faster, so "nearly free" is a claim about our own experience rather than a finding from the
+literature. The plan is affordable because the marginal experiment is cheap, not because the team is
+large.
 
 Flexpectation's plan is riskier than a narrower one would be, and that is worth saying plainly.
 Artificial Forecasting chose a focused agenda and delivered it into live operational use, which is
@@ -689,23 +697,24 @@ at the start of this review is one this project is well placed to help with, and
 already: HEFTCom and Energy-Arena both compare methods on common data with a common metric, and
 Energy-Arena keeps a live public leaderboard. A third route exists, and it shows what the
 alternative costs: [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) did recover a
-defensible ranking of solar forecasting methods from the published literature, by hand-extracting
-4,687 skill scores from 320 papers and then statistically removing the effect of ten study-design
-choices, finding that ensemble and hybrid models improve on time-series models by 7 to 27 percentage
-points of skill score while many advanced machine-learning methods gave inconsistent gains. A
-comparison can therefore be dug out of this literature, but only at that price, and nobody does it
-routinely. Publishing comparable results in the first place is much cheaper. Neither covers
-distribution-substation load, which is the level NGED acts at, so we intend to follow their
-protocols where they apply rather than invent our own. Some substation data is already public —
-NGED's [Connected Data Portal](https://connecteddata.nationalgrid.co.uk/), and Northern Powergrid's
-release of five years of demand at 486 primary substations — and publishing the telemetry behind our
-own experiments would make the results reproducible by anyone, which is still rare in the substation
-literature, where only 52 of the 221 low-voltage papers reviewed used any open dataset at all.
-Alongside it we will publish the evaluation protocol, the metric definitions and the code that
-computes them, and a leaderboard carrying every experiment we run. Artificial Forecasting is moving
-the same way, with substation-level historical forecasts and model-performance metrics designed into
-its Open Data Portal release, and a shared evaluation protocol between two GB networks would be
-worth more than either alone.
+defensible ranking of solar forecasting methods from the published literature, by screening 1,447
+studies, reading 320 of them in full, hand-extracting 4,687 skill scores from the 188 that reported
+one, and then statistically removing the effect of ten other factors. Their finding is that
+ensemble-hybrid models improve on time-series models by 7 to 27 percentage points of skill score,
+while many advanced machine-learning methods gave inconsistent gains. A comparison can therefore be
+dug out of this literature, but only at that price, and nobody does it routinely. Publishing
+comparable results in the first place is much cheaper. Neither covers distribution-substation load,
+which is the level NGED acts at, so we intend to follow their protocols where they apply rather than
+invent our own. Some substation data is already public — NGED's [Connected Data
+Portal](https://connecteddata.nationalgrid.co.uk/), and Northern Powergrid's release of five years
+of demand at 486 primary substations — and publishing the telemetry behind our own experiments would
+make the results reproducible by anyone, which is still rare in the substation literature, where
+only 52 of the 221 low-voltage papers reviewed used any open dataset at all. Alongside it we will
+publish the evaluation protocol, the metric definitions and the code that computes them, and a
+leaderboard carrying every experiment we run. Artificial Forecasting is moving the same way, with
+substation-level historical forecasts and model-performance metrics designed into its Open Data
+Portal release, and a shared evaluation protocol between two GB networks would be worth more than
+either alone.
 
 ## What this review excluded, and why
 
@@ -730,12 +739,12 @@ though the ingredients exist separately. There is substantial work on physics-in
 networks for power systems, including models that map weather to solar output, and one 2026 paper
 applying a differentiable temperature-demand relationship at system level. On the demand side the
 physics that matters is the thermal response of a few thousand buildings rather than of a panel or a
-turbine, and models that build that response in are a maturing field of their own: [Di Natale et al.
+turbine, and models that build that response in are a field of their own: [Di Natale et al.
 (2022)](https://doi.org/10.1016/j.apenergy.2022.119806) constrain a neural network so that heat
 always flows the physically correct way, and [Jiang et al.
-(2025)](https://doi.org/10.1016/j.adapen.2025.100223) review the field. What we did not find is
-anyone aggregating building thermal physics up to a substation and putting it inside a probabilistic
-forecast, which is the version this project would need.
+(2025)](https://doi.org/10.1016/j.adapen.2025.100223) review that field, which they describe as
+nascent. What we did not find is anyone aggregating building thermal physics up to a substation and
+putting it inside a probabilistic forecast, which is the version this project would need.
 
 **The bulk of the low-voltage forecasting literature** is covered through the Haben et al. (2021)
 review of 221 papers rather than read individually, which is the appropriate level of detail for

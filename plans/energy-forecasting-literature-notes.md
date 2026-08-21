@@ -2620,11 +2620,15 @@ already cites three times.
   provided by BMRA does not include information on the farms' available capacity over time", so
   "the method described in the supplementary material was applied to estimate the available
   capacity at each time stamp (i.e., a time series of available capacity)". They also exclude
-  curtailed half-hours: "Estimated curtailment volumes are contained in BAV data. Thus, periods
-  with non-zero BAVs were excluded from modelling and forecast evaluation." Two caveats that keep
-  our gap alive: the estimation algorithm is in the Wiley supplementary material, not the free
-  preprint; and bid-acceptance volumes exist for transmission-connected wind farms, not for NGED's
-  embedded generators.
+  curtailed half-hours: "Estimated curtailment volumes are contained in BAV data. Thus, periods with
+  non-zero BAVs were excluded from modelling and forecast evaluation." Also verbatim: "The wind power
+  time series were normalised by each wind farm's available (or nominal) capacity." **Two caveats
+  that keep our gap alive.** The estimation algorithm is in the Wiley supplementary material, not the
+  free preprint, and two independent attempts failed to retrieve it — so we cannot claim they work
+  "from the metered output alone"; the method could draw on a capacity register or REMIT outage
+  messages. And bid-acceptance volumes exist for transmission-connected wind farms, not for NGED's
+  embedded generators. **Getting that supplementary material is the single highest-value follow-up
+  for the effective-capacity work.**
 
 - **RdTools** (NREL), concept DOI <https://doi.org/10.5281/zenodo.1210316>, MIT licence. Estimates
   year-on-year degradation, soiling loss and availability. Important correction to what the
@@ -2636,8 +2640,11 @@ already cites three times.
 
 - **Severiano et al. (2026)**, *Solar Energy* 308, <https://doi.org/10.1016/j.solener.2026.114382>.
   Rule-based detection and classification of photovoltaic underperformance across 1,089 systems
-  from alternating-current data plus satellite irradiance. 92% and 88% accuracy on two case types
-  but only 56% on generation clipping.
+  (2,213 inverter monitors, Australia) from inverter data — the title says "using inverter data", and
+  a reviewer reading the paper found no irradiance input at all, contradicting the coverage
+  reviewer's "plus satellite irradiance". 92% and 88% accuracy on two case types but only 56% on
+  generation clipping. **Cite the first author as Mendonça Severiano**, which is how Crossref indexes
+  the name.
 
 - **Jordan et al. (2022)**, "Photovoltaic fleet degradation insights", *Prog. Photovolt.* 30(10)
   1166–1175, <https://doi.org/10.1002/pip.3566>. 1,700 sites, 7.2 GW. Overall −0.75%/year; verified
@@ -2692,10 +2699,15 @@ already cites three times.
 - **Nguyen & Müsgens (2026)**, "A meta-analysis of solar forecasting based on skill score", *J.
   Renewable and Sustainable Energy* 18(2), <https://doi.org/10.1063/5.0300682>. The partial
   counter-example to the report's opening thesis: a defensible ranking *can* be recovered from this
-  literature, by hand-extracting 4,687 skill scores from 320 papers and regressing out ten
-  study-design factors. Verified from the abstract: ensemble–hybrid models raise skill score by
-  7–27 percentage points over time-series models, "while many advanced machine learning methods
-  show inconsistent gains"; day-ahead forecasts do best with NWP data (+11.5 pp).
+  literature, by screening 1,447 studies, reading 320 in full and hand-extracting 4,687 skill scores
+  from the 188 that reported one, then regressing out ten other factors. **Count correction:** 320 is
+  the number of full texts assessed, not the number that yielded data; the body says "Our work is
+  based on 4,687 data points extracted from 188 papers". Verified from the *published* 2026 abstract:
+  ensemble–hybrid models raise skill score by 7–27 percentage points over time-series models, "while
+  many advanced machine learning methods show inconsistent gains"; day-ahead forecasts do best with
+  NWP data (+11.5 pp). Note the 2023 arXiv preprint (v2 of 2208.10536) carries a different Table 3
+  whose largest ensemble–hybrid coefficient is +21.2 pp — cite the published version's figures, not
+  the preprint's.
 
 ### Forecast verification methodology from meteorology
 
@@ -2728,10 +2740,14 @@ already cites three times.
   and still be unreliable for extremes.
 
 - **Gilleland, Ahijevych, Brown, Casati & Ebert (2009)**, *Weather and Forecasting* 24(5),
-  1416–1430, <https://doi.org/10.1175/2009WAF2222269.1>. The double penalty and the four families
-  of fix. Caveat carried into the report: most displacement-tolerant scores, the Fractions Skill
-  Score included, are not proper, so they are diagnostics alongside a proper score, never
-  replacements.
+  1416–1430, <https://doi.org/10.1175/2009WAF2222269.1>. The double penalty and the four families of fix. **Two caveats:** the double penalty they name is
+  *spatial* ("a forecast feature with the correct size and structure might yield very poor
+  verification scores if the feature is displaced slightly in space"), not temporal, and the paper
+  is an intercomparison of spatial verification methods for gridded fields. And it does **not**
+  discuss propriety; its nearest passage says the opposite of a confident claim — "it is unlikely
+  (but not impossible) that one would tune a model to obtain the best performance by hedging…
+  Nevertheless, it will be worth investigating how each method could be hedged, if at all." The
+  statement that most displacement-tolerant scores are not proper is ours, not theirs.
 
 - **Richardson (2000)**, *QJRMS* 126(563), 649–667, <https://doi.org/10.1002/qj.49712656313>.
   Relative economic value of the ECMWF ensemble across the full range of user cost-loss ratios.
@@ -2740,9 +2756,12 @@ already cites three times.
 
 - **Buizza & Leutbecher (2015)**, *QJRMS* 141(693), 3366–3382, <https://doi.org/10.1002/qj.2619>.
   The forecast skill horizon — the lead time at which the ensemble stops beating a climatological
-  distribution, scored by CRPS — is 16 to 23 days for instantaneous grid-point fields. Read the
-  caveat before quoting: those figures are for upper-air fields, and 2-metre temperature and
-  surface irradiance at a substation will be shorter.
+  distribution, scored by CRPS — is 16 to 23 days for instantaneous grid-point fields. **Read the
+  caveat before quoting:** the study's variables are all free-atmosphere (Z500, T850, T200, U850,
+  V850). It assesses no 2-metre temperature and no irradiance, and makes no claim that surface
+  variables have shorter horizons. Its only contrast is instantaneous versus time- and space-averaged
+  fields, where averaging makes horizons *longer*. Any "shorter at the surface" statement is our
+  inference and must be worded as one.
 
 - **Vannitsem et al. (2021)**, *BAMS* 102(3), E681–E699, <https://doi.org/10.1175/BAMS-D-19-0308.1>.
   The current review of statistical post-processing, including ensemble copula coupling and the
@@ -2755,7 +2774,11 @@ already cites three times.
   84–90, <https://doi.org/10.1038/s41586-024-08252-9>. GenCast: 15-day global ensembles at 0.25°
   and 12-hour steps in 8 minutes; verified from the abstract, "greater skill than ENS on 97.2% of
   1,320 targets we evaluated and better predicts extreme weather, tropical cyclone tracks and wind
-  power production". (The arXiv preprint says 97.4%; cite the *Nature* figure.)
+  power production". (The arXiv preprint says 97.4%; cite the *Nature* figure.) **Scope correction:**
+  the 1,320 targets are combinations of variable, lead time and vertical level. Wind power is a
+  *separate* downstream experiment in Fig. 4, interpolating 10 m wind speed to 5,344 wind farm
+  locations from the Global Power Plant Database and applying an idealised power curve — it is not
+  one of the 1,320.
 
 - **Lang et al. (2026)**, "AIFS-CRPS", *npj Artificial Intelligence* 2(1),
   <https://doi.org/10.1038/s44387-026-00073-7>. ECMWF's machine-learned ensemble outperforms the
@@ -2783,9 +2806,16 @@ physics to a substation and put it inside a probabilistic forecast.
 
 - **Sculley et al. (2015)**, "Hidden Technical Debt in Machine Learning Systems", NeurIPS 28,
   2503–2511, <https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems>
-  (NIPS 2015 is not DOI-registered). Configuration debt, training/serving skew, glue code, data
-  dependency debt and undeclared consumers map clause-for-clause onto the three design choices the
-  report lists.
+  (NIPS 2015 is not DOI-registered). **Terminology correction:** the phrases "skew" and "serving" appear **zero** times in this paper —
+  "training-serving skew" is later Google TFX vocabulary, not Sculley's, and must not be attributed
+  here. The terms the paper actually uses are configuration debt, glue code, pipeline jungles, dead
+  experimental codepaths, data dependencies, CACE, correction cascades and undeclared consumers. Two
+  further cautions: their hedge is "Glue code and pipeline jungles are symptomatic of integration
+  issues that **may have** a root cause in overly separated 'research' and 'engineering' roles", and
+  their prescribed remedy is different from ours ("Pipeline jungles can only be avoided by thinking
+  holistically about data collection and feature extraction"). Their next named debt, dead
+  experimental codepaths, warns against experimenting via "conditional branches within the main
+  production code" — adjacent enough that a reader who knows the paper could misread us.
 - **Kreuzberger, Kühl & Hirschl (2023)**, *IEEE Access*,
   <https://doi.org/10.1109/ACCESS.2023.3262138>. The reference architecture that licenses "current
   industry best practice".
