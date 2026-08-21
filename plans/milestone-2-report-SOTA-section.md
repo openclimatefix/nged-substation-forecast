@@ -851,8 +851,8 @@ computes them. Artificial Forecasting is moving the same way, with substation-le
 forecasts and model-performance metrics designed into its Open Data Portal release, and a shared
 evaluation protocol between two GB networks would be worth more than either alone.
 
-Fourteen commitments to publish or report are made across this review. Collected in one place, and
-in the order a reader would want them, they are:
+This review makes nine commitments to publish or report. Collected in one place, and in the order a
+reader would want them, they are:
 
 - **Every ratio comes with its reference forecast, the population it was scored on, and the number
   of ensemble members that produced it**, with Weigel's ensemble-size correction applied to any
