@@ -2599,6 +2599,239 @@ on substation level", CIRED 2023, doi 10.1049/icp.2023.0476) and an unverified 2
 load forecasting under MV network reconfiguration that would bear on gap 4. Chase the IET CIRED
 archive before relying on either absence claim.
 
+## Sources found by the third-round wide-net coverage review
+
+This round searched four areas the earlier rounds had not: estimating the effective capacity of
+metered generators, machine-learning operations and reproducibility practice, forecast verification
+methodology from meteorology, and a free-ranging sweep. Everything below was verified against a
+primary source (Crossref metadata, the paper itself, or the tool's own documentation) before being
+used in the report.
+
+### Effective capacity of metered generators — the report's absence claim was too strong
+
+The report previously said the technique was standard one level down "but always from the
+generator's own instrumentation". That is false, and the counter-example is by an author the report
+already cites three times.
+
+- **Dantas & Browell (2026)**, "Seamless Short- to Mid-Term Probabilistic Wind Power Forecasting",
+  *Wind Energy* 29(2) e70079, <https://doi.org/10.1002/we.70079>; preprint
+  <https://arxiv.org/abs/2502.11960>. 73 GB wind farms (34 onshore, 39 offshore), 2019–2023, lead
+  times 6–162 h, driven by the ECMWF ensemble. Verified verbatim from the paper: "The dataset
+  provided by BMRA does not include information on the farms' available capacity over time", so
+  "the method described in the supplementary material was applied to estimate the available
+  capacity at each time stamp (i.e., a time series of available capacity)". They also exclude
+  curtailed half-hours: "Estimated curtailment volumes are contained in BAV data. Thus, periods
+  with non-zero BAVs were excluded from modelling and forecast evaluation." Two caveats that keep
+  our gap alive: the estimation algorithm is in the Wiley supplementary material, not the free
+  preprint; and bid-acceptance volumes exist for transmission-connected wind farms, not for NGED's
+  embedded generators.
+
+- **RdTools** (NREL), concept DOI <https://doi.org/10.5281/zenodo.1210316>, MIT licence. Estimates
+  year-on-year degradation, soiling loss and availability. Important correction to what the
+  coverage reviewer reported: the clear-sky workflow is *not* free of site irradiance. Its own
+  documentation says "site irradiance data is still required to identify clear-sky conditions to be
+  analyzed", and warns that "Satellite and clear-sky analyses tend to provide less stable results
+  than sensor-based analysis". The availability analysis needs inverter-level data. So RdTools
+  removes the need for plant *internals*, not for irradiance.
+
+- **Severiano et al. (2026)**, *Solar Energy* 308, <https://doi.org/10.1016/j.solener.2026.114382>.
+  Rule-based detection and classification of photovoltaic underperformance across 1,089 systems
+  from alternating-current data plus satellite irradiance. 92% and 88% accuracy on two case types
+  but only 56% on generation clipping.
+
+- **Jordan et al. (2022)**, "Photovoltaic fleet degradation insights", *Prog. Photovolt.* 30(10)
+  1166–1175, <https://doi.org/10.1002/pip.3566>. 1,700 sites, 7.2 GW. Overall −0.75%/year; verified
+  from the abstract, "cooler climates exhibit a median −0.48%/year loss, which increases to
+  −0.88%/year in hotter climates". The −0.48% figure is the right prior for GB.
+
+- **Staffell & Green (2014)**, *Renewable Energy* 66, 775–786,
+  <https://doi.org/10.1016/j.renene.2013.10.041>. UK onshore load factors decline 0.44 ± 0.04
+  percentage points a year, inferred from Ofgem regulatory meter readings alone. Monthly and
+  fleet-averaged, so it proves the signal is present in meter data rather than supplying a method.
+
+- Supporting methodological citations behind RdTools, all verified: Jordan et al. (2018)
+  <https://doi.org/10.1109/JPHOTOV.2017.2779779> (the year-on-year estimator); Lindig, Theristis &
+  Moser (2022) <https://doi.org/10.1088/2516-1083/ac655f> (open access; the same data yields
+  materially different degradation rates depending on filter and estimator choice).
+
+- **Validation data with ground truth already exists.** Cubico's Kelmarsh
+  (<https://doi.org/10.5281/zenodo.8252025>, 6 turbines, 2016–2022) and Penmanshiel
+  (<https://doi.org/10.5281/zenodo.5946808>, 14 turbines, 2016–mid-2021) releases each carry
+  10-minute turbine SCADA *with alarm and events data* **and** site substation and fiscal grid meter
+  data for the same period, CC-BY-4.0. Verified from the Zenodo records. That is a ready-made rig:
+  build the estimator from the meter alone, score it against the turbine records.
+
+- **What survives as a genuine gap:** nothing estimates effective capacity from a *substation's*
+  net flow, where generation is mixed with demand; there is no wind equivalent of RdTools working
+  from a revenue meter alone (OpenOA's meter-only path still expects a reported availability and
+  curtailment table); and much distribution-connected GB curtailment is instructed by the network
+  operator under active network management, so that component is a data join inside NGED rather
+  than an estimation problem.
+
+### The field's own account of why its results cannot be compared
+
+- **Hong, Pinson, Wang, Weron, Yang & Zareipour (2020)**, "Energy Forecasting: A Review and
+  Outlook", *IEEE OAJPE* 7, 376–388, <https://doi.org/10.1109/OAJPE.2020.3029979>. Open access.
+  Verified verbatim from the PDF: "Unfortunately, most papers can never be replicated, because the
+  data have never been published"; "Sometimes authors tend to pick the error measures in favor of
+  their proposed method but hide the results from other error measures"; "When the obtained
+  differences in errors are close to zero, the statistical significance tests are seldom
+  performed"; "many papers avoid direct comparisons with classic, established, and state-of-the-art
+  models. Some even skip comparisons with naive models. Many papers draw a small circle in the case
+  study section by only comparing with the models within the immediate family."
+
+- **Tawn & Browell (2022)**, *RSER* 153, 111758, <https://doi.org/10.1016/j.rser.2021.111758>. Open
+  copy at <https://eprints.gla.ac.uk/320301/1/320301.pdf>. **Attribution correction:** the "8 of
+  42" figure is *not* theirs. Their sentence reads: "we found both solar and wind papers which only
+  compare models to their own variations [11 references]: this is in line with a survey by
+  Doubleday et al [11], who find that 8 of 42 solar forecasting papers surveyed did not include a
+  benchmark other than variants of the same model." Cite Doubleday, Van Scyoc Hernandez & Hodge
+  (2020), *Solar Energy* 206, 52–67, <https://doi.org/10.1016/j.solener.2020.05.051> for the
+  number, and Tawn & Browell for the eleven papers they found themselves.
+
+- **Nguyen & Müsgens (2026)**, "A meta-analysis of solar forecasting based on skill score", *J.
+  Renewable and Sustainable Energy* 18(2), <https://doi.org/10.1063/5.0300682>. The partial
+  counter-example to the report's opening thesis: a defensible ranking *can* be recovered from this
+  literature, by hand-extracting 4,687 skill scores from 320 papers and regressing out ten
+  study-design factors. Verified from the abstract: ensemble–hybrid models raise skill score by
+  7–27 percentage points over time-series models, "while many advanced machine learning methods
+  show inconsistent gains"; day-ahead forecasts do best with NWP data (+11.5 pp).
+
+### Forecast verification methodology from meteorology
+
+- **Weigel, Liniger & Appenzeller (2007)**, *MWR* 135(1), 118–124,
+  <https://doi.org/10.1175/MWR3280.1>. The ranked probability skill score is negatively biased for
+  small ensembles; they derive an analytical bias correction for any ensemble size. Directly
+  relevant: we run 51 members and will be compared against studies running far fewer.
+
+- **Lerch, Thorarinsdottir, Ravazzolo & Gneiting (2017)**, "Forecaster's Dilemma: Extreme Events and
+  Forecast Evaluation", *Statistical Science* 32(1), 106–127, <https://doi.org/10.1214/16-STS588>.
+  Scoring only the cases where an extreme occurred is *biased*, not merely noisy: conditioning the
+  evaluation on the outcome rewards a forecaster who over-predicts extremes. No proper scoring rule
+  stays proper on an outcome-conditioned subset. This constrains how our tail metric may be built.
+
+- **Gneiting & Ranjan (2011)**, *JBES* 29(3), 411–422, <https://doi.org/10.1198/jbes.2010.08110>.
+  The threshold-weighted CRPS: put a weight function on the outcome axis (for us,
+  `w(z) = 1{z > firm capacity}` per substation) and the score stays proper. Implemented in the
+  Python `scoringrules` package. The same paper gives the negative result: multiplying a proper
+  score by an outcome-dependent weight destroys propriety.
+
+- **Foygel Barber, Candès, Ramdas & Tibshirani (2020)**, *Information and Inference* 10(2),
+  455–482, <https://doi.org/10.1093/imaiai/iaaa017>. Distribution-free *conditional* coverage is
+  impossible. Conformal prediction therefore cannot promise 90% coverage at the peaks, only on
+  average — which is why finding 5 in the report commits to *stratified* coverage.
+
+- **Hamill (2001)**, *MWR* 129(3), 550–560, and **Allen, Koh, Segers & Ziegel (2025)**, *JASA*
+  120(552), 2796–2808, <https://doi.org/10.1080/01621459.2025.2506194>. A flat rank histogram, and
+  equally an on-target coverage figure, can be produced by a forecast that is over-dispersed on
+  some days and under-dispersed on others; and a forecast can be calibrated in the standard sense
+  and still be unreliable for extremes.
+
+- **Gilleland, Ahijevych, Brown, Casati & Ebert (2009)**, *Weather and Forecasting* 24(5),
+  1416–1430, <https://doi.org/10.1175/2009WAF2222269.1>. The double penalty and the four families
+  of fix. Caveat carried into the report: most displacement-tolerant scores, the Fractions Skill
+  Score included, are not proper, so they are diagnostics alongside a proper score, never
+  replacements.
+
+- **Richardson (2000)**, *QJRMS* 126(563), 649–667, <https://doi.org/10.1002/qj.49712656313>.
+  Relative economic value of the ECMWF ensemble across the full range of user cost-loss ratios.
+  Meteorology has priced forecast decisions since 2000; the report's "the price is missing" claim
+  only holds with an explicit "at distribution level" qualifier.
+
+- **Buizza & Leutbecher (2015)**, *QJRMS* 141(693), 3366–3382, <https://doi.org/10.1002/qj.2619>.
+  The forecast skill horizon — the lead time at which the ensemble stops beating a climatological
+  distribution, scored by CRPS — is 16 to 23 days for instantaneous grid-point fields. Read the
+  caveat before quoting: those figures are for upper-air fields, and 2-metre temperature and
+  surface irradiance at a substation will be shorter.
+
+- **Vannitsem et al. (2021)**, *BAMS* 102(3), E681–E699, <https://doi.org/10.1175/BAMS-D-19-0308.1>.
+  The current review of statistical post-processing, including ensemble copula coupling and the
+  Schaake shuffle, which restore space-time correlation after per-variable calibration. Relevant
+  because we push a raw 51-member ensemble through a load model.
+
+### Machine-learning weather models
+
+- **Price et al. (2025)**, "Probabilistic weather forecasting with machine learning", *Nature* 637,
+  84–90, <https://doi.org/10.1038/s41586-024-08252-9>. GenCast: 15-day global ensembles at 0.25°
+  and 12-hour steps in 8 minutes; verified from the abstract, "greater skill than ENS on 97.2% of
+  1,320 targets we evaluated and better predicts extreme weather, tropical cyclone tracks and wind
+  power production". (The arXiv preprint says 97.4%; cite the *Nature* figure.)
+
+- **Lang et al. (2026)**, "AIFS-CRPS", *npj Artificial Intelligence* 2(1),
+  <https://doi.org/10.1038/s44387-026-00073-7>. ECMWF's machine-learned ensemble outperforms the
+  physics IFS ensemble for the majority of variables and lead times in the medium range. Deployment
+  facts verified against ECMWF's own announcement: operational **1 July 2025**, 51 members (50
+  perturbed plus one control), 31 km resolution against the physics ensemble's 9 km, 6-hourly steps
+  to 15 days.
+
+### Differentiable physics for demand — the report had the physics wrong
+
+For demand at a substation the dominant physics is the thermal response of a few thousand
+buildings, not a panel and a turbine, and that has a mature differentiable literature.
+
+- **Di Natale, Svetozarevic, Heer & Jones (2022)**, "Physically Consistent Neural Networks for
+  building thermal modeling", *Applied Energy* 325, 119806,
+  <https://doi.org/10.1016/j.apenergy.2022.119806>.
+- **Jiang, Wang, Li, Hong & You (2025)**, "Physics-informed machine learning for building
+  performance simulation", *Advances in Applied Energy* 18, 100223,
+  <https://doi.org/10.1016/j.adapen.2025.100223>.
+
+The gap the report describes still stands in narrowed form: nobody has aggregated building-thermal
+physics to a substation and put it inside a probabilistic forecast.
+
+### Machine-learning operations — a real gap that citations cannot close
+
+- **Sculley et al. (2015)**, "Hidden Technical Debt in Machine Learning Systems", NeurIPS 28,
+  2503–2511, <https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems>
+  (NIPS 2015 is not DOI-registered). Configuration debt, training/serving skew, glue code, data
+  dependency debt and undeclared consumers map clause-for-clause onto the three design choices the
+  report lists.
+- **Kreuzberger, Kühl & Hirschl (2023)**, *IEEE Access*,
+  <https://doi.org/10.1109/ACCESS.2023.3262138>. The reference architecture that licenses "current
+  industry best practice".
+- **The honest limit:** there is no citable empirical study measuring whether config-driven,
+  automatically-tracked, production-path experimentation makes research *faster*. The one
+  MLOps-for-energy-forecasting paper, Zhao, Ma & Jørgensen (2026),
+  <https://doi.org/10.3390/info17040328>, is a capability mapping of 13 platforms, not a velocity
+  measurement. The report therefore states the speed claim as our own experience, not as a finding
+  from the literature. Pre-registration in forecasting is essentially an unwritten literature, so
+  advocating it is an original argument rather than a cited one.
+
+### Other verified sources not yet used, or used once
+
+- **Ruhhütl, Schmaranz & Dietrichsteiner (2023)**, "Load and generation forecast on substation
+  level", *CIRED 2023*, IET Conference Proceedings 2023(6), 706–710,
+  <https://doi.org/10.1049/icp.2023.0476>. Kärnten Netz, Austria. Crossref carries no abstract;
+  **not yet read**. Cited in the report only to narrow the CIRED absence claim.
+- **Akhtar, Mohammadi-Ivatloo & Lassila (2026)**, "Datasets for wind energy forecasting
+  applications", *RSER* 236, 116941, <https://doi.org/10.1016/j.rser.2026.116941>. Over 1,400
+  articles; strong geographic bias; proposes a benchmarking protocol. Published August 2026,
+  independent 2026 support for the report's central thesis.
+- **Roelofs et al. (2019)**, "A Meta-Analysis of Overfitting in Machine Learning", NeurIPS 32. Over
+  a hundred Kaggle competitions; public-leaderboard rank tracks private-test rank with little
+  evidence of substantial overfitting. Useful if the report's leaderboard proposal is challenged.
+- **Bracher, Ray, Gneiting & Reich (2021)**, *PLOS Comp. Biol.* 17(2), e1008618,
+  <https://doi.org/10.1371/journal.pcbi.1008618>. The weighted interval score: proper, in the units
+  of the target, decomposes into dispersion plus under-prediction plus over-prediction, and it is
+  the operational scoring scheme of a large multi-team public forecast hub — a direct precedent for
+  the leaderboard we propose.
+- **Tools:** `scoringrules` (Python) implements the threshold-weighted CRPS directly; `scores`
+  (Bureau of Meteorology, <https://doi.org/10.21105/joss.06889>) has 50+ peer-reviewed metrics
+  including isotonic reliability diagrams and rank histograms, though it is xarray-native.
+- **Standards correction:** IEC 61400-26-1:2019 cancels and replaces TS 61400-26-1:2011, -26-2:2014
+  and -26-3:2016. Cite the consolidated 2019 standard, not `-26-2`. It says how to *account for*
+  lost production once known, not how to *estimate* it without turbine state signals.
+- **NGED curtailment analysis and Curtailment Estimator** for flexible and curtailable connections:
+  <https://dso.nationalgrid.co.uk/planning-our-future-network/curtailment-analysis>.
+
+### Freshness check
+
+Nothing published since the earlier rounds supersedes the report's load-forecasting sources. Hertel
+et al. (2026) and Kaas et al. (2026) remain the current benchmarks; Paredes & Vargas remains the
+canonical "rewrite the history rather than delete it" citation. One earlier attribution was
+re-checked and confirmed correct: the claim that per-quantile pinball loss in the tail is too noisy
+to rank forecasting systems is near-verbatim Browell & Fasiolo (2021), Section V-A.
+
 ## Full reference list
 
 - Browell, J., van der Meer, D., Kälvegren, H., Haglund, S., Simioni, E., Bessa, R. J. & Wang, Y.
