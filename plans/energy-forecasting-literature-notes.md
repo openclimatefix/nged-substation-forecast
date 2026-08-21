@@ -29,7 +29,7 @@ Each paper gets four sections:
   Smart Grid, CC BY-NC-ND, supplied by Jack); Haben et al. (arXiv:2106.00006); Browell & Fasiolo
   (Glasgow accepted manuscript, eprints.gla.ac.uk/250372/1/250372.pdf — note this is the accepted
   version, not the published one, and may differ); Pinheiro, Madeira & Francisco
-  (escholarship.org/content/qt0cc1t3fs/qt0cc1t3fs.pdf, CC BY); and the two supporting papers,
+  (escholarship.org/content/qt0s14445q/qt0s14445q.pdf, CC BY); and the two supporting papers,
   Gilbert, Browell & Stephen (arXiv:2206.11745) and the FeederBW dataset paper, Treutlein et al.
   (arXiv:2602.03521). Also supplied by Jack and read in full, all Northern Powergrid / Faculty: the
   **Artificial Forecasting SIF Beta Annual Progress Report, March 2026** (52 pages), and the two
@@ -1211,8 +1211,10 @@ regions) as the last reliable quantile-regression levels. Second, both a static 
 GPD produce calibrated tails, but the conditional version — with its scale parameter varying smoothly
 with wind speed, irradiance and expected net load — is materially sharper. Third, in the reserve
 use case and at the same risk level, the conditional GPD reduces **upward** reserve volume by up to
-24.6% against the static GPD and by 16.5–18.0% against a naive historical-error approach. Downward
-reserve behaves differently: only 0.8–10.8% against the static GPD, but 19.8–25.8% against naive. Do
+24.6% against the static GPD and by 16.5–18.0% against a naive historical-error approach. That
+24.6% is the *most* extreme upward level (0.01%); the same column falls to 13.9%, 9.1% and 3.2%
+at 0.05%, 0.1% and 0.25%, so 3.2% is the saving at the least extreme upward level tested.
+Downward reserve behaves differently: only 0.8–10.8% against the static GPD, but 19.8–25.8% against naive. Do
 not quote a single headline percentage — four probability levels times two directions gives eight
 numbers spanning 0.8% to 25.8%.
 
@@ -1344,7 +1346,7 @@ procurement is both accurate and more credible than claiming the decision-metric
 
 *Short-term electricity load forecasting — A systematic approach from system level to secondary
 substations.* Applied Energy 332, 120493. **Gold open access under CC BY; read in full via
-escholarship.org/content/qt0cc1t3fs/qt0cc1t3fs.pdf.** Marco Pinheiro is at Instituto Superior
+escholarship.org/content/qt0s14445q/qt0s14445q.pdf.** Marco Pinheiro is at Instituto Superior
 Técnico and at EDP, the Portuguese utility, and declares that as a competing interest; the work was
 part of an internal EDP project.
 
@@ -1915,7 +1917,7 @@ Open publication of deliverables is a condition of SIF funding, and they had.
 ### 10b. Installed PV capacity detection on LV substations
 
 *Comparison of Data-Driven and Model-Based methods.* International Journal of Electrical Power &
-Energy Systems, 2026 (doi 10.1016/j.ijepes.2026.110904; ScienceDirect S0142061526002905). **Abstract
+Energy Systems, 2026 (doi 10.1016/j.ijepes.2026.111848; ScienceDirect S0142061526002905). **Abstract
 and preview only — not read in full.**
 
 Included because it is a direct benchmark of the exact problem our capacity-estimation item poses:
@@ -2512,6 +2514,91 @@ the ones most likely to change a conclusion. Items 20–22 should probably not h
 
 ---
 
+## Sources found by the second-round coverage review
+
+These were missed by the first search and are all cited in the Milestone 2 section. Every DOI below
+was verified against Crossref, and every portal record was read directly.
+
+**GB network-innovation projects.** The first search looked for UK innovation projects and recorded
+no results; it missed all of these.
+
+- **SSEN TRANSITION** (Network Innovation Competition, Oxfordshire, load-forecasting dissemination
+  report V3, November 2021). Net load at 13 primary substations, their bulk supply points and 11 kV
+  feeders, 30 minutes to 10 days ahead. **40-member ICON-EU-EPS ensemble to H+120, then MOSMIX as a
+  single deterministic scenario to H+240** — so 41 weather scenarios in total. Disaggregates net
+  load into demand and generation and recomposes it. Uses the connectivity map, and lists
+  "historical network connectivity data availability is just as important as historical net demand
+  and generation measurements" as a headline learning. Calibration: all primary substation models
+  below 10% MAPE except two (13.4% and 19.7%); 94% of 11 kV feeders below 20%. The live PDF now
+  redirects to the project landing page; read the Internet Archive snapshot of
+  `ssen-transition.com/wp-content/uploads/2021/11/TRANSITION-Load-Forecasting-Dissemination-Report-Final-V3.pdf`.
+  **This is the closest precedent for our method and it weakens gaps 1, 4, 5 and 6 as originally
+  written.** What survives: the ensemble stops at four days, and the trial was 13 substations.
+
+- **EFFS** (Western Power Distribution, now NGED; NIC, Jan 2018 – Nov 2021, £3,338,896;
+  <https://smarter.energynetworks.org/projects/wpden03/>). GSPs, BSPs, primary substation
+  transformers and generation sites, hour-ahead to six months. Independently selected XGBoost as the
+  best accuracy-versus-effort trade-off. Deterministic only. This is NGED's own predecessor project
+  and the review should not omit it.
+
+- **NIA_UKPN0104**, "AI for Visibility and Forecasting of Renewable Generation" (UK Power Networks,
+  Oct 2024 – Jul 2026, £389,444, third parties Open Climate Fix and Sheffield Solar;
+  <https://smarter.energynetworks.org/projects/nia_ukpn0104/>). Infers unmetered solar capacity
+  behind substations, and the portal record states the capacity estimates "feed into a solar forecast
+  algorithm to produce forecasts of unmetered solar generation at primary substations".
+  **This refutes the unqualified form of gap 5, and OCF is a partner.**
+
+- **SSEN FastTrack** (SIF Round 4 Alpha, 2025–2026, £554,998, with Faculty;
+  <https://smarter.energynetworks.org/projects/10166254/>) — probabilistic load forecast per
+  substation rolled up to GSP. **SP Energy Networks Predict4Resilience** (SIF Beta, £5,020,674;
+  <https://smarter.energynetworks.org/projects/10061710/>) — ensemble NWP driving a probability
+  distribution of network faults per district to 7 days, in a control room. **Energy Systems
+  Catapult DNO Forecasting Forum** — NGED participates and wrote its forecasting taxonomy.
+
+**Papers.**
+
+- **Paredes & Vargas (2017)**, doi 10.1049/iet-gtd.2017.0129, and **Paredes, Vargas & Maldonado
+  (2020)**, doi 10.1049/iet-gtd.2018.7127. Four methods that *adjust* reconfiguration-affected
+  history rather than deleting it, on six years of hourly data across 169 real feeders; the 2020
+  follow-up forecasts future reconfiguration events. **Refutes "nobody keeps the history".**
+- **Huyghues-Beaufond et al. (2020)**, doi 10.1016/j.apenergy.2019.114405. 342 UK MV feeders;
+  structural breaks detected by binary segmentation and removed. The canonical detect-and-delete
+  citation, and UK.
+- **Ludwig, Arora & Taylor (2023)**, doi 10.1080/01605682.2022.2115411. GB national load, 51-member
+  ECMWF ENS, 1–6 days, with **EMOS post-processing plus ensemble copula coupling before the load
+  model** because raw ensembles are biased and under-dispersed. Names LV-hierarchy application as
+  future work. Arora co-authored Haben et al. 2021, whose own future-work list asks for the same
+  thing. **This is the missing link between Taylor & Buizza 2002 and us.**
+- **Nespoli et al. (2020)**, doi 10.1016/j.epsr.2020.106755 (arXiv 1910.03976), and **Ben Taieb,
+  Taylor & Hyndman (2021)**, doi 10.1080/01621459.2020.1736081. Hierarchical reconciliation on a
+  real Swiss distribution grid, and the probabilistic version. Narrows gap 6 to: reconciliation uses
+  only the summation constraint, which carries no adjacency information and which an abnormal
+  running arrangement invalidates by construction.
+- **Kara et al. (2018)**, doi 10.1016/j.segan.2017.11.001; **Li et al. (2021)**, doi
+  10.1109/TPWRS.2020.3035639; **Stratman et al. (2023)**, doi 10.1109/TIA.2023.3276356. Solar
+  disaggregation at feeder-head and substation level — above household level, so the
+  behind-the-meter exclusion does not cover them.
+- **Göçmen et al. (2021)**, doi 10.5194/wes-6-111-2021. Available-power estimation for a
+  down-regulated turbine, from the turbine's own instrumentation. The technique behind gap 7, one
+  level down.
+- **Haben, Giasemidis, Ziel & Arora (2019)**, doi 10.1016/j.ijforecast.2018.10.007. 100 real LV
+  feeders, forecast *and* observed temperature, no effect or a negative one. **Counter-evidence.**
+- **Haben, Voss & Holderbaum (2023)**, doi 10.1007/978-3-031-27852-5. Open-access book-length update
+  from the lead author of the 2021 review; better entry point than the review for post-2020 work.
+- **Browell et al. (2025)** is now journal-published: doi 10.1016/j.ijforecast.2025.10.005.
+
+**Counter-evidence found in this round.** Browell & Fasiolo compared GAM-Point against GAM-Grid
+across 14 GB regions: significantly better in two, significantly **worse in three**, indistinguishable
+in nine — gridded NWP statistics added no value in their framework. Artificial Forecasting bought
+postcode-level forecasts for Meadowfield and Hazlehead and reported no notable improvement. Both bear
+directly on our ensemble-on-a-spatial-grid bet and are now in the report.
+
+**Still unaudited.** No CIRED paper is cited anywhere in these notes, and CIRED is the venue this
+audience reads. There is at least one on-topic paper (Ruhhütl et al., "Load and generation forecast
+on substation level", CIRED 2023, doi 10.1049/icp.2023.0476) and an unverified 2000 CIRED paper on
+load forecasting under MV network reconfiguration that would bear on gap 4. Chase the IET CIRED
+archive before relying on either absence claim.
+
 ## Full reference list
 
 - Browell, J., van der Meer, D., Kälvegren, H., Haglund, S., Simioni, E., Bessa, R. J. & Wang, Y.
@@ -2555,7 +2642,7 @@ the ones most likely to change a conclusion. Items 20–22 should probably not h
   117798. arXiv:2106.00006.
 - Pinheiro, M. G., Madeira, S. C. & Francisco, A. P. (2023). Short-term electricity load
   forecasting — A systematic approach from system level to secondary substations. *Applied Energy*,
-  332, 120493. Open access (CC BY): escholarship.org/content/qt0cc1t3fs/qt0cc1t3fs.pdf.
+  332, 120493. Open access (CC BY): escholarship.org/content/qt0s14445q/qt0s14445q.pdf.
 - Haben, S., Ward, J., Vukadinović Greetham, D., Singleton, C. & Grindrod, P. (2014). A new error
   measure for forecasts of household-level, high resolution electrical energy consumption. *IJF*,
   30(2), 246–256. (The adjusted *p*-norm error used by Pinheiro et al. at substation level.)
