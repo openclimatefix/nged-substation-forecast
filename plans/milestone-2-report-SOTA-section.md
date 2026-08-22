@@ -15,10 +15,10 @@ Secondly - and perhaps most importantly - the fact that the industry doesn't yet
 This review cites around fifty-five published sources. We read most of the ones an argument rests on
 in full; the rest were available to us only as an abstract, a preprint or part of a paper, and
 wherever a claim rests on a partial read we say so at the point the claim is made. We also read the
-published deliverables of six concurrent GB network projects. The selection was deliberate rather
-than systematic: a paper earned its place by bearing on a decision Flexpectation actually faces and
-by changing something we believed. Papers may be missing for no better reason than that we did not
-find them, and the section "What this review excluded, and why" lists what we knowingly left out. A
+published deliverables of nine GB network projects. The selection was deliberate rather than
+systematic: a paper earned its place by bearing on a decision Flexpectation actually faces and by
+changing something we believed. Papers may be missing for no better reason than that we did not find
+them, and the section "What this review excluded, and why" lists what we knowingly left out. A
 further group of papers is cited once each, for one specific result, rather than reviewed.
 
 One concurrent project is cited more than any paper: Northern Powergrid's Artificial Forecasting, an
@@ -874,9 +874,11 @@ this network under its former name, with 673 participants and around 137,000 cha
 the demand of a group of chargers as `Group Demand = N·P + Q√N`, where P is the mean demand per
 charger and Q the deviation. The mean scales with the number of chargers and the deviation only with
 its square root, so relative uncertainty falls as more chargers are added, exactly as it does for
-any other diversified domestic load. A Danish study of charging coincidence fits the same decay and
-measures an exponent of about 0.43 to 0.46 against the 0.5 that complete independence would give,
-which puts a number on how much synchronisation there actually is.
+any other diversified domestic load. [Bollerslev et al.
+(2022)](https://doi.org/10.1109/TTE.2021.3088275) fit the same decay to Danish driving and plug-in
+behaviour and measure the exponent at 0.43 to 0.46 across battery sizes and charger ratings, against
+the 0.5 that complete independence would give, which puts a number on how much synchronisation there
+actually is.
 
 **What makes electric-vehicle charging the harder network problem is when it lands, and that an
 automated tariff can re-synchronise a population that had diversified.** In Electric Nation's third
@@ -1112,17 +1114,20 @@ benchmark, published as they go, so that the next team does not have to start wh
 
 ## What GB networks have already built
 
-Six concurrent or recent GB network-innovation projects bear on this work, and between them they
+Nine concurrent or recent GB network-innovation projects bear on this work, and between them they
 have built more of what Flexpectation needs than the academic literature has. Five are summarised
-here; the sixth, Northern Powergrid's Artificial Forecasting, gets its own section below because
-this review leans on it more heavily than on any other.
+here. The sixth, Northern Powergrid's Artificial Forecasting, gets its own section below because
+this review leans on it more heavily than on any other. The remaining three — Electricity North
+West's ATLAS, UK Power Networks' Distribution Network Visibility and this network's own Time Series
+Data Quality — are described under problems 4 and 6 instead, because what they contribute is about
+finding bad and switched measurements rather than about forecasting.
 
 **Scottish and Southern Electricity Networks' TRANSITION** (Network Innovation Competition,
 Oxfordshire, reported 2021) is the closest precedent for Flexpectation's method. It forecast net
-load at 13 primary substations, their bulk supply points and their 11 kV feeders, from 30 minutes to
-10 days ahead. SSEN TRANSITION drew its uncertainty from the 40 members of the German weather
-service's ICON-EU ensemble. It split each substation's net load — demand minus whatever generation
-behind that substation happened to produce — into demand and generation, forecast the two
+load at 13 primary substations, their bulk supply points and their 33 kV and 11 kV feeders, from 30
+minutes to 10 days ahead. SSEN TRANSITION drew its uncertainty from the 40 members of the German
+weather service's ICON-EU ensemble. It split each substation's net load — demand minus whatever
+generation behind that substation happened to produce — into demand and generation, forecast the two
 separately, then recombined them. And it used the network connectivity map, the record of which
 substation feeds which, throughout: the project ranks "historical network connectivity data
 availability" as being just as important as the demand measurements themselves. Two limits of SSEN
