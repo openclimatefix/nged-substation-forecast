@@ -587,6 +587,23 @@ same way. They also report that when their bottom-up estimate fails, the cause i
 topology data rather than a bad algorithm — a warning about the network records that any such
 estimate depends on.
 
+**A GB network operator separated switching from bad data six years before that, with cruder tools
+and no published accuracy.** Electricity North West's
+[ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project processed five years of
+half-hourly demand for "over 70 BSPs and 380 primary substations" — a larger GB fleet than
+Flexpectation's trial area by two orders of magnitude. It works in stages. The first flags any
+abrupt change, using a threshold of 80% of the standard deviation of the demand series. The second
+then decides what kind of change it was, and this is the part that matters here: one rule handles
+blocks of "unreasonably zero or negative demand", and a separate rule handles "switching operations
+and network reconfigurations", each firing when the block's mean sits more than a set percentage
+away from the mean of the whole series — 50% for the first, 30% for the second. So the distinction
+between a broken meter and a reconfigured network was drawn on GB primary substations, on power
+alone, without a bottom-up reference series. What ATLAS never reports is how often either rule is
+right: there are no precision or recall figures anywhere in its documents, and the project falls
+back on "the importance of visual sense checks of the obtained processed demand data". That is the
+shape of the GB precedent — the problem was recognised and a rule was written, but nobody measured
+the rule.
+
 **Where the gaps are: the published method detects on a residual we cannot build the same way, and
 the events NGED cares about are harder than the ones detected.** A switch at NGED usually fans out
 to two or three neighbouring substations rather than one, and the common case is a *partial*
@@ -677,6 +694,36 @@ monitoring equipment by comparing each measurement against a short-term load for
 the wild, and the fault taxonomy is calibration gain and offset drift plus outliers, not the stuck
 values, false zeros and multi-month gaps that dominate NGED's telemetry.
 
+**Three GB network innovation projects made faulty metering their subject, and one of them was this
+network's own.** UK Power Networks' [Distribution Network
+Visibility](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_version_3.0_270214.pdf)
+project (Low Carbon Networks Fund, reported 2014) checked its remote terminal units against physics
+rather than against a forecast: apparent power must equal the root of real power squared plus
+reactive power squared, and where it does not, something is wrong with the installation — "an error
+with the physical connection of the RTU CTs or voltage connections such as direction, wiring
+connection, placement, ratio or dual tail issues". They ran it over 377 units and found that "95%
+were found to obey the expected logic within 15 kVA, with 5% identified as probably having
+installation problems", then put the check into a daily health report that ranks units for
+maintenance. Alongside it they defined six named anomaly patterns — dropouts to a fixed value,
+spikes, flat-lining above zero, gaps, flat-lining at zero, and out-of-range values — which is close
+to the taxonomy NGED's telemetry needs. Their caution is worth repeating: "Different users have a
+different view on what is a data quality point... For Control engineers operating in real time, the
+data may represent a system event. However, for Planning engineers, the data may corrupt any
+statistical analysis they wish to undertake." A run of implausible values is a fault to a forecaster
+and a real event to a control engineer, and only the purpose settles which.
+
+**This network's own predecessor ran the same investigation on the same telemetry, and its findings
+should temper what we expect to find.** Western Power Distribution's [Time Series Data
+Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/) project (Network Innovation
+Allowance, reported March 2017) checked SCADA analogues for zeros, for "non-varying non-zero values,
+perhaps indicating a 'stuck' or incorrectly configured sensor", and for gaps, across all four
+licence areas. It found that "13.8% of all analogues in the WPD South-West licence area are only
+recording 0 values. (20.7% companywide)", that the share of PowerOn data points unavailable to
+planners ran from 1% in the South West to 36% in the Midlands, and — the finding most relevant to
+problems 3 and 7 — that "63% of all new solar sites across the company have not had their analogues
+commissioned correctly". Flexpectation should expect metering defects at that prevalence rather than
+as an exception.
+
 **Everywhere else, faulty metering appears as a data-cleaning step described in passing rather than
 as a problem in its own right.** [Mendonça Severiano et al.
 (2026)](https://doi.org/10.1016/j.solener.2026.114382) classify solar underperformance, but from
@@ -692,16 +739,28 @@ portal](https://www.liander.nl/over-ons/open-data) as "STORM onderstation", expl
 others can train and validate algorithms against it. That is the one place in this review where the
 evaluation data for a problem is already public.
 
-**Where the gaps are: the fault taxonomy, a GB equivalent, and a reference series to detect
+**Where the gaps are: the fault taxonomy, a measured GB detector, and a reference series to detect
 against.** The Dutch labels collapse switching events and measurement errors into a single class, so
 they cannot separate a stuck meter from a network reconfiguration — which is exactly the distinction
 problems 4 and 6 have to make between them — and four per cent of their timestamps are labelled as
 the labeller being unsure. They describe a Dutch network, and [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164) detect on a residual against a bottom-up load estimate
-NGED does not have and cannot build. Nothing else we found addresses recovering the direction of
-flow from a magnitude-only meter at all. A GB labelled set, with a taxonomy that separates metering
-faults from switching, is a gap this project can close cheaply, because the trial area is small
-enough to label by hand.
+NGED does not have and cannot build. None of the three GB projects above reports how often its
+checks are right, and none published its labels, so there is no GB number to compare a new detector
+against.
+
+**Recovering the direction of flow from a magnitude-only meter has been attempted in GB, by this
+network's predecessor, and left unfinished.** [Time Series Data
+Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/) set out to "first detect then
+assign directions to power flows where absent". What it reports achieving is more modest than that
+objective — plotting every analogue made it "clear where (for example in cases of generation) the
+directional sense of analogues was incorrectly set", and correction was explored "by (for example)
+flipping the direction/sense of a suitable candidate feeder" where summed currents at a transformer
+and along its feeders failed to reconcile by more than a threshold. That is a manual,
+engineer-triggered process feeding a rectification list, not an automatic detector, and no accuracy
+is reported for it. The objective is nine years old and still open. A GB labelled set, with a
+taxonomy that separates metering faults from switching, is a gap this project can close cheaply,
+because the trial area is small enough to label by hand.
 
 ### 7. Disaggregating unmetered solar and wind from a substation's net flow
 
