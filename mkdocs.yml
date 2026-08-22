@@ -57,6 +57,7 @@ nav:
       - NGED's Incumbent Forecast: background/nged-incumbent-forecast.md
       - Data Quality: background/data-quality.md
       - Switching Events: background/switching-events.md
+      - "Energy Forecasting: State of the Art": background/energy-forecasting-review.md
   - Techniques:
       - Overview: techniques/index.md
       - Convex Optimisation: techniques/convex-optimisation.md
