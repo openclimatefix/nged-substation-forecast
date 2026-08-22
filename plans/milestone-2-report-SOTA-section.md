@@ -24,13 +24,13 @@ further group of papers is cited once each, for one specific result, rather than
 One concurrent project is cited more than any paper: Northern Powergrid's Artificial Forecasting, an
 Ofgem Strategic Innovation Fund programme whose Alpha and Beta deliverables are both public, and
 which has its own section below. Three further sources carry findings rather than comparable scores,
-and are drawn on throughout. [Haben et al. 2021](https://arxiv.org/abs/2106.00006) reviewed 221
+and are drawn on throughout. [Haben et al. (2021)](https://arxiv.org/abs/2106.00006) reviewed 221
 low-voltage forecasting papers published to 2020. [Shukla and Hong
-2024](https://doi.org/10.1049/stg2.12162) reports the BigDEAL competition across three neighbouring
-US distribution companies. [Energy-Arena](https://arxiv.org/abs/2604.24705) is a live public
-leaderboard rather than a competition — we could not extract the full paper and worked from its
-abstract and the running platform, which today carries 24 deterministic challenges across prices,
-load, wind and solar.
+(2024)](https://doi.org/10.1049/stg2.12162) reports the BigDEAL competition across three
+neighbouring US distribution companies. [Energy-Arena](https://arxiv.org/abs/2604.24705) is a live
+public leaderboard rather than a competition — we could not extract the full paper and worked from
+its abstract and the running platform, which today carries 24 deterministic challenges across
+prices, load, wind and solar.
 
 Almost every number in this review depends on where in the network it was measured, so here is the
 voltage ladder of a distribution network, from the top down:
@@ -125,14 +125,14 @@ expect a shorter horizon.
 
 | Source | What they forecast | Level and scale | Horizon | Result, and what it was compared against | Weather |
 |---|---|---|---|---|---|
-| [Kaas et al. 2026](https://arxiv.org/abs/2607.01966) | Net load, Germany | Low-voltage feeder: 200 | 4 days | A general-purpose foundation model that had never seen the data beat every purpose-trained model on average error, 3.8 kW against 4.2 kW | Actual weather, after the fact |
-| [Hertel et al. 2026](https://arxiv.org/abs/2607.15705) | Load, Germany and Portugal | Transmission, plus 200 low-voltage feeders and 287 individual customers | 4 days | Best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage feeders, 23.3% at individual customers | Reanalysis and 1–3 h forecasts |
-| [Browell and Fasiolo 2021](https://arxiv.org/abs/2103.10335) | Regional net load, GB | Regional: 14 grid supply point groups | Day-ahead | Held the same risk with **up to 24.6% less upward reserve** than a fixed-tail alternative (note 1) | Real forecasts |
-| [Pinheiro et al. 2023](https://doi.org/10.1016/j.apenergy.2022.120493) | Load, Portugal | Secondary substation: 96,989 | Day-ahead | 42–47% better than the reference benchmark at system level. **At substation level, beat a naive forecast on 83–87% of network-owned and 66–70% of customer-owned sites** | Real forecasts, 7–8 h old |
-| [Gilbert et al. 2023](https://arxiv.org/abs/2206.11745) | Load, GB | Four levels: primary substation down to household | Day-ahead | Combining forecasts gained **0.0–0.4% averaged over all periods**, but **5.7–9.0% when restricted to peaks** | None at all |
+| [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) | Net load, Germany | Low-voltage feeder: 200 | 4 days | A general-purpose foundation model that had never seen the data beat every purpose-trained model on average error, 3.8 kW against 4.2 kW | Actual weather, after the fact |
+| [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) | Load, Germany and Portugal | Transmission, plus 200 low-voltage feeders and 287 individual customers | 4 days | Best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage feeders, 23.3% at individual customers | Reanalysis and 1–3 h forecasts |
+| [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) | Regional net load, GB | Regional: 14 grid supply point groups | Day-ahead | Held the same risk with **up to 24.6% less upward reserve** than a fixed-tail alternative (note 1) | Real forecasts |
+| [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) | Load, Portugal | Secondary substation: 96,989 | Day-ahead | 42–47% better than the reference benchmark at system level. **At substation level, beat a naive forecast on 83–87% of network-owned and 66–70% of customer-owned sites** | Real forecasts, 7–8 h old |
+| [Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) | Load, GB | Four levels: primary substation down to household | Day-ahead | Combining forecasts gained **0.0–0.4% averaged over all periods**, but **5.7–9.0% when restricted to peaks** | None at all |
 | [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | Primary substation: 13, plus their bulk supply points and 11 kV feeders | 30 min to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted (note 2) | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
 | [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | Primary substation: 551 with export data, 171 modelled; secondary: 729 | Day-ahead to 11 days at primary; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method (note 3) | Real forecasts at primary; none in the published secondary results |
-| [Ruhhütl et al. 2023](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Substation | Day-ahead | **3 to 8% mean absolute percentage error**, varying with how industrial and how large the supplied area was; linear and Gaussian regression preferred over the alternatives tested (abstract only) | Not stated in the abstract |
+| [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Substation | Day-ahead | **3 to 8% mean absolute percentage error**, varying with how industrial and how large the supplied area was; linear and Gaussian regression preferred over the alternatives tested (abstract only) | Not stated in the abstract |
 
 *Notes.* **1.** The 24.6% saving is at the most extreme tail level Browell and Fasiolo (2021)
 tested, and falls to 3.2% at the least extreme. **2.** The two SSEN TRANSITION models that missed
@@ -300,7 +300,7 @@ dispatched on market prices and operator decisions, and no weather forecast cont
 
 **Forecasting wind and solar output from a weather forecast is the most mature problem on this list,
 and the one where the literature can compare itself.** [Browell et al.
-2025](https://doi.org/10.1016/j.ijforecast.2025.10.005) report the Hybrid Energy Forecasting and
+(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report the Hybrid Energy Forecasting and
 Trading Competition (HEFTCom), in which every team forecast the combined day-ahead output of one GB
 portfolio — the 1.2 GW Hornsea 1 offshore wind farm plus the aggregate solar capacity of East
 England, about 3.6 GW together — from real weather forecasts as they arrived. The winning team
@@ -1005,11 +1005,11 @@ be read rather than inferred from a deliverable.
 **The second is far larger than any project here.** Enedis, the French distribution network
 operator, has forecast consumption and generation at all 2,300 of its high-voltage-to-medium-voltage
 substations since 2015, and is now extending that to a finer geographic grid ([Cordier et al.
-2024](https://doi.org/10.1049/icp.2024.2058), whose abstract we read rather than the full paper). A
-high-voltage-to-medium-voltage substation in France is broadly the level of a GB primary substation.
-Forecasting operationally at the scale Flexpectation reaches in 2027 is therefore a decade old
-somewhere else, which is reassuring about the engineering and says nothing about the forecast
-quality, because the paper reports none.
+(2024)](https://doi.org/10.1049/icp.2024.2058), whose abstract we read rather than the full paper).
+A high-voltage-to-medium-voltage substation in France is broadly the level of a GB primary
+substation. Forecasting operationally at the scale Flexpectation reaches in 2027 is therefore a
+decade old somewhere else, which is reassuring about the engineering and says nothing about the
+forecast quality, because the paper reports none.
 
 ### Northern Powergrid's Artificial Forecasting is further ahead, and sets the bar
 
