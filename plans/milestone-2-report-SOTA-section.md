@@ -1136,11 +1136,11 @@ properly is the first deliverable on this strand, before any model.
 
 The eight problems above need three different kinds of evaluation, and this literature is far
 stronger on the first than on the other two. Forecasting has settled practice we can adopt.
-Estimating something nobody measures — an effective capacity, an unmetered solar output — has four
-substitutes for ground truth and no agreement on which to use. Detecting rare events has good
-academic practice and, in GB, no precedent that measured anything at all. This section says what we
-will do about each, and it is placed before the recurring findings because the answer changed how we
-intend to run the project rather than only how we intend to report it.
+Estimating something nobody measures — an effective capacity, an unmetered solar output — has six
+possible substitutes for ground truth, of which this literature uses four. Detecting rare events has
+good academic practice and, in GB, no precedent that measured anything at all. This section says
+what we will do about each, and it is placed before the recurring findings because the answer
+changed how we intend to run the project rather than only how we intend to report it.
 
 ### Forecasting: problems 1, 2 and 5
 
@@ -1185,18 +1185,24 @@ stride as future work, and describe exactly what it would create — "each data 
 covered by multiple forecasts, as opposed to a single forecast per data point in the used
 configuration".
 
-**So this is a gap in the field's practice rather than a solved problem we can look up, and we will
-say what we did about it.** Our evaluation will score each lead time separately, so that a day-ahead
-forecast is never averaged together with a fourteen-day one; will cut folds at forecast origins and
-drop any origin whose 14-day target window crosses the boundary, so no target half-hour appears in
-both training and test; and will treat the forecast origin rather than the target half-hour as the
-unit when judging whether a difference between models is real. Two of the reviews we read ask for
-less than that and are still worth meeting: [Haben et al. (2021)](https://arxiv.org/abs/2106.00006)
-ask that "how the data is split into train and test sets should be clearly stated" and that "a
-validation set should have been defined and be separate from the test set", while [Hong et al.
-(2020)](https://doi.org/10.1109/OAJPE.2020.3029979) advise authors whose results look too good to
-"perform sanity checks and see if future information has leaked into the process during parameter
-estimation, model selection, or tuning of hyper-parameters".
+**Flexpectation's own protocol matches this literature where the literature has settled, and
+inherits the open question where it has not.** We use an expanding training window with the
+validation window lying strictly after it, which is what every paper above does. Our validation
+window is a complete year, which meets [Pinheiro et al.
+(2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s rule that "one year is the minimum
+acceptable to test a forecasting model whose target value shows annual seasonality". Power lag
+features shorter than the lead time are nullified, so a forecast can never see the load it is
+predicting. What none of that settles is the overlap question: our forecasts are reissued every six
+hours over a 14-day horizon, so the same target half-hour is scored 56 times, and we do not yet know
+how much that inflates the apparent precision of a comparison between two models. We will report
+what we did about it rather than leave it implicit, and we treat it as an open methodological
+question rather than a solved one, because no paper in this review offers an answer to copy. Two of
+the reviews we read ask for less and are still worth meeting: [Haben et al.
+(2021)](https://arxiv.org/abs/2106.00006) ask that "how the data is split into train and test sets
+should be clearly stated" and that "a validation set should have been defined and be separate from
+the test set", while [Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979) advise authors
+whose results look too good to "perform sanity checks and see if future information has leaked into
+the process during parameter estimation, model selection, or tuning of hyper-parameters".
 
 **On metrics for these three problems, the review's commitments are collected under "Publishing
 results that others can compare against" below, and two cautions from this literature belong with
@@ -1209,7 +1215,10 @@ late is punished twice, once for the peak that did not happen and once for the p
 scores worse than a flat line. The second caution is [Gilbert et al.
 (2023)](https://arxiv.org/abs/2206.11745)'s finding, described under problem 1 above, that
 cross-validation flattered the aggregation levels relative to their held-out test. We will report
-both numbers wherever we report either.
+both numbers wherever we report either. That finding also bears on a risk we have already written
+down: a single validation fold that serves as both the model-selection set and the reported result
+will flatter whichever model won, the more so the more experiments are run against it, and the
+remedy is a final-test window that no experiment is scored on until a champion has been chosen.
 
 ### Estimating something nobody measures: problems 3, 7 and 8
 
@@ -1219,8 +1228,8 @@ that estimate them say so.** [Viotti et al. (2026)](https://doi.org/10.1002/we.7
 straight forward, and there are potential weaknesses in both evaluation methods". [Gouveia et al.
 (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) put it the same way about rooftop solar: "as
 there is no information on installed PV capacity, no ground truth exists for these values for the
-consumers with installed PV". Between them this literature uses four substitutes for truth, and each
-one fails differently.
+consumers with installed PV". Between them this literature uses four substitutes for truth, each of
+which fails differently, and leaves two more on the table.
 
 **The first is to hold out sites that are metered and pretend they are not.** [Teng et al.
 (2023)](https://doi.org/10.1016/j.rser.2023.113662) take ten Dutch substations with complete
@@ -1271,15 +1280,37 @@ the embedded generation capacities out of the model raised the static model's no
 more than 10% and moved the adaptive model's by 0.4%, which is evidence that the adaptation tracks
 capacity implicitly — though they never check the value it recovers against the real one.
 
-**What we will do is use all four, name which one produced each number, and treat them as answering
-different questions.** The hold-out is the most direct and we have the sites for it at problems 3
-and 7. Injection is the only way to test a de-rating we have not seen, and we will publish the
-injected case alongside the score so that a reader can judge how realistic it was. The
-independent-tool comparison is available for solar through RdTools and Solar Data Tools, and tells
-us only whether we agree with an existing method, not whether either is right. The downstream test
-is the one that settles whether the work was worth doing at all, and problem 3 above states it as an
-open question this project intends to answer: whether estimating effective capacity improves the
-forecast NGED actually buys flexibility against.
+**Two further substitutes barely appear in this literature at all, and both are worth having.** The
+first is to check an estimate against physics rather than against an answer. Disaggregated
+components must sum to the measured net flow; disaggregated solar must be zero at night and must sit
+under the clear-sky envelope; disaggregated wind must track wind speed rather than irradiance; an
+inferred rooftop-solar capacity must be plausible for the area a substation serves. None of those
+checks needs a label, and a violation is a detectable error whatever the truth turns out to be. What
+the papers above do with physics is a different thing: they build it into the method as a
+constraint, so it can never be violated and therefore never tests anything. [Viotti et al.
+(2026)](https://doi.org/10.1002/we.70136) optimise subject to a maximum system efficiency and a
+monotonicity condition; [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) run a
+physical correction model as the last stage of DAZLS;
+[OpenSTEF](https://lfenergy.org/projects/openstef/)'s splitter guarantees its components sum to the
+total it started from. Using physical consistency to *score* an estimate, rather than to *shape* it,
+is close to absent here, and it is the cheapest evaluation on this list. The second is a substation
+where every feeder and every embedded generator is metered for a period, used only as validation.
+One such site would anchor everything else, and none of the papers above had one.
+
+**What Flexpectation will do is run all six and treat agreement between them as the signal, because
+no one of them is trustworthy alone.** They are not six attempts at the same measurement: the
+hold-out is biased towards the sites that happen to be metered; synthetic aggregation systematically
+flatters, because a clean sum of metered sources has no switching events, no false zeros and no
+unmetered load, so it should always be reported as performance under idealised aggregation rather
+than as real-world skill; the independent-tool comparison says only whether we agree with an
+existing method; the physics checks find wrongness but never confirm rightness; and the downstream
+test measures whether the estimate is *useful*, which is not the same as whether it is *right* — an
+estimate that is wrong in a way the forecast does not care about will score well. For the metered
+generators of problem 3 the same logic produces a head-to-head contest between candidate estimators
+in which downstream forecast skill decides, with synthetic fault injection, precision and recall of
+the fitted change dates against NGED's maintenance records, robustness to unlogged curtailment, and
+the calibration of each estimator's stated uncertainty as the supporting evidence. Every number we
+publish will say which of these produced it.
 
 ### Detecting rare events: problems 4 and 6
 
