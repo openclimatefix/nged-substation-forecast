@@ -12,15 +12,14 @@ Secondly - and perhaps most importantly - the fact that the industry doesn't yet
 
 ## What we read
 
-This review was written for National Grid Electricity Distribution (NGED). It cites around
-fifty-five published sources. We read most of the ones an argument rests on in full; the rest were
-available to us only as an abstract, a preprint or part of a paper, and wherever a claim rests on a
-partial read we say so at the point the claim is made. We also read the published deliverables of
-six concurrent GB network projects. The selection was deliberate rather than systematic: a paper
-earned its place by bearing on a decision Flexpectation actually faces and by changing something we
-believed. Papers may be missing for no better reason than that we did not find them, and the section
-"What this review excluded, and why" lists what we knowingly left out. A further group of papers is
-cited once each, for one specific result, rather than reviewed.
+This review cites around fifty-five published sources. We read most of the ones an argument rests on
+in full; the rest were available to us only as an abstract, a preprint or part of a paper, and
+wherever a claim rests on a partial read we say so at the point the claim is made. We also read the
+published deliverables of six concurrent GB network projects. The selection was deliberate rather
+than systematic: a paper earned its place by bearing on a decision Flexpectation actually faces and
+by changing something we believed. Papers may be missing for no better reason than that we did not
+find them, and the section "What this review excluded, and why" lists what we knowingly left out. A
+further group of papers is cited once each, for one specific result, rather than reviewed.
 
 One concurrent project is cited more than any paper: Northern Powergrid's Artificial Forecasting, an
 Ofgem Strategic Innovation Fund programme whose Alpha and Beta deliverables are both public, and
