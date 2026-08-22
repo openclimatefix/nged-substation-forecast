@@ -2593,11 +2593,7 @@ in nine — gridded NWP statistics added no value in their framework. Artificial
 postcode-level forecasts for Meadowfield and Hazlehead and reported no notable improvement. Both bear
 directly on our ensemble-on-a-spatial-grid bet and are now in the report.
 
-**Still unaudited.** No CIRED paper is cited anywhere in these notes, and CIRED is the venue this
-audience reads. There is at least one on-topic paper (Ruhhütl et al., "Load and generation forecast
-on substation level", CIRED 2023, doi 10.1049/icp.2023.0476) and an unverified 2000 CIRED paper on
-load forecasting under MV network reconfiguration that would bear on gap 4. Chase the IET CIRED
-archive before relying on either absence claim.
+**Now audited.** See "The CIRED audit" below. The lead about a 2000 CIRED paper on load forecasting under MV network reconfiguration was chased and not found; the nearest thing is Yasuoka (2001), whose load-transfer module was described as future work and never followed up.
 
 ## Sources found by the third-round wide-net coverage review
 
@@ -2831,8 +2827,7 @@ physics to a substation and put it inside a probabilistic forecast.
 
 - **Ruhhütl, Schmaranz & Dietrichsteiner (2023)**, "Load and generation forecast on substation
   level", *CIRED 2023*, IET Conference Proceedings 2023(6), 706–710,
-  <https://doi.org/10.1049/icp.2023.0476>. Kärnten Netz, Austria. Crossref carries no abstract;
-  **not yet read**. Cited in the report only to narrow the CIRED absence claim.
+  <https://doi.org/10.1049/icp.2023.0476>. Kärnten Netz, Austria. Abstract read via OpenAlex; full text paywalled on the IET Digital Library and on IEEE Xplore, and absent from the open CIRED repository. Day-ahead, deterministic, prefers linear or Gaussian regression, MAPE 3–8% varying with how industrial and how large the supplied area is. Weather input not mentioned. Corroborates findings 1 and 2; bears on none of the seven gaps.
 - **Akhtar, Mohammadi-Ivatloo & Lassila (2026)**, "Datasets for wind energy forecasting
   applications", *RSER* 236, 116941, <https://doi.org/10.1016/j.rser.2026.116941>. Over 1,400
   articles; strong geographic bias; proposes a benchmarking protocol. Published August 2026,
@@ -2861,6 +2856,125 @@ et al. (2026) and Kaas et al. (2026) remain the current benchmarks; Paredes & Va
 canonical "rewrite the history rather than delete it" citation. One earlier attribution was
 re-checked and confirmed correct: the claim that per-quantile pinball loss in the tail is too noisy
 to rank forecasting systems is near-verbatim Browell & Fasiolo (2021), Section V-A.
+
+## The CIRED audit
+
+Method: Crossref cursor dump of ISSN 2732-4494 and 2515-0855 for 2020–2026, filtered to the CIRED
+volume blocks, plus ISSN-level enumeration for CIRED 2017; abstracts pulled from OpenAlex. The
+resulting corpus is 4,151 records with 4,148 abstracts, covering CIRED 2017 Glasgow (695 papers),
+2020 Berlin Workshop (228), 2021 online (675), 2022 Porto Workshop (243), 2023 Rome (833), 2024
+Vienna Workshop (257) and 2025 Geneva (681) — about 3,600 CIRED papers, with roughly 540 adjacent
+non-CIRED IET conference records left in as a safety margin, which only strengthens the negatives.
+CIRED 2018 Ljubljana and 2019 Madrid are not in Crossref under the 10.1049 prefix; they were
+searched by query against the full-text-indexed DSpace API at `cired-repository.org`. Pre-2017 was
+sampled by targeted Crossref queries, not enumerated. Abstracts were read, not full texts: CIRED
+2023 and 2025 full texts are paywalled on the IET Digital Library and are not on the open
+repository, which stops at 2019.
+
+**No CIRED paper undercuts any of the seven absence claims.** The verified negatives, each
+re-derived independently rather than taken from the search agent:
+
+- **Weather ensembles.** Nine papers mention "ensemble" at all; one co-occurs with any weather word,
+  and it is about climate-change temperature extremes. Two name an NWP system. No CIRED paper drives
+  a load or generation forecast from a weather ensemble.
+- **Horizon.** 443 papers mention forecasting. Ten-day and week-ahead: zero. Forty-eight-hour: one.
+  Day-ahead: 22. The only 14-day forecast predicts feeder faults, not load
+  (<https://doi.org/10.1049/icp.2025.1612>).
+- **Tail.** Three papers use tail vocabulary, all irrelevant (IEC 61850, power-line communications,
+  rooftop PV profitability). One mentions pinball or CRPS, in a blockchain reserve paper.
+- **Probabilistic forecasting.** Fourteen papers, of which one is at MV substation scale.
+- **Switching-contaminated history.** Thirty-two papers on reconfiguration, four of which mention
+  forecasting; none is about what a reconfiguration does to a training set.
+- **Topology as adjacency.** Eight papers use graph or adjacency vocabulary; only Jung et al. (2024)
+  puts grid adjacency inside a forecasting model, and it forecasts voltage in simulation.
+- **Effective capacity.** 136 papers use capacity-availability vocabulary; all are hosting capacity,
+  inverter reliability or EV charging headroom.
+
+Added to the report: Wade et al. (2024), Cordier et al. (2024), Mesarcik et al. (2025), Jung et al.
+(2024), Pfeifer et al. (2021), and the LianderPower open dataset.
+
+**Audited, on-topic, and deliberately left out** — real and relevant, but changing no conclusion.
+Recorded here so the absence claims have a citable evidence base if challenged: Wiss & Ruwaida
+(2025) `icp.2025.2257`, five winters of congestion forecasts driving Swedish flexibility markets;
+Peppanen & Alvarez-Fernandez (2025) `icp.2025.2297`, an EPRI survey of DSO forecasting gaps;
+Gonçalves et al. (2021) `icp.2021.1696` and `icp.2021.2191`, E-REDES PREDIS forecasting 100k HV/MV
+connection points — the same operator as Pinheiro et al. (2023); Camal et al. (2023) `icp.2023.1212`,
+hierarchical reconciliation to the TSO/DSO interface; Howorth et al. (2023) `icp.2023.0471` and
+Plana Ollé et al. (2023) `icp.2023.1009`, the two closest CIRED papers to gap 3, both pricing
+decisions without holding risk constant; Lusis et al. (2025) `icp.2025.2219`, dynamic safety
+thresholds bolted onto a point forecast — the practice gap 2 argues against; Jayan et al. (2025)
+`icp.2025.1502`, propagating a *known* topology change into congestion calculations; Gérossier et al.
+(2017) `oap-cired.2017.0625`, the oldest genuinely probabilistic distribution forecast in CIRED;
+Heres et al. (2023) `icp.2023.0814` and Kloibhofer et al. (2017) `oap-cired.2017.1333`, gap-5
+adjacent but below our aggregation level; Yasuoka (2001) `cp:20010890`, whose promised load-transfer
+module is CIRED's only ever gesture at gap 4; Fox et al. (2018) `10.34890/134`, SP Energy Networks
+weather-correcting primary substation peaks with NWP — left out because that section covers
+network-innovation projects rather than papers, which is a judgement call worth revisiting.
+
+## The Dantas and Browell available-capacity algorithm
+
+Obtained. The Wiley supporting information is unreachable, but the paper's data-availability
+statement names nine Zenodo deposits, and DOI 10.5281/zenodo.13309890 ("Pre-processed BMRA data and
+scripts") contains `Pre-processing_AuxiliaryMaterial.pdf` — "Observational Data Preprocessing",
+Dantas & Browell, 6 pages — together with the Python that implements it. Both are saved to
+`literature/papers/` (which is gitignored, so they live on disk only). Note for future searches:
+`export.arxiv.org` is reachable from this machine even though `arxiv.org` is blocked.
+
+**They use the metered output alone, plus ERA5 reanalysis wind speed. No capacity register, no
+REMIT, no turbine-model data — they state that the BMRA database carries none.** Two stages:
+
+1. Find timestamps at rated power: a moving window of L = 4 half-hours where the spread of metered
+   output is under ΔP\* = 0.5 MW *and* wind speed is at or above rated throughout. At those
+   timestamps available capacity equals metered power. Rated wind speed is inferred per site as the
+   upper limit of the bin containing `argmax(f_w · w³)`, w binned at 1 m/s — entirely from the site's
+   own wind-speed distribution, because no turbine model is known. Wind speed is ERA5 at 100 m,
+   bilinearly interpolated to the farm's coordinates.
+2. Between two rated-power timestamps, capacity holds the earlier value; if metered power ever
+   exceeds the assigned capacity, that timestamp itself becomes a rated-power timestamp. So the
+   estimate is a step function that only ratchets up when the meter forces it.
+
+Two reliability filters, both from the metered output: drop timestamps where estimated availability
+is under 40% of the series maximum, and drop each farm's first six months of operation. Curtailment
+is handled by discarding half-hours with non-zero bid-acceptance volumes — the one input
+Flexpectation will not have for embedded generators.
+
+**Consequence for the report.** Two gap-7 claims were false and are now fixed: that nobody estimates
+this from a revenue meter alone, and that we could not say how Dantas and Browell did it. What
+survives is solar (the equivalent plateau test needs irradiance the site does not measure) and the
+absent outage register.
+
+## The Browell corpus audit
+
+Every load-bearing figure the report attributes to Browell's five papers was checked against the
+source text and **all are correct**: the 24.6%/3.2% reserve savings (Table IV, upward, 0.01% and
+0.25% levels), the 40%/60%/10% pinball-loss gains, the two-helped/three-hurt/nine-neutral split on
+spatial statistics, the 1st-and-99th-percentile calibration limit, Gilbert's 0.0–0.4% and
+5.7/9.0/8.2/6.0% figures and the peak-timing range, and the HEFTCom scoreboard (22.18, 23.18, 24.64,
+25.38, 53.58) with the Hornsea 1 episode.
+
+Two papers earned a place and are now cited: **Angus, Browell, Greenwood & Deakin (2027)**, "Risk-
+based dynamic thermal rating in distribution transformers via probabilistic forecasting", *EPSR*
+262, 113545, <https://doi.org/10.1016/j.epsr.2026.113545> (preprint arXiv:2603.11905), which holds
+risk constant at 644 individual LV transformers and so narrows gap 3; and **de Vilmarest, Browell,
+Fasiolo, Goude & Wintenberger (2024)**, "Adaptive Probabilistic Forecasting of Electricity
+(Net-)Load", *IEEE TPWRS* 39(2), 4154–4163, <https://doi.org/10.1109/TPWRS.2023.3310280>, which
+narrows gap 4 and supplies gap 7's strongest counter-argument — a Kalman-adapted GAM absorbed the
+removal of embedded generation capacities entirely (offline error up more than 10%, adaptive error
+down 0.4%).
+
+Considered and left out: Gioia et al. (2024) additive covariance matrices, and Browell, Gilbert &
+Fasiolo (2022) covariance structures — both share information statistically rather than
+topologically, which is the distinction gap 6 already draws with the hierarchical Bayesian example.
+Telford et al. (2021) Dirichlet-sampled LV capacity and loss estimation — network headroom from
+partial metering, not generation availability, but the right prior if the scale-up ever needs one
+for unobserved customers. Browell, Stock & McMillan (2019), "Recommendation for the Evaluation of
+Wind Farm Power Available Signal Accuracy" — scores an availability signal a farm already produces
+from its own telemetry, so it is the opposite problem, but it is the obvious yardstick if
+Flexpectation ever needs to score its own effective-capacity estimates. Donaldson, Browell & Gilbert
+(2023) BigDEAL peak timing — already covered by Shukla & Hong (2024) and Gilbert et al. (2023); its
+numbers were not verified. Tawn, Browell & Dinwoodie (2020), Messner et al. (2020), Möhrlen et al.
+(2022) and ProbCast — all say what Hong et al. (2020) and Tawn & Browell (2022) already say in the
+report.
 
 ## Full reference list
 
