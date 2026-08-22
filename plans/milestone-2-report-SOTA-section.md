@@ -556,9 +556,11 @@ as information rather than as damage.** Huyghues-Beaufond et al. (2020) leave th
 a side-effect of cleaning for outliers, and they report the result as a cost. The question we want
 to settle is whether the contamination can be made to earn its place. Instead of correcting the
 series, a model could be fed the difference between what a substation actually metered and what a
-model that ignores network topology expected it to meter. That difference is the same quantity
-Bouman et al. (2024) use to detect switch events, but used as a forecast input rather than as a
-detector, so a reading taken while the network was abnormally configured would still carry
+model that ignores network topology expected it to meter. That plays the same role as the residual
+Bouman et al. (2024) detect on, though it is built differently: theirs is metered load minus a
+topology-informed reconstruction, which goes stale the moment the network is switched, whereas ours
+would be metered load minus a model that never sees topology at all. Used as a forecast input rather
+than as a detector, so a reading taken while the network was abnormally configured would still carry
 information without anyone having to estimate a level correction first. A negative result here would
 still be valuable: evidence that switching cannot be recovered from power data alone would
 strengthen the case for taking switching labels from operational systems instead — a route
