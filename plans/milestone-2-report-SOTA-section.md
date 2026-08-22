@@ -180,15 +180,53 @@ models at different time resolutions, and the two metrics answer different quest
 results that others can compare against", the last section of this review, returns to what follows
 from those results being incomparable.
 
+**The larger of those two papers is the most direct measurement in this review of how forecast
+difficulty changes with voltage level, and its headline result is that the plain model won.**
+[Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) forecast 96 hours ahead, hourly, with a new
+forecast issued every hour, at three levels at once: one transmission control area over eleven
+years, the 200 low-voltage feeders over two years, and 287 individual customers over four years.
+Against a day-type persistence benchmark — the same hour on the most recent workday, Saturday or
+Sunday — the best model cut mean absolute error by 59.6% at the transmission level, 42.3% at the
+feeders and 23.3% at individual customers, and their reading of that is the one this review takes:
+"it is easier to outperform a simple approach on highly aggregated data than on the more volatile LV
+feeder and client-level data". The best model was a standard encoder-decoder Transformer, and it
+beat the authors' own purpose-built variant on all three datasets. They say so plainly: the
+architectural modifications "do not improve the forecast error compared to that of a standard
+Transformer", and the standard design "is already a strong model, and architectural modifications
+are not needed and can even lead to worse accuracy as it makes hyperparameter optimization more
+difficult".
+
+**Three further conclusions from that paper bear directly on how Flexpectation should build and
+report.** The first is that retraining beats architecture: on both datasets long enough to allow it,
+they refitted every model monthly on all data up to that point, and the retrained model beat its
+static counterpart, which they attribute to concept drift — the load changing shape underneath the
+model. The second is that weather and calendar inputs helped most on the two datasets "largely
+influenced by behind-the-meter photovoltaic power generation", which is the condition NGED's network
+is moving towards. The third is a warning about their own numbers, which we repeat because it
+applies to every figure in the table above: the errors "might be unrealistically low for real
+applications", because past load is assumed available immediately when in practice it arrives hours
+or days later, and because the weather they use was not available at forecast time. One
+qualification the abstract does not carry: the foundation model that wins at customer level was
+pre-trained on that dataset, so that particular comparison is not the zero-shot test it appears to
+be. And the whole benchmark is deterministic — the authors name probabilistic forecasting as future
+work, and note that a single number "does not cover the uncertainty of a forecast", which is
+precisely what Flexpectation exists to supply.
+
 **One study in the table shows how much an annual average hides.** [Gilbert et al.
 (2023)](https://arxiv.org/abs/2206.11745) forecast load at four levels of a hypothetical GB
 distribution hierarchy, from a primary substation down to individual households — built by
 aggregating 742 smart meters, so their top level is, as they say themselves, smaller than a real
-primary substation — and combined a conventional half-hourly forecast with a bespoke daily-peak
-forecast. Averaged over every period, that combination gained 0.0–0.4% over the conventional
-forecast alone, indistinguishable from nothing, and a result that would ordinarily end the
-investigation. Restricted to the periods containing the daily peak, the same comparison gave 5.7% at
-the primary substation, 9.0% at secondary, 8.2% at feeder level and 6.0% at household level.
+primary substation — and combined a conventional half-hourly forecast with two bespoke forecasts of
+the daily peak, one of how large it will be and one of when it will happen. The combination is not a
+new model but a weighting scheme: a hazard model gives the probability that the peak falls in each
+half-hour, and that probability sets how much weight the peak forecast carries against the
+conventional one at that half-hour. The conventional forecasts they combine are generalised additive
+models for location, scale and shape, which forecast a whole distribution rather than a number, and
+they score everything with the continuous ranked probability score because it measures sharpness and
+calibration together. Averaged over every period, that combination gained 0.0–0.4% over the
+conventional forecast alone, indistinguishable from nothing, and a result that would ordinarily end
+the investigation. Restricted to the periods containing the daily peak, the same comparison gave
+5.7% at the primary substation, 9.0% at secondary, 8.2% at feeder level and 6.0% at household level.
 Combining the two forecasts was always worth having, and we know that only because [Gilbert et al.
 (2023)](https://arxiv.org/abs/2206.11745) reported both numbers.
 
@@ -200,6 +238,23 @@ individual forecasts were worse than a trivial benchmark based only on the time 
 combination of the two beat it. Together, the peak-versus-average gap and the collapse in peak
 timing are the strongest measured argument in this review for the tail and exceedance metrics
 Flexpectation is building.
+
+**Three more of their findings should shape how Flexpectation runs its own experiments.** The first
+is that cross-validation flattered the aggregation levels: during cross-validation the gain rose
+steadily with voltage level, but on the held-out test data the levels came out much closer together,
+and the authors offer three candidate explanations — harder test data at the aggregated levels, the
+benchmark improving faster than the advanced model as training data grows, or the advanced model
+overfitting slightly. Any of the three would embarrass a project that reported the cross-validation
+figure alone. The second is that the average hides the spread even within one voltage level: the
+fusion method helped at 80% of households and not at the rest, and they draw the general lesson that
+"'average' performance across multiple households will mask this variation in forecast performance".
+The third is a negative result worth having, because it cost them the effort to find it — a
+recalibration step taken from the forecast-combination literature reduced skill in cross-validation
+and was dropped. Two limits bound how far all of this carries. Their hierarchy is sampled from smart
+meters rather than measured from a real network, so it carries no embedded generation and no
+correlation between neighbouring nodes; and their data is anonymised, so they could use no weather
+at all. A comparison between this paper and one that used weather would measure the weather, not the
+method.
 
 **The closest analogue to Flexpectation in a live setting is a Portuguese production system.**
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) run a production
@@ -1097,7 +1152,12 @@ either direction.
 When Artificial Forecasting tested a neural network against a four-week-average baseline at 729
 secondary substations, the neural network lost on five of six metrics at the 24 substations with the
 worst data quality. The margin was small, and data quality and the choice of metric mattered at
-least as much as model complexity.
+least as much as model complexity. [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) make the
+same point from the other end of the sophistication scale: their purpose-built Transformer variant
+lost to a standard encoder-decoder Transformer on all three of their datasets, and they conclude
+that architectural modification is "not needed and can even lead to worse accuracy" because it
+enlarges the space of hyperparameters that then has to be searched. What did help them was refitting
+the model every month rather than redesigning it.
 
 ### 2. In every study that forecast more than one voltage level, accuracy got worse further down the network
 
