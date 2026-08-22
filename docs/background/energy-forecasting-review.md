@@ -12,7 +12,7 @@ Secondly - and perhaps most importantly - the fact that the industry doesn't yet
 
 ## What we read
 
-This review cites around fifty-five published sources. We read most of the ones an argument rests on
+This review cites just over seventy published papers. We read most of the ones an argument rests on
 in full; the rest were available to us only as an abstract, a preprint or part of a paper, and
 wherever a claim rests on a partial read we say so at the point the claim is made. We also read the
 published deliverables of nine GB network projects. The selection was deliberate rather than
@@ -43,12 +43,13 @@ voltage ladder of a distribution network, from the top down:
 - **Secondary substation** — 11 kV down to 400 V. Tens to a few hundred customers.
 - **Feeder and individual customer** — the bottom of the ladder, at 400 V.
 
-NGED owns 52 grid supply points, 271 bulk supply points and 1,161 primary substations, of which 16
-are in the 32-series trial area. **Flexpectation forecasts no secondary substations**, neither in
-the trial area nor in the network-wide scale-up, though several of the studies below do. GB is
-separately divided into 14 *grid supply point groups*, each a whole distribution region containing
-many grid supply points, and several studies below forecast those regions, which are far larger than
-any single substation.
+NGED owns 52 grid supply points, 271 bulk supply points and 1,161 primary substations. The 32 series
+of the trial area are 16 of those primary substations, two grid supply points, two bulk supply
+points and the 12 metered generators described under problem 2 below. **Flexpectation forecasts no
+secondary substations**, neither in the trial area nor in the network-wide scale-up, though several
+of the studies below do. GB is separately divided into 14 *grid supply point groups*, each a whole
+distribution region containing many grid supply points, and several studies below forecast those
+regions, which are far larger than any single substation.
 
 ## How to read the numbers in this review
 
@@ -291,12 +292,12 @@ the LV [low-voltage] hierarchy", and [Ludwig et al.
 be investigated "at different layers of the energy hierarchy, including the low voltage level".
 
 **The ensemble itself is being replaced, which turns this gap into a question we can answer
-directly.** ECMWF's own machine-learned ensemble,
-[AIFS-ENS](https://doi.org/10.1038/s44387-026-00073-7), has been operational since 1 July 2025 with
-51 members, 6-hourly to 15 days, and beats the physics ensemble on the majority of variables and
-lead times; [GenCast](https://doi.org/10.1038/s41586-024-08252-9) beats it too. Flexpectation runs
-on the physics ensemble today, and whether a machine-learned ensemble forecasts substation load
-better is something we can measure.
+directly.** ECMWF's own machine-learned ensemble, AIFS-ENS ([Lang et al.
+(2026)](https://doi.org/10.1038/s44387-026-00073-7)), has been operational since 1 July 2025 with 51
+members, 6-hourly to 15 days, and beats the physics ensemble on the majority of variables and lead
+times; [GenCast](https://doi.org/10.1038/s41586-024-08252-9) beats it too. Flexpectation runs on the
+physics ensemble today, and whether a machine-learned ensemble forecasts substation load better is
+something we can measure.
 
 **Almost every study here optimises average accuracy, but NGED's question is about the top of the
 distribution.** The largest competition in this review, HEFTCom — described under problem 2 below —
@@ -1030,7 +1031,7 @@ sharpness. NESO covers the 14-day horizon but deterministically. [Faustine et al
 low-voltage substations with solar behind them, by quantile regression on a feed-forward network,
 and beat four published methods on the trade-off between accuracy, calibration and compute — but
 day-ahead again, not multi-day. [Erdener et al. (2022)](https://doi.org/10.1016/j.rser.2022.112224)
-survey the field. We read the full paper for Zhang et al. and the abstracts for the other four.
+survey the field. We read the full paper for Zhang et al. and the abstracts for the other three.
 
 **Where the gaps are: doing it without a metered training set, inferring the capacity rather than
 being told it, and putting uncertainty and a multi-day horizon in the same forecast at substation
@@ -1190,16 +1191,17 @@ cannot reach, because their stride equals their horizon, four days each, so no t
 forecasts share a target; that is our inference from their design rather than a claim they make, and
 they give a different reason for wanting a shorter stride, that it would "provide more insights",
 while describing exactly what it would create — "each data point in the dataset covered by multiple
-forecasts, as opposed to a single forecast per data point in the used configuration". One paper does
-address the underlying statistics in a different setting, and it is the closest thing here to a
-model to follow. [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) build the
-consistency intervals on their calibration diagrams "considering the temporal correlation of
-net-load, as the usual assumption of independence between samples does not hold". That is the right
-instinct applied to a neighbouring problem: their forecasts are day-ahead, so they are not exposed
-to reissue overlap, but they do not let a correlated sample masquerade as an independent one. By
-contrast [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079), whose twice-daily reissue
-over seven days is heavily overlapped, bootstrap their skill scores without any correction of that
-kind.
+forecasts, as opposed to a single forecast per data point in the used configuration".
+
+**One paper does address the underlying statistics, though for a different exposure, and it is the
+closest thing here to a model to follow.** [Browell and Fasiolo
+(2021)](https://arxiv.org/abs/2103.10335) build the consistency intervals on their calibration
+diagrams "considering the temporal correlation of net-load, as the usual assumption of independence
+between samples does not hold". That is the right instinct applied to a neighbouring problem: their
+forecasts are day-ahead, so they are not exposed to reissue overlap, but they do not let a
+correlated sample masquerade as an independent one. By contrast [Dantas and Browell
+(2026)](https://doi.org/10.1002/we.70079), whose twice-daily reissue over seven days is heavily
+overlapped, bootstrap their skill scores without any correction of that kind.
 
 **Flexpectation's own protocol matches this literature where the literature has settled, and
 inherits the open question where it has not.** We use an expanding training window with the
@@ -1493,53 +1495,6 @@ weather archive available to them reached only 16 days ahead while their forecas
 and a substitute built from the previous year's observations at the same time of year had, in their
 words, "trivial or net negative" effects on every type of model they tried.
 
-### Three findings that cut against this project's plan
-
-Three results in this literature point against Flexpectation's plan, and we intend to test all three
-rather than route around them.
-
-#### Finer-grained weather data has not always paid
-
-[Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) added spatial statistics derived from
-gridded numerical weather prediction to their model of 14 grid supply point groups in GB. Those
-spatial statistics helped significantly in two of the 14 regions, hurt significantly in three, and
-made no measurable difference in the remaining nine. They put that down to their own model rather
-than to the data, writing that another method might yet extract value from it by building different
-features. Weather itself was worth a great deal to them — adding wind and irradiance cut their
-pinball loss by 40% overall, and by 60% in North Scotland against 10% in London — so the question is
-not whether weather matters but whether *finer* weather does. Artificial Forecasting obtained
-postcode-level weather forecasts for two wind-connected primary substations after their
-wind-connected models had performed poorly, and reported that the postcode-level forecasts "did not
-notably improve model performance", naming better weather data as a next step. What both results say
-is that finer weather data does not help everywhere, so the interesting question is *where* it
-helps. That question is answerable, and answering it is part of this project: we expect finer
-weather data to matter most where a substation's load is dominated by weather-driven generation or
-heating, which is where NGED most needs the forecast to be right.
-
-#### Weather has bought less than expected at low voltage in the past
-
-[Haben et al. (2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) tested 100 real low-voltage
-feeders with both forecast and observed temperature, and found that temperature had no effect on
-forecast accuracy, or a negative one. [Haben et al.
-(2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) used data collected in the early 2010s,
-and we expect how much weather matters at a substation to be changing quickly, because the thing
-that makes a substation weather-dependent is embedded solar generation and heat pumps, and there are
-far more of both on the network now than there were then. A primary substation that was almost
-weather-independent ten years ago may be strongly weather-dependent today. That is a prediction,
-though, not a measurement — and the Scottish primary-substation sensitivities of [Fox et al.
-(2018)](https://doi.org/10.34890/134), measured on ten years of data ending in the mid-2010s and
-described under "What GB networks have already built" below, say weather was already moving primary
-substation demand well before the mid-2010s. Measuring how much weather now explains at NGED's
-primary substations is one of the more useful things this project can report.
-
-#### A model trained on none of NGED's data may match a model trained on all of it
-
-[Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) tested Chronos-2, a general-purpose
-time-series model that had never seen their data, against models trained specifically on those 200
-feeders. Chronos-2 beat every purpose-trained competitor on mean absolute error, 3.8 kW against 4.2
-kW. If heavily engineered models do not clearly beat an off-the-shelf model given none of the target
-network's data, that is important information about the value of any such experimental programme.
-
 ### Two explanations for why sophisticated models beat simple ones by so little, and how Flexpectation can tell them apart
 
 There are two quite different explanations for the small margin between sophisticated and simple
@@ -1578,6 +1533,53 @@ find.
 this project alone.** That is the shape of what Flexpectation offers beyond its own forecasts: not a
 claim to have found the state of the art, but a run of comparable experiments on one fixed
 benchmark, published as they go, so that the next team does not have to start where we started.
+
+## Three findings that cut against this project's plan
+
+Three results in this literature point against Flexpectation's plan, and we intend to test all three
+rather than route around them.
+
+### Finer-grained weather data has not always paid
+
+[Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) added spatial statistics derived from
+gridded numerical weather prediction to their model of 14 grid supply point groups in GB. Those
+spatial statistics helped significantly in two of the 14 regions, hurt significantly in three, and
+made no measurable difference in the remaining nine. They put that down to their own model rather
+than to the data, writing that another method might yet extract value from it by building different
+features. Weather itself was worth a great deal to them — adding wind and irradiance cut their
+pinball loss by 40% overall, and by 60% in North Scotland against 10% in London — so the question is
+not whether weather matters but whether *finer* weather does. Artificial Forecasting obtained
+postcode-level weather forecasts for two wind-connected primary substations after their
+wind-connected models had performed poorly, and reported that the postcode-level forecasts "did not
+notably improve model performance", naming better weather data as a next step. What both results say
+is that finer weather data does not help everywhere, so the interesting question is *where* it
+helps. That question is answerable, and answering it is part of this project: we expect finer
+weather data to matter most where a substation's load is dominated by weather-driven generation or
+heating, which is where NGED most needs the forecast to be right.
+
+### Weather has bought less than expected at low voltage in the past
+
+[Haben et al. (2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) tested 100 real low-voltage
+feeders with both forecast and observed temperature, and found that temperature had no effect on
+forecast accuracy, or a negative one. [Haben et al.
+(2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) used data collected in the early 2010s,
+and we expect how much weather matters at a substation to be changing quickly, because the thing
+that makes a substation weather-dependent is embedded solar generation and heat pumps, and there are
+far more of both on the network now than there were then. A primary substation that was almost
+weather-independent ten years ago may be strongly weather-dependent today. That is a prediction,
+though, not a measurement — and the Scottish primary-substation sensitivities of [Fox et al.
+(2018)](https://doi.org/10.34890/134), measured on ten years of data ending in the mid-2010s and
+described under "What GB networks have already built" below, say weather was already moving primary
+substation demand well before the mid-2010s. Measuring how much weather now explains at NGED's
+primary substations is one of the more useful things this project can report.
+
+### A model trained on none of NGED's data may match a model trained on all of it
+
+[Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) tested Chronos-2, a general-purpose
+time-series model that had never seen their data, against models trained specifically on those 200
+feeders. Chronos-2 beat every purpose-trained competitor on mean absolute error, 3.8 kW against 4.2
+kW. If heavily engineered models do not clearly beat an off-the-shelf model given none of the target
+network's data, that is important information about the value of any such experimental programme.
 
 ## What GB networks have already built
 
@@ -1719,11 +1721,12 @@ families of model:
   to learn only what the physics cannot supply: the response of a solar panel and of a wind turbine
   on the generation side, and the thermal response of buildings on the demand side.
 
-Only the heavily-tuned gradient-boosting model is in scope for the first version of the service. The
-pre-trained encoders, the connectivity-map models and the differentiable physics all belong to the
-network-wide scale-up from 2027, as does the disaggregation of unmetered generation and forecasting
-the network as a network. "What this review excluded, and why" explains why the
-differentiable-physics strand is the least well supported of the four.
+**Only the first of those four strands is in scope for version one.** Only the heavily-tuned
+gradient-boosting model is in scope for the first version of the service. The pre-trained encoders,
+the connectivity-map models and the differentiable physics all belong to the network-wide scale-up
+from 2027, as does the disaggregation of unmetered generation and forecasting the network as a
+network. "What this review excluded, and why" explains why the differentiable-physics strand is the
+least well supported of the four.
 
 **The main reason for attempting all eight at once is that they may be one problem rather than
 eight.** A switching event, a turbine out for repair and a stuck meter all surface in the same
@@ -1846,15 +1849,19 @@ Fourteen forecast probabilistically at all, of which one is at substation scale 
 Dutch substations. Nothing scores the upper tail, nothing keeps switching-contaminated history
 usable, and nothing estimates how much of a generator's capacity is available. The closest paper to
 our own problem, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476), appears in the
-table under problem 1 above; its result is a further instance of findings 1 and 2. We read only the
-abstracts of it and of [Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968), because both
-full texts are paywalled. The Brussels titles of June 2026 change none of this: 23 of the 305 name
-forecasting or prediction, none names an ensemble, and the only short-horizon forecast named is
-day-ahead; the three others that name a horizon at all name long-term planning. Two of the 23 apply
-time-series foundation models, so the possibility that a model given none of a network's own data
-can compete is being tested in this venue too.
+table under problem 1 above; its result is a further instance of finding 1, and of the aggregation
+effect that finding 2 explains. We read only the abstracts of it and of [Mesarcik et al.
+(2025)](https://doi.org/10.1049/icp.2025.1968), because both full texts are paywalled. The Brussels
+titles of June 2026 change none of this: 23 of the 305 name forecasting or prediction, none names an
+ensemble, and the only short-horizon forecast named is day-ahead; the three others that name a
+horizon at all name long-term planning. Two of the 23 apply time-series foundation models, so the
+possibility that a model given none of a network's own data can compete is being tested in this
+venue too.
 
 ## Publishing results that others can compare against
+
+This section carries forward the evaluation design set out under "How we will know whether each of
+these worked" above, and says what we will publish so that someone outside the project can check it.
 
 **Energy forecasting's own senior figures say that published results in the field cannot be compared
 with each other.** [Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979), a review
@@ -2074,7 +2081,7 @@ Every source cited above, in alphabetical order by first author.
 - Martín, P., Moreno, G., Rodríguez, F. J., Jiménez, J. A. and Fernández, I. (2018). [A Hybrid
   Approach to Short-Term Load Forecasting Aimed at Bad Data Detection in Secondary Substation
   Monitoring Equipment](https://doi.org/10.3390/s18113947). *Sensors*.
-- Mendonca Severiano, B. et al. (2026). [A robust rule-based method for detecting and classifying
+- Mendonça Severiano, B. et al. (2026). [A robust rule-based method for detecting and classifying
   underperformance in photovoltaic systems using inverter
   data](https://doi.org/10.1016/j.solener.2026.114382). *Solar Energy*.
 - Mesarcik, M., Loke, J., Wildeboer, J. and Lucassen, B. (2025). [Probabilistic day-ahead power
