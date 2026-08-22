@@ -627,33 +627,41 @@ goal for the trial area and a requirement for the network-wide scale-up.
 **Where demand and generation are separated at all in this literature, the generation is metered.**
 Artificial Forecasting models gross demand and customer export independently at primary substations,
 which is more than any paper here does, but customer export is metered. SSEN TRANSITION split net
-load into demand and generation, forecast the two separately and recombined them, again with metered
-generation.
+load into demand and generation, forecast the two separately and recombined them. Its rooftop solar
+is not metered — but neither is its capacity inferred. SSEN gathered a list of Feed-In Tariff
+installations, aggregated 5.3 MW of them to one notional generator per 11 kV feeder, and drove that
+with a generic solar model, noting that "there is obviously no generation output data easily
+available for those generators". Looking a capacity up in a subsidy register is the step
+Flexpectation cannot take, because the register stopped being complete when the Feed-In Tariff
+closed.
 
 **The nearest peer-reviewed work stops one step short of a forecast.** [Kara et al.
 (2018)](https://doi.org/10.1016/j.segan.2017.11.001) and [Li et al.
 (2021)](https://doi.org/10.1109/TPWRS.2020.3035639) recover the solar signal from feeder-head and
 substation measurements without forecasting it. The one benchmark we found on estimating installed
-capacity is at secondary substations, which is a level below ours; we read only its abstract. Most
-of the rest of the behind-the-meter disaggregation literature works on individual smart meters, a
-level or two below a primary substation, and is excluded for that reason.
+capacity, [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848), compares
+data-driven against model-based methods at low-voltage substations, which is a level below ours; we
+read only its abstract. Most of the rest of the behind-the-meter disaggregation literature works on
+individual smart meters, a level or two below a primary substation, and is excluded for that reason.
 
 **The direct predecessor of this work is running now in GB.** [UK Power Networks'
-NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/) (2024–2026, £389,444), with
-Open Climate Fix and Sheffield Solar, infers the capacity of unmetered solar sitting behind each
-primary substation from half-hourly substation load and weather, then forecasts that generation.
-Open Climate Fix is a partner in both projects, so Flexpectation starts from its method rather than
-from scratch.
+NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/) (2024–2026, £389,444),
+which Open Climate Fix worked on, infers the capacity of unmetered solar sitting behind each primary
+substation from half-hourly substation load and weather, then forecasts that generation. Open
+Climate Fix is a partner in both projects, so Flexpectation starts from its method rather than from
+scratch.
 
 **One production system already splits unmetered wind and solar out of substation measurements, by
 transferring from substations that do meter them.** [Teng et al.
 (2023)](https://doi.org/10.1016/j.rser.2023.113662) train on ten Dutch substations that carry
 complete renewable metering, then predict solar and wind power separately at substations with none,
 from weather, geospatial position and each site's known renewable capacity, at 15-minute resolution
-— a root-mean-square error of 0.07 against 0.70 for a conventional transfer-learning model; we read
-their abstract rather than the full paper. It ships as the `split_energy` component of
+— a root-mean-square error of 0.07 against 0.70 for a conventional transfer-learning model, both
+normalised to each facility's installed capacity, so 0.07 reads as 7%; we read their abstract rather
+than the full paper. The technique ships as the energy-splitting component of
 [OpenSTEF](https://lfenergy.org/projects/openstef/), Alliander's open-source forecasting stack,
-which is in live operation.
+which is in live operation at hundreds of grid locations; OpenSTEF's own description of that
+component names the technique this paper introduces.
 
 **GB already has an operational forecast of unmetered generation, at national scale.** NESO
 publishes [embedded wind and solar
@@ -691,8 +699,10 @@ being told it, and putting uncertainty and a multi-day horizon in the same forec
 level.** Teng et al. (2023) need a population of fully-metered substations to transfer from, and are
 given the existence and capacity of each renewable facility rather than inferring it — whereas
 inferring that capacity is half of what NGED needs. Their output is a near-real-time estimate rather
-than a forecast. Nothing we found combines a probabilistic forecast, a horizon beyond day-ahead and
-the level of an individual primary substation.
+than a forecast. SSEN TRANSITION does combine a weather ensemble, a horizon beyond day-ahead and the
+level of an individual primary substation — but it is told the unmetered capacity rather than
+inferring it, which is the half of the problem NGED needs solved. Nothing we found infers that
+capacity from measurements and then carries it into a probabilistic forecast at substation level.
 
 ### 8. Disaggregating other distributed energy resources: heat pumps, electric-vehicle chargers and batteries
 
@@ -746,9 +756,10 @@ assumed when the point is that two identical batteries dispatch in opposite dire
 
 **This remains the largest deliberate omission in the review.** Our search covered substation and
 generation forecasting, not electrification, and the paragraphs above are what a targeted follow-up
-search surfaced rather than a proper review. The volume of work is easy to demonstrate: of the 265
-papers accepted for CIRED's Brussels workshop of June 2026, 17 concern electrification — almost as
-many as the 19 that name forecasting or prediction at all.
+search surfaced rather than a proper review. The volume of work is easy to demonstrate: of the 305
+papers accepted for CIRED's Brussels workshop of June 2026, 29 have a title naming electric
+vehicles, chargers, heat pumps or batteries — more than the 23 whose titles name forecasting or
+prediction at all.
 
 **Where the gaps are: forecast skill at substation aggregation, and the tariff-driven peak.** The
 one direct measurement of charging forecast skill against aggregation we found, on a German dataset,
@@ -1176,7 +1187,7 @@ most likely to read — it is where European distribution network operators publ
 operational work, so it is where a claim of ours is most likely to be contradicted. We therefore
 searched it in full: the titles and abstracts of every paper in the CIRED main conferences and
 workshops of 2017 and 2020 to 2025, about 3,600 of them; the 2018 and 2019 proceedings, which are
-not indexed, by keyword against their open full-text archive; and the 265 papers accepted for the
+not indexed, by keyword against their open full-text archive; and the 305 papers accepted for the
 Brussels workshop of June 2026 by title, those proceedings not yet being published. Nothing there
 contradicts what this review reports missing, and the absences are worth stating, because CIRED is
 where the counter-example would have been. No CIRED paper drives a load or generation forecast from
@@ -1190,9 +1201,9 @@ usable, and nothing estimates how much of a generator's capacity is available. T
 our own problem, Ruhhütl et al. (2023), appears in the table under problem 1 above; its result is a
 further instance of findings 1 and 2. We read only the abstracts of it and of Mesarcik et al.
 (2025), because both full texts are paywalled. The Brussels titles of June 2026 change none of this:
-19 of the 265 name forecasting or prediction, none names an ensemble, and the only short-horizon
+23 of the 305 name forecasting or prediction, none names an ensemble, and the only short-horizon
 forecast named is day-ahead; the three others that name a horizon at all name long-term planning.
-Two of the 19 apply time-series foundation models, so the possibility that a model given none of a
+Two of the 23 apply time-series foundation models, so the possibility that a model given none of a
 network's own data can compete is being tested in this venue too.
 
 ## Publishing results that others can compare against
