@@ -26,11 +26,12 @@ Ofgem Strategic Innovation Fund programme whose Alpha and Beta deliverables are 
 which has its own section below. Three further sources carry findings rather than comparable scores,
 and are drawn on throughout. [Haben et al. (2021)](https://arxiv.org/abs/2106.00006) reviewed 221
 low-voltage forecasting papers published to 2020. [Shukla and Hong
-(2024)](https://doi.org/10.1049/stg2.12162) reports the BigDEAL competition across three
-neighbouring US distribution companies. [Energy-Arena](https://arxiv.org/abs/2604.24705) is a live
-public leaderboard rather than a competition — we could not extract the full paper and worked from
-its abstract and the running platform, which today carries 24 deterministic challenges across
-prices, load, wind and solar.
+(2024)](https://doi.org/10.1049/stg2.12162) reports the BigDEAL Challenge 2022, a competition on
+forecasting the *timing* of peak demand rather than its size, which drew 78 teams from 27 countries
+and published its data alongside the paper. [Energy-Arena](https://arxiv.org/abs/2604.24705) is a
+live public leaderboard rather than a competition — we could not extract the full paper and worked
+from its abstract and the running platform, which today carries 24 challenges across prices, load,
+wind and solar — eight scored as point forecasts, eight as quantiles and eight as ensembles.
 
 Almost every number in this review depends on where in the network it was measured, so here is the
 voltage ladder of a distribution network, from the top down:
@@ -120,7 +121,11 @@ runs from 51 slightly different starting conditions, whose spread shows how conf
 is — stops beating a climatological distribution — the spread of weather actually observed on that
 day of the year over many years — at 16 to 23 days. They measured that on upper-air variables rather
 than on the near-surface temperature and irradiance that drive substation load, for which we would
-expect a shorter horizon.
+expect a shorter horizon. That measurement is also now eleven years old, and the ensemble has
+improved since: ECMWF's headline skill scores have advanced by roughly a day per decade, so today's
+horizon is probably a little longer than the figure quoted. We found no more recent study measuring
+the same quantity, so we quote the 2015 figure and treat it as a lower bound rather than a current
+reading.
 
 **What the literature reports.**
 
@@ -823,8 +828,8 @@ from 59.6% to 42.3% to 23.3% as aggregation fell. What shrank is the headroom ab
 rather than the accuracy itself, which is the more useful reading: their own gloss is that it is
 easier to beat a simple approach on highly aggregated data than on volatile feeder- and client-level
 data. [Pfeifer et al. (2021)](https://doi.org/10.1049/icp.2021.2177) measured the same thing
-separately for wind power, solar power and load across a German medium-voltage region, and report
-that forecasts get worse both at lower levels of aggregation and at longer horizons; we read their
+separately for wind power, solar power and load across a medium-voltage grid region, and report that
+forecasts get worse both at lower levels of aggregation and at longer horizons; we read their
 abstract rather than the full paper. The model did not get worse; the problem got harder. That
 pattern is probably not a fact about forecasting so much as a fact about averaging: a grid supply
 point aggregates hundreds of thousands of customers, whose individual quirks cancel out, while a
@@ -923,9 +928,10 @@ generation and heat pumps, and there are far more of both on the network now tha
 primary substation that was almost weather-independent ten years ago may be strongly
 weather-dependent today. That is a prediction, though, not a measurement — and the Scottish
 primary-substation sensitivities of [Fox et al. (2018)](https://doi.org/10.34890/134), measured on
-data ending in 2016/17 and described under "What GB networks have already built" below, say weather
-was already moving primary substation demand well before then. Measuring how much weather now
-explains at NGED's primary substations is one of the more useful things this project can report.
+ten years of data ending in the mid-2010s and described under "What GB networks have already built"
+below, say weather was already moving primary substation demand well before then. Measuring how much
+weather now explains at NGED's primary substations is one of the more useful things this project can
+report.
 
 **A model trained on none of NGED's data may match a model trained on all of it.** [Kaas et al.
 (2026)](https://arxiv.org/abs/2607.01966) tested Chronos-2, a general-purpose time-series model that
