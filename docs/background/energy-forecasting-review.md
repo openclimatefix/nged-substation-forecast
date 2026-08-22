@@ -157,7 +157,7 @@ and near the end of it.
 | [Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) | Load, GB | Four levels: primary substation down to household | Day-ahead | Combining forecasts gained **0.0–0.4% averaged over all periods**, but **5.7–9.0% when restricted to peaks** | None at all |
 | [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | Primary substation: 13, plus their bulk supply points and 11 kV feeders | 30 min to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted (note 2) | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
 | [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | Primary substation: 551 with export data, 171 modelled; secondary: 729 | Day-ahead to 11 days at primary; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method (note 3) | Real forecasts at primary; none in the published secondary results |
-| [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Substation | Day-ahead | **3 to 8% mean absolute percentage error**, varying with how industrial and how large the supplied area was; linear and Gaussian regression preferred over the alternatives tested (abstract only) | Not stated in the abstract |
+| [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Substation | Day-ahead | **3 to 8% mean absolute percentage error**, varying with how industrial and how large the supplied area was; linear and Gaussian regression preferred over the alternatives tested (abstract only, note 5) | Not stated in the abstract |
 
 *Notes.* **1.** The 24.6% saving is at the most extreme tail level [Browell and Fasiolo
 (2021)](https://arxiv.org/abs/2103.10335) tested, and falls to 3.2% at the least extreme. **2.** The
@@ -168,7 +168,11 @@ eight of the near-capacity substations it was evaluated on. **4.** The beat-a-na
 are given as ranges because [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)
 reports two different pairs of numbers for the same statistic: 82.8% and 66.0% in the body text,
 86.5% and 70.0% in the caption of the figure on the page after. We could not tell which is intended,
-so the table spans both.
+so the table spans both. **5.** By this review's own test, the Austrian figure does not transfer: a
+mean absolute percentage error is normalised by the load that happened to occur rather than by
+anything physical, and the paper names no baseline to measure it against. It is in the table because
+it is the only substation-level study we found from a comparable European network, and it is the one
+row whose number should not be read as a target.
 
 **Even within this one table, the studies cannot be compared with each other.** The sharpest
 illustration comes from two papers published a fortnight apart, by overlapping groups at the
@@ -972,19 +976,19 @@ exactly the generation problem 7 is about. NESO states the problem in its own wo
 embedded generation, meaning it is connected to a distribution network rather than the transmission
 network, making it invisible to grid operators." NESO reports that the forecast the project produced
 "was 2.8 times better than our previous Photo Voltaic (PV) forecast (for forecasts up to two hours
-ahead)", with a mean absolute error of 233 MW against 650 MW for the forecast it replaced, and that
-the first fully operational service reached its control room in December 2022. The project's [own
-record on the Smarter Networks Portal](https://smarter.energynetworks.org/projects/nia2_ngeso002/)
-reports "Accuracy improvement over the previous model by approximately 30% for the GSP and National
-forecasts (4-8 hours)" and lists "Probabilistic forecasts for all horizons" among its outcomes. Two
-qualifications belong here, both from NESO's own record. The operational service is not one model:
-PVNet covers 0 to 6 hours, a blend of PVNet and a second model called National_xg covers 6 to 8
-hours, and National_xg alone runs from 8 hours out. And the production system around the model — the
-part that reached 99.5% availability — was built by NESO rather than by Open Climate Fix, with the
-infrastructure written as code so that it could be reproduced. So the combination this review says
-is missing — unmetered generation, forecast probabilistically, at a spatial level below the country
-— has been built once in GB, at grid supply point level rather than at primary substations, and for
-solar rather than for net demand.
+ahead)", and that the first fully operational service reached its control room in December 2022. The
+project's [own record on the Smarter Networks
+Portal](https://smarter.energynetworks.org/projects/nia2_ngeso002/) reports "Accuracy improvement
+over the previous model by approximately 30% for the GSP and National forecasts (4-8 hours)" and
+lists "Probabilistic forecasts for all horizons" among its outcomes. Two qualifications belong here,
+both from NESO's own record. The operational service is not one model: PVNet covers 0 to 6 hours, a
+blend of PVNet and a second model called National_xg covers 6 to 8 hours, and National_xg alone runs
+from 8 hours out. And the production system around the model — the part that reached 99.5%
+availability — was built by NESO rather than by Open Climate Fix, with the infrastructure written as
+code so that it could be reproduced. So the combination this review says is missing — unmetered
+generation, forecast probabilistically, at a spatial level below the country — has been built once
+in GB, at grid supply point level rather than at primary substations, and for solar rather than for
+net demand.
 
 **The model itself is published and open source, which is unusual in this literature.**
 [PVNet](https://github.com/openclimatefix/PVNet) is released under the MIT licence and described by
@@ -1124,12 +1128,15 @@ prediction at all.
 one direct measurement of charging forecast skill against aggregation that we found is [Ostermann
 and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1), who forecast "over 350,000 charging
 processes at more than 500 locations across Germany" a day ahead at 15-minute resolution, scoring
-the distribution with the pinball and interval scores against a naive benchmark. Aggregation is what
-decides whether the forecast is worth having: "almost all models have values above 1 for the MASE
-and nRMSE for both the individual sites and the zip codes, which means that the benchmark model is
-better in some cases", and of their five example sites only the one with over 100 charging points
-was "significantly better than those of the naive model". Pooled across the whole portfolio of more
-than 500 sites, their two best models — random forest and Ada boosting — reach a normalised
+the distribution with the pinball and interval scores against a naive benchmark. The aggregation
+threshold below is a day-ahead result, and forecast uncertainty grows with lead time, so at the 14
+days NGED needs the number of charge points required before a forecast beats a naive one should be
+expected to be higher than the figure quoted here rather than the same. Aggregation is what decides
+whether the forecast is worth having: "almost all models have values above 1 for the MASE and nRMSE
+for both the individual sites and the zip codes, which means that the benchmark model is better in
+some cases", and of their five example sites only the one with over 100 charging points was
+"significantly better than those of the naive model". Pooled across the whole portfolio of more than
+500 sites, their two best models — random forest and Ada boosting — reach a normalised
 root-mean-square error of 0.41 and 0.42. The lesson for NGED is that charger forecasting starts to
 beat the naive benchmark somewhere above a hundred charge points, which is a larger aggregation than
 most single sites and a smaller one than a primary substation. Nothing we found forecasts an
@@ -1725,8 +1732,14 @@ families of model:
 gradient-boosting model is in scope for the first version of the service. The pre-trained encoders,
 the connectivity-map models and the differentiable physics all belong to the network-wide scale-up
 from 2027, as does the disaggregation of unmetered generation and forecasting the network as a
-network. "What this review excluded, and why" explains why the differentiable-physics strand is the
-least well supported of the four.
+network. "What this review excluded, and why" explains why the demand-side half of the
+differentiable-physics strand — aggregating the thermal response of a few thousand buildings up to a
+substation — is the least well supported by published work of anything this project plans. Its
+generation-side half is in the opposite position: [Pierrot and Pinson
+(2024)](https://doi.org/10.1080/00401706.2024.2350421) fit the physical parameters of a generator
+inside a differentiable model, and [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) and
+[Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) supply the wind and solar building
+blocks that problems 2 and 3 describe.
 
 **The main reason for attempting all eight at once is that they may be one problem rather than
 eight.** A switching event, a turbine out for repair and a stuck meter all surface in the same
@@ -1848,9 +1861,10 @@ Fourteen forecast probabilistically at all, of which one is at substation scale 
 (2025)](https://doi.org/10.1049/icp.2025.1968), day-ahead, on ten years of measurements from 312
 Dutch substations. Nothing scores the upper tail, nothing keeps switching-contaminated history
 usable, and nothing estimates how much of a generator's capacity is available. The closest paper to
-our own problem, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476), appears in the
-table under problem 1 above; its result is a further instance of finding 1, and of the aggregation
-effect that finding 2 explains. We read only the abstracts of it and of [Mesarcik et al.
+our own problem *among the ones this exclusion covers*, [Ruhhütl et al.
+(2023)](https://doi.org/10.1049/icp.2023.0476), appears in the table under problem 1 above; its
+result is a further instance of finding 1, and of the aggregation effect that finding 2 explains. We
+read only the abstracts of it and of [Mesarcik et al.
 (2025)](https://doi.org/10.1049/icp.2025.1968), because both full texts are paywalled. The Brussels
 titles of June 2026 change none of this: 23 of the 305 name forecasting or prediction, none names an
 ensemble, and the only short-horizon forecast named is day-ahead; the three others that name a
@@ -1929,12 +1943,19 @@ reader would want them, they are:
   signals no weather forecast contains.
 - **A peak-aware score is reported alongside a proper scoring rule**, never instead of one.
 - **The tail is scored with a threshold-weighted continuous ranked probability score**, weighted
-  above each substation's firm capacity, rather than by selecting the periods in which an exceedance
-  happened. The obvious alternative — keep only the periods in which load crossed the limit, and
-  score those — is not merely noisy but biased: [Lerch et al.
-  (2017)](https://doi.org/10.1214/16-STS588) show that choosing which periods to score on the basis
-  of what happened rewards a forecaster who over-predicts extremes, and can rank a deliberately
-  biased forecast above an honest one. [Gneiting and Ranjan
+  above a fixed per-series threshold set at the 99th percentile of that series' own measured
+  history, rather than by selecting the periods in which an exceedance happened. We use a historical
+  percentile rather than the substation's firm capacity, which is the more obvious choice, for three
+  reasons: a firm capacity is not published for every series we forecast; a limit that is never
+  crossed during a validation year produces no scoreable events at all, and a warning system cannot
+  be graded on events that never happened; and each substation's firm capacity sits at a different
+  point of its own load distribution, so scores taken against firm capacities cannot be compared
+  between substations. The percentile threshold gives every series roughly the same event rate by
+  construction, which is what makes the scores comparable. The obvious alternative — keep only the
+  periods in which load crossed the limit, and score those — is not merely noisy but biased: [Lerch
+  et al. (2017)](https://doi.org/10.1214/16-STS588) show that choosing which periods to score on the
+  basis of what happened rewards a forecaster who over-predicts extremes, and can rank a
+  deliberately biased forecast above an honest one. [Gneiting and Ranjan
   (2011)](https://doi.org/10.1198/jbes.2010.08110)'s threshold-weighted score puts the emphasis
   inside the score instead, and stays a proper scoring rule while doing it.
 - **Coverage — how often reality fell inside the range the forecast claimed — is broken down by
