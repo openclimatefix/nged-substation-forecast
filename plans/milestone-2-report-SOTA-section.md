@@ -145,7 +145,11 @@ reading.
 two SSEN TRANSITION models that missed 10% reached 13.4% and 19.7%, and 94% of the 11 kV feeders it
 built models for came in below 20%. **3.** Artificial Forecasting also captured 83% of the top 10%
 of demand values inside its 5th-to-95th-percentile band, and beat its comparison benchmarks at all
-eight of the near-capacity substations it was evaluated on.
+eight of the near-capacity substations it was evaluated on. **4.** The beat-a-naive-forecast figures
+are given as ranges because [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)
+reports two different pairs of numbers for the same statistic: 82.8% and 66.0% in the body text,
+86.5% and 70.0% in the caption of the figure on the same page. We could not tell which is intended,
+so the table spans both.
 
 **Even within this one table, the studies cannot be compared with each other.** The sharpest
 illustration comes from two papers published a fortnight apart, by overlapping groups at the
