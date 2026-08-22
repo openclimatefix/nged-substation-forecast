@@ -166,7 +166,7 @@ of demand values inside its 5th-to-95th-percentile band, and beat its comparison
 eight of the near-capacity substations it was evaluated on. **4.** The beat-a-naive-forecast figures
 are given as ranges because [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)
 reports two different pairs of numbers for the same statistic: 82.8% and 66.0% in the body text,
-86.5% and 70.0% in the caption of the figure on the same page. We could not tell which is intended,
+86.5% and 70.0% in the caption of the figure on the page after. We could not tell which is intended,
 so the table spans both.
 
 **Even within this one table, the studies cannot be compared with each other.** The sharpest
@@ -181,36 +181,40 @@ results that others can compare against", the last section of this review, retur
 from those results being incomparable.
 
 **The larger of those two papers is the most direct measurement in this review of how forecast
-difficulty changes with voltage level, and its headline result is that the plain model won.**
-[Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) forecast 96 hours ahead, hourly, with a new
-forecast issued every hour, at three levels at once: one transmission control area over eleven
-years, the 200 low-voltage feeders over two years, and 287 individual customers over four years.
-Against a day-type persistence benchmark — the same hour on the most recent workday, Saturday or
-Sunday — the best model cut mean absolute error by 59.6% at the transmission level, 42.3% at the
-feeders and 23.3% at individual customers, and their reading of that is the one this review takes:
-"it is easier to outperform a simple approach on highly aggregated data than on the more volatile LV
-feeder and client-level data". The best model was a standard encoder-decoder Transformer, and it
-beat the authors' own purpose-built variant on all three datasets. They say so plainly: the
-architectural modifications "do not improve the forecast error compared to that of a standard
-Transformer", and the standard design "is already a strong model, and architectural modifications
-are not needed and can even lead to worse accuracy as it makes hyperparameter optimization more
-difficult".
+difficulty changes with voltage level, and its headline result is that the plain model beat the
+elaborate one.** [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) forecast 96 hours ahead,
+hourly, with a new forecast issued every hour, at three levels at once: one transmission control
+area over eleven years, the 200 low-voltage feeders over two years, and 287 individual customers
+over four years. Against a day-type persistence benchmark — the same hour on the most recent day of
+the same type, where the three types are workday, Saturday and Sunday-or-holiday — the best model
+cut mean absolute error by 59.6% at the transmission level, 42.3% at the feeders and 23.3% at
+individual customers, and their reading of that is the one this review takes: "it is easier to
+outperform a simple approach on highly aggregated data than on the more volatile LV feeder and
+client-level data". A standard encoder-decoder Transformer won on the transmission control area and
+on the feeders, and a pre-trained foundation model won at customer level. The result that matters
+more is internal to their own work: the plain Transformer beat the authors' purpose-built variant of
+it on all three datasets. They say so plainly: the architectural modifications "do not improve the
+forecast error compared to that of a standard Transformer", and the standard design "is already a
+strong model, and architectural modifications are not needed and can even lead to worse accuracy as
+it makes hyperparameter optimization (HPO) more difficult due to an extended hyperparameter search
+space".
 
 **Three further conclusions from that paper bear directly on how Flexpectation should build and
 report.** The first is that retraining beats architecture: on both datasets long enough to allow it,
 they refitted every model monthly on all data up to that point, and the retrained model beat its
 static counterpart, which they attribute to concept drift — the load changing shape underneath the
-model. The second is that weather and calendar inputs helped most on the two datasets "largely
-influenced by behind-the-meter photovoltaic power generation", which is the condition NGED's network
-is moving towards. The third is a warning about their own numbers, which we repeat because it
-applies to every figure in the table above: the errors "might be unrealistically low for real
-applications", because past load is assumed available immediately when in practice it arrives hours
-or days later, and because the weather they use was not available at forecast time. One
-qualification the abstract does not carry: the foundation model that wins at customer level was
-pre-trained on that dataset, so that particular comparison is not the zero-shot test it appears to
-be. And the whole benchmark is deterministic — the authors name probabilistic forecasting as future
-work, and note that a single number "does not cover the uncertainty of a forecast", which is
-precisely what Flexpectation exists to supply.
+model. The second is that adding covariates helped most on the two datasets "largely influenced by
+behind-the-meter photovoltaic power generation", which is the condition NGED's network is moving
+towards; calendar features, separately, mattered most where industrial activity drops over holidays.
+The third is a warning about their own numbers, which we repeat because it applies to every figure
+in the table above: the errors "might be unrealistically low for real applications", because past
+load is assumed available immediately when in practice it arrives hours or days later, and because
+the weather they use was not available at forecast time. One qualification the abstract does not
+carry: the foundation model that wins at customer level was pre-trained on that dataset, so that
+particular comparison is not the zero-shot test it appears to be. And the whole benchmark is
+deterministic — the authors name probabilistic forecasting as future work, and note that a single
+number "does not cover the uncertainty of a forecast", which is precisely what Flexpectation exists
+to supply.
 
 **One study in the table shows how much an annual average hides.** [Gilbert et al.
 (2023)](https://arxiv.org/abs/2206.11745) forecast load at four levels of a hypothetical GB
@@ -556,11 +560,11 @@ to pick out the clear-sky periods it analyses, and its own documentation warns t
 substitute gives less stable results. But [Meyers et al.
 (2020)](https://doi.org/10.1109/JPHOTOV.2019.2957646) removed that requirement: their unsupervised
 signal-processing approach "only requires a measured power signal as an input — no irradiance data,
-temperature data, or system configuration information are required", and they validate it against
-RdTools on the same dataset, reporting greater robustness to data anomalies. Their approach is now
-the open-source Solar Data Tools, whose pipeline detects capacity changes and clipping and estimates
-degradation, with a Monte Carlo step that returns a distribution rather than a point estimate.
-Independent work reaches the same place from other directions: [Cronin et al.
+temperature data, or system configuration information", and they validate it against RdTools on the
+same dataset, reporting greater robustness to data anomalies. Their approach is now the open-source
+Solar Data Tools, whose pipeline detects capacity changes and clipping and estimates degradation,
+with a Monte Carlo step that returns a distribution rather than a point estimate. Independent work
+reaches the same place from other directions: [Cronin et al.
 (2014)](https://doi.org/10.1002/pip.2310) recover relative degradation rates by comparing daily
 yields across a group of systems, which maps onto the six solar farms in the trial area, and
 [Peratikou and Charalambides (2022)](https://doi.org/10.1016/j.seja.2022.100015) compute clear-sky
@@ -864,7 +868,8 @@ evaluation data for a problem is already public.
 against.** The Dutch labels collapse switching events and measurement errors into a single class, so
 they cannot separate a stuck meter from a network reconfiguration — which is exactly the distinction
 problems 4 and 6 have to make between them — and nearly four per cent of their timestamps are
-labelled as the labeller being unsure. They describe a Dutch network, and [Bouman et al.
+labelled as the labeller being unsure — a figure we counted from the released dataset, because the
+paper does not report it. They describe a Dutch network, and [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164) detect on a residual against a bottom-up load estimate
 NGED does not have and cannot build. None of the three GB projects above reports how often its
 checks are right, and none published its labels, so there is no GB number to compare a new detector
@@ -940,10 +945,11 @@ rather than a site-specific one, and OpenSTEF's own documentation says the step 
 forecast accuracy" — the components are redistributed from a total that was forecast first, so any
 error in the total is inherited by every component. OpenSTEF's source carries no trace of DAZLS, in
 its current release or in the older ones we checked. [Teng et al.
-(2023)](https://doi.org/10.1016/j.rser.2023.113662) settle the point themselves: they benchmark
-DAZLS against "the energy splitting model in the OpenSTEF software package" on the same data and
-report that DAZLS "significantly outperforms" it — which is not a comparison an author runs against
-a package that already implements their own method.
+(2023)](https://doi.org/10.1016/j.rser.2023.113662) settle the point themselves, and the authorship
+makes it stronger rather than weaker: two of them work at Alliander, the operator that builds
+OpenSTEF, and they benchmark DAZLS against "the energy splitting model in the OpenSTEF software
+package" on the same data and report that DAZLS "significantly outperforms" it. Alliander's own
+people treat the two as different methods and prefer the new one.
 
 **GB already has an operational forecast of unmetered generation, at national scale.** NESO
 publishes [embedded wind and solar
@@ -1177,13 +1183,23 @@ set is contaminated outright. [Hertel et al. (2026)](https://arxiv.org/abs/2607.
 exposure — a 96-hour horizon reissued hourly, so consecutive forecasts share 95 of their 96 target
 hours — and say nothing about it. [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079)
 issue twice a day over a 168-hour horizon and say nothing about it either. We searched all ten
-papers for any discussion of a gap, an embargo, a buffer or overlap between training and test data
-and found none. [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) are the exception, and they
-escape the problem by construction rather than by treating it: their stride equals their horizon,
-four days each, so no two forecasts in their evaluation share a target. They name shortening that
-stride as future work, and describe exactly what it would create — "each data point in the dataset
-covered by multiple forecasts, as opposed to a single forecast per data point in the used
-configuration".
+papers for any treatment of the overlap that reissuing a forecast creates — a gap or buffer between
+training and test, a block bootstrap, a correction to the number of independent observations — and
+found none. [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) are the one paper the problem
+cannot reach, because their stride equals their horizon, four days each, so no two of their
+forecasts share a target; that is our inference from their design rather than a claim they make, and
+they give a different reason for wanting a shorter stride, that it would "provide more insights",
+while describing exactly what it would create — "each data point in the dataset covered by multiple
+forecasts, as opposed to a single forecast per data point in the used configuration". One paper does
+address the underlying statistics in a different setting, and it is the closest thing here to a
+model to follow. [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) build the
+consistency intervals on their calibration diagrams "considering the temporal correlation of
+net-load, as the usual assumption of independence between samples does not hold". That is the right
+instinct applied to a neighbouring problem: their forecasts are day-ahead, so they are not exposed
+to reissue overlap, but they do not let a correlated sample masquerade as an independent one. By
+contrast [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079), whose twice-daily reissue
+over seven days is heavily overlapped, bootstrap their skill scores without any correction of that
+kind.
 
 **Flexpectation's own protocol matches this literature where the literature has settled, and
 inherits the open question where it has not.** We use an expanding training window with the
@@ -1196,13 +1212,15 @@ predicting. What none of that settles is the overlap question: our forecasts are
 hours over a 14-day horizon, so the same target half-hour is scored 56 times, and we do not yet know
 how much that inflates the apparent precision of a comparison between two models. We will report
 what we did about it rather than leave it implicit, and we treat it as an open methodological
-question rather than a solved one, because no paper in this review offers an answer to copy. Two of
-the reviews we read ask for less and are still worth meeting: [Haben et al.
-(2021)](https://arxiv.org/abs/2106.00006) ask that "how the data is split into train and test sets
-should be clearly stated" and that "a validation set should have been defined and be separate from
-the test set", while [Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979) advise authors
-whose results look too good to "perform sanity checks and see if future information has leaked into
-the process during parameter estimation, model selection, or tuning of hyper-parameters".
+question rather than a solved one. The nearest thing to an answer in this review is Browell and
+Fasiolo's correction for temporal correlation, described above, which was written for a different
+exposure but points the right way. Two of the reviews we read ask for less and are still worth
+meeting: [Haben et al. (2021)](https://arxiv.org/abs/2106.00006) ask that "how the data is split
+into train and test sets should be clearly stated" and that "a validation set should have been
+defined and be separate from the test set", while [Hong et al.
+(2020)](https://doi.org/10.1109/OAJPE.2020.3029979) advise authors whose results look too good to
+"perform sanity checks and see if future information has leaked into the process during parameter
+estimation, model selection, or tuning of hyper-parameters".
 
 **On metrics for these three problems, the review's commitments are collected under "Publishing
 results that others can compare against" below, and two cautions from this literature belong with
@@ -1265,10 +1283,12 @@ sites fall inside RdTools' confidence bounds, and their spread is tighter, 1.0% 
 weakness is exactly what you would expect. Where the two disagree, neither is evidence about the
 other: in the case they work through, the cause of the anomaly "is unknown" and their own answer
 merely "appears to be a more reasonable estimate". [Teng et al.
-(2023)](https://doi.org/10.1016/j.rser.2023.113662) use this strategy too, and the comparison they
-chose settles a question raised under problem 7 above — they benchmark their own method against the
-energy-splitting model inside [OpenSTEF](https://lfenergy.org/projects/openstef/) and beat it, which
-is not something an author does to a package that already implements their method.
+(2023)](https://doi.org/10.1016/j.rser.2023.113662) use this strategy too, though with a caveat of
+its own: the independent tool they chose, the energy splitter inside
+[OpenSTEF](https://lfenergy.org/projects/openstef/), is built by Alliander, where two of the paper's
+authors work. That makes it an in-house comparison rather than an arms-length one, which weakens it
+as evidence of superiority and strengthens it as evidence that the two are different methods — the
+point it settles under problem 7 above.
 
 **The fourth is indirect: measure whether the estimate improves the thing it was meant to improve.**
 [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) show 2.0% lower mean absolute error and
@@ -1334,11 +1354,12 @@ set the threshold by maximising that averaged score rather than by the conventio
 three-standard-deviation control limit, and they resample the test stations 10,000 times to put an
 uncertainty on the result.
 
-**Two other choices in this literature are worth copying.** [Perry et al.
-(2021)](https://doi.org/10.1109/PVSC43889.2021.9518733) score a detection as correct if it lands
-"within 30 days of their labelled occurrence", which is the right shape for a problem where the
-exact timestamp of a gradual shift is not knowable; the tolerance has to be stated, because the
-score means nothing without it. [Martín et al. (2018)](https://doi.org/10.3390/s18113947) set their
+**Two other choices in this literature are worth copying.** [Perry and Muller
+(2022)](https://doi.org/10.1109/PVSC48317.2022.9938675), detecting step changes across 101 manually
+labelled photovoltaic power and irradiance streams, score a detection as correct if it lands "within
+30 days of their labelled occurrence", which is the right shape for a problem where the exact
+timestamp of a gradual shift is not knowable; the tolerance has to be stated, because the score
+means nothing without it. [Martín et al. (2018)](https://doi.org/10.3390/s18113947) set their
 detection threshold from instrument physics rather than from the data: transformers contribute up to
 ±1% error and the measurement equipment ±0.5% to ±1%, so ±2% is the inherent floor, and they set the
 threshold at ±4% "to avoid detection of false gain and offset errors". A threshold derived that way
@@ -2109,6 +2130,9 @@ Every source cited above, in alphabetical order by first author.
 - Perry, K., Muller, M. and Anderson, K. (2021). [Performance Comparison of Clipping Detection
   Techniques in AC Power Time Series](https://doi.org/10.1109/PVSC43889.2021.9518733). *2021 IEEE
   48th Photovoltaic Specialists Conference (PVSC)*.
+- Perry, K. and Muller, M. (2022). [Automated Shift Detection in Sensor-Based PV Power and
+  Irradiance Time Series](https://doi.org/10.1109/PVSC48317.2022.9938675). *2022 IEEE 49th
+  Photovoltaics Specialists Conference (PVSC)*.
 - Pfeifer, P., Tran, J., Fendri, A., Krahl, S., Moser, A. and Verheggen, L. (2021). [Accuracy of
   load and generation forecasts for the operational planning of power distribution
   systems](https://doi.org/10.1049/icp.2021.2177). *IET Conference Proceedings*.
