@@ -1025,9 +1025,11 @@ us.
 
 **Uncertainty and the horizon both exist in this literature, but never together.** [Wang et al.
 (2018)](https://doi.org/10.1109/TPWRS.2017.2762599) run the whole pipeline this problem describes —
-estimate behind-the-meter photovoltaic capacity, decompose net load into generation, demand and a
-residual, forecast each, then recombine them with a copula into a probabilistic net-load forecast —
-but at ISO New England scale and day-ahead. [Zhang et al.
+estimate behind-the-meter photovoltaic capacity, by grid-searching candidate capacities for the one
+scoring highest on a maximal-information-coefficient measure of dependence, then decompose net load
+into generation, demand and a residual, forecast each, and recombine them with a copula that models
+how the three forecast errors depend on each other rather than assuming they are independent — but
+at ISO New England scale and day-ahead. [Zhang et al.
 (2022)](https://doi.org/10.1016/j.engappai.2022.104707) do probabilistic disaggregation at grid
 supply point and feeder level with a multi-quantile recurrent network, scored on reliability and
 sharpness. NESO covers the 14-day horizon but deterministically. [Faustine et al.
