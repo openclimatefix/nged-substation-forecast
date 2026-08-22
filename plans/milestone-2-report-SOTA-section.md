@@ -439,7 +439,8 @@ Three things transfer:
   direction independently would work the same way.
 
 - **When their bottom-up estimate fails, the cause is usually wrong topology data**, not a bad
-  algorithm — a warning about the network records that any disaggregation work depends on.
+  algorithm — a warning about the network records that any bottom-up estimate of substation load
+  depends on.
 
 ### [Gilbert, Browell & Stephen 2023](https://arxiv.org/abs/2206.11745) — why an annual average hides what happens at peak
 
@@ -569,19 +570,22 @@ engineers concerned name the gap themselves.
    identified, naming the incorporation of planned-outage records in its post-Beta roadmap.
 
 5. **Where studies separate demand from generation, the generation is metered; nobody separates out
-   the rooftop solar and small wind that no meter sees.** Where demand and generation are separated
-   at all, the generation is usually metered: Artificial Forecasting models gross demand and
-   customer export independently at primary substations, which is more than any paper here does. The
-   unmetered solar and wind — the rooftop panels and small turbines that appear only as a dent in a
-   substation's net flow — have to be estimated from that net flow. This is being worked on now: UK
-   Power Networks' NIA_UKPN0104, with Open Climate Fix and Sheffield Solar, infers unmetered solar
-   capacity behind each primary substation and forecasts that generation. In the peer-reviewed
-   literature the nearest work stops one step short — [Kara et
-   al.](https://doi.org/10.1016/j.segan.2017.11.001) and [Li et
-   al.](https://doi.org/10.1109/TPWRS.2020.3035639) recover the solar signal from feeder-head and
-   substation measurements without forecasting it, and the one benchmark we found on estimating
-   installed capacity is at secondary substations, which is a level below ours; we read only its
-   abstract. What remains open at primary substation level is estimating unmetered *wind*
+   the rooftop solar and small wind that no meter sees.** This is the task we call *disaggregation*:
+   recovering, from a substation's net flow alone, both the half-hourly output of the unmetered
+   solar and wind sitting behind that substation and the installed capacity of that unmetered
+   generation. It is a different task from estimating how much of a *metered* generator's capacity
+   is available today, which is gap 7 below. Where demand and generation are separated at all, the
+   generation is usually metered: Artificial Forecasting models gross demand and customer export
+   independently at primary substations, which is more than any paper here does. The unmetered solar
+   and wind — the rooftop panels and small turbines that appear only as a dent in a substation's net
+   flow — have to be estimated from that net flow. This is being worked on now: UK Power Networks'
+   NIA_UKPN0104, with Open Climate Fix and Sheffield Solar, infers unmetered solar capacity behind
+   each primary substation and forecasts that generation. In the peer-reviewed literature the
+   nearest work stops one step short — [Kara et al.](https://doi.org/10.1016/j.segan.2017.11.001)
+   and [Li et al.](https://doi.org/10.1109/TPWRS.2020.3035639) recover the solar signal from
+   feeder-head and substation measurements without forecasting it, and the one benchmark we found on
+   estimating installed capacity is at secondary substations, which is a level below ours; we read
+   only its abstract. What remains open at primary substation level is estimating unmetered *wind*
    generation, and putting both unmetered solar and unmetered wind inside a 14-day forecast that
    states its own uncertainty.
 
@@ -606,49 +610,58 @@ engineers concerned name the gap themselves.
    beneath it, and to treat the disagreement between the two answers as a check on both. We will
    report whether it improves accuracy as well.
 
-7. **No study estimates, from a substation's own meter, how much of its connected generation is
-   actually available today.** We call the amount of generation actually available at a site its
-   *effective capacity*: the output it could produce right now if the weather allowed, as opposed to
-   its nameplate rating. Turbines go out for repair, inverters degrade, and sites are curtailed —
-   told by the network operator to generate less than they could. A substation whose 20 MW wind farm
-   has been limited to 14 MW for a month is, for forecasting purposes, a different substation, and a
-   model trained on nameplate ratings cannot see the difference. Estimating effective capacity is
-   standard practice for the owner of an individual wind farm or solar plant, and it does not always
-   need the generator's own instrumentation. For wind, [Dantas and Browell
-   (2026)](https://doi.org/10.1002/we.70079) forecast 73 GB wind farms from the ECMWF ensemble and
-   hit our problem exactly: the metered-output database they use "does not include information on
-   the farms' available capacity over time", so rather than use a nameplate rating they estimate a
-   time series of available capacity for each farm and normalise that farm's power by it before
-   modelling. Dantas and Browell (2026) do at an individual wind farm what Flexpectation proposes to
-   do at a substation. How they estimate it sits in supplementary material we could not obtain, so
-   we cannot say whether the estimate comes from the metered output alone or leans on outage
-   messages as well. They also used a data source Flexpectation will not have, excluding curtailed
-   half-hours with published bid-acceptance volumes, which exist for transmission-connected wind
-   farms and not for NGED's embedded generators. For solar, the estimate is routinely made from the
-   plant's output rather than its internals: the open-source
-   [RdTools](https://doi.org/10.5281/zenodo.1210316) estimates degradation and soiling from a
-   plant's alternating-current output together with modelled or satellite irradiance, and [Mendonça
-   Severiano et al. (2026)](https://doi.org/10.1016/j.solener.2026.114382) classify underperformance
-   across 1,089 systems from inverter data alone — though they catch clipping, when the panels
-   produce more than the inverter can pass through, only about half the time, which is a warning for
-   the six half-hourly-metered solar farms in the trial area. Artificial Forecasting gets closest at
-   substation level: its Alpha work calibrates each substation's forecast installed capacity down to
-   the fraction actually generated over two years, and separately found that the National Energy
-   System Operator's national generator-availability signal "almost universally substantially
-   improved results" at wind-connected primary substations, while a feature tracking connected
-   generation capacity over time did not help, which they put down to too few new connections
-   falling inside the training window rather than to the feature itself.
+7. **No study estimates, from a generator's revenue meter alone, how much of that generator's
+   capacity is actually available today.** This gap is about the 12 *metered* generators
+   Flexpectation forecasts in the trial area, each of which has a half-hourly meter of its own; the
+   unmetered rooftop solar and small wind of gap 5 are a separate task. We call the amount of
+   generation actually available at a metered site its *effective capacity*: the output it could
+   produce right now if the weather allowed, as opposed to its nameplate rating. Turbines go out for
+   repair, inverters degrade, and sites are curtailed — told by the network operator to generate
+   less than they could. A 20 MW wind farm that has been limited to 14 MW for a month is, for
+   forecasting purposes, a different wind farm, and a model trained on its nameplate rating cannot
+   see the difference. The same goes for a primary substation with a large metered generator
+   connected behind it. Estimating effective capacity is standard practice for the owner of an
+   individual wind farm or solar plant, and it does not always need the generator's own
+   instrumentation. For wind, [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) forecast
+   73 GB wind farms from the ECMWF ensemble and hit our problem exactly: the metered-output database
+   they use "does not include information on the farms' available capacity over time", so rather
+   than use a nameplate rating they estimate a time series of available capacity for each farm and
+   normalise that farm's power by it before modelling. Dantas and Browell (2026) do at an individual
+   wind farm what Flexpectation proposes to do at each of its 12 metered generators. How they
+   estimate it sits in supplementary material we could not obtain, so we cannot say whether the
+   estimate comes from the metered output alone or leans on outage messages as well. They also used
+   a data source Flexpectation will not have, excluding curtailed half-hours with published
+   bid-acceptance volumes, which exist for transmission-connected wind farms and not for NGED's
+   embedded generators. For solar, the estimate is routinely made from the plant's output rather
+   than its internals: the open-source [RdTools](https://doi.org/10.5281/zenodo.1210316) estimates
+   degradation and soiling from a plant's alternating-current output together with modelled or
+   satellite irradiance, and [Mendonça Severiano et al.
+   (2026)](https://doi.org/10.1016/j.solener.2026.114382) classify underperformance across 1,089
+   systems from inverter data alone — though they catch clipping, when the panels produce more than
+   the inverter can pass through, only about half the time, which is a warning for the six
+   half-hourly-metered solar farms in the trial area. Artificial Forecasting gets closest, and does
+   it at a substation rather than at an individual generator: its Alpha work calibrates each
+   substation's forecast installed capacity down to the fraction actually generated over two years,
+   and separately found that the National Energy System Operator's national generator-availability
+   signal "almost universally substantially improved results" at wind-connected primary substations,
+   while a feature tracking connected generation capacity over time did not help, which they put
+   down to too few new connections falling inside the training window rather than to the feature
+   itself.
 
     The gap is therefore real but narrower than it first appears, and it states its own research
-    question: **can effective capacity be recovered from a substation's net flow, where generation
-    is mixed with demand and there is no separate generation meter to check the answer against?**
-    That is the one version of this nobody has published. There is also no equivalent of RdTools for
-    wind that works from a revenue meter alone, because the wind literature assumes turbine
-    telemetry: its authors are the owners who have it. And part of the problem is a data question
-    rather than a modelling one, because much distribution-connected curtailment in GB is instructed
-    by the network operator under active network management, so for those sites the curtailment
-    component of effective capacity is already known inside NGED. Public data exists for testing an
-    estimator before it meets NGED's network: Cubico has released the
+    question: **can effective capacity be recovered from a metered generator's revenue meter alone,
+    with no turbine telemetry, no inverter data and no curtailment record to check the answer
+    against?** That is the one version of this nobody has published, and it is the version
+    Flexpectation needs, because a half-hourly revenue meter is all NGED holds for these sites. The
+    harder version — recovering the capacity of generation that has no meter of its own, from a
+    substation's net flow where generation is mixed with demand — is the disaggregation task of gap
+    5, and belongs to the network-wide scale-up rather than the trial area. There is also no
+    equivalent of RdTools for wind that works from a revenue meter alone, because the wind
+    literature assumes turbine telemetry: its authors are the owners who have it. And part of the
+    problem is a data question rather than a modelling one, because much distribution-connected
+    curtailment in GB is instructed by the network operator under active network management, so for
+    those sites the curtailment component of effective capacity is already known inside NGED. Public
+    data exists for testing an estimator before it meets NGED's network: Cubico has released the
     [Kelmarsh](https://doi.org/10.5281/zenodo.8252025) and
     [Penmanshiel](https://doi.org/10.5281/zenodo.5946808) wind farm datasets, which carry turbine
     telemetry with alarm and status events *and* the site's own grid meter for the same period, so
@@ -677,9 +690,9 @@ alongside the core forecast, across several families of model:
 
 Only the heavily-tuned gradient-boosting model is in scope for the first version of the service. The
 pre-trained encoders, the connectivity-map models and the differentiable physics all belong to the
-network-wide scale-up from 2027, as do separating out unmetered generation and forecasting the
-network as a network. "What this review excluded, and why" explains why the differentiable-physics
-strand is the least well supported of the four.
+network-wide scale-up from 2027, as do the disaggregation work of gap 5 — separating out unmetered
+generation — and forecasting the network as a network. "What this review excluded, and why" explains
+why the differentiable-physics strand is the least well supported of the four.
 
 Attempting all seven means running on the order of hundreds of machine-learning experiments a month,
 and that is possible only because of engineering already done. One more experiment now costs almost
