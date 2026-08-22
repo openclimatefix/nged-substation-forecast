@@ -97,9 +97,11 @@ state. The leaderboard's per-slice counts therefore overstate how much independe
 separates two experiments, and a naive significance test on them would report more confidence than
 the data supports.
 
-We have not fixed this, and the energy-forecasting literature review found no paper offering a
-method to copy. The closest is [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335), who
-build the consistency intervals on their
+We have not fixed this, and the
+[energy-forecasting literature review](../background/energy-forecasting-review.md) found no paper
+offering a method to copy. The closest is
+[Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335), who build the consistency intervals
+on their
 calibration diagrams "considering the temporal correlation of net-load, as the usual assumption of
 independence between samples does not hold" — the right instinct, applied to day-ahead forecasts
 that are not reissued. Until we do something better, the rule is the one already in force for

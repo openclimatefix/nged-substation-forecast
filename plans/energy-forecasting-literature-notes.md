@@ -3,7 +3,7 @@
 > **DEPRECATED — 22 August 2026. Do not cite this file, and do not trust it against the report.**
 >
 > These are working notes from the literature search. They have been superseded by
-> [`milestone-2-report-SOTA-section.md`](milestone-2-report-SOTA-section.md), which is the
+> [the energy-forecasting literature review](../docs/background/energy-forecasting-review.md), which is the
 > deliverable and is the authoritative text. Where the two disagree, **the report is right and this
 > file is wrong** — the report has since been through five adversarial fact-checks and this file has
 > not. At least two errors are known to have propagated from here into an earlier draft of the

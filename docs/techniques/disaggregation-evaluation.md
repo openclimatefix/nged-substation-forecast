@@ -55,7 +55,10 @@ irradiance; estimated unmetered-PV capacity is physically plausible given the su
 geographic footprint.
 
 Violations are detectable errors without any ground truth — a rigorous "wrongness floor" that
-discriminates between methods. This spoke is underused in the disaggregation literature.
+discriminates between methods. This spoke is underused in the disaggregation literature: the
+[energy-forecasting review](../background/energy-forecasting-review.md) found that the papers it
+surveyed do use physical constraints, but build them into the method — an efficiency ceiling, a
+monotonicity condition, a summation invariant — where they cannot be violated and so test nothing.
 
 ---
 
