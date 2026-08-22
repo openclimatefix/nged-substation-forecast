@@ -896,12 +896,14 @@ heat pump sized small relative to a house's heat demand runs flat out for hours 
 GB design guidance concedes that whether diversity survives colder-than-average winters needs
 further research — which is precisely the condition under which a substation approaches its limit.
 
-**Domestic batteries are the barren case, and the industry agrees.** Northern Powergrid's
-low-voltage design code fits diversity curves to measured trial data for general domestic load, heat
-pumps and chargers alike, and then states that diversity "should not be applied when considering a
-BESS device" — a diversity factor of exactly one. What academic work exists separates a battery from
-a household's net flow only by assuming a known control model, which is the one thing that cannot be
-assumed when the point is that two identical batteries dispatch in opposite directions.
+**Domestic batteries are the barren case, and the industry agrees.** Northern Powergrid's [code of
+practice for the economic development of the low-voltage
+system](https://www.northernpowergrid.com/sites/default/files/assets/IMP001911_0.pdf) fits diversity
+curves to measured trial data for general domestic load, heat pumps and chargers alike, and then
+states that diversity "should not be applied when considering a BESS device" — a diversity factor of
+exactly one. What academic work exists separates a battery from a household's net flow only by
+assuming a known control model, which is the one thing that cannot be assumed when the point is that
+two identical batteries dispatch in opposite directions.
 
 **This remains the largest deliberate omission in the review.** Our search covered substation and
 generation forecasting, not electrification, and the paragraphs above are what a targeted follow-up
@@ -927,7 +929,7 @@ aggregate of heat pumps, chargers and batteries behind a GB primary substation, 
 uncertainty, and is scored against the evening peak that the network actually cares about. Reading
 the electrification literature properly is the first deliverable on this strand, before any model.
 
-## What recurs across the studies we read
+## Six findings that recur across the studies we read
 
 Six findings recur across the studies reviewed above. These are findings about this literature, not
 laws of nature: each is what several teams measured on their own networks, and a network that
@@ -1073,7 +1075,7 @@ every purpose-trained competitor on mean absolute error, 3.8 kW against 4.2 kW. 
 engineered models do not clearly beat an off-the-shelf model given none of the target network's
 data, that is important information about the value of any such experimental programme.
 
-### An open question this review cannot settle
+### Two explanations for why sophisticated models beat simple ones by so little, and how Flexpectation can tell them apart
 
 There are two quite different explanations for the small margin between sophisticated and simple
 models reported across this literature, and nothing we read separates them.
@@ -1190,10 +1192,11 @@ forecast quality, because the paper reports none.
 Strategic Innovation Fund programme, with about £3.9m of grant across its three phases, run by
 Northern Powergrid with Faculty, EV.energy and Oaktree Power, the final Beta phase running to
 February 2027. Its deliverables are publicly available on the Energy Networks Association's Smarter
-Networks Portal, though the Beta deliverables sit under a separate project registration from the
-Alpha ones linked above. It does much of what Flexpectation does at primary substations, it also
-covers secondary substations, which Flexpectation does not, and at the time of writing it is further
-ahead than Flexpectation.
+Networks Portal, though the [Beta
+deliverables](https://smarter.energynetworks.org/projects/10145998/) sit under a separate project
+registration from the Alpha ones linked above. It does much of what Flexpectation does at primary
+substations, it also covers secondary substations, which Flexpectation does not, and at the time of
+writing it is further ahead than Flexpectation.
 
 **Its argument is in the peer-reviewed literature as well as in its deliverables.** [Wade et al.
 (2024)](https://doi.org/10.1049/icp.2024.2102), by authors at Northern Powergrid and Faculty, put it
