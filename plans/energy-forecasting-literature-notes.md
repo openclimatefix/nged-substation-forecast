@@ -2866,8 +2866,7 @@ resulting corpus is 4,151 records with 4,148 abstracts, covering CIRED 2017 Glas
 Vienna Workshop (257) and 2025 Geneva (681) — about 3,600 CIRED papers, with roughly 540 adjacent
 non-CIRED IET conference records left in as a safety margin, which only strengthens the negatives.
 CIRED 2018 Ljubljana and 2019 Madrid are not in Crossref under the 10.1049 prefix; they were
-searched by query against the full-text-indexed DSpace API at `cired-repository.org`. Pre-2017 was
-sampled by targeted Crossref queries, not enumerated. Abstracts were read, not full texts: CIRED
+searched by query against the full-text-indexed DSpace API at `cired-repository.org`. Pre-2017 was sampled by targeted Crossref queries, not enumerated. **CIRED 2026 Brussels Workshop, 9–10 June 2026**, is not yet in Crossref — volume 2026 of IET Conference Proceedings holds 11 issues and none is CIRED — so it was searched from the organisers' accepted-papers list (<https://2026brussels.cired.net/>, saved to `literature/papers/`), 265 papers, titles and authors only. Past deposit lag runs 3 to 7 months after the event (Rome June 2023 appeared that September, Geneva June 2025 that October, Vienna June 2024 the following January), so the Brussels abstracts should be searchable from about September 2026 and are worth re-running then. Of the 265 titles, 19 name forecasting or prediction; zero name an ensemble; the only horizon named is day-ahead; switching, capacity availability and disaggregation appear in no forecasting title. Two apply time-series foundation models (1383 grid-edge energy management, 1537 residential consumption), and 17 titles concern electrification — the topic our own review does not cover. The next main conference is **CIRED 2027 Stockholm, 14–17 June 2027**. Abstracts were read, not full texts: CIRED
 2023 and 2025 full texts are paywalled on the IET Digital Library and are not on the open
 repository, which stops at 2019.
 

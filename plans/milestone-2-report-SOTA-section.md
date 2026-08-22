@@ -824,11 +824,12 @@ most likely to read — it is where European distribution network operators publ
 operational work, so it is where a claim of ours is most likely to be contradicted. We therefore
 searched it in full: the titles and abstracts of every paper in the CIRED main conferences and
 workshops from 2017 to 2025, about 3,600 of them, plus the openly archived 2018 and 2019 proceedings
-by keyword. Nothing there contradicts the seven gaps, and the absences are worth stating, because
-CIRED is where the counter-example would have been. No CIRED paper drives a load or generation
-forecast from a weather ensemble. None forecasts load or generation beyond 48 hours: the only 14-day
-forecast in the proceedings predicts feeder faults rather than load. Fourteen forecast
-probabilistically at all, of which one is at substation scale — [Mesarcik et al.
+by keyword, and the 265 papers accepted for the Brussels workshop of June 2026 by title, those
+proceedings not yet being published. Nothing there contradicts the seven gaps, and the absences are
+worth stating, because CIRED is where the counter-example would have been. No CIRED paper drives a
+load or generation forecast from a weather ensemble. None forecasts load or generation beyond 48
+hours: the only 14-day forecast in the proceedings predicts feeder faults rather than load. Fourteen
+forecast probabilistically at all, of which one is at substation scale — [Mesarcik et al.
 (2025)](https://doi.org/10.1049/icp.2025.1968), day-ahead, on ten years of measurements from 312
 Dutch substations. Nothing scores the upper tail, nothing keeps switching-contaminated history
 usable, and nothing estimates how much of a generator's capacity is available. The closest paper to
@@ -837,6 +838,10 @@ load and generation day-ahead at substation level at an Austrian network operato
 or Gaussian regression over the alternatives it tested, and reports 3 to 8% mean absolute percentage
 error, varying with how industrial the supplied area was and how large — a further instance of
 findings 1 and 2. We read only the abstracts of these two, because both full texts are paywalled.
+The Brussels titles of June 2026 change none of this: 19 of the 265 name forecasting or prediction,
+none names an ensemble, and the only horizon named is day-ahead. Two of the 19 apply time-series
+foundation models, so the possibility that a model given none of a network's own data can compete is
+being tested in this venue too.
 
 ## Publishing results that others can compare against
 
