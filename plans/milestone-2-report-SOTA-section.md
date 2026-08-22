@@ -653,7 +653,7 @@ poorly as a result".
 ### 4. Detecting switching events
 
 **In summary.** One paper detects switching at a real network operator, using a bottom-up reference
-series NGED does not have; the GB precedent drew the same distinction in 2018 but never measured how
+series NGED does not have; the GB precedent drew the same distinction in 2016 but never measured how
 often it was right.
 
 **The problem.** When a cable fault or planned maintenance moves part of a network from one
@@ -939,7 +939,11 @@ the paper above: it splits a forecast rather than a measurement, it applies one 
 rather than a site-specific one, and OpenSTEF's own documentation says the step "does not improve
 forecast accuracy" — the components are redistributed from a total that was forecast first, so any
 error in the total is inherited by every component. OpenSTEF's source carries no trace of DAZLS, in
-its current release or in the older ones we checked.
+its current release or in the older ones we checked. [Teng et al.
+(2023)](https://doi.org/10.1016/j.rser.2023.113662) settle the point themselves: they benchmark
+DAZLS against "the energy splitting model in the OpenSTEF software package" on the same data and
+report that DAZLS "significantly outperforms" it — which is not a comparison an author runs against
+a package that already implements their own method.
 
 **GB already has an operational forecast of unmetered generation, at national scale.** NESO
 publishes [embedded wind and solar
@@ -1127,6 +1131,206 @@ uncertainty, and is scored against the evening peak that the network actually ca
 we found tests whether the re-synchronised peak an automated tariff creates, described above,
 survives at the aggregation a primary substation carries. Reading the electrification literature
 properly is the first deliverable on this strand, before any model.
+
+## How we will know whether each of these worked
+
+The eight problems above need three different kinds of evaluation, and this literature is far
+stronger on the first than on the other two. Forecasting has settled practice we can adopt.
+Estimating something nobody measures — an effective capacity, an unmetered solar output — has four
+substitutes for ground truth and no agreement on which to use. Detecting rare events has good
+academic practice and, in GB, no precedent that measured anything at all. This section says what we
+will do about each, and it is placed before the recurring findings because the answer changed how we
+intend to run the project rather than only how we intend to report it.
+
+### Forecasting: problems 1, 2 and 5
+
+**Every forecasting paper we read that describes its split uses a rolling origin, and the training
+window usually grows rather than slides.** [Browell and Fasiolo
+(2021)](https://arxiv.org/abs/2103.10335) developed on three-fold cross-validation over 2014 to
+2017, tested on 2018 alone, and retrained every two weeks during that test year in what they call an
+expanding window. [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) refit every model monthly
+on all data up to that month. [Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) cut each
+month of 2013 into three blocks of about ten days, trained and cross-validated on the first two and
+held the third back, repeating that for all twelve months. [Pinheiro et al.
+(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) state the principle plainly — "the
+corresponding training set consists only of observations that occurred before the observation that
+forms the test set" — and vary the update cycle from a day to a year, giving 365, 52, 26 or 1 folds.
+[Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405) give the clearest
+statement of why the alternative is wrong: "because of the temporal dependence between errors in the
+training and testing datasets of time series data, training and testing sets are not independent,
+which invalidates the cross-validation results", and "the traditional setting of k-fold cross
+validation uses future observations to predict the past".
+
+**One length rule is worth adopting outright.** [Pinheiro et al.
+(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) held out the whole of 2019 and note that
+"one year is the minimum acceptable to test a forecasting model whose target value shows annual
+seasonality". Substation load shows exactly that seasonality, so any fold shorter than a year cannot
+tell us whether a model handles winter, and winter is when NGED buys flexibility.
+
+**Not one of the papers we read addresses the leakage a frequently reissued forecast creates, and
+Flexpectation is the most exposed design of the lot.** When a forecast covering 14 days is reissued
+every six hours, every target half-hour is covered by 56 separate forecasts. Those 56 are not 56
+independent observations of the model's skill: they share the weather, the recent load and most of
+the model state. Count them as independent and a significance test will report a confidence the data
+does not support; let a target half-hour fall on both sides of a train-test boundary and the test
+set is contaminated outright. [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) run the same
+exposure — a 96-hour horizon reissued hourly, so consecutive forecasts share 95 of their 96 target
+hours — and say nothing about it. [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079)
+issue twice a day over a 168-hour horizon and say nothing about it either. We searched all ten
+papers for any discussion of a gap, an embargo, a buffer or overlap between training and test data
+and found none. [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) are the exception, and they
+escape the problem by construction rather than by treating it: their stride equals their horizon,
+four days each, so no two forecasts in their evaluation share a target. They name shortening that
+stride as future work, and describe exactly what it would create — "each data point in the dataset
+covered by multiple forecasts, as opposed to a single forecast per data point in the used
+configuration".
+
+**So this is a gap in the field's practice rather than a solved problem we can look up, and we will
+say what we did about it.** Our evaluation will score each lead time separately, so that a day-ahead
+forecast is never averaged together with a fourteen-day one; will cut folds at forecast origins and
+drop any origin whose 14-day target window crosses the boundary, so no target half-hour appears in
+both training and test; and will treat the forecast origin rather than the target half-hour as the
+unit when judging whether a difference between models is real. Two of the reviews we read ask for
+less than that and are still worth meeting: [Haben et al. (2021)](https://arxiv.org/abs/2106.00006)
+ask that "how the data is split into train and test sets should be clearly stated" and that "a
+validation set should have been defined and be separate from the test set", while [Hong et al.
+(2020)](https://doi.org/10.1109/OAJPE.2020.3029979) advise authors whose results look too good to
+"perform sanity checks and see if future information has leaked into the process during parameter
+estimation, model selection, or tuning of hyper-parameters".
+
+**On metrics for these three problems, the review's commitments are collected under "Publishing
+results that others can compare against" below, and two cautions from this literature belong with
+them.** [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) alongside their
+percentage errors also use an error measure that tolerates a peak forecast being displaced in time,
+and [Haben et al. (2021)](https://arxiv.org/abs/2106.00006) recommend that "studies focusing on peak
+LV load forecasts should use modified error measures that avoid the double penalty" — the double
+penalty being that a forecast which gets a peak's height and width right but puts it half an hour
+late is punished twice, once for the peak that did not happen and once for the peak it missed, and
+scores worse than a flat line. The second caution is [Gilbert et al.
+(2023)](https://arxiv.org/abs/2206.11745)'s finding, described under problem 1 above, that
+cross-validation flattered the aggregation levels relative to their held-out test. We will report
+both numbers wherever we report either.
+
+### Estimating something nobody measures: problems 3, 7 and 8
+
+**There is no ground truth for an effective capacity or an unmetered solar output, and the papers
+that estimate them say so.** [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) write that
+"due to the lack of ground truth data, the evaluation of the installed capacity time series is not
+straight forward, and there are potential weaknesses in both evaluation methods". [Gouveia et al.
+(2026)](https://doi.org/10.1016/j.ijepes.2026.111848) put it the same way about rooftop solar: "as
+there is no information on installed PV capacity, no ground truth exists for these values for the
+consumers with installed PV". Between them this literature uses four substitutes for truth, and each
+one fails differently.
+
+**The first is to hold out sites that are metered and pretend they are not.** [Teng et al.
+(2023)](https://doi.org/10.1016/j.rser.2023.113662) take ten Dutch substations with complete
+renewable metering and rotate each one into the role of the unmetered target while the other nine
+train the model, over 8,831 timestamps. This is the most direct substitute available, because the
+answer really is known, and Flexpectation can run it: the trial area has 12 metered generators whose
+output can be hidden from a model that then has to recover it. Its weakness is sample size and
+sameness — ten substations in one country — and [Teng et al.
+(2023)](https://doi.org/10.1016/j.rser.2023.113662) do not discuss whether that design generalises.
+
+**The second is to inject a change into real data and see whether the method recovers it.** [Viotti
+et al. (2026)](https://doi.org/10.1002/we.70136) built 144 synthetic datasets by aggregating real
+per-farm production and zeroing one farm for the first half of each period, which simulates a new
+wind farm connecting. [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) build
+Monte Carlo substations from 400 real consumers who have no solar, add solar generation
+artificially, and then sweep the penetration, the number of consumers, the measurement noise, the
+sampling rate and the irradiance error. [Moriano et al. (2016)](https://doi.org/10.3390/s16010085)
+and [Martín et al. (2018)](https://doi.org/10.3390/s18113947) inject known gain and offset errors
+from ±1% to ±10%. The strength of this approach is that it can test a case that has not happened
+yet, which for problem 3 is the whole point, because a de-rating we have never observed cannot be
+held out. The weakness is that the injected case is only as realistic as the person injecting it,
+and all three sets of authors say so: [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) note
+their synthetic truth "will systematically be some percentage points low, mainly due to electrical
+losses"; [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) note that their
+design "assumes full knowledge of irradiance... This favours Model-Based methods"; and [Moriano et
+al. (2016)](https://doi.org/10.3390/s16010085) conclude that detection accuracy "does depend upon
+the performance of the load forecasting algorithm" underneath it.
+
+**The third is to compare against an independent tool rather than against truth.** [Meyers et al.
+(2020)](https://doi.org/10.1109/JPHOTOV.2019.2957646) ran their method blind across 573 systems and
+compared it with RdTools on the 368 that both accepted: the median degradation rates agree, 85.6% of
+sites fall inside RdTools' confidence bounds, and their spread is tighter, 1.0% against 1.4%. The
+weakness is exactly what you would expect. Where the two disagree, neither is evidence about the
+other: in the case they work through, the cause of the anomaly "is unknown" and their own answer
+merely "appears to be a more reasonable estimate". [Teng et al.
+(2023)](https://doi.org/10.1016/j.rser.2023.113662) use this strategy too, and the comparison they
+chose settles a question raised under problem 7 above — they benchmark their own method against the
+energy-splitting model inside [OpenSTEF](https://lfenergy.org/projects/openstef/) and beat it, which
+is not something an author does to a package that already implements their method.
+
+**The fourth is indirect: measure whether the estimate improves the thing it was meant to improve.**
+[Viotti et al. (2026)](https://doi.org/10.1002/we.70136) show 2.0% lower mean absolute error and
+2.3% lower root-mean-square error day-ahead when production is normalised by their capacity estimate
+rather than by the running maximum, while warning that "it is plausible that some errors in the
+normalization will compensate for other errors in the forecasting". [de Vilmarest et al.
+(2024)](https://doi.org/10.1109/TPWRS.2023.3310280) run the mirror image of the same test: taking
+the embedded generation capacities out of the model raised the static model's normalised error by
+more than 10% and moved the adaptive model's by 0.4%, which is evidence that the adaptation tracks
+capacity implicitly — though they never check the value it recovers against the real one.
+
+**What we will do is use all four, name which one produced each number, and treat them as answering
+different questions.** The hold-out is the most direct and we have the sites for it at problems 3
+and 7. Injection is the only way to test a de-rating we have not seen, and we will publish the
+injected case alongside the score so that a reader can judge how realistic it was. The
+independent-tool comparison is available for solar through RdTools and Solar Data Tools, and tells
+us only whether we agree with an existing method, not whether either is right. The downstream test
+is the one that settles whether the work was worth doing at all, and problem 3 above states it as an
+open question this project intends to answer: whether estimating effective capacity improves the
+forecast NGED actually buys flexibility against.
+
+### Detecting rare events: problems 4 and 6
+
+**Detection needs different metrics, and the best-worked example in this review chose them
+deliberately.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score precision, recall and
+an F-score with β set to 1.5 rather than 1, "to give a higher importance to the recall term, as the
+potential impact of a false negative is higher than that of a false positive in power grid expansion
+planning". That asymmetry holds for Flexpectation too: a missed switching event silently corrupts
+the history a model trains on, whereas a false alarm costs an engineer a look. They also explain why
+they report those three rather than an area under a curve — the prediction is binary once
+thresholded, so precision and recall "most closely illustrate the performance trade-off that is
+being made by thresholding".
+
+**Class imbalance is the design problem, not a detail.** In [Bouman et al.
+(2024)](https://arxiv.org/abs/2405.16164)'s labelled data, the twelve events longer than 42 days
+carry 84,108 labelled quarter-hours between them, against 5,739 for the 985 events shorter than six
+hours. Score by timestamp and the long events decide the number; score by event and the short ones
+do. Their answer is to split events into four duration bands, score each band separately and
+average, and to exclude the timestamps a labeller marked uncertain from the scoring entirely. They
+set the threshold by maximising that averaged score rather than by the conventional two- or
+three-standard-deviation control limit, and they resample the test stations 10,000 times to put an
+uncertainty on the result.
+
+**Two other choices in this literature are worth copying.** [Perry et al.
+(2021)](https://doi.org/10.1109/PVSC43889.2021.9518733) score a detection as correct if it lands
+"within 30 days of their labelled occurrence", which is the right shape for a problem where the
+exact timestamp of a gradual shift is not knowable; the tolerance has to be stated, because the
+score means nothing without it. [Martín et al. (2018)](https://doi.org/10.3390/s18113947) set their
+detection threshold from instrument physics rather than from the data: transformers contribute up to
+±1% error and the measurement equipment ±0.5% to ±1%, so ±2% is the inherent floor, and they set the
+threshold at ±4% "to avoid detection of false gain and offset errors". A threshold derived that way
+can be defended to an engineer who asks why their substation was flagged.
+
+**The honest headline from the one paper that measured properly is that this is hard.** [Bouman et
+al. (2024)](https://arxiv.org/abs/2405.16164) report F-scores near 0.2 on the shortest events and
+around 0.5 on the longest, and conclude that performance "is relatively low across the board, even
+on the train data. This indicates that the problem is hard to learn". Any target we set for problems
+4 and 6 should start from that number rather than from an intuition about how obvious a switching
+event looks on a chart.
+
+**No GB project offers a number to compare against, which we checked rather than assumed.** Across
+Electricity North West's ATLAS — both its 2016 methodology and its 2018 closedown report — UK Power
+Networks' Distribution Network Visibility and this network's own Time Series Data Quality, the words
+precision, recall, F-score, true positive and false positive do not appear at all. ATLAS justifies
+its thresholds as ones that "can adequately identify most" of the cases they target. UK Power
+Networks' figure that 95% of 377 remote terminal units obeyed the expected physics is a pass rate
+for a consistency check, not a detector's accuracy: the 5% are described as "probably" having
+installation problems, and the confirmed faults reported elsewhere in that document come from a
+different sample of units. Publishing precision and recall against a stated label set, with the
+labels released, would therefore be a first for a GB network, and it is the cheapest of this
+review's commitments to keep.
 
 ## Six findings that recur across the studies we read
 
