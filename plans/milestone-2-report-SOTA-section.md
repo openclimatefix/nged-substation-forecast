@@ -107,11 +107,11 @@ this review sets out: they may turn out to be one problem rather than eight.
 **The problem.** Forecast net demand — demand minus whatever generation sits behind the substation —
 at every grid supply point, bulk supply point and primary substation, half-hourly, 14 days ahead,
 updated every six hours, as a range of possible loads with a probability attached to each rather
-than as a single number. NGED acts on the forecast one to ten days ahead, and the question it asks
-of the forecast is "how likely is load to cross this substation's firm capacity — the load it can
-carry safely with its largest transformer out of service?" rather than "what is the most likely
-load?". This is the highest priority of the eight problems, and the other seven exist mainly to make
-it better.
+than as a single number. NGED acts on the forecast one to ten days ahead, and the question NGED asks
+of the forecast is "how likely is load to cross this substation's firm capacity — the load the
+substation can carry safely with its largest transformer out of service?" rather than "what is the
+most likely load?". This is the highest priority of the eight problems, and the other seven exist
+mainly to make it better.
 
 **The 14-day horizon sits at the edge of what a weather ensemble can supply.** [Buizza and
 Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put the lead time at which a weather ensemble —
