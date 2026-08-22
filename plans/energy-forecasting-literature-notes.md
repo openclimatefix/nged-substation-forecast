@@ -2890,8 +2890,9 @@ re-derived independently rather than taken from the search agent:
 - **Effective capacity.** 136 papers use capacity-availability vocabulary; all are hosting capacity,
   inverter reliability or EV charging headroom.
 
-Added to the report: Wade et al. (2024), Cordier et al. (2024), Mesarcik et al. (2025), Jung et al.
-(2024), Pfeifer et al. (2021), and the LianderPower open dataset.
+Added to the report: Wade et al. (2024), Cordier et al. (2024), Mesarcik et al. (2025), Jung et al. (2024), Pfeifer et al. (2021), Fox et al. (2018), and the LianderPower open dataset.
+
+**Fox, Plećaš, Neilson, Cannon & Parr (2018)**, "Analysis of local demand trends and forecasting through weather correction and benefit to DSO transition and microgrids", CIRED 2018 Ljubljana Workshop, paper 0415, <https://doi.org/10.34890/134>. SP Energy Networks with Digital Engineering. **Full text read** — the open CIRED repository serves it through its DSpace bitstream API, which is how to reach anything from CIRED 2018 or 2019. They run a numerical weather prediction model over Scotland at 1 km squares and 30-minute steps for ten years, map it to each primary substation weighted by customer density, and fit machine learning against measured demand to compute a Weather Correction Factor per substation. Thirteen 33/11 kV primaries in the proof of concept, almost 400 in production. Results worth having: customer sensitivity to effective temperature runs from 1.4% to 4.8% demand change per degree Celsius across the 13 sites, varying with customer mix (industrial customers are less weather-sensitive than domestic); weather correction moves an annual peak by 5 to 10%; effective temperature, global horizontal irradiance and the cooling power of wind carried the explanatory power, while relative humidity carried none. Their motivating finding is that weather masks the underlying trend — raw flows looked flat from 2007/08 to 2010/11 while the corrected trend was falling, and the mild winters from 2013/14 to 2016/17 hid a trend that was higher than the raw flows suggested. Cited in the report's GB-networks section, and used to qualify the claim that no measurement of weather sensitivity exists at GB primary substation level.
 
 **Audited, on-topic, and deliberately left out** — real and relevant, but changing no conclusion.
 Recorded here so the absence claims have a citable evidence base if challenged: Wiss & Ruwaida
@@ -2906,10 +2907,7 @@ thresholds bolted onto a point forecast — the practice gap 2 argues against; J
 `icp.2025.1502`, propagating a *known* topology change into congestion calculations; Gérossier et al.
 (2017) `oap-cired.2017.0625`, the oldest genuinely probabilistic distribution forecast in CIRED;
 Heres et al. (2023) `icp.2023.0814` and Kloibhofer et al. (2017) `oap-cired.2017.1333`, gap-5
-adjacent but below our aggregation level; Yasuoka (2001) `cp:20010890`, whose promised load-transfer
-module is CIRED's only ever gesture at gap 4; Fox et al. (2018) `10.34890/134`, SP Energy Networks
-weather-correcting primary substation peaks with NWP — left out because that section covers
-network-innovation projects rather than papers, which is a judgement call worth revisiting.
+adjacent but below our aggregation level; and Yasuoka (2001) `cp:20010890`, whose promised load-transfer module is CIRED's only ever gesture at gap 4.
 
 ## The Dantas and Browell available-capacity algorithm
 

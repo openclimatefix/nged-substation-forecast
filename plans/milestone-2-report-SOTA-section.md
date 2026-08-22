@@ -290,8 +290,10 @@ expect how much weather matters at a substation to be changing quickly, because 
 a substation weather-dependent is embedded solar generation and heat pumps, and there are far more
 of both on the network now than there were then. A primary substation that was almost
 weather-independent ten years ago may be strongly weather-dependent today. That is a prediction,
-though, not a measurement, and measuring how much weather now explains at NGED's primary substations
-is one of the more useful things this project can report.
+though, not a measurement — and Fox et al.'s Scottish sensitivities, measured on data ending in
+2016/17, say weather was already moving primary substation demand well before then. Measuring how
+much weather now explains at NGED's primary substations is one of the more useful things this
+project can report.
 
 **A model trained on none of NGED's data may match a model trained on all of it.** Kaas et al.
 (2026) tested Chronos-2, a general-purpose time-series model that had never seen their data, against
@@ -377,7 +379,14 @@ to a grid supply point view. **[SP Energy Networks'
 Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/)** drives a probability
 distribution of network faults per district from an ensemble weather forecast, up to seven days
 ahead, in an operational control room — the GB precedent for putting ensemble-derived distributions
-in front of network operators.
+in front of network operators. SP Energy Networks has also published at Flexpectation's own voltage
+level: [Fox et al. (2018)](https://doi.org/10.34890/134) ran a numerical weather prediction model
+over Scotland at 1 km resolution for ten years, mapped it onto each primary substation weighted by
+customer density, and used it to separate the effect of weather on peak demand from the effect of
+everything else — 13 substations in the proof of concept, almost 400 in production. Demand rose by
+between 1.4% and 4.8% per degree Celsius, differing substation by substation with the mix of
+customers behind it. It corrects history for planning rather than forecasting forward, but it is the
+GB precedent for putting gridded weather onto individual primary substations.
 
 One deployment outside GB belongs alongside these, because it is far larger than any of them.
 Enedis, the French distribution network operator, has forecast consumption and generation at all
