@@ -12,11 +12,12 @@ Secondly - and perhaps most importantly - the fact that the industry doesn't yet
 
 ## What we read
 
-This review was written for National Grid Electricity Distribution (NGED). We read fifteen papers in
-full and drew on ten more that were only partly available to us — an abstract, or part of a paper.
-Where one of those ten appears below, we say so. We also read the published deliverables of six
-concurrent GB network projects. The selection was deliberate rather than systematic: a paper earned
-its place by bearing on a decision Flexpectation actually faces and by changing something we
+This review was written for National Grid Electricity Distribution (NGED). It cites around
+fifty-five published sources. We read most of the ones an argument rests on in full; the rest were
+available to us only as an abstract, a preprint or part of a paper, and wherever a claim rests on a
+partial read we say so at the point the claim is made. We also read the published deliverables of
+six concurrent GB network projects. The selection was deliberate rather than systematic: a paper
+earned its place by bearing on a decision Flexpectation actually faces and by changing something we
 believed. Papers may be missing for no better reason than that we did not find them, and the section
 "What this review excluded, and why" lists what we knowingly left out. A further group of papers is
 cited once each, for one specific result, rather than reviewed.
@@ -225,7 +226,8 @@ operator acts, at 95%, and compare what two forecasts cost that operator in cong
 **3,102 euros a year using standard load profiles against 86 euros using a smart-meter-informed
 forecast**, a 97% reduction, with a matching fall in voltage violations. They also give the exchange
 rate NGED would want — a 1% cut in the standard deviation of forecast error is worth about 1.4% of
-congestion-management cost. Two things keep the gap open: the network is a modified IEEE 33-node
+congestion-management cost. We read the sections of that paper bearing on the cost calculation
+rather than the whole of it. Two things keep the gap open: the network is a modified IEEE 33-node
 test system rather than a real one, and what they compare is two *information levels*, not two
 forecasting models, so the metric has never been used to rank one forecast against another at a real
 substation. The rest of the metric exists in pieces. Browell and Fasiolo (2021) fix a risk appetite,
@@ -321,13 +323,14 @@ biofuel plant inside a net-demand forecast.** For the battery there is at least 
 [Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469) recover a price-taking storage
 operator's own optimisation parameters by gradient descent on historical prices and observed
 dispatch, and prove the recovered parameters converge to the true ones for a class of storage models
-— their motivation, that "future power system operators must understand and predict strategic
-storage arbitrage behaviors", is NGED's. We found nothing comparable for a gas generator or a
-biofuel plant. Otherwise the closest the literature comes is a warning rather than a method:
-Pinheiro et al. (2023) found that sites serving a single customer, whose load follows decisions no
-weather model can see, were forecast markedly worse than the rest (finding 3 below). We expect the
-battery, the gas generator and the biofuel plant to be the hardest series in the trial area for the
-same reason, and we will report them separately rather than pooled with the wind and solar sites.
+— we read their abstract rather than the full paper — — their motivation, that "future power system
+operators must understand and predict strategic storage arbitrage behaviors", is NGED's. We found
+nothing comparable for a gas generator or a biofuel plant. Otherwise the closest the literature
+comes is a warning rather than a method: Pinheiro et al. (2023) found that sites serving a single
+customer, whose load follows decisions no weather model can see, were forecast markedly worse than
+the rest (finding 3 below). We expect the battery, the gas generator and the biofuel plant to be the
+hardest series in the trial area for the same reason, and we will report them separately rather than
+pooled with the wind and solar sites.
 
 ### 3. Estimating the effective capacity of metered generators
 
@@ -374,14 +377,15 @@ substitute gives less stable results. But [Meyers et al.
 (2020)](https://doi.org/10.1109/JPHOTOV.2019.2957646) removed that requirement: their unsupervised
 signal-processing approach "only requires a measured power signal as an input — no irradiance data,
 temperature data, or system configuration information are required", and they validate it against
-RdTools on the same dataset, reporting greater robustness to data anomalies. It is now the
-open-source Solar Data Tools, whose pipeline detects capacity changes and clipping and estimates
-degradation, with a Monte Carlo step that returns a distribution rather than a point estimate.
-Independent work reaches the same place from other directions: [Cronin et al.
-(2014)](https://doi.org/10.1002/pip.2310) recover relative degradation rates by comparing daily
-yields across a group of systems, which maps onto the six solar farms in the trial area, and
-[Peratikou and Charalambides (2022)](https://doi.org/10.1016/j.seja.2022.100015) compute clear-sky
-output from photovoltaic data alone.
+RdTools on the same dataset, reporting greater robustness to data anomalies; we read their abstract
+and the package documentation rather than the full paper. It is now the open-source Solar Data
+Tools, whose pipeline detects capacity changes and clipping and estimates degradation, with a Monte
+Carlo step that returns a distribution rather than a point estimate. Independent work reaches the
+same place from other directions: [Cronin et al. (2014)](https://doi.org/10.1002/pip.2310) recover
+relative degradation rates by comparing daily yields across a group of systems, which maps onto the
+six solar farms in the trial area, and [Peratikou and Charalambides
+(2022)](https://doi.org/10.1016/j.seja.2022.100015) compute clear-sky output from photovoltaic data
+alone; we read the abstracts of both rather than the full papers.
 
 **Detecting the specific fault modes is further along than the review's earlier drafts assumed.**
 [Mendonça Severiano et al. (2026)](https://doi.org/10.1016/j.solener.2026.114382) classify
@@ -390,7 +394,8 @@ catch clipping — when the panels produce more than the inverter can pass throu
 the time. But [Perry et al. (2021)](https://doi.org/10.1109/PVSC43889.2021.9518733) score clipping
 detectors against expert labels on 36 systems from alternating-current power alone, and a
 logic-based detector reaches an F-score of 85.0 against 56.4 for the RdTools method, with the choice
-of detector shifting the estimated degradation rate by up to 0.6% a year.
+of detector shifting the estimated degradation rate by up to 0.6% a year; we read their abstract
+rather than the full paper.
 
 **At substation rather than generator level, Artificial Forecasting gets closest.** Its Alpha work
 builds the baseline it forecasts against by scaling Northern Powergrid's own installed-capacity
@@ -616,9 +621,10 @@ transferring from substations that do meter them.** [Teng et al.
 (2023)](https://doi.org/10.1016/j.rser.2023.113662) train on ten Dutch substations that carry
 complete renewable metering, then predict solar and wind power separately at substations with none,
 from weather, geospatial position and each site's known renewable capacity, at 15-minute resolution
-— a root-mean-square error of 0.07 against 0.70 for a conventional transfer-learning model. It ships
-as the `split_energy` component of [OpenSTEF](https://lfenergy.org/projects/openstef/), Alliander's
-open-source forecasting stack, which is in live operation.
+— a root-mean-square error of 0.07 against 0.70 for a conventional transfer-learning model; we read
+their abstract rather than the full paper. It ships as the `split_energy` component of
+[OpenSTEF](https://lfenergy.org/projects/openstef/), Alliander's open-source forecasting stack,
+which is in live operation.
 
 **Where the gaps are: doing it without a metered training set, estimating the capacity rather than
 being told it, and stating the uncertainty.** Teng et al. (2023) need a population of fully-metered
