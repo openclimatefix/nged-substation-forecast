@@ -1378,8 +1378,7 @@ reports these percentages inconsistently — §3.6 says 82.8% and 66.0%, the Fig
 **The negative result that matters most to us: XGBoost lost to the GAM.** They fitted a gradient
 boosting model on identical features with an exhaustive hyper-parameter grid search, temperature
 unfolded to polynomial terms, one-hot encoded categoricals, scaled numerics and three families of
-base learner. It reached 199 MW RMSE against the GAM's 191 MW. They rejected it on accuracy *and*
-interpretability, noting that a GBM reaching comparable accuracy needs thousands of weighted trees
+base learner. It reached 199 MW RMSE against the GAM's 191 MW. **Corrected 2026-08-22:** the paper's own words are "no improvements in accuracy" and "it achieves the same accuracy, but with two disadvantages" — the two being the cost of hyper-parameter optimisation and the loss of interpretability. Accuracy is not one of the grounds for rejection. It notes that a GBM reaching comparable accuracy needs thousands of weighted trees
 or linear functions and so loses the domain-level interpretability that individually-interpretable
 base learners promise.
 
@@ -2133,8 +2132,7 @@ same spatial statistics — is plausible and untested.
 
 **A thoroughly-tuned gradient booster lost to a GAM.** Pinheiro et al. fitted XGBoost on identical
 features to their GAM, with an exhaustive hyper-parameter grid search, polynomial temperature terms,
-one-hot encoding, scaling, and three families of base learner. It reached 199 MW RMSE against the
-GAM's 191 MW, and they rejected it on interpretability as well. Our entire baseline is XGBoost. The
+one-hot encoding, scaling, and three families of base learner. It reached 199 MW RMSE against the GAM's 191 MW, and they rejected it on tuning cost and interpretability, saying it achieved the same accuracy. Our entire baseline is XGBoost. The
 rebuttal is that their target is smooth national aggregate load where spline structure fits
 naturally, and ours is volatile net demand at ten megawatts — but that is a hypothesis, and a GAM arm
 is cheap.
@@ -2561,9 +2559,15 @@ no results; it missed all of these.
   (2020)**, doi 10.1049/iet-gtd.2018.7127. Four methods that *adjust* reconfiguration-affected
   history rather than deleting it, on six years of hourly data across 169 real feeders; the 2020
   follow-up forecasts future reconfiguration events. **Refutes "nobody keeps the history".**
-- **Huyghues-Beaufond et al. (2020)**, doi 10.1016/j.apenergy.2019.114405. 342 UK MV feeders;
-  structural breaks detected by binary segmentation and removed. The canonical detect-and-delete
-  citation, and UK.
+- **Huyghues-Beaufond et al. (2020)**, doi 10.1016/j.apenergy.2019.114405. 342 UK MV feeders.
+  **Corrected 2026-08-22 after reading the full text** (TU Delft green open-access copy): this is
+  *not* a detect-and-delete citation. Binary segmentation detects change-points, but only to bound
+  the piecewise-stationary segments inside which Tukey's rule removes **outliers** — "detect and
+  remove outliers from piecewise stationary segments". Every segment is kept and the level shifts
+  stay in training and test data. The paper reports that they bias the fitted parameters and hurt
+  the forecast, while also concluding the forecasters "handle level-shifts well by adapting quickly
+  to changes". So it is a counter-example to any claim that nobody trains on switching-contaminated
+  history — what survives is that nobody exploits that contamination deliberately.
 - **Ludwig, Arora & Taylor (2023)**, doi 10.1080/01605682.2022.2115411. GB national load, 51-member
   ECMWF ENS, 1–6 days, with **EMOS post-processing plus ensemble copula coupling before the load
   model** because raw ensembles are biased and under-dispersed. Names LV-hierarchy application as
@@ -3062,3 +3066,106 @@ report.
   "CONFIDENTIAL" stamp on each slide is stale Faculty boilerplate (§10a).
 - Northern Powergrid, Faculty Science, EV.energy & Oaktree Power (2026). *Artificial Forecasting Beta
   (SIF) — Annual Progress Report, March 2026* (52 pages). SIF reference 10145998 (§10a).
+
+## Sources found by the 2026-08-22 search agents
+
+Three literature-scout agents were run against the eight-problem structure. Everything below was
+absent from this file before that run. Each entry says whether the full text was read.
+
+### Effective capacity — the section's central absence claim was wrong
+
+- **Meyers, Deceglie, Deline & Jordan (2020)**, "Signal Processing on PV Time-Series Data: Robust
+  Degradation Analysis Without Physical Models", *IEEE J. Photovoltaics* 10(2) 546–553,
+  <https://doi.org/10.1109/JPHOTOV.2019.2957646>. Abstract verified verbatim via OpenAlex: "This
+  approach only requires a measured power signal as an input-no irradiance data, temperature data,
+  or system configuration information are required", validated against RdTools on the same NREL
+  dataset. **This kills the claim that solar capacity estimation needs irradiance the site does not
+  measure.** It is now the open-source Solar Data Tools (NREL/Stanford), whose pipeline does
+  capacity-change detection, clipping detection and a Monte Carlo degradation estimate — a
+  distribution, not a point value. Abstract only; the package documentation was read.
+- **Viotti, Arnqvist & Olauson (2026)**, "Estimating Wind-Power Capacity Time Series From
+  Production Data Using a Power Curve Model and Quadratic Optimization", *Wind Energy* 29(8)
+  e70136, <https://doi.org/10.1002/we.70136>. **Full text read** (CC-BY, Uppsala DiVA). Verified
+  verbatim: the cumulative maximum "requires monotonically increasing capacity and relies on
+  frequent high wind events"; 27.2% lower normalised MAE quantifying capacity after a step change;
+  a forecasting model normalised their way scored 2.0% lower MAE and 2.3% lower RMSE day-ahead.
+  Directly criticises the ratchet Dantas & Browell use, on the ground that matters to us — our
+  effective capacity goes *down* when a turbine is out.
+- **Pierrot & Pinson (2024)**, "On Tracking Varying Bounds When Forecasting Bounded Time Series",
+  *Technometrics* 66(4) 651–661, <https://doi.org/10.1080/00401706.2024.2350421>, preprint
+  arXiv:2306.13428. **Preprint read.** Capacity as the time-varying upper bound of a generalized
+  logit-normal distribution, tracked online by normalised gradient descent jointly with the
+  forecast. Anholt offshore, 14 months, 10-minute: CRPS 34.22% better than probabilistic
+  persistence and 17.89% better than the same model with a fixed bound. Their motivation is ours
+  verbatim — the bound "may change over time, while being unknown, for example in case of
+  curtailment actions for which information is not available or not reliable". **This is the
+  published precedent for the joint approach we described as our own.**
+- **Perry, Muller & Anderson (2021)**, IEEE PVSC 48, <https://doi.org/10.1109/PVSC43889.2021.9518733>.
+  Clipping detection scored against expert labels on 36 systems from AC power alone: F-score 85.0
+  for a logic-based detector, 56.4 for RdTools; detector choice moves the degradation estimate by
+  up to 0.6%/year. Abstract only.
+- **Cronin et al. (2014)**, <https://doi.org/10.1002/pip.2310> — fleet-relative degradation without
+  irradiance. **Peratikou & Charalambides (2022)**, <https://doi.org/10.1016/j.seja.2022.100015> —
+  clear-sky output from photovoltaic data alone. Both abstract only.
+
+### Substation forecasting and topology
+
+- **Bernecker et al. (2025)**, *IJEPES* 168 110713, <https://doi.org/10.1016/j.ijepes.2025.110713>.
+  **Numbers verified from the full PDF** (open access via d-nb.info when ScienceDirect 403s).
+  Congestion-management cost held at a 95% confidence level: 3,102 EUR with standard load profiles
+  against 86 EUR with a smart-meter forecast; a 1% cut in forecast-error standard deviation is
+  worth ~1.4% of cost. **Refutes "nobody prices a risk-constant decision metric at distribution
+  level"** — but on a modified IEEE 33-node *test* system, comparing two information levels rather
+  than two forecasting models.
+- **Campagne et al. (2025)**, arXiv:2507.03690. **Full text read.** GNN load forecasting on French
+  regions and on the GB DNOs' open smart-meter feed (SSEN and NGED, ~2M meters, 50,000
+  substations). Graph-aware models beat the baselines, but "for the UK data, data-driven graphs
+  proved more suitable since that dataset exhibits finer spatial granularity and noisier
+  correlations", and they are explicit that "the objective in forecasting is not to reproduce the
+  transmission network itself". Their graphs are geodesic or correlation-based, never electrical
+  adjacency — so the specific connectivity-map question survives, narrowly.
+- **Bian et al. (2024)**, *IEEE TSG* 15(2) 1608–1619, <https://doi.org/10.1109/TSG.2023.3303469>.
+  Recovers a price-taking storage operator's optimisation parameters by gradient descent on prices
+  and observed dispatch, with a convergence proof. Abstract verified. The method to borrow for the
+  trial area's battery.
+
+### Disaggregation — and a production system this review had missed entirely
+
+- **Teng et al. (2023)**, *RSER* 186 113662, <https://doi.org/10.1016/j.rser.2023.113662>. Abstract
+  verified via OpenAlex. Trains on 10 fully-metered Dutch substations, then predicts solar and wind
+  *separately* at substations with no renewable metering, from weather plus geospatial position and
+  known facility capacity, at 15 minutes; RMSEP 0.07 against 0.70 for default transfer learning.
+  **Refutes "nothing estimates unmetered wind behind a substation."** Qualifications that keep a
+  narrower gap alive: it is a nowcast, it needs a metered population to transfer from, and it is
+  *given* each site's capacity rather than estimating it.
+- **OpenSTEF** (<https://lfenergy.org/projects/openstef/>) — Alliander's open-source forecasting
+  stack under LF Energy, in production across thousands of grid connection points to 48 hours, of
+  which Teng et al.'s method is the `split_energy` component. A second live production comparator
+  alongside Pinheiro et al., and the only one whose code can be read.
+
+### Leads not yet closed
+
+- **Giamarelos & Zois (2024)**, *SEGAN* 38 101304, <https://doi.org/10.1016/j.segan.2024.101304> —
+  a case study on one real HV/MV substation, our voltage level, but Elsevier blocked every route
+  and Crossref carries no abstract. Worth a table row if the numbers can be got.
+- **Li, Li & Wang (2026)**, *RSER* 226 116383, <https://doi.org/10.1016/j.rser.2025.116383> — a
+  review of customer-baseline-load estimation, the mature literature on counterfactual load that
+  was never metered. Metadata only; the abstract could not be retrieved. Relevant to problem 5, and
+  NGED procures flexibility against such baselines.
+- **Wang & Samworth (2018)**, *JRSS-B* 80(1) 57–83, <https://doi.org/10.1111/rssb.12243> — sparse
+  multivariate change-point detection by projection. No energy application, which is the point: the
+  fitted projection direction would have opposite signs on a donor substation and its recipients,
+  which is exactly the partial multi-recipient transfer problem 4 describes.
+- **Bloomfield et al. (2021)**, <https://doi.org/10.5194/essd-13-2259-2021>; **Lindas et al.
+  (2026)**, <https://doi.org/10.1088/2753-3751/ae5ca6> — calibrated ensemble-to-energy forecasts
+  past day 10, at country scale. The reference implementations for the 14-day ambition.
+
+### Tool notes for the next search
+
+- `arxiv.org` is blocked; `export.arxiv.org` works but **301-redirects to https, so curl needs
+  `-L`** or it silently returns nothing. Quoted multi-term `all:` boolean queries return nothing;
+  use `abs:"phrase" AND abs:word`.
+- `mdpi.com`, `sciencedirect.com` and `linkinghub.elsevier.com` return 403. Elsevier open-access
+  articles are sometimes served whole by the German National Library mirror at `d-nb.info`.
+- OpenAlex has a daily free budget that two of the three agents exhausted; Semantic Scholar
+  rate-limits without a key. Citation-graph walks are therefore the least-explored avenue.
