@@ -467,15 +467,15 @@ six solar farms in the trial area, and [Peratikou and Charalambides
 (2022)](https://doi.org/10.1016/j.seja.2022.100015) compute clear-sky output from photovoltaic data
 alone; we read the abstracts of both rather than the full papers.
 
-**Detecting the specific fault modes is further along than the review's earlier drafts assumed.**
-[Mendonça Severiano et al. (2026)](https://doi.org/10.1016/j.solener.2026.114382) classify
-underperformance across 1,089 systems from inverter data a network operator does not receive, and
-catch clipping — when the panels produce more than the inverter can pass through — only about half
-the time. But [Perry et al. (2021)](https://doi.org/10.1109/PVSC43889.2021.9518733) score clipping
-detectors against expert labels on 36 systems from alternating-current power alone, and a
-logic-based detector reaches an F-score of 85.0 against 56.4 for the RdTools method, with the choice
-of detector shifting the estimated degradation rate by up to 0.6% a year; we read their abstract
-rather than the full paper.
+**Detectors aimed at a specific fault mode work well or badly depending on which mode.** [Mendonça
+Severiano et al. (2026)](https://doi.org/10.1016/j.solener.2026.114382) classify underperformance
+across 1,089 systems from inverter data a network operator does not receive, and catch clipping —
+when the panels produce more than the inverter can pass through — only about half the time. But
+[Perry et al. (2021)](https://doi.org/10.1109/PVSC43889.2021.9518733) score clipping detectors
+against expert labels on 36 systems from alternating-current power alone, and a logic-based detector
+reaches an F-score of 85.0 against 56.4 for the RdTools method, with the choice of detector shifting
+the estimated degradation rate by up to 0.6% a year; we read their abstract rather than the full
+paper.
 
 **At substation rather than generator level, Artificial Forecasting gets closest.** Its Alpha work
 builds the baseline it forecasts against by scaling Northern Powergrid's own installed-capacity
@@ -495,17 +495,16 @@ in their own words: the bound "may change over time, while being unknown, for ex
 curtailment actions for which information is not available or not reliable".
 
 **Where the gap is: none of this has been done across a mixed fleet at a distribution network, or
-tested for whether it improves the forecast NGED buys flexibility against.** The pieces exist and
-most of them work from a revenue meter alone, which is more than the first draft of this review
-credited. What nobody has published is the combination: solar, wind and dispatchable sites at one
-distribution network operator, each with its capacity tracked from its own meter, feeding a 14-day
-probabilistic forecast, with the improvement measured rather than assumed. Where richer data does
-exist, the state of the art still simply reads capacity off a register — the team that won HEFTCom
-clipped its forecast quantiles to the maximum capacity implied by published outage notices, and
-NGED's embedded generators publish no such notices. Part of the problem is a data question rather
-than a modelling one, because much distribution-connected curtailment in GB is instructed by the
-network operator under active network management, so for those sites the curtailment component is
-already known inside NGED.
+tested for whether it improves the forecast NGED buys flexibility against.** The pieces exist, and
+most of them work from a revenue meter alone. What nobody has published is the combination: solar,
+wind and dispatchable sites at one distribution network operator, each with its capacity tracked
+from its own meter, feeding a 14-day probabilistic forecast, with the improvement measured rather
+than assumed. Where richer data does exist, the state of the art still simply reads capacity off a
+register — the team that won HEFTCom clipped its forecast quantiles to the maximum capacity implied
+by published outage notices, and NGED's embedded generators publish no such notices. Part of the
+problem is a data question rather than a modelling one, because much distribution-connected
+curtailment in GB is instructed by the network operator under active network management, so for
+those sites the curtailment component is already known inside NGED.
 
 **We plan to attempt this two ways, neither of which starts from scratch.** The first is the
 two-stage route: estimate a capacity time series from the meter, then normalise by it before
