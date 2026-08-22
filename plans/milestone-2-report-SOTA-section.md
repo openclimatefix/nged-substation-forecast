@@ -333,7 +333,64 @@ rather than a plant.
 (2026)](https://doi.org/10.1002/we.70079) forecast 73 wind farms in GB — 34 onshore, 39 offshore —
 from the ECMWF ensemble, seamlessly from 6 to 162 hours ahead. That is the same driver, the same
 horizon band and the same probabilistic form Flexpectation needs for its three wind sites, and it is
-also where the effective-capacity method described under problem 3 comes from.
+also where the effective-capacity method described under problem 3 comes from. Because it is the
+closest published work to what Flexpectation has to build, the rest of this subsection sets out what
+their method does and what we should take from it.
+
+**Their method separates the two things that can go wrong, and that separation is the paper's main
+result.** A wind power forecast can be wrong because the weather forecast was wrong, or because the
+conversion from weather to power was wrong. Dantas and Browell quantify both. They fit a
+gradient-boosted quantile regression tree that maps weather to power, trained on ECMWF's operational
+analysis rather than on forecasts so that the errors of the weather forecast do not contaminate the
+conversion model, and they then push each of the ensemble's 50 members through that tree separately.
+They treat the members as exchangeable, which is why one conversion model serves all of them; note
+that they use the 50 perturbed members, where Flexpectation reads all 51 fields ECMWF publishes, the
+50 perturbed members plus the control. Each member emerges as a normal distribution whose width is
+set by that member's own predicted interquartile range, so a member the conversion model is unsure
+about is given a wider kernel than one it is confident about. The 50 kernels are merged with the
+beta-transformed linear opinion pool of [Gneiting and Ranjan
+(2013)](https://doi.org/10.1214/13-EJS823), whose parameters are fitted separately at each lead time
+by minimising CRPS, which corrects the miscalibration that arises because the members are not
+independent of one another. The output is a full predictive distribution at each lead time.
+
+**Their headline conclusion is that which of those two uncertainties dominates flips with lead time,
+and that where it flips varies a lot between sites.** In their words, "weather-to-power uncertainty
+dominates short-term forecast performance, while weather forecast uncertainty dominates mid-term.
+Typically, the transition from one situation to the other is 2 to 3 days ahead but can vary
+dramatically between wind farms. The transition typically occurs at shorter lead times for offshore
+wind farms compared with onshore." Handling both is what lets one model cover 6 to 162 hours, where
+the field had previously used a short-term model and a separate mid-term one. Flexpectation faces
+the same seam over its 14-day horizon, and this paper is evidence that the seam can be removed
+rather than managed.
+
+**A second conclusion is more uncomfortable for a project built on an ensemble: a deterministic
+forecast at higher resolution beat the ensemble at short lead times.** Their short-term reference
+method uses ECMWF's deterministic HRES at 0.1° and hourly steps, while their own method uses the
+ensemble at 0.5° and 6-hourly steps, because the archive they drew on carries no 100 m wind and no
+finer ensemble. On those unequal terms "the short-term method is better than the proposed method for
+horizons up to the day ahead", although it "cannot outperform the proposed method for horizons
+beyond 1 day ahead". Give both methods the same resolution and the same variables and their own
+method wins at every horizon. The lesson for Flexpectation is that a comparison of ensemble against
+deterministic measures the resolution difference unless the resolution is equalised first.
+
+**A third conclusion is about what an average score hides.** Averaged over five years, their method
+showed no gain over the state of the art at day 0 and day 1. Restricted to the periods when the
+ensemble members disagreed most — frontal passages and the like — it showed a real gain even at
+those short lead times, "which was not evident in the long-run average CRPS", because a
+deterministic method "is not able to discriminate between high/low weather uncertainty". They argue
+the field should score those periods separately: "assessing forecast performance under
+high-uncertainty events should be considered in recommended practices". Flexpectation should follow
+that, because the hours when the ensemble spread is wide are the hours when a network operator has a
+decision to make.
+
+**Two things their method does not do are things Flexpectation will need.** They fit a separate
+model per wind farm rather than one model across all 73, and they state that their forecasts carry
+no coherence across sites or across lead times, listing "member-by-member correction to retain
+spatio-temporal structure" as future work. A net-demand forecast that adds several generators and a
+substation together needs precisely that coherence, so it cannot be taken from this paper. Against
+that, their design is cheap: it fits three trees per wind farm however many quantiles and horizons
+are wanted, where the deterministic short-term reference needs one tree per quantile per horizon,
+513 of them for the 19 quantiles and 27 horizons they report.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.
@@ -373,9 +430,12 @@ is above the speed at which a turbine reaches full power marks the farm as runni
 has, and capacity is then held at that level until the meter exceeds it. Because their database
 names no turbine model, they infer that wind speed from the site's own distribution of wind speeds,
 and they take the wind speed itself from reanalysis rather than from any instrument at the farm.
-They did use one data source Flexpectation will not have, excluding curtailed half-hours with
-published bid-acceptance volumes, which exist for transmission-connected wind farms and not for
-NGED's embedded generators.
+They did use one data source Flexpectation will not have in the same form: they excluded curtailed
+half-hours using published bid-acceptance volumes, which exist for transmission-connected wind farms
+and not for NGED's embedded generators. Flexpectation has something adjacent, in that the active
+network management system records curtailment for each of NGED's generator customers, but that
+record is ambiguous enough that it cannot simply be dropped in where Dantas and Browell use a
+bid-acceptance volume.
 
 **That ratchet has since been criticised in print, on the grounds that matter most to NGED.**
 [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) point out that taking the running maximum
@@ -791,12 +851,21 @@ vehicles, chargers, heat pumps or batteries — more than the 23 whose titles na
 prediction at all.
 
 **Where the gaps are: forecast skill at substation aggregation, and the tariff-driven peak.** The
-one direct measurement of charging forecast skill against aggregation we found, on a German dataset,
-gives errors worse than a naive forecast for individual sites and postcodes, crossing below naive
-only at around 100 charge points. Nothing we found forecasts an aggregate of heat pumps, chargers
-and batteries behind a GB primary substation, states its own uncertainty, and is scored against the
-evening peak that the network actually cares about. Reading the electrification literature properly
-is the first deliverable on this strand, before any model.
+one direct measurement of charging forecast skill against aggregation that we found is [Ostermann
+and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1), who forecast "over 350,000 charging
+processes at more than 500 locations across Germany" a day ahead at 15-minute resolution, scoring
+the distribution with the pinball and interval scores against a naive benchmark. Aggregation is what
+decides whether the forecast is worth having: at the level of a single site and of a postcode
+"almost all models have values above 1 for the MASE and nRMSE, which means that the benchmark model
+is better in some cases", and of their five example sites only the one with over 100 charging points
+was "significantly better than those of the naive model". Pooled across the whole portfolio of more
+than 500 sites, their two best models — random forest and Ada boosting — reach a normalised
+root-mean-square error of 0.41 and 0.42. The lesson for NGED is that charger forecasting starts to
+beat the naive benchmark somewhere above a hundred charge points, which is a larger aggregation than
+most single sites and a smaller one than a primary substation. Nothing we found forecasts an
+aggregate of heat pumps, chargers and batteries behind a GB primary substation, states its own
+uncertainty, and is scored against the evening peak that the network actually cares about. Reading
+the electrification literature properly is the first deliverable on this strand, before any model.
 
 ## What recurs across the studies we read
 
@@ -1015,20 +1084,24 @@ no uncertainty attached, which is the step this project adds.
 Flexpectation's unmetered-solar work.
 
 **[SSEN FastTrack](https://smarter.energynetworks.org/projects/10166254/)** (Strategic Innovation
-Fund, Alpha 2025–2026) is building a probabilistic load forecast substation by substation, rolled up
-to a grid supply point view. **[SP Energy Networks'
+Fund, Alpha 2025–2026) combines probabilistic forecasting with simulation to model how the
+distribution connections queue — around 180 GW and growing — will load the network, from primary
+substations up to the grid supply point. FastTrack puts a probability on how much of that queue
+turns into real load and how it behaves, which is a planning question rather than the operational
+one Flexpectation asks. **[SP Energy Networks'
 Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/)** drives a probability
 distribution of network faults per district from an ensemble weather forecast, up to seven days
-ahead, in an operational control room — the GB precedent for putting ensemble-derived distributions
-in front of network operators. SP Energy Networks has also published at Flexpectation's own voltage
-level: [Fox et al. (2018)](https://doi.org/10.34890/134) ran a numerical weather prediction model
-over Scotland at 1 km resolution for ten years, mapped it onto each primary substation weighted by
-customer density, and used it to separate the effect of weather on peak demand from the effect of
-everything else — 13 substations in the proof of concept, almost 400 in production. Demand fell by
-between 1.4% and 4.8% for each degree Celsius of effective temperature, differing substation by
-substation with the mix of customers behind it — GB primary substation demand being
-heating-dominated. It corrects history for planning rather than forecasting forward, but it is the
-GB precedent for putting gridded weather onto individual primary substations.
+ahead, in a tool built with control-room engineers and now being trialled live — the GB precedent
+for putting ensemble-derived distributions in front of network operators. SP Energy Networks has
+also published at Flexpectation's own voltage level: [Fox et al.
+(2018)](https://doi.org/10.34890/134) ran a numerical weather prediction model over Scotland at 1 km
+resolution for ten years, mapped it onto each primary substation weighted by customer density, and
+used it to separate the effect of weather on peak demand from the effect of everything else — 13
+substations in the proof of concept, almost 400 in production. Demand fell by between 1.4% and 4.8%
+for each degree Celsius of effective temperature, differing substation by substation with the mix of
+customers behind it — GB primary substation demand being heating-dominated. It corrects history for
+planning rather than forecasting forward, but it is the GB precedent for putting gridded weather
+onto individual primary substations.
 
 Two deployments outside GB belong alongside these.
 
