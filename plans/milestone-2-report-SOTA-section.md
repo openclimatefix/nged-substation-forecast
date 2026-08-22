@@ -95,7 +95,8 @@ prose: the absence is itself the finding.
 
 Everything below is what our search surfaced as most relevant to NGED, not a ranking of the field:
 every study answers the problem its own authors set, and they set different problems. The eight are
-not a shortlist to choose from — the plan is to attempt all of them.
+not a shortlist to choose from — the plan is to attempt all of them, for a reason the last part of
+this review sets out: they may turn out to be one problem rather than eight.
 
 ### 1. Probabilistic forecasts of net demand at substations
 
@@ -835,6 +836,32 @@ pre-trained encoders, the connectivity-map models and the differentiable physics
 network-wide scale-up from 2027, as does the disaggregation of unmetered generation and forecasting
 the network as a network. "What this review excluded, and why" explains why the
 differentiable-physics strand is the least well supported of the four.
+
+**The main reason for attempting all eight at once is that they may be one problem rather than
+eight.** A switching event, a turbine out for repair and a stuck meter all surface in the same
+place: as a discrepancy between what a substation metered and what the weather and the calendar say
+it should have metered. Every study reviewed above that touches more than one of the eight solves
+them as a pipeline. Dantas and Browell estimate available capacity, then normalise by it, then
+forecast. Artificial Forecasting rescales step-change blocks in data preparation, then forecasts.
+SSEN TRANSITION splits net load into demand and generation, forecasts each, then recombines.
+Huyghues-Beaufond et al. detect structural breaks and delete them before training begins. In every
+case one stage's output is frozen before the next stage sees it, so an error made early cannot be
+corrected later and the forecast error never gets to tell the capacity estimator it was wrong.
+
+**So the question we want to answer is whether one model that estimates capacity, switching state
+and demand together beats that pipeline.** NGED's specification leaves room for it, asking that
+these phenomena be handled rather than that they be handled explicitly. The one published result
+that bears on the question points the joint way: de Vilmarest et al. (2024), described under problem
+3, removed the embedded wind and solar capacities from their model of GB regional net load, and the
+adaptive version got 0.4% *better*, absorbing into its own coefficients what the explicit capacity
+figure had been supplying, while the static version got more than 10% worse. That is one result, on
+regions far larger than a substation, for one phenomenon out of several — and there are good reasons
+to doubt it generalises. A gradient-boosted tree is structurally poor at the subtraction a two-stage
+residual hands it precomputed, and each of our series carries only tens of thousands of training
+rows, which is not the regime in which a model reliably discovers an implicit baseline for itself.
+We expect the answer to differ by model family, which is part of why the differentiable-physics
+strand matters: it is the one family in which capacity, weather response and demand are estimated
+jointly by construction.
 
 **The first reason for confidence is that experiments are nearly free.** The core forecast already
 exists and runs today, on an experiment framework that makes one more experiment cost compute time
