@@ -583,12 +583,21 @@ filtered out before substation measurements can be used, detect both on the same
 report detector performance stratified by how long the event lasted. Their sign-recovery technique
 addresses exactly the non-directional metering defect described above. Alliander has run the method
 in production since 2021, fully replacing what was previously a manual process; its open-data portal
-names the associated dataset "STORM onderstation". Elsewhere in this literature, faulty metering
-appears as a data-cleaning step described in passing rather than as a problem in its own right:
-Mendonça Severiano et al. (2026) classify solar underperformance, but from inverter data a
-distribution network operator does not receive, and Artificial Forecasting supplies only indirect
-evidence that it matters — across their 729 secondary substations, data quality mattered at least as
-much as the choice of model (finding 1 below).
+names the associated dataset "STORM onderstation".
+
+**One other group has made it their subject, one voltage level down.** [Moriano et al.
+(2016)](https://doi.org/10.3390/s16010085) and [Martín et al.
+(2018)](https://doi.org/10.3390/s18113947) detect systematic errors in secondary-substation
+monitoring equipment by comparing each measurement against a short-term load forecast, and report a
+98% hit rate. Two things limit how far that carries: the errors are *injected* rather than found in
+the wild, and the fault taxonomy is calibration gain and offset drift plus outliers, not the stuck
+values, false zeros and multi-month gaps that dominate NGED's telemetry.
+
+**Everywhere else, faulty metering appears as a data-cleaning step described in passing rather than
+as a problem in its own right.** Mendonça Severiano et al. (2026) classify solar underperformance,
+but from inverter data a distribution network operator does not receive, and Artificial Forecasting
+supplies only indirect evidence that it matters — across their 729 secondary substations, data
+quality mattered at least as much as the choice of model (finding 1 below).
 
 **A public labelled dataset exists, and it is Dutch.** Knowing how often a detector is right
 requires measurements labelled as faulty or not, and Bouman et al. (2024) had 180 primary
@@ -597,9 +606,14 @@ portal](https://www.liander.nl/over-ons/open-data) as "STORM onderstation", expl
 others can train and validate algorithms against it. That is the one place in this review where the
 evaluation data for a problem is already public.
 
-**Where the gaps are: no GB equivalent, and no reference series to detect against.** The Dutch
-labels describe a Dutch network, and Bouman et al. (2024) detect on a residual against a bottom-up
-load estimate NGED does not have and cannot build. A GB labelled set is a gap this project can close
+**Where the gaps are: the fault taxonomy, a GB equivalent, and a reference series to detect
+against.** The Dutch labels collapse switching events and measurement errors into a single class, so
+they cannot separate a stuck meter from a network reconfiguration — which is exactly the distinction
+problems 4 and 6 have to make between them — and four per cent of their timestamps are labelled as
+the labeller being unsure. They describe a Dutch network, and Bouman et al. (2024) detect on a
+residual against a bottom-up load estimate NGED does not have and cannot build. Nothing else we
+found addresses recovering the direction of flow from a magnitude-only meter at all. A GB labelled
+set, with a taxonomy that separates metering faults from switching, is a gap this project can close
 cheaply, because the trial area is small enough to label by hand.
 
 ### 7. Disaggregating unmetered solar and wind from a substation's net flow
@@ -641,12 +655,44 @@ their abstract rather than the full paper. It ships as the `split_energy` compon
 [OpenSTEF](https://lfenergy.org/projects/openstef/), Alliander's open-source forecasting stack,
 which is in live operation.
 
-**Where the gaps are: doing it without a metered training set, estimating the capacity rather than
-being told it, and stating the uncertainty.** Teng et al. (2023) need a population of fully-metered
-substations to transfer from, and they are given the existence and capacity of each renewable
-facility rather than inferring it — whereas estimating that capacity is half of what NGED needs.
-Their output is a near-real-time estimate rather than a forecast, so nothing here puts unmetered
-solar or wind inside a forecast that states its own uncertainty over a horizon like ours.
+**GB already has an operational forecast of unmetered generation, at national scale.** NESO
+publishes [embedded wind and solar
+forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts) half-hourly, from
+within-day to 14 days ahead, updated hourly — the same resolution and horizon Flexpectation
+delivers. "Embedded" means precisely the generation this problem is about: wind and solar sitting on
+the distribution network with no transmission metering, which NESO's own field definition calls
+"invisible" to it. NESO also publishes its best view of installed embedded capacity, compiled from
+public sources rather than inferred from measurements, and warns that it "is not the definitive
+view". The forecast is a single number per half-hour, with no uncertainty attached, and it covers GB
+as one region rather than substation by substation.
+
+**Estimating unmetered *wind* capacity from measurements has been done at feeder level.** [Nikzad
+and Venkatesh (2024)](https://doi.org/10.1109/OAJPE.2024.3413606) estimate the aggregate capacity of
+connected distributed generation — wind and solar — from a North American utility's feeder
+measurements, reporting 97.53% accuracy on capacity and 93.70% on feeder flow, and [extend the
+method in 2026](https://doi.org/10.1109/TPWRD.2025.3631805) with separate wind and solar models. We
+read the abstracts rather than the full papers, and could not confirm from them whether wind and
+solar capacity are separated or estimated as one aggregate — which is the part that matters most to
+us.
+
+**Uncertainty and the horizon both exist in this literature, but never together.** [Wang et al.
+(2018)](https://doi.org/10.1109/TPWRS.2017.2762599) run the whole pipeline this problem describes —
+estimate behind-the-meter photovoltaic capacity, decompose net load into generation, demand and a
+residual, forecast each, then recombine them with a copula into a probabilistic net-load forecast —
+but at ISO New England scale and day-ahead. [Zhang et al.
+(2022)](https://doi.org/10.1016/j.engappai.2022.104707) do probabilistic disaggregation at grid
+supply point and feeder level with a multi-quantile recurrent network, scored on reliability and
+sharpness. NESO covers the 14-day horizon but deterministically. [Erdener et al.
+(2022)](https://doi.org/10.1016/j.rser.2022.112224) survey the field. We read the abstracts of all
+four.
+
+**Where the gaps are: doing it without a metered training set, inferring the capacity rather than
+being told it, and putting uncertainty and a multi-day horizon in the same forecast at substation
+level.** Teng et al. (2023) need a population of fully-metered substations to transfer from, and are
+given the existence and capacity of each renewable facility rather than inferring it — whereas
+inferring that capacity is half of what NGED needs. Their output is a near-real-time estimate rather
+than a forecast. Nothing we found combines a probabilistic forecast, a horizon beyond day-ahead and
+the level of an individual primary substation.
 
 ### 8. Disaggregating other distributed energy resources: heat pumps, electric-vehicle chargers and batteries
 
@@ -966,11 +1012,13 @@ rather build on it than rebuild it.
 **Measured against the studies above, the plan goes beyond this literature in four directions at
 once.** No study in this review drives a substation forecast from a weather ensemble across a 14-day
 horizon. None models the upper tail explicitly at substation level; the one study that models it
-explicitly at all works on regions far larger than a substation. None tracks the available capacity
-of a mixed fleet of solar, wind and dispatchable generators at one distribution network, or measures
-whether doing so improves the forecast. None turns switching-contaminated history into a useful
-input rather than deleting it, rewriting it, or absorbing the cost of leaving it in. Flexpectation
-attempts all eight problems above, across four families of model:
+explicitly at all works on regions far larger than a substation. None puts unmetered generation
+inside a probabilistic forecast at substation level over a multi-day horizon, though each of those
+three properties exists on its own. None tracks the available capacity of a mixed fleet of solar,
+wind and dispatchable generators at one distribution network, or measures whether doing so improves
+the forecast. None turns switching-contaminated history into a useful input rather than deleting it,
+rewriting it, or absorbing the cost of leaving it in. Flexpectation attempts all eight problems
+above, across four families of model:
 
 - a heavily-tuned version of the gradient-boosting approach that wins most tabular forecasting
   competitions, and which NGED's own EFFS project independently selected;
