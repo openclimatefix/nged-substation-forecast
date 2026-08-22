@@ -1039,10 +1039,13 @@ system". That is precisely the condition under which a substation approaches its
 practice](https://www.northernpowergrid.com/sites/default/files/assets/IMP001911_0.pdf) fits
 diversity curves to measured trial data for general domestic load, heat pumps and chargers alike,
 and then states that diversity "should not be applied when considering a BESS device" — a battery
-energy storage system — a diversity factor of exactly one. What academic work exists separates a
-battery from a household's net flow only by assuming a known control model, which is the one thing
-that cannot be assumed when the point is that two identical batteries dispatch in opposite
-directions.
+energy storage system — a diversity factor of exactly one. The academic work we found separates a
+battery from a household's net flow by assuming a known control model, which is the one thing that
+cannot be assumed when the point is that two identical batteries dispatch in opposite directions.
+The nearest escape from that assumption is [Bian et al.
+(2024)](https://doi.org/10.1109/TSG.2023.3303469) under problem 2 above, who recover the control
+model rather than assuming it — but from a market participant's dispatch against known prices, not
+from a household's net flow, so the method still has to be carried across.
 
 **This remains the largest deliberate omission in the review.** Our search covered substation and
 generation forecasting, not electrification, and the paragraphs above are what a targeted follow-up
