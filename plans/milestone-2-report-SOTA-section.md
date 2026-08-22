@@ -823,15 +823,17 @@ over months rather than years, tests a handful of model configurations, and repo
 dataset that no other paper uses. Energy forecasting has therefore never accumulated the thousands
 of directly comparable attempts that protein-structure prediction had accumulated before AlphaFold.
 
-We hold explanation two loosely, and explanation one may well be the right one. Flexpectation is not
-resourced like a large industrial research laboratory. What it is resourced to do is run many
+**We hold explanation two loosely, and explanation one may well be the right one.** Flexpectation is
+not resourced like a large industrial research laboratory. What it is resourced to do is run many
 experiments cheaply against one fixed benchmark, which is the part that matters for telling the two
 explanations apart. If explanation one is right, sustained experimentation will converge quickly on
 a small improvement over a naive forecast and then stop improving, however many further experiments
 we run — and we will report that plainly. If explanation two is right, improvements should keep
 arriving well past the point at which a smaller effort would have concluded there were none left to
-find. Either answer is worth publishing, and the second would be worth more to the industry than to
-this project alone. That is the shape of what Flexpectation offers beyond its own forecasts: not a
+find.
+
+**Either answer is worth publishing, and the second would be worth more to the industry than to this
+project alone.** That is the shape of what Flexpectation offers beyond its own forecasts: not a
 claim to have found the state of the art, but a run of comparable experiments on one fixed
 benchmark, published as they go, so that the next team does not have to start where we started.
 
@@ -882,16 +884,17 @@ substation with the mix of customers behind it — GB primary substation demand 
 heating-dominated. It corrects history for planning rather than forecasting forward, but it is the
 GB precedent for putting gridded weather onto individual primary substations.
 
-Two deployments outside GB belong alongside these. **The Dutch operator Alliander runs
-[OpenSTEF](https://lfenergy.org/projects/openstef/)**, an open-source forecasting stack under the
-Linux Foundation's LF Energy umbrella, in live operation across thousands of grid connection points
-to 48 hours ahead. It is the only production system we found that separates unmetered wind and solar
-out of a substation's measurements, by the method of Teng et al. (2023) described under problem 7,
-and being open source it is the one whose method can be read rather than inferred from a
-deliverable.
+Two deployments outside GB belong alongside these.
 
-The second is far larger than any project here. Enedis, the French distribution network operator,
-has forecast consumption and generation at all 2,300 of its high-voltage-to-medium-voltage
+**The Dutch operator Alliander runs [OpenSTEF](https://lfenergy.org/projects/openstef/)**, an
+open-source forecasting stack under the Linux Foundation's LF Energy umbrella, in live operation
+across thousands of grid connection points to 48 hours ahead. It is the only production system we
+found that separates unmetered wind and solar out of a substation's measurements, by the method of
+Teng et al. (2023) described under problem 7, and being open source it is the one whose method can
+be read rather than inferred from a deliverable.
+
+**The second is far larger than any project here.** Enedis, the French distribution network
+operator, has forecast consumption and generation at all 2,300 of its high-voltage-to-medium-voltage
 substations since 2015, and is now extending that to a finer geographic grid ([Cordier et al.
 2024](https://doi.org/10.1049/icp.2024.2058), whose abstract we read rather than the full paper). A
 high-voltage-to-medium-voltage substation in France is broadly the level of a GB primary substation.
@@ -901,18 +904,20 @@ quality, because the paper reports none.
 
 ### Northern Powergrid's Artificial Forecasting is further ahead, and sets the bar
 
-One concurrent project matters more than any paper here. Artificial Forecasting is an Ofgem
+**One concurrent project matters more than any paper here.** Artificial Forecasting is an Ofgem
 Strategic Innovation Fund programme, with about £3.9m of grant across its three phases, run by
 Northern Powergrid with Faculty, EV.energy and Oaktree Power, the final Beta phase running to
 February 2027. Its deliverables are publicly available on the Energy Networks Association's Smarter
 Networks Portal, though the Beta deliverables sit under a separate project registration from the
-Alpha ones linked above. Its argument is also in the peer-reviewed literature: [Wade et al.
+Alpha ones linked above. It does much of what Flexpectation does at primary substations, it also
+covers secondary substations, which Flexpectation does not, and at the time of writing it is further
+ahead than Flexpectation.
+
+**Its argument is in the peer-reviewed literature as well as in its deliverables.** [Wade et al.
 (2024)](https://doi.org/10.1049/icp.2024.2102), by authors at Northern Powergrid and Faculty, put it
 to CIRED that annual, assumptions-driven models of load at primary and secondary substations will
 not support flexibility procurement, and that monthly, weekly and daily operational forecasts are
-needed instead; we read its abstract rather than the full paper. Artificial Forecasting does much of
-what Flexpectation does at primary substations. It also covers secondary substations, which
-Flexpectation does not. And at the time of writing it is further ahead than Flexpectation.
+needed instead; we read its abstract rather than the full paper.
 
 **Artificial Forecasting has run operationally through a full winter flexibility procurement
 cycle.** A forecasting service for primary substations is deployed and has passed the network's
@@ -931,8 +936,8 @@ is more guarded than the numbers suggest: it reports early Beta evidence, from o
 procurement cycle, supporting the performance assumptions behind the value case, which "remains
 appropriate, subject to further validation".
 
-Artificial Forecasting is independent evidence that short-term substation forecasting is
-operationally useful, that networks will change their procurement process around it, and that a
+**Artificial Forecasting is independent evidence that short-term substation forecasting is
+operationally useful**, that networks will change their procurement process around it, and that a
 benefits case has been made and accepted. Because it is public, operational and benchmarked against
 a real incumbent method, it also sets the clearest available bar for what "working" looks like.
 Northern Powergrid's programme rightly prioritised getting a service into live operational use;
