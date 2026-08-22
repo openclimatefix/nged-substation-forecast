@@ -491,12 +491,12 @@ same way.
 
 **A second technique from the same paper solves a known defect in NGED's trial area.** Some
 Alliander substations measure only absolute current, so reverse flow appears as a rise rather than a
-sign change — the identical defect at ten of NGED's 12 metered generators. Their bottom-up estimate
-is built from measurements that record the direction of flow, so Bouman et al. (2024) take the
-direction from the estimate rather than from the meter. Any reference series that records direction
-independently would work the same way. They also report that when their bottom-up estimate fails,
-the cause is usually wrong topology data rather than a bad algorithm — a warning about the network
-records that any such estimate depends on.
+sign change — the identical defect at ten of the 32 series in NGED's trial area, primary substations
+among them. Their bottom-up estimate is built from measurements that record the direction of flow,
+so Bouman et al. (2024) take the direction from the estimate rather than from the meter. Any
+reference series that records direction independently would work the same way. They also report that
+when their bottom-up estimate fails, the cause is usually wrong topology data rather than a bad
+algorithm — a warning about the network records that any such estimate depends on.
 
 **Where the gaps are: the published method detects on a residual we cannot build the same way, and
 the events NGED cares about are harder than the ones detected.** A switch at NGED usually fans out
@@ -558,10 +558,11 @@ already identified, naming the incorporation of planned-outage records in its po
 
 **The problem.** NGED's telemetry carries stuck values that repeat unchanged for a day or more,
 zeros that mean "no reading" rather than "no load", physically impossible values, and gaps running
-from a single half-hour to several months. Ten of the 12 metered generators in the trial area report
-magnitude without direction, so export appears as a rise. A model trained on uncleaned data learns
-the fault, and a forecast that fails silently because its recent history was stuck is worse than one
-that says it is degraded.
+from a single half-hour to several months. Ten of the 32 series in the trial area are metered in
+apparent power only, so they report magnitude without direction and reverse flow appears as a rise:
+at one primary substation the meter bounces off zero on sunny days, when a solar farm behind it
+exports. A model trained on uncleaned data learns the fault, and a forecast that fails silently
+because its recent history was stuck is worse than one that says it is degraded.
 
 **One published method makes this its subject, and it is the same paper that detects switching.**
 Bouman et al. (2024) treat measurement errors and switch events as the two things that must be
