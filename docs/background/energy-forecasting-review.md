@@ -65,10 +65,13 @@ members produced it: the ranked probability skill score is biased downwards for 
 almost no paper states its ensemble size.
 
 **Errors normalised by something physical also transfer.** An error expressed as a fraction of a
-substation's firm capacity or transformer rating means the same thing at every substation, whereas
-an error expressed as a fraction of the load that happened to occur does not. An absolute error in
-kilowatts or megawatts tells NGED nothing on its own, because it depends entirely on how big the
-substation was, and none of the absolute figures below should be read as a target for this project.
+substation's firm capacity or transformer rating comes far closer to meaning the same thing at every
+substation than an error expressed as a fraction of the load that happened to occur. It is not
+exact, because a rating is itself a convention standing in for a limit that moves with air
+temperature, wind and the duration of the overload, so a paper that normalises this way should say
+which rating it used. An absolute error in kilowatts or megawatts tells NGED nothing on its own,
+because it depends entirely on how big the substation was, and none of the absolute figures below
+should be read as a target for this project.
 
 **Whether a study used the weather forecast a real forecaster would have had changes what its
 numbers mean.** In the table under problem 1 below, "real forecasts" means the weather forecast that
@@ -121,8 +124,13 @@ updated every six hours, as a range of possible loads with a probability attache
 than as a single number. NGED acts on the forecast one to ten days ahead, and the question NGED asks
 of the forecast is "how likely is load to cross this substation's firm capacity — the load the
 substation can carry safely with its largest transformer out of service?" rather than "what is the
-most likely load?". This is the highest priority of the eight problems, and the other seven exist
-mainly to make that net-demand forecast better.
+most likely load?". That limit is not one number. A transformer's safe rating rises as the air gets
+colder and as wind carries heat away from it, so the same plant carries more on a windy January
+night than on a still August afternoon; and because the plant has thermal mass, it can take a large
+overload for a short period without damage, so how *long* an exceedance lasts matters as much as how
+far above the rating it goes. A single firm capacity is a planning convention laid over a limit that
+moves. This is the highest priority of the eight problems, and the other seven exist mainly to make
+that net-demand forecast better.
 
 **The 14-day horizon sits at the edge of what a weather ensemble can supply.** [Buizza and
 Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put at 16 to 23 days the lead time beyond which
@@ -1947,17 +1955,20 @@ reader would want them, they are:
 - **The tail is scored with a threshold-weighted continuous ranked probability score**, weighted
   above a fixed per-series threshold set at the 99th percentile of that series' own measured
   history, rather than by selecting the periods in which an exceedance happened. We use a historical
-  percentile rather than the substation's firm capacity, which is the more obvious choice, for three
-  reasons: a firm capacity is not published for every series we forecast; a limit that is never
-  crossed during a validation year produces no scoreable events at all, and a warning system cannot
-  be graded on events that never happened; and each substation's firm capacity sits at a different
-  point of its own load distribution, so scores taken against firm capacities cannot be compared
-  between substations. The percentile threshold gives every series roughly the same event rate by
-  construction, which is what makes the scores comparable. The obvious alternative — keep only the
-  periods in which load crossed the limit, and score those — is not merely noisy but biased: [Lerch
-  et al. (2017)](https://doi.org/10.1214/16-STS588) show that choosing which periods to score on the
-  basis of what happened rewards a forecaster who over-predicts extremes, and can rank a
-  deliberately biased forecast above an honest one. [Gneiting and Ranjan
+  percentile rather than the substation's firm capacity, which is the more obvious choice, for four
+  reasons. The first is that there is no single firm capacity to score against: as described under
+  problem 1, the real limit moves with air temperature and wind, and tolerates a brief overload that
+  a sustained one would not survive, so any constant we picked would already be an approximation.
+  The rest are practical: a firm capacity is not published for every series we forecast; a limit
+  that is never crossed during a validation year produces no scoreable events at all, and a warning
+  system cannot be graded on events that never happened; and each substation's firm capacity sits at
+  a different point of its own load distribution, so scores taken against firm capacities cannot be
+  compared between substations. The percentile threshold gives every series roughly the same event
+  rate by construction, which is what makes the scores comparable. The obvious alternative — keep
+  only the periods in which load crossed the limit, and score those — is not merely noisy but
+  biased: [Lerch et al. (2017)](https://doi.org/10.1214/16-STS588) show that choosing which periods
+  to score on the basis of what happened rewards a forecaster who over-predicts extremes, and can
+  rank a deliberately biased forecast above an honest one. [Gneiting and Ranjan
   (2011)](https://doi.org/10.1198/jbes.2010.08110)'s threshold-weighted score puts the emphasis
   inside the score instead, and stays a proper scoring rule while doing it.
 - **Coverage — how often reality fell inside the range the forecast claimed — is broken down by

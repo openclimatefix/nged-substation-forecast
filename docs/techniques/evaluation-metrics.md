@@ -431,9 +431,9 @@ lives in ad-hoc analyses — see
 ### Choosing the thresholds: static, per-series, quantile-derived
 
 The metrics above need a threshold $r$ per series, and here honesty matters: **a substation's
-true limit is not a single number.** Thermal ratings vary with ambient temperature and season;
-transformers tolerate being overloaded for short periods, so the *duration* of an exceedance
-matters (cyclic ratings); and switching changes what a feeder carries. NGED's own operator
+true limit is not a single number.** Thermal ratings vary with ambient temperature, with the wind carrying heat away, and so
+with season; transformers tolerate being overloaded for short periods because of their thermal
+mass, so the *duration* of an exceedance matters (cyclic ratings); and switching changes what a feeder carries. NGED's own operator
 tool draws the limit as a time-varying "Flex Profile", not a constant. We do not attempt to
 model any of that for scoring. Instead we pick **static, per-series thresholds chosen for
 their scoring properties**, and state plainly that they are a proxy — these metrics measure
