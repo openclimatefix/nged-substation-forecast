@@ -569,7 +569,7 @@ its post-Beta roadmap.
 
 ### 6. Detecting faulty metering
 
-**The problem.** NGED's telemetry carries stuck values that repeat unchanged for a day or more,
+**The problem.** NGED's telemetry carries stuck values that repeat unchanged for hours or days,
 zeros that mean "no reading" rather than "no load", physically impossible values, and gaps running
 from a single half-hour to several months. Ten of the 32 series in the trial area are metered in
 apparent power only, so they report magnitude without direction and reverse flow appears as a rise:
@@ -577,13 +577,14 @@ at one primary substation the meter bounces off zero on sunny days, when a solar
 exports. A model trained on uncleaned data learns the fault, and a forecast that fails silently
 because its recent history was stuck is worse than one that says it is degraded.
 
-**One published method makes this its subject, and it is the same paper that detects switching.**
-Bouman et al. (2024) treat measurement errors and switch events as the two things that must be
-filtered out before substation measurements can be used, detect both on the same residual, and
-report detector performance stratified by how long the event lasted. Their sign-recovery technique
-addresses exactly the non-directional metering defect described above. Alliander has run the method
-in production since 2021, fully replacing what was previously a manual process; its open-data portal
-names the associated dataset "STORM onderstation".
+**The most useful published method treats faulty metering and switching as one problem.** Bouman et
+al. (2024) treat measurement errors and switch events as the two things that must be filtered out
+before substation measurements can be used, detect both on the same residual, and report detector
+performance stratified by how long the event lasted. Their sign-recovery technique addresses exactly
+the non-directional metering defect described above. Earlier variations of their methodology have
+run at Alliander since 2021, "fully replacing the manual, time-consuming, process", and the authors
+report that the ensemble method presented in this paper has since been adopted too; its open-data
+portal names the associated dataset "STORM onderstation".
 
 **One other group has made it their subject, one voltage level down.** [Moriano et al.
 (2016)](https://doi.org/10.3390/s16010085) and [Martín et al.
@@ -701,26 +702,62 @@ the shape of a substation's load in ways a model trained on history cannot antic
 number of them behind any given substation is growing quickly. The stretch goal is to disaggregate
 and forecast them separately rather than letting them sit inside net demand.
 
-**The three are not equally tractable: heat pumps have a weather driver, chargers have none, and
-batteries follow a control decision.** A heat pump is driven by outdoor temperature, which the
-weather ensemble supplies directly, so it should behave much like any other weather-driven load. An
-electric-vehicle charger has no exogenous driver at all: whether someone plugs in tonight depends on
-where they drove today, and because charging behaviour is synchronised across many households,
-errors add up rather than cancelling — and synchronised evening peaks are precisely what a network
-constraint is about. Price-sensitive batteries are harder still, because the driver is a control
-decision: two identical batteries behind the same substation can dispatch in opposite directions on
-the same day depending on the tariffs their owners are on.
+**Detecting these loads and forecasting them are separately hard, and not in the order we
+expected.** Northern Powergrid's [smart-meter detection
+trial](https://smarter.energynetworks.org/projects/npg_nia_-49/), on 1,500 monitored premises, found
+that "EV identification at premises level was found to be relatively straightforward" and that
+although "aggregation does mask some signals, EV usage is still clearly identifiable at feeder and
+substation level", while "the detection of ASHP is frustrated by the low levels of adoption". So the
+spiky, synchronised charging that makes electric vehicles hard to *forecast* is what makes them easy
+to *detect* in aggregate; heat pumps are the reverse.
 
-**This is the largest deliberate omission in the present review.** Our search covered substation and
-generation forecasting, and did not cover the electrification literature, which is large and active
-in its own right. The volume of work is easy to demonstrate: of the 265 papers accepted for CIRED's
-Brussels workshop of June 2026, 17 concern electrification — almost as many as the 19 that name
-forecasting or prediction at all. We will read that literature properly before this strand begins,
-and until then this review has nothing to report about it beyond its existence.
+**Errors across many chargers cancel rather than compound, and the measurement is NGED's own.** The
+[Electric Nation
+trial](https://eatechnology.com/media/girhcnsc/electric-nation-customer-trial-report.pdf) — run by
+this network under its former name, with 673 participants and around 137,000 charging events — fits
+the demand of a group of chargers as `Group Demand = N·P + Q√N`, where P is the mean demand per
+charger and Q the deviation. The mean scales with the number of chargers and the deviation only with
+its square root, so relative uncertainty falls as more chargers are added, exactly as it does for
+any other diversified domestic load. A Danish study of charging coincidence fits the same decay and
+measures an exponent of about 0.43 to 0.46 against the 0.5 that complete independence would give,
+which puts a number on how much synchronisation there actually is.
 
-**Where the gap is: we cannot yet say what a gap would look like.** Naming it honestly needs the
-reading we have not done, so the first deliverable on this strand is a review of the electrification
-literature rather than a model.
+**What makes electric-vehicle charging the harder network problem is when it lands, and that an
+automated tariff can re-synchronise a population that had diversified.** In Electric Nation's third
+trial, with a time-of-use tariff, the share of charging events starting in the 22:00 hour rose from
+5.8% without the tariff to 24.7% with it — and to 37.6% among participants using the smart-charging
+app, against 5.5% for those on the same tariff who did not use it. The synchronisation came from the
+scheduler, not from the tariff, and the resulting peak was higher than any previously observed in
+the trial. Heat pumps, by contrast, peak in the morning rather than at the network's evening peak.
+
+**Heat pumps diversify in an average winter, and it is the cold weather that matters which is
+untested.** [Love et al. (2017)](https://doi.org/10.1016/j.apenergy.2017.07.026) measured around 700
+GB domestic heat pumps and found demand per heat pump falling from 4.0 kW for a single unit to 1.7
+kW once 275 are aggregated, with the spread between samples falling from 1.5 kW to 0.1 kW. But a
+heat pump sized small relative to a house's heat demand runs flat out for hours in cold weather, and
+GB design guidance concedes that whether diversity survives colder-than-average winters needs
+further research — which is precisely the condition under which a substation approaches its limit.
+
+**Domestic batteries are the barren case, and the industry agrees.** Northern Powergrid's
+low-voltage design code fits diversity curves to measured trial data for general domestic load, heat
+pumps and chargers alike, and then states that diversity "should not be applied when considering a
+BESS device" — a diversity factor of exactly one. What academic work exists separates a battery from
+a household's net flow only by assuming a known control model, which is the one thing that cannot be
+assumed when the point is that two identical batteries dispatch in opposite directions.
+
+**This remains the largest deliberate omission in the review.** Our search covered substation and
+generation forecasting, not electrification, and the paragraphs above are what a targeted follow-up
+search surfaced rather than a proper review. The volume of work is easy to demonstrate: of the 265
+papers accepted for CIRED's Brussels workshop of June 2026, 17 concern electrification — almost as
+many as the 19 that name forecasting or prediction at all.
+
+**Where the gaps are: forecast skill at substation aggregation, and the tariff-driven peak.** The
+one direct measurement of charging forecast skill against aggregation we found, on a German dataset,
+gives errors worse than a naive forecast for individual sites and postcodes, crossing below naive
+only at around 100 charge points. Nothing we found forecasts an aggregate of heat pumps, chargers
+and batteries behind a GB primary substation, states its own uncertainty, and is scored against the
+evening peak that the network actually cares about. Reading the electrification literature properly
+is the first deliverable on this strand, before any model.
 
 ## What recurs across the studies we read
 
