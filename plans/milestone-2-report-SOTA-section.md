@@ -468,14 +468,18 @@ change in the underlying demand. NGED's substations spend roughly a tenth of the
 an abnormal running arrangement. Switching labels exist for the 32-series trial area but not for the
 wider network, so a method that is to scale has to work from power measurements alone.
 
-**One paper detects these events at a real network operator in order to use them rather than delete
-them.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164), working with the Dutch network
-operator Alliander, study 180 primary substations at 15-minute resolution over roughly a year,
-detecting the step changes caused when a cable fault or planned maintenance reroutes part of a
-subgrid to a different substation. Events run from a few minutes to several months. They estimate
-annual maximum and minimum load within a 10% margin in 88% and 91% of cases. It is the most directly
-useful paper in this review, and it leaves the forecasting half untouched — which is what
-Flexpectation would add.
+**One paper detects these events at a real network operator, in order to strip them out before
+estimating how much load a substation carries.** [Bouman et al.
+(2024)](https://arxiv.org/abs/2405.16164), working with the Dutch network operator Alliander, study
+180 primary substations at 15-minute resolution over roughly a year, detecting the step changes
+caused when a cable fault or planned maintenance reroutes part of a subgrid to a different
+substation. Events run from a few minutes to several months. They estimate annual maximum and
+minimum load within a 10% margin in 88% and 91% of cases. Their purpose is a clean capacity-planning
+figure rather than a forecast: with the contaminated periods removed, the annual minimum and maximum
+load estimates stop being inflated — by up to 300% at worst when no filtering is applied. It is the
+most directly useful paper in this review, and it leaves the forecasting half untouched, which is
+what Flexpectation would add: keeping a forecast running through the events rather than deleting
+them.
 
 **Their central trick is to detect on a residual rather than on the load itself.** Alliander
 maintains an independent bottom-up estimate of each substation's load, reconstructed from customer
@@ -568,13 +572,14 @@ because its recent history was stuck is worse than one that says it is degraded.
 Bouman et al. (2024) treat measurement errors and switch events as the two things that must be
 filtered out before substation measurements can be used, detect both on the same residual, and
 report detector performance stratified by how long the event lasted. Their sign-recovery technique
-addresses exactly the non-directional metering defect described above. Alliander runs the method in
-production, as its STORM algorithm. Elsewhere in this literature, faulty metering appears as a
-data-cleaning step described in passing rather than as a problem in its own right: Mendonça
-Severiano et al. (2026) classify solar underperformance, but from inverter data a distribution
-network operator does not receive, and Artificial Forecasting supplies only indirect evidence that
-it matters — across their 729 secondary substations, data quality mattered at least as much as the
-choice of model (finding 1 below).
+addresses exactly the non-directional metering defect described above. Alliander has run the method
+in production since 2021, fully replacing what was previously a manual process; its open-data portal
+names the associated dataset "STORM onderstation". Elsewhere in this literature, faulty metering
+appears as a data-cleaning step described in passing rather than as a problem in its own right:
+Mendonça Severiano et al. (2026) classify solar underperformance, but from inverter data a
+distribution network operator does not receive, and Artificial Forecasting supplies only indirect
+evidence that it matters — across their 729 secondary substations, data quality mattered at least as
+much as the choice of model (finding 1 below).
 
 **A public labelled dataset exists, and it is Dutch.** Knowing how often a detector is right
 requires measurements labelled as faulty or not, and Bouman et al. (2024) had 180 primary

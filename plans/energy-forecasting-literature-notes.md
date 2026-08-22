@@ -1,5 +1,30 @@
 # Energy forecasting benchmarks and competitions: notes for the Flexpectation SOTA review
 
+> **DEPRECATED — 22 August 2026. Do not cite this file, and do not trust it against the report.**
+>
+> These are working notes from the literature search. They have been superseded by
+> [`milestone-2-report-SOTA-section.md`](milestone-2-report-SOTA-section.md), which is the
+> deliverable and is the authoritative text. Where the two disagree, **the report is right and this
+> file is wrong** — the report has since been through five adversarial fact-checks and this file has
+> not. At least two errors are known to have propagated from here into an earlier draft of the
+> report (the Huyghues-Beaufond entry, which had the paper's method backwards, and the Pinheiro
+> entry, which had the wrong grounds for rejecting a gradient booster); both are corrected in place
+> below, but others may remain.
+>
+> **Four sections are still live**, and they are what to harvest when `docs/roadmap/` is updated
+> with the ideas this review surfaced:
+>
+> - "How Flexpectation could contribute to this literature"
+> - "Conclusions for Flexpectation", and inside it "The recommendations, ranked and costed"
+> - "Sources found by the 2026-08-22 search agents", and inside it "Leads not yet closed"
+> - "Tool notes for the next search" — how to reach the databases and which hosts block us
+>
+> Everything else here is history: per-paper reading notes whose conclusions have already been
+> folded into the report, and earlier coverage reviews that the report has since overtaken.
+>
+> This file is deliberately not being reconciled with the report. It will be deleted when the
+> roadmap additions have been folded in.
+
 **Written by Claude Opus 5 (Anthropic), prompted and directed by Jack, and revised through several
 rounds of adversarial review in which the model was asked to attack its own accuracy, sourcing and
 reasoning. Several substantive errors were caught and corrected that way; others may remain, so
