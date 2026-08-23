@@ -1507,38 +1507,43 @@ rounds do not apply to us, while the lessons about protocol — what makes a com
 apply with more force, because a competition gets some of its integrity free from having rivals who
 would like to catch each other out, and we will not have any.
 
-**Energy forecasting has run competitions on common data for over a decade, and none of them is at
+**Energy forecasting has run competitions on common data for over a decade, and only one got near
 the level NGED acts on.** The Global Energy Forecasting Competitions of 2012, 2014 and 2017 covered
-hierarchical load, price, wind and solar, published their data as supplementary material to the
-papers describing the winning methods, and drew hundreds of contestants from more than 60 countries
-([Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979)). [Shukla and Hong
-(2024)](https://doi.org/10.1049/stg2.12162)'s BigDEAL Challenge 2022 forecast peak timing for three
-neighbouring local distribution companies. [Browell et al.
+hierarchical load, price, wind and solar, published their data as supplementary files to the papers
+introducing each competition, and drew hundreds of contestants from more than 60 countries ([Hong et
+al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979)). [Shukla and Hong
+(2024)](https://doi.org/10.1049/stg2.12162)'s BigDEAL Challenge 2022 forecast the magnitude, timing
+and shape of daily peak load for three neighbouring local distribution companies. [Browell et al.
 (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s HEFTCom forecast one 3.6 GW hybrid
 portfolio day-ahead. [Energy-Arena](https://arxiv.org/abs/2604.24705) and
 [TS-Arena](https://arxiv.org/abs/2512.20761) run continuously rather than closing. The closest of
-these to a distribution network is BigDEAL, which is one or two levels of aggregation above a
-primary substation and covers three series. Competitions have been run on GB distribution-network
-problems: [McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541) report
-three of them and draw the same conclusion this review does, that "many solutions are only tested on
-private data using a single method only compared (if at all) to simple, non-competitive benchmarks",
-which "limits the reproducibility and usefulness of the outputs". We read the abstract rather than
-the full paper, which is behind a paywall with no open copy, so we cannot say from it what level
-those three problems sat at or whether any left a leaderboard behind. What we found no example of is
-a *standing* leaderboard at distribution-substation level — one that keeps accepting new entries
-after its competition closes. That is the gap Flexpectation's leaderboards fall into, though the
-search behind that statement is ours and we would be glad to be pointed at a counter-example.
+these to a distribution network is the second track of GEFCom2017, which asked for probabilistic
+forecasts of 183 delivery-point meters of a US utility and drew 177 entrants in total across both
+its tracks ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)). BigDEAL's three
+local distribution companies are whole utilities, several levels of aggregation above a primary
+substation. Competitions have been run on GB distribution-network problems: [McSweeney et al.
+(2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541) report three of them and draw the
+same conclusion this review does, that "many solutions are only tested on private data using a
+single method only compared (if at all) to simple, non-competitive benchmarks", which "limits the
+reproducibility and usefulness of the outputs". We read the abstract rather than the full paper,
+which is behind a paywall with no open copy, so we cannot say from it what level those three
+problems sat at or whether any left a leaderboard behind. What we found no example of is a
+*standing* leaderboard at distribution-substation level — one that keeps accepting new entries after
+its competition closes. That is the gap Flexpectation's leaderboards fall into, though the search
+behind that statement is ours and we would be glad to be pointed at a counter-example.
 
-**The closest published precedent is a leaderboard run by one team, which is our exact position.**
-TS-Arena evaluates 13 families of time-series model across 186 live energy series, and every one of
-those entries is run by the platform's own operators. What keeps it honest is a set of rules the
-operators impose on themselves. Their reference models "act as neutral participants, autonomously
-requesting context from the API Portal and submitting forecasts to it", so that they "operate under
-the exact same constraints (e.g., submission windows, data access) as other (external)
-participants". They run each competing model from its authors' own code at its authors' recommended
-defaults, without tuning. All three of those are available to a single team, and we intend to adopt
-them: our own models go through the same evaluation interface as any baseline, and a baseline is run
-as its authors published it.
+**The closest published precedent is a platform whose whole current leaderboard is populated by
+models its own operators run.** That is not quite our position, because TS-Arena does invite outside
+entries, but it is near enough that its self-imposed rules transfer. It evaluates thirteen reference
+foundation models and three statistical baselines across 186 live energy series, all of them run by
+the platform team. What keeps it honest is a set of rules the operators impose on themselves. Their
+reference models "act as neutral participants, autonomously requesting context from the API Portal
+and submitting forecasts to it", so that they "operate under the exact same constraints (e.g.,
+submission windows, data access) as other (external) participants". They run each competing model
+from its authors' own code at its authors' recommended defaults, with no domain-specific tuning. All
+three of those are available to a single team, and we intend to adopt them: our own models go
+through the same evaluation interface as any baseline, and a baseline is run as its authors
+published it.
 
 **The mechanism that makes a leaderboard trustworthy is time, not policing.** TS-Arena's central
 idea is that a forecast is submitted before the outturn it will be scored against physically exists,
@@ -1586,35 +1591,39 @@ ECMWF run and its arrival, and the same fix is available: score against the data
 landed at the forecast's issue time.
 
 **A leaderboard wears out through repeated use, and the published remedies are all forms of
-rationing.** [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015), writing as an
-organiser rather than a critic, expects it: "over-study of a single benchmark data set means that
+rationing.** [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015), who has organised
+forecasting competitions himself, expects it: "over-study of a single benchmark data set means that
 methods will eventually over-fit the published test data. I suspect this has happened with the M3
 data over the past 20 years, and it is likely to happen with the M4 data, despite its much larger
 size. Therefore, a wider range of benchmarks is desirable, and these need to be updated regularly.
 Consequently, there can never be a 'final forecasting competition'." The remedies in use are crude
 and effective: ImageNet's post-challenge evaluation server limits researchers to two submissions a
 week "to discourage parameter tuning on the test data" ([Russakovsky et al.
-(2015)](https://doi.org/10.1007/s11263-015-0816-y)); the M5 competition ran a live leaderboard
-during a validation phase and then scored the result on a completely dark window with no feedback at
-all ([Makridakis et al. (2022)](https://doi.org/10.1016/j.ijforecast.2021.11.013)). There is also a
-theoretical answer built for exactly our case — a leaderboard queried repeatedly by people who can
-see the score. [Blum and Hardt (2015)](https://arxiv.org/abs/1502.04585)'s Ladder publishes a new
-best only when a candidate beats the standing best by more than a set margin, and reports it rounded
-to that margin, which bounds the error by roughly the cube root of the log of the number of attempts
-rather than by its square root.
+(2015)](https://doi.org/10.1007/s11263-015-0816-y)); Kaggle competitions compute the running
+leaderboard on a small subset of the test data, with the final accuracy "computed on the remaining
+part of the test set only available after the competition is completed" ([Hyndman
+(2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)). There is also a theoretical answer built
+for exactly our case — a leaderboard queried repeatedly by people who can see the score. [Blum and
+Hardt (2015)](https://arxiv.org/abs/1502.04585)'s Ladder publishes a new best only when a candidate
+beats the standing best by more than a set margin, and reports it rounded to that margin, which
+bounds the leaderboard's error by roughly the cube root of log k over n, where k is the number of
+attempts and n the amount of data the score is computed on, where an ordinary leaderboard's error
+grows like the square root of k.
 
 **The empirical evidence on whether leaderboards actually get overfitted is more reassuring than the
 theory, with one exception that is precisely our situation.** [Recht et al.
 (2019)](https://arxiv.org/abs/1902.10811) rebuilt the ImageNet and CIFAR-10 test sets from scratch;
-accuracy fell by 11 to 14 percentage points, but the ranking of models survived almost exactly, and
-they attribute the drop to the new images being harder rather than to years of test-set reuse.
-[Roelofs et al.
+accuracy fell by 11 to 14 percentage points on ImageNet and 3 to 15 on CIFAR-10, but the ranking of
+models survived almost exactly, and they attribute the drop to the new images being harder rather
+than to years of test-set reuse. [Roelofs et al.
 (2019)](https://proceedings.neurips.cc/paper_files/paper/2019/file/ee39e503b6bedf0c98c388b7e8589aca-Paper.pdf)
 looked across 120 Kaggle competitions and "found little to no signs of adaptive overfitting". The
-exception in their data is the one that applies to us: the competitions where overfitting did appear
-were those with very small test sets or splits that were not independent draws. A leaderboard over
-32 substations, on data where consecutive half-hours are strongly correlated, is small and dependent
-on both counts, so we should not take the general reassurance as covering our case.
+exception in their data is the one that applies to us: the outlier competitions "usually have
+pathologies such as non-i.i.d. data splits or (effectively) small test sets". Two things keep us
+from taking the reassurance. Their survey covers classification competitions rather than forecasting
+ones. And our fold is small in effective sample size rather than in row count, because consecutive
+half-hours are strongly correlated — a different fault from the non-random public-private split they
+mean, but one that shrinks the evidence the same way.
 
 **Our own leaderboard has this problem today, and we would rather say so than discover it later.**
 The fold that Flexpectation currently reports serves as both the model-selection set and the
@@ -1629,12 +1638,13 @@ itself a statistic worth publishing beside the fold's results.
 **Rankings survive; absolute numbers do not travel.** This is the most consistent finding across
 every benchmark we looked at, and it decides what a leaderboard should report as its headline.
 [Recht et al. (2019)](https://arxiv.org/abs/1902.10811) found the ordering of models preserved on a
-freshly collected test set while the accuracy level moved by more than a decade's worth of progress.
-[Fildes (2020)](https://doi.org/10.1016/j.ijforecast.2019.04.012), reviewing the M4 competition,
-compared its daily micro series against a real retail forecasting problem and found the same method
-scoring 1.665% on one and 11.1% on the other. His conclusion is a direct endorsement of what
-Flexpectation is doing: "each organization needs to organize its own forecasting competition for its
-own forecasting problems, and should not rely on even large benchmark data sets", with the published
+freshly collected test set while the accuracy level moved by "approximately five years of progress
+in a highly active period of machine learning research". [Fildes
+(2020)](https://doi.org/10.1016/j.ijforecast.2019.04.012), reviewing the M4 competition, compared
+its daily micro series against a real retail forecasting problem and found the same method scoring
+1.665% on one and 11.1% on the other. His conclusion is a direct endorsement of what Flexpectation
+is doing: "each organization needs to organize its own forecasting competition for its own
+forecasting problems, and should not rely on even large benchmark data sets", with the published
 competition useful for narrowing "the pool of methods to be considered" rather than for predicting
 your own error. So a leaderboard should lead with ranks and with margins over a stated baseline, and
 treat an absolute skill number as valid only on the distribution it was measured on.
@@ -1642,17 +1652,19 @@ treat an absolute skill number as valid only on the distribution it was measured
 **A finite evaluation window can rank the wrong model first, and several months is not obviously
 enough.** [Messner et al. (2020)](https://doi.org/10.1002/we.2497) demonstrate this rather than
 asserting it. They fit three forecasting models with three different loss functions, so that each is
-optimal for one metric by construction, and then score them on the first 200 time steps: the ranking
-inverts, and the model that should have won on each metric loses on all three. Their conclusion is
-the sharpest warning we found about reading a leaderboard: "evaluation results based on a finite
-data set are always subject to some degree of uncertainty and the best ranked forecast does not
-necessarily have to be the truly best one. Depending on the actual setup, e.g., in a benchmarking
-exercise to hire a forecaster, it should be remembered that even periods of several months may still
-yield uncertainty in terms of who the best forecaster truly is." HEFTCom's own competition period
-was three months. The practical response, which TS-Arena adopts, is to publish an interval on the
-ranking rather than the ranking alone, so that a new entry near the top is visibly provisional; they
-warn against "treating short-term success as proven superiority", and note that the confidence
-intervals of their own top models overlap.
+optimal for one metric by construction, and then score them on the first 200 time steps: the model
+built for the quadratic loss now wins all three metrics, and the two built to win on mean absolute
+error and on the quantile score both lose on their own. Their conclusion is the sharpest warning we
+found about reading a leaderboard: "evaluation results based on a finite data set are always subject
+to some degree of uncertainty and the best ranked forecast does not necessarily have to be the truly
+best one. Depending on the actual setup, e.g., in a benchmarking exercise to hire a forecaster, it
+should be remembered that even periods of several months may still yield uncertainty in terms of who
+the best forecaster truly is." HEFTCom's own competition period was three months. The practical
+response, which TS-Arena adopts, is to publish an interval on the ranking rather than the ranking
+alone, so that a new entry near the top is visibly provisional. Their interval comes from replaying
+the round order in random permutations, so it widens for models with few rounds rather than
+measuring sampling error over a finite window; they warn against "treating short-term success as
+proven superiority", and note that the confidence intervals of their own top models overlap.
 
 **The AlphaFold comparison is worth stating precisely, because the precise version supports this
 project better than the loose one.** CASP, the assessment that AlphaFold won, is a recurring
@@ -1662,52 +1674,54 @@ the sequences to entrants ([Kryshtafovych et al. (2021)](https://doi.org/10.1002
 target is single-use, because once the structure is published nobody can be blind to it again. The
 standing benchmark in that field is a different thing, CAMEO, which has run continuously since 2012
 by taking the weekly pre-release of forthcoming structures as targets and scoring roughly 800 a year
-against CASP's 84 ([Robin et al. (2021)](https://doi.org/10.1002/prot.26213)). And between CASP
-rounds, AlphaFold was developed against neither: [Jumper et al.
+against CASP's 84 ([Robin et al. (2021)](https://doi.org/10.1002/prot.26213)). AlphaFold2's own
+published generalisation check was neither: [Jumper et al.
 (2021)](https://doi.org/10.1038/s41586-021-03819-2) trained on structures released up to a fixed
-cut-off date and validated on more than ten thousand sequences released after it, a rolling temporal
-hold-out of exactly the kind a live forecasting service gets for free. The competition was the
-audit, not the development loop. That is the same division of labour Flexpectation is proposing, and
-it is the reason a leaderboard without entrants is a coherent thing to build.
+cut-off of 30 April 2018 and reported accuracy on 10,795 sequences released after it — a temporal
+hold-out of exactly the kind a live forecasting service gets for free. The blind competition was the
+audit; the temporal hold-out was what the team could check for itself between rounds. That is the
+same division of labour Flexpectation is proposing, and it is the reason a leaderboard without
+entrants is a coherent thing to build.
 
 **The most useful sentence in that literature is an admission.** Describing the earlier AlphaFold,
 [Senior et al. (2020)](https://doi.org/10.1038/s41586-019-1923-7) report results on their own
 held-out set and then add: "we note that accuracies for this set are higher than for the CASP13 test
-domains". One clause, conceding that their internal benchmark was easier than the blind one, and
-saying by how much. A single-team leaderboard cannot buy credibility from rivals, so it has to buy
-it this way. Flexpectation's own version of that gap is known in advance: the leaderboard runs on 32
-trial-area series and the service is meant to reach roughly 2,500, so we should expect our published
-numbers to flatter what happens at scale, and should say so each time we publish them.
+domains". One clause, conceding that their internal benchmark was easier than the blind one. A
+single-team leaderboard cannot buy credibility from rivals, so it has to buy it this way.
+Flexpectation's own version of that gap is known in advance: the leaderboard runs on 32 trial-area
+series and the service is meant to reach roughly 2,500, so we should expect our published numbers to
+flatter what happens at scale, and should say so each time we publish them.
 
 **How long these benchmarks took to produce a step change is worth knowing before promising one.**
 The ImageNet challenge ran for two years of incremental progress before the 2012 result cut the
 error rate by a third, and the dataset was already at full size from the start ([Russakovsky et al.
-(2015)](https://doi.org/10.1007/s11263-015-0816-y)). CASP ran for 24 years, including a
+(2015)](https://doi.org/10.1007/s11263-015-0816-y)). CASP ran for twenty-six years, including a
 fourteen-year stretch from 2000 to 2014 in which its contact-prediction accuracy did not
 significantly improve at all, before the results that made the field's name ([Kryshtafovych et al.
 (2021)](https://doi.org/10.1002/prot.26237)). The forecasting competitions took from 1982 to 2018 to
-overturn their own founding conclusion that simple methods beat complex ones, and what changed was
-the size of the benchmark rather than the novelty of the methods: M4 had 100,000 series where M3 had
-3,003 ([Makridakis et al. (2020)](https://doi.org/10.1016/j.ijforecast.2019.04.014)). Two things
-follow for a project of Flexpectation's length. A leaderboard's first product is usually a credible
-measured plateau rather than a breakthrough, and in CASP's case the plateau is what made the later
-jump believable. And a benchmark of 32 series is small enough that the constraint on what can be
-learned from it is likely to be its size, which is an argument for extending it to the wider network
-as soon as the data allows rather than for running more experiments against the trial area.
+overturn their own founding conclusion that "statistically sophisticated or complex methods do not
+typically produce more accurate forecasts than simpler ones", on a benchmark that had grown from the
+3,003 series of M3 to the 100,000 of M4 ([Hyndman
+(2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)). Two things follow for a project of
+Flexpectation's length. A leaderboard's first product is usually a credible measured plateau rather
+than a breakthrough, and in CASP's case the plateau is what made the later jump believable. And a
+benchmark of 32 series is small enough that the constraint on what can be learned from it is likely
+to be its size, which is an argument for extending it to the wider network as soon as the data
+allows rather than for running more experiments against the trial area.
 
 **What a leaderboard without entrants cannot do, we should not claim it does.** Three of the
 strongest results in the benchmarks above are unavailable to us. CASP's finding that its field
 plateaued for fourteen years is a statement about protein structure prediction only because dozens
 of groups were trying independently; a plateau on our leaderboard would be ambiguous between a hard
 problem and a team that did not think of the right idea. The M competitions' conclusions about whole
-classes of method — that combinations dominated in M4, that every one of the top fifty entries in M5
-used the same gradient-boosting library — describe what many independent people chose to try, and no
-single team's leaderboard can support that kind of claim. And the reassurance about adaptive
-overfitting comes from competitions with thousands of teams whose protective mechanism was precisely
-that independence. What our leaderboard can do is narrower and still worth having: show which
-approaches beat a stated baseline on NGED's own data, under one protocol, with the forecasts, the
-metric definitions and the code published so that anyone can check the arithmetic or rerun the
-comparison themselves.
+classes of method — that complex methods do not typically beat simpler ones, that combining methods
+beats the methods combined — describe what many independent people chose to try, and no single
+team's leaderboard can support that kind of claim. And the reassurance about adaptive overfitting
+comes from competitions with at least a thousand submissions each, entered independently against a
+private split held back until the end — neither of which our leaderboard has. What our leaderboard
+can do is narrower and still worth having: show which approaches beat a stated baseline on NGED's
+own data, under one protocol, with the forecasts, the metric definitions and the code published so
+that anyone can check the arithmetic or rerun the comparison themselves.
 
 ## Six findings that recur across the studies we read
 
@@ -2468,12 +2482,7 @@ Every source cited above, in alphabetical order by first author.
 - Ludwig, N., Arora, S. and Taylor, J. W. (2023). [Probabilistic load forecasting using
   post-processed weather ensemble predictions](https://doi.org/10.1080/01605682.2022.2115411).
   *Journal of the Operational Research Society*.
-- Makridakis, S., Spiliotis, E. and Assimakopoulos, V. (2020). [The M4 Competition: 100,000 time
-  series and 61 forecasting methods](https://doi.org/10.1016/j.ijforecast.2019.04.014).
-  *International Journal of Forecasting*.
-- Makridakis, S., Spiliotis, E. and Assimakopoulos, V. (2022). [M5 accuracy competition: Results,
-  findings, and conclusions](https://doi.org/10.1016/j.ijforecast.2021.11.013). *International
-  Journal of Forecasting*.
+
 - Martín, P., Moreno, G., Rodríguez, F. J., Jiménez, J. A. and Fernández, I. (2018). [A Hybrid
   Approach to Short-Term Load Forecasting Aimed at Bad Data Detection in Secondary Substation
   Monitoring Equipment](https://doi.org/10.3390/s18113947). *Sensors*.
