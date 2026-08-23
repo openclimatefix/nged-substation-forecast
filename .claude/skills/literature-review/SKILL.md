@@ -141,7 +141,11 @@ another is one fact stated twice, and the reader who divides them wonders which 
 **Attribution.** Which organisation did which part? A tool built by one group and deployed by
 another, a method named after a project that did not invent it, a benchmark run by a competition
 rather than by its host — these are easy to blur and embarrassing to get wrong in a document the
-parties will read.
+parties will read. **When the claim is about software, check the tagged source, not the current
+release.** A review once said an open-source stack "carries no trace" of a method its own
+maintainers had published; the method shipped in every release across a whole major version, and
+the current release still ships its simplified descendant pre-trained. Fetching three tags from the
+project's repository settled in a minute what the sentence had got backwards.
 
 ## Consistency with your own project's documents
 
@@ -216,6 +220,13 @@ the same authorship; called a set of figures unverifiable when the full text was
 disk; proposed deleting a table row that another section cross-referenced; and twice proposed
 cutting a passage that an earlier round had added deliberately to *limit* a claim in the project's
 own favour.
+
+**A search that returns nothing is not a finding until you have proved the search ran.** A grep
+against a mistyped path, a wrong directory or a PDF that extracted to zero lines prints exactly what
+a genuine absence prints. Before recording any "we found no…", confirm the corpus was actually
+read — count the lines the extraction produced, or grep for a string you know is present. This is
+the same failure as the hard-wrapping trap: both return a confident empty result from a search that
+never happened.
 
 Three triage rules earn their keep:
 
