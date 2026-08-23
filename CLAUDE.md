@@ -63,6 +63,7 @@ needed one, the mistake is already written.
 | `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
 | `implement-issue` | writing code for an approved plan: worktree, verify set, PR, up to two adversarial reviews, stop |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh pr merge`, or ship-time triage |
+| `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
 
 ## Docs
@@ -96,8 +97,8 @@ by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised expor
 
 ### Prose style
 
-These five rules apply to everything we write in prose: `docs/` pages, READMEs, `SKILL.md` files,
-docstrings, code comments, and GitHub issue and PR bodies.
+These rules apply to everything we write in prose: `docs/` pages, READMEs, `SKILL.md` files,
+docstrings, code comments, GitHub issue and PR bodies, and anything we write for an outside reader.
 
 **Be concrete and plain; write for a skim-reader.** Assume the reader is skimming and wants the
 meaning to jump off the page, not to spend effort decoding a clever, abstract or metaphorical
@@ -110,6 +111,18 @@ Economist*'s house style — short words, active voice, concrete nouns, British 
 acronym expanded on first use — but without the two journalistic habits that would hurt a reference
 doc, so no punning or whimsical headings, and no scene-setting opening: state the conclusion first,
 then explain it.
+
+**Name the thing; don't write "it".** Wherever a pronoun or a demonstrative makes the reader look
+backwards to work out what it refers to, repeat the noun instead. "It", "this", "that", "these",
+"those", "they", "such", "the former" and "the latter" are the usual offenders, and a paragraph that
+*opens* with one is the worst case, because a skim-reader landing there has nothing to look back at.
+Prefer "the NWP download" over "it", "the threshold-weighted score" over "this". A little repetition
+beats an ambiguous sentence every time: never make the reader refer backwards to decode a sentence,
+and never buy elegance with a referent the reader has to hunt for.
+
+**Put the words in the order that cannot be misread.** "73 wind farms in GB" says what it means;
+"73 GB wind farms" makes the reader parse a noun-pile and can be read as a unit of measure. Where a
+qualifier can attach to more than one noun, move it or add the word that pins it down.
 
 **Be concise by cutting whole sentences, not words.** Prose should be as short as it can be
 without losing readability, but the compressible material is rarely inside a sentence. It is whole
@@ -131,6 +144,20 @@ changelog and makes the docs unreadable. When a change invalidates a passage, re
 to describe the new behaviour rather than appending a note about what changed. This is the
 "comments and docs must reflect current state only" rule in
 [`docs/architecture/code-style.md`](docs/architecture/code-style.md), applied to prose.
+
+**Say what the source found, not what is always true.** When prose rests on a paper, a measurement
+or a trial, state the finding with its scope attached: "in the studies we read, a gradient-boosted
+model beat a same-time-yesterday rule by 10 to 20%", not "sophisticated models beat naive ones".
+A law-like sentence claims far more than the evidence supports, and the first reader who knows a
+counter-example stops trusting the rest of the page. The same applies to claims that something does
+*not* exist: an absence claim is only ever as good as the search behind it, so say what was searched
+and let the reader judge, rather than asserting that nobody has done a thing.
+
+**Lead each paragraph with a bolded sentence that states its conclusion.** The reader should get the
+argument from the bolded leads alone, then read on only where they want the reasoning. This is why
+we prefer sub-headings and short paragraphs over bullet lists: a list flattens the argument into
+items of equal weight, whereas a bolded lead says which claim matters and the sentences under it
+say why.
 
 **Don't name individuals.** Write the rule, not who asked for it: "get a contract change agreed
 before making it", never "ask so-and-so before changing a contract". One person maintains this repo
