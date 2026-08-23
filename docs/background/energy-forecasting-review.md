@@ -1602,34 +1602,9 @@ forecasting competition himself, expects it: "over-study of a single benchmark d
 methods will eventually over-fit the published test data. I suspect this has happened with the M3
 data over the past 20 years, and it is likely to happen with the M4 data, despite its much larger
 size. Therefore, a wider range of benchmarks is desirable, and these need to be updated regularly.
-Consequently, there can never be a 'final forecasting competition'." The remedies in use are crude
-and effective: ImageNet's post-challenge evaluation server limits researchers to two submissions a
-week "to discourage parameter tuning on the test data" ([Russakovsky et al.
-(2015)](https://doi.org/10.1007/s11263-015-0816-y)); Kaggle competitions compute the running
-leaderboard on a small subset of the test data, with the final accuracy "computed on the remaining
-part of the test set only available after the competition is completed" ([Hyndman
-(2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)). There is also a theoretical answer built
-for exactly our case — a leaderboard queried repeatedly by people who can see the score. [Blum and
-Hardt (2015)](https://arxiv.org/abs/1502.04585)'s Ladder publishes a new best only when a candidate
-beats the standing best by more than a set margin, and reports it rounded to that margin, which
-bounds the leaderboard's error by roughly the cube root of log k over n, where k is the number of
-attempts and n the amount of data the score is computed on, where an ordinary leaderboard's error
-grows like the square root of k.
+Consequently, there can never be a 'final forecasting competition'." The remedies in use are crude and effective, and all of them ration how often a score can be seen.
 
-**The empirical evidence on whether leaderboards actually get overfitted is more reassuring than the
-theory, with one exception that is precisely our situation.** [Recht et al.
-(2019)](https://arxiv.org/abs/1902.10811) rebuilt the ImageNet and CIFAR-10 test sets from scratch;
-accuracy fell by 11 to 14 percentage points on ImageNet and 3 to 15 on CIFAR-10, but the ranking of
-models survived almost exactly, and they attribute the drop to the new images being harder rather
-than to years of test-set reuse. [Roelofs et al.
-(2019)](https://proceedings.neurips.cc/paper_files/paper/2019/file/ee39e503b6bedf0c98c388b7e8589aca-Paper.pdf)
-looked across 120 Kaggle competitions and "found little to no signs of adaptive overfitting". The
-exception in their data is the one that applies to us: the outlier competitions "usually have
-pathologies such as non-i.i.d. data splits or (effectively) small test sets". Two things keep us
-from taking the reassurance. Their survey covers classification competitions rather than forecasting
-ones. And our fold is small in effective sample size rather than in row count, because consecutive
-half-hours are strongly correlated — a different fault from the non-random public-private split they
-mean, but one that shrinks the evidence the same way.
+**The empirical evidence on how often leaderboards actually get overfitted is more reassuring than the theory, and it does not cover our case.** What reassurance there is comes from competitions with many independent entrants and a private split held back until the end, and the exceptions in it are benchmarks with effectively small test sets. Our fold is small in effective sample size rather than in row count, because consecutive half-hours are strongly correlated, which shrinks the evidence the same way.
 
 **Our own leaderboard has this problem today, and we would rather say so than discover it later.**
 The fold that Flexpectation currently reports serves as both the model-selection set and the
@@ -1674,49 +1649,13 @@ measuring sampling error over a finite window; they warn against "treating short
 proven superiority", and note that the confidence intervals of their own top models overlap.
 
 **The AlphaFold comparison is worth stating precisely, because the precise version supports this
-project better than the loose one.** CASP, the assessment that AlphaFold won, is a recurring
-competition rather than a standing benchmark: every two years its organisers gather proteins "for
-which the experimental structure is about to be solved or is solved but still not public" and give
-the sequences to entrants ([Kryshtafovych et al. (2021)](https://doi.org/10.1002/prot.26237)). Each
-target is single-use, because once the structure is published nobody can be blind to it again. The
-standing benchmark in that field is a different thing, CAMEO, which has run continuously since 2012
-by taking the weekly pre-release of forthcoming structures as targets and scoring roughly 800 a year
-against CASP's 84 ([Robin et al. (2021)](https://doi.org/10.1002/prot.26213)). AlphaFold2's own
-published generalisation check was neither: [Jumper et al.
-(2021)](https://doi.org/10.1038/s41586-021-03819-2) trained on structures released up to a fixed
-cut-off of 30 April 2018 and reported accuracy on 10,795 sequences released after it — a temporal
-hold-out of exactly the kind a live forecasting service gets for free. The blind competition was the
-audit; the temporal hold-out was a check the team could run for itself, on data no rival had to
-supply. That is the same division of labour Flexpectation is proposing, and it is the reason a
-leaderboard without entrants is a coherent thing to build.
+project better than the loose one.** CASP, the assessment that AlphaFold won, is a recurring competition rather than a standing benchmark: every two years its organisers gather proteins "for which the experimental structure is about to be solved or is solved but still not public" and give the sequences to entrants ([Kryshtafovych et al. (2021)](https://doi.org/10.1002/prot.26237)). Each target is single-use, because once the structure is published nobody can be blind to it again. The standing benchmark in that field is a different thing, CAMEO, which takes the weekly pre-release of forthcoming structures as its targets. AlphaFold2 was developed against neither, but against a temporal hold-out of its own — trained to a fixed cut-off and scored on structures released after it, which is what a live forecasting service gets for free. The blind competition was the audit; the temporal hold-out was a check the team could run for itself, on data no rival had to supply. That is the same division of labour Flexpectation is proposing, and it is the reason a leaderboard without entrants is a coherent thing to build.
 
-**The most useful sentence in that literature is an admission.** Describing the earlier AlphaFold,
-[Senior et al. (2020)](https://doi.org/10.1038/s41586-019-1923-7) report results on their own
-held-out set and then add: "we note that accuracies for this set are higher than for the CASP13 test
-domains". One clause, conceding that their internal benchmark was easier than the blind one. A
-single-team leaderboard cannot buy credibility from rivals, so it has to buy it this way.
-Flexpectation's own version of that gap is known in advance: the leaderboard runs on the 32
+**A single-team leaderboard cannot buy credibility from rivals, so it has to buy it by declaring its own gaps.** Flexpectation's is known in advance: the leaderboard runs on the 32
 trial-area series and the service is meant to reach the whole of NGED's network, so we should expect
 our published numbers to flatter what happens at scale, and should say so each time we publish them.
 
-**How long these benchmarks took to produce a step change is worth knowing before promising one.**
-The ImageNet challenge ran for two years of incremental progress before the 2012 result cut the
-error rate by a third, and the dataset was already at full size from the start ([Russakovsky et al.
-(2015)](https://doi.org/10.1007/s11263-015-0816-y)). CASP has run biennially since 1994, including a
-fourteen-year stretch from 2000 to 2014 in which its contact-prediction accuracy "showed no
-significant improvement", before the results that made the field's name ([Kryshtafovych et al.
-(2021)](https://doi.org/10.1002/prot.26237)). The forecasting competitions had been running for
-sixteen years before their founding conclusion — that "statistically sophisticated or complex
-methods do not typically produce more accurate forecasts than simpler ones" — stopped being carried
-by their own results: [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015) records
-that the M3 organisers claimed their competition upheld it, "yet the results did not provide the
-evidence supporting the first finding", because "the best two methods were not obviously 'simple'".
-The benchmark meanwhile grew from the 3,003 series of M3 to the 100,000 of M4. Two things follow for
-a project of Flexpectation's length. A leaderboard's first product is usually a credible measured
-plateau rather than a breakthrough, and in CASP's case the plateau is what made the later jump
-believable. And a benchmark of 32 series is small enough that the constraint on what can be learned
-from it is likely to be its size, which is an argument for extending it to the wider network as soon
-as the data allows rather than for running more experiments against the trial area.
+**Two things follow from how long those benchmarks took to produce a step change.** A leaderboard's first product is usually a credible measured plateau rather than a breakthrough, and in CASP's case a fourteen-year plateau is what made the later jump believable ([Kryshtafovych et al. (2021)](https://doi.org/10.1002/prot.26237)). And a benchmark of 32 series is small enough that the constraint on what can be learned from it is likely to be its size, which is an argument for extending it to the wider network as soon as the data allows rather than for running more experiments against the trial area.
 
 **What a leaderboard without entrants cannot do, we should not claim it does.** Three of the
 strongest results in the benchmarks above are unavailable to us. CASP's finding that its field
@@ -2359,8 +2298,6 @@ Every source cited above, in alphabetical order by first author.
   Energy Systems*.
 - Bian, Y., Zheng, N., Zheng, Y., Xu, B. and Shi, Y. (2024). [Predicting Strategic Energy Storage
   Behaviors](https://doi.org/10.1109/TSG.2023.3303469). *IEEE Transactions on Smart Grid*.
-- Blum, A. and Hardt, M. (2015). [The Ladder: A Reliable Leaderboard for Machine Learning
-  Competitions](https://arxiv.org/abs/1502.04585).
 - Bollerslev, J., Andersen, P. B., Jensen, T. V., Marinelli, M., Thingvad, A., Calearo, L. and
   Weckesser, T. (2022). [Coincidence Factors for Domestic EV Charging From Driving and Plug-In
   Behavior](https://doi.org/10.1109/TTE.2021.3088275). *IEEE Transactions on Transportation
@@ -2456,9 +2393,6 @@ Every source cited above, in alphabetical order by first author.
 - Jiang, Z., Wang, X., Li, H., Hong, T., You, F., Drgoňa, J., Vrabie, D. and Dong, B. (2025).
   [Physics-informed machine learning for building performance simulation-A review of a nascent
   field](https://doi.org/10.1016/j.adapen.2025.100223). *Advances in Applied Energy*.
-- Jumper, J., Evans, R., Pritzel, A., Green, T., Figurnov, M., Ronneberger, O., Tunyasuvunakool, K.,
-  Bates, R., Zidek, A., Potapenko, A. et al. (2021). [Highly accurate protein structure prediction
-  with AlphaFold](https://doi.org/10.1038/s41586-021-03819-2). *Nature*.
 - Jumper, J. (2024). [Nobel Week
   interview](https://www.nobelprize.org/prizes/chemistry/2024/jumper/interview/).
 - Jung, B. W., Lee, D. S., Lee, J. W. and Son, S. Y. (2024). [Distribution network voltage
@@ -2580,24 +2514,12 @@ Every source cited above, in alphabetical order by first author.
 - Richardson, D. S. (2000). [Skill and relative economic value of the ECMWF ensemble prediction
   system](https://doi.org/10.1002/qj.49712656313). *Quarterly Journal of the Royal Meteorological
   Society*.
-- Robin, X., Haas, J., Gumienny, R., Smolinski, A., Tauriello, G. and Schwede, T. (2021).
-  [Continuous Automated Model EvaluatiOn (CAMEO) — Perspectives on the future of fully automated
-  evaluation of structure prediction methods](https://doi.org/10.1002/prot.26213). *Proteins*.
-- Roelofs, R., Fridovich-Keil, S., Miller, J., Shankar, V., Hardt, M., Recht, B. and Schmidt, L.
-  (2019). [A Meta-Analysis of Overfitting in Machine
-  Learning](https://proceedings.neurips.cc/paper_files/paper/2019/file/ee39e503b6bedf0c98c388b7e8589aca-Paper.pdf).
 - Ruhhütl, M., Schmaranz, R. and Dietrichsteiner, T. (2023). [Load and generation forecast on
   substation level](https://doi.org/10.1049/icp.2023.0476). *IET Conference Proceedings*.
-- Russakovsky, O., Deng, J., Su, H., Krause, J., Satheesh, S., Ma, S., Huang, Z., Karpathy, A.,
-  Khosla, A., Bernstein, M. et al. (2015). [ImageNet Large Scale Visual Recognition
-  Challenge](https://doi.org/10.1007/s11263-015-0816-y). *International Journal of Computer Vision*.
 - Scottish and Southern Electricity Networks (2021).
   [TRANSITION](https://ssen-innovation.co.uk/transition/).
 - Scottish and Southern Electricity Networks (2025). [FastTrack, Alpha Round
   4](https://smarter.energynetworks.org/projects/10166254/).
-- Senior, A. W., Evans, R., Jumper, J., Kirkpatrick, J., Sifre, L., Green, T., Qin, C., Zidek, A.,
-  Nelson, A. W. R., Bridgland, A. et al. (2020). [Improved protein structure prediction using
-  potentials from deep learning](https://doi.org/10.1038/s41586-019-1923-7). *Nature*.
 - Shukla, S. and Hong, T. (2024). [BigDEAL Challenge 2022: Forecasting peak timing of electricity
   demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
 - SP Energy Networks (2023).
