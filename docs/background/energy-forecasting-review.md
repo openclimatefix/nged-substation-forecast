@@ -30,12 +30,12 @@ which has its own section below. Three further sources carry findings rather tha
 and are drawn on throughout. [Haben et al. (2021)](https://arxiv.org/abs/2106.00006) reviewed a
 final list of 221 low-voltage forecasting papers published to 2020, noting that the number they
 actually read is slightly smaller. [Shukla and Hong (2024)](https://doi.org/10.1049/stg2.12162)
-reports the BigDEAL Challenge 2022, a competition on forecasting the *timing* of peak demand rather
-than its size, which drew 78 teams from 27 countries and published its data alongside the paper.
-[Energy-Arena](https://arxiv.org/abs/2604.24705) is a live public leaderboard rather than a
-competition — the paper describes a platform that at the time of writing targeted deterministic
-day-ahead tasks, and the running platform today carries 24 challenges across prices, load, wind and
-solar — eight scored as point forecasts, eight as quantiles and eight as ensembles.
+reports the BigDEAL Challenge 2022, a competition themed on forecasting the *timing* of peak demand
+rather than its size, which drew 78 teams from 27 countries and published its data alongside the
+paper. [Energy-Arena](https://arxiv.org/abs/2604.24705) keeps a permanent leaderboard rather than
+closing after a fixed period — the paper describes a platform that at the time of writing targeted
+deterministic day-ahead tasks, and the running platform today carries 24 challenges across prices,
+load, wind and solar — eight scored as point forecasts, eight as quantiles and eight as ensembles.
 
 Almost every number in this review depends on where in the network it was measured, so here is the
 voltage ladder of a distribution network, from the top down:
@@ -443,11 +443,11 @@ portfolio — the 1.2 GW Hornsea 1 offshore wind farm plus the aggregate solar c
 England, about 3.6 GW together — from real weather forecasts as they arrived. The winning team
 scored a mean pinball loss of 22.18 MWh against the organisers' starter benchmark of 53.58, with the
 next two teams on 23.18 and 24.64. The organisers also entered a more competitive reference,
-unranked, which scored 25.38. HEFTCom is the competition in this review whose paper we read in full,
-and the one whose data is closest to NGED's problem, so it is the clearest case here of many teams
-forecasting the same data with the same metric — which is exactly what the rest of this literature
-cannot do. Its wind half is a single offshore farm far larger than any generator NGED meters, and
-its solar half is a regional aggregate rather than a plant.
+unranked, which scored 25.38. HEFTCom is the competition in this review whose data is closest to
+NGED's problem, so it is the clearest case here of many teams forecasting the same data with the
+same metric — which is exactly what the rest of this literature cannot do. Its wind half is a single
+offshore farm far larger than any generator NGED meters, and its solar half is a regional aggregate
+rather than a plant.
 
 **At the scale of an individual generator, the closest work is on wind.** [Dantas and Browell
 (2026)](https://doi.org/10.1002/we.70079) forecast 73 wind farms in GB — 34 onshore, 39 offshore —
@@ -1499,32 +1499,35 @@ worked", above, settles how a single forecast is scored; this section is about t
 results from many experiments are put side by side so that the comparison means something.
 
 **What Flexpectation is building is a leaderboard, not a competition, and the distinction changes
-which published lessons apply.** Our leaderboards carry our own experiments — one per class of
-asset, so grid supply points, bulk supply points, primary substations and each kind of metered
-generator get their own — with every row a model, a feature set and a processing choice scored on
-the same test data with the same metrics. They will be public to view and reproducible, but we are
-not inviting other teams to submit entries. Anyone who wants to benchmark against us can rerun the
-setup for themselves. That means the published lessons about attracting entrants, prize pots and
-qualifying rounds do not apply to us, while the lessons about protocol — what makes a comparison
-trustworthy — apply with more force, because a competition gets some of its integrity free from
-having rivals who would like to catch each other out, and we will not have any.
+which published lessons apply.** Our leaderboards carry our own experiments — one per class of time
+series, so solar farms, wind farms, batteries and the demand at primary substations each get their
+own, with grid and bulk supply points sharing a board because their measurements are the same kind
+of thing — with every row a model, a feature set and a processing choice scored on the same test
+data with the same metrics. They will be public to view and reproducible, but we are not inviting
+other teams to submit entries. Anyone who wants to benchmark against us can rerun the setup for
+themselves. That means the published lessons about attracting entrants, prize pots and qualifying
+rounds do not apply to us, while the lessons about protocol — what makes a comparison trustworthy —
+apply with more force, because a competition gets some of its integrity free from having rivals who
+would like to catch each other out, and we will not have any.
 
-**Energy forecasting has run competitions on common data for over a decade, and only one got near
-the level NGED acts on.** The Global Energy Forecasting Competitions of 2012, 2014 and 2017 covered
-hierarchical load, price, wind and solar, published their data as supplementary files to the papers
-introducing each competition, and drew hundreds of contestants from more than 60 countries ([Hong et
-al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979)). [Shukla and Hong
-(2024)](https://doi.org/10.1049/stg2.12162)'s BigDEAL Challenge 2022 forecast the timing of peak
-demand for three neighbouring local distribution companies. [Browell et al.
+**Energy forecasting has run competitions on common data for over a decade, and of the ones whose
+target we could establish, only one got near the level NGED acts on.** The Global Energy Forecasting
+Competitions of 2012, 2014 and 2017 covered hierarchical load, price, wind and solar, published
+their data as supplementary files to the papers introducing each competition, and drew hundreds of
+contestants from more than 60 countries ([Hong et al.
+(2020)](https://doi.org/10.1109/OAJPE.2020.3029979)). [Shukla and Hong
+(2024)](https://doi.org/10.1049/stg2.12162)'s BigDEAL Challenge 2022 was themed on peak timing, and
+its final match asked for the magnitude, timing and shape of daily peak load at three neighbouring
+local distribution companies. [Browell et al.
 (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s HEFTCom forecast one 3.6 GW hybrid
 portfolio day-ahead. [Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705)'s Energy-Arena
-and [Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)'s TS-Arena are live leaderboards rather
-than competitions, and run continuously rather than closing. The closest of these to a distribution
-network is the second track of GEFCom2017, which asked for probabilistic forecasts of 183
-delivery-point meters of a US utility and drew 177 entrants in total across both its tracks
+and [Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)'s TS-Arena keep permanent leaderboards
+open to new entries, and run continuously rather than closing. The closest of these to a
+distribution network is the second track of GEFCom2017, which asked for probabilistic forecasts of
+183 delivery-point meters of a US utility and drew 177 entrants in total across both its tracks
 ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)). BigDEAL's three local
-distribution companies are whole utilities, several levels of aggregation above a primary
-substation. Competitions have been run on GB distribution-network problems: [McSweeney et al.
+distribution companies are whole utilities, an aggregation well above a single primary substation.
+Competitions have been run on distribution-network problems: [McSweeney et al.
 (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541) report three of them and draw the
 same conclusion this review does, that "many solutions are only tested on private data using a
 single method only compared (if at all) to simple, non-competitive benchmarks", which "limits the
@@ -1535,18 +1538,18 @@ problems sat at or whether any left a leaderboard behind. What we found no examp
 its competition closes. That is the gap Flexpectation's leaderboards fall into, though the search
 behind that statement is ours and we would be glad to be pointed at a counter-example.
 
-**The closest published precedent is a platform whose whole current leaderboard is populated by
-models its own operators run.** That is not quite our position, because TS-Arena does invite outside
-entries, but it is near enough that its self-imposed rules transfer. It evaluates thirteen reference
-foundation models and three statistical baselines across 186 live energy series, all of them run by
-the platform team. What keeps it honest is a set of rules the operators impose on themselves. Their
-reference models "act as neutral participants, autonomously requesting context from the API Portal
-and submitting forecasts to it", so that they "operate under the exact same constraints (e.g.,
-submission windows, data access) as other (external) participants". They run each competing model
-from its authors' own code at its authors' recommended defaults, with no domain-specific tuning. All
-three of those are available to a single team, and we intend to adopt them: our own models go
-through the same evaluation interface as any baseline, and a baseline is run as its authors
-published it.
+**The closest published precedent is a platform whose leaderboard, at the last snapshot its authors
+published, was populated entirely by models its own operators run.** That is not quite our position,
+because TS-Arena does invite outside entries, but it is near enough that its self-imposed rules
+transfer. It evaluates thirteen reference foundation models and three statistical baselines across
+186 live energy series, all of them run by the platform team. What keeps it honest is a set of rules
+the operators impose on themselves. Their reference models "act as neutral participants,
+autonomously requesting context from the API Portal and submitting forecasts to it", so that they
+"operate under the exact same constraints (e.g., submission windows, data access) as other
+(external) participants". They run each foundation model from its authors' own repository at its
+authors' recommended defaults, with no domain-specific tuning. All three of those are available to a
+single team, and we intend to adopt them: our own models go through the same evaluation interface as
+any baseline, and a baseline is run as its authors published it.
 
 **The mechanism that makes a leaderboard trustworthy is time, not policing.** TS-Arena's central
 idea is that a forecast is submitted before the outturn it will be scored against physically exists,
@@ -1579,23 +1582,23 @@ yardstick, which "should be consistent, accessible, and easily reproducible, tho
 necessarily need be considered a 'good' forecast", and a point on the yardstick, which "should be
 close to the state of the art". They recommend carrying both, so that a new method can be positioned
 between them rather than merely declared better than something. That is the shape our leaderboards
-already take, with a persistence and a climatology forecast as the bookends and NGED's incumbent
-method as the target that matters.
+take: persistence and climatology as the naive yardstick, and NGED's incumbent method as the point
+on the yardstick a new model has to reach.
 
 **The submission deadline, not a rule about features, is what defines a fair information set.**
 [Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705) give a worked example of the trap:
 several published papers use the day-ahead wind and solar forecasts that the European Network of
-Transmission System Operators publishes as inputs to day-ahead price models, but those forecasts are
-"released only after 18:00 on the day before delivery, whereas the day-ahead market already closes
-at 12:00 on that day". The feature did not exist when the forecast had to be made. Their fix is
-structural rather than procedural — each challenge "implicitly defines an operational information
-set through the submission deadline". Flexpectation has the same hazard in the delay between an
-ECMWF run and its arrival, and the same fix is available: score against the data that had actually
-landed at the forecast's issue time.
+Transmission System Operators for Electricity publishes as inputs to day-ahead price models, but
+those forecasts are "released only after 18:00 on the day before delivery, whereas the day-ahead
+market already closes at 12:00 on that day". The feature did not exist when the forecast had to be
+made. Their fix is structural rather than procedural — each challenge "implicitly defines an
+operational information set through the submission deadline". Flexpectation has the same hazard in
+the delay between an ECMWF run and its arrival, and the same fix is available: score against the
+data that had actually landed at the forecast's issue time.
 
 **A leaderboard wears out through repeated use, and the published remedies are all forms of
-rationing.** [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015), who has organised
-forecasting competitions himself, expects it: "over-study of a single benchmark data set means that
+rationing.** [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015), who co-organised a
+forecasting competition himself, expects it: "over-study of a single benchmark data set means that
 methods will eventually over-fit the published test data. I suspect this has happened with the M3
 data over the past 20 years, and it is likely to happen with the M4 data, despite its much larger
 size. Therefore, a wider range of benchmarks is desirable, and these need to be updated regularly.
@@ -1638,11 +1641,12 @@ numbers are selection metrics rather than estimates of future skill, differences
 fold-level noise should not drive decisions, and the number of experiments run against a fold is
 itself a statistic worth publishing beside the fold's results.
 
-**Rankings survive; absolute numbers do not travel.** This is the most consistent finding across
-every benchmark we looked at, and it decides what a leaderboard should report as its headline.
-[Recht et al. (2019)](https://arxiv.org/abs/1902.10811) found the ordering of models preserved on a
-freshly collected test set while the accuracy level moved by "approximately five years of progress
-in a highly active period of machine learning research". [Fildes
+**Rankings travel better than absolute numbers do.** Where a benchmark has enough data behind it,
+the ordering of models survives a change of test set even when the accuracy level does not, and that
+decides what a leaderboard should report as its headline. [Recht et al.
+(2019)](https://arxiv.org/abs/1902.10811) found the ordering of models preserved on a freshly
+collected test set while the accuracy level moved by "approximately five years of progress in a
+highly active period of machine learning research". [Fildes
 (2020)](https://doi.org/10.1016/j.ijforecast.2019.04.012), reviewing the M4 competition, compared
 its daily micro series against a real retail forecasting problem and found the same method scoring
 1.665% on one and 11.1% on the other. His conclusion is a direct endorsement of what Flexpectation
@@ -1682,9 +1686,9 @@ published generalisation check was neither: [Jumper et al.
 (2021)](https://doi.org/10.1038/s41586-021-03819-2) trained on structures released up to a fixed
 cut-off of 30 April 2018 and reported accuracy on 10,795 sequences released after it — a temporal
 hold-out of exactly the kind a live forecasting service gets for free. The blind competition was the
-audit; the temporal hold-out was what the team could check for itself between rounds. That is the
-same division of labour Flexpectation is proposing, and it is the reason a leaderboard without
-entrants is a coherent thing to build.
+audit; the temporal hold-out was a check the team could run for itself, on data no rival had to
+supply. That is the same division of labour Flexpectation is proposing, and it is the reason a
+leaderboard without entrants is a coherent thing to build.
 
 **The most useful sentence in that literature is an admission.** Describing the earlier AlphaFold,
 [Senior et al. (2020)](https://doi.org/10.1038/s41586-019-1923-7) report results on their own
@@ -1698,19 +1702,21 @@ our published numbers to flatter what happens at scale, and should say so each t
 **How long these benchmarks took to produce a step change is worth knowing before promising one.**
 The ImageNet challenge ran for two years of incremental progress before the 2012 result cut the
 error rate by a third, and the dataset was already at full size from the start ([Russakovsky et al.
-(2015)](https://doi.org/10.1007/s11263-015-0816-y)). CASP ran for twenty-six years, including a
-fourteen-year stretch from 2000 to 2014 in which its contact-prediction accuracy did not
-significantly improve at all, before the results that made the field's name ([Kryshtafovych et al.
-(2021)](https://doi.org/10.1002/prot.26237)). The forecasting competitions took from 1982 to 2018 to
-overturn their own founding conclusion that "statistically sophisticated or complex methods do not
-typically produce more accurate forecasts than simpler ones", on a benchmark that had grown from the
-3,003 series of M3 to the 100,000 of M4 ([Hyndman
-(2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)). Two things follow for a project of
-Flexpectation's length. A leaderboard's first product is usually a credible measured plateau rather
-than a breakthrough, and in CASP's case the plateau is what made the later jump believable. And a
-benchmark of 32 series is small enough that the constraint on what can be learned from it is likely
-to be its size, which is an argument for extending it to the wider network as soon as the data
-allows rather than for running more experiments against the trial area.
+(2015)](https://doi.org/10.1007/s11263-015-0816-y)). CASP has run biennially since 1994, including a
+fourteen-year stretch from 2000 to 2014 in which its contact-prediction accuracy "showed no
+significant improvement", before the results that made the field's name ([Kryshtafovych et al.
+(2021)](https://doi.org/10.1002/prot.26237)). The forecasting competitions had been running for
+sixteen years before their founding conclusion — that "statistically sophisticated or complex
+methods do not typically produce more accurate forecasts than simpler ones" — stopped being carried
+by their own results: [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015) records
+that the M3 organisers claimed their competition upheld it, "yet the results did not provide the
+evidence supporting the first finding", because "the best two methods were not obviously 'simple'".
+The benchmark meanwhile grew from the 3,003 series of M3 to the 100,000 of M4. Two things follow for
+a project of Flexpectation's length. A leaderboard's first product is usually a credible measured
+plateau rather than a breakthrough, and in CASP's case the plateau is what made the later jump
+believable. And a benchmark of 32 series is small enough that the constraint on what can be learned
+from it is likely to be its size, which is an argument for extending it to the wider network as soon
+as the data allows rather than for running more experiments against the trial area.
 
 **What a leaderboard without entrants cannot do, we should not claim it does.** Three of the
 strongest results in the benchmarks above are unavailable to us. CASP's finding that its field
