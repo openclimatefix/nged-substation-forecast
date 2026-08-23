@@ -101,6 +101,36 @@ claim and is currently filed under housekeeping. Both are pure reordering, no wo
 your manual read because a section move is the kind of change you would want to see before it
 happens.
 
+## From the leaderboard section, added 2026-08-23
+
+**One question only you can answer: did the Presumed Open Data data science challenge exist, and
+what was it?** A research agent recalled a Western Power Distribution or NGED challenge on
+forecasting and battery scheduling at a real GB primary substation. If that is right, it is a
+*substation-level* leaderboard run by this network's own predecessor, and it would change the new
+section's claim that we found no published leaderboard at distribution-substation level — a claim
+that is otherwise well evidenced and that the section now makes. I searched OpenAlex several ways,
+tried Crossref-style bibliographic queries and guessed at Energy Networks Association portal
+identifiers, and found no indexed account; the nearest hit was a Swansea paper that may be a
+participant write-up rather than the challenge itself. Rather than publish an absence claim over
+something you may simply know, this is flagged for your Monday read.
+
+**`docs/roadmap/metrics-and-leaderboard.md` now has literature behind it, and cites none of it.**
+The new review section draws on TS-Arena's pre-registration protocol, Energy-Arena's
+deadline-defines-the-information-set rule, Doubleday et al.'s two-benchmark bracket, Blum and
+Hardt's Ladder, and Messner et al.'s demonstration that a several-month window can rank the wrong
+model first. The roadmap page independently arrived at several of the same positions — most
+strikingly it already names "classic leaderboard overfitting" and tracks a final-test window under
+issue #226 — so this is a matter of citing the support rather than changing the design. Inbound
+only, as with the rest of step 2.
+
+**Two mechanisms in the literature that the roadmap does not currently have.** Blum and Hardt's
+Ladder — publish a new best only when it beats the standing best by more than a margin, and report
+it rounded to that margin — is a cheap, implementable guard for a leaderboard one team queries
+repeatedly, and it is stronger than the submission-rate caps that ImageNet and the M5 competition
+used. And CAMEO freezes its baseline pipelines while their underlying databases keep updating, so
+that data growth cannot be mistaken for method improvement; the analogue here is rerunning frozen
+persistence and climatology baselines on every evaluation window.
+
 ## Open questions for the manual read of the review
 
 Review-side rather than roadmap-side, collected here so they are in one place.

@@ -1835,14 +1835,17 @@ gradient-boosted trees and similar established methods, usually applied to a sta
 calendar and weather features. Those are sensible, well-chosen tools, applied by people who know the
 problem better than we do. What has been missing is not effort but the structure that lets effort
 compound. AlphaFold reached its result through several years of a large team running a great many
-experiments against one fixed, public benchmark. That route is open to energy forecasting in
-principle, but it is rare in practice, for structural reasons rather than any failing of the
-researchers: a forecasting paper is typically written by a small team over months rather than years,
-tests a handful of model configurations, and reports results on a dataset that no other paper uses.
-Energy forecasting has run competitions on common data for over a decade, from GEFCom2012 to
-HEFTCom, but each competition sets its own target and closes when it ends. So the field has not
-accumulated thousands of attempts against one standing benchmark, in the way protein-structure
-prediction had before AlphaFold.
+experiments, measured all the while against targets whose answers the team could not have seen — its
+own rolling temporal hold-out day to day, CAMEO's weekly pre-released structures across the field,
+and CASP's blind assessment every two years as the audit. Those are described under "What published
+leaderboards did" above. That combination is open to energy forecasting in principle, but it is rare
+in practice, for structural reasons rather than any failing of the researchers: a forecasting paper
+is typically written by a small team over months rather than years, tests a handful of model
+configurations, and reports results on a dataset that no other paper uses. Energy forecasting has
+run competitions on common data for over a decade, from GEFCom2012 to HEFTCom, but each sets its own
+target and closes when it ends, and the field has nothing running continuously in between of the
+kind CAMEO provides for protein structures. So the attempts have not accumulated against a common
+measure in the way they had in protein-structure prediction before AlphaFold.
 
 **We hold explanation two loosely, and explanation one may well be the right one.** Flexpectation is
 not resourced like a large industrial research laboratory. What it is resourced to do is run many
