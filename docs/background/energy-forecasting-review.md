@@ -1489,6 +1489,219 @@ network has done so, and it is the cheapest of this review's commitments to keep
 project did publish such figures we would like to know, because we would rather compare against a
 published baseline than start a new one.
 
+## What published leaderboards did, and what a single team can borrow from them
+
+Building leaderboards is one of Flexpectation's deliverables, so the design of a leaderboard is
+itself a question the literature can be asked about. The metrics section above settles how a single
+forecast is scored; this section is about the other half — how results from many experiments are put
+side by side so that the comparison means something.
+
+**What Flexpectation is building is a leaderboard, not a competition, and the distinction changes
+which published lessons apply.** Our leaderboards carry our own experiments — one per
+`time_series_type`, so primary substations, grid supply points, solar farms and the rest each get
+their own — with every row a model, a feature set and a processing choice scored on the same test
+data with the same metrics. They will be public to view and reproducible, but we are not inviting
+other teams to submit entries. Anyone who wants to benchmark against us can rerun the setup for
+themselves. That means the published lessons about attracting entrants, prize pots and qualifying
+rounds do not apply to us, while the lessons about protocol — what makes a comparison trustworthy —
+apply with more force, because a competition gets some of its integrity free from having rivals who
+would like to catch each other out, and we will not have any.
+
+**Energy forecasting has run competitions on common data for over a decade, and none of them is at
+the level NGED acts on.** The Global Energy Forecasting Competitions of 2012, 2014 and 2017 covered
+hierarchical load, price, wind and solar, published their data as supplementary material to the
+papers describing the winning methods, and drew hundreds of contestants from more than 60 countries
+([Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979)). [Shukla and Hong
+(2024)](https://doi.org/10.1049/stg2.12162)'s BigDEAL Challenge 2022 forecast peak timing for three
+neighbouring local distribution companies. [Browell et al.
+(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s HEFTCom forecast one 3.6 GW hybrid
+portfolio day-ahead. [Energy-Arena](https://arxiv.org/abs/2604.24705) and
+[TS-Arena](https://arxiv.org/abs/2512.20761) run continuously rather than closing. The closest of
+these to a distribution network is BigDEAL, which is one or two levels of aggregation above a
+primary substation and covers three series. We searched for a published leaderboard at
+distribution-substation level and found none, which makes Flexpectation's the first we know of at
+this level rather than a late entrant to a crowded field.
+
+**The closest published precedent is a leaderboard run by one team, which is our exact position.**
+TS-Arena evaluates 13 families of time-series model across 186 live energy series, and every one of
+those entries is run by the platform's own operators. What keeps it honest is a set of rules the
+operators impose on themselves. Their reference models "act as neutral participants, autonomously
+requesting context from the API Portal and submitting forecasts to it", so that they "operate under
+the exact same constraints (e.g., submission windows, data access) as other (external)
+participants". They run each competing model from its authors' own code at its authors' recommended
+defaults, without tuning. All three of those are available to a single team, and we intend to adopt
+them: our own models go through the same evaluation interface as any baseline, and a baseline is run
+as its authors published it.
+
+**The mechanism that makes a leaderboard trustworthy is time, not policing.** TS-Arena's central
+idea is that a forecast is submitted before the outturn it will be scored against physically exists,
+which "makes test-set contamination impossible by design". HEFTCom made the same argument from
+experience: because the competition ran on the real, unknown future, "data leakage, accidental or
+deliberate, was impossible". The corollary is uncomfortable for anyone relying on a fixed hold-out
+set, and TS-Arena states it plainly: "leveraging any fixed dataset that is not evolving over time
+and directed into the future — regardless of how carefully curated — can eventually lead to
+information leakage". [Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979) name the same
+failure from the other end, that "some datasets have been studied so well that the researchers may
+use some of the future information to give unfair advantage of their proposed methods". A
+half-hourly forecasting service is unusually well placed here: every day supplies 48 fresh
+evaluation points that can never be reused, and the condition that the answer did not exist when the
+model was frozen holds automatically.
+
+**The specific way a single team fools itself is not fabrication but running the baseline badly.**
+[Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705) put it as a general problem with
+published comparisons: competing methods "are not always implemented or optimized with equal care",
+so reported differences "may reflect differences in implementation quality rather than inherent
+methodological advantages". [Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979) put it
+more bluntly, that "sometimes the parameters are manipulated, so that the competing models are being
+dominated by the proposed ones", alongside two related habits — picking the error measure that
+favours the proposed method, and skipping comparison with naive models altogether. A team that runs
+every entry on its own leaderboard is exposed to all three by construction, which is why the
+author's-code-and-author's-defaults rule matters more for us than it does for a competition.
+
+**Run two baselines that bracket the answer, not one.** [Doubleday et al.
+(2020)](https://doi.org/10.1016/j.solener.2020.05.051) distinguish the two jobs a benchmark does: a
+yardstick, which "should be consistent, accessible, and easily reproducible, though it does not
+necessarily need be considered a 'good' forecast", and a point on the yardstick, which "should be
+close to the state of the art". They recommend carrying both, so that a new method can be positioned
+between them rather than merely declared better than something. That is the shape our leaderboards
+already take, with a persistence and a climatology forecast as the bookends and NGED's incumbent
+method as the target that matters.
+
+**The submission deadline, not a rule about features, is what defines a fair information set.**
+[Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705) give a worked example of the trap:
+several published papers use the day-ahead wind and solar forecasts that the European Network of
+Transmission System Operators publishes as inputs to day-ahead price models, but those forecasts are
+"released only after 18:00 on the day before delivery, whereas the day-ahead market already closes
+at 12:00 on that day". The feature did not exist when the forecast had to be made. Their fix is
+structural rather than procedural — each challenge "implicitly defines an operational information
+set through the submission deadline". Flexpectation has the same hazard in the delay between an
+ECMWF run and its arrival, and the same fix is available: score against the data that had actually
+landed at the forecast's issue time.
+
+**A leaderboard wears out through repeated use, and the published remedies are all forms of
+rationing.** [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015), writing as an
+organiser rather than a critic, expects it: "over-study of a single benchmark data set means that
+methods will eventually over-fit the published test data. I suspect this has happened with the M3
+data over the past 20 years, and it is likely to happen with the M4 data, despite its much larger
+size. Therefore, a wider range of benchmarks is desirable, and these need to be updated regularly.
+Consequently, there can never be a 'final forecasting competition'." The remedies in use are crude
+and effective: ImageNet's post-challenge evaluation server limits researchers to two submissions a
+week "to discourage parameter tuning on the test data" ([Russakovsky et al.
+(2015)](https://doi.org/10.1007/s11263-015-0816-y)); the M5 competition ran a live leaderboard
+during a validation phase and then scored the result on a completely dark window with no feedback at
+all ([Makridakis et al. (2022)](https://doi.org/10.1016/j.ijforecast.2021.11.013)). There is also a
+theoretical answer built for exactly our case — a leaderboard queried repeatedly by people who can
+see the score. [Blum and Hardt (2015)](https://arxiv.org/abs/1502.04585)'s Ladder publishes a new
+best only when a candidate beats the standing best by more than a set margin, and reports it rounded
+to that margin, which bounds the error by roughly the cube root of the log of the number of attempts
+rather than by its square root.
+
+**The empirical evidence on whether leaderboards actually get overfitted is more reassuring than the
+theory, with one exception that is precisely our situation.** [Recht et al.
+(2019)](https://arxiv.org/abs/1902.10811) rebuilt the ImageNet and CIFAR-10 test sets from scratch;
+accuracy fell by 11 to 14 percentage points, but the ranking of models survived almost exactly, and
+they attribute the drop to the new images being harder rather than to years of test-set reuse.
+[Roelofs et al.
+(2019)](https://proceedings.neurips.cc/paper_files/paper/2019/file/ee39e503b6bedf0c98c388b7e8589aca-Paper.pdf)
+looked across 120 Kaggle competitions and "found little to no signs of adaptive overfitting". The
+exception in their data is the one that applies to us: the competitions where overfitting did appear
+were those with very small test sets or splits that were not independent draws. A leaderboard over
+32 substations, on data where consecutive half-hours are strongly correlated, is small and dependent
+on both counts, so we should not take the general reassurance as covering our case.
+
+**Our own leaderboard has this problem today, and we would rather say so than discover it later.**
+The fold that Flexpectation currently reports serves as both the model-selection set and the
+reported result, so every hyperparameter choice and feature ablation is adjudicated on the same
+twelve months the leaderboard publishes. With hundreds of experiments planned, the winner's reported
+skill will be optimistically biased. The structural fix is a final-test window that no model
+selection is allowed to touch, and it is scheduled. Until it lands, three things hold: leaderboard
+numbers are selection metrics rather than estimates of future skill, differences smaller than
+fold-level noise should not drive decisions, and the number of experiments run against a fold is
+itself a statistic worth publishing beside the fold's results.
+
+**Rankings survive; absolute numbers do not travel.** This is the most consistent finding across
+every benchmark we looked at, and it decides what a leaderboard should report as its headline.
+[Recht et al. (2019)](https://arxiv.org/abs/1902.10811) found the ordering of models preserved on a
+freshly collected test set while the accuracy level moved by more than a decade's worth of progress.
+[Fildes (2020)](https://doi.org/10.1016/j.ijforecast.2019.04.012), reviewing the M4 competition,
+compared its daily micro series against a real retail forecasting problem and found the same method
+scoring 1.665% on one and 11.1% on the other. His conclusion is a direct endorsement of what
+Flexpectation is doing: "each organization needs to organize its own forecasting competition for its
+own forecasting problems, and should not rely on even large benchmark data sets", with the published
+competition useful for narrowing "the pool of methods to be considered" rather than for predicting
+your own error. So a leaderboard should lead with ranks and with margins over a stated baseline, and
+treat an absolute skill number as valid only on the distribution it was measured on.
+
+**A finite evaluation window can rank the wrong model first, and several months is not obviously
+enough.** [Messner et al. (2020)](https://doi.org/10.1002/we.2497) demonstrate this rather than
+asserting it. They fit three forecasting models with three different loss functions, so that each is
+optimal for one metric by construction, and then score them on the first 200 time steps: the ranking
+inverts, and the model that should have won on each metric loses on all three. Their conclusion is
+the sharpest warning we found about reading a leaderboard: "evaluation results based on a finite
+data set are always subject to some degree of uncertainty and the best ranked forecast does not
+necessarily have to be the truly best one. Depending on the actual setup, e.g., in a benchmarking
+exercise to hire a forecaster, it should be remembered that even periods of several months may still
+yield uncertainty in terms of who the best forecaster truly is." HEFTCom's own competition period
+was three months. The practical response, which TS-Arena adopts, is to publish an interval on the
+ranking rather than the ranking alone, so that a new entry near the top is visibly provisional; they
+warn against "treating short-term success as proven superiority", and note that the confidence
+intervals of their own top models overlap.
+
+**The AlphaFold comparison is worth stating precisely, because the precise version supports this
+project better than the loose one.** CASP, the assessment that AlphaFold won, is a recurring
+competition rather than a standing benchmark: every two years its organisers gather proteins "for
+which the experimental structure is about to be solved or is solved but still not public" and give
+the sequences to entrants ([Kryshtafovych et al. (2021)](https://doi.org/10.1002/prot.26237)). Each
+target is single-use, because once the structure is published nobody can be blind to it again. The
+standing benchmark in that field is a different thing, CAMEO, which has run continuously since 2012
+by taking the weekly pre-release of forthcoming structures as targets and scoring roughly 800 a year
+against CASP's 84 ([Robin et al. (2021)](https://doi.org/10.1002/prot.26213)). And between CASP
+rounds, AlphaFold was developed against neither: [Jumper et al.
+(2021)](https://doi.org/10.1038/s41586-021-03819-2) trained on structures released up to a fixed
+cut-off date and validated on more than ten thousand sequences released after it, a rolling temporal
+hold-out of exactly the kind a live forecasting service gets for free. The competition was the
+audit, not the development loop. That is the same division of labour Flexpectation is proposing, and
+it is the reason a leaderboard without entrants is a coherent thing to build.
+
+**The most useful sentence in that literature is an admission.** Describing the earlier AlphaFold,
+[Senior et al. (2020)](https://doi.org/10.1038/s41586-019-1923-7) report results on their own
+held-out set and then add: "we note that accuracies for this set are higher than for the CASP13 test
+domains". One clause, conceding that their internal benchmark was easier than the blind one, and
+saying by how much. A single-team leaderboard cannot buy credibility from rivals, so it has to buy
+it this way. Flexpectation's own version of that gap is known in advance: the leaderboard runs on 32
+trial-area series and the service is meant to reach roughly 2,500, so we should expect our published
+numbers to flatter what happens at scale, and should say so each time we publish them.
+
+**How long these benchmarks took to produce a step change is worth knowing before promising one.**
+The ImageNet challenge ran for two years of incremental progress before the 2012 result cut the
+error rate by a third, and the dataset was already at full size from the start ([Russakovsky et al.
+(2015)](https://doi.org/10.1007/s11263-015-0816-y)). CASP ran for 24 years, including a
+fourteen-year stretch from 2000 to 2014 in which its contact-prediction accuracy did not
+significantly improve at all, before the results that made the field's name ([Kryshtafovych et al.
+(2021)](https://doi.org/10.1002/prot.26237)). The forecasting competitions took from 1982 to 2018 to
+overturn their own founding conclusion that simple methods beat complex ones, and what changed was
+the size of the benchmark rather than the novelty of the methods: M4 had 100,000 series where M3 had
+3,003 ([Makridakis et al. (2020)](https://doi.org/10.1016/j.ijforecast.2019.04.014)). Two things
+follow for a project of Flexpectation's length. A leaderboard's first product is usually a credible
+measured plateau rather than a breakthrough, and in CASP's case the plateau is what made the later
+jump believable. And a benchmark of 32 series is small enough that the constraint on what can be
+learned from it is likely to be its size, which is an argument for extending it to the wider network
+as soon as the data allows rather than for running more experiments against the trial area.
+
+**What a leaderboard without entrants cannot do, we should not claim it does.** Three of the
+strongest results in the benchmarks above are unavailable to us. CASP's finding that its field
+plateaued for fourteen years is a statement about protein structure prediction only because dozens
+of groups were trying independently; a plateau on our leaderboard would be ambiguous between a hard
+problem and a team that did not think of the right idea. The M competitions' conclusions about whole
+classes of method — that combinations dominated in M4, that every one of the top fifty entries in M5
+used the same gradient-boosting library — describe what many independent people chose to try, and no
+single team's leaderboard can support that kind of claim. And the reassurance about adaptive
+overfitting comes from competitions with thousands of teams whose protective mechanism was precisely
+that independence. What our leaderboard can do is narrower and still worth having: show which
+approaches beat a stated baseline on NGED's own data, under one protocol, with the forecasts, the
+metric definitions and the code published so that anyone can check the arithmetic or rerun the
+comparison themselves.
+
 ## Six findings that recur across the studies we read
 
 Six findings recur across the studies reviewed above. These are findings about this literature, not
@@ -2029,11 +2242,15 @@ gave inconsistent gains. A comparison can therefore be dug out of this literatur
 price, and nobody does it routinely. Publishing comparable results in the first place is much
 cheaper.
 
-**Some of the data needed to run a substation-level competition is already public.** Neither HEFTCom
-nor Energy-Arena covers distribution-substation load, which is the level NGED acts at, so we intend
-to follow their protocols where they apply rather than invent our own. Some substation data is
-already public — NGED's [Connected Data Portal](https://connecteddata.nationalgrid.co.uk/), and
-Northern Powergrid's [open data
+**We are not proposing to run a competition, and the distinction matters.** Flexpectation's
+leaderboards carry our own experiments: public to view and reproducible, but with no invitation for
+other teams to submit entries. What we take from the competitions above is their protocol — a fixed
+test set, one common metric, a named baseline everything is scored against — rather than their
+format. Neither HEFTCom nor Energy-Arena covers distribution-substation load, which is the level
+NGED acts at, so where their protocols apply we follow them rather than invent our own, and anyone
+wanting to benchmark against our results can reproduce the setup rather than submit to us. Some
+substation data is already public — NGED's [Connected Data
+Portal](https://connecteddata.nationalgrid.co.uk/), and Northern Powergrid's [open data
 portal](https://northernpowergrid.opendatasoft.com/explore/dataset/primary-operational-metering/),
 which publishes half-hourly metering from its primary substations. The Dutch operator Liander goes
 furthest, publishing [LianderPower](https://www.liander.nl/over-ons/open-data), twelve years of
@@ -2108,6 +2325,8 @@ Every source cited above, in alphabetical order by first author.
   Energy Systems*.
 - Bian, Y., Zheng, N., Zheng, Y., Xu, B. and Shi, Y. (2024). [Predicting Strategic Energy Storage
   Behaviors](https://doi.org/10.1109/TSG.2023.3303469). *IEEE Transactions on Smart Grid*.
+- Blum, A. and Hardt, M. (2015). [The Ladder: A Reliable Leaderboard for Machine Learning
+  Competitions](https://arxiv.org/abs/1502.04585).
 - Bollerslev, J., Andersen, P. B., Jensen, T. V., Marinelli, M., Thingvad, A., Calearo, L. and
   Weckesser, T. (2022). [Coincidence Factors for Domestic EV Charging From Driving and Plug-In
   Behavior](https://doi.org/10.1109/TTE.2021.3088275). *IEEE Transactions on Transportation
@@ -2140,6 +2359,9 @@ Every source cited above, in alphabetical order by first author.
 - Di Natale, L., Svetozarevic, B., Heer, P. and Jones, C. (2022). [Physically Consistent Neural
   Networks for building thermal modeling: Theory and
   analysis](https://doi.org/10.1016/j.apenergy.2022.119806). *Applied Energy*.
+- Doubleday, K., Van Scyoc Hernandez, V. and Hodge, B. M. (2020). [Benchmark probabilistic solar
+  forecasts: Characteristics and recommendations](https://doi.org/10.1016/j.solener.2020.05.051).
+  *Solar Energy*.
 - EA Technology and Western Power Distribution (2019). [Electric Nation Customer Trial Final
   Report](https://eatechnology.com/media/girhcnsc/electric-nation-customer-trial-report.pdf).
 - Electricity North West (2018). [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/).
@@ -2149,6 +2371,9 @@ Every source cited above, in alphabetical order by first author.
 - Faustine, A., Nunes, N. and Pereira, L. (2025). [Efficiency Through Simplicity: MLP-Based Approach
   for Net-Load Forecasting With Uncertainty Estimates in Low-Voltage Distribution
   Networks](https://doi.org/10.1109/TPWRS.2024.3400123). *IEEE Transactions on Power Systems*.
+- Fildes, R. (2020). [Learning from forecasting
+  competitions](https://doi.org/10.1016/j.ijforecast.2019.04.012). *International Journal of
+  Forecasting*.
 - Fox, J., Plecas, M., Neilson, D., Cannon, D. and Parr, J. (2018). [Analysis of local demand trends
   and forecasting through weather correction and benefit to DSO transistion and microgrids Analysis
   of local demand trends and forecasting through weather correction and benefit to DSO transition
@@ -2191,9 +2416,15 @@ Every source cited above, in alphabetical order by first author.
 - Huyghues-Beaufond, N., Tindemans, S., Falugi, P., Sun, M. and Strbac, G. (2020). [Robust and
   automatic data cleansing method for short-term load forecasting of distribution
   feeders](https://doi.org/10.1016/j.apenergy.2019.114405). *Applied Energy*.
+- Hyndman, R. J. (2020). [A brief history of forecasting
+  competitions](https://doi.org/10.1016/j.ijforecast.2019.03.015). *International Journal of
+  Forecasting*.
 - Jiang, Z., Wang, X., Li, H., Hong, T., You, F., Drgoňa, J., Vrabie, D. and Dong, B. (2025).
   [Physics-informed machine learning for building performance simulation-A review of a nascent
   field](https://doi.org/10.1016/j.adapen.2025.100223). *Advances in Applied Energy*.
+- Jumper, J., Evans, R., Pritzel, A., Green, T., Figurnov, M., Ronneberger, O., Tunyasuvunakool, K.,
+  Bates, R., Zidek, A., Potapenko, A. et al. (2021). [Highly accurate protein structure prediction
+  with AlphaFold](https://doi.org/10.1038/s41586-021-03819-2). *Nature*.
 - Jumper, J. (2024). [Nobel Week
   interview](https://www.nobelprize.org/prizes/chemistry/2024/jumper/interview/).
 - Jung, B. W., Lee, D. S., Lee, J. W. and Son, S. Y. (2024). [Distribution network voltage
@@ -2208,6 +2439,9 @@ Every source cited above, in alphabetical order by first author.
   Networks*.
 - Kleinebrahm, M. et al. (2026). [Energy-Arena: A Dynamic Benchmark for Operational Energy
   Forecasting](https://arxiv.org/abs/2604.24705).
+- Kryshtafovych, A., Schwede, T., Topf, M., Fidelis, K. and Moult, J. (2021). [Critical assessment
+  of methods of protein structure prediction (CASP) — Round
+  XIV](https://doi.org/10.1002/prot.26237). *Proteins*.
 - Lang, S. et al. (2026). [AIFS-CRPS: ensemble forecasting using a model trained with a loss
   function based on the continuous ranked probability
   score](https://doi.org/10.1038/s44387-026-00073-7). *npj Artificial Intelligence*.
@@ -2224,6 +2458,12 @@ Every source cited above, in alphabetical order by first author.
 - Ludwig, N., Arora, S. and Taylor, J. W. (2023). [Probabilistic load forecasting using
   post-processed weather ensemble predictions](https://doi.org/10.1080/01605682.2022.2115411).
   *Journal of the Operational Research Society*.
+- Makridakis, S., Spiliotis, E. and Assimakopoulos, V. (2020). [The M4 Competition: 100,000 time
+  series and 61 forecasting methods](https://doi.org/10.1016/j.ijforecast.2019.04.014).
+  *International Journal of Forecasting*.
+- Makridakis, S., Spiliotis, E. and Assimakopoulos, V. (2022). [M5 accuracy competition: Results,
+  findings, and conclusions](https://doi.org/10.1016/j.ijforecast.2021.11.013). *International
+  Journal of Forecasting*.
 - Martín, P., Moreno, G., Rodríguez, F. J., Jiménez, J. A. and Fernández, I. (2018). [A Hybrid
   Approach to Short-Term Load Forecasting Aimed at Bad Data Detection in Secondary Substation
   Monitoring Equipment](https://doi.org/10.3390/s18113947). *Sensors*.
@@ -2233,6 +2473,10 @@ Every source cited above, in alphabetical order by first author.
 - Mesarcik, M., Loke, J., Wildeboer, J. and Lucassen, B. (2025). [Probabilistic day-ahead power
   forecasting in the medium-voltage grid using state space
   models](https://doi.org/10.1049/icp.2025.1968). *IET Conference Proceedings*.
+- Messner, J. W., Pinson, P., Browell, J., Bjerregård, M. B. and Schicker, I. (2020). [Evaluation of
+  wind power forecasts — An up-to-date view](https://doi.org/10.1002/we.2497). *Wind Energy*.
+- Meyer, M., Kaltenpoth, S., Albers, H., Zalipski, K. and Müller, O. (2026). [TS-Arena: A Live
+  Forecast Pre-Registration Platform](https://arxiv.org/abs/2512.20761).
 - Meyers, B., Deceglie, M., Deline, C. and Jordan, D. (2020). [Signal Processing on PV Time-Series
   Data: Robust Degradation Analysis Without Physical
   Models](https://doi.org/10.1109/JPHOTOV.2019.2957646). *IEEE Journal of Photovoltaics*.
@@ -2299,15 +2543,29 @@ Every source cited above, in alphabetical order by first author.
   *Zenodo*.
 - Price, I. et al. (2024). [Probabilistic weather forecasting with machine
   learning](https://doi.org/10.1038/s41586-024-08252-9). *Nature*.
+- Recht, B., Roelofs, R., Schmidt, L. and Shankar, V. (2019). [Do ImageNet Classifiers Generalize to
+  ImageNet?](https://arxiv.org/abs/1902.10811)
 - Richardson, D. S. (2000). [Skill and relative economic value of the ECMWF ensemble prediction
   system](https://doi.org/10.1002/qj.49712656313). *Quarterly Journal of the Royal Meteorological
   Society*.
+- Robin, X., Haas, J., Gumienny, R., Smolinski, A., Tauriello, G. and Schwede, T. (2021).
+  [Continuous Automated Model EvaluatiOn (CAMEO) — Perspectives on the future of fully automated
+  evaluation of structure prediction methods](https://doi.org/10.1002/prot.26213). *Proteins*.
+- Roelofs, R., Fridovich-Keil, S., Miller, J., Shankar, V., Hardt, M., Recht, B. and Schmidt, L.
+  (2019). [A Meta-Analysis of Overfitting in Machine
+  Learning](https://proceedings.neurips.cc/paper_files/paper/2019/file/ee39e503b6bedf0c98c388b7e8589aca-Paper.pdf).
 - Ruhhütl, M., Schmaranz, R. and Dietrichsteiner, T. (2023). [Load and generation forecast on
   substation level](https://doi.org/10.1049/icp.2023.0476). *IET Conference Proceedings*.
+- Russakovsky, O., Deng, J., Su, H., Krause, J., Satheesh, S., Ma, S., Huang, Z., Karpathy, A.,
+  Khosla, A., Bernstein, M. et al. (2015). [ImageNet Large Scale Visual Recognition
+  Challenge](https://doi.org/10.1007/s11263-015-0816-y). *International Journal of Computer Vision*.
 - Scottish and Southern Electricity Networks (2021).
   [TRANSITION](https://ssen-innovation.co.uk/transition/).
 - Scottish and Southern Electricity Networks (2025). [FastTrack, Alpha Round
   4](https://smarter.energynetworks.org/projects/10166254/).
+- Senior, A. W., Evans, R., Jumper, J., Kirkpatrick, J., Sifre, L., Green, T., Qin, C., Zidek, A.,
+  Nelson, A. W. R., Bridgland, A. et al. (2020). [Improved protein structure prediction using
+  potentials from deep learning](https://doi.org/10.1038/s41586-019-1923-7). *Nature*.
 - Shukla, S. and Hong, T. (2024). [BigDEAL Challenge 2022: Forecasting peak timing of electricity
   demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
 - SP Energy Networks (2023).
