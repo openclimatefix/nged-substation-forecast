@@ -15,10 +15,10 @@ Secondly - and perhaps most importantly - the fact that the industry doesn't yet
 This review cites just over seventy published papers. We read most of the ones an argument rests on
 in full; the rest were available to us only as an abstract, a preprint or part of a paper, and
 wherever a claim rests on a partial read we say so at the point the claim is made. We also read the
-published deliverables of nine GB network projects. The selection was deliberate rather than
-systematic: a paper earned its place by bearing on a decision Flexpectation actually faces and by
-changing something we believed. Papers may be missing for no better reason than that we did not find
-them, and the section "What this review excluded, and why" lists what we knowingly left out. A
+published deliverables of twelve GB network-innovation projects. The selection was deliberate rather
+than systematic: a paper earned its place by bearing on a decision Flexpectation actually faces and
+by changing something we believed. Papers may be missing for no better reason than that we did not
+find them, and the section "What this review excluded, and why" lists what we knowingly left out. A
 further group of papers is cited once each, for one specific result, rather than reviewed.
 
 One concurrent project is cited more than any paper: Northern Powergrid's Artificial Forecasting, an
@@ -134,18 +134,20 @@ that net-demand forecast better.
 
 **The 14-day horizon sits at the edge of what a weather ensemble can supply.** [Buizza and
 Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put at 16 to 23 days the lead time beyond which
-a weather ensemble stops beating a climatological distribution. The ensemble is the 51 slightly
-different forecasts the European Centre for Medium-Range Weather Forecasts (ECMWF) runs from 51
-slightly different starting conditions, whose spread shows how confident the forecast is; the
-climatological distribution is the spread of weather actually observed on that day of the year over
-many years. They measured that on upper-air variables rather than on the near-surface temperature
-and irradiance that drive substation load. Two later papers move the estimate towards what
-Flexpectation needs. [Zhang et al. (2019)](https://doi.org/10.1175/JAS-D-18-0269.1), with Buizza
-among the authors, repeated the exercise on ECMWF's 9 km operational model and put the skilful lead
-time for midlatitude instantaneous weather at about 10 days, arguing that this is a limit intrinsic
-to the atmosphere rather than an artefact of the models of the day, and that cutting today's
-initial-condition uncertainty by a factor of ten would buy at most five more days. [van Straaten et
-al. (2020)](https://doi.org/10.1002/qj.3810) took the same forecast-skill-horizon idea to 2 metre
+a weather ensemble stops beating a climatological distribution. The ensemble is the 51 forecasts the
+European Centre for Medium-Range Weather Forecasts (ECMWF) runs each time: one control forecast
+started from the best available estimate of today's weather, plus 50 perturbed members started from
+50 slightly different versions of that estimate. How far the 51 drift apart shows how confident the
+forecast is; the climatological distribution is the spread of weather actually observed on that day
+of the year over many years. They measured that on upper-air variables rather than on the
+near-surface temperature and irradiance that drive substation load. Two later papers move the
+estimate towards what Flexpectation needs. [Zhang et al.
+(2019)](https://doi.org/10.1175/JAS-D-18-0269.1), with Buizza among the authors, repeated the
+exercise on ECMWF's 9 km operational model and put the skilful lead time for midlatitude
+instantaneous weather at about 10 days, arguing that this is a limit intrinsic to the atmosphere
+rather than an artefact of the models of the day, and that cutting today's initial-condition
+uncertainty by a factor of ten would buy at most five more days. [van Straaten et al.
+(2020)](https://doi.org/10.1002/qj.3810) took the same forecast-skill-horizon idea to 2 metre
 temperature itself — the near-surface variable that drives heating and cooling load — on ECMWF's
 subseasonal system, and found European predictability extending at most into the fourth week, with
 spatial and temporal aggregation buying two extra skilful days and statistical post-processing
@@ -161,7 +163,7 @@ and near the end of it.
 | [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) | Net load, Germany | Low-voltage feeder: 200 | 4 days | A general-purpose foundation model that had never seen the data beat every purpose-trained model on average error, 3.8 kW against 4.2 kW | Actual weather, after the fact |
 | [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) | Load, Germany and Portugal | Transmission, plus 200 low-voltage feeders and 287 individual customers | 4 days | Best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage feeders, 23.3% at individual customers | 1–3 h forecasts at the feeders, reanalysis elsewhere |
 | [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) | Regional net load, GB | Regional: 14 grid supply point groups | Day-ahead | Held the same risk with **up to 24.6% less upward reserve** than a fixed-tail alternative (note 1) | Real forecasts |
-| [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) | Load, Portugal | Secondary substation: 96,989 | Day-ahead | 42–47% better than the reference benchmark at system level. **At substation level, beat a naive forecast on 83–87% of network-owned and 66–70% of customer-owned sites** | Real forecasts, 7–8 h old |
+| [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) | Load, Portugal | Secondary substation: 96,989 | Day-ahead | 42–47% better than the reference benchmark at system level. **At substation level, beat a naive forecast on 83–87% of network-owned and 66–70% of customer-owned sites** (note 4) | Real forecasts, 7–8 h old |
 | [Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) | Load, GB | Four levels: primary substation down to household | Day-ahead | Combining forecasts gained **0.0–0.4% averaged over all periods**, but **5.7–9.0% when restricted to peaks** | None at all |
 | [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | Primary substation: 13, plus their bulk supply points and 11 kV feeders | 30 min to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted (note 2) | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
 | [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | Primary substation: 551 with export data, 171 modelled; secondary: 729 | Day-ahead to 11 days at primary; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method (note 3) | Real forecasts at primary; none in the published secondary results |
@@ -178,9 +180,9 @@ reports two different pairs of numbers for the same statistic: 82.8% and 66.0% i
 86.5% and 70.0% in the caption of the figure on the page after. We could not tell which is intended,
 so the table spans both. **5.** By this review's own test, the Austrian figure does not transfer: a
 mean absolute percentage error is normalised by the load that happened to occur rather than by
-anything physical, and the paper names no baseline to measure it against. It is in the table because
-it is the only substation-level study we found from a comparable European network, and it is the one
-row whose number should not be read as a target.
+anything physical, and the abstract names no baseline to measure it against. It is in the table
+because it is the only substation-level study we found from a comparable European network, and it is
+the one row whose number should not be read as a target.
 
 **Even within this one table, the studies cannot be compared with each other.** The sharpest
 illustration comes from two papers published a fortnight apart, by overlapping groups at the
@@ -359,13 +361,14 @@ capacity.
 **What is still missing is the price on a real network.** Meteorology has priced forecast decisions
 this way for decades: [Richardson (2000)](https://doi.org/10.1002/qj.49712656313) computed the
 relative economic value of the ECMWF ensemble across the whole range of ratios between the cost of
-acting on a forecast and the loss avoided by acting. The relative-economic-value curve of Richardson
-(2000) is the right shape for NGED's problem, because each substation has its own firm capacity and
-its own cost of being wrong, so a single assumed cost ratio is the thing to avoid. Every published
-version of it on a real distribution network, though, is denominated in energy volumes or in spare
-capacity rather than in money. Artificial Forecasting does put a price on its service, but that is a
-business case for a programme rather than a score that holds risk constant and can rank one forecast
-against another at one substation.
+acting on a forecast and the loss avoided by acting. The relative-economic-value curve of
+[Richardson (2000)](https://doi.org/10.1002/qj.49712656313) is the right shape for NGED's problem,
+because each substation has its own firm capacity and its own cost of being wrong, so a single
+assumed cost ratio is the thing to avoid. Every published version of that curve on a real
+distribution network, though, is denominated in energy volumes or in spare capacity rather than in
+money. Artificial Forecasting does put a price on its service, but that is a business case for a
+programme rather than a score that holds risk constant and can rank one forecast against another at
+one substation.
 
 **Topology enters this literature almost entirely as one thing: the summation constraint in
 hierarchical forecast reconciliation.** [Nespoli et al. (2019)](https://arxiv.org/abs/1910.03976)
@@ -1061,9 +1064,9 @@ carries it into a probabilistic forecast at substation level.
 ### 8. Disaggregating other distributed energy resources: heat pumps, electric-vehicle chargers and batteries
 
 **In summary.** This is the largest gap in the review and the largest deliberate omission from our
-search: charger forecasts only beat a naive benchmark above about a hundred charge points, heat-pump
-diversity is untested in the cold weather that matters, and no diversity factor helps for domestic
-batteries at all.
+search: in the one study we found that measures charger forecast skill against aggregation, only the
+site with more than a hundred charge points beat a naive benchmark, heat-pump diversity is untested
+in the cold weather that matters, and no diversity factor helps for domestic batteries at all.
 
 **The problem.** Heat pumps, electric-vehicle chargers and price-sensitive domestic batteries change
 the shape of a substation's load in ways a model trained on history cannot anticipate, because the
@@ -1197,14 +1200,15 @@ every six hours, every target half-hour is covered by 56 separate forecasts. Tho
 independent observations of the model's skill: they share the weather, the recent load and most of
 the model state. Count them as independent and a significance test will report a confidence the data
 does not support; let a target half-hour fall on both sides of a train-test boundary and the test
-set is contaminated outright. [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) run the same
-exposure — a 96-hour horizon reissued hourly, so consecutive forecasts share 95 of their 96 target
-hours — and say nothing about it. [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079)
-issue twice a day over a 168-hour horizon and say nothing about it either. We searched all ten
-papers for any treatment of the overlap that reissuing a forecast creates — a gap or buffer between
-training and test, a block bootstrap, a correction to the number of independent observations — and
-found none. [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) are the one paper the problem
-cannot reach, because their stride equals their horizon, four days each, so no two of their
+set is contaminated outright. [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) carry the
+same exposure — a 96-hour horizon reissued hourly, so consecutive forecasts share 95 of their 96
+target hours — and [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) issue twice a day
+over a 168-hour horizon. Neither paper set out to address the overlap, and neither is unusual in
+that. We searched every forecasting paper in this review that reissues a forecast more often than
+its horizon is long, for any treatment of the overlap that reissuing creates — a gap or buffer
+between training and test, a block bootstrap, a correction to the number of independent observations
+— and found none. [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) are the one paper the
+problem cannot reach, because their stride equals their horizon, four days each, so no two of their
 forecasts share a target; that is our inference from their design rather than a claim they make, and
 they give a different reason for wanting a shorter stride, that it would "provide more insights",
 while describing exactly what it would create — "each data point in the dataset covered by multiple
@@ -1216,30 +1220,29 @@ closest thing here to a model to follow.** [Browell and Fasiolo
 diagrams "considering the temporal correlation of net-load, as the usual assumption of independence
 between samples does not hold". That is the right instinct applied to a neighbouring problem: their
 forecasts are day-ahead, so they are not exposed to reissue overlap, but they do not let a
-correlated sample masquerade as an independent one. By contrast [Dantas and Browell
-(2026)](https://doi.org/10.1002/we.70079), whose twice-daily reissue over seven days is heavily
-overlapped, bootstrap their skill scores without any correction of that kind.
+correlated sample masquerade as an independent one. [Dantas and Browell
+(2026)](https://doi.org/10.1002/we.70079)'s twice-daily reissue over seven days is heavily
+overlapped, and their skill-score bootstrap carries no correction of that kind — which we note
+because our own design has the problem worse, not because their conclusions turn on it.
 
 **Flexpectation's own protocol matches this literature where the literature has settled, and
 inherits the open question where it has not.** We use an expanding training window with the
 validation window lying strictly after it, which is what every paper above does. Our validation
 window is a complete year, which meets [Pinheiro et al.
-(2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s rule that "one year is the minimum
-acceptable to test a forecasting model whose target value shows annual seasonality". Power lag
-features shorter than the lead time are nullified, so a forecast can never see the load it is
-predicting. What none of that settles is the overlap question: our forecasts are reissued every six
-hours over a 14-day horizon, so the same target half-hour is scored 56 times, and we do not yet know
-how much that inflates the apparent precision of a comparison between two models. We will report
-what we did about it rather than leave it implicit, and we treat it as an open methodological
-question rather than a solved one. The nearest thing to an answer in this review is Browell and
-Fasiolo's correction for temporal correlation, described above, which was written for a different
-exposure but points the right way. Two of the reviews we read ask for less and are still worth
-meeting: [Haben et al. (2021)](https://arxiv.org/abs/2106.00006) ask that "how the data is split
-into train and test sets should be clearly stated" and that "a validation set should have been
-defined and be separate from the test set", while [Hong et al.
-(2020)](https://doi.org/10.1109/OAJPE.2020.3029979) advise authors whose results look too good to
-"perform sanity checks and see if future information has leaked into the process during parameter
-estimation, model selection, or tuning of hyper-parameters".
+(2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s minimum quoted above. Power lag features
+shorter than the lead time are nullified, so a forecast can never see the load it is predicting.
+What none of that settles is the overlap question: our forecasts are reissued every six hours over a
+14-day horizon, so the same target half-hour is scored 56 times, and we do not yet know how much
+that inflates the apparent precision of a comparison between two models. We will report what we did
+about it rather than leave it implicit, and we treat it as an open methodological question rather
+than a solved one. The nearest thing to an answer in this review is Browell and Fasiolo's correction
+for temporal correlation, described above, which was written for a different exposure but points the
+right way. Two of the reviews we read ask for less and are still worth meeting: [Haben et al.
+(2021)](https://arxiv.org/abs/2106.00006) ask that "how the data is split into train and test sets
+should be clearly stated" and that "a validation set should have been defined and be separate from
+the test set", while [Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979) advise authors
+whose results look too good to "perform sanity checks and see if future information has leaked into
+the process during parameter estimation, model selection, or tuning of hyper-parameters".
 
 **On metrics for these three problems, the review's commitments are collected under "Publishing
 results that others can compare against" below, and two cautions from this literature belong with
@@ -1252,10 +1255,10 @@ late is punished twice, once for the peak that did not happen and once for the p
 scores worse than a flat line. The second caution is [Gilbert et al.
 (2023)](https://arxiv.org/abs/2206.11745)'s finding, described under problem 1 above, that
 cross-validation flattered the aggregation levels relative to their held-out test. We will report
-both numbers wherever we report either. That finding also bears on a risk we have already written
-down: a single validation fold that serves as both the model-selection set and the reported result
-will flatter whichever model won, the more so the more experiments are run against it, and the
-remedy is a final-test window that no experiment is scored on until a champion has been chosen.
+both numbers wherever we report either. That finding also bears on a second risk: a single
+validation fold that serves as both the model-selection set and the reported result will flatter
+whichever model won, the more so the more experiments are run against it, and the remedy is a
+final-test window that no experiment is scored on until a champion has been chosen.
 
 ### Estimating something nobody measures: problems 3, 7 and 8
 
@@ -1525,17 +1528,20 @@ nothing in the weather or the calendar determines it. If this explanation is rig
 already captures nearly all of the predictable part, a sophisticated model has almost nothing left
 to find, and the small gains reported across this literature are the correct answer to the question.
 
-**Explanation two: nobody has yet pushed hard enough to find out how well substation demand can be
-predicted.** The sophisticated models in this literature are generalised additive models,
+**Explanation two: the field has not yet had the standing benchmark that would settle the
+question.** The sophisticated models in this literature are generalised additive models,
 gradient-boosted trees and similar established methods, usually applied to a standard set of
-calendar and weather features. Those are sensible, well-chosen tools. They are also not what a
-sustained modern machine-learning effort looks like. AlphaFold reached its result through several
-years of a large team running a great many experiments against one fixed, public benchmark. That
-route is open to energy forecasting in principle, but it is rare in practice, for structural reasons
-rather than any failing of the researchers: a forecasting paper is typically written by a small team
-over months rather than years, tests a handful of model configurations, and reports results on a
-dataset that no other paper uses. Energy forecasting has therefore never accumulated the thousands
-of directly comparable attempts that protein-structure prediction had accumulated before AlphaFold.
+calendar and weather features. Those are sensible, well-chosen tools, applied by people who know the
+problem better than we do. What has been missing is not effort but the structure that lets effort
+compound. AlphaFold reached its result through several years of a large team running a great many
+experiments against one fixed, public benchmark. That route is open to energy forecasting in
+principle, but it is rare in practice, for structural reasons rather than any failing of the
+researchers: a forecasting paper is typically written by a small team over months rather than years,
+tests a handful of model configurations, and reports results on a dataset that no other paper uses.
+Energy forecasting has run competitions on common data for over a decade, from GEFCom2012 to
+HEFTCom, but each competition sets its own target and closes when it ends. So the field has not
+accumulated thousands of attempts against one standing benchmark, in the way protein-structure
+prediction had before AlphaFold.
 
 **We hold explanation two loosely, and explanation one may well be the right one.** Flexpectation is
 not resourced like a large industrial research laboratory. What it is resourced to do is run many
@@ -1600,13 +1606,17 @@ network's data, that is important information about the value of any such experi
 
 ## What GB networks have already built
 
-Nine concurrent or recent GB network-innovation projects bear on this work, and between them they
+Twelve concurrent or recent GB network-innovation projects bear on this work, and between them they
 have built more of what Flexpectation needs than the academic literature has. Five are summarised
 here. The sixth, Northern Powergrid's Artificial Forecasting, gets its own section below because
 this review leans on it more heavily than on any other. The remaining three — Electricity North
 West's ATLAS, UK Power Networks' Distribution Network Visibility and this network's own Time Series
 Data Quality — are described under problems 4 and 6 instead, because what they contribute is about
-finding bad and switched measurements rather than about forecasting.
+finding bad and switched measurements rather than about forecasting. The last three — NGED's own
+Electric Nation charging trial, the National Energy System Operator's Solar NowCasting project and
+Northern Powergrid's smart-meter detection trial — are described under problems 7 and 8, because
+what they contribute is about individual low-carbon technologies rather than about substation
+forecasting.
 
 **Scottish and Southern Electricity Networks' TRANSITION** (Network Innovation Competition,
 Oxfordshire; its load-forecasting deliverable reported 2021) is the closest precedent for
@@ -1669,7 +1679,7 @@ substations since 2015, and is now extending that to a finer geographic grid ([C
 A high-voltage-to-medium-voltage substation in France is broadly the level of a GB primary
 substation. Forecasting operationally at the scale Flexpectation reaches in 2027 is therefore a
 decade old somewhere else, which is reassuring about the engineering and says nothing about the
-forecast quality, because the paper reports none.
+forecast quality, because the abstract we read reports no accuracy figures.
 
 ### Northern Powergrid's Artificial Forecasting is further ahead, and sets the bar
 
@@ -1709,11 +1719,14 @@ which "remains appropriate, subject to further validation".
 **Artificial Forecasting is independent evidence that short-term substation forecasting is
 operationally useful**, that networks will change their procurement process around it, and that a
 benefits case has been made and accepted. Because it is public, operational and benchmarked against
-a real incumbent method, it also sets the clearest available bar for what "working" looks like.
-Northern Powergrid's programme rightly prioritised getting a service into live operational use;
-Flexpectation takes on research questions that priority left for later. Artificial Forecasting's
-core intellectual property is to be made available royalty-free to other GB networks, and we would
-rather build on it than rebuild it.
+a real incumbent method, it also sets the clearest available bar for what "working" looks like. The
+two programmes are aimed at different parts of the same problem. Artificial Forecasting has taken a
+probabilistic primary-substation service through architecture review, information security and a
+full winter procurement cycle, which is the half Flexpectation has not yet reached. Flexpectation's
+contribution sits upstream of that, in the eight problems above. Artificial Forecasting's core
+intellectual property is to be made available royalty-free to other GB networks, and we would rather
+build on it than rebuild it — a shared evaluation protocol between two GB networks would be worth
+more to both than two separate ones.
 
 ## Set against this literature, what we plan is ambitious, and here is why we think it can be done
 
@@ -1738,18 +1751,18 @@ families of model:
   to learn only what the physics cannot supply: the response of a solar panel and of a wind turbine
   on the generation side, and the thermal response of buildings on the demand side.
 
-**Only the first of those four strands is in scope for version one.** Only the heavily-tuned
-gradient-boosting model is in scope for the first version of the service. The pre-trained encoders,
-the connectivity-map models and the differentiable physics all belong to the network-wide scale-up
-from 2027, as does the disaggregation of unmetered generation and forecasting the network as a
-network. "What this review excluded, and why" explains why the demand-side half of the
-differentiable-physics strand — aggregating the thermal response of a few thousand buildings up to a
-substation — is the least well supported by published work of anything this project plans. Its
-generation-side half is in the opposite position: [Pierrot and Pinson
-(2024)](https://doi.org/10.1080/00401706.2024.2350421) fit the physical parameters of a generator
-inside a differentiable model, and [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) and
-[Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) supply the wind and solar building
-blocks that problems 2 and 3 describe.
+**Only the first of those four strands — the heavily-tuned gradient-boosting model — is in scope for
+version one.** The pre-trained encoders, the connectivity-map models and the differentiable physics
+all belong to the network-wide scale-up from 2027, as does the disaggregation of unmetered
+generation and forecasting the network as a network. "What this review excluded, and why" explains
+why the demand-side half of the differentiable-physics strand — aggregating the thermal response of
+a few thousand buildings up to a substation — is the least well supported by published work of
+anything this project plans. Its generation-side half is in the opposite position: [Pierrot and
+Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) fit the physical parameters of a
+generator inside a differentiable model, and [Viotti et al.
+(2026)](https://doi.org/10.1002/we.70136) and [Dantas and Browell
+(2026)](https://doi.org/10.1002/we.70079) supply the wind and solar building blocks that problems 2
+and 3 describe.
 
 **The main reason for attempting all eight at once is that they may be one problem rather than
 eight.** A switching event, a turbine out for repair and a stuck meter all surface in the same
@@ -1794,8 +1807,7 @@ meter plus reanalysis wind speed has been published, with code, by [Dantas and B
 (2026)](https://doi.org/10.1002/we.70079). Inferring unmetered solar behind a primary substation is
 being built now by UK Power Networks with Open Climate Fix, who are also a partner in Flexpectation.
 For most of the eight, the work is to extend a published method to NGED's data rather than to invent
-one, and Artificial Forecasting's core intellectual property is to be made available royalty-free to
-other GB networks.
+one.
 
 **The third is that the strands are independent, so one failing does not strand the others.** The
 live service for the 32-series trial area is problem 1, and it does not depend on any of problems 2
@@ -1906,17 +1918,21 @@ in one.
 
 **[Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979) name two remedies: publishing the
 underlying data, and running competitions in which every team forecasts the same dataset.** This
-project is well placed to help with both, and others have started already: HEFTCom and Energy-Arena
-both compare methods on common data with a common metric, and Energy-Arena keeps a live public
-leaderboard. A third approach — recovering a ranking from the published literature after the fact —
-shows what the alternative costs: [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) did
-recover a defensible ranking of solar forecasting methods from the published literature, by
-screening 1,447 studies and hand-extracting 4,687 skill scores from those that reported one, then
-statistically removing the effect of ten other factors. Their finding is that ensemble-hybrid models
-improve on time-series models by 7 percentage points of skill score day-ahead, 13 intra-day and 21
-intra-hour, while many advanced machine-learning methods gave inconsistent gains. A comparison can
-therefore be dug out of this literature, but only at that price, and nobody does it routinely.
-Publishing comparable results in the first place is much cheaper.
+project is well placed to help with both, and there is a long track record to build on, much of it
+created by the authors of that review: Hong and his collaborators ran the Global Energy Forecasting
+Competitions of 2012, 2014 and 2017, whose papers describe the winning methods and carry the contest
+data as supplementary files. [Shukla and Hong (2024)](https://doi.org/10.1049/stg2.12162)'s BigDEAL
+Challenge 2022 did the same for peak timing, and HEFTCom and Energy-Arena continue the pattern, with
+Energy-Arena keeping a live public leaderboard. A third approach — recovering a ranking from the
+published literature after the fact — shows what the alternative costs: [Nguyen and Müsgens
+(2026)](https://doi.org/10.1063/5.0300682) did recover a defensible ranking of solar forecasting
+methods from the published literature, by screening 1,447 studies and hand-extracting 4,687 skill
+scores from those that reported one, then statistically removing the effect of ten other factors.
+Their finding is that ensemble-hybrid models improve on time-series models by 7 percentage points of
+skill score day-ahead, 13 intra-day and 21 intra-hour, while many advanced machine-learning methods
+gave inconsistent gains. A comparison can therefore be dug out of this literature, but only at that
+price, and nobody does it routinely. Publishing comparable results in the first place is much
+cheaper.
 
 **Some of the data needed to do that is already public.** Neither HEFTCom nor Energy-Arena covers
 distribution-substation load, which is the level NGED acts at, so we intend to follow their
