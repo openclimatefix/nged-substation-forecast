@@ -28,13 +28,16 @@ than what is always true, and name the thing instead of writing "it".
    review the literature against those problems. A review organised around the questions is
    useful to the funder; a review organised around the papers is a reading list.
 2. **Assemble the library** — full texts on local disk, not abstracts.
-3. **Draft**, one problem at a time.
-4. **Review in rounds**, each round asking a different question. Accuracy and readability are
+3. **Draft**, one problem at a time, with the sources open rather than a summary of them.
+4. **Fact-check new prose before you commit it**, not after. A section that lands and is then
+   corrected twenty times leaves a history that is honest but avoidable, and every uncorrected
+   hour is an hour the wrong claim could have been read.
+5. **Review in rounds**, each round asking a different question. Accuracy and readability are
    separate rounds, because they find different defects and a reviewer asked for both does
    neither well.
-5. **Triage every finding against the source yourself** before changing a word.
+6. **Triage every finding against the source yourself** before changing a word.
 
-Rounds 4 and 5 repeat. Expect the review to keep finding real defects for longer than feels
+Rounds 5 and 6 repeat. Expect the review to keep finding real defects for longer than feels
 reasonable.
 
 ## Assembling the library
@@ -43,6 +46,22 @@ reasonable.
 done and that it worked; it almost never carries the number, the baseline, the horizon or the
 caveat that makes a finding worth citing. Several of the worst errors caught in review came from
 drafting off an abstract and inferring the rest.
+
+**Draft from the source, not from a summary of the source.** A research agent's report — or your
+own notes, or a previous draft — is a map of where to look, never a substitute for looking. Writing
+a section against notes rather than against the papers is the single most productive way to
+introduce errors that read perfectly well: a number drifts (a source's "approximately five years"
+became "more than a decade"), a hedge evaporates ("their internal benchmark was easier" acquired
+"and saying by how much", which the source never says), and the summariser's paraphrase hardens into
+your assertion. One section written this way needed twenty corrections in two thousand words, an
+error rate several times worse than anything drafted with the PDFs open. If you must write against
+notes to get the shape down, treat that draft as unpublishable until every sourced sentence has been
+opened against its source.
+
+**A source you are citing for one claim may bear on the claim next to it.** The same section cited a
+paper for one fact while contradicting that paper's account of a second, three sentences away —
+the absence claim it made was refuted on a page it had already quoted from. When you open a source,
+read what it says about the neighbouring claims too, not only the sentence you came for.
 
 **Only legitimate routes.** Never use a pirate mirror. In rough order of yield:
 

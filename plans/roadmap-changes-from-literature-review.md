@@ -103,6 +103,16 @@ happens.
 
 ## From the leaderboard section, added 2026-08-23
 
+**Incoming: the full text of McSweeney, Haben and Young (2023).** Requested directly from Stephen
+Haben, so a legitimate author-shared copy rather than anything the paywall blocks. When it arrives,
+three things follow. The review currently cites it from its abstract and says so, and that caveat
+comes out. The abstract does not say what network level the three challenges sat at, so the
+leaderboard section's remaining absence claim — that we found no *standing* leaderboard at
+distribution-substation level — can be checked properly and narrowed again if one of the three was
+at substation level. And if the challenges left public data or a public leaderboard behind, that
+belongs in the section as the nearest GB precedent, ahead of GEFCom2017's delivery-point meters.
+Save the PDF to `literature/papers/mcsweeney-2023-data-science-challenges.pdf`.
+
 **Partly resolved: GB distribution-network data science competitions do exist.** The search that
 produced the leaderboard section's absence claim missed McSweeney, Haben and Young (2023), "Data
 Science Challenges; A Whole Systems Lens for Energy Network Solutions" (IEEE ISGT Europe), which
