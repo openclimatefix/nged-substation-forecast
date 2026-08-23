@@ -103,16 +103,17 @@ happens.
 
 ## From the leaderboard section, added 2026-08-23
 
-**One question only you can answer: did the Presumed Open Data data science challenge exist, and
-what was it?** A research agent recalled a Western Power Distribution or NGED challenge on
-forecasting and battery scheduling at a real GB primary substation. If that is right, it is a
-*substation-level* leaderboard run by this network's own predecessor, and it would change the new
-section's claim that we found no published leaderboard at distribution-substation level — a claim
-that is otherwise well evidenced and that the section now makes. I searched OpenAlex several ways,
-tried Crossref-style bibliographic queries and guessed at Energy Networks Association portal
-identifiers, and found no indexed account; the nearest hit was a Swansea paper that may be a
-participant write-up rather than the challenge itself. Rather than publish an absence claim over
-something you may simply know, this is flagged for your Monday read.
+**Partly resolved: GB distribution-network data science competitions do exist.** The search that
+produced the leaderboard section's absence claim missed McSweeney, Haben and Young (2023), "Data
+Science Challenges; A Whole Systems Lens for Energy Network Solutions" (IEEE ISGT Europe), which
+reports three distribution-network-focused competitions and reaches the same diagnosis this review
+does about private data and non-competitive benchmarks. The paper is paywalled with no open copy, so
+the review cites it from its abstract and says so. What the abstract does not settle is what network
+level those three problems sat at, or whether any of them left a standing leaderboard — so the
+review's claim is now narrowed to the absence of a *standing* leaderboard at distribution-substation
+level. **Worth asking NGED directly**, since they are the partner and this is their own network's
+innovation history: were any of those three challenges at substation level, and is there a public
+record of the challenge itself rather than the write-up? If so the claim narrows again.
 
 **`docs/roadmap/metrics-and-leaderboard.md` now has literature behind it, and cites none of it.**
 The new review section draws on TS-Arena's pre-registration protocol, Energy-Arena's

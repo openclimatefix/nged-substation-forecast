@@ -1518,9 +1518,16 @@ neighbouring local distribution companies. [Browell et al.
 portfolio day-ahead. [Energy-Arena](https://arxiv.org/abs/2604.24705) and
 [TS-Arena](https://arxiv.org/abs/2512.20761) run continuously rather than closing. The closest of
 these to a distribution network is BigDEAL, which is one or two levels of aggregation above a
-primary substation and covers three series. We searched for a published leaderboard at
-distribution-substation level and found none, which makes Flexpectation's the first we know of at
-this level rather than a late entrant to a crowded field.
+primary substation and covers three series. Competitions have been run on GB distribution-network
+problems: [McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541) report
+three of them and draw the same conclusion this review does, that "many solutions are only tested on
+private data using a single method only compared (if at all) to simple, non-competitive benchmarks",
+which "limits the reproducibility and usefulness of the outputs". We read the abstract rather than
+the full paper, which is behind a paywall with no open copy, so we cannot say from it what level
+those three problems sat at or whether any left a leaderboard behind. What we found no example of is
+a *standing* leaderboard at distribution-substation level — one that keeps accepting new entries
+after its competition closes. That is the gap Flexpectation's leaderboards fall into, though the
+search behind that statement is ours and we would be glad to be pointed at a counter-example.
 
 **The closest published precedent is a leaderboard run by one team, which is our exact position.**
 TS-Arena evaluates 13 families of time-series model across 186 live energy series, and every one of
@@ -2470,6 +2477,9 @@ Every source cited above, in alphabetical order by first author.
 - Martín, P., Moreno, G., Rodríguez, F. J., Jiménez, J. A. and Fernández, I. (2018). [A Hybrid
   Approach to Short-Term Load Forecasting Aimed at Bad Data Detection in Secondary Substation
   Monitoring Equipment](https://doi.org/10.3390/s18113947). *Sensors*.
+- McSweeney, L., Haben, S. and Young, S. (2023). [Data Science Challenges; A Whole Systems Lens for
+  Energy Network Solutions](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541). *2023 IEEE PES
+  Innovative Smart Grid Technologies Europe*.
 - Mendonça Severiano, B. et al. (2026). [A robust rule-based method for detecting and classifying
   underperformance in photovoltaic systems using inverter
   data](https://doi.org/10.1016/j.solener.2026.114382). *Solar Energy*.
