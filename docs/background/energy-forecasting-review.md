@@ -12,7 +12,7 @@ Secondly - and perhaps most importantly - the fact that the industry doesn't yet
 
 ## What we read
 
-This review cites just over seventy published papers. We read most of the ones an argument rests on
+This review cites just under ninety published papers. We read most of the ones an argument rests on
 in full; the rest were available to us only as an abstract, a preprint or part of a paper, and
 wherever a claim rests on a partial read we say so at the point the claim is made. We also read the
 published deliverables of twelve network-innovation projects in GB. The selection was deliberate
@@ -113,8 +113,9 @@ prose: the absence is itself the finding.
 
 Everything below is what our search surfaced as most relevant to NGED, not a ranking of the field:
 every study answers the problem its own authors set, and they set different problems. The eight are
-not a shortlist to choose from — the plan is to attempt all of them, for a reason the last part of
-this review sets out: they may turn out to be one problem rather than eight.
+not a shortlist to choose from — the plan is to attempt all of them, for a reason set out under "Set
+against this literature, what we plan is ambitious" below: they may turn out to be one problem
+rather than eight.
 
 ### 1. Probabilistic forecasts of net demand at substations
 
@@ -325,8 +326,8 @@ ensemble too. Flexpectation runs on the physics ensemble today, and whether a ma
 ensemble forecasts substation load better is something we can measure.
 
 **Almost every study here optimises average accuracy, but NGED's question is about the top of the
-distribution.** The largest competition in this review, HEFTCom — described under problem 2 below —
-scores only the 10th to 90th percentiles. [Browell and Fasiolo
+distribution.** The competition in this review closest to NGED's own data, HEFTCom — described under
+problem 2 below — scores only the 10th to 90th percentiles. [Browell and Fasiolo
 (2021)](https://arxiv.org/abs/2103.10335) is the one study here that models the upper tail
 explicitly, and what they found is a warning rather than a reassurance: they work across risk levels
 from 0.01% to 0.25%, one of which — 0.05%, or one part in two thousand — corresponds to reserve
@@ -1233,7 +1234,8 @@ Estimating something nobody measures — an effective capacity, an unmetered sol
 possible substitutes for ground truth, of which this literature uses four. Detecting rare events has
 good academic practice and, in GB, no precedent that measured anything at all. This section says
 what we will do about each, and it is placed before the recurring findings because the answer
-changed how we intend to run the project rather than only how we intend to report it.
+changed how we intend to run the project rather than only how we intend to report it. How those
+scores are then put side by side is the subject of the section that follows.
 
 ### Forecasting: problems 1, 2 and 5
 
@@ -1492,35 +1494,36 @@ published baseline than start a new one.
 ## What published leaderboards did, and what a single team can borrow from them
 
 Building leaderboards is one of Flexpectation's deliverables, so the design of a leaderboard is
-itself a question the literature can be asked about. The metrics section above settles how a single
-forecast is scored; this section is about the other half — how results from many experiments are put
-side by side so that the comparison means something.
+itself a question the literature can be asked about. "How we will know whether each of these
+worked", above, settles how a single forecast is scored; this section is about the other half — how
+results from many experiments are put side by side so that the comparison means something.
 
 **What Flexpectation is building is a leaderboard, not a competition, and the distinction changes
-which published lessons apply.** Our leaderboards carry our own experiments — one per
-`time_series_type`, so primary substations, grid supply points, solar farms and the rest each get
-their own — with every row a model, a feature set and a processing choice scored on the same test
-data with the same metrics. They will be public to view and reproducible, but we are not inviting
-other teams to submit entries. Anyone who wants to benchmark against us can rerun the setup for
-themselves. That means the published lessons about attracting entrants, prize pots and qualifying
-rounds do not apply to us, while the lessons about protocol — what makes a comparison trustworthy —
-apply with more force, because a competition gets some of its integrity free from having rivals who
-would like to catch each other out, and we will not have any.
+which published lessons apply.** Our leaderboards carry our own experiments — one per class of
+asset, so grid supply points, bulk supply points, primary substations and each kind of metered
+generator get their own — with every row a model, a feature set and a processing choice scored on
+the same test data with the same metrics. They will be public to view and reproducible, but we are
+not inviting other teams to submit entries. Anyone who wants to benchmark against us can rerun the
+setup for themselves. That means the published lessons about attracting entrants, prize pots and
+qualifying rounds do not apply to us, while the lessons about protocol — what makes a comparison
+trustworthy — apply with more force, because a competition gets some of its integrity free from
+having rivals who would like to catch each other out, and we will not have any.
 
 **Energy forecasting has run competitions on common data for over a decade, and only one got near
 the level NGED acts on.** The Global Energy Forecasting Competitions of 2012, 2014 and 2017 covered
 hierarchical load, price, wind and solar, published their data as supplementary files to the papers
 introducing each competition, and drew hundreds of contestants from more than 60 countries ([Hong et
 al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979)). [Shukla and Hong
-(2024)](https://doi.org/10.1049/stg2.12162)'s BigDEAL Challenge 2022 forecast the magnitude, timing
-and shape of daily peak load for three neighbouring local distribution companies. [Browell et al.
+(2024)](https://doi.org/10.1049/stg2.12162)'s BigDEAL Challenge 2022 forecast the timing of peak
+demand for three neighbouring local distribution companies. [Browell et al.
 (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s HEFTCom forecast one 3.6 GW hybrid
-portfolio day-ahead. [Energy-Arena](https://arxiv.org/abs/2604.24705) and
-[TS-Arena](https://arxiv.org/abs/2512.20761) run continuously rather than closing. The closest of
-these to a distribution network is the second track of GEFCom2017, which asked for probabilistic
-forecasts of 183 delivery-point meters of a US utility and drew 177 entrants in total across both
-its tracks ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)). BigDEAL's three
-local distribution companies are whole utilities, several levels of aggregation above a primary
+portfolio day-ahead. [Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705)'s Energy-Arena
+and [Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)'s TS-Arena are live leaderboards rather
+than competitions, and run continuously rather than closing. The closest of these to a distribution
+network is the second track of GEFCom2017, which asked for probabilistic forecasts of 183
+delivery-point meters of a US utility and drew 177 entrants in total across both its tracks
+([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)). BigDEAL's three local
+distribution companies are whole utilities, several levels of aggregation above a primary
 substation. Competitions have been run on GB distribution-network problems: [McSweeney et al.
 (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541) report three of them and draw the
 same conclusion this review does, that "many solutions are only tested on private data using a
@@ -1688,9 +1691,9 @@ entrants is a coherent thing to build.
 held-out set and then add: "we note that accuracies for this set are higher than for the CASP13 test
 domains". One clause, conceding that their internal benchmark was easier than the blind one. A
 single-team leaderboard cannot buy credibility from rivals, so it has to buy it this way.
-Flexpectation's own version of that gap is known in advance: the leaderboard runs on 32 trial-area
-series and the service is meant to reach roughly 2,500, so we should expect our published numbers to
-flatter what happens at scale, and should say so each time we publish them.
+Flexpectation's own version of that gap is known in advance: the leaderboard runs on the 32
+trial-area series and the service is meant to reach the whole of NGED's network, so we should expect
+our published numbers to flatter what happens at scale, and should say so each time we publish them.
 
 **How long these benchmarks took to produce a step change is worth knowing before promising one.**
 The ImageNet challenge ran for two years of incremental progress before the 2012 result cut the
@@ -1715,19 +1718,20 @@ plateaued for fourteen years is a statement about protein structure prediction o
 of groups were trying independently; a plateau on our leaderboard would be ambiguous between a hard
 problem and a team that did not think of the right idea. The M competitions' conclusions about whole
 classes of method — that complex methods do not typically beat simpler ones, that combining methods
-beats the methods combined — describe what many independent people chose to try, and no single
-team's leaderboard can support that kind of claim. And the reassurance about adaptive overfitting
-comes from competitions with at least a thousand submissions each, entered independently against a
-private split held back until the end — neither of which our leaderboard has. What our leaderboard
-can do is narrower and still worth having: show which approaches beat a stated baseline on NGED's
-own data, under one protocol, with the forecasts, the metric definitions and the code published so
-that anyone can check the arithmetic or rerun the comparison themselves.
+beats the methods combined ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) —
+describe what many independent people chose to try, and no single team's leaderboard can support
+that kind of claim. And the reassurance about adaptive overfitting comes from competitions with at
+least a thousand submissions each, entered independently against a private split held back until the
+end — neither of which our leaderboard has. What our leaderboard can do is narrower and still worth
+having: show which approaches beat a stated baseline on NGED's own data, under one protocol, with
+the forecasts, the metric definitions and the code published so that anyone can check the arithmetic
+or rerun the comparison themselves.
 
 ## Six findings that recur across the studies we read
 
-Six findings recur across the studies reviewed above. These are findings about this literature, not
-laws of nature: each is what several teams measured on their own networks, and a network that
-differs from theirs may well behave differently.
+Six findings recur across the energy-forecasting studies reviewed under the eight problems above.
+These are findings about this literature, not laws of nature: each is what several teams measured on
+their own networks, and a network that differs from theirs may well behave differently.
 
 ### 1. In the load-forecasting studies we read, each further step up in model sophistication bought a much smaller margin than the effort put into it would suggest
 
@@ -1857,16 +1861,16 @@ calendar and weather features. Those are sensible, well-chosen tools, applied by
 problem better than we do. What has been missing is not effort but the structure that lets effort
 compound. AlphaFold reached its result through several years of a large team running a great many
 experiments, measured all the while against targets whose answers the team could not have seen — its
-own rolling temporal hold-out day to day, CAMEO's weekly pre-released structures across the field,
-and CASP's blind assessment every two years as the audit. Those are described under "What published
-leaderboards did" above. That combination is open to energy forecasting in principle, but it is rare
-in practice, for structural reasons rather than any failing of the researchers: a forecasting paper
-is typically written by a small team over months rather than years, tests a handful of model
-configurations, and reports results on a dataset that no other paper uses. Energy forecasting has
-run competitions on common data for over a decade, from GEFCom2012 to HEFTCom, but each sets its own
-target and closes when it ends, and the field has nothing running continuously in between of the
-kind CAMEO provides for protein structures. So the attempts have not accumulated against a common
-measure in the way they had in protein-structure prediction before AlphaFold.
+own temporal hold-out, trained to a fixed cut-off and scored on structures released after it;
+CAMEO's weekly pre-released structures across the field; and CASP's blind assessment every two years
+as the audit. Those are described under "What published leaderboards did" above. That combination is
+open to energy forecasting in principle, but it is rare in practice, for structural reasons rather
+than any failing of the researchers: a forecasting paper is typically written by a small team over
+months rather than years, tests a handful of model configurations, and reports results on a dataset
+that no other paper uses. Energy forecasting's competitions each set their own target and close when
+they end, and the continuously-running leaderboards that have since appeared are recent and cover no
+distribution substations. So the attempts have not accumulated against a common measure in the way
+they had in protein-structure prediction before AlphaFold.
 
 **We hold explanation two loosely, and explanation one may well be the right one.** Flexpectation is
 not resourced like a large industrial research laboratory. What it is resourced to do is run many
