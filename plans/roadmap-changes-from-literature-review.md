@@ -1,7 +1,7 @@
 # Roadmap changes the literature review surfaced
 
-Working note, written 2026-08-22, to be deleted with the rest of `plans/` before this branch
-merges. It exists because the relevance review of
+Working note, started 2026-08-22 and extended 2026-08-23, to be deleted with the rest of
+`plans/` before this branch merges. It exists because the relevance review of
 [`docs/background/energy-forecasting-review.md`](../docs/background/energy-forecasting-review.md)
 turned up work on the roadmap side that we are deliberately not doing yet: the next step is a
 manual read of the review itself.
@@ -50,6 +50,56 @@ on the roadmap side.
   thermal rating; it now names wind and thermal mass too.
 - `docs/ml_experimentation/cross-validation-folds.md` and
   `docs/techniques/disaggregation-evaluation.md` already link to the review.
+
+## Decisions the review round of 2026-08-23 left for you
+
+Six Opus reviewers read the whole review — as a junior colleague, a skimming senior manager, a
+cited author, an Ofgem analyst, an NGED planning engineer and a mechanical house-style auditor —
+and six more fact-checked it chunk by chunk against the sources on disk. Most of what they found
+was applied. These are the findings that were **not** applied, because each one commits the project
+to something, and that is not a reviewer's call or Claude's.
+
+**The consumer benefit is invisible, and the review does not commit to the metric it says the field
+lacks.** Across 28,000 words the only money linking forecasting to bill-payers belongs to other
+people: Northern Powergrid's £60m value case, Bernecker et al.'s euros, Angus et al.'s 10 to 12%
+extra transformer capacity. The review spends four paragraphs arguing that what the literature is
+missing is the price on a real network, and then makes no commitment to supply one. The Ofgem
+reviewer called this the single thing most likely to read as research for its own sake. The
+suggested fix was a tenth publication commitment: a relative-economic-value curve in the shape of
+Richardson (2000), per substation, across the range of ratios between the cost of acting and the
+loss avoided. That is a real commitment on NGED's behalf, so it needs your decision rather than
+Claude's.
+
+**Four of the eight problem sections never say what Flexpectation will do.** Problems 1, 2, 3 and 6
+survey the literature and then state a plan. Problems 4, 5, 7 and 8 survey and stop. The NGED
+planning engineer's verdict was that the plan is the half they are paying for. Adding those four
+paragraphs means writing down project commitments that do not exist anywhere yet.
+
+**The review never says what NGED gets, or when.** The pieces are scattered across five passages up
+to 1,700 lines apart, and three facts appear nowhere in the file at all: the size of the
+network-wide scale-up (about 2,500 series), the project end date (March 2028), and the form the
+forecast arrives in — no dashboard, alert, API or control-room hand-off is described anywhere. The
+suggested fix was a short "What Flexpectation delivers, and when" block after the voltage ladder.
+Every sentence of it would be a delivery commitment.
+
+**A funding-boundary sentence in the Open Climate Fix interest declaration.** The review declares
+that Open Climate Fix is a partner in both NIA_UKPN0104 and Flexpectation. It does not say that
+Flexpectation is not paying again for the capacity-inference work funded there. Duplicate funding
+across two Network Innovation Allowance projects with a shared delivery partner is exactly what an
+Ofgem analyst looks for, and the sentence would be cheap — but only you can confirm it is true.
+
+**The third counter-finding ends by conceding the project might not be worth doing.** "A model
+trained on none of NGED's data may match a model trained on all of it" closes on that possibility
+without saying what NGED still gets if it holds. The other two counter-findings each end with a
+test and a reason the result may not carry over.
+
+**Two structural moves, both reversible and both left alone.** Moving "What GB networks have
+already built" to sit before the eight problems, so the material the customer trusts most arrives
+first rather than fourth from last; and moving the CIRED search out of "What this review excluded"
+into "What we read", since searching 3,600 papers in full is the review's strongest completeness
+claim and is currently filed under housekeeping. Both are pure reordering, no words lost. Left for
+your manual read because a section move is the kind of change you would want to see before it
+happens.
 
 ## Open questions for the manual read of the review
 
