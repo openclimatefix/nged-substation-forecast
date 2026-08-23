@@ -432,13 +432,13 @@ and the one problem where different studies' results can be compared directly.**
 Trading Competition (HEFTCom), in which every team forecast the combined day-ahead output of one GB
 portfolio — the 1.2 GW Hornsea 1 offshore wind farm plus the aggregate solar capacity of East
 England, about 3.6 GW together — from real weather forecasts as they arrived. The winning team
-scored a mean pinball loss of 22.18 MWh against the organisers' quick-start benchmark of 53.58, with
-the next two teams on 23.18 and 24.64. The organisers also entered a more competitive reference,
-unranked, which scored 25.38. HEFTCom is the largest competition in this review and the only fully
-probabilistic one, so it is the clearest case of many teams forecasting the same data with the same
-metric — which is exactly what the rest of this literature cannot do. Its wind half is a single
-offshore farm far larger than any generator NGED meters, and its solar half is a regional aggregate
-rather than a plant.
+scored a mean pinball loss of 22.18 MWh against the organisers' starter benchmark of 53.58, with the
+next two teams on 23.18 and 24.64. The organisers also entered a more competitive reference,
+unranked, which scored 25.38. HEFTCom is the competition in this review whose paper we read in full,
+and the one whose data is closest to NGED's problem, so it is the clearest case here of many teams
+forecasting the same data with the same metric — which is exactly what the rest of this literature
+cannot do. Its wind half is a single offshore farm far larger than any generator NGED meters, and
+its solar half is a regional aggregate rather than a plant.
 
 **At the scale of an individual generator, the closest work is on wind.** [Dantas and Browell
 (2026)](https://doi.org/10.1002/we.70079) forecast 73 wind farms in GB — 34 onshore, 39 offshore —
@@ -452,19 +452,20 @@ their method does and what we should take from it.
 result.** A wind power forecast can be wrong because the weather forecast was wrong, or because the
 conversion from weather to power was wrong. [Dantas and Browell
 (2026)](https://doi.org/10.1002/we.70079) quantify both. They fit a gradient-boosted quantile
-regression tree that maps weather to power, trained on ECMWF's operational analysis rather than on
-forecasts so that the errors of the weather forecast do not contaminate the conversion model, and
-they then push each of the ensemble's 50 members through that tree separately. They treat the
-members as exchangeable, which is why one conversion model serves all of them; note that they use
-the 50 perturbed members, whereas Flexpectation reads all 51 fields ECMWF publishes, the 50
+regression tree that maps weather to power, trained on ECMWF's operational analysis, topped up with
+six-hour-ahead forecasts to fill the hours the analysis does not cover, rather than on the full
+forecast horizons, so that the errors of the weather forecast do not contaminate the conversion
+model, and they then push each of the ensemble's 50 members through that tree separately. They treat
+the members as exchangeable, which is why one conversion model serves all of them; note that they
+use the 50 perturbed members, whereas Flexpectation reads all 51 fields ECMWF publishes, the 50
 perturbed members plus the control. Each member emerges as a normal distribution whose width is set
 by that member's own predicted interquartile range, so a member the conversion model is unsure about
 is given a wider kernel than one it is confident about. The 50 kernels are merged with the
 beta-transformed linear opinion pool of [Gneiting and Ranjan
 (2013)](https://doi.org/10.1214/13-EJS823), whose parameters are fitted separately at each lead time
-by minimising the continuous ranked probability score (CRPS). That fitting step corrects the
-miscalibration which arises because the members are not independent of one another. The output is a
-full predictive distribution at each lead time.
+by minimising the continuous ranked probability score (CRPS). The beta transform is there to correct
+the miscalibration a plain linear pool produces when the kernels are not independent of one another.
+The output is a full predictive distribution at each lead time.
 
 **[Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) conclude that whether
 weather-forecast error or weather-to-power conversion error dominates flips with lead time, and that
@@ -483,14 +484,16 @@ method uses ECMWF's deterministic HRES at 0.1° and hourly steps, while their ow
 ensemble at 0.5° and 6-hourly steps, because the archive they drew on carries no 100 m wind and no
 finer ensemble. On those unequal terms "the short-term method is better than the proposed method for
 horizons up to the day ahead", although it "cannot outperform the proposed method for horizons
-beyond 1 day ahead". Give both methods the same resolution and the same variables and their own
-method matches the short-term one on the first day and beats it from two days ahead. The lesson for
-Flexpectation is that a comparison of ensemble against deterministic measures the resolution
-difference unless the resolution is equalised first.
+beyond 1 day ahead". Match the two on time step and on variables and their own method matches the
+short-term one on the first day and beats it from two days ahead — though even then the
+deterministic reference keeps its finer 0.1° grid, which the paper flags in the caption of the
+figure the comparison rests on. The lesson for Flexpectation is that a comparison of ensemble
+against deterministic measures the resolution difference unless the resolution is equalised first,
+and that equalising it fully is harder than it sounds.
 
-**A third conclusion is about what an average score hides.** Averaged over five years, their method
-showed no gain over the state of the art at day 0 and day 1. Restricted to the periods when the
-ensemble members disagreed most — frontal passages and the like — it showed a real gain even at
+**A third conclusion is about what an average score hides.** Averaged over a full test year, their
+method showed no gain over the state of the art at day 0 and day 1. Restricted to the periods when
+the ensemble members disagreed most — frontal passages and the like — it showed a real gain even at
 those short lead times, "which was not evident in the long-run average CRPS", because a
 deterministic method "is not able to discriminate between high/low weather uncertainty". They argue
 the field should score those periods separately: "assessing forecast performance under
@@ -515,21 +518,22 @@ biofuel plant inside a net-demand forecast.** For the battery there is at least 
 operator's own optimisation parameters by gradient descent on historical prices and observed
 dispatch, and prove the recovered parameters converge to the true ones for a class of storage
 models. Their motivation, that "future power system operators must understand and predict strategic
-storage arbitrage behaviors", is NGED's. The same group has since argued that this two-stage shape —
-predict the price, then solve the operator's optimisation — is the wrong one. [Yi et al.
-(2025)](https://doi.org/10.1109/TSG.2025.3548009) point out that a price forecast trained to get the
-price level right will miss the price *spread*, which is what a battery actually arbitrages, and
-train the predictor against the storage decision itself instead. They report the best behaviour
+storage arbitrage behaviors", is NGED's. A team sharing a senior author has since argued that this
+two-stage shape — predict the price, then solve the operator's optimisation — is the wrong one. [Yi
+et al. (2025)](https://doi.org/10.1109/TSG.2025.3548009) point out that a price forecast trained to
+get the price level right will miss the price *spread*, which is what a battery actually arbitrages,
+and train the predictor against the storage decision itself instead. They report the best behaviour
 prediction against the earlier benchmarks. For NGED the lesson transfers: if the point is to
 forecast what the battery does, train against what the battery does, not against the price it
 responds to. We found no method worth borrowing for the gas generator or the biofuel plant; what
 little exists forecasts a gas or biofuel plant's own output directly rather than as a component of a
 substation's net demand. Otherwise the closest the literature comes is a warning rather than a
 method: [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) found that sites
-serving a single customer, whose load follows decisions no weather model can see, were forecast
-markedly worse than the rest (finding 3 below). We expect the battery, the gas generator and the
-biofuel plant to be the hardest series in the trial area for the same reason, and we will report
-them separately rather than pooled with the wind and solar sites.
+serving a single customer were forecast markedly worse than the rest (finding 3 below). We read that
+as the signature of load following decisions no weather model can see; Pinheiro et al. attribute it
+to their model structure being tuned for the distributor's own substations. We expect the battery,
+the gas generator and the biofuel plant to be the hardest series in the trial area for the same
+reason, and we will report them separately rather than pooled with the wind and solar sites.
 
 ### 3. Estimating the effective capacity of metered generators
 
@@ -564,21 +568,27 @@ something adjacent, in that the active network management system records curtail
 NGED's generator customers, but that record is ambiguous enough that it cannot simply be dropped in
 where [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) use a bid-acceptance volume.
 
-**That hold-until-exceeded rule has since been criticised in print, on the grounds that matter most
-to NGED.** [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) point out that taking the
-running maximum of production "requires monotonically increasing capacity and relies on frequent
-high wind events" — and NGED's effective capacity goes *down* when a turbine is out for repair,
-which is the case this project's effective-capacity work exists to handle. They fit the most likely
-capacity time series instead, by quadratic optimisation against a capacity factor simulated from
-reanalysis and a power curve, and report **27.2% lower normalised mean absolute error** than the
-running maximum at quantifying capacity after a new wind farm connects. They also measure what the
-choice is worth downstream: a forecasting model trained on production normalised their way scored
-**2.0% lower mean absolute error and 2.3% lower root-mean-square error** day-ahead than the same
-model normalised by the running maximum. Their target is a Swedish bidding zone rather than an
-individual farm, and that headline figure is for capacity going up rather than down. They do test
-the de-rating case, by suppressing production in the 30 days after a step, and there both their
-method and the running maximum get worse, with no comparable improvement figure to report. The case
-NGED cares about most is the one their paper answers least well.
+**The general shape of that rule — take the running maximum of production — has since been
+criticised in print, on the grounds that matter most to NGED. The criticism is of the method rather
+than of that paper: Viotti et al. use the running maximum as their own reference method and do not
+cite Dantas and Browell.** [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) point out that
+taking the running maximum of production "requires monotonically increasing capacity and relies on
+frequent high wind events" — and NGED's effective capacity goes *down* when a turbine is out for
+repair, which is the case this project's effective-capacity work exists to handle. They fit the most
+likely capacity time series instead, by quadratic optimisation against a capacity factor simulated
+from reanalysis and a power curve, and report **27.2% lower normalised mean absolute error** than
+the running maximum at quantifying capacity after a new wind farm connects. They also measure what
+the choice is worth downstream: a forecasting model trained on production normalised their way
+scored **2.0% lower mean absolute error and 2.3% lower root-mean-square error** day-ahead than the
+same model normalised by the running maximum, across Sweden as a whole and for one of the
+parameterisations they tried; across individual bidding zones and parameterisations the range runs
+from 8.0% better to 0.6% worse. Their target is a Swedish bidding zone or the whole Swedish market
+area rather than an individual farm, and that headline figure is scored by the monotonic variant of
+their method, the one that still assumes capacity only rises; their non-monotonic variant, which
+could track capacity downwards, comes out 31% worse on the same test. They do test the de-rating
+case, by suppressing production in the 30 days after a step, and there both their method and the
+running maximum get worse, with no comparable improvement figure to report. The case NGED cares
+about most is the one their paper answers least well.
 
 **For solar, the equivalent can be done from the power signal and nothing else.** The best-known
 tool, the open-source [RdTools](https://doi.org/10.5281/zenodo.1210316), does need site irradiance
@@ -613,22 +623,22 @@ found that the National Energy System Operator's national generator-availability
 universally substantially improved results" at wind-connected primary substations — the nearest
 thing in this review to reading effective capacity off an external feed.
 
-**Estimating capacity as a distribution, jointly with the forecast, has also been published.**
-[Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind farm's
-available capacity as the unknown, time-varying upper bound of a generalised logit-normal
+**Estimating capacity jointly with the forecast, rather than in two stages, has also been
+published.** [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind
+farm's available capacity as the unknown, time-varying upper bound of a generalised logit-normal
 distribution and track it online by normalised gradient descent, fitting the bound and the forecast
 together rather than in two stages. On 14 months of ten-minute data from the Anholt offshore wind
-farm, that improved the continuous ranked probability score by **34.2% over probabilistic
-persistence and 17.9% over a benchmark that holds the bound fixed at one**. Read that second figure
-carefully. The fixed-bound benchmark is their earlier rolling maximum-likelihood method rather than
-the same gradient-descent model with its bound frozen, so the 17.9% mixes the gain from tracking the
-bound with the gain from changing the fitting method. Their one clean test of tracking on its own
-pairs the rolling maximum-likelihood method with a varying bound against the identical method with a
-fixed one, and that gained 2.43%, which they report as no "significant improvement when compared to
-its equivalent with a fixed bound". Tracking a varying bound is worth having, then, but this paper
-does not show it is worth 17.9% by itself. Their motivation is NGED's, in their own words: the bound
-"may change over time, while being unknown, for example in case of curtailment actions for which
-information is not available or not reliable".
+farm, that improved the ten-minute-ahead continuous ranked probability score by **34.2% over
+probabilistic persistence and 17.9% over a benchmark that holds the bound fixed at one**. Read that
+second figure carefully. The fixed-bound benchmark is their earlier rolling maximum-likelihood
+method rather than the same gradient-descent model with its bound frozen, so the 17.9% mixes the
+gain from tracking the bound with the gain from changing the fitting method. Their one clean test of
+tracking on its own pairs the rolling maximum-likelihood method with a varying bound against the
+identical method with a fixed one, and that gained 2.43%, which they report as no "significant
+improvement when compared to its equivalent with a fixed bound". Tracking a varying bound is worth
+having, then, but this paper does not show it is worth 17.9% by itself. Their motivation is NGED's,
+in their own words: the bound "may change over time, while being unknown, for example in case of
+curtailment actions for which information is not available or not reliable".
 
 **Where the gap is: none of this has been done across a mixed fleet at a distribution network, or
 tested for whether it improves the forecast NGED buys flexibility against.** The pieces exist, and
@@ -699,13 +709,14 @@ estimating how much load a substation carries.** [Bouman et al.
 180 primary substations at 15-minute resolution over roughly a year, detecting the step changes
 caused when a cable fault or planned maintenance reroutes part of a subgrid to a different
 substation. Events run from a few minutes to several months. On the 60 substations they held out as
-a test set, their best model estimates annual maximum and minimum load within a 10% margin in 88%
-and 91% of cases. Their purpose is a clean capacity-planning figure rather than a forecast: with the
-contaminated periods removed, the annual minimum and maximum load estimates stop being inflated — by
-up to 300% at worst when no filtering is applied. [Bouman et al.
-(2024)](https://arxiv.org/abs/2405.16164) is the most directly useful paper in this review, and it
-leaves the forecasting half untouched, which is what Flexpectation would add: keeping a forecast
-running through the events rather than deleting them.
+a test set, their best model estimates the annual maximum load within a 10% margin in 88% of cases,
+and the annual minimum within 10% in 91% of the 23 substations that ever measure a negative sign.
+Their purpose is a clean capacity-planning figure rather than a forecast: with the contaminated
+periods removed, the annual minimum and maximum load estimates stop being inflated — by up to 300%
+at worst when no filtering is applied. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) is
+the most directly useful paper in this review, and it leaves the forecasting half untouched, which
+is what Flexpectation would add: keeping a forecast running through the events rather than deleting
+them.
 
 **[Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s central trick is to detect on a
 residual rather than on the load itself.** Alliander maintains an independent bottom-up estimate of
@@ -733,19 +744,22 @@ than a bad algorithm — a warning about the network records that any bottom-up 
 **A GB network operator separated switching from bad data in 2016, with cruder tools and no
 published accuracy.** Electricity North West's
 [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project processed five years of
-half-hourly demand for "over 70 BSPs and 380 primary substations" — a larger fleet in GB than
-Flexpectation's trial area by two orders of magnitude. It works in stages. The first flags any
-abrupt change, using a threshold of 80% of the standard deviation of the demand series. The second
-then decides what kind of change it was, and the second stage is the part that matters here: one
-rule handles blocks of "unreasonably zero or negative demand", and a separate rule handles
-"switching operations and network reconfigurations", each firing when the block's mean sits more
-than a set percentage away from the mean of the whole series — 50% for the zero-or-negative-demand
-rule, 30% for the switching rule. So the distinction between a broken meter and a reconfigured
-network was drawn on GB primary substations, on power alone, without a bottom-up reference series.
-ATLAS was a data-preparation project rather than a detector-benchmarking one, so it reports no
-precision or recall figures for either rule, and it pairs them with "the importance of visual sense
-checks of the obtained processed demand data". That leaves the GB precedent in a useful state for
-us: the problem was recognised and a rule was written, and the measurement is the part still to do.
+half-hourly demand for "over 70 BSPs and 380 primary substations" — a fleet in GB more than ten
+times the size of Flexpectation's trial area. It works in stages. The first flags any abrupt change,
+firing where the half-hourly change in demand exceeds ±80% of the standard deviation of the demand
+series. The second then decides what kind of change it was, and the second stage is the part that
+matters here: one rule handles blocks of "unreasonably zero or negative demand", and a separate rule
+handles "switching operations and network reconfigurations", the first firing where a block's mean
+sits more than 50% below the mean of the whole series, and the second where it sits more than a set
+percentage either side of it — 30% for bulk supply points and 40% for primary substations. A third
+stage catches the smaller switching events the second misses, using a simultaneous ±10% change in
+daily peak demand and ±5% change in daily minimum. So the distinction between a broken meter and a
+reconfigured network was drawn on GB primary substations, on power alone, without a bottom-up
+reference series. ATLAS was a data-preparation project rather than a detector-benchmarking one, so
+it reports no precision or recall figures for either rule, and it pairs them with "the importance of
+visual sense checks of the obtained processed demand data". That leaves the GB precedent in a useful
+state for us: the problem was recognised and a rule was written, and the measurement is the part
+still to do.
 
 **Where the gaps are: the published method detects on a residual we cannot build the same way, and
 the events NGED cares about are harder than the ones detected.** A switch at NGED usually fans out
@@ -781,21 +795,21 @@ it across 169 real feeders and report better medium-term forecasts for it, and A
 Forecasting does the same in its data-preparation pipeline, aligning any earlier block whose median
 falls outside the 10th-to-90th-percentile range of the most recent block onto that recent block's
 median, so the history is brought up to the substation's present level rather than dropped.
-Artificial Forecasting argues for going further on the grounds that demand changes of an order of
+Artificial Forecasting argues for going further on the grounds that demand changes of orders of
 magnitude, mostly caused by network reconfigurations, "cannot be directly handled even by powerful
 nonlinear models like neural networks" — though they add that changes that large are rare at their
 secondary substations. [Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) name adaptive
 handling of structural breaks as future work. The third strand is models that adapt to the new level
 instead of touching the training series.
 
-**Adaptive models are the live alternative, and they handle gradual change rather than steps.** [de
-Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) let a Kalman filter track the
-drift on the 14-region GB dataset of [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335)
-instead of correcting the history, cutting error by about 4% in 2019, 7% in 2020 and 8% in 2021
-against the same model refitted every day. But a switching event is a step, not a drift, and a model
-that simply adapts to a new load level never learns that switching happened — so it cannot report
-what the substation would have carried under its normal arrangement, which is the quantity NGED
-needs.
+**Adaptive models are the live alternative: they track a new level once it arrives, including one
+that arrives abruptly, but they never record that a switch happened.** [de Vilmarest et al.
+(2024)](https://doi.org/10.1109/TPWRS.2023.3310280) let a Kalman filter track the drift on the
+14-region GB dataset of [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) instead of
+correcting the history, cutting error by about 4% in 2019, 7% in 2020 and 8% in 2021 against the
+same model refitted every day. But a switching event is a step, not a drift, and a model that simply
+adapts to a new load level never learns that switching happened — so it cannot report what the
+substation would have carried under its normal arrangement, which is the quantity NGED needs.
 
 **Where the gap is: we found nobody who feeds a model switching-contaminated history *deliberately*,
 as information rather than as damage.** [Huyghues-Beaufond et al.
@@ -843,20 +857,22 @@ onderstation".
 (2016)](https://doi.org/10.3390/s16010085) and [Martín et al.
 (2018)](https://doi.org/10.3390/s18113947) detect systematic errors in secondary-substation
 monitoring equipment by comparing each measurement against a short-term load forecast. The 2018
-paper reports a 98% hit rate; the 2016 one reports only that the errors are "successfully detected",
+paper reports a 98% hit rate; the 2016 one reports how accurately the size of an injected error is
+recovered rather than a detection rate, saying only that the errors are "successfully detected",
 with no figure attached. Two things limit how far the Moriano and Martín results carry: the errors
 are *injected* rather than found in the wild, and the fault taxonomy is calibration gain and offset
 drift plus outliers, not the stuck values, false zeros and multi-month gaps that dominate NGED's
 telemetry.
 
-**Three network-innovation projects in GB made faulty metering their subject — Electricity North
-West's ATLAS, described under problem 4 above, UK Power Networks' Distribution Network Visibility,
-and this network's own Time Series Data Quality.** UK Power Networks' [Distribution Network
+**Three network-innovation projects in GB tackled faulty metering substantively, one of them as its
+whole subject — Electricity North West's ATLAS, described under problem 4 above, UK Power Networks'
+Distribution Network Visibility, and this network's own Time Series Data Quality.** UK Power
+Networks' [Distribution Network
 Visibility](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_version_3.0_270214.pdf)
-project (Low Carbon Networks Fund, reported 2014) checked its remote terminal units against physics
-rather than against a forecast: apparent power must equal the root of real power squared plus
-reactive power squared, and where it does not, something is wrong with the installation — "an error
-with the physical connection of the RTU CTs or voltage connections such as direction, wiring
+project (Low Carbon Networks Fund, reported December 2013) checked its remote terminal units against
+physics rather than against a forecast: apparent power must equal the root of real power squared
+plus reactive power squared, and where it does not, something is wrong with the installation — "an
+error with the physical connection of the RTU CTs or voltage connections such as direction, wiring
 connection, placement, ratio or dual tail issues". They ran it over 377 units and found that "95%
 were found to obey the expected logic within 15 kVA, with 5% identified as probably having
 installation problems", then put the check into a daily health report that ranks units for
@@ -874,11 +890,12 @@ Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/) project (Netw
 Allowance, reported March 2017) checked SCADA analogues for zeros, for "non-varying non-zero values,
 perhaps indicating a 'stuck' or incorrectly configured sensor", and for gaps, across all four
 licence areas. It found that "13.8% of all analogues in the WPD South-West licence area are only
-recording 0 values. (20.7% companywide)", that the share of PowerOn data points unavailable to
-planners ran from 1% in the South West to 36% in the Midlands, and — the finding most relevant to
-problems 3 and 7 — that "63% of all new solar sites across the company have not had their analogues
-commissioned correctly". Flexpectation should expect metering defects at that prevalence rather than
-as an exception.
+recording 0 values. (20.7% companywide)" — adding that "many of these may be valid open circuit
+values, however some will reflect incorrect values" — that the share of PowerOn data points
+unavailable to planners ran from 1% in the South West to 36% in the Midlands, and — the finding most
+relevant to problems 3 and 7 — that "63% of all new solar sites across the company have not had
+their analogues commissioned correctly". Flexpectation should expect metering defects to be common
+rather than exceptional, though none of these figures is a defect rate on its own.
 
 **Everywhere else, faulty metering appears as a data-cleaning step described in passing rather than
 as a problem in its own right.** [Mendonça Severiano et al.
@@ -890,10 +907,10 @@ quality mattered at least as much as the choice of model (finding 1 below).
 **A public labelled dataset exists, and it is Dutch.** Knowing how often a detector is right
 requires measurements labelled as faulty or not, and [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164) had 180 primary substations labelled at 15-minute
-resolution — since released on Alliander's [open data
-portal](https://www.liander.nl/over-ons/open-data) as "STORM onderstation", explicitly so that
-others can train and validate algorithms against it. That is the one place in this review where the
-evaluation data for a problem is already public.
+resolution — since released as "STORM onderstation" on the [open data
+portal](https://www.liander.nl/over-ons/open-data) of Liander, Alliander's network operator,
+explicitly so that others can train and validate algorithms against it. That is the one place in
+this review where the evaluation data for a problem is already public.
 
 **Where the gaps are: the fault taxonomy, a measured GB detector, and a reference series to detect
 against.** The Dutch labels collapse switching events and measurement errors into a single class, so
@@ -913,11 +930,12 @@ assign directions to power flows where absent". What it reports achieving is mor
 objective — plotting every analogue made it "clear where (for example in cases of generation) the
 directional sense of analogues was incorrectly set", and correction was explored "by (for example)
 flipping the direction/sense of a suitable candidate feeder" where summed currents at a transformer
-and along its feeders failed to reconcile by more than a threshold. That is a manual,
-engineer-triggered process feeding a rectification list, not an automatic detector, and no accuracy
-is reported for it. The automatable version of that objective is nine years old and still available.
-A GB labelled set, with a taxonomy that separates metering faults from switching, is a gap this
-project can close cheaply, because the trial area is small enough to label by hand.
+and along its feeders failed to reconcile by more than a threshold. The plotting and the flagging
+were automated, but a candidate directional error was confirmed and corrected by an engineer,
+feeding a rectification list rather than an end-to-end detector, and no accuracy is reported for it.
+The automatable version of that objective is nine years old and still available. A GB labelled set,
+with a taxonomy that separates metering faults from switching, is a gap this project can close
+cheaply, because the trial area is small enough to label by hand.
 
 ### 7. Disaggregating unmetered solar and wind from a substation's net flow
 
