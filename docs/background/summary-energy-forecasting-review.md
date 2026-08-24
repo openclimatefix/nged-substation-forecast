@@ -194,23 +194,24 @@ case for the work we plan in version 2.
   general technique of differentiable physics is well established in neighbouring fields like
   modelling battery chemistry.
 
-**The encoders Flexpectation plans to pre-train cover weather, time, and place, and the machinery for
-the weather encoder has been built separately from any energy forecast.** We plan to research a neural
-network that turns the raw ECMWF ensemble into a calibrated probabilistic weather forecast in
-physical units, which a substation model then reads, alongside a time encoder that learns how people
-use the calendar — e.g. that Christmas is not an ordinary day — and a space encoder holding the
-standing geographic context of each substation. Both halves of the weather encoder have been built.
-[Rasp and Lerch (2018)](https://arxiv.org/abs/1805.09091) built the first: a neural network that
-post-processes a 50-member ECMWF ensemble into calibrated probabilistic 2-metre temperature at 537
-German stations 48 hours ahead, cutting mean continuous ranked probability score from 1.16 for the
-raw ensemble to 0.78, with a learned per-station embedding one of the two components the authors
-credit for the gain. [Mitra and Ramavajjala (2023)](https://arxiv.org/abs/2312.00290) built the
-second: they freeze a weather autoencoder and train small models on the frozen representation alone,
-at accuracy comparable to purpose-built models, though the targets they predict are further weather
-variables rather than anything on a network. The nearest we found anyone joining the two is one
-entrant in HEFTCom, a competition to forecast a GB wind-and-solar portfolio day-ahead: [Browell et
-al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed embeddings
-from their own AI weather models into downstream neural networks and finished third of the ranked
+**The encoders Flexpectation plans to pre-train cover weather and time, and possibly a third for
+place, and the machinery for the weather encoder has been built separately from any energy
+forecast.** We plan to research a neural network that turns the raw ECMWF ensemble into a calibrated
+probabilistic weather forecast in physical units, which a substation model then reads, alongside a
+time encoder that learns how people use the calendar — e.g. that Christmas is not an ordinary day —
+and possibly a space encoder holding the standing geographic context of each substation. Both halves
+of the weather encoder have been built. [Rasp and Lerch (2018)](https://arxiv.org/abs/1805.09091)
+built the first: a neural network that post-processes a 50-member ECMWF ensemble into calibrated
+probabilistic 2-metre temperature at 537 German stations 48 hours ahead, cutting mean continuous
+ranked probability score from 1.16 for the raw ensemble to 0.78, with a learned per-station
+embedding one of the two components the authors credit for the gain. [Mitra and Ramavajjala
+(2023)](https://arxiv.org/abs/2312.00290) built the second: they freeze a weather autoencoder and
+train small models on the frozen representation alone, at accuracy comparable to purpose-built
+models, though the targets they predict are further weather variables rather than anything on a
+network. The nearest we found anyone joining the two is one entrant in HEFTCom, a competition to
+forecast a GB wind-and-solar portfolio day-ahead: [Browell et al.
+(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed embeddings from
+their own AI weather models into downstream neural networks and finished third of the ranked
 entrants. What we found nobody doing is pre-training a weather encoder against observations and then
 reading a substation's probabilistic load forecast off it, or using a differentiable model of a
 solar or wind farm to strip out the variance the engineering explains so that the weather encoder
@@ -272,18 +273,18 @@ ahead, and we found nobody putting a differentiable model of a generator inside 
 probabilistic net-demand forecast. On lead time alone, then, the larger differentiable-physics prize
 for Flexpectation would be on the demand side rather than the generation side.
 
-**The second reason to try differentiable physics on generators is the metadata NGED does not
-have.** The generation forecasts in this literature are given numbers we do not have: [Teng et al.
-(2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each site's capacity, and HEFTCom's
-portfolio was one named 1.2 GW offshore wind farm plus the solar capacity of a region. When an
-export-cable fault cut that wind farm's available capacity mid-competition, the winning team clipped
-its quantiles to the capacity implied by the outage notices the farm is obliged to publish, while
-the organisers' benchmark ignored the fault and, in [Browell et al.
-(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed extremely poorly as a
-result". NGED's embedded generators publish no such notices, and NGED holds no dependable capacity,
-panel tilt, panel azimuth, or ratio of direct-current to alternating-current rating for them, so a
-differentiable plant model would have to fit what a register supplies elsewhere. Each half of that
-fitting has been made to work on its own: [Pierrot and Pinson
+**The second reason to try differentiable physics on generators is to infer the metadata
+Flexpectation is not given.** The generation forecasts in this literature are given metadata about
+each generator: [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each
+site's capacity, and HEFTCom's portfolio was one named 1.2 GW offshore wind farm plus the solar
+capacity of a region. When an export-cable fault cut that wind farm's available capacity
+mid-competition, the winning team clipped its quantiles to the capacity implied by the outage
+notices the farm is obliged to publish, while the organisers' benchmark ignored the fault and, in
+[Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
+extremely poorly as a result". NGED's embedded generators publish no such notices, and NGED holds no
+dependable capacity, panel tilt, panel azimuth, or ratio of direct-current to alternating-current
+rating for them. A differentiable model has the ability to infer these properties of each generator.
+Each half of that fitting has been made to work on its own: [Pierrot and Pinson
 (2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind farm's capacity as a
 time-varying bound fitted jointly with the forecast, and beat probabilistic persistence by 34.2% on
 continuous ranked probability score over 14 months at the Anholt offshore wind farm, though their
@@ -943,6 +944,14 @@ above, across four families of model:
 - differentiable physics — building known physical behaviour directly into the model, so that it has
   to learn only what the physics cannot supply: the response of a solar panel and of a wind turbine
   on the generation side, and the thermal response of buildings on the demand side.
+
+**By the standard of scope in this literature, each of the four strands is a separate piece of
+work.** Almost every study reviewed above takes on one of the eight challenges, at one voltage
+level, with one family of model; the few that touch two solve them as a pipeline rather than
+together. Pre-training weather and time encoders and then reading a substation's probabilistic
+forecast off them would be a full study by that standard, and so would each of the other three
+strands. That sizes the work rather than promising an output — how many of the strands survive
+contact with the data is exactly what the project has to find out.
 
 **Only the first of those four strands — the heavily-tuned gradient-boosting model — is in scope for
 version 1.** The other three strands belong to the network-wide scale-up from 2027, as does the

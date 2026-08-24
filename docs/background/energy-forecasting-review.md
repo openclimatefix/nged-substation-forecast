@@ -1585,39 +1585,47 @@ above, across four families of model:
   to learn only what the physics cannot supply: the response of a solar panel and of a wind turbine
   on the generation side, and the thermal response of buildings on the demand side.
 
+**By the standard of scope in this literature, each of the four strands is a separate piece of
+work.** Almost every study reviewed above takes on one of the eight challenges, at one voltage
+level, with one family of model; the few that touch two solve them as a pipeline rather than
+together. Pre-training weather and time encoders and then reading a substation's probabilistic
+forecast off them would be a full study by that standard, and so would each of the other three
+strands. That sizes the work rather than promising an output — how many of the strands survive
+contact with the data is exactly what the project has to find out.
+
 **Only the first of those four strands — the heavily-tuned gradient-boosting model — is in scope for
 version one.** The pre-trained encoders, the connectivity-map models, and the differentiable physics
 all belong to the network-wide scale-up from 2027, as does the disaggregation of unmetered
 generation and forecasting the network as a network.
 
-**The encoders Flexpectation plans to pre-train cover weather, time, and place, and the machinery
-for the weather one has been built separately from any energy forecast.** The plan is a network that
-turns the raw ECMWF ensemble into a calibrated probabilistic weather forecast in physical units,
-which a substation model then reads, alongside a time encoder that learns how people use the
-calendar — that Christmas is not an ordinary Thursday — and a space encoder holding the standing
-geographic context of each substation. Both halves of the weather encoder have been built. [Rasp and
-Lerch (2018)](https://arxiv.org/abs/1805.09091) built the first: a neural network that
-post-processes a 50-member ECMWF ensemble into calibrated probabilistic 2-metre temperature at 537
-German stations 48 hours ahead, cutting mean continuous ranked probability score from 1.16 for the
-raw ensemble to 0.78, with a learned per-station embedding one of the two components the authors
-credit for the gain. [Mitra and Ramavajjala (2023)](https://arxiv.org/abs/2312.00290) built the
-second: they freeze a weather autoencoder and train small models on the frozen representation alone,
-at accuracy comparable to purpose-built models, though the targets they predict are further weather
-variables rather than anything on a network. A network operator has already fine-tuned a pre-trained
-weather model on its own sensors: [Bodnar et al. (2025)](https://arxiv.org/abs/2509.25268)
-post-train Silurian AI's 1.5-billion-parameter Generative Forecasting Transformer on Hydro-Québec's
-transmission-line weather stations, wind-farm met masts, and icing sensors, cutting mean absolute
-error against numerical weather prediction benchmarks by 15% for temperature, 35% for total
-precipitation, and 15% for hub-height wind speed at 6 to 72 hours ahead — but the forecasts are of
-weather at the assets rather than of power, and only the icing detector is probabilistic. The
-nearest anyone came to joining the two is one entrant in HEFTCom, a competition to forecast a GB
-wind-and-solar portfolio day-ahead: [Browell et al.
-(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed embeddings from
-their own AI weather models into downstream neural networks and finished third of the ranked
-entrants. What we found nobody doing is pre-training a weather encoder against observations and then
-reading a substation's probabilistic load forecast off it, or using a differentiable model of a
-solar or wind farm to strip out the variance the engineering explains so that the weather encoder
-trains on a clean weather signal.
+**The encoders Flexpectation plans to pre-train cover weather and time, and possibly a third for
+place, and the machinery for the weather one has been built separately from any energy forecast.**
+The plan is a network that turns the raw ECMWF ensemble into a calibrated probabilistic weather
+forecast in physical units, which a substation model then reads, alongside a time encoder that
+learns how people use the calendar — that Christmas is not an ordinary Thursday — and possibly a
+space encoder holding the standing geographic context of each substation. Both halves of the weather
+encoder have been built. [Rasp and Lerch (2018)](https://arxiv.org/abs/1805.09091) built the first:
+a neural network that post-processes a 50-member ECMWF ensemble into calibrated probabilistic
+2-metre temperature at 537 German stations 48 hours ahead, cutting mean continuous ranked
+probability score from 1.16 for the raw ensemble to 0.78, with a learned per-station embedding one
+of the two components the authors credit for the gain. [Mitra and Ramavajjala
+(2023)](https://arxiv.org/abs/2312.00290) built the second: they freeze a weather autoencoder and
+train small models on the frozen representation alone, at accuracy comparable to purpose-built
+models, though the targets they predict are further weather variables rather than anything on a
+network. A network operator has already fine-tuned a pre-trained weather model on its own sensors:
+[Bodnar et al. (2025)](https://arxiv.org/abs/2509.25268) post-train Silurian AI's
+1.5-billion-parameter Generative Forecasting Transformer on Hydro-Québec's transmission-line weather
+stations, wind-farm met masts, and icing sensors, cutting mean absolute error against numerical
+weather prediction benchmarks by 15% for temperature, 35% for total precipitation, and 15% for
+hub-height wind speed at 6 to 72 hours ahead — but the forecasts are of weather at the assets rather
+than of power, and only the icing detector is probabilistic. The nearest anyone came to joining the
+two is one entrant in HEFTCom, a competition to forecast a GB wind-and-solar portfolio day-ahead:
+[Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed
+embeddings from their own AI weather models into downstream neural networks and finished third of
+the ranked entrants. What we found nobody doing is pre-training a weather encoder against
+observations and then reading a substation's probabilistic load forecast off it, or using a
+differentiable model of a solar or wind farm to strip out the variance the engineering explains so
+that the weather encoder trains on a clean weather signal.
 
 **The main reason for attempting all eight at once is that they may be one challenge rather than
 eight.** A switching event, a turbine out for repair, and a stuck meter all surface in the same
