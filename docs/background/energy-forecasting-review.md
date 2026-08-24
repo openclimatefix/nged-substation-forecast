@@ -364,9 +364,34 @@ physical generator model is established practice: [Gijón et al.
 turbines and train a second model on the residual, improving on the physics model alone by 37%, with
 conformalised quantile regression supplying the uncertainty. But they predict power from measured
 wind rather than forecasting it days ahead, and we found nobody putting a differentiable generator
-model inside a network's probabilistic net-demand forecast. On this evidence the larger
-differentiable-physics prize for Flexpectation may be on the demand side rather than the generation
-side.
+model inside a network's probabilistic net-demand forecast. On lead time alone, then, the larger differentiable-physics prize for Flexpectation would be on the
+demand side rather than the generation side.
+
+**The second reason to try differentiable physics on generators is the metadata NGED does not
+have.** The generation forecasts in this literature are handed the numbers we lack: [Teng et al.
+(2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each site's capacity, and HEFTCom's
+portfolio was one named 1.2 GW offshore wind farm plus the solar capacity of a region. When an
+export-cable fault cut that wind farm's available capacity mid-competition, the winning team clipped
+its quantiles to the capacity implied by the outage notices the farm is obliged to publish, while
+the organisers' benchmark ignored the fault and, in [Browell et al.
+(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed extremely poorly as a
+result". NGED's embedded generators publish no such notices, and NGED holds no dependable capacity,
+panel tilt, panel azimuth, or ratio of direct-current to alternating-current rating for them, so a
+differentiable plant model would have to fit what a register supplies elsewhere. Each half of that
+fitting has been made to work on its own: [Pierrot and Pinson
+(2024)](https://doi.org/10.1080/00401706.2024.2350421) track a wind farm's capacity jointly with the
+forecast and beat the same model with a fixed capacity by 17.89% on continuous ranked probability
+score, and [Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and
+azimuth of roof photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°
+from generation data plus an irradiance measurement up to 195 km away, though we could reach only
+their abstract. Neither sits inside a substation's net-demand forecast, which is where Flexpectation
+would have to put it. How much the physics is worth getting right has been measured for solar:
+[Mayer and Gróf (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) score every combination of
+nine irradiance-separation, ten transposition, three reflection-loss, five cell-temperature, four
+module, two shading, and three inverter models against a year of 15-minute production from 16
+Hungarian photovoltaic plants, and report 13% in mean absolute error between the best and worst
+model chains, with transposition — the step that takes the panel's tilt and azimuth as its input —
+one of the two that matter most.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator, or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.
@@ -383,9 +408,9 @@ to their model structure being tuned for the distributor's own substations.
 
 ### 3. Estimating the effective capacity of metered generators
 
-**In summary.** A method exists for each generation technology separately, but nobody has run them
-across a mixed fleet at a distribution network, or tested whether estimating capacity improves the
-forecast.
+**In summary.** A method exists for each generation technology separately, but nobody has run them across a mixed
+fleet at a distribution network, and the two studies that measure what estimating capacity is worth
+downstream measure it for wind alone, at national or single-farm scale.
 
 **The challenge.** We call the amount of generation actually available at a metered site its
 *effective capacity*: the output it could produce right now if the weather allowed, as opposed to
@@ -1858,9 +1883,13 @@ Every source cited above, in alphabetical order by first author.
 - Martín, P., Moreno, G., Rodríguez, F. J., Jiménez, J. A. and Fernández, I. (2018). [A Hybrid
   Approach to Short-Term Load Forecasting Aimed at Bad Data Detection in Secondary Substation
   Monitoring Equipment](https://doi.org/10.3390/s18113947). *Sensors*.
+- Mayer, M. J. and Gróf, G. (2021). [Extensive comparison of physical models for photovoltaic power
+  forecasting](https://doi.org/10.1016/j.apenergy.2020.116239). *Applied Energy*.
 - McSweeney, L., Haben, S. and Young, S. (2023). [Data Science Challenges; A Whole Systems Lens for
   Energy Network Solutions](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541). *2023 IEEE PES
   Innovative Smart Grid Technologies Europe*.
+- Meng, B., Loonen, R. and Hensen, J. L. M. (2020). [Data-driven inference of unknown tilt and
+  azimuth of distributed PV systems](https://doi.org/10.1016/j.solener.2020.09.077). *Solar Energy*.
 - Mesarcik, M., Loke, J., Wildeboer, J. and Lucassen, B. (2025). [Probabilistic day-ahead power
   forecasting in the medium-voltage grid using state space
   models](https://doi.org/10.1049/icp.2025.1968). *IET Conference Proceedings*.
