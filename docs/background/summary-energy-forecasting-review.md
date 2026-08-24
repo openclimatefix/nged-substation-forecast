@@ -433,10 +433,11 @@ events shorter than 3 days their best detector reaches about 0.2; on events of 4
 about 0.5 — but those two scores come from different detectors, because no single method they tried
 wins across the range. Both figures were achieved on a Dutch network, with the help of a second load
 estimate NGED does not have. NGED's switches are usually partial and fan out to two or three
-substations, so plan for worse than 0.2 to 0.5 rather than better, and do not judge the difficulty
-from how obvious a switch looks on a chart. A negative result is worth having here, because evidence
-that switching cannot be recovered from power measurements alone would justify extracting switching
-labels from NGED's operational systems instead of continuing to infer them.
+substations, so we should expect worse F1.5 scores than 0.2 to 0.5 rather than better, and do not
+judge the difficulty from how obvious a switch looks on a chart. A negative result is worth having
+here, because evidence that switching cannot be recovered from power measurements alone would
+justify extracting switching labels from NGED's operational systems instead of continuing to infer
+them.
 
 **The one directly useful paper detects switching but never forecasts, and forecasting is the half
 Flexpectation would add.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164), working with
@@ -454,9 +455,8 @@ substation's own meter plus weather and the calendar. The first attempt is class
 seasonal-trend decomposition of each series into a trend and daily, weekly, and annual cycles,
 leaving a remainder in which a switch shows up as a sustained level shift. The second uses the
 project's existing XGBoost machinery, trained with no power-lag features, so that an earlier
-switching event cannot contaminate the expected-power estimate the way a lagged reference would.
-Neither route needs metering from below the substation. Whether a modelled reference detects
-switching as well as a measured one is what the project has to find out.
+switching event cannot contaminate the expected-power estimate. Neither route needs metering from
+below the substation. 
 
 **Where the gaps are: [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s published method
 needs a second, independently-built load series for the same substation, which NGED does not have,
