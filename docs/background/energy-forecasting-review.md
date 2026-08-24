@@ -419,10 +419,16 @@ wrong physical model, not the cost of not knowing a system's orientation.
 literature, and the four papers closest to the question each stop short of it.** [Meng et al.
 (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan et al.
 (2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's tilt and azimuth from
-its own output — Meng et al. to 4.3° and 4.5°, Saint-Drenan et al. to within 1.5° of tilt and 5° of
-azimuth on two individually-metered Swiss rooftop plants — but report their accuracy in degrees
-alone. [Mayer and Gróf (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) price the choice of
-physical model with every plant's geometry known and held fixed. And [Amaro e Silva and Brito
+its metered alternating-current power output paired with an irradiance series measured somewhere
+else, never from the power series alone. Meng et al. match normalised hourly power against
+normalised plane-of-array irradiance on the clearest day of each month, transposing hourly readings
+from a weather station up to 195 km away, and land within 4.3° of tilt and 4.5° of azimuth on
+rooftop systems across the Netherlands. Saint-Drenan et al. fit tilt, azimuth, and an angular-loss
+coefficient to a year of 15-minute power with satellite-derived irradiance and reanalysis air
+temperature, landing within 1.5° of tilt and 5° of azimuth on the worse of two individually-metered
+Swiss plants. Both report their accuracy in degrees alone. [Mayer and Gróf
+(2021)](https://doi.org/10.1016/j.apenergy.2020.116239) price the choice of physical model with
+every plant's geometry known and held fixed. And [Amaro e Silva and Brito
 (2019)](https://doi.org/10.1016/j.apenergy.2019.113807) price the mismatch between
 differently-tilted surfaces in a forecast made 10 seconds ahead by watching cloud shadows cross a 1
 km² grid of pyranometers in Hawaii, on synthetic photovoltaic output derived from those sensors
