@@ -1391,11 +1391,11 @@ Flexpectation is building.
 
 **[NGED's own Electricity Flexibility and Forecasting System,
 EFFS](https://smarter.energynetworks.org/projects/wpden03/)** (Network Innovation Competition,
-2018–2021, budgeted at £3,338,798 and spending £2,948,281) forecast grid supply points, bulk supply
-points, primary substation transformers and generation sites from an hour to six months ahead,
-feeding automated constraint identification. Its evaluation independently selected XGBoost as the
-best balance of accuracy against effort — the same starting point Flexpectation uses. Its forecasts
-were deterministic, with no uncertainty attached, which is the step this project adds.
+2018–2021, £3,338,896 of expenditure) forecast grid supply points, bulk supply points, primary
+substation transformers and generation sites from an hour to six months ahead, feeding automated
+constraint identification. Its evaluation independently selected XGBoost as the best balance of
+accuracy against effort — the same starting point Flexpectation uses. Its forecasts were
+deterministic, with no uncertainty attached, which is the step this project adds.
 
 **UK Power Networks' NIA_UKPN0104** is described under challenge 7 above, as the direct predecessor
 of Flexpectation's unmetered-solar work.

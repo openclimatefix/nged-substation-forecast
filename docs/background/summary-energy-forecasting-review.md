@@ -91,16 +91,17 @@ but very little of what we read can be compared with the rest of that literature
 papers driving a probabilistic substation forecast from a weather ensemble across a 14-day horizon.
 
 **What this means for Flexpectation.** Building v1 on a gradient-boosted tree is defensible, but the
-literature makes it a sensible default rather than a proven winner. NGED's own EFFS project
-independently picked XGBoost on the balance of accuracy against effort, and no study we read shows a
-large, dependable margin for anything more sophisticated at substation level. Both network
-deployments that actually tried boosted trees — [Pinheiro et al.
-(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) and Artificial Forecasting — kept a simpler
-model instead, and Pinheiro et al. give two reasons for doing so: there was no accuracy gain to be
-had, and the cost of tuning the booster and the interpretability given up with it decided the rest.
-So expect the choice of model family to matter less than the data, the features and how often the
-model is refitted. Read those results with one thing in mind, though — when a paper says "XGBoost"
-it usually means a lighter model than the one we plan. [Kaas et al.
+literature makes it a sensible default rather than a proven winner. [NGED's own EFFS
+project](https://smarter.energynetworks.org/projects/wpden03/) independently picked XGBoost on the
+balance of accuracy against effort, and no study we read shows a large, dependable margin for
+anything more sophisticated at substation level. Both network deployments that actually tried
+boosted trees — [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) and
+[Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) — kept a
+simpler model instead, and Pinheiro et al. give two reasons for doing so: there was no accuracy gain
+to be had, and the cost of tuning the booster and the interpretability given up with it decided the
+rest. So expect the choice of model family to matter less than the data, the features and how often
+the model is refitted. Read those results with one thing in mind, though — when a paper says
+"XGBoost" it usually means a lighter model than the one we plan. [Kaas et al.
 (2026)](https://arxiv.org/abs/2607.01966) give theirs lagged power, weather, time and metadata and
 nothing beyond that: no clear-sky index, no wind power curve, no monotone constraints. [Pinheiro et
 al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) keep that caveat honest, because their
@@ -705,11 +706,11 @@ design is the shape Flexpectation is building.
 
 **[NGED's own Electricity Flexibility and Forecasting System,
 EFFS](https://smarter.energynetworks.org/projects/wpden03/)** (Network Innovation Competition,
-2018–2021, budgeted at £3,338,798 and spending £2,948,281) forecast grid supply points, bulk supply
-points, primary substation transformers and generation sites from an hour to six months ahead,
-feeding automated constraint identification. Its evaluation independently selected XGBoost as the
-best balance of accuracy against effort — the same starting point Flexpectation uses. EFFS's
-forecasts were deterministic, with no uncertainty attached, which is the step this project adds.
+2018–2021, £3,338,896 of expenditure) forecast grid supply points, bulk supply points, primary
+substation transformers and generation sites from an hour to six months ahead, feeding automated
+constraint identification. Its evaluation independently selected XGBoost as the best balance of
+accuracy against effort — the same starting point Flexpectation uses. EFFS's forecasts were
+deterministic, with no uncertainty attached, which is the step this project adds.
 
 **[SSEN FastTrack](https://smarter.energynetworks.org/projects/10166254/)** (Strategic Innovation
 Fund, Alpha 2025–2026) models how the distribution connections queue — around 180 GW and growing —
@@ -734,12 +735,13 @@ nothing about the forecast quality, because the abstract we read reports no accu
 
 ### Northern Powergrid's Artificial Forecasting is further ahead, and sets the bar
 
-**One concurrent project matters more than any paper here.** Artificial Forecasting is an Ofgem
-Strategic Innovation Fund programme, with about £3.9m of grant across its three phases, run by
-Northern Powergrid with Faculty, EV.energy and Oaktree Power, the final Beta phase running to
-February 2027. Artificial Forecasting does much of what Flexpectation does at primary substations,
-it also covers secondary substations, which Flexpectation does not, and at the time of writing it is
-further ahead than Flexpectation.
+**One concurrent project matters more than any paper here.** [Artificial
+Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) is an Ofgem Strategic
+Innovation Fund programme, with about £3.9m of grant across its three phases, run by Northern
+Powergrid with Faculty, EV.energy and Oaktree Power, the final Beta phase running to February 2027.
+Artificial Forecasting does much of what Flexpectation does at primary substations, it also covers
+secondary substations, which Flexpectation does not, and at the time of writing it is further ahead
+than Flexpectation.
 
 **Artificial Forecasting has run operationally through a full winter flexibility procurement
 cycle.** A forecasting service for primary substations is deployed and has passed the network's
