@@ -121,7 +121,7 @@ the data, the feature engineering, and how often the model is refitted.
 
 **Read those results knowing that when a paper says "XGBoost" it usually means a model with
 considerably less feature engineering than what we plan to implement.** [Kaas et al.
-(2026)](https://arxiv.org/abs/2607.01966) give their ML model lagged power, weather, time and
+(2026)](https://arxiv.org/abs/2607.01966) give their ML model lagged power, weather, time, and
 metadata, and nothing beyond that: no clear-sky index, no wind power curve, no monotone constraints.
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) ran the one comparison on
 equal terms — their GBT and their generalised additive model received the same features, but that
@@ -174,20 +174,20 @@ switching state and demand together, which the pipelines of separate models in t
 cannot do. The section below titled "Set against this literature, what we plan is ambitious" sets out the
 case for the work we plan in version 2.
 
-**The evidence behind those three ML model families is uneven.** 
+**The evidence behind those three ML model families is uneven.**
 
 - **Pre-trained models** have the best support of the three, but the measured result is for a
   different kind of pre-training from the one we plan: the general-purpose model [Kaas et al.
   (2026)](https://arxiv.org/abs/2607.01966) tested was pre-trained on time series, had never been
   trained on their data, and still beat every purpose-trained competitor across 200 German
-  low-voltage feeders. 
+  low-voltage feeders.
 - **Connectivity-map models** have been measured on NGED's own published data: [Campagne et al.
   (2025)](https://arxiv.org/abs/2507.03690) compare eight graph neural network architectures against
   feed-forward, persistence, and foundation-model baselines on French regional load and on the GB
   distribution networks' open smart-meter feed — about 2 million meters and 50,000 substations
   across NGED's and SSEN's areas — and the graph-aware models won on both. But their graphs are
   built from geographic distance or from correlation between series, never from electrical
-  connectivity, so whether NGED's own connectivity map improves a forecast is still unanswered. 
+  connectivity, so whether NGED's own connectivity map improves a forecast is still unanswered.
 - A search for **differentiable physics applied to substation demand forecasting** produced no
   strong result, and we found nobody aggregating building thermal physics up to a substation and
   putting it inside a probabilistic forecast, though the ingredients exist separately, and the
@@ -260,7 +260,7 @@ raise skill score by 7 to 27 percentage points over time-series models while man
 machine-learning methods show inconsistent gains.
 
 **For generators, the measured prize from better weather-to-power physics is largest at short lead
-times, which is not where NGED acts.** Differentiable physics attacks the weather-to-power half of
+times.** Differentiable physics attacks the weather-to-power half of
 the error, so on [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079)'s measurement it has
 most to offer inside the first 2 to 3 days of the 1-to-10-day window NGED acts on, and less beyond
 it, where the weather forecast itself is the binding constraint. Adding a learned residual to a
@@ -471,7 +471,7 @@ NIA_UKPN0104's method rather than from scratch.
 needs exactly what NGED lacks.** [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662)
 train on 10 Dutch substations that carry complete renewable metering, then predict solar and wind
 power separately at substations with none, from the substation's measured total load, weather,
-geospatial position and each site's known renewable capacity, at 15-minute resolution — a
+geospatial position, and each site's known renewable capacity, at 15-minute resolution — a
 root-mean-square error of 0.07 against 0.70 for a default transfer-learning model, on a
 min-max-scaled target. The paper reads 0.07 as 7%, but does not say what the scaling divides by, so
 the figure does not transfer to another dataset.
@@ -618,7 +618,7 @@ competitions on its own network data already: [McSweeney et al.
 (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541) report three competitions NGED funded
 with Energy Systems Catapult, drawing 37 teams and over 2,500 submissions. None of the three was a
 load forecast — they asked for 1-minute peaks inside half-hourly averages, the electric-vehicle
-share of a feeder's demand, and missing values across a grid supply point, its bulk supply points
+share of a feeder's demand, and missing values across a grid supply point, its bulk supply points,
 and their primaries — and all three closed between December 2021 and April 2022, though their data
 is still readable on CodaLab. So what we found no example of is a *standing* leaderboard for
 substation *forecasting*, one that keeps accepting entries after its competition closes. That is the
@@ -975,7 +975,7 @@ own senior figures say that published results in the field cannot be compared wi
 field's most senior figures, concludes that "most papers can never be replicated, because the data
 have never been published". **Incomparable results are what this review ran into at every one of the
 eight challenges.** Even the eight studies in the one table above, all forecasting electricity
-demand somewhere on a network, differ in target, level, horizon and weather assumption in nearly
+demand somewhere on a network, differ in target, level, horizon, and weather assumption in nearly
 every row, so almost none of them can be compared directly with any other.
 
 This review makes nine commitments to publish or report. Collected in one place, they are:
