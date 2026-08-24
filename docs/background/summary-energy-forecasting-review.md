@@ -253,10 +253,11 @@ separately for each weather source, 9 of the top 10 teams forecast wind and sola
 combining them, and [Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)
 conclude that gradient-boosted trees remain competitive for day-ahead wind and solar forecasting,
 with performance depending heavily on implementation. NGED's own EFFS project selected XGBoost when
-it evaluated model families. Two results cut the other way, and both argue for combining models
-rather than against trees: team Rnt finished third in HEFTCom's forecasting track using no
-tree-based model at all, feeding embeddings from their own artificial-intelligence weather models
-into downstream neural networks that predicted wind and solar generation, and [Nguyen and Müsgens
+it evaluated model families. Two results cut the other way, though neither is an argument against
+trees: team Rnt finished third in HEFTCom's forecasting track using no tree-based model at all,
+feeding embeddings from machine-learned weather-forecasting models they built in-house into
+downstream neural networks that predicted wind and solar generation — a route that rests on building
+and running a weather model, not on a different downstream model family. And [Nguyen and Müsgens
 (2026)](https://doi.org/10.1063/5.0300682), meta-analysing 4,687 skill scores extracted from 188
 solar forecasting papers, find that beyond 6 hours ahead ensemble-hybrid models beat classical
 statistical time-series models — the autoregressive integrated moving average (ARIMA) family,

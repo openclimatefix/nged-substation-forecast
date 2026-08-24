@@ -347,12 +347,16 @@ weather source, 9 of the top 10 teams forecast wind and solar separately before 
 [Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) conclude that
 gradient-boosted trees remain competitive for day-ahead wind and solar forecasting, with performance
 depending heavily on implementation. NGED's own forecasting system, EFFS, independently selected
-XGBoost when it evaluated model families. Two results cut the other way, and both argue for
-combining models rather than against trees: team Rnt finished third in HEFTCom's forecasting track
-using no tree-based model at all, feeding embeddings from their own artificial-intelligence weather
-models into downstream neural networks that predicted wind and solar generation, and [Nguyen and
-Müsgens (2026)](https://doi.org/10.1063/5.0300682), meta-analysing 4,687 skill scores extracted from
-188 solar forecasting papers, find that beyond 6 hours ahead ensemble-hybrid models beat classical
+XGBoost when it evaluated model families. Two results cut the other way, though neither is an
+argument against trees: team Rnt finished third in HEFTCom's forecasting track using no tree-based
+model at all, feeding embeddings from machine-learned weather-forecasting models they built in-house
+— a published deep-learning weather model extended to add solar irradiance and day-ahead lead times,
+driven by station observations, radar, satellite imagery, and numerical-weather-prediction analysis
+— into downstream neural networks that predicted wind and solar generation. Rnt's route therefore
+rests on building and running a machine-learned weather model, which is a far larger undertaking
+than swapping one downstream model family for another. And [Nguyen and Müsgens
+(2026)](https://doi.org/10.1063/5.0300682), meta-analysing 4,687 skill scores extracted from 188
+solar forecasting papers, find that beyond 6 hours ahead ensemble-hybrid models beat classical
 statistical time-series models — the autoregressive integrated moving average family, exponential
 smoothing, and their multivariate relatives such as autoregressive models with exogenous inputs — by
 7.0 percentage points of skill score, and pure ensemble models beat the same family by 8.3.
