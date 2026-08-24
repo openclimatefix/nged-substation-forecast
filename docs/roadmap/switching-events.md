@@ -98,7 +98,9 @@ rather than the baseline. MSTL carries no weather covariate, so a cold snap or a
 the remainder alongside the switching events. And MSTL estimates the trend and the seasonal
 components from the series' own history, so a months-long event can be partly absorbed into the
 trend it ought to be standing out against — a milder form of the lagged-power contamination
-described above. Both limits are why the XGBoost baseline follows.
+described above. Both limits are why the XGBoost baseline follows. A published detector, [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) under stage 1 below, is built on a robust
+seasonal-trend decomposition used in exactly this role.
 
 **Baseline implementation: reuse the existing XGBoost forecaster with no lag features.** The
 production forecaster already consumes most of the covariates the baseline needs — NWP weather,
@@ -453,6 +455,8 @@ The detector adds three stages on top of the shared baseline: it detects level s
 ##### Stage 1 — changepoint detection on the baseline residual
 
 Detect **sustained level shifts** in the baseline's normalised residual — the switching-event signature is a step, not a spike or a slope — with a standard mean-shift changepoint method (PELT or binary segmentation with an L2 cost, or CUSUM). The **output** is candidate step times and magnitudes per substation. But baseline residuals violate the assumptions those detectors make, so the residual must be prepared first.
+
+**A published detector already runs close to this whole chain, on distribution load alone.** [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) removes seasonal and trend components with a robust seasonal-trend decomposition, transforms the residual with a Haar stationary wavelet transform, finds candidate changepoints with Pruned Exact Linear Time, computes 15 statistical features per candidate — load variation, residual statistics, slope, ratio, and time location — and classifies the candidates with an isolation forest, reporting that "accurate detection is possible using load data alone, without external sensors or prior labels". Two differences matter here. Kim scores each distribution line on its own, with no balance check across neighbours, which is the redundancy stage 2 exists to exploit. And the paper reports no sensitivity floor in transferred magnitude × duration, so it does not answer the question this stage is built to answer. Only the abstract is readable — the full text sits behind a Korean subscription platform — so treat the pipeline as a prior-art pointer, not a specification to copy.
 
 **Changepoint detection must respect the residual's real statistics.** Textbook mean-shift
 detectors (PELT/BinSeg with an L2 cost, CUSUM) assume roughly independent noise with constant

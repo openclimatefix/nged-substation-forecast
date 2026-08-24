@@ -420,7 +420,10 @@ time. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) detect switching 
 operator, but detect it in the gap between the substation's own meter and a second estimate of the
 same load, built from smart-meter and bulk-customer readings taken below the substation. A Korean
 line of work, most recently [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), detects load
-transfers on a distribution line from that line's own load alone. Electricity North West's
+transfers on a distribution line from that line's own load alone, by robust seasonal-trend
+decomposition, then changepoint detection, then an isolation forest over each candidate changepoint
+— close to the pipeline Flexpectation plans, but scored one line at a time, and with no accuracy
+figures we could read, because only the abstract is open. Electricity North West's
 [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted step changes into
 faulty metering and network reconfigurations on GB substations in 2016, from power measurements
 alone, and published no precision or recall for either rule.
