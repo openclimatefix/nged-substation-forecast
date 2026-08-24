@@ -398,12 +398,16 @@ orientations, scores 4.8° on tilt and 3.1° on azimuth across 21 notional panel
 the south-facing ones at 7.9° on tilt against 3.0° to 5.1° for north, east, and west. Neither method
 sits inside a substation's net-demand forecast, which is where Flexpectation would have to put it.
 How much the physics is worth getting right has been measured for solar: [Mayer and Gróf
-(2021)](https://doi.org/10.1016/j.apenergy.2020.116239) score every combination of nine
+(2021)](https://doi.org/10.1016/j.apenergy.2020.116239) score all 32,400 combinations of nine
 irradiance-separation, ten transposition, three reflection-loss, five cell-temperature, four module,
-two shading, and three inverter models against a year of 15-minute production from 16 Hungarian
-photovoltaic plants, and report 13% in mean absolute error between the best and worst model chains,
-with transposition — the step that takes the panel's tilt and azimuth as its input — one of the two
-that matter most.
+two shading, and three inverter models against a year of 15-minute metered output from 16
+ground-mounted plants at 14 sites in Hungary, and find that the best model chain has 13% lower mean
+absolute error than the worst, naming irradiance separation and transposition — the step that
+projects horizontal irradiance onto the plane of the array, and so depends on the array's tilt and
+azimuth — as the two whose model choice matters most. Two limits on that 13%: it is the gap between
+the extremes of 32,400 chains rather than a typical penalty, and every plant's tilt and azimuth came
+from its design documentation and stayed fixed, so Mayer and Gróf bound the cost of choosing the
+wrong physical model, not the cost of not knowing a system's orientation.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator, or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.
