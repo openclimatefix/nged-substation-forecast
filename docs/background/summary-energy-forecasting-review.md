@@ -124,11 +124,15 @@ beyond which a weather ensemble stops beating a climatological distribution is 1
 measured on upper-air variables, not on the near-surface temperature and irradiance that drive
 substation load.
 
-A very relevant finding for us at substation level is a warning about the extremes: [Browell and
-Fasiolo (2021)](https://arxiv.org/abs/2103.10335) found quantile regression alone uncalibrated
-beyond the 1st and 99th percentiles — the range NGED is likely to act on. So we plan to follow
-Browell and Fasiolo and implement an explicit tail treatment rather than reading extreme quantiles
-off the model.
+Almost every substation-load study we found optimises average accuracy, but NGED's question is
+about the top of the distribution, and that is the one place where the literature gives a direct
+warning. [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) is the only study we found
+that models the upper tail explicitly, and they find that "below 1% and above 99% the forecasts
+based on quantile regression only are not calibrated at any GSP Group. Therefore, these quantiles
+are not suitable for use in decision-making" — and that was with five years of half-hourly data,
+across regions far larger than a substation. Above those percentiles Browell and Fasiolo switch to
+a fitted parametric tail, and Flexpectation plans to do the same rather than reading extreme
+quantiles straight off the model.
 
 All the text above is a verdict on Flexpectation version one. The three more sophisticated ML
 model families we plan to research in 2027 — pre-trained encoders, connectivity-map models and
@@ -169,15 +173,6 @@ national demand one to six days ahead, from the same 51-member ECMWF ensemble Fl
 and they too ask for the method to be pushed down "to different layers of the energy hierarchy,
 including the low voltage level". Neither request names a horizon or a time resolution, and both
 point below NGED's primary substations rather than at them.
-
-**Almost every study here optimises average accuracy, but NGED's question is about the top of the
-distribution.** [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) is the one study here
-that models the upper tail explicitly, and what they found is a warning rather than a reassurance:
-they find that "below 1% and above 99% the forecasts based on quantile regression only are not
-calibrated at any GSP Group. Therefore, these quantiles are not suitable for use in
-decision-making", even with five years of half-hourly data across regions far larger than a
-substation. Above the 1st and 99th percentiles, Browell and Fasiolo switch to a fitted parametric
-tail.
 
 ### 2. Forecasting metered generators
 
