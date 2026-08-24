@@ -78,19 +78,20 @@ against anything, so those are described in prose.
 ### 1. Probabilistic forecasts of net demand at substations
 
 #### The challenge
-"Net" demand is "gross" demand minus whatever generation sits behind the
-substation. In Flexpectation, we plan to forecast net demand at every grid supply point, bulk supply
-point and primary substation in NGED's licence areas. Our forecasts will be half-hourly, 14 days
-ahead, updated every six hours, and probabilistic. NGED acts on the forecast one to ten days ahead,
-and the question NGED asks of the forecast is "how likely is load to exceed the substation's
-capacity?" rather than "what is the most likely load?". Forecasting net demand is the highest
-priority of the eight challenges, and the other seven exist mainly to improve our net-demand
-forecast.
+
+"Net" demand is "gross" demand minus whatever generation sits behind the substation. In
+Flexpectation, we plan to forecast net demand at every grid supply point, bulk supply point and
+primary substation in NGED's licence areas. Our forecasts will be half-hourly, 14 days ahead,
+updated every six hours, and probabilistic. NGED acts on the forecast one to ten days ahead, and the
+question NGED asks of the forecast is "how likely is load to exceed the substation's capacity?"
+rather than "what is the most likely load?". Forecasting net demand is the highest priority of the
+eight challenges, and the other seven exist mainly to improve our net-demand forecast.
 
 #### What the literature says
-A large literature exists on the topic of forecasting substation load,
-but very little of what we read can be compared with the rest of that literature, and we found no
-papers driving a probabilistic substation forecast from a weather ensemble across a 14-day horizon.
+
+A large literature exists on the topic of forecasting substation load, but very little of what we
+read can be compared with the rest of that literature, and we found no papers driving a
+probabilistic substation forecast from a weather ensemble across a 14-day horizon.
 
 | Source | What they forecast | Level and scale | Horizon | Result, and what it was compared against | Weather |
 |---|---|---|---|---|---|
@@ -175,22 +176,28 @@ out the case for the work we plan in version 2.
 
 ### 2. Forecasting metered generators
 
-**The challenge.** Twelve of the 32 series in the trial area are individually metered generators —
-six solar farms, three wind farms, a biofuel plant, a battery and a gas generator — and each needs
-the same probabilistic, half-hourly, 14-day forecast as a substation. Solar and wind are driven by
-weather the ensemble supplies directly. The battery, the gas generator and the biofuel plant are
-dispatched on market prices and operator decisions, and no weather forecast contains either.
+#### The challenge
 
-**What the literature says.** Forecasting wind and solar from a weather forecast is the mature case,
-and one paper matches Flexpectation's challenge closely; nothing we found forecasts a
-distribution-connected battery, gas generator or biofuel plant inside a net-demand forecast.
+Twelve of the 32 series in the trial area are individually metered generators — six solar farms,
+three wind farms, a biofuel plant, a battery and a gas generator — and each needs the same
+probabilistic, half-hourly, 14-day forecast as a substation. Solar and wind are driven by weather
+the ensemble supplies directly. The battery, the gas generator and the biofuel plant are dispatched
+on market prices and operator decisions, and no weather forecast contains either.
 
-**What this means for Flexpectation.** Wind and solar are the one place in the specification where
-we can copy a method rather than invent one: [Dantas and Browell
-(2026)](https://doi.org/10.1002/we.70079) already forecast individual GB wind farms from the ECMWF
-ensemble out to 162 hours, which covers most of our horizon. So v1 should report the battery, the
-gas generator and the biofuel plant against their own baseline rather than expect a weather-driven
-model to carry them, and should not let their errors disappear into an averaged generation score.
+#### What the literature says
+
+Forecasting wind and solar from a weather forecast is the mature case, and one paper matches
+Flexpectation's challenge closely; nothing we found forecasts a distribution-connected battery, gas
+generator or biofuel plant inside a net-demand forecast.
+
+#### What this means for Flexpectation
+
+Wind and solar are the one place in the specification where we can copy a method rather than invent
+one: [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) already forecast individual GB
+wind farms from the ECMWF ensemble out to 162 hours, which covers most of our horizon. So v1 should
+report the battery, the gas generator and the biofuel plant against their own baseline rather than
+expect a weather-driven model to carry them, and should not let their errors disappear into an
+averaged generation score.
 
 **The one close precedent carries a warning for a project built on an ensemble.** [Dantas and
 Browell (2026)](https://doi.org/10.1002/we.70079) forecast 73 wind farms in GB — 34 onshore, 39
@@ -208,23 +215,28 @@ gas or biofuel plant's own output directly rather than as a component of a subst
 
 ### 3. Estimating the effective capacity of metered generators
 
-**The challenge.** We call the amount of generation actually available at a metered site its
-*effective capacity*: the output it could produce right now if the weather allowed, as opposed to
-its nameplate rating. Turbines go out for repair, inverters degrade, and sites are curtailed — told
-by the network operator to generate less than they could. A 20 MW wind farm that has been limited to
-14 MW for a month is, for forecasting purposes, a different wind farm, and a model trained on its
-nameplate rating cannot see the difference.
+#### The challenge
 
-**What the literature says.** A method exists for each generation technology separately, but nobody
-has run them across a mixed fleet at a distribution network, or tested whether estimating capacity
-improves the forecast.
+We call the amount of generation actually available at a metered site its *effective capacity*: the
+output it could produce right now if the weather allowed, as opposed to its nameplate rating.
+Turbines go out for repair, inverters degrade, and sites are curtailed — told by the network
+operator to generate less than they could. A 20 MW wind farm that has been limited to 14 MW for a
+month is, for forecasting purposes, a different wind farm, and a model trained on its nameplate
+rating cannot see the difference.
 
-**What this means for Flexpectation.** The two published methods disagree on exactly the point that
-matters here: taking a running maximum of production assumes capacity only ever rises, whereas
-NGED's falls when a turbine goes out for repair. So v1 should build both estimators and let the
-comparison decide, and should treat normalising by effective capacity as a hypothesis to test rather
-than a settled preprocessing step, because no study we found has measured whether it improves the
-forecast NGED buys flexibility against.
+#### What the literature says
+
+A method exists for each generation technology separately, but nobody has run them across a mixed
+fleet at a distribution network, or tested whether estimating capacity improves the forecast.
+
+#### What this means for Flexpectation
+
+The two published methods disagree on exactly the point that matters here: taking a running maximum
+of production assumes capacity only ever rises, whereas NGED's falls when a turbine goes out for
+repair. So v1 should build both estimators and let the comparison decide, and should treat
+normalising by effective capacity as a hypothesis to test rather than a settled preprocessing step,
+because no study we found has measured whether it improves the forecast NGED buys flexibility
+against.
 
 **For wind we can copy a published method rather than invent one.** [Dantas and Browell
 (2026)](https://doi.org/10.1002/we.70079) needed available capacity for the same reason we do, so
@@ -243,24 +255,29 @@ against.** The per-technology methods exist, and most of them work from a revenu
 
 ### 4. Detecting switching events
 
-**The challenge.** When a cable fault or planned maintenance moves part of a network from one
-substation to another, the load a substation meters steps up and its neighbour's steps down, with no
-change in the underlying demand. NGED's substations spend roughly a tenth of their operating time in
-an abnormal running arrangement. Switching labels exist for the 32-series trial area but not for the
-wider network, so a method that is to scale to the wider network has to work from power measurements
+#### The challenge
+
+When a cable fault or planned maintenance moves part of a network from one substation to another,
+the load a substation meters steps up and its neighbour's steps down, with no change in the
+underlying demand. NGED's substations spend roughly a tenth of their operating time in an abnormal
+running arrangement. Switching labels exist for the 32-series trial area but not for the wider
+network, so a method that is to scale to the wider network has to work from power measurements
 alone.
 
-**What the literature says.** One paper detects switching at a real network operator, using a
-bottom-up reference series NGED does not have; the GB precedent drew the same distinction in 2016
-but never measured how often its rule was right.
+#### What the literature says
 
-**What this means for Flexpectation.** Set expectations from the one measured result rather than
-from how obvious a switch looks on a chart: F-scores near 0.2 on the shortest events and around 0.5
-on the longest, achieved on a Dutch network using a reference series NGED does not have. NGED's
-switches are usually partial and fan out to two or three substations, so expect worse than that
-rather than better. A negative result is worth having here, because evidence that switching cannot
-be recovered from power data alone would justify extracting switching labels from operational
-systems instead of continuing to infer them.
+One paper detects switching at a real network operator, using a bottom-up reference series NGED does
+not have; the GB precedent drew the same distinction in 2016 but never measured how often its rule
+was right.
+
+#### What this means for Flexpectation
+
+Set expectations from the one measured result rather than from how obvious a switch looks on a
+chart: F-scores near 0.2 on the shortest events and around 0.5 on the longest, achieved on a Dutch
+network using a reference series NGED does not have. NGED's switches are usually partial and fan out
+to two or three substations, so expect worse than that rather than better. A negative result is
+worth having here, because evidence that switching cannot be recovered from power data alone would
+justify extracting switching labels from operational systems instead of continuing to infer them.
 
 **The one directly useful paper leaves untouched the half Flexpectation would add.** [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164), working with the Dutch network operator Alliander, study
@@ -276,22 +293,27 @@ transfer rather than a whole subgrid.
 
 ### 5. Forecasting a substation as if it were always in its normal running arrangement
 
-**The challenge.** NGED plan the network against what each substation would carry under its normal
-running arrangement, so that is what the forecast has to predict — including for a substation that
-has been sitting in an abnormal arrangement for weeks. That makes the target a quantity that was
-never metered, and it makes the training history contaminated: past readings taken while the network
-was abnormally configured describe a different substation from the one being forecast.
+#### The challenge
 
-**What the literature says.** Researchers either leave the level shifts in and pay for them, rewrite
-the history, or adapt to the new level; we found nobody who feeds the contamination to a model
-deliberately, as information.
+NGED plan the network against what each substation would carry under its normal running arrangement,
+so that is what the forecast has to predict — including for a substation that has been sitting in an
+abnormal arrangement for weeks. That makes the target a quantity that was never metered, and it
+makes the training history contaminated: past readings taken while the network was abnormally
+configured describe a different substation from the one being forecast.
 
-**What this means for Flexpectation.** Every published response throws information away: leaving the
-level shifts in pays for them, rewriting history erases them, and adapting to the new level forgets
-that a switch happened — which is disqualifying here, because the quantity NGED needs is what the
-substation *would* have carried under its normal arrangement. That gap is the reason to try feeding
-the contamination to the model as an input, and the reason to carry rewriting the history as the
-fallback, since rewriting is the option with a published precedent behind it.
+#### What the literature says
+
+Researchers either leave the level shifts in and pay for them, rewrite the history, or adapt to the
+new level; we found nobody who feeds the contamination to a model deliberately, as information.
+
+#### What this means for Flexpectation
+
+Every published response throws information away: leaving the level shifts in pays for them,
+rewriting history erases them, and adapting to the new level forgets that a switch happened — which
+is disqualifying here, because the quantity NGED needs is what the substation *would* have carried
+under its normal arrangement. That gap is the reason to try feeding the contamination to the model
+as an input, and the reason to carry rewriting the history as the fallback, since rewriting is the
+option with a published precedent behind it.
 
 **Rewriting the history is the fallback because it is the only response with a published precedent
 behind it.** [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) rewrite the
@@ -309,24 +331,30 @@ expected it to meter.
 
 ### 6. Detecting faulty metering
 
-**The challenge.** NGED's telemetry carries stuck values that repeat unchanged for hours or days,
-zeros that mean "no reading" rather than "no load", physically impossible values, and gaps running
-from a single half-hour to several months. Ten of the 32 series in the trial area are metered in
-apparent power only, so they report magnitude without direction and reverse flow appears as a rise:
-at one primary substation the meter bounces off zero on sunny days, when a solar farm behind it
-exports. A model trained on uncleaned data learns the fault, and a forecast that fails silently
-because its recent history was stuck is worse than one that says it is degraded.
+#### The challenge
 
-**What the literature says.** Faulty metering is usually a data-cleaning step mentioned in passing
-rather than a problem in its own right, the only public labelled dataset we found is Dutch, and
-recovering the direction of flow from a magnitude-only meter was attempted by this network's
-predecessor, whose automatic version is still open.
+NGED's telemetry carries stuck values that repeat unchanged for hours or days, zeros that mean "no
+reading" rather than "no load", physically impossible values, and gaps running from a single
+half-hour to several months. Ten of the 32 series in the trial area are metered in apparent power
+only, so they report magnitude without direction and reverse flow appears as a rise: at one primary
+substation the meter bounces off zero on sunny days, when a solar farm behind it exports. A model
+trained on uncleaned data learns the fault, and a forecast that fails silently because its recent
+history was stuck is worse than one that says it is degraded.
 
-**What this means for Flexpectation.** There is no GB number to beat, so whatever precision and
-recall we publish becomes the first, which is cheap to do and worth doing. The practical constraint
-is that the only public labelled data is Dutch and treats switching and measurement error as a
-single class: useful for building a detector, but not for validating the separation between
-challenges 4 and 6 that cleaning NGED telemetry actually requires.
+#### What the literature says
+
+Faulty metering is usually a data-cleaning step mentioned in passing rather than a problem in its
+own right, the only public labelled dataset we found is Dutch, and recovering the direction of flow
+from a magnitude-only meter was attempted by this network's predecessor, whose automatic version is
+still open.
+
+#### What this means for Flexpectation
+
+There is no GB number to beat, so whatever precision and recall we publish becomes the first, which
+is cheap to do and worth doing. The practical constraint is that the only public labelled data is
+Dutch and treats switching and measurement error as a single class: useful for building a detector,
+but not for validating the separation between challenges 4 and 6 that cleaning NGED telemetry
+actually requires.
 
 **The most useful published method treats faulty metering and switching as one challenge, and its
 sign-recovery technique addresses NGED's magnitude-only meters directly.** [Bouman et al.
@@ -342,23 +370,28 @@ published its labels, so there is no GB number to compare a new detector against
 
 ### 7. Disaggregating unmetered solar and wind from a substation's net flow
 
-**The challenge.** Rooftop panels and small turbines appear only as a dent in a substation's net
-flow. Recovering both the half-hourly output of that unmetered generation and its installed
-capacity, from the net flow alone, is what we call *disaggregation*. Disaggregation is a different
-task from estimating how much of a *metered* generator's capacity is available today, which is
-challenge 3. Disaggregation is a stretch goal for the trial area and a requirement for the
-network-wide scale-up.
+#### The challenge
 
-**What the literature says.** Splitting generation out of a substation's net flow has been done
-where the generation is metered or its capacity is read from a register, and uncertainty and a
-multi-day horizon each appear in this literature, but never together.
+Rooftop panels and small turbines appear only as a dent in a substation's net flow. Recovering both
+the half-hourly output of that unmetered generation and its installed capacity, from the net flow
+alone, is what we call *disaggregation*. Disaggregation is a different task from estimating how much
+of a *metered* generator's capacity is available today, which is challenge 3. Disaggregation is a
+stretch goal for the trial area and a requirement for the network-wide scale-up.
 
-**What this means for Flexpectation.** This is the strongest starting position of the eight
-challenges, because NIA_UKPN0104 is the same method on the same kind of GB data with the same
-delivery partner. The warning is not to read published transfer-learning accuracy as achievable
-here: [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) are given a population of
-fully-metered substations to learn from and are told each site's capacity, whereas inferring that
-capacity is half of what NGED needs.
+#### What the literature says
+
+Splitting generation out of a substation's net flow has been done where the generation is metered or
+its capacity is read from a register, and uncertainty and a multi-day horizon each appear in this
+literature, but never together.
+
+#### What this means for Flexpectation
+
+This is the strongest starting position of the eight challenges, because NIA_UKPN0104 is the same
+method on the same kind of GB data with the same delivery partner. The warning is not to read
+published transfer-learning accuracy as achievable here: [Teng et al.
+(2023)](https://doi.org/10.1016/j.rser.2023.113662) are given a population of fully-metered
+substations to learn from and are told each site's capacity, whereas inferring that capacity is half
+of what NGED needs.
 
 **The direct predecessor of this work is running now in GB.** [UK Power Networks'
 NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/) (2024–2026, £0.4 million),
@@ -391,24 +424,29 @@ attaches no uncertainty and covers GB as one region.
 
 ### 8. Disaggregating other distributed energy resources: heat pumps, electric-vehicle chargers and batteries
 
-**The challenge.** Heat pumps, electric-vehicle chargers and price-sensitive domestic batteries
-change the shape of a substation's load in ways a model trained on history cannot anticipate,
-because the number of them behind any given substation is growing quickly. The stretch goal is to
-disaggregate and forecast them separately rather than letting them sit inside net demand.
+#### The challenge
 
-**What the literature says.** Heat pumps, chargers and batteries are the largest gap in the review
-and the largest deliberate omission from our search: in the one study we found that measures charger
-forecast skill against aggregation, only the site with more than a hundred charge points was
-significantly better than a naive benchmark, though some models at one much smaller site also beat
-it, heat-pump diversity is untested in the cold weather that matters, and no diversity factor helps
-for domestic batteries at all.
+Heat pumps, electric-vehicle chargers and price-sensitive domestic batteries change the shape of a
+substation's load in ways a model trained on history cannot anticipate, because the number of them
+behind any given substation is growing quickly. The stretch goal is to disaggregate and forecast
+them separately rather than letting them sit inside net demand.
 
-**What this means for Flexpectation.** The realistic v1 position is that these resources stay inside
-net demand rather than being forecast separately. The one measurement we found says a day-ahead
-charger forecast only clearly beat a naive benchmark above about a hundred charge points, and
-forecast uncertainty grows with lead time, so at the 14 days NGED needs that threshold should be
-expected to be higher rather than the same. The first deliverable on this strand is reading the
-electrification literature properly, not a model.
+#### What the literature says
+
+Heat pumps, chargers and batteries are the largest gap in the review and the largest deliberate
+omission from our search: in the one study we found that measures charger forecast skill against
+aggregation, only the site with more than a hundred charge points was significantly better than a
+naive benchmark, though some models at one much smaller site also beat it, heat-pump diversity is
+untested in the cold weather that matters, and no diversity factor helps for domestic batteries at
+all.
+
+#### What this means for Flexpectation
+
+The realistic v1 position is that these resources stay inside net demand rather than being forecast
+separately. The one measurement we found says a day-ahead charger forecast only clearly beat a naive
+benchmark above about a hundred charge points, and forecast uncertainty grows with lead time, so at
+the 14 days NGED needs that threshold should be expected to be higher rather than the same. The
+first deliverable on this strand is reading the electrification literature properly, not a model.
 
 **Detecting heat pumps, chargers and batteries and forecasting them are separately hard, and not in
 the order we expected.** Northern Powergrid's [smart-meter detection
