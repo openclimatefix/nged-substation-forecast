@@ -118,7 +118,9 @@ backwards to work out what it refers to, repeat the noun instead. "It", "this", 
 *opens* with one is the worst case, because a skim-reader landing there has nothing to look back at.
 Prefer "the NWP download" over "it", "the threshold-weighted score" over "this". A little repetition
 beats an ambiguous sentence every time: never make the reader refer backwards to decode a sentence,
-and never buy elegance with a referent the reader has to hunt for.
+and never buy elegance with a referent the reader has to hunt for. The same rule covers version
+numbers: write "Flexpectation v1" and "Flexpectation v2", never a bare "v1" or "v2", which could be
+a version of anything.
 
 **Put the words in the order that cannot be misread.** "73 wind farms in GB" says what it means;
 "73 GB wind farms" makes the reader parse a noun-pile and can be read as a unit of measure. Where a
