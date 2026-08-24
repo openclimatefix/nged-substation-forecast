@@ -485,21 +485,24 @@ NGED plan the network against what each substation would carry under its normal 
 so that is what the forecast has to predict — including for a substation that has been sitting in an
 abnormal arrangement for weeks. That makes the target a quantity that was never metered, and it
 makes the training history contaminated: past readings taken while the network was abnormally
-configured describe a different substation from the one being forecast.
+configured describe a different scenario from the scenario being forecast.
 
 #### What the literature says
 
-Researchers either leave the level shifts in and pay for them, rewrite the history, or adapt to the
-new level; we found nobody who feeds the contamination to a model deliberately, as information.
+Researchers respond in one of three ways: leaving the level shifts in and paying for them, as
+[Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405) do; rewriting the
+history, as [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) do; or adapting
+to the new level, as [de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) do. We
+found nobody who feeds the contamination to a model deliberately, as information.
 
 #### What this means for Flexpectation
 
-Every published response throws information away: leaving the level shifts in pays for them,
-rewriting history erases them, and adapting to the new level forgets that a switch happened — which
-is disqualifying here, because the quantity NGED needs is what the substation *would* have carried
-under its normal arrangement. That gap is the reason to try feeding the contamination to the model
-as an input, and the reason to carry rewriting the history as the fallback, since rewriting is the
-option with a published precedent behind it.
+Every published solution throws information away: leaving the level shifts in the data hurts
+performance, rewriting history erases the level shifts, and adapting to the new level forgets that a
+switch happened — which is disqualifying here, because the quantity NGED needs is what the
+substation *would* have carried under its normal arrangement. That gap is the reason to try feeding
+the contamination to the model as an input, and the reason to consider rewriting the history as the
+fallback, since rewriting is the option with a published precedent behind it.
 
 **Rewriting the history is the fallback because it is the only response with a published precedent
 behind it.** [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) rewrite the
@@ -1169,6 +1172,9 @@ sources that this summary does not.
   substation](https://doi.org/10.1049/icp.2024.2058). *IET Conference Proceedings*.
 - Dantas, G. and Browell, J. (2026). [Seamless Short‐ to Mid‐Term Probabilistic Wind Power
   Forecasting](https://doi.org/10.1002/we.70079). *Wind Energy*.
+- de Vilmarest, J., Browell, J., Fasiolo, M., Goude, Y. and Wintenberger, O. (2024). [Adaptive
+  Probabilistic Forecasting of Electricity (Net-)Load](https://doi.org/10.1109/TPWRS.2023.3310280).
+  *IEEE Transactions on Power Systems*.
 - Doubleday, K., Van Scyoc Hernandez, V. and Hodge, B. M. (2020). [Benchmark probabilistic solar
   forecasts: Characteristics and recommendations](https://doi.org/10.1016/j.solener.2020.05.051).
   *Solar Energy*.
@@ -1202,6 +1208,9 @@ sources that this summary does not.
 - Hong, T., Pinson, P., Wang, Y., Weron, R., Yang, D. and Zareipour, H. (2020). [Energy Forecasting:
   A Review and Outlook](https://doi.org/10.1109/OAJPE.2020.3029979). *IEEE Open Access Journal of
   Power and Energy*.
+- Huyghues-Beaufond, N., Tindemans, S., Falugi, P., Sun, M. and Strbac, G. (2020). [Robust and
+  automatic data cleansing method for short-term load forecasting of distribution
+  feeders](https://doi.org/10.1016/j.apenergy.2019.114405). *Applied Energy*.
 - Hyndman, R. J. (2020). [A brief history of forecasting
   competitions](https://doi.org/10.1016/j.ijforecast.2019.03.015). *International Journal of
   Forecasting*.

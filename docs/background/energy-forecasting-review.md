@@ -736,9 +736,12 @@ minimum size — rather than a whole subgrid.
 
 ### 5. Forecasting a substation as if it were always in its normal running arrangement
 
-**In summary.** Researchers either leave the level shifts in and pay for them, rewrite the history,
-or adapt to the new level; we found nobody who feeds the contamination to a model deliberately, as
-information.
+**In summary.** Researchers respond in one of three ways: leaving the level shifts in and paying for
+them, as [Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405) do;
+rewriting the history, as [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) do;
+or adapting to the new level, as [de Vilmarest et al.
+(2024)](https://doi.org/10.1109/TPWRS.2023.3310280) do. We found nobody who feeds the contamination
+to a model deliberately, as information.
 
 **The challenge.** NGED plan the network against what each substation would carry under its normal
 running arrangement, so that is what the forecast has to predict — including for a substation that
