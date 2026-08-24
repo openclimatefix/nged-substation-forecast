@@ -134,6 +134,14 @@ metered generators"), or spell the number out. Counts of the document's own stru
 families") and idiomatic ratios ("nine ideas in ten") stay in words, because neither is a
 measurement.
 
+**Use the serial comma — the one before the final "and" or "or" in a list of three or more items.**
+So "solar, wind, and dispatchable generators", never "solar, wind and dispatchable generators".
+The serial comma is the one deliberate departure from *The Economist*'s house style above, and it
+removes a real ambiguity: without the comma the last two items can read as a pair belonging to the
+item before them, which in a list of assets or of data sources changes the meaning. A list of two items takes no
+comma, and an author string in a reference list follows the citation convention rather than this
+rule.
+
 **Be concise by cutting whole sentences, not words.** Prose should be as short as it can be
 without losing readability, but the compressible material is rarely inside a sentence. It is whole
 sentences and paragraphs that carry no information: restating the heading, summarising what the
