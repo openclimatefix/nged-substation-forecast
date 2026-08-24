@@ -175,9 +175,11 @@ cannot do. The section below titled "Set against this literature, what we plan i
 case for the work we plan in version 2.
 
 **The evidence behind those three ML model families is uneven.**
-Pre-trained models have the best support of the three, and it sits in the table above: the
-general-purpose model [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) tested had never been
-trained on their data and still beat every purpose-trained competitor across 200 German low-voltage feeders.
+Pre-trained models have the best support of the three, but the measured result is for a different
+kind of pre-training from the one we plan: the general-purpose model [Kaas et al.
+(2026)](https://arxiv.org/abs/2607.01966) tested was pre-trained on time series, had never been
+trained on their data, and still beat every purpose-trained competitor across 200 German low-voltage
+feeders.
 Connectivity-map models have been measured on NGED's own published data: [Campagne et al.
 (2025)](https://arxiv.org/abs/2507.03690) compare eight graph neural network architectures against
 feed-forward, persistence and foundation-model baselines on French regional load and on the GB
@@ -188,6 +190,26 @@ whether NGED's own connectivity map improves a forecast is still unanswered. Dif
 is the blank: applied to substation demand forecasting it produced no strong result in our search,
 and we found nobody aggregating building thermal physics up to a substation and putting it inside a
 probabilistic forecast, though the ingredients exist separately.
+
+**The encoder Flexpectation plans to pre-train is a weather encoder, and its two halves have been
+built separately from any energy forecast.** The plan is a network that turns the raw ECMWF ensemble
+into a calibrated probabilistic weather forecast in physical units, which a substation model then
+reads. [Rasp and Lerch (2018)](https://arxiv.org/abs/1805.09091) built the first half: a neural
+network that post-processes a 50-member ECMWF ensemble into calibrated probabilistic 2-metre
+temperature at 537 German stations 48 hours ahead, cutting mean continuous ranked probability score
+from 1.16 for the raw ensemble to 0.78, with a learned per-station embedding one of the two
+components the authors credit for the gain. [Mitra and Ramavajjala
+(2023)](https://arxiv.org/abs/2312.00290) built the second half: they freeze a weather autoencoder
+and train small models on the frozen representation alone, at accuracy comparable to purpose-built
+models, though the targets they predict are further weather variables rather than anything on a
+network. The nearest anyone came to joining the two is one entrant in HEFTCom, a competition to
+forecast a GB wind-and-solar portfolio day-ahead: [Browell et al.
+(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed embeddings from
+their own AI weather models into downstream neural networks and finished third of the ranked
+entrants. What we found nobody doing is pre-training a weather encoder against observations and then
+reading a substation's probabilistic load forecast off it, or using a differentiable model of a
+solar or wind farm to strip out the variance the engineering explains so that the weather encoder
+trains on a clean weather signal.
 
 ### 2. Forecasting metered generators
 
@@ -202,21 +224,14 @@ on market prices and operator decisions.
 #### What the literature says
 
 Forecasting wind and solar from a weather forecast is a well-studied area, and one paper matches
-Flexpectation's challenge closely; nothing we found forecasts a distribution-connected battery, gas
+Flexpectation's challenge closely. Nothing we found forecasts a distribution-connected battery, gas
 generator or biofuel plant inside a net-demand forecast.
 
 #### What this means for Flexpectation
 
-Wind and solar are the one place in the specification where we can copy a method rather than invent
-one: [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) already forecast individual GB
-wind farms from the ECMWF ensemble out to 162 hours, which covers most of our horizon. So v1 should
-report the battery, the gas generator and the biofuel plant against their own baseline rather than
-expect a weather-driven model to carry them, and should not let their errors disappear into an
-averaged generation score.
-
-**The one close precedent carries a warning for a project built on an ensemble.** [Dantas and
-Browell (2026)](https://doi.org/10.1002/we.70079) forecast 73 wind farms in GB — 34 onshore, 39
-offshore — from the ECMWF ensemble, seamlessly from 6 to 162 hours ahead, and two of their
+**A warning for a project built on an NWP ensemble.** [Dantas and Browell
+(2026)](https://doi.org/10.1002/we.70079) forecast 73 wind farms in GB — 34 onshore, 39 offshore —
+from the ECMWF ensemble, seamlessly from 6 to 162 hours (6.75 days) ahead, and two of their
 conclusions bear on Flexpectation. Whether weather-forecast error or weather-to-power conversion
 error dominates flips with lead time, and the lead time at which it flips varies a lot between
 sites. And a deterministic forecast at higher resolution beat the ensemble at short lead times.
@@ -1043,6 +1058,8 @@ sources that this summary does not.
   wind power forecasts — An up-to-date view](https://doi.org/10.1002/we.2497). *Wind Energy*.
 - Meyer, M., Kaltenpoth, S., Albers, H., Zalipski, K. and Müller, O. (2026). [TS-Arena: A Live
   Forecast Pre-Registration Platform](https://arxiv.org/abs/2512.20761).
+- Mitra, P. and Ramavajjala, V. (2023). [Learning to forecast diagnostic parameters using
+  pre-trained weather embedding](https://arxiv.org/abs/2312.00290).
 - National Energy System Operator. [Embedded wind and solar
   forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts).
 - Northern Powergrid (2024). [Artificial Forecasting, Alpha
@@ -1055,6 +1072,8 @@ sources that this summary does not.
 - Pinheiro, M. G., Madeira, S. C. and Francisco, A. P. (2023). [Short-term electricity load
   forecasting—A systematic approach from system level to secondary
   substations](https://doi.org/10.1016/j.apenergy.2022.120493). *Applied Energy*.
+- Rasp, S. and Lerch, S. (2018). [Neural networks for post-processing ensemble weather
+  forecasts](https://arxiv.org/abs/1805.09091). *Monthly Weather Review*.
 - Ruhhütl, M., Schmaranz, R. and Dietrichsteiner, T. (2023). [Load and generation forecast on
   substation level](https://doi.org/10.1049/icp.2023.0476). *IET Conference Proceedings*.
 - Scottish and Southern Electricity Networks (2021).

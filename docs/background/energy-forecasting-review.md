@@ -1511,6 +1511,32 @@ version one.** The pre-trained encoders, the connectivity-map models and the dif
 all belong to the network-wide scale-up from 2027, as does the disaggregation of unmetered
 generation and forecasting the network as a network.
 
+**The encoder Flexpectation plans to pre-train is a weather encoder, and its two halves have been
+built separately from any energy forecast.** The plan is a network that turns the raw ECMWF ensemble
+into a calibrated probabilistic weather forecast in physical units, which a substation model then
+reads. [Rasp and Lerch (2018)](https://arxiv.org/abs/1805.09091) built the first half: a neural
+network that post-processes a 50-member ECMWF ensemble into calibrated probabilistic 2-metre
+temperature at 537 German stations 48 hours ahead, cutting mean continuous ranked probability score
+from 1.16 for the raw ensemble to 0.78, with a learned per-station embedding one of the two
+components the authors credit for the gain. [Mitra and Ramavajjala
+(2023)](https://arxiv.org/abs/2312.00290) built the second half: they freeze a weather autoencoder
+and train small models on the frozen representation alone, at accuracy comparable to purpose-built
+models, though the targets they predict are further weather variables rather than anything on a
+network. A network operator has already fine-tuned a pre-trained weather model on its own sensors:
+[Bodnar et al. (2025)](https://arxiv.org/abs/2509.25268) post-train Silurian AI's
+1.5-billion-parameter Generative Forecasting Transformer on Hydro-Québec's transmission-line weather
+stations, wind-farm met masts and icing sensors, cutting mean absolute error against numerical
+weather prediction benchmarks by 15% for temperature, 35% for total precipitation and 15% for
+hub-height wind speed at 6 to 72 hours ahead — but the forecasts are of weather at the assets rather
+than of power, and only the icing detector is probabilistic. The nearest anyone came to joining the
+two is one entrant in HEFTCom, a competition to forecast a GB wind-and-solar portfolio day-ahead:
+[Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed
+embeddings from their own AI weather models into downstream neural networks and finished third of
+the ranked entrants. What we found nobody doing is pre-training a weather encoder against
+observations and then reading a substation's probabilistic load forecast off it, or using a
+differentiable model of a solar or wind farm to strip out the variance the engineering explains so
+that the weather encoder trains on a clean weather signal.
+
 **The main reason for attempting all eight at once is that they may be one challenge rather than
 eight.** A switching event, a turbine out for repair and a stuck meter all surface in the same
 place: as a discrepancy between what a substation metered and what the weather and the calendar say
@@ -1684,6 +1710,9 @@ Every source cited above, in alphabetical order by first author.
   Energy Systems*.
 - Bian, Y., Zheng, N., Zheng, Y., Xu, B. and Shi, Y. (2024). [Predicting Strategic Energy Storage
   Behaviors](https://doi.org/10.1109/TSG.2023.3303469). *IEEE Transactions on Smart Grid*.
+- Bodnar, C., Rousseau-Rizzi, R., Shankar, N., Merleau, J., Flampouris, S., Candille, G., Antic, S.,
+  Miralles, F. and Gupta, J. K. (2025). [A Weather Foundation Model for the Power
+  Grid](https://arxiv.org/abs/2509.25268).
 - Bollerslev, J., Andersen, P. B., Jensen, T. V., Marinelli, M., Thingvad, A., Calearo, L. and
   Weckesser, T. (2022). [Coincidence Factors for Domestic EV Charging From Driving and Plug-In
   Behavior](https://doi.org/10.1109/TTE.2021.3088275). *IEEE Transactions on Transportation
@@ -1804,6 +1833,8 @@ Every source cited above, in alphabetical order by first author.
 - Meyers, B., Deceglie, M., Deline, C. and Jordan, D. (2020). [Signal Processing on PV Time-Series
   Data: Robust Degradation Analysis Without Physical
   Models](https://doi.org/10.1109/JPHOTOV.2019.2957646). *IEEE Journal of Photovoltaics*.
+- Mitra, P. and Ramavajjala, V. (2023). [Learning to forecast diagnostic parameters using
+  pre-trained weather embedding](https://arxiv.org/abs/2312.00290).
 - Moriano, J., Rodríguez, F., Martín, P., Jiménez, J. and Vuksanovic, B. (2016). [A New Approach to
   Detection of Systematic Errors in Secondary Substation Monitoring Equipment Based on Short Term
   Load Forecasting](https://doi.org/10.3390/s16010085). *Sensors*.
@@ -1842,6 +1873,8 @@ Every source cited above, in alphabetical order by first author.
 - Pinheiro, M. G., Madeira, S. C. and Francisco, A. P. (2023). [Short-term electricity load
   forecasting—A systematic approach from system level to secondary
   substations](https://doi.org/10.1016/j.apenergy.2022.120493). *Applied Energy*.
+- Rasp, S. and Lerch, S. (2018). [Neural networks for post-processing ensemble weather
+  forecasts](https://arxiv.org/abs/1805.09091). *Monthly Weather Review*.
 - Recht, B., Roelofs, R., Schmidt, L. and Shankar, V. (2019). [Do ImageNet Classifiers Generalize to
   ImageNet?](https://arxiv.org/abs/1902.10811)
 - Richardson, D. S. (2000). [Skill and relative economic value of the ECMWF ensemble prediction
