@@ -415,11 +415,11 @@ work from power measurements alone.
 
 #### What the literature says
 
-One paper detects switching at a real network operator, but detects it in the gap between the
-substation's own meter and a second estimate of the same load, built from smart-meter and
-bulk-customer readings taken below the substation — a second estimate NGED does not have.
-Electricity North West's ATLAS project sorted step changes into faulty metering and network
-reconfigurations on GB substations in 2016, from power measurements alone, and published no
+We only found two relevant papers: One paper detects switching at a real network operator, but
+detects it in the gap between the substation's own meter and a second estimate of the same load,
+built from smart-meter and bulk-customer readings taken below the substation. The second paper
+describes Electricity North West's ATLAS project, which sorted step changes into faulty metering and
+network reconfigurations on GB substations in 2016, from power measurements alone, and published no
 precision or recall for either rule.
 
 #### What this means for Flexpectation
