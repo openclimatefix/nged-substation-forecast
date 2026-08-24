@@ -91,8 +91,8 @@ but very little of what we read can be compared with the rest of that literature
 papers driving a probabilistic substation forecast from a weather ensemble across a 14-day horizon.
 
 **What this means for Flexpectation.** Building v1 on a gradient-boosted tree is defensible, but the
-literature makes it a sensible default rather than a proven winner. [NGED's own EFFS
-project](https://smarter.energynetworks.org/projects/wpden03/) independently picked XGBoost on the
+literature makes it a sensible default rather than a proven winner. [NGED's own 2021 EFFS project (Electricity
+Flexibility and Forecasting System)](https://smarter.energynetworks.org/projects/wpden03/) independently picked XGBoost on the
 balance of accuracy against effort, and no study we read shows a large, dependable margin for
 anything more sophisticated at substation level. Both network deployments that actually tried
 boosted trees — [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) and
@@ -346,7 +346,7 @@ fully-metered substations to learn from and are told each site's capacity, where
 capacity is half of what NGED needs.
 
 **The direct predecessor of this work is running now in GB.** [UK Power Networks'
-NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/) (2024–2026, £389,444),
+NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/) (2024–2026, £0.4 million),
 which Open Climate Fix worked on, infers the capacity of unmetered solar sitting behind each primary
 substation from half-hourly substation load and weather, then forecasts that generation. Open
 Climate Fix is a partner in both NIA_UKPN0104 and Flexpectation, so Flexpectation starts from
@@ -706,11 +706,11 @@ design is the shape Flexpectation is building.
 
 **[NGED's own Electricity Flexibility and Forecasting System,
 EFFS](https://smarter.energynetworks.org/projects/wpden03/)** (Network Innovation Competition,
-2018–2021, £3,338,896 of expenditure) forecast grid supply points, bulk supply points, primary
-substation transformers and generation sites from an hour to six months ahead, feeding automated
-constraint identification. Its evaluation independently selected XGBoost as the best balance of
-accuracy against effort — the same starting point Flexpectation uses. EFFS's forecasts were
-deterministic, with no uncertainty attached, which is the step this project adds.
+2018–2021, £3.3 million) forecast grid supply points, bulk supply points, primary substation
+transformers and generation sites from an hour to six months ahead, feeding automated constraint
+identification. Its evaluation independently selected XGBoost as the best balance of accuracy
+against effort — the same starting point Flexpectation uses. EFFS's forecasts were deterministic,
+with no uncertainty attached, which is the step this project adds.
 
 **[SSEN FastTrack](https://smarter.energynetworks.org/projects/10166254/)** (Strategic Innovation
 Fund, Alpha 2025–2026) models how the distribution connections queue — around 180 GW and growing —
@@ -737,7 +737,7 @@ nothing about the forecast quality, because the abstract we read reports no accu
 
 **One concurrent project matters more than any paper here.** [Artificial
 Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) is an Ofgem Strategic
-Innovation Fund programme, with about £3.9m of grant across its three phases, run by Northern
+Innovation Fund programme, with about £3.9 million of grant across its three phases, run by Northern
 Powergrid with Faculty, EV.energy and Oaktree Power, the final Beta phase running to February 2027.
 Artificial Forecasting does much of what Flexpectation does at primary substations, it also covers
 secondary substations, which Flexpectation does not, and at the time of writing it is further ahead
@@ -752,8 +752,8 @@ half-hourly probabilistic forecasts with 5th-to-95th-percentile bands, flags for
 firm capacity, and is benchmarked against the network's existing growth-based and persistence
 methods and a rolling four-week baseline. The deliverable states, without publishing the figures
 behind it, that performance did not materially degrade on average across the 11-day horizon.
-Artificial Forecasting's value case puts whole-life net present value at around £60m for one
-network, or £250m if three further networks adopt it, driven by a 3% reduction in spending on
+Artificial Forecasting's value case puts whole-life net present value at around £60 million for one
+network, or £250 million if three further networks adopt it, driven by a 3% reduction in spending on
 reinforcement — building bigger transformers and cables — in the current price-control period rising
 to 6% in the next, and a 25% improvement in the cost-effectiveness of contracted flexibility. The
 project pairs those figures with the appropriate qualification: it reports early Beta evidence, from
