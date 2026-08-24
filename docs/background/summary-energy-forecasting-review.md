@@ -260,26 +260,28 @@ downstream neural networks that predicted wind and solar generation — a route 
 and running a weather model, not on a different downstream model family. And [Nguyen and Müsgens
 (2026)](https://doi.org/10.1063/5.0300682) meta-analyse 4,687 skill scores extracted from 188 solar
 forecasting papers. Their baseline class is classic statistical time-series models — the
-autoregressive integrated moving average (ARIMA) family, exponential smoothing, and multivariate
-relatives such as autoregressive models with exogenous inputs. Beyond 6 hours ahead, two classes
-beat that baseline. Ensemble-hybrid models gain 7.0 percentage points of skill score. An
-ensemble-hybrid chains one model's output into the next as an input, and also averages several
-models together. Pure ensemble models gain 8.3 points. A pure ensemble runs several models and
-aggregates their outputs, without the chaining. Individual machine-learning models (including
-gradient-boosted trees), numerical-weather-prediction models, and regressions show no significant
-advantage at all over classic statistical time-series models beyond 6 hours ahead. Their own advice
-is to exhaust the simple models first, because classical statistical time-series methods "still have
-very good performance compared to more complex methods such as individual ML models".
+autoregressive integrated moving average (ARIMA) family, exponential smoothing (ETS, for error,
+trend, and seasonality), and multivariate relatives such as autoregressive models with exogenous
+inputs (ARX). Beyond 6 hours ahead, two classes beat that baseline. Ensemble-hybrid models gain 7.0
+percentage points of skill score. An ensemble-hybrid chains one model's output into the next as an
+input, and also averages several models together. Pure ensemble models gain 8.3 points. A pure
+ensemble runs several models and aggregates their outputs, without the chaining. Individual
+machine-learning models (including gradient-boosted trees), numerical-weather-prediction models, and
+regressions show no significant advantage at all over classic statistical time-series models beyond
+6 hours ahead. Their own advice is to exhaust the simple models first, because classical statistical
+time-series methods "still have very good performance compared to more complex methods such as
+individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
-puts the weight on exactly the input Flexpectation is built around.** [Nguyen and Müsgens
-(2026)](https://doi.org/10.1063/5.0300682) fit a separate regression for each horizon band, and
-beyond 6 hours ahead numerical weather prediction as an input is worth 11.6 percentage points of
-skill score — the largest input effect they measure — while lagged power costs 6.4 percentage points
-out there, having gained 8.2 within the day. Their sample is deterministic forecasting of irradiance
-or plant output rather than probabilistic substation net demand, and their beyond-6-hours band
-covers the whole of NGED's 1-to-14-day window in one category, so the figures say which inputs earn
-their keep at long range rather than how much.
+puts the weight on the NWP input Flexpectation is built around.** [Nguyen and Müsgens
+(2026)](https://doi.org/10.1063/5.0300682) fit a separate regression for each horizon band for solar
+power forecasting, and beyond 6 hours ahead numerical weather prediction as an input is worth 11.6
+percentage points of skill score — the largest input effect they measure — while lagged power
+*reduces* performance by 6.4 percentage points beyond 6 hours ahead, having *increased* performance
+by 8.2 pp at intra-day horizons. Their sample is deterministic forecasting of irradiance or plant
+output rather than probabilistic substation net demand, and their beyond-6-hours band covers the
+whole of NGED's 1-to-14-day window in one category, so the figures say which inputs earn their keep
+at long range rather than how much.
 
 **For generators, the measured prize from better weather-to-power physics is largest at short lead
 times.** Differentiable physics attacks the weather-to-power half of the error, so on [Dantas and
@@ -305,7 +307,7 @@ notices the farm is obliged to publish, while the organisers' benchmark ignored 
 extremely poorly as a result". NGED's embedded generators publish no such notices. NGED's Embedded
 Capacity Register does give a registered capacity for generation of 50 kW and above: in the August
 2026 edition, 5,598 connected generators totalling 11,456 MW, of which 4,202 sites and 5,958 MW are
-solar. But a registered capacity is contractual rather than operational — the export limit is the
+solar. But a registered capacity is *contractual* rather than operational — the export limit is the
 one "permitted as per the connection agreement" — and the register carries no panel tilt, panel
 azimuth, or ratio of direct-current to alternating-current rating. A differentiable model has the
 ability to infer these properties of each generator. Each half of that fitting has been made to work

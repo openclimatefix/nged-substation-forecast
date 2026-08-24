@@ -357,18 +357,18 @@ rests on building and running a machine-learned weather model, which is a far la
 than swapping one downstream model family for another. And [Nguyen and Müsgens
 (2026)](https://doi.org/10.1063/5.0300682) meta-analyse 4,687 skill scores extracted from 188 solar
 forecasting papers. Their baseline class is classic statistical time-series models — the
-autoregressive integrated moving average (ARIMA) family, exponential smoothing, and multivariate
-relatives such as autoregressive models with exogenous inputs. Beyond 6 hours ahead, two classes
-beat that baseline. Ensemble-hybrid models gain 7.0 percentage points of skill score. An
-ensemble-hybrid chains one model's output into the next as an input, and also averages several
-models together. Pure ensemble models gain 8.3 points. A pure ensemble runs several models and
-aggregates their outputs, without the chaining. Individual machine-learning models (including
-gradient-boosted trees), numerical-weather-prediction models, and regressions show no significant
-advantage at all over classic statistical time-series models beyond 6 hours ahead. Their model
-classes follow each paper's own nomenclature, so the boundary between an ensemble and a hybrid is
-fuzzy by their own account. Their own advice is to exhaust the simple models first, because
-classical statistical time-series methods "still have very good performance compared to more complex
-methods such as individual ML models".
+autoregressive integrated moving average (ARIMA) family, exponential smoothing (ETS, for error,
+trend, and seasonality), and multivariate relatives such as autoregressive models with exogenous
+inputs (ARX). Beyond 6 hours ahead, two classes beat that baseline. Ensemble-hybrid models gain 7.0
+percentage points of skill score. An ensemble-hybrid chains one model's output into the next as an
+input, and also averages several models together. Pure ensemble models gain 8.3 points. A pure
+ensemble runs several models and aggregates their outputs, without the chaining. Individual
+machine-learning models (including gradient-boosted trees), numerical-weather-prediction models, and
+regressions show no significant advantage at all over classic statistical time-series models beyond
+6 hours ahead. Their model classes follow each paper's own nomenclature, so the boundary between an
+ensemble and a hybrid is fuzzy by their own account. Their own advice is to exhaust the simple
+models first, because classical statistical time-series methods "still have very good performance
+compared to more complex methods such as individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
 puts the weight on exactly the input Flexpectation is built around.** [Nguyen and Müsgens
