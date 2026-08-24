@@ -734,8 +734,13 @@ threshold." A later paper in the same line, [Kim
 (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), drops the trained model for a pipeline close
 to the one this project plans — robust seasonal-trend decomposition, then Pruned Exact Linear Time
 changepoint detection, then an isolation forest over features of each candidate changepoint —
-detecting transfers "using only load time series data". We read the full text of [Kim et al.
-(2020)](https://doi.org/10.3390/en13174358); [Kim
+detecting transfers "using only load time series data". [Kim et al.
+(2022)](https://doi.org/10.3390/en15041441), also open access, detect the same events from
+polynomial and standard-pattern preprocessing rather than from a trained model, and report the only
+accuracy figure in the line: 7 of 9 logged transfers found on one Korean distribution line and 7 of
+7 on another, which their abstract averages to 88.89%. Read that figure for what it is — the share
+of logged events found, over 16 events on two lines in one year, with no false-alarm rate given.
+Both Energies papers are open access under a Creative Commons licence and we read them in full; [Kim
 (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) sits behind a subscription, so we read only
 its abstract.
 
@@ -2115,6 +2120,9 @@ Every source cited above, in alphabetical order by first author.
   Foundation Models Evaluated on Application-Oriented Metrics](https://arxiv.org/abs/2607.01966).
 - Kim, J.-H., Lee, B.-S. and Kim, C.-H. (2020). [A Study on the Development of Machine-Learning
   Based Load Transfer Detection Algorithm for Distribution Planning](https://doi.org/10.3390/en13174358).
+  *Energies*.
+- Kim, J.-H., Joung, J.-M. and Lee, B.-S. (2022). [A Study on the Preprocessing Method for Power
+  System Applications Based on Polynomial and Standard Patterns](https://doi.org/10.3390/en15041441).
   *Energies*.
 - Kim, J.-H. (2025). [Unsupervised Load Transfer Detection Based on Wavelet Change Point
   Analysis and Isolation Forest](https://doi.org/10.5370/KIEE.2025.74.11.1757). *The

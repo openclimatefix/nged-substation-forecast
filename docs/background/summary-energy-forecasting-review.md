@@ -419,11 +419,16 @@ Switching detection from metered load has been published more than once, always 
 time. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) detect switching at a real network
 operator, but detect it in the gap between the substation's own meter and a second estimate of the
 same load, built from smart-meter and bulk-customer readings taken below the substation. A Korean
-line of work, most recently [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), detects load
-transfers on a distribution line from that line's own load alone, by robust seasonal-trend
-decomposition, then changepoint detection, then an isolation forest over each candidate changepoint
-— close to the pipeline Flexpectation plans, but scored one line at a time, and with no accuracy
-figures we could read, because only the abstract is open. Electricity North West's
+line of work detects load transfers on a distribution line from that line's own load alone. The two
+earlier papers are open access: [Kim et al. (2020)](https://doi.org/10.3390/en13174358) flag a
+transfer where the measured load departs from a neural network's prediction for the same line, and
+[Kim et al. (2022)](https://doi.org/10.3390/en15041441) detect the same events from polynomial and
+standard-pattern preprocessing, reporting the only accuracy figure in the line — 7 of 9 logged
+transfers found on one Korean distribution line and 7 of 7 on another, averaged to 88.89%, with no
+false-alarm rate given. The most recent paper, [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), runs a robust seasonal-trend decomposition,
+then changepoint detection, then an isolation forest over each candidate changepoint — close to the
+pipeline Flexpectation plans — but only its abstract is open. Electricity North West's
 [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted step changes into
 faulty metering and network reconfigurations on GB substations in 2016, from power measurements
 alone, and published no precision or recall for either rule.
@@ -1266,6 +1271,12 @@ sources that this summary does not.
 - Kaas, B., Treutlein, M., Gerber, H. B., Neumann, O., Phatthanakhuha, C., Resch, O., Mikut, R. and
   Hagenmeyer, V. (2026). [Probabilistic Low-Voltage Peak Load Forecasting with Time Series
   Foundation Models Evaluated on Application-Oriented Metrics](https://arxiv.org/abs/2607.01966).
+- Kim, J.-H., Lee, B.-S. and Kim, C.-H. (2020). [A Study on the Development of Machine-Learning
+  Based Load Transfer Detection Algorithm for Distribution Planning](https://doi.org/10.3390/en13174358).
+  *Energies*.
+- Kim, J.-H., Joung, J.-M. and Lee, B.-S. (2022). [A Study on the Preprocessing Method for Power
+  System Applications Based on Polynomial and Standard Patterns](https://doi.org/10.3390/en15041441).
+  *Energies*.
 - Kim, J.-H. (2025). [Unsupervised Load Transfer Detection Based on Wavelet Change Point
   Analysis and Isolation Forest](https://doi.org/10.5370/KIEE.2025.74.11.1757). *The
   Transactions of The Korean Institute of Electrical Engineers*.
