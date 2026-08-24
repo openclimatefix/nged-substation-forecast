@@ -117,16 +117,18 @@ both. So no published head-to-head we found gives a GBT the feature engineering 
 in Flexpectation v1.
 
 On the rest of the Flexpectation specification there is no published result to lean on, for or
-against. We found no study that drives substation-level uncertainty from a weather ensemble out to
-14 days. The 14-day horizon also sits near the edge of what a weather ensemble can supply at all:
-[Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put at 16 to 23 days the lead time
-beyond which a weather ensemble stops beating a climatological distribution — measured on upper-air
-variables, not on the near-surface temperature and irradiance that drive substation load. The
-closest thing to evidence at substation level is a warning about the extremes: [Browell and Fasiolo
-(2021)](https://arxiv.org/abs/2103.10335) found quantile regression alone uncalibrated beyond the
-1st and 99th percentiles — the range NGED is likely to act on. So we plan to follow Browell and
-Fasiolo and implement an explicit tail treatment rather than reading extreme quantiles off the
-model.
+against. We found no study that drives substation-level uncertainty from a weather ensemble all the
+way out to 14 days. The 14-day horizon also sits near the edge of what a weather ensemble can supply
+at all: [Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) found that the lead time
+beyond which a weather ensemble stops beating a climatological distribution is 16 to 23 days ahead —
+measured on upper-air variables, not on the near-surface temperature and irradiance that drive
+substation load.
+
+A relevant very finding for us at substation level is a warning about the extremes: [Browell and
+Fasiolo (2021)](https://arxiv.org/abs/2103.10335) found quantile regression alone uncalibrated
+beyond the 1st and 99th percentiles — the range NGED is likely to act on. So we plan to follow
+Browell and Fasiolo and implement an explicit tail treatment rather than reading extreme quantiles
+off the model.
 
 All the text above is a verdict on Flexpectation version one. The three more sophisticated ML
 model families we plan to research in 2027 — pre-trained encoders, connectivity-map models and
@@ -161,10 +163,12 @@ a full 14-day horizon.** Two papers ask for exactly this, in their own words. [H
 (2021)](https://arxiv.org/abs/2106.00006) end their review of 221 low-voltage papers by naming
 "post-processed weather ensemble predictions to generate multi-step probabilistic forecasts of load
 at different levels of the LV hierarchy" as an avenue of future research. [Ludwig et al.
-(2023)](https://doi.org/10.1080/01605682.2022.2115411) did that for Great Britain's national demand,
-from the same 51-member ECMWF ensemble Flexpectation uses, and ask for it to be pushed down "to
-different layers of the energy hierarchy, including the low voltage level". Neither names a horizon,
-and both point below NGED's primary substations rather than at them.
+(2023)](https://doi.org/10.1080/01605682.2022.2115411) built exactly that — a multi-step
+probabilistic load forecast driven by a post-processed weather ensemble — for Great Britain's
+national demand one to six days ahead, from the same 51-member ECMWF ensemble Flexpectation uses,
+and they too ask for the method to be pushed down "to different layers of the energy hierarchy,
+including the low voltage level". Neither request names a horizon or a time resolution, and both
+point below NGED's primary substations rather than at them.
 
 **Almost every study here optimises average accuracy, but NGED's question is about the top of the
 distribution.** [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) is the one study here
