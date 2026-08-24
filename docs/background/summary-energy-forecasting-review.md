@@ -114,15 +114,19 @@ shared feature set was itself short: a linear trend, load lagged 24 hours and on
 nine day types, the named public holidays, day of year, and temperature interacted with time of day
 and with day of year. It carried no irradiance and no wind, though the weather they downloaded held
 both. So no published head-to-head we found gives a GBT the feature engineering we plan to implement
-in Flexpectation v1. 
+in Flexpectation v1.
 
 On the rest of the Flexpectation specification there is no published result to lean on, for or
 against. We found no study that drives substation-level uncertainty from a weather ensemble out to
-14 days. The closest thing to evidence is a warning about the extremes: [Browell and Fasiolo
+14 days. The 14-day horizon also sits near the edge of what a weather ensemble can supply at all:
+[Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put at 16 to 23 days the lead time
+beyond which a weather ensemble stops beating a climatological distribution — measured on upper-air
+variables, not on the near-surface temperature and irradiance that drive substation load. The
+closest thing to evidence at substation level is a warning about the extremes: [Browell and Fasiolo
 (2021)](https://arxiv.org/abs/2103.10335) found quantile regression alone uncalibrated beyond the
 1st and 99th percentiles — the range NGED is likely to act on. So we plan to follow Browell and
 Fasiolo and implement an explicit tail treatment rather than reading extreme quantiles off the
-model. 
+model.
 
 All the text above is a verdict on Flexpectation version one. The three more sophisticated ML
 model families we plan to research in 2027 — pre-trained encoders, connectivity-map models and
@@ -931,6 +935,9 @@ sources that this summary does not.
   Conditional Extremes and Gridded NWP](https://arxiv.org/abs/2103.10335).
 - Browell, J., van der Meer, D., Kälvegren, H., Haglund, S., Simioni, E., Bessa, R. J. and Wang, Y. (2025). [The hybrid renewable energy forecasting and trading competition
   2024](https://doi.org/10.1016/j.ijforecast.2025.10.005). *International Journal of Forecasting*.
+- Buizza, R. and Leutbecher, M. (2015). [The forecast skill
+  horizon](https://doi.org/10.1002/qj.2619). *Quarterly Journal of the Royal Meteorological
+  Society*.
 - Cordier, G. et al. (2024). [Methods and techniques used to produce electricity forecasts on
   Enedis’ distribution network at a finer grid than the HV/MV
   substation](https://doi.org/10.1049/icp.2024.2058). *IET Conference Proceedings*.

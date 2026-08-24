@@ -139,8 +139,9 @@ make that net-demand forecast better.
 
 **The 14-day horizon sits at the edge of what a weather ensemble can supply.** [Buizza and
 Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put at 16 to 23 days the lead time beyond which
-a weather ensemble stops beating a climatological distribution.  Buizza and Leutbecher measured the forecast skill horizon on upper-air
-variables rather than on the near-surface temperature and irradiance that drive substation load.
+a weather ensemble stops beating a climatological distribution. Buizza and Leutbecher measured
+the forecast skill horizon on upper-air variables rather than on the near-surface temperature
+and irradiance that drive substation load.
 
 **What the literature reports.**
 
