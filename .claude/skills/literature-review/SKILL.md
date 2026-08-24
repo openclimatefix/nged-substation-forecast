@@ -294,6 +294,47 @@ def rsub(pat, rep, n=1):
 The assertion is the point: a silent zero-match edit is the commonest way a batch of fixes half
 lands.
 
+**A span anchored by its opening and closing words deletes the wrong thing when the closing words
+recur.** Deleting by line number goes stale after the first cut, so the natural fix is to anchor a
+span by the words it starts and ends with. That fix has its own failure: `opening + .*? + closing`
+finds the *next* occurrence of the closing words, and if those words appear again later, the
+deletion swallows everything in between and reports success. Twice in one session that removed
+whole sections — once about 250 words, once about 550 — with nothing in the output to show it. Two
+guards between them make the tool safe, and neither costs anything:
+
+- **Cap the match length** and refuse anything longer, because a legitimate sentence-level cut is
+  tens of words and a runaway one is hundreds.
+- **Print what was removed** — the word count, the first few words and the last few — so a cut that
+  ran past its intended end is visible in the log rather than in the finished document.
+
+The related failure is quieter still: when the closing words are a *suffix of the opening words*,
+the pattern can never match and the cut is simply skipped. That one at least reports zero matches,
+which is why an assertion on the match count is not optional.
+
+## Writing a short version of a long review
+
+**Build the short version by lifting whole sentences out of the long one, not by writing a summary
+from memory.** Every sentence in the long review has already survived fact-checking; a freshly
+written paraphrase has not, and drafting from notes rather than from sources is what produced
+twenty errors in two thousand words the last time it was tried. Lifting also keeps the two documents
+saying the same thing, which matters when a reader has both.
+
+**Write the extraction as a script, not as retyping.** A script that pulls each span out of the
+source file and refuses anything that does not match exactly once cannot mistype a number or drop a
+hedge. The connective prose written as literals in that script is then the only text in the short
+version that has never been checked, and it is small enough to check by hand.
+
+**Audit the result with shingles.** Split the short version into overlapping nine-word runs and
+check each against the long review. Every run that is not found is either connective prose you
+wrote or a join between two lifted passages — and the joins are where the faults are: a stranded
+"the ones" whose referent was in the sentence you cut, a bare "0.07" whose result sentence went
+with it, a space left before a full stop. Read every miss.
+
+**Expect the cuts to strand referents.** A pronoun or a demonstrative that was clear in the long
+review points at nothing once the sentence naming its subject is gone. After each round of cutting,
+list every sentence-initial "it", "this", "that", "these", "those", "they" and "the ones" and check
+that the noun is still in the previous sentence.
+
 **Verify the render, not just the lint.** A clean lint and a successful build both pass on markdown
 that renders visibly wrong — see the `mkdocs-authoring` skill. After each batch, rebuild and count
 the elements in the generated HTML: headings at each level, table count, reference list items, and
