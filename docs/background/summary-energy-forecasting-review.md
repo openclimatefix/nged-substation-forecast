@@ -418,9 +418,10 @@ work from power measurements alone.
 We only found two relevant papers: One paper detects switching at a real network operator, but
 detects it in the gap between the substation's own meter and a second estimate of the same load,
 built from smart-meter and bulk-customer readings taken below the substation. The second paper
-describes Electricity North West's ATLAS project, which sorted step changes into faulty metering and
-network reconfigurations on GB substations in 2016, from power measurements alone, and published no
-precision or recall for either rule.
+describes Electricity North West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/)
+project, which sorted step changes into faulty metering and network reconfigurations on GB
+substations in 2016, from power measurements alone, and published no precision or recall for either
+rule.
 
 #### What this means for Flexpectation
 
@@ -456,7 +457,7 @@ seasonal-trend decomposition of each series into a trend and daily, weekly, and 
 leaving a remainder in which a switch shows up as a sustained level shift. The second uses the
 project's existing XGBoost machinery, trained with no power-lag features, so that an earlier
 switching event cannot contaminate the expected-power estimate. Neither route needs metering from
-below the substation. 
+below the substation.
 
 **Where the gaps are: [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s published method
 needs a second, independently-built load series for the same substation, which NGED does not have,
@@ -1159,6 +1160,7 @@ sources that this summary does not.
 - Doubleday, K., Van Scyoc Hernandez, V. and Hodge, B. M. (2020). [Benchmark probabilistic solar
   forecasts: Characteristics and recommendations](https://doi.org/10.1016/j.solener.2020.05.051).
   *Solar Energy*.
+- Electricity North West (2018). [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/).
 - Fildes, R. (2020). [Learning from forecasting
   competitions](https://doi.org/10.1016/j.ijforecast.2019.04.012). *International Journal of
   Forecasting*.
