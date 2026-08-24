@@ -112,12 +112,14 @@ booster did not lose for want of them — but that shared feature set was itself
 trend, load lagged 24 hours and one week, time of day, nine day types, the named public holidays,
 day of year, and temperature interacted with time of day and with day of year. It carried no
 irradiance and no wind, though the weather they downloaded held both. So no published head-to-head
-we found gives a gradient booster the feature engineering Flexpectation plans. What the literature
-does not underwrite is the rest of the specification: nobody has driven substation uncertainty from
-a weather ensemble over 14 days, and [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335)
-found quantile regression alone uncalibrated beyond the 1st and 99th percentiles — the range NGED
-acts on — even with five years of data on regions far larger than a substation. Plan for an explicit
-tail treatment rather than reading extreme quantiles off the model.
+we found gives a gradient booster the feature engineering Flexpectation plans. On the rest of the
+specification there is no published result to lean on, for or against. We found no study that drives
+substation-level uncertainty from a weather ensemble out to 14 days, so whether that works is an
+open question for this project to answer. The closest thing to evidence is a warning about the
+extremes: [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) found quantile regression
+alone uncalibrated beyond the 1st and 99th percentiles — the range NGED acts on — even with five
+years of data on regions far larger than a substation. Plan for an explicit tail treatment rather
+than reading extreme quantiles off the model.
 
 **What the literature reports.**
 
