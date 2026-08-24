@@ -350,9 +350,34 @@ depending heavily on implementation. NGED's own forecasting system, EFFS, indepe
 XGBoost when it evaluated model families. Two results cut the other way, and both argue for
 combining models rather than against trees: team Rnt finished third in HEFTCom using no tree-based
 model, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682), meta-analysing 4,687
-skill scores extracted from 188 solar forecasting papers, report that ensemble and hybrid models
-raise skill score by 7 to 27 percentage points over time-series models while many advanced
-machine-learning methods show inconsistent gains.
+skill scores extracted from 188 solar forecasting papers, find that beyond 6 hours ahead
+ensemble-hybrid models beat plain time-series methods by 7.0 percentage points of skill score and
+pure ensemble models by 8.3, while individual machine-learning models, numerical-weather-prediction
+models, and regressions show no significant advantage over time-series methods at that horizon at
+all. Their own advice is to exhaust the simple models first, because time-series methods "still have
+very good performance compared to more complex methods such as individual ML models".
+
+**Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
+puts the weight on exactly the input Flexpectation is built around.** [Nguyen and Müsgens
+(2026)](https://doi.org/10.1063/5.0300682) fit a separate regression for each horizon band, and
+beyond 6 hours ahead numerical weather prediction as an input is worth 11.6 percentage points of
+skill score — the largest input effect they measure — with locally measured meteorological data
+worth a further 5.1. The inputs that pay at short range carry the opposite sign out there: lagged
+power costs 6.4 percentage points beyond 6 hours where it gains 8.2 within the day, and data from
+neighbouring sites costs 5.5 where it gains 3.9. Two scope limits travel with those numbers. Their
+sample is deterministic forecasting of solar irradiance or plant output rather than probabilistic
+substation net demand, and their beyond-6-hours band lumps the whole of NGED's 1-to-14-day window
+into a single category, so the figures say which inputs earn their keep at long range, not how much
+they earn at day 10.
+
+**A caution on carrying any of these numbers across to GB.** Skill score is meant to normalise away
+location, but [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) find it does not: their
+regressions use the warm-temperate Köppen-Geiger zone C, which is GB's, as the baseline, and the
+equatorial, arid, and snow zones score 1.6 to 6.0 percentage points higher. Nguyen and Müsgens read
+that as the reference model doing relatively worse where forecasting is harder, which inflates the
+skill score rather than reflecting a better forecast, and conclude that transferring findings
+between climate zones has to be done carefully. A GB project should therefore expect the skill
+scores it can reach to sit below the ones a typical paper reports.
 
 **For generators, the measured prize from better weather-to-power physics is largest at short lead
 times, which is not where NGED acts.** Differentiable physics attacks the weather-to-power half of

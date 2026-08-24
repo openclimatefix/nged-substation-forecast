@@ -244,21 +244,34 @@ weather-forecast uncertainty the mid-term, with the transition typically 2 to 3 
 earlier for offshore farms than onshore ones, and varying dramatically between farms. And a
 deterministic forecast at higher resolution beat the ensemble at short lead times.
 
-**Gradient-boosted trees, fitted separately for each kind of generator, is what this literature does
-and what won when teams were scored against each other on the same data.** [Dantas and Browell
-(2026)](https://doi.org/10.1002/we.70079) model the weather-to-power relationship with quantile
-regression on gradient-boosted trees, fitting a separate model for each quantile. In HEFTCom the
-winning team fitted gradient-boosted trees separately for wind and for solar and separately for each
-weather source, 9 of the top 10 teams forecast wind and solar separately before combining them, and
-[Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) conclude that
-gradient-boosted trees remain competitive for day-ahead wind and solar forecasting, with performance
-depending heavily on implementation. NGED's own EFFS project selected
-XGBoost when it evaluated model families. Two results cut the other way, and both argue for
-combining models rather than against trees: team Rnt finished third in HEFTCom using no tree-based
-model, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682), meta-analysing 4,687
-skill scores extracted from 188 solar forecasting papers, report that ensemble and hybrid models
-raise skill score by 7 to 27 percentage points over time-series models while many advanced
-machine-learning methods show inconsistent gains.
+**Gradient-boosted trees, fitted separately for each kind of generator, is the standard approach in
+the literature, and what won when teams were scored against each other on the same data.** [Dantas
+and Browell (2026)](https://doi.org/10.1002/we.70079) model the weather-to-power relationship with
+quantile regression on gradient-boosted trees, fitting a separate model for each quantile. In
+HEFTCom the winning team fitted gradient-boosted trees separately for wind and for solar and
+separately for each weather source, 9 of the top 10 teams forecast wind and solar separately before
+combining them, and [Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)
+conclude that gradient-boosted trees remain competitive for day-ahead wind and solar forecasting,
+with performance depending heavily on implementation. NGED's own EFFS project selected XGBoost when
+it evaluated model families. Two results cut the other way, and both argue for combining models
+rather than against trees: team Rnt finished third in HEFTCom using no tree-based model, and [Nguyen
+and Müsgens (2026)](https://doi.org/10.1063/5.0300682), meta-analysing 4,687 skill scores extracted
+from 188 solar forecasting papers, find that beyond 6 hours ahead ensemble-hybrid models beat plain
+time-series methods by 7.0 percentage points of skill score and pure ensemble models by 8.3, while
+individual machine-learning models, numerical-weather-prediction models, and regressions show no
+significant advantage over time-series methods at that horizon at all. Their own advice is to
+exhaust the simple models first, because time-series methods "still have very good performance
+compared to more complex methods such as individual ML models".
+
+**Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
+puts the weight on exactly the input Flexpectation is built around.** [Nguyen and Müsgens
+(2026)](https://doi.org/10.1063/5.0300682) fit a separate regression for each horizon band, and
+beyond 6 hours ahead numerical weather prediction as an input is worth 11.6 percentage points of
+skill score — the largest input effect they measure — while lagged power costs 6.4 percentage points
+out there, having gained 8.2 within the day. Their sample is deterministic forecasting of irradiance
+or plant output rather than probabilistic substation net demand, and their beyond-6-hours band
+covers the whole of NGED's 1-to-14-day window in one category, so the figures say which inputs earn
+their keep at long range rather than how much.
 
 **For generators, the measured prize from better weather-to-power physics is largest at short lead
 times.** Differentiable physics attacks the weather-to-power half of the error, so on [Dantas and
