@@ -288,11 +288,14 @@ fitting has been made to work on its own: [Pierrot and Pinson
 time-varying bound fitted jointly with the forecast, and beat probabilistic persistence by 34.2% on
 continuous ranked probability score over 14 months at the Anholt offshore wind farm, though their
 one clean test of tracking the bound on its own gained 2.43%, and [Meng et al.
-(2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of roof
-photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5° from generation
-data plus an irradiance measurement up to 195 km away, though we could reach only their abstract.
-Neither sits inside a substation's net-demand forecast, which is where Flexpectation would have to
-put it.
+(2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of 13 roof
+photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°, matching the shape
+of each system's hourly output against plane-of-array irradiance from a station up to 195 km away.
+Because both curves are normalised before matching, their method needs no nameplate rating — but it
+reports its accuracy only in degrees, and never converts an orientation error into a power error, so
+what better orientation metadata is worth to a forecast is a number this literature does not give
+us. Neither method sits inside a substation's net-demand forecast, which is where Flexpectation
+would have to put it.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator, or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.

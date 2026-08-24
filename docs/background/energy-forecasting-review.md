@@ -384,11 +384,20 @@ fitting has been made to work on its own: [Pierrot and Pinson
 time-varying bound fitted jointly with the forecast, and beat probabilistic persistence by 34.2% on
 continuous ranked probability score over 14 months at the Anholt offshore wind farm, though their
 one clean test of tracking the bound on its own gained 2.43%, and [Meng et al.
-(2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of roof
-photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5° from generation
-data plus an irradiance measurement up to 195 km away, though we could reach only their abstract.
-Neither sits inside a substation's net-demand forecast, which is where Flexpectation would have to
-put it. How much the physics is worth getting right has been measured for solar: [Mayer and Gróf
+(2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of 13 roof
+photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°, matching the shape
+of each system's hourly output against plane-of-array irradiance computed for every candidate
+orientation, from a station up to 195 km away. Two details of that paper matter to Flexpectation.
+Because both curves are normalised before matching, the method needs no nameplate rating, which is
+the one piece of metadata it might otherwise have demanded. And it reports its accuracy only in
+degrees: Meng et al. never convert an orientation error into a power error, so what better
+orientation metadata is worth to a forecast is a number this literature does not give us. Their own
+stated limitation is that all 13 systems sit on the same standardised 42° roof, so the tilt figure
+is tested against a single true tilt; the accompanying simulation study, which does span
+orientations, scores 4.8° on tilt and 3.1° on azimuth across 21 notional panels, and is weakest on
+the south-facing ones at 7.9° on tilt against 3.0° to 5.1° for north, east, and west. Neither method
+sits inside a substation's net-demand forecast, which is where Flexpectation would have to put it.
+How much the physics is worth getting right has been measured for solar: [Mayer and Gróf
 (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) score every combination of nine
 irradiance-separation, ten transposition, three reflection-loss, five cell-temperature, four module,
 two shading, and three inverter models against a year of 15-minute production from 16 Hungarian
