@@ -652,10 +652,12 @@ precision or recall for either rule.
 **The challenge.** When a cable fault or planned maintenance moves part of a network from one
 substation to another, the load the first substation meters steps down and the load of each
 substation picking up that work steps up, with no change in the underlying demand. The pick-up is
-usually shared across two or three neighbouring substations rather than landing on one. NGED's
-substations spend roughly a tenth of their operating time in an abnormal running arrangement.
-Switching labels exist for the 32-series trial area but not for the wider network, so a method that
-is to scale to the wider network has to work from power measurements alone.
+usually shared across two or three neighbouring substations rather than landing on one, and usually
+only part of a substation's load moves — a continuous fraction, with no minimum size — rather than a
+whole subgrid. NGED's substations spend roughly a tenth of their operating time in an abnormal
+running arrangement. Switching labels exist for the 32-series trial area but not for the wider
+network, so a method that is to scale to the wider network has to work from power measurements
+alone.
 
 **One paper detects these events at a real network operator, and stops at the detection.** [Bouman
 et al. (2024)](https://arxiv.org/abs/2405.16164), working with the Dutch network operator Alliander,
@@ -692,22 +694,22 @@ switching as well as a measured one is what the project has to find out.
 power has to go somewhere.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score each
 substation against its own history — "the current analysis considers one year of measurements for
 one station at a time" — so nothing in the method asks whether the power that left one substation
-turned up at another. We looked for a method that checks both sides — 40 title-and-abstract queries
-and 10 full-text queries on OpenAlex, the Semantic Scholar, Crossref, and arXiv search interfaces,
-the works citing [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) under both its journal and
-its arXiv identifier (4 citing works, all read at abstract level), and the titles of all 3,160
-projects on the Energy Networks Association's Smarter Networks Portal, which publishes no abstracts
-to search — and found none. The closest is [Willis et al.
-(1984)](https://doi.org/10.1109/TPAS.1984.318713), whose regression fits a group of
-mutually-transferring substations together and needs neither the size nor the direction of a
-transfer as an input, but which corrects annual peak-load curve fits for long-range planning rather
-than detecting an event at a point in time. We could not obtain its full text. Flexpectation intends
-to look for both sides of the transfer: when one substation's metered power drops, the substations
-that picked the load up should rise at the same moment, and their rises should sum to the drop. A
-step that fails to balance that way is more likely a meter fault or a one-off than a switch, which
-is where a per-substation detector spends its false positives. The catch is that an NGED transfer
-usually fans out across two or three neighbours, so the search runs over subsets of neighbours
-rather than over pairs, and the balance holds only approximately.
+turned up at another. Flexpectation intends to look for both sides of the transfer: when one
+substation's metered power drops, the substations that picked the load up should rise at the same
+moment, and their rises should sum to the drop. A step that fails to balance that way is more likely
+a meter fault or a one-off than a switch, which is where a per-substation detector spends its false
+positives. The catch is that an NGED transfer usually fans out across two or three neighbours, so
+the search runs over subsets of neighbours rather than over pairs, and the balance holds only
+approximately. We looked for a method that checks both sides — 40 title-and-abstract queries and 10
+full-text queries on OpenAlex, the Semantic Scholar, Crossref, and arXiv search interfaces, the
+works citing [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) under both its journal and its
+arXiv identifier (4 citing works, all read at abstract level), and the titles of all 3,160 projects
+on the Energy Networks Association's Smarter Networks Portal, which publishes no abstracts to search
+— and found none. The closest is [Willis et al. (1984)](https://doi.org/10.1109/TPAS.1984.318713),
+whose regression fits a group of mutually-transferring substations together and needs neither the
+size nor the direction of a transfer as an input, but which corrects annual peak-load curve fits for
+long-range planning rather than detecting an event at a point in time. We could not obtain its full
+text.
 
 **The measured accuracy is modest, and worst on the short events.** [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164) score every detector with the F1.5 score, which blends
@@ -757,12 +759,6 @@ meter and a reconfigured network was drawn on GB primary substations, on power a
 bottom-up reference series. ATLAS was a data-preparation project rather than a detector-benchmarking
 one, so it reports no precision or recall figures for either rule, and it pairs them with "the
 importance of visual sense checks of the obtained processed demand data".
-
-**Where the gaps are: the published method needs a second, independently-built load series for the
-same substation, which NGED does not have, and the events NGED cares about are harder than the ones
-detected.** A switch at NGED usually fans out to two or three neighbouring substations rather than
-one, and the common case is a *partial* transfer — a continuous fraction of the load moving, with no
-minimum size — rather than a whole subgrid.
 
 ### 5. Forecasting a substation as if it were always in its normal running arrangement
 
