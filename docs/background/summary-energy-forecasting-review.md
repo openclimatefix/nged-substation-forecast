@@ -292,11 +292,20 @@ one clean test of tracking the bound on its own gained 2.43%, and [Meng et al.
 (2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of 13 roof
 photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°, matching the shape
 of each system's hourly output against plane-of-array irradiance from a station up to 195 km away.
-Because both curves are normalised before matching, their method needs no nameplate rating — but it
-reports its accuracy only in degrees, and never converts an orientation error into a power error, so
-what better orientation metadata is worth to a forecast is a number this literature does not give
-us. Neither method sits inside a substation's net-demand forecast, which is where Flexpectation
-would have to put it.
+Because both curves are normalised before matching, their method needs no nameplate rating. Neither
+method sits inside a substation's net-demand forecast, which is where Flexpectation would have to
+put it.
+
+**What better orientation metadata is worth to a forecast is a number nobody has published, so
+Flexpectation treats it as a hypothesis to test rather than a settled prize.** [Meng et al.
+(2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan et al.
+(2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's tilt and azimuth from
+its own output, to a few degrees, but report their accuracy in degrees alone. Saint-Drenan et al.
+also name Flexpectation's case as their method's failure mode — where a power series is "the
+aggregated production of modules with different orientations", the algorithm "performs poorly" — and
+found that their fitted parameters gave better simulations than the true ones, because the fit
+absorbs the physical model's own bias. That makes accuracy in degrees the wrong target: what a
+differentiable plant model needs is an effective tilt and azimuth that make the forecast right.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator, or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.
@@ -1165,6 +1174,9 @@ sources that this summary does not.
   forecasts](https://arxiv.org/abs/1805.09091). *Monthly Weather Review*.
 - Ruhhütl, M., Schmaranz, R. and Dietrichsteiner, T. (2023). [Load and generation forecast on
   substation level](https://doi.org/10.1049/icp.2023.0476). *IET Conference Proceedings*.
+- Saint-Drenan, Y.-M., Bofinger, S., Fritz, R., Vogt, S., Good, G. H. and Dobschinski, J. (2015).
+  [An empirical approach to parameterizing photovoltaic plants for power forecasting and
+  simulation](https://doi.org/10.1016/j.solener.2015.07.024). *Solar Energy*.
 - Scottish and Southern Electricity Networks (2021).
   [TRANSITION](https://ssen-innovation.co.uk/transition/).
 - Scottish and Southern Electricity Networks (2025). [FastTrack, Alpha Round

@@ -390,12 +390,11 @@ of each system's hourly output against plane-of-array irradiance computed for ev
 orientation, from a station up to 195 km away. Two details of that paper matter to Flexpectation.
 Because both curves are normalised before matching, the method needs no nameplate rating, which is
 the one piece of metadata it might otherwise have demanded. And it reports its accuracy only in
-degrees: Meng et al. never convert an orientation error into a power error, so what better
-orientation metadata is worth to a forecast is a number this literature does not give us. Their own
-stated limitation is that all 13 systems sit on the same standardised 42° roof, so the tilt figure
-is tested against a single true tilt; the accompanying simulation study, which does span
-orientations, scores 4.8° on tilt and 3.1° on azimuth across 21 notional panels, and is weakest on
-the south-facing ones at 7.9° on tilt against 3.0° to 5.1° for north, east, and west. Neither method
+degrees: Meng et al. never convert an orientation error into a power error. Their own stated
+limitation is that all 13 systems sit on the same standardised 42° roof, so the tilt figure is
+tested against a single true tilt; the accompanying simulation study, which does span orientations,
+scores 4.8° on tilt and 3.1° on azimuth across 21 notional panels, and is weakest on the
+south-facing ones at 7.9° on tilt against 3.0° to 5.1° for north, east, and west. Neither method
 sits inside a substation's net-demand forecast, which is where Flexpectation would have to put it.
 How much the physics is worth getting right has been measured for solar: [Mayer and Gróf
 (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) score all 32,400 combinations of nine
@@ -408,6 +407,34 @@ azimuth — as the two whose model choice matters most. Two limits on that 13%: 
 the extremes of 32,400 chains rather than a typical penalty, and every plant's tilt and azimuth came
 from its design documentation and stayed fixed, so Mayer and Gróf bound the cost of choosing the
 wrong physical model, not the cost of not knowing a system's orientation.
+
+**What better orientation metadata is worth to a forecast is a number nobody has published, and the
+four papers closest to the question each stop short of it.** [Meng et al.
+(2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan et al.
+(2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's tilt and azimuth from
+its own output — Meng et al. to 4.3° and 4.5°, Saint-Drenan et al. to within 1.5° of tilt and 5° of
+azimuth on two individually-metered Swiss rooftop plants — but report their accuracy in degrees
+alone. [Mayer and Gróf (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) price the choice of
+physical model with every plant's geometry known and held fixed. And [Amaro e Silva and Brito
+(2019)](https://doi.org/10.1016/j.apenergy.2019.113807) price the mismatch between
+differently-tilted surfaces in a forecast made 10 seconds ahead by watching cloud shadows cross a 1
+km² grid of pyranometers in Hawaii, on synthetic photovoltaic output derived from those sensors
+rather than from metered plants — neither our horizon nor our question, and the orientations there
+are known throughout rather than estimated.
+
+**Two findings from that search shape what Flexpectation should build.** [Saint-Drenan et al.
+(2015)](https://doi.org/10.1016/j.solener.2015.07.024) name Flexpectation's own case as their
+method's failure mode: where a power series is "the aggregated production of modules with different
+orientations", the algorithm "performs poorly", because it assumes one orientation per plant.
+Recovering a single orientation per substation is therefore not the thing to attempt. And they
+report that an azimuth fitted 5° from the true one gave better simulations than the true value,
+because the fit balances the systematic error of the physical model, concluding that the output
+"should be seen as a set of parameters that lead to the best simulation and not necessarily as the
+actual characteristics of the PV plant". That makes accuracy in degrees the wrong target for
+Flexpectation: what a differentiable plant model needs is an effective tilt and azimuth that make
+the forecast right, which is measurable against the forecast we already score. Their method also
+folds inverter clipping into a fitted look-up table rather than modelling it explicitly, which is
+one route to the ratio of direct-current to alternating-current rating that NGED does not hold.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator, or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.
@@ -1791,6 +1818,10 @@ This review makes nine commitments to publish or report. Collected in one place,
 
 Every source cited above, in alphabetical order by first author.
 
+- Amaro e Silva, R. and Brito, M. C. (2019). [Spatio-temporal PV forecasting sensitivity to
+  modules' tilt and orientation](https://doi.org/10.1016/j.apenergy.2019.113807). *Applied
+  Energy*. Read as chapter 5 of Amaro e Silva's open-access doctoral thesis, the published paper
+  being paywalled.
 - Angus, S., Browell, J., Greenwood, D. and Deakin, M. (2027). [Risk-based dynamic thermal rating in
   distribution transformers via probabilistic
   forecasting](https://doi.org/10.1016/j.epsr.2026.113545). *Electric Power Systems Research*.
@@ -1981,6 +2012,9 @@ Every source cited above, in alphabetical order by first author.
   Society*.
 - Ruhhütl, M., Schmaranz, R. and Dietrichsteiner, T. (2023). [Load and generation forecast on
   substation level](https://doi.org/10.1049/icp.2023.0476). *IET Conference Proceedings*.
+- Saint-Drenan, Y.-M., Bofinger, S., Fritz, R., Vogt, S., Good, G. H. and Dobschinski, J. (2015).
+  [An empirical approach to parameterizing photovoltaic plants for power forecasting and
+  simulation](https://doi.org/10.1016/j.solener.2015.07.024). *Solar Energy*.
 - Scottish and Southern Electricity Networks (2021).
   [TRANSITION](https://ssen-innovation.co.uk/transition/).
 - Scottish and Southern Electricity Networks (2025). [FastTrack, Alpha Round
