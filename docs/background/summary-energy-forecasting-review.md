@@ -273,7 +273,7 @@ time-series methods "still have very good performance compared to more complex m
 individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
-puts the weight on the NWP input Flexpectation is built around.** [Nguyen and Müsgens
+we found confirms the importance of NWP inputs at the lead times Flexpectation cares about.** [Nguyen and Müsgens
 (2026)](https://doi.org/10.1063/5.0300682) fit a separate regression for each horizon band for solar
 power forecasting, and beyond 6 hours ahead numerical weather prediction as an input is worth 11.6
 percentage points of skill score — the largest input effect they measure — while lagged power
@@ -284,8 +284,8 @@ whole of NGED's 1-to-14-day window in one category, so the figures say which inp
 at long range rather than how much.
 
 **For generators, the measured prize from better weather-to-power physics is largest at short lead
-times.** Differentiable physics attacks the weather-to-power half of the error, so on [Dantas and
-Browell (2026)](https://doi.org/10.1002/we.70079)'s measurement it has most to offer inside the
+times.** Differentiable physics (DP) attacks the weather-to-power half of the error, so on [Dantas
+and Browell (2026)](https://doi.org/10.1002/we.70079)'s measurement DP has most to offer inside the
 first 2 to 3 days of the 1-to-10-day window NGED acts on, and less beyond it, where the weather
 forecast itself is the binding constraint. Adding a learned residual to a physical generator model
 is established practice: [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) fit a
@@ -380,8 +380,7 @@ capacity time series instead, by quadratic optimisation against a capacity facto
 reanalysis weather and a power curve, and they publish a monotonic variant alongside a non-monotonic
 one. The direction of travel is what matters for NGED: a turbine out for repair for a month makes
 effective capacity *fall*, and a ratchet cannot follow it down. Flexpectation v1 will therefore
-implement the estimators that can fall as well as rise, and keep the running maximum only as the
-reference method the published numbers are quoted against.
+implement estimators that can fall as well as rise.
 
 **The published numbers favour fitting over ratcheting, with one caveat that lands on NGED's case.**
 [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) say the running maximum "requires
