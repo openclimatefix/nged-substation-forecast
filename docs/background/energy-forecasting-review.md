@@ -642,9 +642,12 @@ no account of the fault, "performed extremely poorly as a result".
 
 ### 4. Detecting switching events
 
-**In summary.** One paper detects switching at a real network operator, using a bottom-up reference
-series NGED does not have; the GB precedent drew the same distinction in 2016 but never measured how
-often its rule was right.
+**In summary.** One paper detects switching at a real network operator, but detects it in the gap
+between the substation's own meter and a second estimate of the same load, built from smart-meter
+and bulk-customer readings taken below the substation — a second estimate NGED does not have.
+Electricity North West's ATLAS project sorted step changes into faulty metering and network
+reconfigurations on GB substations in 2016, from power measurements alone, and published no
+precision or recall for either rule.
 
 **The challenge.** When a cable fault or planned maintenance moves part of a network from one
 substation to another, the load a substation meters steps up and its neighbour's steps down, with no
@@ -653,16 +656,16 @@ an abnormal running arrangement. Switching labels exist for the 32-series trial 
 wider network, so a method that is to scale to the wider network has to work from power measurements
 alone.
 
-**One paper detects these events at a real network operator, in order to strip them out before
-estimating how much load a substation carries.** [Bouman et al.
-(2024)](https://arxiv.org/abs/2405.16164), working with the Dutch network operator Alliander, study
-180 primary substations at 15-minute resolution over roughly a year, detecting the step changes
-caused when a cable fault or planned maintenance reroutes part of a subgrid to a different
-substation. Events run from a few minutes to several months.
- [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) is
-the most directly useful paper in this review, and it leaves the forecasting half untouched, which
-is what Flexpectation would add: keeping a forecast running through the events rather than deleting
-them.
+**One paper detects these events at a real network operator, and stops at the detection.** [Bouman
+et al. (2024)](https://arxiv.org/abs/2405.16164), working with the Dutch network operator Alliander,
+study 180 primary substations at 15-minute resolution over roughly a year, detecting the step
+changes caused when a cable fault or planned maintenance reroutes part of a subgrid to a different
+substation. Events run from a few minutes to several months. What Alliander wants from the detection
+is a clean maximum and minimum load for each substation, because those two extremes decide whether
+the substation needs a bigger transformer or can take on more customers, and a switch pushes both of
+them to the wrong value. The detected periods are therefore cut out of the history before the
+extremes are read off. Forecasting is the half Flexpectation would add: a forecast that keeps
+running through a switching event, rather than a history with the switched periods removed.
 
 **[Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s central trick is to detect on a
 residual rather than on the load itself.** Alliander maintains an independent bottom-up estimate of
@@ -671,9 +674,22 @@ fit and rescale that bottom-up estimate to the measured series, then hunt for st
 *difference* between the estimate and the measurement. Normal daily and seasonal variation largely
 cancels, leaving a much cleaner signal. NGED has no bottom-up estimate of substation load, and
 building one is not in Flexpectation's scope, because the project uses no telemetry from below
-primary substation level.
-Flexpectation does, though, produce its own forecast, which can serve as the reference series in the
-same way.
+primary substation level. Flexpectation does, though, produce its own forecast, which can serve as
+the reference series in the same way.
+
+**The measured accuracy is modest, and worst on the short events.** [Bouman et al.
+(2024)](https://arxiv.org/abs/2405.16164) score every detector with the F1.5 score, which blends
+precision — the share of flagged points that really were switching — with recall — the share of
+switched points the detector flagged — weighting recall 1.5 times as heavily as precision. An F1.5
+score of 1 is a perfect detector and 0 is a useless one, so higher is better. They report the score
+separately for four event lengths: 15 minutes to 6 hours, 6 hours to 3 days, 3 to 42 days, and 42
+days or longer. On the two shortest bands the best detectors, statistical process control and an
+isolation forest, reach about 0.2, and binary segmentation scores near what random guessing would
+give. On the longest band binary segmentation reaches nearly 0.5. Combining the detectors, by
+flagging a point if any of them fired, raised recall but added enough false positives that the
+combination did not inherit statistical process control's strength on short events: on the two
+shortest bands the combined detectors scored only marginally better than binary segmentation on its
+own.
 
 **A GB network operator separated switching from bad data in 2016, with cruder tools and no
 published accuracy.** Electricity North West's
@@ -683,17 +699,17 @@ times the size of Flexpectation's trial area. It works in stages. The first flag
 firing where the half-hourly change in demand exceeds ±80% of the standard deviation of the demand
 series. The second then decides what kind of change it was, and the second stage is the part that
 matters here: one rule handles blocks of "unreasonably zero or negative demand", and a separate rule
-handles "switching operations and network reconfigurations".  So the distinction between a broken meter and a
-reconfigured network was drawn on GB primary substations, on power alone, without a bottom-up
-reference series. ATLAS was a data-preparation project rather than a detector-benchmarking one, so
-it reports no precision or recall figures for either rule, and it pairs them with "the importance of
-visual sense checks of the obtained processed demand data".
+handles "switching operations and network reconfigurations". So the distinction between a broken
+meter and a reconfigured network was drawn on GB primary substations, on power alone, without a
+bottom-up reference series. ATLAS was a data-preparation project rather than a detector-benchmarking
+one, so it reports no precision or recall figures for either rule, and it pairs them with "the
+importance of visual sense checks of the obtained processed demand data".
 
-**Where the gaps are: the published method detects on a residual we cannot build the same way, and
-the events NGED cares about are harder than the ones detected.** A switch at NGED usually fans out
-to two or three neighbouring substations rather than one, and the common case is a *partial*
-transfer — a continuous fraction of the load moving, with no minimum size — rather than a whole
-subgrid.
+**Where the gaps are: the published method needs a second, independently-built load series for the
+same substation, which NGED does not have, and the events NGED cares about are harder than the ones
+detected.** A switch at NGED usually fans out to two or three neighbouring substations rather than
+one, and the common case is a *partial* transfer — a continuous fraction of the load moving, with no
+minimum size — rather than a whole subgrid.
 
 ### 5. Forecasting a substation as if it were always in its normal running arrangement
 

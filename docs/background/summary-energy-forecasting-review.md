@@ -414,30 +414,41 @@ alone.
 
 #### What the literature says
 
-One paper detects switching at a real network operator, using a bottom-up reference series NGED does
-not have; the GB precedent drew the same distinction in 2016 but never measured how often its rule
-was right.
+One paper detects switching at a real network operator, but detects it in the gap between the
+substation's own meter and a second estimate of the same load, built from smart-meter and
+bulk-customer readings taken below the substation — a second estimate NGED does not have.
+Electricity North West's ATLAS project sorted step changes into faulty metering and network
+reconfigurations on GB substations in 2016, from power measurements alone, and published no
+precision or recall for either rule.
 
 #### What this means for Flexpectation
 
-Set expectations from the one measured result rather than from how obvious a switch looks on a
-chart: F-scores near 0.2 on the shortest events and around 0.5 on the longest, achieved on a Dutch
-network using a reference series NGED does not have. NGED's switches are usually partial and fan out
-to two or three substations, so expect worse than that rather than better. A negative result is
-worth having here, because evidence that switching cannot be recovered from power data alone would
-justify extracting switching labels from operational systems instead of continuing to infer them.
+**Only one published result measures how well switching can be detected from data, and it sets a low
+ceiling.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score their detectors with the
+F1.5 score, which blends precision — the share of flagged points that really were switching — with
+recall — the share of switched points the detector flagged — weighting recall the more heavily of
+the two. An F1.5 score of 1 is a perfect detector and 0 is a useless one, so higher is better. On
+events shorter than 3 days their best detectors reach about 0.2; on events of 42 days or longer,
+about 0.5. Both figures were achieved on a Dutch network, with the help of a second load estimate
+NGED does not have. NGED's switches are usually partial and fan out to two or three substations, so
+plan for worse than 0.2 to 0.5 rather than better, and do not judge the difficulty from how obvious
+a switch looks on a chart. A negative result is worth having here, because evidence that switching
+cannot be recovered from power measurements alone would justify extracting switching labels from
+NGED's operational systems instead of continuing to infer them.
 
-**The one directly useful paper leaves untouched the half Flexpectation would add.** [Bouman et al.
-(2024)](https://arxiv.org/abs/2405.16164), working with the Dutch network operator Alliander, study
-180 primary substations at 15-minute resolution over roughly a year, detecting events that run from
-a few minutes to several months — but they detect switching in order to strip it out before
-estimating how much load a substation carries, and leave the forecasting half alone. Flexpectation
-would keep a forecast running through the events rather than deleting them.
+**The one directly useful paper detects switching but never forecasts, and forecasting is the half
+Flexpectation would add.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164), working with
+the Dutch network operator Alliander, study 180 primary substations at 15-minute resolution over
+roughly a year, detecting events that run from a few minutes to several months. Alliander's purpose
+is capacity planning: a switch pushes the maximum and minimum load a substation records to the wrong
+value, and those two extremes decide whether the substation needs a bigger transformer, so the
+detected periods are cut out of the history before the extremes are read off. Flexpectation needs a
+forecast that keeps running through a switching event instead.
 
-**Where the gaps are: the published method detects on a residual we cannot build the same way, and
-the events NGED cares about are harder than the events detected.** A switch at NGED usually fans out
-to two or three neighbouring substations rather than one, and the common case is a *partial*
-transfer rather than a whole subgrid.
+**Where the gaps are: the published method needs a second, independently-built load series for the
+same substation, which NGED does not have, and the events NGED cares about are harder than the
+events detected.** A switch at NGED usually fans out to two or three neighbouring substations rather
+than one, and the common case is a *partial* transfer rather than a whole subgrid.
 
 ### 5. Forecasting a substation as if it were always in its normal running arrangement
 
