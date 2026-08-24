@@ -96,15 +96,14 @@ independently picked XGBoost on the balance of accuracy against effort, and no s
 large, dependable margin for anything more sophisticated at substation level. Both network
 deployments that actually tried boosted trees — [Pinheiro et al.
 (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) and Artificial Forecasting — kept a simpler
-model instead, so expect the choice of model family to matter less than the data, the features and
-how often the model is refitted. Finding 1 below gives the two reasons this
-literature keeps settling on the simpler model: the extra accuracy was not there to be had, and the
-cost of tuning and the loss of interpretability then decided against the more complicated one. Read
-those results with one thing in mind, though — when a paper says "XGBoost" it usually means a
-lighter model than the one we plan. [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) give
-theirs lagged power, weather, time and metadata and nothing beyond that: no clear-sky index, no wind
-power curve, no monotone constraints. [Pinheiro et al.
-(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) keep that caveat honest, because their
+model instead, and Pinheiro et al. give two reasons for doing so: there was no accuracy gain to be
+had, and the cost of tuning the booster and the interpretability given up with it decided the rest.
+So expect the choice of model family to matter less than the data, the features and how often the
+model is refitted. Read those results with one thing in mind, though — when a paper says "XGBoost"
+it usually means a lighter model than the one we plan. [Kaas et al.
+(2026)](https://arxiv.org/abs/2607.01966) give theirs lagged power, weather, time and metadata and
+nothing beyond that: no clear-sky index, no wind power curve, no monotone constraints. [Pinheiro et
+al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) keep that caveat honest, because their
 booster and their generalised additive model were fitted on identical features and the simpler model
 still won. What the literature does not underwrite is the rest of the specification: nobody has
 driven substation uncertainty from a weather ensemble over 14 days, and [Browell and Fasiolo
