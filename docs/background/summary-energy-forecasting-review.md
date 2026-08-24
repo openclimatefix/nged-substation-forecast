@@ -281,10 +281,12 @@ capacity of a region. When an export-cable fault cut that wind farm's available 
 mid-competition, the winning team clipped its quantiles to the capacity implied by the outage
 notices the farm is obliged to publish, while the organisers' benchmark ignored the fault and, in
 [Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
-extremely poorly as a result". NGED's embedded generators publish no such notices, and NGED holds no
-dependable capacity, panel tilt, panel azimuth, or ratio of direct-current to alternating-current
-rating for them. A differentiable model has the ability to infer these properties of each generator.
-Each half of that fitting has been made to work on its own: [Pierrot and Pinson
+extremely poorly as a result". NGED's embedded generators publish no such notices. NGED's Embedded
+Capacity Register does give a registered capacity for the larger distributed generators, but a
+registered capacity is static — what was connected, not what is available today — and the register
+carries no panel tilt, panel azimuth, or ratio of direct-current to alternating-current rating. A
+differentiable model has the ability to infer these properties of each generator. Each half of that
+fitting has been made to work on its own: [Pierrot and Pinson
 (2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind farm's capacity as a
 time-varying bound fitted jointly with the forecast, and beat probabilistic persistence by 34.2% on
 continuous ranked probability score over 14 months at the Anholt offshore wind farm, though their
