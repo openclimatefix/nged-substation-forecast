@@ -304,11 +304,12 @@ literature, so Flexpectation treats it as a hypothesis to test rather than a set
 et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan et al.
 (2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's tilt and azimuth from
 its metered alternating-current power output paired with an irradiance series measured somewhere
-else — a weather station up to 195 km away for Meng et al., satellite images for Saint-Drenan et al.
-— and land within a few degrees, but report their accuracy in degrees alone. Saint-Drenan et al.
-also found that an azimuth fitted 5° from the true one gave better simulations than the true value,
-because the fit balances the systematic error of the physical model — so accuracy in degrees is the
-wrong target. What matters is an *effective* tilt and azimuth that make the forecast right.
+else — a weather station up to 195 km away for Meng et al., HelioClim-3 satellite-derived irradiance
+for Saint-Drenan et al. — and land within a few degrees, but report their accuracy in degrees alone.
+Saint-Drenan et al. also found that an azimuth fitted 5° from the true azimuth gave better
+simulations than the true value, because the fit balances the systematic error of the physical model
+— so accuracy in degrees is the wrong target. What matters is an *effective* tilt and azimuth that
+make the forecast right.
 
 **The two cases Flexpectation faces need different machinery, and the dividing line is the limit
 Saint-Drenan et al. state.** For a single metered site, fitting tilt, azimuth, and the effective
