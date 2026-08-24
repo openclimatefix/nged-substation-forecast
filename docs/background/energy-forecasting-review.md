@@ -688,6 +688,18 @@ switching event cannot contaminate the expected-power estimate the way a lagged 
 Neither route needs metering from below the substation. Whether a modelled reference detects
 switching as well as a measured one is what the project has to find out.
 
+**Flexpectation also plans to use a signal that a one-substation-at-a-time method cannot see: the
+power has to go somewhere.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score each
+substation against its own history — "the current analysis considers one year of measurements for
+one station at a time" — so nothing in the method asks whether the power that left one substation
+turned up at another. Flexpectation intends to look for both sides of the transfer: when one
+substation's metered power drops, the substations that picked the load up should rise at the same
+moment, and their rises should sum to the drop. A step that fails to balance that way is more likely
+a meter fault or a one-off than a switch, which is where a per-substation detector spends its false
+positives. The catch is that an NGED transfer usually fans out across two or three neighbours, so
+the search runs over subsets of neighbours rather than over pairs, and the balance holds only
+approximately.
+
 **The measured accuracy is modest, and worst on the short events.** [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164) score every detector with the F1.5 score, which blends
 precision — the share of flagged points that really were switching — with recall — the share of

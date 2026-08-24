@@ -415,13 +415,13 @@ work from power measurements alone.
 
 #### What the literature says
 
-We only found two relevant papers: One paper detects switching at a real network operator, but
-detects it in the gap between the substation's own meter and a second estimate of the same load,
-built from smart-meter and bulk-customer readings taken below the substation. The second paper
-describes Electricity North West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/)
-project, which sorted step changes into faulty metering and network reconfigurations on GB
-substations in 2016, from power measurements alone, and published no precision or recall for either
-rule.
+We only found two relevant papers: [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) detect
+switching at a real network operator, but detect it in the gap between the substation's own meter
+and a second estimate of the same load, built from smart-meter and bulk-customer readings taken
+below the substation. The second paper describes Electricity North West's
+[ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project, which sorted step changes
+into faulty metering and network reconfigurations on GB substations in 2016, from power measurements
+alone, and published no precision or recall for either rule.
 
 #### What this means for Flexpectation
 
@@ -458,6 +458,18 @@ leaving a remainder in which a switch shows up as a sustained level shift. The s
 project's existing XGBoost machinery, trained with no power-lag features, so that an earlier
 switching event cannot contaminate the expected-power estimate. Neither route needs metering from
 below the substation.
+
+**Flexpectation also plans to use a signal that a one-substation-at-a-time method cannot see: the
+power has to go somewhere.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score each
+substation against its own history — "the current analysis considers one year of measurements for
+one station at a time" — so nothing in the method asks whether the power that left one substation
+turned up at another. Flexpectation intends to look for both sides of the transfer: when one
+substation's metered power drops, the substations that picked the load up should rise at the same
+moment, and their rises should sum to the drop. A step that fails to balance that way is more likely
+a meter fault or a one-off than a switch, which is where a per-substation detector spends its false
+positives. The catch is that an NGED transfer usually fans out across two or three neighbours, so
+the search runs over subsets of neighbours rather than over pairs, and the balance holds only
+approximately.
 
 **Where the gaps are: [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s published method
 needs a second, independently-built load series for the same substation, which NGED does not have,
