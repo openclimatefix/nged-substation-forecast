@@ -124,6 +124,16 @@ and never buy elegance with a referent the reader has to hunt for.
 "73 GB wind farms" makes the reader parse a noun-pile and can be read as a unit of measure. Where a
 qualifier can attach to more than one noun, move it or add the word that pins it down.
 
+**Use numerals when the number carries a unit, is 10 or more, or sits beside another numeral in the
+same phrase; use words otherwise.** So "5 years of half-hourly data", "50,000 substations" and "6
+solar farms, 3 wind farms", but "the eight challenges" and "nine ideas in ten". Reserving numerals
+for measured quantities makes the figures the reader cares about jump off the page on a skim, and
+stops one horizon appearing as "day four" in one paragraph and "day 4" in the next. Never open a
+sentence with a numeral: recast so the number falls inside the sentence ("Of the 32 series, 12 are
+metered generators"), or spell the number out. Counts of the document's own structure ("three model
+families") and idiomatic ratios ("nine ideas in ten") stay in words, because neither is a
+measurement.
+
 **Be concise by cutting whole sentences, not words.** Prose should be as short as it can be
 without losing readability, but the compressible material is rarely inside a sentence. It is whole
 sentences and paragraphs that carry no information: restating the heading, summarising what the
