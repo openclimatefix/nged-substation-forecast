@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 import sys
+import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from itertools import pairwise
@@ -146,13 +147,19 @@ def check_duplicates(references: list[Reference]) -> list[str]:
     return [f"{count}x {url}" for url, count in counts.items() if count > 1]
 
 
+def sort_key(surname: str) -> str:
+    """Return the key `surname` sorts under, folding diacritics so Hüttel files under Huttel."""
+    decomposed = unicodedata.normalize("NFKD", surname)
+    return "".join(char for char in decomposed if not unicodedata.combining(char)).lower()
+
+
 def check_alphabetical(references: list[Reference]) -> list[str]:
     """Return every adjacent pair of entries that is out of alphabetical order by surname."""
     surnames = [ref.surname for ref in references]
     return [
         f"{first!r} precedes {second!r}"
         for first, second in pairwise(surnames)
-        if first.lower() > second.lower()
+        if sort_key(surname=first) > sort_key(surname=second)
     ]
 
 

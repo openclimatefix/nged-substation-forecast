@@ -502,7 +502,9 @@ Researchers respond in one of three ways: leaving the level shifts in and paying
 [Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405) do; rewriting the
 history, as [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) do; or adapting
 to the new level, as [de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) do. We
-found nobody who feeds the contamination to a model deliberately, as information.
+found one substation study that conditions its forecast on an operating-state label, for a switch of
+a different kind, and none that both hands a model the record of when the network was abnormal and
+refuses to let the model predict those periods.
 
 #### What this means for Flexpectation
 
@@ -531,6 +533,32 @@ substation would have carried under its normal arrangement, which is the quantit
 as information rather than as damage.** Instead of correcting the series, a model could be fed the
 difference between what a substation actually metered and what a model that ignores network topology
 expected it to meter.
+
+**Flexpectation v1 will try both halves of that idea at once: the abnormal periods become an input,
+and they stop being a target.** The plan is to label each substation's abnormal running arrangements
+explicitly, hand those labels to the model as features so it can read its own lagged power inputs
+correctly when a lag falls inside an abnormal period, and drop the abnormal half-hours from the
+training target, so the model is never asked to predict an abnormal arrangement. The nearest
+published precedent for the first half is [Liu et al.
+(2019)](https://doi.org/10.1109/ACCESS.2019.2951422), who fit a separate regression per substation
+operating condition — though their switching moves load between transformers inside one substation,
+so the substation total stays metered and the never-metered-target problem does not arise for them.
+For the second half, [Salinas et al. (2020)](https://doi.org/10.1016/j.ijforecast.2019.07.001) state
+the mechanism for a probabilistic forecaster, motivated by retail stock-outs, and say they omitted
+the experiments for it. Searching OpenAlex, Crossref, and arXiv, we found no load-forecasting study
+reporting what dropping contaminated periods from the training target is worth, so Flexpectation
+will have to measure that itself.
+
+**Later research will go further and treat the normal-arrangement demand as a latent variable to be
+inferred, rather than a series to be repaired first**, through a differentiable-physics model of
+each substation with separate photovoltaic, wind, and demand components. Recovering a demand the
+meter never saw is mature where demand is censored — airline revenue management calls it
+unconstraining, and retail and electric-vehicle-charging work calls it censored-demand recovery, as
+in [Hüttel et al. (2023)](https://arxiv.org/abs/2301.06418) — but censoring is one-sided, so the
+observed value bounds the latent one from below, whereas an abnormal running arrangement substitutes
+a different set of customers and can read either side of the normal-arrangement demand. We found no
+published model that recovers a latent normal-running-arrangement demand for a distribution
+substation.
 
 ### 6. Detecting faulty metering
 
@@ -1222,6 +1250,9 @@ sources that this summary does not.
 - Hong, T., Pinson, P., Wang, Y., Weron, R., Yang, D. and Zareipour, H. (2020). [Energy Forecasting:
   A Review and Outlook](https://doi.org/10.1109/OAJPE.2020.3029979). *IEEE Open Access Journal of
   Power and Energy*.
+- Hüttel, F. B., Rodrigues, F. and Pereira, F. C. (2023). [Mind the Gap: Modelling
+  Difference Between Censored and Uncensored Electric Vehicle Charging
+  Demand](https://arxiv.org/abs/2301.06418).
 - Huyghues-Beaufond, N., Tindemans, S., Falugi, P., Sun, M. and Strbac, G. (2020). [Robust and
   automatic data cleansing method for short-term load forecasting of distribution
   feeders](https://doi.org/10.1016/j.apenergy.2019.114405). *Applied Energy*.
@@ -1240,6 +1271,9 @@ sources that this summary does not.
 - Lerch, S., Thorarinsdottir, T. L., Ravazzolo, F. and Gneiting, T. (2017). [Forecaster’s Dilemma:
   Extreme Events and Forecast Evaluation](https://doi.org/10.1214/16-STS588). *Statistical Science*.
 - LF Energy. [OpenSTEF](https://lfenergy.org/projects/openstef/).
+- Liu, R., Wang, S., Wei, C., Li, T. and Lin, Y. (2019). [Two-Stage Short-Term Load
+  Forecasting for Power Transformers Under Different Substation Operating
+  Conditions](https://doi.org/10.1109/ACCESS.2019.2951422). *IEEE Access*.
 - Ludwig, N., Arora, S. and Taylor, J. W. (2023). [Probabilistic load forecasting using
   post-processed weather ensemble predictions](https://doi.org/10.1080/01605682.2022.2115411).
   *Journal of the Operational Research Society*.
@@ -1280,6 +1314,10 @@ sources that this summary does not.
 - Saint-Drenan, Y.-M., Bofinger, S., Fritz, R., Vogt, S., Good, G. H. and Dobschinski, J. (2015).
   [An empirical approach to parameterizing photovoltaic plants for power forecasting and
   simulation](https://doi.org/10.1016/j.solener.2015.07.024). *Solar Energy*.
+- Salinas, D., Flunkert, V., Gasthaus, J. and Januschowski, T. (2020). [DeepAR:
+  Probabilistic forecasting with autoregressive recurrent
+  networks](https://doi.org/10.1016/j.ijforecast.2019.07.001). *International Journal of
+  Forecasting*.
 - Scottish and Southern Electricity Networks (2021).
   [TRANSITION](https://ssen-innovation.co.uk/transition/).
 - Scottish and Southern Electricity Networks (2025). [FastTrack, Alpha Round
