@@ -256,12 +256,15 @@ with performance depending heavily on implementation. NGED's own EFFS project se
 it evaluated model families. Two results cut the other way, and both argue for combining models
 rather than against trees: team Rnt finished third in HEFTCom using no tree-based model, and [Nguyen
 and Müsgens (2026)](https://doi.org/10.1063/5.0300682), meta-analysing 4,687 skill scores extracted
-from 188 solar forecasting papers, find that beyond 6 hours ahead ensemble-hybrid models beat plain
-time-series methods by 7.0 percentage points of skill score and pure ensemble models by 8.3, while
-individual machine-learning models, numerical-weather-prediction models, and regressions show no
-significant advantage over time-series methods at that horizon at all. Their own advice is to
-exhaust the simple models first, because time-series methods "still have very good performance
-compared to more complex methods such as individual ML models".
+from 188 solar forecasting papers, find that beyond 6 hours ahead ensemble-hybrid models beat
+classical statistical time-series models — the autoregressive integrated moving average family,
+exponential smoothing, and their multivariate relatives such as autoregressive models with exogenous
+inputs — by 7.0 percentage points of skill score, and pure ensemble models beat the same family by
+8.3. Individual machine-learning models, numerical-weather-prediction models, and regressions show
+no significant advantage over that classical family at that horizon at all, and gradient-boosted
+trees sit in their machine-learning class. Their own advice is to exhaust the simple models first,
+because time-series methods "still have very good performance compared to more complex methods such
+as individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
 puts the weight on exactly the input Flexpectation is built around.** [Nguyen and Müsgens
