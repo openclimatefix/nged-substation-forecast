@@ -282,8 +282,8 @@ mid-competition, the winning team clipped its quantiles to the capacity implied 
 notices the farm is obliged to publish, while the organisers' benchmark ignored the fault and, in
 [Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
 extremely poorly as a result". NGED's embedded generators publish no such notices. NGED's Embedded
-Capacity Register does give a registered capacity for generation of 50 kW and above: in the May 2026
-edition, 5,500 connected generators totalling 10,938 MW, of which 3,995 sites and 5,669 MW are
+Capacity Register does give a registered capacity for generation of 50 kW and above: in the August
+2026 edition, 5,598 connected generators totalling 11,456 MW, of which 4,202 sites and 5,958 MW are
 solar. But a registered capacity is contractual rather than operational — the export limit is the
 one "permitted as per the connection agreement" — and the register carries no panel tilt, panel
 azimuth, or ratio of direct-current to alternating-current rating. A differentiable model has the
@@ -306,7 +306,7 @@ et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan 
 its own output, to a few degrees, but report their accuracy in degrees alone. Saint-Drenan et al.
 also found that an azimuth fitted 5° from the true one gave better simulations than the true value,
 because the fit balances the systematic error of the physical model — so accuracy in degrees is the
-wrong target. What matters is an effective tilt and azimuth that make the forecast right.
+wrong target. What matters is an *effective* tilt and azimuth that make the forecast right.
 
 **The two cases Flexpectation faces need different machinery, and the dividing line is the limit
 Saint-Drenan et al. state.** For a single metered site, fitting tilt, azimuth, and the effective

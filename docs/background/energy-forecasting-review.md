@@ -377,14 +377,14 @@ its quantiles to the capacity implied by the outage notices the farm is obliged 
 the organisers' benchmark ignored the fault and, in [Browell et al.
 (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed extremely poorly as a
 result". NGED's embedded generators publish no such notices. NGED's Embedded Capacity Register does
-give a registered capacity for generation of 50 kW and above: in the May 2026 edition, 5,500
-connected generators totalling 10,938 MW, of which 3,995 sites and 5,669 MW are solar, and 4,892 of
-the 5,500 name the primary substation they connect at. But a registered capacity is contractual
+give a registered capacity for generation of 50 kW and above: in the August 2026 edition, 5,598
+connected generators totalling 11,456 MW, of which 4,202 sites and 5,958 MW are solar, and 4,996 of
+the 5,598 name the primary substation they connect at. But a registered capacity is contractual
 rather than operational — the export limit is the one "permitted as per the connection agreement" —
 and the register carries no panel tilt, panel azimuth, or ratio of direct-current to
 alternating-current rating for any of them. The one field that would bear on availability, the flag
 for a flexible connection under Active Network Management, was unpopulated for every connected
-generator in the May 2026 edition. A differentiable plant model would therefore start from the
+generator in the August 2026 edition. A differentiable plant model would therefore start from the
 registered capacity and fit the rest, including the day-to-day availability that a register cannot
 express. Each half of that fitting has been made to work on its own: [Pierrot and Pinson
 (2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind farm's capacity as a
