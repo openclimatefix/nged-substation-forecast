@@ -340,8 +340,8 @@ biofuel plant inside a net-demand forecast.** For the battery there is at least 
 [Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469) recover a price-taking storage
 operator's own optimisation parameters by gradient descent on historical prices and observed
 dispatch, and prove the recovered parameters converge to the true ones for a class of storage
-models.   We found no method worth borrowing for the gas generator or the biofuel plant; what
-little exists forecasts a gas or biofuel plant's own output directly rather than as a component of a
+models. We found no method worth borrowing for the gas generator or the biofuel plant; what little
+exists forecasts a gas or biofuel plant's own output directly rather than as a component of a
 substation's net demand. Otherwise the closest the literature comes is a warning rather than a
 method: [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) found that sites
 serving a single customer were forecast markedly worse than the rest (finding 3 below). We read that
@@ -1246,7 +1246,11 @@ binary flag — on feeders whose target is net load with heavy solar feed-in. Th
 read as a foundation model beating a lightly-featurised gradient booster than as a verdict on
 gradient boosting. [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) are the
 exception, and the more uncomfortable result for us: their booster and their generalised additive
-model were fitted on identical features, and the simpler model still won.
+model were fitted on identical features, and the simpler model still won. Even there the shared
+feature set was short — a linear trend, load lagged 24 hours and one week, time of day, nine day
+types, the named public holidays, day of year, and temperature interacted with time of day and with
+day of year, with temperature unfolded to its first three powers for the booster — and it carried no
+irradiance and no wind, though the six weather fields they downloaded held both.
 
 ### 2. In every study that forecast more than one voltage level, accuracy got worse further down the network
 
@@ -1276,9 +1280,9 @@ levels is something this project can measure, and we intend to.
 
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) found that their model beat
 a "same time yesterday" forecast at 83–87% of network-owned secondary substations but at only 66–70%
-of customer-owned ones.  We do not know that
-NGED's primary substations will behave the same way, and they may not, because a primary substation
-aggregates far more customers than a Portuguese secondary substation does.
+of customer-owned ones. We do not know that NGED's primary substations will behave the same way, and
+they may not, because a primary substation aggregates far more customers than a Portuguese secondary
+substation does.
 
 ### 4. In the studies we read, standard accuracy measures rewarded flat forecasts that would be of little use for flexibility procurement
 
