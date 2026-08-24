@@ -125,6 +125,26 @@ adding no skill over either, and without these rows nobody would know.
 Side benefit: several more `BaseForecaster` implementations pressure-test the abstraction (the
 docs promise the interface is model-agnostic; today only `XGBoostForecaster` exercises it).
 
+**How much the choice of reference moves the answer has been measured, and it argues for reading a
+win over either bookend as the optimistic end of the range.** [Nguyen and Müsgens
+(2026)](https://doi.org/10.1063/5.0300682) include the reference model as a regressor across 4,687
+skill scores drawn from 188 solar forecasting papers, and find that a forecast scored against plain
+persistence reports a skill score 10.7 percentage points higher at horizons beyond 6 hours than the
+same forecast scored against a convex combination of smart persistence and climatology, with smart
+persistence alone 9.0 points higher. They recommend the combination as the more demanding benchmark.
+Two differences before carrying the number across: their smart persistence is persistence corrected
+by the clearness index and their climatology is a constant equal to the sample mean, both narrower
+than the rows described here, and their sample is deterministic solar forecasting rather than
+probabilistic substation net demand. The direction survives both — a margin over persistence alone,
+or over climatology alone, flatters a forecast that a combined reference would judge more harshly.
+
+**That is an argument for keeping `nged_incumbent` as the headline bar, not for building a fourth
+baseline.** The incumbent already blends recency with seasonality — the last 6 weeks of
+same-weekday, same-time-of-day analogues alongside the 49-to-55-weeks-back group — so it plays on
+substation load the role the combined reference plays on irradiance, and it is the bar that decides
+whether the project is worth its money. Persistence and climatology stay as diagnostic bookends,
+read as the loose end of the range rather than as the benchmark a win should be claimed against.
+
 ### Implementation details — baselines (deleted when they ship)
 
 Five PRs, in order. PRs 1–2 are shared-framework groundwork (no baseline yet); PRs 3–5 add one
