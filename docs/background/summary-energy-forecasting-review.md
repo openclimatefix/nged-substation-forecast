@@ -1,14 +1,13 @@
 # The current state of the art in energy forecasting: a summary
 
 This is a short version of a literature review Open Climate Fix carried out for National Grid
-Electricity Distribution, as part of the Flexpectation project. The summary is meant to be read on
+Electricity Distribution, as part of the Flexpectation project. This summary is meant to be readable on
 its own. The full review, which cites eighty sources and gives the evidence
-behind every claim here, is published at
-<https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/>,
+behind every claim here, is [published online](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/),
 and is referred to below as "the full review".
 
 Before we discuss the literature, there is a very important caveat to admit up-front: In 2026, no
-honest narrative review of the energy forecasting literature can claim to reveal the canonical
+honest review of the energy forecasting literature can claim to reveal the canonical
 "state of the art"! That is because (almost) all energy forecasting papers measure performance in
 different ways, against different datasets. It's like an international football tournament where
 every team plays by different rules, with different size goals.
@@ -24,16 +23,18 @@ Having said that, there have been some valiant attempts to compare multiple fore
 against the same dataset. But none of these attempts directly address the main challenges relevant
 to Flexpectation. Before we discuss those attempts, we must emphasise two reasons for optimism:
 
+## Reasons for optimism
+
 Firstly, whilst we might not know exactly which algorithms provide the best forecasting performance,
-we do know how to go about finding out. There's no magic. Machine learning is an empirical science,
-and progress in it comes largely from testing many ideas under identical conditions and measuring
-carefully — because most ideas fail. John Jumper, who shared the 2024 Nobel Prize in Chemistry for
-his work on AlphaFold, puts the share of research ideas that fail at around 90%, and treats that
-rate as an ordinary and necessary feature of doing research rather than as evidence of doing it
-badly ([Nobel Week interview](https://www.nobelprize.org/prizes/chemistry/2024/jumper/interview/), 6
-December 2024, from 14:12). If roughly one idea in ten survives contact with the data, ten attempts
-is simply the price of one result. So our task is to run hundreds of ML experiments, and then
-measure performance against the same dataset, using the same performance metrics.
+we *do* know how to *research and develop* a state of the art forecast. There's no magic. Machine
+learning is an empirical science, and most research ideas fail. John Jumper, who shared the 2024
+Nobel Prize in Chemistry for his work on AlphaFold, puts the share of research ideas that fail at
+around 90%, and treats that rate as an ordinary and necessary feature of doing research rather than
+as evidence of doing it badly ([Nobel Week
+interview](https://youtu.be/nNM1QdmFwIs?si=5pnuZSd6sM8l8vyU&t=852), December 2024). So
+progress comes largely from being able to quickly test many ideas under identical conditions and
+carefully measure performance. We have built an MLOps framework that should allow us to
+test research ideas as efficiently as possible.
 
 Secondly - and perhaps most importantly - the fact that the industry doesn't yet know the state of
 the art is a huge opportunity for the Flexpectation project: We are in a very privileged position
@@ -42,136 +43,84 @@ opportunity to make a significant contribution to the energy forecasting industr
 "leaderboards of ML experiments", and hence help the industry as a whole to better understand how
 multiple approaches perform.
 
-## What we read, and what Flexpectation is
+## AI disclosure
 
-Flexpectation forecasts net demand — demand minus whatever generation sits behind the substation —
-at NGED's grid supply points, bulk supply points and primary substations. The forecast is
-half-hourly, runs 14 days ahead, is reissued every six hours, and states a range of possible loads
-with a probability attached to each rather than a single number. Version one covers a 32-series
-trial area; the scale-up from 2027 covers the network.
+The bulk of the *ideas* in this literature review are "human". The structure of this literature
+review is human; the research questions are human; all the text above is written entirely manually,
+and the bulk of the text below is written manually.
 
-We read most of the papers an argument rests on in full; the other papers were available to us only
-as an abstract, a preprint or part of a paper, and wherever a claim rests on a partial read we say
-so at the point the claim is made. We also read the published deliverables of twelve
-network-innovation projects in GB. Papers may be missing for no better reason than that we did not
-find them, and the section "What this review excluded, and why" lists what we knowingly left out.
-Every statement below that we found no published work on something is a statement about our search
-rather than about the field: if you know of work that fills one of these gaps, we would rather cite
-it than repeat it, and we will correct this review.
+We used Claude Code as a "research assistant" for this literature review. Claude Code tirelessly
+searches the literature, downloads PDFs, creates tables summarising papers, traces citations
+forwards and backwards (to find updates on results published a few years ago), adversarially reviews
+its own text to check claims against the source PDFs, finds gaps in the literature, writes
+little Python scripts to download data published in the literature to confirm results, etc.
 
-One concurrent project is cited more than any paper: Northern Powergrid's Artificial Forecasting, an
-Ofgem Strategic Innovation Fund programme whose Alpha and Beta deliverables are both public, and
-which has its own section below. [Haben et al. (2021)](https://arxiv.org/abs/2106.00006) reviewed a
-final list of 221 low-voltage forecasting papers published to 2020, noting that the number they
-actually read is slightly smaller. [Shukla and Hong (2024)](https://doi.org/10.1049/stg2.12162)
-reports the BigDEAL Challenge 2022, a competition themed on forecasting the *timing* of peak demand
-rather than its size, which drew 78 teams from 27 countries and published its data alongside the
-paper.
+We're confident the facts in Claude's "research notes" are accurate because we configured Claude to
+check against the downloaded PDFs (rather than half-remembering information embedded in the LLM's
+weights), and because we ran on the order of one hundred rounds of agentic adversarial review
+and hundreds of manual fact checks. (The "literature review" process we developed is written up as a
+Claude Code "skill", viewable
+[here](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.claude/skills/literature-review/SKILL.md)).
 
-Almost every number in this review depends on where in the network it was measured, so here is the
-voltage ladder of a distribution network, from the top down:
+But - to our tastes - Claude struggles to write readable prose. So the text below has been heavily
+re-written (and cut down) by hand. 
 
-- **Grid supply point** — where the distribution network meets the transmission system, 400 kV or
-  275 kV down to 132 kV. Hundreds of thousands of customers sit below one.
-- **Bulk supply point** — 132 kV down to 33 kV or 66 kV. Tens of thousands of customers.
-- **Primary substation** — 33 kV or 66 kV down to 11 kV. A few thousand customers.
-- **Secondary substation** — 11 kV down to 400 V. Tens to a few hundred customers.
-- **Feeder and individual customer** — the bottom of the ladder, at 400 V.
-
-NGED owns 52 grid supply points, 271 bulk supply points and 1,161 primary substations. The 32 series
-of the trial area are 16 of those primary substations, two grid supply points, two bulk supply
-points and the 12 metered generators described under problem 2 below. **Flexpectation forecasts no
-secondary substations**, neither in the trial area nor in the network-wide scale-up, though several
-of the studies below do. GB is separately divided into 14 *grid supply point groups*, each a whole
-distribution region containing many grid supply points, and several studies below forecast those
-regions, which are far larger than any single substation.
-
-## How to read the numbers in this review
-
-**Two kinds of published number transfer to a different network, and other kinds do not.** A ratio
-against a baseline transfers, but only if the paper says what the baseline was and which substations
-it was averaged over. Those baselines differ far more than the prose in most papers suggests —
-yesterday's value at the same time, the average of the last four weeks, a day-type persistence rule
-and the long-run seasonal average all appear among the studies reviewed here, and a percentage gain
-against one baseline is not a percentage gain against another. A skill score — how much less error a
-forecast has than a stated benchmark, as a percentage — needs its benchmark named for the same
-reason.
-
-**Errors normalised by something physical also transfer.** An error expressed as a fraction of a
-substation's firm capacity or transformer rating comes far closer to meaning the same thing at every
-substation than an error expressed as a fraction of the load that happened to occur. Normalising by
-a rating is not exact, because a rating is itself a convention standing in for a limit that moves
-with air temperature, wind and the duration of the overload, so a paper that normalises this way
-should say which rating it used. An absolute error in kilowatts or megawatts tells NGED nothing on
-its own, because it depends entirely on how big the substation was, and none of the absolute figures
-below should be read as a target for this project.
-
-**Whether a study used the weather forecast a real forecaster would have had changes what its
-numbers mean.** In the table under problem 1 below, "real forecasts" means the weather forecast that
-was genuinely available when the power forecast was made; "actual weather, after the fact" means
-observations, or a weather model re-run after the event, that no forecaster would have had. Two of
-the studies in the table below use actual weather after the fact, which makes their figures upper
-bounds rather than achievable performance, because it removes the error that dominates beyond a day
-or two — precisely the range NGED acts on.
-
-**Terms used below.** **Pinball loss** scores a forecast that states a range rather than a single
-number, penalising it more heavily for missing on the side it claimed was unlikely. A **day-type
-persistence** benchmark predicts today's load from the most recent day of the same type — last
-Tuesday for a Tuesday. A **foundation model** is trained on large numbers of unrelated time series
-and then applied to a new one it has never seen. **Deterministic** means a single predicted number
-with no uncertainty attached.
-
-## The eight problems Flexpectation has to solve, and what the literature says about each
+## What the literature says about the eight problems Flexpectation aims solve
 
 Flexpectation's specification breaks into eight problems. This section takes each in turn, says what
 the problem is, reports the most relevant published results found in our literature search, and says
-where those results stop short. The coverage is uneven. The first problem has enough published
-results to tabulate, and the second problem is the most mature field on the list. For most of the
-remaining six we found no published result that could be compared against anything, so those are
-described in prose: the absence is itself the finding.
+where those results stop short. The coverage is uneven. The first problem (probabilistic forecasts
+of net demand at substations) has enough published results to tabulate, and the second problem
+(forecasting metered generators) is the most mature field on the list. For most of the remaining six
+we found no published result that could be compared against anything, so those are described in
+prose.
 
 ### 1. Probabilistic forecasts of net demand at substations
 
-**The problem.** Forecast net demand — demand minus whatever generation sits behind the substation —
-at every grid supply point, bulk supply point and primary substation, half-hourly, 14 days ahead,
-updated every six hours, as a range of possible loads with a probability attached to each rather
-than as a single number. NGED acts on the forecast one to ten days ahead, and the question NGED asks
-of the forecast is "how likely is load to cross this substation's firm capacity — the load the
-substation can carry safely with its largest transformer out of service?" rather than "what is the
-most likely load?". Forecasting net demand is the highest priority of the eight problems, and the
-other seven exist mainly to make that net-demand forecast better.
+**The problem.** "Net" demand is "gross" demand minus whatever generation sits behind the
+substation. In Flexpectation, we plan to forecast net demand at every grid supply point, bulk supply
+point and primary substation in NGED's license areas. Our forecasts will be half-hourly, 14 days
+ahead, updated every six hours, and probabilistic. NGED acts on the forecast one to ten days ahead,
+and the question NGED asks of the forecast is "how likely is load to exceed the substation's
+capacity?" rather than "what is the most likely load?". Forecasting net demand is the highest
+priority of the eight challenges, and the other seven challenges exist mainly to improve our
+net-demand forecast.
 
-**In summary.** A large literature forecasts substation load, but very little of what we read can be
-compared with the rest of that literature, and we found none of it driving a probabilistic
-substation forecast from a weather ensemble across a 14-day horizon.
+**In summary.** A large literature exists on the topic of forecasting substation load, but very
+little of what we read can be compared with the rest of that literature, and we found no papers
+driving a probabilistic substation forecast from a weather ensemble across a 14-day horizon.
 
 **What the literature reports.**
 
 | Source | What they forecast | Level and scale | Horizon | Result, and what it was compared against | Weather |
 |---|---|---|---|---|---|
-| [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) | Net load, Germany | Low-voltage feeder: 200 | 4 days | A general-purpose foundation model that had never seen the data beat every purpose-trained model on average error, 3.8 kW against 4.2 kW | Actual weather, after the fact |
+| [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) | Net load, Germany | 200 low-voltage feeders | 4 days | A general-purpose foundation model that had never seen the data beat every purpose-trained model on average error, 3.8 kW against 4.2 kW | Actual weather, after the fact |
 | [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) | Load, Germany and Portugal | Transmission, plus 200 low-voltage feeders and 287 individual customers | 4 days | Best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage feeders, 23.3% at individual customers | 1–3 h forecasts at the feeders, reanalysis elsewhere |
 | [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) | Regional net load, GB | Regional: 14 grid supply point groups | Day-ahead | Held the same risk with **up to 24.6% less upward reserve** than a fixed-tail alternative (note 1) | Real forecasts |
-| [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) | Load, Portugal | Secondary substation: 96,989 | Day-ahead | 42–47% better than the reference benchmark at system level. **At substation level, beat a naive forecast on 83–87% of network-owned and 66–70% of customer-owned sites** (note 4) | Real forecasts, 7–8 h old |
+| [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) | Load, Portugal | 96,989 secondary substations | Day-ahead | 42–47% better than the reference benchmark at system level. **At substation level, beat a naive forecast on 83–87% of network-owned and 66–70% of customer-owned sites** (note 4) | Real forecasts, 7–8 h old |
 | [Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) | Load, GB | Four levels: primary substation down to household | Day-ahead | Combining forecasts gained **0.0–0.4% averaged over all periods**, but **5.7–9.0% when restricted to peaks** | None at all |
-| [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | Primary substation: 13, plus their bulk supply points and 11 kV feeders | 30 min to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted (note 2) | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
-| [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | Primary substation: 551 with export data, 171 modelled; secondary: 729 | Day-ahead to 11 days at primary; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method (note 3) | Real forecasts at primary; none in the published secondary results |
+| [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | 13 primary substations, plus their bulk supply points and 11 kV feeders | 30 min to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted (note 2) | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
+| [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondaries | Day-ahead to 11 days at primary; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method (note 3) | Real forecasts at primary; none in the published secondary results |
 | [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Substation | Day-ahead | **3 to 8% mean absolute percentage error**, varying with how industrial and how large the supplied area was; linear and Gaussian regression preferred over the alternatives tested (abstract only, note 5) | Not stated in the abstract |
 
-*Notes.* **1.** The 24.6% saving is at the most extreme tail level [Browell and Fasiolo
-(2021)](https://arxiv.org/abs/2103.10335) tested, and falls to 3.2% at the least extreme. **2.** The
-two SSEN TRANSITION models that missed 10% reached 13.4% and 19.7%, and 94% of the 11 kV feeders it
-built models for came in below 20%. **3.** Artificial Forecasting also captured 83% of the top 10%
-of demand values inside its 5th-to-95th-percentile band, and beat its comparison benchmarks at all
-eight of the near-capacity substations it was evaluated on. **4.** The beat-a-naive-forecast figures
-are given as ranges because [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)
-reports two different pairs of numbers for the same statistic: 82.8% and 66.0% in the body text,
-86.5% and 70.0% in the caption of the figure on the page after. We could not tell which is intended,
-so the table spans both. **5.** By this review's own test, the Austrian figure does not transfer: a
-mean absolute percentage error is normalised by the load that happened to occur rather than by
-anything physical, and the abstract names no baseline to measure it against. The Austrian row is in
-the table because it is the only substation-level study we found from a comparable European network,
-and it is the one row whose number should not be read as a target.
+**Notes:** 
+
+1. The 24.6% saving is at the most extreme tail level [Browell and Fasiolo
+   (2021)](https://arxiv.org/abs/2103.10335) tested, and falls to 3.2% at the least extreme. 
+2. The two SSEN TRANSITION models that missed 10% reached 13.4% and 19.7%, and 94% of the 11 kV
+   feeders it built models for came in below 20%.
+3. Artificial Forecasting also captured 83% of the top 10% of demand values inside its
+   5th-to-95th-percentile band, and beat its comparison benchmarks at all eight of the near-capacity
+   substations it was evaluated on.
+4. The beat-a-naive-forecast figures are given as ranges because [Pinheiro et al.
+   (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) reports two different pairs of numbers
+   for the same statistic: 82.8% and 66.0% in the body text, 86.5% and 70.0% in the caption of the
+   figure on the page after. We could not tell which is intended, so the table spans both. 
+5. By this review's own test, the Austrian figure does not transfer: a mean absolute percentage
+   error is normalised by the load that happened to occur rather than by anything physical, and the
+   abstract names no baseline to measure it against. The Austrian row is in the table because it is
+   the only substation-level study we found from a comparable European network, and it is the one
+   row whose number should not be read as a target.
 
 **Even within this one table, the studies cannot be compared with each other.** [Kaas et al.
 (2026)](https://arxiv.org/abs/2607.01966) and [Hertel et al.
