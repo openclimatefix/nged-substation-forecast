@@ -54,11 +54,14 @@ repos:
         language: system
         types: [python]
         files: *marimo_notebooks
+      # Markdown is in scope because ruff formats the Python inside a fenced code block, and CI
+      # runs `ruff format --check .` over the whole tree. With `types: [python]` the hook never saw
+      # a `.md` file, so a snippet in a docs page or a SKILL.md passed the commit and failed CI.
       - id: ruff-format
         name: ruff format
         entry: uv run ruff format --force-exclude
         language: system
-        types: [python]
+        types_or: [python, markdown]
       - id: ty
         name: ty
         entry: uv run --all-packages ty check --project .

@@ -285,7 +285,7 @@ match, or every edit whose target spans a line break fails:
 def rsub(pat, rep, n=1):
     """Replace `pat` (whitespace-insensitive) with `rep`, asserting it matched exactly n times."""
     global t
-    r = re.compile(r'\s+'.join(re.escape(w) for w in pat.split()))
+    r = re.compile(r"\s+".join(re.escape(w) for w in pat.split()))
     t2, c = r.subn(lambda m: rep, t, count=n)
     assert c == n, f"count={c}: {pat[:70]!r}"
     t = t2
