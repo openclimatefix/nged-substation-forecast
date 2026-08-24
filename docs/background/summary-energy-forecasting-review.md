@@ -2,7 +2,7 @@
 
 This is a short version of a literature review Open Climate Fix carried out for National Grid
 Electricity Distribution, as part of the Flexpectation project. The summary is meant to be read on
-its own. The full review, which cites just under ninety published papers and gives the evidence
+its own. The full review, which cites eighty sources and gives the evidence
 behind every claim here, is published at
 <https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/>,
 and is referred to below as "the full review".

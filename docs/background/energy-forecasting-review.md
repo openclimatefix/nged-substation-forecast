@@ -12,7 +12,7 @@ Secondly - and perhaps most importantly - the fact that the industry doesn't yet
 
 ## What we read
 
-This review cites just under ninety published papers. We read most of the ones an argument rests on
+This review cites eighty sources. We read most of the ones an argument rests on
 in full; the rest were available to us only as an abstract, a preprint or part of a paper, and
 wherever a claim rests on a partial read we say so at the point the claim is made. We also read the
 published deliverables of twelve network-innovation projects in GB. The selection was deliberate
