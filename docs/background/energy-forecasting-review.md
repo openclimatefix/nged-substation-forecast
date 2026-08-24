@@ -692,13 +692,22 @@ switching as well as a measured one is what the project has to find out.
 power has to go somewhere.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score each
 substation against its own history — "the current analysis considers one year of measurements for
 one station at a time" — so nothing in the method asks whether the power that left one substation
-turned up at another. Flexpectation intends to look for both sides of the transfer: when one
-substation's metered power drops, the substations that picked the load up should rise at the same
-moment, and their rises should sum to the drop. A step that fails to balance that way is more likely
-a meter fault or a one-off than a switch, which is where a per-substation detector spends its false
-positives. The catch is that an NGED transfer usually fans out across two or three neighbours, so
-the search runs over subsets of neighbours rather than over pairs, and the balance holds only
-approximately.
+turned up at another. We looked for a method that checks both sides — 40 title-and-abstract queries
+and 10 full-text queries on OpenAlex, the Semantic Scholar, Crossref, and arXiv search interfaces,
+the works citing [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) under both its journal and
+its arXiv identifier (4 citing works, all read at abstract level), and the titles of all 3,160
+projects on the Energy Networks Association's Smarter Networks Portal, which publishes no abstracts
+to search — and found none. The closest is [Willis et al.
+(1984)](https://doi.org/10.1109/TPAS.1984.318713), whose regression fits a group of
+mutually-transferring substations together and needs neither the size nor the direction of a
+transfer as an input, but which corrects annual peak-load curve fits for long-range planning rather
+than detecting an event at a point in time. We could not obtain its full text. Flexpectation intends
+to look for both sides of the transfer: when one substation's metered power drops, the substations
+that picked the load up should rise at the same moment, and their rises should sum to the drop. A
+step that fails to balance that way is more likely a meter fault or a one-off than a switch, which
+is where a per-substation detector spends its false positives. The catch is that an NGED transfer
+usually fans out across two or three neighbours, so the search runs over subsets of neighbours
+rather than over pairs, and the balance holds only approximately.
 
 **The measured accuracy is modest, and worst on the short events.** [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164) score every detector with the F1.5 score, which blends
@@ -713,6 +722,22 @@ flagging a point if any of them fired, raised recall but added enough false posi
 combination did not inherit statistical process control's strength on short events: on the two
 shortest bands the combined detectors scored only marginally better than binary segmentation on its
 own.
+
+**Detecting a load transfer from a substation's own metered load has been published several times,
+and every method we could read works one series at a time.** [Kim et al.
+(2020)](https://doi.org/10.3390/en13174358) train a long short-term memory network on a Korean
+distribution line's own past load, treat its prediction as the normal state, and flag a transfer
+where the measurement departs from that prediction: "the predicted load is set as the reference
+value, which is considered as normal state. Finally, the actual measured data is compared with the
+predicted data, and detect it as a load transfer if the difference between them exceeds the
+threshold." A later paper in the same line, [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), drops the trained model for a pipeline close
+to the one this project plans — robust seasonal-trend decomposition, then Pruned Exact Linear Time
+changepoint detection, then an isolation forest over features of each candidate changepoint —
+detecting transfers "using only load time series data". We read the full text of [Kim et al.
+(2020)](https://doi.org/10.3390/en13174358); [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) sits behind a subscription, so we read only
+its abstract.
 
 **A GB network operator separated switching from bad data in 2016, with cruder tools and no
 published accuracy.** Electricity North West's
@@ -757,7 +782,11 @@ segments within which Huyghues-Beaufond et al. remove *outliers*. A second stran
 history to the level it would have had if the switch had never happened: [Paredes and Vargas
 (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) do it across 169 real feeders and report better
 medium-term forecasts for it, and Artificial Forecasting does the same in its data-preparation
-pipeline.
+pipeline. The fix is a level shift applied to the *older* half of each series: Paredes and Vargas
+measure how far average demand moved across the step and add that difference to every reading before
+it, and the variant they recommend uses a separate difference for each hour of the day and each day
+of the week rather than one number for the whole series. They take the event times from expert
+identification rather than from a detector, since detection was not their subject.
 
 **Adaptive models are the live alternative: they track a new level once it arrives, including one
 that arrives abruptly, but they never record that a switch happened.** [de Vilmarest et al.
@@ -2040,6 +2069,12 @@ Every source cited above, in alphabetical order by first author.
 - Kaas, B., Treutlein, M., Gerber, H. B., Neumann, O., Phatthanakhuha, C., Resch, O., Mikut, R. and
   Hagenmeyer, V. (2026). [Probabilistic Low-Voltage Peak Load Forecasting with Time Series
   Foundation Models Evaluated on Application-Oriented Metrics](https://arxiv.org/abs/2607.01966).
+- Kim, J.-H., Lee, B.-S. and Kim, C.-H. (2020). [A Study on the Development of Machine-Learning
+  Based Load Transfer Detection Algorithm for Distribution Planning](https://doi.org/10.3390/en13174358).
+  *Energies*.
+- Kim, J.-H. (2025). [Unsupervised Load Transfer Detection Based on Wavelet Change Point
+  Analysis and Isolation Forest](https://doi.org/10.5370/KIEE.2025.74.11.1757). *The
+  Transactions of The Korean Institute of Electrical Engineers*.
 - Kleinebrahm, M. et al. (2026). [Energy-Arena: A Dynamic Benchmark for Operational Energy
   Forecasting](https://arxiv.org/abs/2604.24705).
 - Kryshtafovych, A., Schwede, T., Topf, M., Fidelis, K. and Moult, J. (2021). [Critical assessment
@@ -2158,6 +2193,9 @@ Every source cited above, in alphabetical order by first author.
   Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/).
 - Western Power Distribution (2021). [Electricity Flexibility and Forecasting System
   (EFFS)](https://smarter.energynetworks.org/projects/wpden03/).
+- Willis, H. L., Powell, R. D. and Wall, D. L. (1984). [Load Transfer Coupling Regression
+  Curve Fitting for Distribution Load Forecasting](https://doi.org/10.1109/TPAS.1984.318713).
+  *IEEE Transactions on Power Apparatus and Systems*.
 - Zhang, X. Y., Watkins, C. and Kuenzel, S. (2022). [Multi-quantile recurrent neural network for
   feeder-level probabilistic energy disaggregation considering roof-top solar
   energy](https://doi.org/10.1016/j.engappai.2022.104707). *Engineering Applications of Artificial

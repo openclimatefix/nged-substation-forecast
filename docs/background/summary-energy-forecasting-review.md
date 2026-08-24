@@ -415,12 +415,14 @@ work from power measurements alone.
 
 #### What the literature says
 
-We only found two relevant papers: [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) detect
-switching at a real network operator, but detect it in the gap between the substation's own meter
-and a second estimate of the same load, built from smart-meter and bulk-customer readings taken
-below the substation. The second paper describes Electricity North West's
-[ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project, which sorted step changes
-into faulty metering and network reconfigurations on GB substations in 2016, from power measurements
+Switching detection from metered load has been published more than once, always one substation at a
+time. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) detect switching at a real network
+operator, but detect it in the gap between the substation's own meter and a second estimate of the
+same load, built from smart-meter and bulk-customer readings taken below the substation. A Korean
+line of work, most recently [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), detects load
+transfers on a distribution line from that line's own load alone. Electricity North West's
+[ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted step changes into
+faulty metering and network reconfigurations on GB substations in 2016, from power measurements
 alone, and published no precision or recall for either rule.
 
 #### What this means for Flexpectation
@@ -463,7 +465,14 @@ below the substation.
 one-substation-at-a-time method cannot see: the power has to go *somewhere*.** [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164) score each substation against its own history — "the
 current analysis considers one year of measurements for one station at a time" — so nothing in their
-method asks whether the power that left one substation turned up at another. Flexpectation intends
+method asks whether the power that left one substation turned up at another. We looked for a method
+that checks both sides, across OpenAlex, Semantic Scholar, Crossref, arXiv, the works citing [Bouman
+et al. (2024)](https://arxiv.org/abs/2405.16164), and the project titles on the Energy Networks
+Association's Smarter Networks Portal, and found none. The closest is [Willis et al.
+(1984)](https://doi.org/10.1109/TPAS.1984.318713), whose regression fits a group of
+mutually-transferring substations together and needs neither the size nor the direction of a
+transfer as an input, but which corrects annual peak-load curve fits for long-range planning rather
+than detecting an event at a point in time; we could not obtain its full text. Flexpectation intends
 to look for both sides of the transfer: when one substation's metered power drops, the substations
 that picked the load up should rise at the same moment, and their rises should sum to the drop. A
 step that fails to balance that way is more likely a meter fault or a one-off than a switch, which
@@ -497,21 +506,26 @@ found nobody who feeds the contamination to a model deliberately, as information
 
 #### What this means for Flexpectation
 
-Every published solution throws information away: leaving the level shifts in the data hurts
-performance, rewriting history erases the level shifts, and adapting to the new level forgets that a
-switch happened — which is disqualifying here, because the quantity NGED needs is what the
-substation *would* have carried under its normal arrangement. That gap is the reason to try feeding
-the contamination to the model as an input, and the reason to consider rewriting the history as the
-fallback, since rewriting is the option with a published precedent behind it.
+Every published solution we found throws information away: leaving the level shifts in the data
+hurts performance, rewriting history erases the level shifts, and adapting to the new level forgets
+that a switch happened — which is disqualifying here, because the quantity NGED needs is what the
+substation *would* have carried under its normal arrangement. No published method we found keeps a
+record of when the network was abnormal and hands that record to the model, and that absence is the
+reason to try exactly that, with rewriting the history as the fallback, since rewriting is the
+option with a published precedent behind it.
 
 **Rewriting the history is the fallback because it is the only response with a published precedent
 behind it.** [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) rewrite the
 history to the level it would have had if the switch had never happened, across 169 real feeders,
 and report better medium-term forecasts for it; Artificial Forecasting does the same in its
-data-preparation pipeline. Adaptive models are the live alternative — they track a new level once it
-arrives, including one that arrives abruptly — but a model that simply adapts to a new load level
-cannot report what the substation would have carried under its normal arrangement, which is the
-quantity NGED needs.
+data-preparation pipeline. The fix is a level shift applied to the *older* half of each series:
+Paredes and Vargas measure how far average demand moved across the step and add that difference to
+every reading before it, and the variant they recommend uses a separate difference for each hour of
+the day and each day of the week rather than one number for the whole series. They take the event
+times from expert identification rather than from a detector, since detection was not their subject.
+Adaptive models are the live alternative — they track a new level once it arrives, including one
+that arrives abruptly — but a model that simply adapts to a new load level cannot report what the
+substation would have carried under its normal arrangement, which is the quantity NGED needs.
 
 **Where the gap is: we found nobody who feeds a model switching-contaminated history *deliberately*,
 as information rather than as damage.** Instead of correcting the series, a model could be fed the
@@ -1218,6 +1232,9 @@ sources that this summary does not.
 - Kaas, B., Treutlein, M., Gerber, H. B., Neumann, O., Phatthanakhuha, C., Resch, O., Mikut, R. and
   Hagenmeyer, V. (2026). [Probabilistic Low-Voltage Peak Load Forecasting with Time Series
   Foundation Models Evaluated on Application-Oriented Metrics](https://arxiv.org/abs/2607.01966).
+- Kim, J.-H. (2025). [Unsupervised Load Transfer Detection Based on Wavelet Change Point
+  Analysis and Isolation Forest](https://doi.org/10.5370/KIEE.2025.74.11.1757). *The
+  Transactions of The Korean Institute of Electrical Engineers*.
 - Kleinebrahm, M. et al. (2026). [Energy-Arena: A Dynamic Benchmark for Operational Energy
   Forecasting](https://arxiv.org/abs/2604.24705).
 - Lerch, S., Thorarinsdottir, T. L., Ravazzolo, F. and Gneiting, T. (2017). [Forecaster’s Dilemma:
@@ -1283,3 +1300,6 @@ sources that this summary does not.
   Probability Skill Scores](https://doi.org/10.1175/MWR3280.1). *Monthly Weather Review*.
 - Western Power Distribution (2021). [Electricity Flexibility and Forecasting System
   (EFFS)](https://smarter.energynetworks.org/projects/wpden03/).
+- Willis, H. L., Powell, R. D. and Wall, D. L. (1984). [Load Transfer Coupling Regression
+  Curve Fitting for Distribution Load Forecasting](https://doi.org/10.1109/TPAS.1984.318713).
+  *IEEE Transactions on Power Apparatus and Systems*.
