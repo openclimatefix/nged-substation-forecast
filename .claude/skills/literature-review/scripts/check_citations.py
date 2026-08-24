@@ -35,6 +35,17 @@ BARE_CITE: Final[str] = (
 ENTRY_HEAD: Final[str] = r"\((\d{4}[a-z]?)\)\.\s*\[(.*?)\]\((https?://[^)]+)\)"
 REFS_HEADING: Final[str] = "## References"
 
+SELF_LINK_HOSTS: Final[tuple[str, ...]] = (
+    "openclimatefix.github.io/nged-substation-forecast",
+    "github.com/openclimatefix/nged-substation-forecast",
+)
+"""Hosts a review may link to without the link being a source.
+
+A review that points the reader at its own longer version, or at the repository holding the code
+behind it, is not citing that page as evidence, so it needs no reference entry. Everything else a
+link points at is treated as a source.
+"""
+
 
 @dataclass(frozen=True)
 class Reference:
@@ -187,7 +198,10 @@ def main(path: Path) -> int:
 
     body_urls: dict[str, list[str]] = defaultdict(list)
     for label, url in re.findall(ANY_LINK, body):
-        body_urls[canonical_url(url)].append(label)
+        canonical = canonical_url(url)
+        if canonical.startswith(SELF_LINK_HOSTS):
+            continue
+        body_urls[canonical].append(label)
     reference_urls: dict[str, Reference] = {}
     for ref in references:
         for url in ref.urls:

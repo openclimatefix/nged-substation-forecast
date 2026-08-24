@@ -1009,8 +1009,7 @@ rounds do not apply to us, while the lessons about protocol — what makes a com
 apply with more force, because a competition gets some of its integrity free from having rivals who
 would like to catch each other out, and we will not have any.
 
-**Energy forecasting has run competitions on common data for over a decade, and of the ones whose
-target we could establish, only one got near the level NGED acts on.** The Global Energy Forecasting
+**Energy forecasting has run competitions on common data for over a decade, and only one of them forecast at anything like the level NGED acts on.** The Global Energy Forecasting
 Competitions of 2012, 2014 and 2017 covered hierarchical load, price, wind and solar, published
 their data as supplementary files to the papers introducing each competition, and drew hundreds of
 contestants from more than 60 countries ([Hong et al.
@@ -1026,13 +1025,7 @@ distribution network is the second track of GEFCom2017, which asked for probabil
 183 delivery-point meters of a US utility and drew 177 entrants in total across both its tracks
 ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)). BigDEAL's three local
 distribution companies are whole utilities, an aggregation well above a single primary substation.
-Competitions have been run on distribution-network problems: [McSweeney et al.
-(2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541) report three of them and draw the
-same conclusion this review does, that "many solutions are only tested on private data using a
-single method only compared (if at all) to simple, non-competitive benchmarks", which "limits the
-reproducibility and usefulness of the outputs". We read the abstract rather than the full paper,
-which is behind a paywall with no open copy, so we cannot say from it what level those three
-problems sat at or whether any left a leaderboard behind. What we found no example of is a
+Competitions have been run on distribution-network problems, and NGED funded three of them. [McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541) report a series NGED ran with Energy Systems Catapult on its own network data, hosted on CodaLab, drawing "37 teams from both academia and industry" and "over 2500 submissions". None of the three was a load forecast. The first asked for the highest and lowest one-minute values inside each half-hour given only half-hourly averages at a substation; the second for the daily maximum demand that a hidden population of electric-vehicle chargers added to three primary-substation feeders; the third for missing values across a hierarchy of primary substations, their bulk supply points and a grid supply point. Two of the three therefore sat at exactly the levels NGED forecasts, which is why the absence claim below is scoped to forecasting rather than to the voltage level. The paper draws the same conclusion this review does, that "many solutions are only tested on private data using a single method only compared (if at all) to simple, non-competitive benchmarks", which "limits the reproducibility and usefulness of the outputs", and pairs its own results with the caveat that they came "despite the necessary reduction in realism" of a curated competition dataset. All three competitions closed between December 2021 and April 2022, though their pages and data are still readable; the paper never uses the word leaderboard, and what it recommends keeping open is the unranked practice phase, "as it allows teams to continue experimenting within the platform". What we found no example of is a
 *standing* leaderboard at distribution-substation level — one that keeps accepting new entries after
 its competition closes. That is the gap Flexpectation's leaderboards fall into, though the search
 behind that statement is ours and we would be glad to be pointed at a counter-example.
