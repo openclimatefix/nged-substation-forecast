@@ -268,8 +268,8 @@ models together. Pure ensemble models gain 8.3 points. A pure ensemble runs seve
 aggregates their outputs, without the chaining. Individual machine-learning models (including
 gradient-boosted trees), numerical-weather-prediction models, and regressions show no significant
 advantage over classic statistical time-series models at that horizon at all. Their own advice is to
-exhaust the simple models first, because time-series methods "still have very good performance
-compared to more complex methods such as individual ML models".
+exhaust the simple models first, because classical statistical time-series methods "still have very
+good performance compared to more complex methods such as individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
 puts the weight on exactly the input Flexpectation is built around.** [Nguyen and Müsgens
