@@ -90,41 +90,46 @@ forecast.
 but very little of what we read can be compared with the rest of that literature, and we found no
 papers driving a probabilistic substation forecast from a weather ensemble across a 14-day horizon.
 
-**What this means for Flexpectation.** Building Flexpectation v1 on a gradient-boosted tree (such as
-XGBoost) is defensible, but the literature paints it as a sensible default rather than a proven
-winner. [NGED's own 2021 EFFS project (Electricity Flexibility and Forecasting
+**What this means for Flexpectation.** Building Flexpectation v1 on a gradient-boosted tree (GBT,
+such as XGBoost) is defensible, but the literature paints GBTs as a sensible default rather than a
+proven winner. [NGED's own 2021 EFFS project (Electricity Flexibility and Forecasting
 System)](https://smarter.energynetworks.org/projects/wpden03/) picked XGBoost on the balance of
 accuracy against effort, and no study we read shows a large, dependable margin for anything more
 sophisticated than XGBoost at substation level. Both network deployments that actually tried boosted
 trees — [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) and [Artificial
 Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) — kept a simpler model
-instead, and Pinheiro et al. give two reasons for doing so: there was no accuracy gain to be had,
-and the cost of tuning the booster and the interpretability given up with it decided the rest. So,
-in Flexpectation, the literature suggests that the choice of model family may matter less than the
-data, the feature engineering, and how often the model is refitted. Read those results with one
+instead, and Pinheiro et al. give two reasons for doing so: they found GBTs did not increase
+accuracy, and the cost of tuning the GBT and the interpretability given up with it decided the rest.
+So, for Flexpectation, the literature suggests that the choice of model family may matter less than
+the data, the feature engineering, and how often the model is refitted.
+
+Read those results with one
 thing in mind, though — when a paper says "XGBoost" it usually means a model with considerably less
 feature engineering than what we plan to implement. [Kaas et al.
 (2026)](https://arxiv.org/abs/2607.01966) give their ML model lagged power, weather, time and
 metadata, and nothing beyond that: no clear-sky index, no wind power curve, no monotone constraints.
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) ran the one comparison on
-equal terms — their booster and their generalised additive model had the same features, so the
-booster did not lose for want of them — but that shared feature set was itself short: a linear
-trend, load lagged 24 hours and one week, time of day, nine day types, the named public holidays,
-day of year, and temperature interacted with time of day and with day of year. It carried no
-irradiance and no wind, though the weather they downloaded held both. So no published head-to-head
-we found gives a gradient booster the feature engineering Flexpectation plans. On the rest of the
-specification there is no published result to lean on, for or against. We found no study that drives
-substation-level uncertainty from a weather ensemble out to 14 days, so whether that works is an
-open question for this project to answer. The closest thing to evidence is a warning about the
-extremes: [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) found quantile regression
-alone uncalibrated beyond the 1st and 99th percentiles — the range NGED acts on — even with five
-years of data on regions far larger than a substation. Plan for an explicit tail treatment rather
-than reading extreme quantiles off the model. All of that is a verdict on version one. The three
-more sophisticated families planned for the network-wide scale-up from 2027 — pre-trained encoders,
-connectivity-map models and differentiable physics — are not there to beat a boosted tree at
-forecasting net demand, but to estimate capacity, switching state and demand together, which the
-pipelines of separate models in this literature cannot do. "Set against this literature, what we
-plan is ambitious" below sets out that case.
+equal terms — their GBT and their generalised additive model received the same features, but that
+shared feature set was itself short: a linear trend, load lagged 24 hours and one week, time of day,
+nine day types, the named public holidays, day of year, and temperature interacted with time of day
+and with day of year. It carried no irradiance and no wind, though the weather they downloaded held
+both. So no published head-to-head we found gives a GBT the feature engineering we plan to implement
+in Flexpectation v1. 
+
+On the rest of the Flexpectation specification there is no published result to lean on, for or
+against. We found no study that drives substation-level uncertainty from a weather ensemble out to
+14 days. The closest thing to evidence is a warning about the extremes: [Browell and Fasiolo
+(2021)](https://arxiv.org/abs/2103.10335) found quantile regression alone uncalibrated beyond the
+1st and 99th percentiles — the range NGED is likely to act on. So we plan to follow Browell and
+Fasiolo and implement an explicit tail treatment rather than reading extreme quantiles off the
+model. 
+
+All the text above is a verdict on Flexpectation version one. The three more sophisticated ML
+model families we plan to research in 2027 — pre-trained encoders, connectivity-map models and
+differentiable physics — are planned to *simultaneously* disaggregate *unmetered* generators, infer
+switching state and demand together, which the pipelines of separate models in this literature
+cannot do. The section below titled "Set against this literature, what we plan is ambitious" sets
+out the case for the work we plan in version 2.
 
 **What the literature reports.**
 
