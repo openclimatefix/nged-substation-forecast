@@ -193,6 +193,16 @@ and so on — to a general-purpose one, with the weights updated online as new d
 system-level root-mean-square error by 24% against that general-purpose model alone, from 203 MW to
 154 MW.
 
+**A non-weather input helped more than a better weather forecast at wind-connected substations.**
+Artificial Forecasting's Alpha work added the National Energy System Operator's national demand and
+operational-margin data to its substation models, and reports that the operational-margin feature
+"generator availability" was "almost universally heavily used as a feature in the model and almost
+universally substantially improved results" at primary substations connected to wind generation. The
+project calls that result surprising, because the models it improved on already carried a forecast
+wind-speed feature. No figure isolating that one feature from the rest of the inputs added in the
+same round is published, so the finding says which input is worth trying rather than what it is
+worth.
+
 **Where the gaps are: no study we found drives substation uncertainty from a weather ensemble across
 a full 14-day horizon.**  What we did not find is
 ensemble-driven uncertainty at half-hourly resolution, per substation, across a full 14-day horizon
@@ -516,8 +526,9 @@ to their model structure being tuned for the distributor's own substations.
 ### 3. Estimating the effective capacity of metered generators
 
 **In summary.** A method exists for each generation technology separately, but we found none run
-across a mixed fleet at a distribution network, and the two studies that measure what estimating
-capacity is worth downstream measure it for wind alone, at national or single-farm scale.
+across a mixed fleet of individually metered generators at a distribution network, and the two
+studies that measure what estimating capacity is worth downstream measure it for wind alone, at
+national or single-farm scale.
 
 **The challenge.** We call the amount of generation actually available at a metered site its
 *effective capacity*: the output it could produce right now if the weather allowed, as opposed to
@@ -575,13 +586,6 @@ RdTools on the same dataset, reporting greater robustness to data anomalies. The
 the open-source Solar Data Tools, whose pipeline detects capacity changes and clipping and estimates
 degradation, with a Monte Carlo step that returns a distribution rather than a point estimate.
 
-**At substation rather than generator level, Artificial Forecasting gets closest.** Its Alpha work
-builds the baseline it forecasts against by scaling Northern Powergrid's own installed-capacity
-projection down by the fraction of that capacity actually generated in 2021–2022. Separately, it
-found that the National Energy System Operator's national generator-availability signal "almost
-universally substantially improved results" at wind-connected primary substations — the nearest
-thing in this review to reading effective capacity off an external feed.
-
 **Estimating capacity jointly with the forecast, rather than in two stages, has also been
 published.** [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind
 farm's available capacity as the unknown, time-varying upper bound of a generalised logit-normal
@@ -597,9 +601,9 @@ identical method with a fixed one, and that gained 2.43%, which they report as n
 improvement when compared to its equivalent with a fixed bound". Tracking a varying bound is worth
 having, then, but this paper does not show it is worth 17.9% by itself.
 
-**Where the gap is: none of this has been done across a mixed fleet at a distribution network, or
-tested for whether it improves the forecast NGED buys flexibility against.** The pieces exist, and
-most of them work from a revenue meter alone.
+**Where the gap is: none of this has been done across a mixed fleet of individually metered
+generators at a distribution network, or tested for whether it improves the forecast NGED buys
+flexibility against.** The pieces exist, and most of them work from a revenue meter alone.
 
 **We plan to attempt that combination two ways, neither of which starts from scratch.** The first is
 the two-stage route: estimate a capacity time series from the meter, then normalise by it before
@@ -622,7 +626,10 @@ place is itself testable, and one published result suggests it may not.** [de Vi
 (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) removed the embedded wind and solar capacities
 from their model of GB regional net load, and a Kalman filter tracking the coefficients absorbed the
 loss completely — error rose by more than 10% for the same model fitted offline, and fell by 0.4%
-for the adaptive one. We will run that comparison rather than assume the normalisation is needed.
+for the adaptive one. The capacities they removed are the aggregate installed capacity of a whole
+region's embedded generation rather than one metered generator's effective capacity, so the result
+is a caution about normalisation rather than a like-for-like test of ours. We will run that
+comparison rather than assume the normalisation is needed.
 
 **The clearest published demonstration of why effective capacity matters is incidental.** Hornsea
 1's export cable faulted on 19 January 2024, about two weeks before HEFTCom's competition period was
@@ -830,11 +837,13 @@ scale-up.
 metered directly or its capacity is read from a register. Capacity is inferred from measurements in
 the academic work below and in NIA_UKPN0104, but never then carried into a probabilistic multi-day
 forecast.** Artificial Forecasting models gross demand and customer export independently at primary
-substations, which is more than any paper here does, but customer export is metered. SSEN TRANSITION
-split net load into demand and generation, forecast the two separately, and recombined them. Its
-rooftop solar is not metered — but neither is its capacity inferred. SSEN gathered a list of Feed-In
-Tariff installations. Looking up a capacity in a subsidy register is the step
-Flexpectation cannot take, because the register stopped being complete when the Feed-In Tariff
+substations, which is more than any paper here does, but customer export is metered, and the
+generation baseline it forecasts against comes from Northern Powergrid's own installed-capacity
+projection per substation, scaled down by the fraction of that capacity actually generated in 2021
+and 2022. SSEN TRANSITION split net load into demand and generation, forecast the two separately,
+and recombined them. Its rooftop solar is not metered — but neither is its capacity inferred. SSEN
+gathered a list of Feed-In Tariff installations. Looking up a capacity in a subsidy register is the
+step Flexpectation cannot take, because the register stopped being complete when the Feed-In Tariff
 closed.
 
 **The direct predecessor of this work is running now in GB.** [UK Power Networks'

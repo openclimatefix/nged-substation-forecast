@@ -364,8 +364,9 @@ rating cannot see the difference.
 #### What the literature says
 
 A method exists for each generation technology separately, but we found none run across a mixed
-fleet at a distribution network, and the two studies that measure what estimating capacity is worth
-downstream measure it for wind alone, at national or single-farm scale.
+fleet of individually metered generators at a distribution network, and the two studies that measure
+what estimating capacity is worth downstream measure it for wind alone, at national or single-farm
+scale.
 
 #### What this means for Flexpectation
 
@@ -395,9 +396,10 @@ estimator wins, normalising by effective capacity stays a hypothesis to test rat
 preprocessing step, because no study we found has measured whether it improves the forecast NGED
 buys flexibility against.
 
-**Where the gap is: no published work we found estimates effective capacity across a mixed fleet at
-a distribution network, or tests whether estimating it improves the forecast NGED buys flexibility
-against.** The per-technology methods exist, and most of them work from a revenue meter alone.
+**Where the gap is: no published work we found estimates effective capacity across a mixed fleet of
+individually metered generators at a distribution network, or tests whether estimating it improves
+the forecast NGED buys flexibility against.** The per-technology methods exist, and most of them
+work from a revenue meter alone.
 
 ### 4. Detecting switching events
 
