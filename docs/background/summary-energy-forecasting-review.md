@@ -260,20 +260,20 @@ raise skill score by 7 to 27 percentage points over time-series models while man
 machine-learning methods show inconsistent gains.
 
 **For generators, the measured prize from better weather-to-power physics is largest at short lead
-times.** Differentiable physics attacks the weather-to-power half of
-the error, so on [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079)'s measurement it has
-most to offer inside the first 2 to 3 days of the 1-to-10-day window NGED acts on, and less beyond
-it, where the weather forecast itself is the binding constraint. Adding a learned residual to a
-physical generator model is established practice: [Gijón et al.
-(2025)](https://arxiv.org/abs/2502.07344) fit a physics-inspired power model to a wind farm of four
-turbines and train a second model on the residual, improving on the physics model alone by 37%, with
-conformalised quantile regression supplying the uncertainty. But they predict power from measured
-wind rather than forecasting it days ahead, and we found nobody putting a differentiable model of a generator
-inside a network's probabilistic net-demand forecast. On lead time alone, then, the larger differentiable-physics prize for Flexpectation would be on the
-demand side rather than the generation side.
+times.** Differentiable physics attacks the weather-to-power half of the error, so on [Dantas and
+Browell (2026)](https://doi.org/10.1002/we.70079)'s measurement it has most to offer inside the
+first 2 to 3 days of the 1-to-10-day window NGED acts on, and less beyond it, where the weather
+forecast itself is the binding constraint. Adding a learned residual to a physical generator model
+is established practice: [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) fit a
+physics-inspired power model to a wind farm of four turbines and train a second model on the
+residual, improving on the physics model alone by 37%, with conformalised quantile regression
+supplying the uncertainty. But they predict power from measured wind rather than forecasting it days
+ahead, and we found nobody putting a differentiable model of a generator inside a network's
+probabilistic net-demand forecast. On lead time alone, then, the larger differentiable-physics prize
+for Flexpectation would be on the demand side rather than the generation side.
 
 **The second reason to try differentiable physics on generators is the metadata NGED does not
-have.** The generation forecasts in this literature are handed the numbers we lack: [Teng et al.
+have.** The generation forecasts in this literature are given numbers we do not have: [Teng et al.
 (2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each site's capacity, and HEFTCom's
 portfolio was one named 1.2 GW offshore wind farm plus the solar capacity of a region. When an
 export-cable fault cut that wind farm's available capacity mid-competition, the winning team clipped
@@ -284,13 +284,15 @@ result". NGED's embedded generators publish no such notices, and NGED holds no d
 panel tilt, panel azimuth, or ratio of direct-current to alternating-current rating for them, so a
 differentiable plant model would have to fit what a register supplies elsewhere. Each half of that
 fitting has been made to work on its own: [Pierrot and Pinson
-(2024)](https://doi.org/10.1080/00401706.2024.2350421) track a wind farm's capacity jointly with the
-forecast and beat the same model with a fixed capacity by 17.89% on continuous ranked probability
-score, and [Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and
-azimuth of roof photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°
-from generation data plus an irradiance measurement up to 195 km away, though we could reach only
-their abstract. Neither sits inside a substation's net-demand forecast, which is where Flexpectation
-would have to put it.
+(2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind farm's capacity as a
+time-varying bound fitted jointly with the forecast, and beat probabilistic persistence by 34.2% on
+continuous ranked probability score over 14 months at the Anholt offshore wind farm, though their
+one clean test of tracking the bound on its own gained 2.43%, and [Meng et al.
+(2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of roof
+photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5° from generation
+data plus an irradiance measurement up to 195 km away, though we could reach only their abstract.
+Neither sits inside a substation's net-demand forecast, which is where Flexpectation would have to
+put it.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator, or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.
@@ -317,23 +319,32 @@ downstream measure it for wind alone, at national or single-farm scale.
 
 #### What this means for Flexpectation
 
-The two published methods disagree on exactly the point that matters here: taking a running maximum
-of production assumes capacity only ever rises, whereas NGED's falls when a turbine goes out for
-repair. So v1 should build both estimators and let the comparison decide, and should treat
-normalising by effective capacity as a hypothesis to test rather than a settled preprocessing step,
-because no study we found has measured whether it improves the forecast NGED buys flexibility
-against.
-
-**For wind we can copy a published method rather than invent one.** [Dantas and Browell
-(2026)](https://doi.org/10.1002/we.70079) needed available capacity for the same reason we do, so
+**Flexpectation v1 needs an estimator that can track effective capacity downwards, and that is
+exactly where the two published wind methods differ.** [Dantas and Browell
+(2026)](https://doi.org/10.1002/we.70079) needed available capacity for the same reason we do, and
 rather than use a nameplate rating they estimate a time series of available capacity for each farm
-and normalise that farm's power by it before modelling, needing no capacity register and no outage
-messages. [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) point out that taking the running
-maximum of production "requires monotonically increasing capacity and relies on frequent high wind
-events" — and NGED's effective capacity goes *down* when a turbine is out for repair. [Viotti et al.
-(2026)](https://doi.org/10.1002/we.70136) fit the most likely capacity time series instead, and
-report **27.2% lower normalised mean absolute error** than the running maximum at quantifying
-capacity after a new wind farm connects.
+from that farm's own metered production, needing no capacity register and no outage messages. The
+general shape of that rule is a running maximum of production, which ratchets upwards and never
+comes back down. [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) fit the most likely
+capacity time series instead, by quadratic optimisation against a capacity factor simulated from
+reanalysis weather and a power curve, and they publish a monotonic variant alongside a non-monotonic
+one. The direction of travel is what matters for NGED: a turbine out for repair for a month makes
+effective capacity *fall*, and a ratchet cannot follow it down. Flexpectation v1 will therefore
+implement the estimators that can fall as well as rise, and keep the running maximum only as the
+reference method the published numbers are quoted against.
+
+**The published numbers favour fitting over ratcheting, with one caveat that lands on NGED's case.**
+[Viotti et al. (2026)](https://doi.org/10.1002/we.70136) say the running maximum "requires
+monotonically increasing capacity and relies on frequent high wind events", and report **27.2% lower
+normalised mean absolute error** than the running maximum at quantifying capacity after a new wind
+farm connects; a forecasting model trained on production normalised their way also scored 2.0% lower
+mean absolute error day-ahead than the same model normalised by the running maximum. Both figures
+are scored by their monotonic variant, and their non-monotonic variant — the one Flexpectation needs
+— comes out 31% worse on the same test, which is a test of a capacity *increase* and so sizes the
+difficulty of the fitting rather than settling how either variant handles a de-rating. Whichever
+estimator wins, normalising by effective capacity stays a hypothesis to test rather than a settled
+preprocessing step, because no study we found has measured whether it improves the forecast NGED
+buys flexibility against.
 
 **Where the gap is: no published work we found estimates effective capacity across a mixed fleet at
 a distribution network, or tests whether estimating it improves the forecast NGED buys flexibility
@@ -528,11 +539,12 @@ all.
 
 #### What this means for Flexpectation
 
-The realistic v1 position is that these resources stay inside net demand rather than being forecast
-separately. The one measurement we found says a day-ahead charger forecast only clearly beat a naive
-benchmark above about 100 charge points, and forecast uncertainty grows with lead time, so at
-the 14 days NGED needs that threshold should be expected to be higher rather than the same. The
-first deliverable on this strand is reading the electrification literature properly, not a model.
+The realistic Flexpectation v1 position is that these resources stay inside net demand rather than
+being forecast separately. The one measurement we found says a day-ahead charger forecast only
+clearly beat a naive benchmark above about 100 charge points, and forecast uncertainty grows with
+lead time, so at the 14 days NGED needs that threshold should be expected to be higher rather than
+the same. The first deliverable on this strand is reading the electrification literature properly,
+not a model.
 
 **Detecting heat pumps, chargers, and batteries and forecasting them are separately hard, and not in
 the order we expected.** Northern Powergrid's [smart-meter detection

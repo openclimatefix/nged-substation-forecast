@@ -244,13 +244,13 @@ money.
 **Topology enters this literature almost entirely as one thing: the summation constraint in
 hierarchical forecast reconciliation.** [Nespoli et al. (2019)](https://arxiv.org/abs/1910.03976)
 apply it to real secondary substations and cabinets in a Swiss distribution grid and gain up to 10%
-in root-mean-square error at the upper levels of the hierarchy, and under 1% at the bottom.  A summation constraint carries no information about which substation
-neighbours which, and it stops holding the moment the network is switched into an abnormal running
-arrangement (challenge 4 below). That is why a summation constraint is not enough for Flexpectation.
-The nearest thing to an exception we found is [Jung et al.
-(2024)](https://doi.org/10.1049/icp.2024.1900), who feed which busbar connects to which into a graph
-neural network — but they forecast voltage rather than load, and test their model only in
-simulation; we read their abstract rather than the full paper.
+in root-mean-square error at the upper levels of the hierarchy, and under 1% at the bottom. A
+summation constraint carries no information about which substation neighbours which, and it stops
+holding the moment the network is switched into an abnormal running arrangement (challenge 4 below).
+That is why a summation constraint is not enough for Flexpectation. The nearest thing to an
+exception we found is [Jung et al. (2024)](https://doi.org/10.1049/icp.2024.1900), who feed which
+busbar connects to which into a graph neural network — but they forecast voltage rather than load,
+and test their model only in simulation; we read their abstract rather than the full paper.
 
 **The nearest answer to whether the shape of the network improves the forecast was measured on
 NGED's own published data, and it points away from geography.** [Campagne et al.
@@ -260,8 +260,8 @@ distribution networks' open smart-meter feed — around two million meters and 5
 across NGED's and SSEN's areas. Graph-aware models beat the baselines on both. But which graph wins
 changes with granularity: spatially informed graphs worked on the coarse French regions, whereas
 "for the UK data, data-driven graphs proved more suitable since that dataset exhibits finer spatial
-granularity and noisier correlations".  Their graphs are built from geographic distance or from correlation between series, never
-from electrical connectivity, so the specific question stays open.
+granularity and noisier correlations". Their graphs are built from geographic distance or from
+correlation between series, never from electrical connectivity, so the specific question stays open.
 
 **Does knowing the shape of the network make the forecast better, or only more consistent?** NGED
 holds a map of which substations and metered generators connect to each other, and no study we found
@@ -364,8 +364,9 @@ physical generator model is established practice: [Gijón et al.
 turbines and train a second model on the residual, improving on the physics model alone by 37%, with
 conformalised quantile regression supplying the uncertainty. But they predict power from measured
 wind rather than forecasting it days ahead, and we found nobody putting a differentiable generator
-model inside a network's probabilistic net-demand forecast. On lead time alone, then, the larger differentiable-physics prize for Flexpectation would be on the
-demand side rather than the generation side.
+model inside a network's probabilistic net-demand forecast. On lead time alone, then, the larger
+differentiable-physics prize for Flexpectation would be on the demand side rather than the
+generation side.
 
 **The second reason to try differentiable physics on generators is the metadata NGED does not
 have.** The generation forecasts in this literature are handed the numbers we lack: [Teng et al.
@@ -379,19 +380,21 @@ result". NGED's embedded generators publish no such notices, and NGED holds no d
 panel tilt, panel azimuth, or ratio of direct-current to alternating-current rating for them, so a
 differentiable plant model would have to fit what a register supplies elsewhere. Each half of that
 fitting has been made to work on its own: [Pierrot and Pinson
-(2024)](https://doi.org/10.1080/00401706.2024.2350421) track a wind farm's capacity jointly with the
-forecast and beat the same model with a fixed capacity by 17.89% on continuous ranked probability
-score, and [Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and
-azimuth of roof photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°
-from generation data plus an irradiance measurement up to 195 km away, though we could reach only
-their abstract. Neither sits inside a substation's net-demand forecast, which is where Flexpectation
-would have to put it. How much the physics is worth getting right has been measured for solar:
-[Mayer and Gróf (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) score every combination of
-nine irradiance-separation, ten transposition, three reflection-loss, five cell-temperature, four
-module, two shading, and three inverter models against a year of 15-minute production from 16
-Hungarian photovoltaic plants, and report 13% in mean absolute error between the best and worst
-model chains, with transposition — the step that takes the panel's tilt and azimuth as its input —
-one of the two that matter most.
+(2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind farm's capacity as a
+time-varying bound fitted jointly with the forecast, and beat probabilistic persistence by 34.2% on
+continuous ranked probability score over 14 months at the Anholt offshore wind farm, though their
+one clean test of tracking the bound on its own gained 2.43%, and [Meng et al.
+(2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of roof
+photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5° from generation
+data plus an irradiance measurement up to 195 km away, though we could reach only their abstract.
+Neither sits inside a substation's net-demand forecast, which is where Flexpectation would have to
+put it. How much the physics is worth getting right has been measured for solar: [Mayer and Gróf
+(2021)](https://doi.org/10.1016/j.apenergy.2020.116239) score every combination of nine
+irradiance-separation, ten transposition, three reflection-loss, five cell-temperature, four module,
+two shading, and three inverter models against a year of 15-minute production from 16 Hungarian
+photovoltaic plants, and report 13% in mean absolute error between the best and worst model chains,
+with transposition — the step that takes the panel's tilt and azimuth as its input — one of the two
+that matter most.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator, or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.
@@ -408,9 +411,9 @@ to their model structure being tuned for the distributor's own substations.
 
 ### 3. Estimating the effective capacity of metered generators
 
-**In summary.** A method exists for each generation technology separately, but nobody has run them across a mixed
-fleet at a distribution network, and the two studies that measure what estimating capacity is worth
-downstream measure it for wind alone, at national or single-farm scale.
+**In summary.** A method exists for each generation technology separately, but nobody has run them
+across a mixed fleet at a distribution network, and the two studies that measure what estimating
+capacity is worth downstream measure it for wind alone, at national or single-farm scale.
 
 **The challenge.** We call the amount of generation actually available at a metered site its
 *effective capacity*: the output it could produce right now if the weather allowed, as opposed to
@@ -496,15 +499,17 @@ most of them work from a revenue meter alone.
 
 **We plan to attempt that combination two ways, neither of which starts from scratch.** The first is
 the two-stage route: estimate a capacity time series from the meter, then normalise by it before
-training — running the method of [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079), the
-quadratic-optimisation alternative of [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) and
-the Solar Data Tools pipeline against each other on our own sites. The second is joint estimation,
-of which [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) are the
-published precedent: a differentiable-physics model of each generator in which the physical
-parameters — including the plant's direct-current and alternating-current capacity — are fitted as
-probability distributions rather than as single numbers, so that capacity is recovered with its own
-uncertainty attached and the forecast inherits that uncertainty instead of treating capacity as
-known.
+training — running the quadratic-optimisation method of [Viotti et al.
+(2026)](https://doi.org/10.1002/we.70136) and the Solar Data Tools pipeline against each other on
+our own sites, with the running maximum of [Dantas and Browell
+(2026)](https://doi.org/10.1002/we.70079) as the reference the published numbers are quoted against
+rather than as a candidate, because a ratchet cannot follow a de-rating downwards. The second is
+joint estimation, of which [Pierrot and Pinson
+(2024)](https://doi.org/10.1080/00401706.2024.2350421) are the published precedent: a
+differentiable-physics model of each generator in which the physical parameters — including the
+plant's direct-current and alternating-current capacity — are fitted as probability distributions
+rather than as single numbers, so that capacity is recovered with its own uncertainty attached and
+the forecast inherits that uncertainty instead of treating capacity as known.
 
 **NGED's specification asks us to track effective capacity over time and, optionally, to combine it
 with the forecast into a "prevailing conditions" view. We intend to go further and use it to
@@ -595,10 +600,11 @@ was abnormally configured describe a different substation from the one being for
 trained to predict.** One strand leaves the level shifts in and reports the damage:
 [Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405) run change-point
 detection across 342 medium-voltage feeders in the UK and use the change-points to bound the
-segments within which Huyghues-Beaufond et al. remove *outliers*.  A second strand rewrites the history to the level it would have had if the
-switch had never happened: [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) do
-it across 169 real feeders and report better medium-term forecasts for it, and Artificial
-Forecasting does the same in its data-preparation pipeline.
+segments within which Huyghues-Beaufond et al. remove *outliers*. A second strand rewrites the
+history to the level it would have had if the switch had never happened: [Paredes and Vargas
+(2017)](https://doi.org/10.1049/iet-gtd.2017.0129) do it across 169 real feeders and report better
+medium-term forecasts for it, and Artificial Forecasting does the same in its data-preparation
+pipeline.
 
 **Adaptive models are the live alternative: they track a new level once it arrives, including one
 that arrives abruptly, but they never record that a switch happened.** [de Vilmarest et al.
@@ -642,10 +648,10 @@ described above.
 **One other group has made faulty metering its subject, one voltage level down.** [Moriano et al.
 (2016)](https://doi.org/10.3390/s16010085) and [Martín et al.
 (2018)](https://doi.org/10.3390/s18113947) detect systematic errors in secondary-substation
-monitoring equipment by comparing each measurement against a short-term load forecast.  Two things limit how far the Moriano and Martín results carry: the errors
-are *injected* rather than found in the wild, and the fault taxonomy is calibration gain and offset
-drift plus outliers, not the stuck values, false zeros, and multi-month gaps that dominate NGED's
-telemetry.
+monitoring equipment by comparing each measurement against a short-term load forecast. Two things
+limit how far the Moriano and Martín results carry: the errors are *injected* rather than found in
+the wild, and the fault taxonomy is calibration gain and offset drift plus outliers, not the stuck
+values, false zeros, and multi-month gaps that dominate NGED's telemetry.
 
 **Three network-innovation projects in GB tackled faulty metering substantively, one of them as its
 whole subject — Electricity North West's ATLAS, described under challenge 4 above, UK Power
@@ -934,20 +940,21 @@ every six hours, every target half-hour is covered by 56 separate forecasts. Tho
 independent observations of the model's skill: they share the weather, the recent load, and most of
 the model state. Count them as independent and a significance test will report a confidence the data
 does not support; let a target half-hour fall on both sides of a train-test boundary and the test
-set is contaminated outright.  We searched every forecasting paper in this review that reissues a forecast more often than
-its horizon is long, for any treatment of the overlap that reissuing creates — a gap or buffer
-between training and test, a block bootstrap, a correction to the number of independent observations
-— and found one partial treatment. [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) compare
-models with Diebold-Mariano tests implemented after the R `forecast` package, whose variance
-estimator corrects for serial correlation in the loss differential when it is told the forecast
-horizon; the paper does not say which horizon it passes, so we cannot tell whether the correction
-was applied. No paper we read treats the train-test contamination that reissuing creates. [Kaas et
-al. (2026)](https://arxiv.org/abs/2607.01966) are the one paper the problem cannot reach, because
-their stride equals their horizon, four days each, so no two of their forecasts share a target; that
-is our inference from their design rather than a claim they make, and they give a different reason
-for wanting a shorter stride, that it would "provide more insights", while describing exactly what
-it would create — "each data point in the dataset covered by multiple forecasts, as opposed to a
-single forecast per data point in the used configuration".
+set is contaminated outright. We searched every forecasting paper in this review that reissues a
+forecast more often than its horizon is long, for any treatment of the overlap that reissuing
+creates — a gap or buffer between training and test, a block bootstrap, a correction to the number
+of independent observations — and found one partial treatment. [Hertel et al.
+(2026)](https://arxiv.org/abs/2607.15705) compare models with Diebold-Mariano tests implemented
+after the R `forecast` package, whose variance estimator corrects for serial correlation in the loss
+differential when it is told the forecast horizon; the paper does not say which horizon it passes,
+so we cannot tell whether the correction was applied. No paper we read treats the train-test
+contamination that reissuing creates. [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) are the
+one paper the problem cannot reach, because their stride equals their horizon, four days each, so no
+two of their forecasts share a target; that is our inference from their design rather than a claim
+they make, and they give a different reason for wanting a shorter stride, that it would "provide
+more insights", while describing exactly what it would create — "each data point in the dataset
+covered by multiple forecasts, as opposed to a single forecast per data point in the used
+configuration".
 
 **Flexpectation's own protocol matches this literature where the literature has settled, and
 inherits the open question where it has not.** We use an expanding training window with the
@@ -968,9 +975,10 @@ methodological question rather than a solved one.
 that estimate them say so.**  This literature uses four substitutes for truth, each of which fails
 differently, and leaves two more on the table.
 
-**The first substitute is to hold out sites that are metered and pretend they are not.**  This is the most direct substitute available, because the
-answer really is known, and Flexpectation can run that substitute: the trial area has 12 metered
-generators whose output can be hidden from a model that then has to recover it.
+**The first substitute is to hold out sites that are metered and pretend they are not.** This is the
+most direct substitute available, because the answer really is known, and Flexpectation can run that
+substitute: the trial area has 12 metered generators whose output can be hidden from a model that
+then has to recover it.
 
 **The second substitute is to inject a change into real data and see whether the method recovers
 that change.**
@@ -985,11 +993,11 @@ first is to check an estimate against physics rather than against an answer. Dis
 components must sum to the measured net flow; disaggregated solar must be zero at night and must sit
 under the clear-sky envelope; disaggregated wind must track wind speed rather than irradiance; an
 inferred rooftop-solar capacity must be plausible for the area a substation serves. None of those
-checks needs a label, and a violation is a detectable error whatever the truth turns out to be.  Using physical consistency to *score* an estimate,
-rather than to *shape* it, is close to absent here, and it is the cheapest evaluation on this list.
-The second is a substation where every feeder and every embedded generator is metered for a period,
-used only as validation. One fully-metered substation would anchor everything else, and none of the
-papers above had one.
+checks needs a label, and a violation is a detectable error whatever the truth turns out to be.
+Using physical consistency to *score* an estimate, rather than to *shape* it, is close to absent
+here, and it is the cheapest evaluation on this list. The second is a substation where every feeder
+and every embedded generator is metered for a period, used only as validation. One fully-metered
+substation would anchor everything else, and none of the papers above had one.
 
 **Flexpectation will run all six substitutes and treat agreement between the six as the signal,
 because no one substitute is trustworthy alone.** They are not six attempts at the same measurement:
@@ -1015,12 +1023,13 @@ the potential impact of a false negative is higher than that of a false positive
 expansion planning". That asymmetry holds for Flexpectation too: a missed switching event silently
 corrupts the history a model trains on, whereas a false alarm costs an engineer a look.
 
-**Class imbalance is the design problem, not a detail.**  Score by timestamp and the long events decide the number; score by event and the short ones
-do. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s answer is to split events into four duration bands, score each band separately and
-average, and to exclude the timestamps a labeller marked uncertain from the scoring entirely. They
-set the threshold by maximising that averaged score rather than by the conventional two- or
-three-standard-deviation control limit, and they resample the test stations 10,000 times to put an
-uncertainty on the result.
+**Class imbalance is the design problem, not a detail.** Score by timestamp and the long events
+decide the number; score by event and the short ones do. [Bouman et al.
+(2024)](https://arxiv.org/abs/2405.16164)'s answer is to split events into four duration bands,
+score each band separately and average, and to exclude the timestamps a labeller marked uncertain
+from the scoring entirely. They set the threshold by maximising that averaged score rather than by
+the conventional two- or three-standard-deviation control limit, and they resample the test stations
+10,000 times to put an uncertainty on the result.
 
 **Two other choices in this literature are worth copying.** [Perry and Muller
 (2022)](https://doi.org/10.1109/PVSC48317.2022.9938675), detecting step changes across 101 manually
