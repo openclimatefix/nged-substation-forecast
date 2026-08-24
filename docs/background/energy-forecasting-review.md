@@ -650,11 +650,12 @@ reconfigurations on GB substations in 2016, from power measurements alone, and p
 precision or recall for either rule.
 
 **The challenge.** When a cable fault or planned maintenance moves part of a network from one
-substation to another, the load a substation meters steps up and its neighbour's steps down, with no
-change in the underlying demand. NGED's substations spend roughly a tenth of their operating time in
-an abnormal running arrangement. Switching labels exist for the 32-series trial area but not for the
-wider network, so a method that is to scale to the wider network has to work from power measurements
-alone.
+substation to another, the load the first substation meters steps down and the load of each
+substation picking up that work steps up, with no change in the underlying demand. The pick-up is
+usually shared across two or three neighbouring substations rather than landing on one. NGED's
+substations spend roughly a tenth of their operating time in an abnormal running arrangement.
+Switching labels exist for the 32-series trial area but not for the wider network, so a method that
+is to scale to the wider network has to work from power measurements alone.
 
 **One paper detects these events at a real network operator, and stops at the detection.** [Bouman
 et al. (2024)](https://arxiv.org/abs/2405.16164), working with the Dutch network operator Alliander,
@@ -674,8 +675,18 @@ fit and rescale that bottom-up estimate to the measured series, then hunt for st
 *difference* between the estimate and the measurement. Normal daily and seasonal variation largely
 cancels, leaving a much cleaner signal. NGED has no bottom-up estimate of substation load, and
 building one is not in Flexpectation's scope, because the project uses no telemetry from below
-primary substation level. Flexpectation does, though, produce its own forecast, which can serve as
-the reference series in the same way.
+primary substation level.
+
+**Flexpectation will model its own reference series rather than measure one.** What Alliander's
+bottom-up estimate gives [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) — a second opinion
+on what each substation's power should have been — Flexpectation plans to produce from the
+substation's own meter plus weather and the calendar. The first attempt is classical: a multiple
+seasonal-trend decomposition of each series into a trend and daily, weekly, and annual cycles,
+leaving a remainder in which a switch shows up as a sustained level shift. The second uses the
+project's existing XGBoost machinery, trained with no power-lag features, so that an earlier
+switching event cannot contaminate the expected-power estimate the way a lagged reference would.
+Neither route needs metering from below the substation. Whether a modelled reference detects
+switching as well as a measured one is what the project has to find out.
 
 **The measured accuracy is modest, and worst on the short events.** [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164) score every detector with the F1.5 score, which blends

@@ -87,6 +87,19 @@ For each substation, form an expected-power baseline that is a function of **exo
 
 **Why the baseline must be weather/calendar-based and *not* a lagged-power baseline.** A tempting cheap baseline is "same half-hour last week." It is unsound here, and disqualified. If last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the **sign reversed**, because the contamination is in the *reference*, not the observation. Stage 2's balance attribution would then hunt for donor rises coincident with a source drop that is a baseline artifact, manufacturing phantom events and mis-attributing them. Worse, because switching events can persist for days to months, a lag can land *inside the same ongoing event*, so there is no step at all and a real event is masked entirely. Weather and clock time are unaffected by network topology, so a baseline built only from them cannot be contaminated by switching state — the residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.
 
+**The first thing to try is a classical seasonal decomposition, which needs no weather input and no
+training run.** Multiple seasonal-trend decomposition (MSTL) splits each substation's series into a
+trend, one seasonal component per period — daily and weekly, plus annual where the history is long
+enough — and a remainder. The remainder plays the same role as the model residual above: a switching
+event appears in it as a sustained level shift. MSTL has no features to engineer and no fitting run
+to wait for, so it is the cheapest way to answer the question that decides whether the rest is worth
+building — are the level shifts visible above the noise at all? Two limits keep MSTL a first look
+rather than the baseline. MSTL carries no weather covariate, so a cold snap or a still week lands in
+the remainder alongside the switching events. And MSTL estimates the trend and the seasonal
+components from the series' own history, so a months-long event can be partly absorbed into the
+trend it ought to be standing out against — a milder form of the lagged-power contamination
+described above. Both limits are why the XGBoost baseline follows.
+
 **Baseline implementation: reuse the existing XGBoost forecaster with no lag features.** The
 production forecaster already consumes most of the covariates the baseline needs — NWP weather,
 time-of-day, day-of-week (holiday flags are a
@@ -564,6 +577,8 @@ Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 **Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**. The floor is not a single MW number: it is a frontier in **transferred magnitude × event duration**, reported per series relative to that series' residual noise. The duration axis exists because changepoint segmentation has a minimum detectable event length at half-hourly sampling (an event lasting minutes to a few hours appears as a spike or one odd interval, not a step), just as residual noise sets a minimum magnitude. Pair the frontier with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.* One caveat to carry into the scoring: measured **precision is a lower bound** — if the control-room logs are incomplete (worth asking NGED how complete they believe them to be), some "false positives" will be real, unlogged events.
 
+**Report an F1 score per event-duration band, so the detector can be set beside the only published measurement.** F1 is the harmonic mean of precision and recall, weighting the two equally, and runs from 0 for a useless detector to 1 for a perfect one. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) — the only published measurement of switching detection at a real network operator — score four duration bands (15 minutes to 6 hours, 6 hours to 3 days, 3 to 42 days, and 42 days or longer), and their best detectors reach about 0.2 on the two shortest bands and nearly 0.5 on the longest. Their headline metric is F1.5 rather than F1: the F-beta family lets recall be weighted more heavily than precision, and they set beta to 1.5 because "the potential impact of a false negative is higher than that of a false positive in power grid expansion planning". The same is true here, so report **both** — F1 as the headline number, F1.5 alongside it wherever the head-to-head with Bouman et al. is the point — and band the scores by duration the way they do, because a single fleet-wide score hides the fact that short events are the hard ones.
+
 **Synthetic event injection (the workhorse of tuning and validation).** The logs contain only however many events the trial period happens to contain, which caps the statistical power of any sensitivity estimate. Injection removes that cap: take periods believed clean, move a synthetic slice between real neighbours (subtract a scaled, plausibly-shaped signal from one series and add it across 1–3 others), and measure detection and attribution over a controlled **magnitude × duration grid**. This maps the full sensitivity frontier with arbitrary precision, tunes every threshold and penalty in stages 1–2 *without touching the gold-standard logs*, and works at any scale — including, later, on unlabelled full-fleet data. The real logs then play their proper role: confirming that the synthetic frontier transfers to reality, rather than carrying the whole measurement burden alone.
 
 **Diagnostic precursor.** Before formal changepoints, a near-trivial check: first-difference each residual (steps → spikes) and, over rolling windows, confirm that a source's negative spike coincides with the *summed* rises of a neighbour subset. Equivalently, around each *logged* event, plot the member residuals and the neighbourhood-sum residual: members should step, the sum should stay (approximately) flat. If known-neighbour groups show no such structure, the neighbour list or baseline is wrong — fix that first.
@@ -994,8 +1009,10 @@ also to test out convex optimisation as a warm-up for v2).
 1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
    (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
    list from NGED (see [Open items / dependencies](#open-items-dependencies)). Nothing downstream is testable without these.
-2. **Baseline.** Configure the existing XGBoost forecaster with weather/calendar features only
-   (**no power-lag features**) and a robust median objective, per series, with a per-series
+2. **Baseline.** Start with the classical route: a multiple seasonal-trend decomposition per
+   series, whose remainder is the first residual to hunt for level shifts in. Then configure
+   the existing XGBoost forecaster with weather/calendar features only (**no power-lag
+   features**) and a robust median objective, per series, with a per-series
    spread estimate (quantile heads once available, or a rolling-MAD interim). Output:
    normalised residual series. Sanity-check residual autocorrelation and per-series spread
    before proceeding.
