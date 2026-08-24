@@ -291,8 +291,11 @@ first 2 to 3 days of the 1-to-10-day window NGED acts on, and less beyond it, wh
 forecast itself is the binding constraint. Adding a learned residual to a physical generator model
 is established practice: [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) fit a
 physics-inspired power model to a wind farm of four turbines and train a second model on the
-residual, improving on the physics model alone by 37%, with conformalised quantile regression
-supplying the uncertainty. But they predict power from measured wind rather than forecasting it days
+residual, cutting the physics model's mean absolute percentage error by 37% and its mean absolute
+error by 28%, with conformalised quantile regression supplying the uncertainty. The hybrid gains
+that margin over the physics model alone; against a purely data-driven model given the same eight
+inputs it "essentially matches" rather than beats, so what the physics buys here is interpretability
+at no accuracy cost. But they predict power from measured wind rather than forecasting it days
 ahead, and we found nobody putting a differentiable model of a generator inside a network's
 probabilistic net-demand forecast. On lead time alone, then, the larger differentiable-physics prize
 for Flexpectation would be on the demand side rather than the generation side.
