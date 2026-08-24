@@ -409,9 +409,9 @@ When a cable fault or planned maintenance moves part of a network from one subst
 the load the first substation meters steps down and the load of each substation picking up that work
 steps up, with no change in the underlying demand. The pick-up is usually shared across two or three
 neighbouring substations rather than landing on one. NGED's substations spend roughly a tenth of
-their operating time in an abnormal running arrangement. Switching labels exist for the 32-series
-trial area but not for the wider network, so a method that is to scale to the wider network has to
-work from power measurements alone.
+their operating time in an abnormal running arrangement. Switching labels exist for the trial area
+but not for the wider network, so a method that is to scale to the wider network has to work from
+power measurements alone.
 
 #### What the literature says
 
