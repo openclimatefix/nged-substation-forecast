@@ -459,8 +459,8 @@ project's existing XGBoost machinery, trained with no power-lag features, so tha
 switching event cannot contaminate the expected-power estimate. Neither route needs metering from
 below the substation.
 
-**Flexpectation also plans to use a signal that Bouman et al.'s one-substation-at-a-time method
-cannot see: the power has to go somewhere.** [Bouman et al.
+**Flexpectation also plans to investigate using a signal that Bouman et al.'s
+one-substation-at-a-time method cannot see: the power has to go *somewhere*.** [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164) score each substation against its own history — "the
 current analysis considers one year of measurements for one station at a time" — so nothing in their
 method asks whether the power that left one substation turned up at another. Flexpectation intends
