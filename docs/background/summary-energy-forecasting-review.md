@@ -97,12 +97,21 @@ large, dependable margin for anything more sophisticated at substation level. Bo
 deployments that actually tried boosted trees — [Pinheiro et al.
 (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) and Artificial Forecasting — kept a simpler
 model instead, so expect the choice of model family to matter less than the data, the features and
-how often the model is refitted (finding 1 below). What the literature does not underwrite is the
-rest of the specification: nobody has driven substation uncertainty from a weather ensemble over 14
-days, and [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) found quantile regression
-alone uncalibrated beyond the 1st and 99th percentiles — the range NGED acts on — even with five
-years of data on regions far larger than a substation. Plan for an explicit tail treatment rather
-than reading extreme quantiles off the model.
+how often the model is refitted. Finding 1 below gives the two reasons this
+literature keeps settling on the simpler model: the extra accuracy was not there to be had, and the
+cost of tuning and the loss of interpretability then decided against the more complicated one. Read
+those results with one thing in mind, though — when a paper says "XGBoost" it usually means a
+lighter model than the one we plan. [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) give
+theirs lagged power, weather, time and metadata and nothing beyond that: no clear-sky index, no wind
+power curve, no monotone constraints. [Pinheiro et al.
+(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) keep that caveat honest, because their
+booster and their generalised additive model were fitted on identical features and the simpler model
+still won. What the literature does not underwrite is the rest of the specification: nobody has
+driven substation uncertainty from a weather ensemble over 14 days, and [Browell and Fasiolo
+(2021)](https://arxiv.org/abs/2103.10335) found quantile regression alone uncalibrated beyond the
+1st and 99th percentiles — the range NGED acts on — even with five years of data on regions far
+larger than a substation. Plan for an explicit tail treatment rather than reading extreme quantiles
+off the model.
 
 **What the literature reports.**
 
@@ -678,9 +687,9 @@ substation demand well before the mid-2010s.
 [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) tested Chronos-2, a general-purpose
 time-series model that had never seen their data, against models trained on the first 160 of those
 feeders and scored, like Chronos-2, on all 200. Chronos-2 beat every purpose-trained competitor on
-mean absolute error, 3.8 kW against 4.2 kW. If heavily engineered models do not clearly beat an
-off-the-shelf model given none of the target network's data, that is important information about the
-value of any programme of heavy engineering.
+mean absolute error, 3.8 kW against 4.2 kW. Their purpose-trained models were not heavily engineered
+— see finding 1 above — but a model given all of a network's history and beaten by one given none of
+it is still important information about the value of any programme of heavy engineering.
 
 ## What GB networks have already built
 

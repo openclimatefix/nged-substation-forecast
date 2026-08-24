@@ -1238,6 +1238,16 @@ that architectural modification is "not needed and can even lead to worse accura
 enlarges the space of hyperparameters that then has to be searched. What did help them was refitting
 the model every month rather than redesigning it.
 
+**"XGBoost" in these papers is a lighter model than the one Flexpectation plans, so read a loss by a
+boosted tree with that in mind.** [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) give theirs
+lagged power, weather, time and metadata covariates and nothing beyond that: no clear-sky index, no
+photovoltaic power proxy, no wind power curve, no monotone constraints, and holidays only as a
+binary flag — on feeders whose target is net load with heavy solar feed-in. Their headline is better
+read as a foundation model beating a lightly-featurised gradient booster than as a verdict on
+gradient boosting. [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) are the
+exception, and the more uncomfortable result for us: their booster and their generalised additive
+model were fitted on identical features, and the simpler model still won.
+
 ### 2. In every study that forecast more than one voltage level, accuracy got worse further down the network
 
 [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) ran the same models against a day-type
@@ -1359,9 +1369,9 @@ primary substations is one of the more useful things this project can report.
 [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) tested Chronos-2, a general-purpose
 time-series model that had never seen their data, against models trained on the first 160 of those
 feeders and scored, like Chronos-2, on all 200. Chronos-2 beat every purpose-trained competitor on
-mean absolute error, 3.8 kW against 4.2 kW. If heavily engineered models do not clearly beat an
-off-the-shelf model given none of the target network's data, that is important information about the
-value of any programme of heavy engineering.
+mean absolute error, 3.8 kW against 4.2 kW. Their purpose-trained models were not heavily engineered
+— see finding 1 above — but a model given all of a network's history and beaten by one given none of
+it is still important information about the value of any programme of heavy engineering.
 
 ## What GB networks have already built
 
