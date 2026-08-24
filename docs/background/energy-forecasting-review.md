@@ -422,19 +422,32 @@ km² grid of pyranometers in Hawaii, on synthetic photovoltaic output derived fr
 rather than from metered plants — neither our horizon nor our question, and the orientations there
 are known throughout rather than estimated.
 
-**Two findings from that search shape what Flexpectation should build.** [Saint-Drenan et al.
-(2015)](https://doi.org/10.1016/j.solener.2015.07.024) name Flexpectation's own case as their
-method's failure mode: where a power series is "the aggregated production of modules with different
-orientations", the algorithm "performs poorly", because it assumes one orientation per plant.
-Recovering a single orientation per substation is therefore not the thing to attempt. And they
-report that an azimuth fitted 5° from the true one gave better simulations than the true value,
-because the fit balances the systematic error of the physical model, concluding that the output
-"should be seen as a set of parameters that lead to the best simulation and not necessarily as the
-actual characteristics of the PV plant". That makes accuracy in degrees the wrong target for
-Flexpectation: what a differentiable plant model needs is an effective tilt and azimuth that make
-the forecast right, which is measurable against the forecast we already score. Their method also
-folds inverter clipping into a fitted look-up table rather than modelling it explicitly, which is
-one route to the ratio of direct-current to alternating-current rating that NGED does not hold.
+**Two findings from that search shape what Flexpectation should build, and they separate the two
+cases the project faces.** [Saint-Drenan et al.
+(2015)](https://doi.org/10.1016/j.solener.2015.07.024) report that an azimuth fitted 5° from the
+true one gave better simulations than the true value, because the fit balances the systematic error
+of the physical model, concluding that the output "should be seen as a set of parameters that lead
+to the best simulation and not necessarily as the actual characteristics of the PV plant". That
+makes accuracy in degrees the wrong target for Flexpectation: what a differentiable plant model
+needs is an effective tilt and azimuth that make the forecast right, which is measurable against the
+forecast we already score. For a single metered site, fitting tilt, azimuth, and the effective
+direct- and alternating-current capacities is the plan — by gradient descent inside the forecast
+rather than by the grid search Saint-Drenan et al. use, so that the fit stays joint and
+probabilistic.
+
+**Their second finding rules out doing the same thing to a substation, and points at what to do
+instead.** Saint-Drenan et al. name Flexpectation's unmetered case as their method's failure mode:
+where a power series is "the aggregated production of modules with different orientations", the
+algorithm "performs poorly", because it assumes one orientation per plant. Flexpectation therefore
+estimates no single orientation per substation. The fleet model represents the aggregate as a
+learned mixture of east-, south-, and west-facing basis shapes — which span the fixed-tilt
+orientations, and which a single tilt and azimuth cannot, because a mixed fleet produces a broad
+mound of power where one south-facing array produces a sharp hill — with a tracking shape added
+where ground-mounted trackers sit behind the substation, and a soft clip in place of a hard one
+because many differently-sized inverters saturate at different irradiances rather than all at once.
+That soft clip is also how the ratio of direct-current to alternating-current rating enters the
+model: as a learned aggregate limit and a learned curvature, rather than as a register value NGED
+does not hold.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator, or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.

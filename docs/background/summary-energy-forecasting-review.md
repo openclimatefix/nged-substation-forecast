@@ -301,11 +301,19 @@ Flexpectation treats it as a hypothesis to test rather than a settled prize.** [
 (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan et al.
 (2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's tilt and azimuth from
 its own output, to a few degrees, but report their accuracy in degrees alone. Saint-Drenan et al.
-also name Flexpectation's case as their method's failure mode — where a power series is "the
-aggregated production of modules with different orientations", the algorithm "performs poorly" — and
-found that their fitted parameters gave better simulations than the true ones, because the fit
-absorbs the physical model's own bias. That makes accuracy in degrees the wrong target: what a
-differentiable plant model needs is an effective tilt and azimuth that make the forecast right.
+also found that an azimuth fitted 5° from the true one gave better simulations than the true value,
+because the fit balances the systematic error of the physical model — so accuracy in degrees is the
+wrong target. What matters is an effective tilt and azimuth that make the forecast right.
+
+**The two cases Flexpectation faces need different machinery, and the dividing line is the limit
+Saint-Drenan et al. state.** For a single metered site, fitting tilt, azimuth, and the effective
+direct- and alternating-current capacities is the plan — by gradient descent inside the forecast
+rather than by grid search, so that the fit stays joint and probabilistic. For unmetered solar
+behind a substation their algorithm "performs poorly", because it assumes one orientation per plant
+where the series is "the aggregated production of modules with different orientations".
+Flexpectation therefore estimates no single orientation per substation: the fleet model represents
+the aggregate as a learned mixture of east-, south-, and west-facing basis shapes, with a soft clip
+standing in for many differently-sized inverters saturating in turn.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator, or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.

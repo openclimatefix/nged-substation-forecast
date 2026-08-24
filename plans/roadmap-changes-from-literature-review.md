@@ -48,6 +48,28 @@ against a load climatology. But the roadmap states the day-8 figure as fact and 
 came from, so either find the source or reword the sentence as the question the climatology baseline
 exists to answer.
 
+**Fitted plant parameters are effective parameters, not true ones, and no page under `docs/` says
+so.** [Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024), read in full this
+session, fit a photovoltaic plant's tilt, azimuth, and angular-loss coefficient to its own power
+history, and report that an azimuth fitted 5° away from the value the operator's records gave — a
+value they checked against an aerial photograph — produced *better* simulations than the true one,
+because the fit balances the systematic error of the physical model. Their conclusion is that the
+output "should be seen as a set of parameters that lead to the best simulation and not necessarily
+as the actual characteristics of the PV plant". Both reviews now draw the consequence: accuracy in
+degrees is the wrong success metric for Flexpectation, and what a differentiable plant model needs
+is an effective tilt and azimuth that make the forecast right.
+
+Verified: no page under `docs/` states this. `docs/techniques/differentiable-physics.md` gives
+`tilt`, `azimuth`, `dc_capacity`, and `ac_capacity` variational posteriors with "tight physical
+priors" but never says whether the target is the true value or the best-fitting one, and
+`docs/roadmap/capacity-estimation.md` does not carry it either. Three things to decide. Where the
+statement belongs — `differentiable-physics.md` is the obvious owner. Whether it changes how the
+differentiable-physics work is scored: if the parameters are effective rather than true, then
+comparing a fitted tilt against a surveyed one is a diagnostic rather than a test, and the test is
+the forecast score. And whether it argues for loosening the priors, because a prior held tightly
+around a surveyed orientation is pulling against the very bias absorption that made Saint-Drenan et
+al.'s fitted value the better one.
+
 **Step 2 proper.** Every `docs/roadmap/` page making a claim the literature bears on should cite it
 and point at the review. Note the direction: **inbound only.** The review links to nothing of ours
 and must stay that way until the Milestone 2 report has gone to NGED, so the work happens entirely
