@@ -77,7 +77,8 @@ against anything, so those are described in prose.
 
 ### 1. Probabilistic forecasts of net demand at substations
 
-**The challenge.** "Net" demand is "gross" demand minus whatever generation sits behind the
+#### The challenge
+"Net" demand is "gross" demand minus whatever generation sits behind the
 substation. In Flexpectation, we plan to forecast net demand at every grid supply point, bulk supply
 point and primary substation in NGED's licence areas. Our forecasts will be half-hourly, 14 days
 ahead, updated every six hours, and probabilistic. NGED acts on the forecast one to ten days ahead,
@@ -86,7 +87,8 @@ capacity?" rather than "what is the most likely load?". Forecasting net demand i
 priority of the eight challenges, and the other seven exist mainly to improve our net-demand
 forecast.
 
-**What the literature says.** A large literature exists on the topic of forecasting substation load,
+#### What the literature says
+A large literature exists on the topic of forecasting substation load,
 but very little of what we read can be compared with the rest of that literature, and we found no
 papers driving a probabilistic substation forecast from a weather ensemble across a 14-day horizon.
 
@@ -101,9 +103,11 @@ papers driving a probabilistic substation forecast from a weather ensemble acros
 | [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondaries | Day-ahead to 11 days at primary; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method  | Real forecasts at primary; none in the published secondary results |
 | [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Substation | Day-ahead | **3 to 8% mean absolute percentage error** against no stated baseline, so not a target; varying with how industrial and how large the supplied area was; linear and Gaussian regression preferred over the alternatives tested (abstract only) | Not stated in the abstract |
 
-**What this means for Flexpectation.** Building Flexpectation v1 on a gradient-boosted tree (GBT,
-such as XGBoost) is defensible, but the literature paints GBTs as a sensible default rather than a
-proven winner. [NGED's own 2021 EFFS project (Electricity Flexibility and Forecasting
+#### What this means for Flexpectation
+
+**Building Flexpectation v1 on a gradient-boosted tree (GBT, such as XGBoost) is defensible, but the
+literature paints GBTs as a sensible default rather than a proven winner**. [NGED's own 2021 EFFS
+project (Electricity Flexibility and Forecasting
 System)](https://smarter.energynetworks.org/projects/wpden03/) picked XGBoost on the balance of
 accuracy against effort, and no study we read shows a large, dependable margin for anything more
 sophisticated than XGBoost at substation level. Both network deployments that actually tried boosted
@@ -134,19 +138,19 @@ they use data from the same 200 low-voltage feeders in Germany. Inside [Kaas et 
 different winners again. Neither disagreement is a mistake: the two papers test different sets of
 models at different time resolutions, and the two metrics answer different questions.
 
-**On the rest of the specification — a weather ensemble driving substation-level uncertainty all the
-way out to 14 days — there is no published result to lean on, for or against, and two published
-papers ask for exactly that.** [Haben et al. (2021)](https://arxiv.org/abs/2106.00006) end their
-review of 221 low-voltage papers by naming "post-processed weather ensemble predictions to generate
-multi-step probabilistic forecasts of load at different levels of the LV hierarchy" as an avenue of
-future research. [Ludwig et al. (2023)](https://doi.org/10.1080/01605682.2022.2115411) built exactly
-that — a multi-step probabilistic load forecast driven by a post-processed weather ensemble — for
-Great Britain's national demand one to six days ahead, from the same 51-member ECMWF ensemble
-Flexpectation uses, and they too ask for the method to be pushed down "to different layers of the
-energy hierarchy, including the low voltage level". Neither request names a horizon or a time
-resolution, and both point below NGED's primary substations rather than at them.
+**On the rest of the Flexpectation specification — a weather ensemble driving substation-level
+uncertainty all the way out to 14 days — there is no published result to lean on, for or against,
+and two published papers ask for exactly that.** [Haben et al.
+(2021)](https://arxiv.org/abs/2106.00006) end their review of 221 low-voltage papers by naming
+"post-processed weather ensemble predictions to generate multi-step probabilistic forecasts of load
+at different levels of the LV hierarchy" as an avenue of future research. [Ludwig et al.
+(2023)](https://doi.org/10.1080/01605682.2022.2115411) built exactly that — a multi-step
+probabilistic load forecast driven by a post-processed weather ensemble — for Great Britain's
+national demand one to six days ahead, from the same 51-member ECMWF ensemble Flexpectation uses,
+and they too ask for the method to be pushed down "to different layers of the energy hierarchy,
+including the low voltage level".
 
-**That 14-day horizon also sits near the edge of what a weather ensemble can supply at all.**
+**Flexpectation's 14-day horizon sits near the edge of what a weather ensemble can reliably forecast.**
 [Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) found that the lead time beyond
 which a weather ensemble stops beating a climatological distribution is 16 to 23 days ahead —
 measured on upper-air variables, not on the near-surface temperature and irradiance that drive
@@ -159,8 +163,8 @@ that models the upper tail explicitly, and they find that "below 1% and above 99
 based on quantile regression only are not calibrated at any GSP Group. Therefore, these quantiles
 are not suitable for use in decision-making" — and that was with five years of half-hourly data,
 across regions far larger than a substation. Above those percentiles Browell and Fasiolo switch to a
-fitted parametric tail, and Flexpectation plans to do the same rather than reading extreme quantiles
-straight off the model.
+fitted parametric tail, and Flexpectation plans to follow Browell and Fasiolo and fit a parametric
+tail rather than reading extreme quantiles straight off the model.
 
 **All the text above is a verdict on Flexpectation version one.** The three more sophisticated ML
 model families we plan to research in 2027 — pre-trained encoders, connectivity-map models and
