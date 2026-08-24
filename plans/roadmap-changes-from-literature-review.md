@@ -1,7 +1,7 @@
 # Roadmap changes the literature review surfaced
 
-Working note, started 2026-08-22 and extended 2026-08-23, to be deleted with the rest of
-`plans/` before this branch merges. It exists because the relevance review of
+Working note, started 2026-08-22 and extended on 2026-08-23 and 2026-08-24, to be deleted with
+the rest of `plans/` before this branch merges. It exists because the relevance review of
 [`docs/background/energy-forecasting-review.md`](../docs/background/energy-forecasting-review.md)
 turned up work on the roadmap side that we are deliberately not doing yet: the next step is a
 manual read of the review itself.
@@ -35,6 +35,18 @@ this is mostly a matter of saying so.
 **Fold overlap, if we ever run more than one fold.** `cross-validation-folds.md` reasons about
 non-overlapping walk-forward *between* folds; the section added this session covers the overlap
 between reissued forecasts *within* a fold. Nobody has checked whether the two interact.
+
+**`docs/roadmap/metrics-and-leaderboard.md` asserts an unsourced skill horizon that pulls against
+the review's.** The baselines section says that "at day 8–14 seasonal climatology often beats
+everything", with nothing behind it. Both reviews now cite [Buizza and Leutbecher
+(2015)](https://doi.org/10.1002/qj.2619), who put at 16 to 23 days the lead time beyond which a
+weather ensemble stops beating a climatological distribution — so on their measurement, day 8 to 14
+sits comfortably inside the range where the weather ensemble still carries skill. Both claims can
+hold at once, because they compare different things: Buizza and Leutbecher pit a weather ensemble
+against a weather climatology on upper-air variables, whereas the roadmap sentence pits a load model
+against a load climatology. But the roadmap states the day-8 figure as fact and cannot say where it
+came from, so either find the source or reword the sentence as the question the climatology baseline
+exists to answer.
 
 **Step 2 proper.** Every `docs/roadmap/` page making a claim the literature bears on should cite it
 and point at the review. Note the direction: **inbound only.** The review links to nothing of ours
