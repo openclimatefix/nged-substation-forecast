@@ -140,15 +140,15 @@ different winners again. Neither disagreement is a mistake: the two papers test 
 models at different time resolutions, and the two metrics answer different questions.
 
 **On the rest of the Flexpectation specification — a weather ensemble driving substation-level
-uncertainty all the way out to 14 days — there is no published result to lean on, for or against,
+uncertainty all the way out to 14 days — we found no published result to lean on, for or against,
 and two published papers ask for exactly that.** [Haben et al.
 (2021)](https://arxiv.org/abs/2106.00006) end their review of 221 low-voltage papers by naming
 "post-processed weather ensemble predictions to generate multi-step probabilistic forecasts of load
 at different levels of the LV hierarchy" as an avenue of future research. [Ludwig et al.
 (2023)](https://doi.org/10.1080/01605682.2022.2115411) built exactly that — a multi-step
 probabilistic load forecast driven by a post-processed weather ensemble — for Great Britain's
-national demand 1 to 6 days ahead, from the same 51-member ECMWF ensemble Flexpectation uses,
-and they too ask for the method to be pushed down "to different layers of the energy hierarchy,
+national demand 1 to 6 days ahead, from the same 51-member ECMWF ensemble Flexpectation uses, and
+they too ask for the method to be pushed down "to different layers of the energy hierarchy,
 including the low voltage level".
 
 **Flexpectation's 14-day horizon sits near the edge of what a weather ensemble can reliably forecast.**
@@ -282,25 +282,26 @@ mid-competition, the winning team clipped its quantiles to the capacity implied 
 notices the farm is obliged to publish, while the organisers' benchmark ignored the fault and, in
 [Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
 extremely poorly as a result". NGED's embedded generators publish no such notices. NGED's Embedded
-Capacity Register does give a registered capacity for the larger distributed generators, but a
-registered capacity is static — what was connected, not what is available today — and the register
-carries no panel tilt, panel azimuth, or ratio of direct-current to alternating-current rating. A
-differentiable model has the ability to infer these properties of each generator. Each half of that
-fitting has been made to work on its own: [Pierrot and Pinson
-(2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind farm's capacity as a
-time-varying bound fitted jointly with the forecast, and beat probabilistic persistence by 34.2% on
-continuous ranked probability score over 14 months at the Anholt offshore wind farm, though their
-one clean test of tracking the bound on its own gained 2.43%, and [Meng et al.
-(2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of 13 roof
+Capacity Register does give a registered capacity for generation of 50 kW and above: in the May 2026
+edition, 5,500 connected generators totalling 10,938 MW, of which 3,995 sites and 5,669 MW are
+solar. But a registered capacity is contractual rather than operational — the export limit is the
+one "permitted as per the connection agreement" — and the register carries no panel tilt, panel
+azimuth, or ratio of direct-current to alternating-current rating. A differentiable model has the
+ability to infer these properties of each generator. Each half of that fitting has been made to work
+on its own: [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind
+farm's capacity as a time-varying bound fitted jointly with the forecast, and beat probabilistic
+persistence by 34.2% on continuous ranked probability score over 14 months at the Anholt offshore
+wind farm, though their one clean test of tracking the bound on its own gained 2.43%, and [Meng et
+al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of 13 roof
 photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°, matching the shape
 of each system's hourly output against plane-of-array irradiance from a station up to 195 km away.
 Because both curves are normalised before matching, their method needs no nameplate rating. Neither
 method sits inside a substation's net-demand forecast, which is where Flexpectation would have to
 put it.
 
-**What better orientation metadata is worth to a forecast is a number nobody has published, so
-Flexpectation treats it as a hypothesis to test rather than a settled prize.** [Meng et al.
-(2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan et al.
+**What better orientation metadata is worth to a forecast is a number we have not found in the
+literature, so Flexpectation treats it as a hypothesis to test rather than a settled prize.** [Meng
+et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan et al.
 (2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's tilt and azimuth from
 its own output, to a few degrees, but report their accuracy in degrees alone. Saint-Drenan et al.
 also found that an azimuth fitted 5° from the true one gave better simulations than the true value,
@@ -336,7 +337,7 @@ rating cannot see the difference.
 
 #### What the literature says
 
-A method exists for each generation technology separately, but nobody has run them across a mixed
+A method exists for each generation technology separately, but we found none run across a mixed
 fleet at a distribution network, and the two studies that measure what estimating capacity is worth
 downstream measure it for wind alone, at national or single-farm scale.
 

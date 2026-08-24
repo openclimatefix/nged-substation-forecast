@@ -222,8 +222,8 @@ error is worth about 1.4% of congestion-management cost on average across rollou
 saving varies between levels and is negative at some of them. We read the sections of that paper
 bearing on the cost calculation rather than the whole of it. Two things keep the gap open: the
 network is a modified IEEE 33-node test system rather than a real one, and what Bernecker et al.
-compare is two *information levels*, not two forecasting models, so the metric has never been used
-to rank one forecast against another at a real substation.
+compare is two *information levels*, not two forecasting models, so we found no case of the metric
+being used to rank one forecast against another at a real substation.
 
 **The rest of the decision metric exists in pieces.** [Browell and Fasiolo
 (2021)](https://arxiv.org/abs/2103.10335) fix a risk appetite, compute the reserve volume each
@@ -377,26 +377,31 @@ its quantiles to the capacity implied by the outage notices the farm is obliged 
 the organisers' benchmark ignored the fault and, in [Browell et al.
 (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed extremely poorly as a
 result". NGED's embedded generators publish no such notices. NGED's Embedded Capacity Register does
-give a registered capacity for the larger distributed generators, but a registered capacity is
-static — what was connected, not what is available on the day — and the register carries no panel
-tilt, panel azimuth, or ratio of direct-current to alternating-current rating. A differentiable
-plant model would therefore start from the registered capacity and fit the rest, including the
-day-to-day availability that a register cannot express. Each half of that fitting has been made to
-work on its own: [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a
-wind farm's capacity as a time-varying bound fitted jointly with the forecast, and beat
-probabilistic persistence by 34.2% on continuous ranked probability score over 14 months at the
-Anholt offshore wind farm, though their one clean test of tracking the bound on its own gained
-2.43%, and [Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and
-azimuth of 13 roof photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°,
-matching the shape of each system's hourly output against plane-of-array irradiance computed for
-every candidate orientation, from a station up to 195 km away. Two details of that paper matter to
-Flexpectation. Because both curves are normalised before matching, the method needs no nameplate
-rating, which is the one piece of metadata it might otherwise have demanded. And it reports its
-accuracy only in degrees: Meng et al. never convert an orientation error into a power error. Their
-own stated limitation is that all 13 systems sit on the same standardised 42° roof, so the tilt
-figure is tested against a single true tilt; the accompanying simulation study, which does span
-orientations, scores 4.8° on tilt and 3.1° on azimuth across 21 notional panels, and is weakest on
-the south-facing ones at 7.9° on tilt against 3.0° to 5.1° for north, east, and west. Neither method
+give a registered capacity for generation of 50 kW and above: in the May 2026 edition, 5,500
+connected generators totalling 10,938 MW, of which 3,995 sites and 5,669 MW are solar, and 4,892 of
+the 5,500 name the primary substation they connect at. But a registered capacity is contractual
+rather than operational — the export limit is the one "permitted as per the connection agreement" —
+and the register carries no panel tilt, panel azimuth, or ratio of direct-current to
+alternating-current rating for any of them. The one field that would bear on availability, the flag
+for a flexible connection under Active Network Management, was unpopulated for every connected
+generator in the May 2026 edition. A differentiable plant model would therefore start from the
+registered capacity and fit the rest, including the day-to-day availability that a register cannot
+express. Each half of that fitting has been made to work on its own: [Pierrot and Pinson
+(2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind farm's capacity as a
+time-varying bound fitted jointly with the forecast, and beat probabilistic persistence by 34.2% on
+continuous ranked probability score over 14 months at the Anholt offshore wind farm, though their
+one clean test of tracking the bound on its own gained 2.43%, and [Meng et al.
+(2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of 13 roof
+photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°, matching the shape
+of each system's hourly output against plane-of-array irradiance computed for every candidate
+orientation, from a station up to 195 km away. Two details of that paper matter to Flexpectation.
+Because both curves are normalised before matching, the method needs no nameplate rating, which is
+the one piece of metadata it might otherwise have demanded. And it reports its accuracy only in
+degrees: Meng et al. never convert an orientation error into a power error. Their own stated
+limitation is that all 13 systems sit on the same standardised 42° roof, so the tilt figure is
+tested against a single true tilt; the accompanying simulation study, which does span orientations,
+scores 4.8° on tilt and 3.1° on azimuth across 21 notional panels, and is weakest on the
+south-facing ones at 7.9° on tilt against 3.0° to 5.1° for north, east, and west. Neither method
 sits inside a substation's net-demand forecast, which is where Flexpectation would have to put it.
 How much the physics is worth getting right has been measured for solar: [Mayer and Gróf
 (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) score all 32,400 combinations of nine
@@ -410,8 +415,8 @@ the extremes of 32,400 chains rather than a typical penalty, and every plant's t
 from its design documentation and stayed fixed, so Mayer and Gróf bound the cost of choosing the
 wrong physical model, not the cost of not knowing a system's orientation.
 
-**What better orientation metadata is worth to a forecast is a number nobody has published, and the
-four papers closest to the question each stop short of it.** [Meng et al.
+**What better orientation metadata is worth to a forecast is a number we have not found in the
+literature, and the four papers closest to the question each stop short of it.** [Meng et al.
 (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan et al.
 (2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's tilt and azimuth from
 its own output — Meng et al. to 4.3° and 4.5°, Saint-Drenan et al. to within 1.5° of tilt and 5° of
@@ -466,7 +471,7 @@ to their model structure being tuned for the distributor's own substations.
 
 ### 3. Estimating the effective capacity of metered generators
 
-**In summary.** A method exists for each generation technology separately, but nobody has run them
+**In summary.** A method exists for each generation technology separately, but we found none run
 across a mixed fleet at a distribution network, and the two studies that measure what estimating
 capacity is worth downstream measure it for wind alone, at national or single-farm scale.
 
