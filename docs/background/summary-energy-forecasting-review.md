@@ -191,21 +191,23 @@ is the blank: applied to substation demand forecasting it produced no strong res
 and we found nobody aggregating building thermal physics up to a substation and putting it inside a
 probabilistic forecast, though the ingredients exist separately.
 
-**The encoder Flexpectation plans to pre-train is a weather encoder, and its two halves have been
-built separately from any energy forecast.** The plan is a network that turns the raw ECMWF ensemble
-into a calibrated probabilistic weather forecast in physical units, which a substation model then
-reads. [Rasp and Lerch (2018)](https://arxiv.org/abs/1805.09091) built the first half: a neural
-network that post-processes a 50-member ECMWF ensemble into calibrated probabilistic 2-metre
-temperature at 537 German stations 48 hours ahead, cutting mean continuous ranked probability score
-from 1.16 for the raw ensemble to 0.78, with a learned per-station embedding one of the two
-components the authors credit for the gain. [Mitra and Ramavajjala
-(2023)](https://arxiv.org/abs/2312.00290) built the second half: they freeze a weather autoencoder
-and train small models on the frozen representation alone, at accuracy comparable to purpose-built
-models, though the targets they predict are further weather variables rather than anything on a
-network. The nearest anyone came to joining the two is one entrant in HEFTCom, a competition to
-forecast a GB wind-and-solar portfolio day-ahead: [Browell et al.
-(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed embeddings from
-their own AI weather models into downstream neural networks and finished third of the ranked
+**The encoders Flexpectation plans to pre-train cover weather, time and place, and the machinery for
+the weather one has been built separately from any energy forecast.** We plan to research a neural
+network that turns the raw ECMWF ensemble into a calibrated probabilistic weather forecast in
+physical units, which a substation model then reads, alongside a time encoder that learns how people
+use the calendar — that Christmas is not an ordinary Thursday — and a space encoder holding the
+standing geographic context of each substation. Both halves of the weather encoder have been built.
+[Rasp and Lerch (2018)](https://arxiv.org/abs/1805.09091) built the first: a neural network that
+post-processes a 50-member ECMWF ensemble into calibrated probabilistic 2-metre temperature at 537
+German stations 48 hours ahead, cutting mean continuous ranked probability score from 1.16 for the
+raw ensemble to 0.78, with a learned per-station embedding one of the two components the authors
+credit for the gain. [Mitra and Ramavajjala (2023)](https://arxiv.org/abs/2312.00290) built the
+second: they freeze a weather autoencoder and train small models on the frozen representation alone,
+at accuracy comparable to purpose-built models, though the targets they predict are further weather
+variables rather than anything on a network. The nearest anyone came to joining the two is one
+entrant in HEFTCom, a competition to forecast a GB wind-and-solar portfolio day-ahead: [Browell et
+al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed embeddings
+from their own AI weather models into downstream neural networks and finished third of the ranked
 entrants. What we found nobody doing is pre-training a weather encoder against observations and then
 reading a substation's probabilistic load forecast off it, or using a differentiable model of a
 solar or wind farm to strip out the variance the engineering explains so that the weather encoder
@@ -233,8 +235,40 @@ generator or biofuel plant inside a net-demand forecast.
 (2026)](https://doi.org/10.1002/we.70079) forecast 73 wind farms in GB — 34 onshore, 39 offshore —
 from the ECMWF ensemble, seamlessly from 6 to 162 hours (6.75 days) ahead, and two of their
 conclusions bear on Flexpectation. Whether weather-forecast error or weather-to-power conversion
-error dominates flips with lead time, and the lead time at which it flips varies a lot between
-sites. And a deterministic forecast at higher resolution beat the ensemble at short lead times.
+error dominates flips with lead time. Weather-to-power uncertainty dominates the short term and
+weather-forecast uncertainty the mid-term, with the transition typically 2 to 3 days ahead, arriving
+earlier for offshore farms than onshore ones and varying dramatically between farms. And a
+deterministic forecast at higher resolution beat the ensemble at short lead times.
+
+**Gradient-boosted trees, fitted separately for each kind of generator, is what this literature does
+and what won when teams were scored against each other on the same data.** [Dantas and Browell
+(2026)](https://doi.org/10.1002/we.70079) model the weather-to-power relationship with quantile
+regression on gradient-boosted trees, fitting a separate model for each quantile. In HEFTCom the
+winning team fitted gradient-boosted trees separately for wind and for solar and separately for each
+weather source, 9 of the top 10 teams forecast wind and solar separately before combining them, and
+[Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) conclude that
+gradient-boosted trees remain competitive for day-ahead wind and solar forecasting, with performance
+depending heavily on implementation. NGED's own forecasting system, EFFS, independently selected
+XGBoost when it evaluated model families. Two results cut the other way, and both argue for
+combining models rather than against trees: team Rnt finished third in HEFTCom using no tree-based
+model, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682), meta-analysing 4,687
+skill scores extracted from 188 solar forecasting papers, report that ensemble and hybrid models
+raise skill score by 7 to 27 percentage points over time-series models while many advanced
+machine-learning methods show inconsistent gains.
+
+**For generators, the measured prize from better weather-to-power physics is largest at short lead
+times, which is not where NGED acts.** Differentiable physics attacks the weather-to-power half of
+the error, so on [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079)'s measurement it has
+most to offer inside the first 2 to 3 days of the 1-to-10-day window NGED acts on, and less beyond
+it, where the weather forecast itself is the binding constraint. Adding a learned residual to a
+physical generator model is established practice: [Gijón et al.
+(2025)](https://arxiv.org/abs/2502.07344) fit a physics-inspired power model to a wind farm of four
+turbines and train a second model on the residual, improving on the physics model alone by 37%, with
+conformalised quantile regression supplying the uncertainty. But they predict power from measured
+wind rather than forecasting it days ahead, and we found nobody putting a differentiable generator
+model inside a network's probabilistic net-demand forecast. On this evidence the larger
+differentiable-physics prize for Flexpectation may be on the demand side rather than the generation
+side.
 
 **Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator or
 biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.
@@ -1017,6 +1051,9 @@ sources that this summary does not.
 - Foygel Barber, R., Candès, E. J., Ramdas, A. and Tibshirani, R. J. (2020). [The limits of
   distribution-free conditional predictive inference](https://doi.org/10.1093/imaiai/iaaa017).
   *Information and Inference: A Journal of the IMA*.
+- Gijón, A., Eiraudo, S., Manjavacas, A., Schiera, D. S., Molina-Solana, M. and Gómez-Romero, J.
+  (2025). [Integrating Physics and Data-Driven Approaches: An Explainable and Uncertainty-Aware
+  Hybrid Model for Wind Turbine Power Prediction](https://arxiv.org/abs/2502.07344).
 - Gilbert, C., Browell, J. and Stephen, B. (2023). [Probabilistic load forecasting for the low
   voltage network: forecast fusion and daily peaks](https://arxiv.org/abs/2206.11745).
 - Gneiting, T. and Ranjan, R. (2011). [Comparing Density Forecasts Using Threshold- and
@@ -1062,6 +1099,8 @@ sources that this summary does not.
   pre-trained weather embedding](https://arxiv.org/abs/2312.00290).
 - National Energy System Operator. [Embedded wind and solar
   forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts).
+- Nguyen, T. N. and Müsgens, F. (2026). [A meta-analysis of solar forecasting based on skill
+  score](https://doi.org/10.1063/5.0300682). *Journal of Renewable and Sustainable Energy*.
 - Northern Powergrid (2024). [Artificial Forecasting, Alpha
   phase](https://smarter.energynetworks.org/projects/npg_sif_006-1/).
 - Northern Powergrid (2024). [Detecting LCTs from Smart Meter Consumption
