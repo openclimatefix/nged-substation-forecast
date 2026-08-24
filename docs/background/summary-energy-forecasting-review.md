@@ -119,7 +119,12 @@ open question for this project to answer. The closest thing to evidence is a war
 extremes: [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) found quantile regression
 alone uncalibrated beyond the 1st and 99th percentiles — the range NGED acts on — even with five
 years of data on regions far larger than a substation. Plan for an explicit tail treatment rather
-than reading extreme quantiles off the model.
+than reading extreme quantiles off the model. All of that is a verdict on version one. The three
+more sophisticated families planned for the network-wide scale-up from 2027 — pre-trained encoders,
+connectivity-map models and differentiable physics — are not there to beat a boosted tree at
+forecasting net demand, but to estimate capacity, switching state and demand together, which the
+pipelines of separate models in this literature cannot do. "Set against this literature, what we
+plan is ambitious" below sets out that case.
 
 **What the literature reports.**
 
