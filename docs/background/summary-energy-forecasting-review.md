@@ -116,15 +116,15 @@ and with day of year. It carried no irradiance and no wind, though the weather t
 both. So no published head-to-head we found gives a GBT the feature engineering we plan to implement
 in Flexpectation v1.
 
-On the rest of the Flexpectation specification there is no published result to lean on, for or
-against. We found no study that drives substation-level uncertainty from a weather ensemble all the
-way out to 14 days. The 14-day horizon also sits near the edge of what a weather ensemble can supply
+On the rest of the Flexpectation specification — a weather ensemble driving substation-level
+uncertainty all the way out to 14 days — there is no published result to lean on, for or
+against. That 14-day horizon also sits near the edge of what a weather ensemble can supply
 at all: [Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) found that the lead time
 beyond which a weather ensemble stops beating a climatological distribution is 16 to 23 days ahead —
 measured on upper-air variables, not on the near-surface temperature and irradiance that drive
 substation load.
 
-A relevant very finding for us at substation level is a warning about the extremes: [Browell and
+A very relevant finding for us at substation level is a warning about the extremes: [Browell and
 Fasiolo (2021)](https://arxiv.org/abs/2103.10335) found quantile regression alone uncalibrated
 beyond the 1st and 99th percentiles — the range NGED is likely to act on. So we plan to follow
 Browell and Fasiolo and implement an explicit tail treatment rather than reading extreme quantiles
