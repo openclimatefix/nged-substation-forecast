@@ -171,8 +171,23 @@ tail rather than reading extreme quantiles straight off the model.
 model families we plan to research in 2027 — pre-trained encoders, connectivity-map models and
 differentiable physics — are planned to *simultaneously* disaggregate *unmetered* generators, infer
 switching state and demand together, which the pipelines of separate models in this literature
-cannot do. The section below titled "Set against this literature, what we plan is ambitious" sets
-out the case for the work we plan in version 2.
+cannot do. The section below titled "Set against this literature, what we plan is ambitious" sets out the
+case for the work we plan in version 2.
+
+**The evidence behind those three families is uneven, and only one of the three is a blank.**
+Pre-trained models have the best support of the three, and it sits in the table above: the
+general-purpose model [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) tested had never seen
+their data and still beat every purpose-trained competitor across 200 German low-voltage feeders.
+Connectivity-map models have been measured on NGED's own published data: [Campagne et al.
+(2025)](https://arxiv.org/abs/2507.03690) compare eight graph neural network architectures against
+feed-forward, persistence and foundation-model baselines on French regional load and on the GB
+distribution networks' open smart-meter feed — about two million meters and 50,000 substations
+across NGED's and SSEN's areas — and the graph-aware models won on both. But their graphs are built
+from geographic distance or from correlation between series, never from electrical connectivity, so
+whether NGED's own connectivity map improves a forecast is still unanswered. Differentiable physics
+is the blank: applied to substation demand forecasting it produced no strong result in our search,
+and we found nobody aggregating building thermal physics up to a substation and putting it inside a
+probabilistic forecast, though the ingredients exist separately.
 
 ### 2. Forecasting metered generators
 
@@ -967,6 +982,8 @@ sources that this summary does not.
 - Buizza, R. and Leutbecher, M. (2015). [The forecast skill
   horizon](https://doi.org/10.1002/qj.2619). *Quarterly Journal of the Royal Meteorological
   Society*.
+- Campagne, E., Amara-Ouali, Y., Goude, Y., Zehavi, I. and Kalogeratos, A. (2025). [Graph Neural
+  Networks for Electricity Load Forecasting](https://arxiv.org/abs/2507.03690).
 - Cordier, G. et al. (2024). [Methods and techniques used to produce electricity forecasts on
   Enedis’ distribution network at a finer grid than the HV/MV
   substation](https://doi.org/10.1049/icp.2024.2058). *IET Conference Proceedings*.
