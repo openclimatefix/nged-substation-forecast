@@ -1470,23 +1470,25 @@ that change.**
 **The fourth substitute is indirect: measure whether the capacity estimate improves the forecast it
 was built to improve.**
 
-**Two further substitutes barely appear in this literature at all, and both are worth having.** The
-first is to check an estimate against physics rather than against an answer. Disaggregated
-components must sum to the measured net flow; disaggregated solar must be zero at night and must sit
-under the clear-sky envelope; disaggregated wind must track wind speed rather than irradiance; an
-inferred rooftop-solar capacity must be plausible for the area a substation serves. None of those
-checks needs a label, and a violation is a detectable error whatever the truth turns out to be.
-Using physical consistency to *score* an estimate, rather than to *shape* it, is close to absent
-here, and it is the cheapest evaluation on this list. The second is a substation where every feeder
-and every embedded generator is metered for a period, used only as validation. One fully-metered
-substation would anchor everything else, and none of the papers above had one.
+**Two further substitutes barely appear in this literature at all.** The first is to check an
+estimate against physics rather than against an answer. Disaggregated components must sum to the
+measured net flow; disaggregated solar must be zero at night and must sit under the clear-sky
+envelope; disaggregated wind must track wind speed rather than irradiance; an inferred rooftop-solar
+capacity must be plausible for the area a substation serves. None of those checks needs a label, and
+a violation is a detectable error whatever the truth turns out to be. Using physical consistency to
+*score* an estimate, rather than to *shape* it, is close to absent here, and it is the cheapest
+evaluation on this list. The second is a substation where every feeder and every embedded generator
+is metered for a period, used only as validation. One fully-metered substation would anchor
+everything else, and none of the papers above had one.
 
-**Flexpectation will run all six substitutes and treat agreement between the six as the signal,
-because no one substitute is trustworthy alone.** They are not six attempts at the same measurement:
-the hold-out is biased towards the sites that happen to be metered; synthetic aggregation
-systematically flatters, because a clean sum of metered sources has no switching events, no false
-zeros, and no unmetered load, so it should always be reported as performance under idealised
-aggregation rather than as real-world skill;
+**Flexpectation will run the five substitutes that need no new metering, and treat agreement between
+the five as the signal, because no one substitute is trustworthy alone.** The five are not five
+attempts at the same measurement. The hold-out is biased towards the sites that happen to be
+metered, and synthetic aggregation systematically flatters, because a clean sum of metered sources
+has no switching events, no false zeros, and no unmetered load, so a score from synthetic
+aggregation should always be reported as performance under idealised aggregation rather than as
+real-world skill. The sixth substitute stays out of reach: a fully metered substation is a field
+deployment rather than an analysis.
 
 **The remaining three substitutes each answer a narrower question than they appear to.** The
 independent-tool comparison says only whether we agree with an existing method; the physics checks
@@ -1498,7 +1500,7 @@ forecast does not care about will score well.
 candidate estimators in which downstream forecast skill decides.** The supporting evidence is
 synthetic fault injection, precision and recall of the fitted change dates against NGED's
 maintenance records, robustness to unlogged curtailment, and the calibration of each estimator's
-stated uncertainty. Every number we publish will say which of the six substitutes produced it.
+stated uncertainty. Every number we publish will say which substitute produced it.
 
 ### Detecting rare events: challenges 4 and 6
 
@@ -2088,13 +2090,13 @@ load disaggregation as one of its innovations — "a novel approach to forecasti
 modelling gross demand and distributed generation" — so the two projects overlap on forecasting net
 demand and on separating generation from demand. Four of Flexpectation's eight challenges have no
 counterpart we could find. Searching every Artificial Forecasting deliverable published on the
-Smarter Networks Portal across Discovery, Alpha, and Beta, save one scanned deck whose text would
-not extract, returns no hit for "switching", "abnormal", or "reconfiguration", which are challenges
-4 and 5; none for "effective capacity" or "derating", which is challenge 3; none for "faulty
-metering" or "metering fault", which is challenge 6; and none for "unmetered", which is the half of
-challenge 7 that estimates the output of generators nobody meters. Flexpectation also delivers 1st
-and 99th percentiles where Artificial Forecasting's published bands run from the 5th to the 95th,
-and the curtailment decisions NGED describe turn on those outer levels.
+Smarter Networks Portal across Discovery, Alpha, and Beta, save one file that holds a single blank
+page, returns no hit for "switching", "abnormal", or "reconfiguration", which are challenges 4 and
+5; none for "effective capacity" or "derating", which is challenge 3; none for "faulty metering" or
+"metering fault", which is challenge 6; and none for "unmetered", which is the half of challenge 7
+that estimates the output of generators nobody meters. Flexpectation also delivers 1st and 99th
+percentiles where Artificial Forecasting's published bands run from the 5th to the 95th, and the
+curtailment decisions NGED describe turn on those outer levels.
 
 ## Set against this literature, what we plan is ambitious, and here is why we think it can be done
 

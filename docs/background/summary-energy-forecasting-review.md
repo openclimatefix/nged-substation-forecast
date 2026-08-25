@@ -986,12 +986,14 @@ differently, and does not use two others. The four in use are to hold out sites 
 pretend they are not; to inject a change into real data and see whether the method recovers it; to
 compare against an independent tool rather than against truth; and to measure whether the estimate
 improves the forecast it was built to improve. The two it does not use are to check an estimate
-against physics rather than against an answer, and to meter one substation completely for a period
-and use it only as validation.
+against physics rather than against an answer, and to use a substation where every feeder and every
+embedded generator is metered, purely as validation.
 
-**Flexpectation will run all six substitutes and treat agreement between the six as the signal,
-because no one substitute is trustworthy alone.** The six substitutes are not six attempts at the
-same measurement. Every number we publish will say which of the six substitutes produced it.
+**Flexpectation will run the five substitutes that need no new metering, and treat agreement between
+the five as the signal, because no one substitute is trustworthy alone.** The five substitutes are
+not five attempts at the same measurement. Every number we publish will say which substitute
+produced it. The sixth substitute would anchor all the others, and none of the papers above had one:
+a fully metered substation is a field deployment rather than an analysis.
 
 **Detection needs different metrics, and the best-worked example in this review chose them
 deliberately.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score precision (the share
@@ -1272,13 +1274,13 @@ load disaggregation as one of its innovations — "a novel approach to forecasti
 modelling gross demand and distributed generation" — so the two projects overlap on forecasting net
 demand and on separating generation from demand. Four of Flexpectation's eight challenges have no
 counterpart we could find. Searching every Artificial Forecasting deliverable published on the
-Smarter Networks Portal across Discovery, Alpha, and Beta, save one scanned deck whose text would
-not extract, returns no hit for "switching", "abnormal", or "reconfiguration", which are challenges
-4 and 5; none for "effective capacity" or "derating", which is challenge 3; none for "faulty
-metering" or "metering fault", which is challenge 6; and none for "unmetered", which is the half of
-challenge 7 that estimates the output of generators nobody meters. Flexpectation also delivers 1st
-and 99th percentiles where Artificial Forecasting's published bands run from the 5th to the 95th,
-and the curtailment decisions NGED describe turn on those outer levels.
+Smarter Networks Portal across Discovery, Alpha, and Beta, save one file that holds a single blank
+page, returns no hit for "switching", "abnormal", or "reconfiguration", which are challenges 4 and
+5; none for "effective capacity" or "derating", which is challenge 3; none for "faulty metering" or
+"metering fault", which is challenge 6; and none for "unmetered", which is the half of challenge 7
+that estimates the output of generators nobody meters. Flexpectation also delivers 1st and 99th
+percentiles where Artificial Forecasting's published bands run from the 5th to the 95th, and the
+curtailment decisions NGED describe turn on those outer levels.
 
 ## Why we think this ambitious plan can be done
 
