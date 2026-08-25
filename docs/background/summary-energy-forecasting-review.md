@@ -80,16 +80,16 @@ against anything, so those are described in prose.
 closest thing already published, and what is missing from it.** The sections that follow give the
 evidence behind each row.
 
-| Challenge | Closest published precedent | Where the gap is |
+| Challenge | Closest published precedent | What this means for Flexpectation |
 |---|---|---|
-| 1. Probabilistic net-demand forecasts at substations | [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) at 551 primary substations, [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) at 96,989 Portuguese secondary substations, [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) at 13 | No study we found drives substation uncertainty from a weather ensemble across a full 14-day horizon |
-| 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 GB wind farms from the ECMWF ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Nothing we found forecasts a distribution-connected battery or gas generator inside a net-demand forecast; the closest case for the biofuel plant is a biomass forecast at Austrian primary substations |
-| 3. Estimating the effective capacity of metered generators | A method for each generation technology separately, most of them working from a revenue meter alone | None of it run across a mixed fleet of individually metered generators at a distribution network, or tested for whether estimating capacity improves the forecast |
-| 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers on one feeder; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | Detection from the substation's own meter alone, scored on precision as well as recall, using the fact that the load has to move to a neighbouring substation |
-| 5. Forecasting through an abnormal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Nobody we found feeds a model switching-contaminated history deliberately, as information rather than as damage |
-| 6. Detecting faulty metering | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s Dutch dataset, the one public labelled set we found, which merges metering faults and switching into a single class | A fault taxonomy that separates the two, a GB detector with a measured accuracy, and a reference series to detect against |
-| 7. Disaggregating unmetered solar and wind | [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) transferring from fully-metered Dutch substations, and [UK Power Networks' NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/), this work's direct predecessor | Doing it with no metered training set, inferring the capacity rather than being told it, and putting uncertainty and a multi-day horizon in the same forecast |
-| 8. Disaggregating heat pumps, chargers, and batteries | [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1) on aggregated charging demand day-ahead | Forecast skill at substation aggregation, and the peak an automated tariff creates |
+| 1. Probabilistic net-demand forecasts at substations | [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) at 551 primary substations, [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) at 96,989 Portuguese secondary substations, [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) at 13 | A gradient-boosted tree is a defensible default for Flexpectation version 1, but the literature paints one as a sensible starting point rather than a proven winner |
+| 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 GB wind farms from the ECMWF ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Gradient-boosted trees fitted separately for each kind of generator are the standard approach, and what won when teams were scored against each other on the same data; a higher-resolution deterministic forecast beat the ensemble at short lead times |
+| 3. Estimating the effective capacity of metered generators | A method for each generation technology separately, most of them working from a revenue meter alone | Flexpectation version 1 needs an estimator that can track effective capacity downwards, which is exactly where the two published wind methods differ |
+| 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers on one feeder; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | The one published result scoring both precision and recall reports an F1.5 score of about 0.2 to 0.5, achieved with a second load estimate NGED does not have, so Flexpectation should expect worse rather than better |
+| 5. Forecasting through an abnormal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Every published solution throws information away, so Flexpectation version 1 makes the abnormal periods an input and stops making them a target |
+| 6. Detecting faulty metering | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s Dutch dataset, the one public labelled set we found, which merges metering faults and switching into a single class | There is no GB number to beat, so whatever precision and recall Flexpectation publishes becomes the first — cheap to do and worth doing |
+| 7. Disaggregating unmetered solar and wind | [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) transferring from fully-metered Dutch substations, and [UK Power Networks' NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/), this work's direct predecessor | NIA_UKPN0104 used the same method on the same kind of GB data with the same delivery partner, so Flexpectation starts from its method rather than from scratch |
+| 8. Disaggregating heat pumps, chargers, and batteries | [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1) on aggregated charging demand day-ahead | Heat pumps, chargers, and batteries stay inside net demand in Flexpectation version 1 rather than being forecast separately |
 
 ### 1. Probabilistic forecasts of net demand at substations
 
@@ -455,11 +455,10 @@ Flexpectation therefore estimates no single orientation per substation: the flee
 the aggregate as a learned mixture of east-, south-, and west-facing basis shapes, with a soft clip
 standing in for many differently-sized inverters saturating in turn.
 
-**Where the gap is: nothing we found forecasts a distribution-connected battery or gas generator
-inside a net-demand forecast; the closest case for the biofuel plant is a biomass forecast at
-Austrian primary substations, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476).** For
-the battery there is at least a method to borrow.
-[Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469) recover a price-taking storage
+**The trial area's battery, gas generator, and biofuel plant each need a method, and the literature
+supplies one to borrow for the battery, none for the gas generator, and a partial one for the
+biofuel plant.** For the battery, [Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469)
+recover a price-taking storage
 operator's own optimisation parameters from historical prices and observed dispatch. We found no
 method worth borrowing for the gas generator, and what little exists forecasts a gas plant's own
 output directly rather than as a component of a substation's net demand. For the biofuel plant,
@@ -524,11 +523,6 @@ running maximum is already a robust estimate of one farm's installed capacity, s
 its advantage on hourly, region-aggregated data. Whichever estimator wins, normalising by effective
 capacity stays a hypothesis to test rather than a settled preprocessing step, because no study we
 found has measured whether it improves the forecast NGED buys flexibility against.
-
-**Where the gap is: no published work we found estimates effective capacity across a mixed fleet of
-individually metered generators at a distribution network.** The per-technology methods exist, and
-most of them
-work from a revenue meter alone.
 
 ### 4. Detecting switching events
 
@@ -689,14 +683,11 @@ Adaptive models are the live alternative — they track a new level once it arri
 that arrives abruptly — but a model that simply adapts to a new load level cannot report what the
 substation would have carried under its normal arrangement, which is the quantity NGED needs.
 
-**Where the gap is: we found nobody who feeds a model switching-contaminated history *deliberately*,
-as information rather than as damage.** Instead of correcting the series, a model could be fed the
-difference between what a substation actually metered and what a model that ignores network topology
-expected it to meter.
-
-**Flexpectation version 1 will try both halves of that idea at once: the abnormal periods become an
-input,
-and they stop being a target.** The plan has two parts. First, label each substation's abnormal
+**Flexpectation version 1 feeds the model its switching-contaminated history deliberately, as
+information rather than as damage: the abnormal periods become an input, and they stop being a
+target.** Instead of correcting the series, the model can be fed the difference between what a
+substation actually metered and what a model that ignores network topology expected it to meter. The
+plan has two parts. First, label each substation's abnormal
 running arrangements explicitly and hand those labels to the model as features, so the model can
 read its own lagged power inputs correctly when a lag falls inside an abnormal period. Second, drop
 the abnormal half-hours from the training target, so the model is never asked to predict an abnormal
@@ -756,11 +747,8 @@ sign-recovery technique addresses NGED's magnitude-only meters directly.** [Boum
 things that must be filtered out before substation measurements can be used, and detect both on the
 same residual. Three network-innovation projects in GB tackled faulty metering substantively, one of
 them as its whole subject — Electricity North West's ATLAS, UK Power Networks' Distribution Network
-Visibility, and this network's own Time Series Data Quality.
-
-**Where the gaps are: the fault taxonomy, a measured GB detector, and a reference series to detect
-against.** None of the three GB projects above reports how often its checks are right, and none
-published its labels, so there is no GB number to compare a new detector against.
+Visibility, and this network's own Time Series Data Quality. None of the three reports how often its
+checks are right, and none published its labels.
 
 ### 7. Disaggregating unmetered solar and wind from a substation's net flow
 
@@ -823,14 +811,6 @@ days ahead, the same resolution and horizon Flexpectation delivers. The forecast
 per half-hour, with no uncertainty attached, and it covers GB as one region rather than substation
 by substation.
 
-**Where the gaps are: disaggregating unmetered solar and wind without a metered training set,
-inferring the capacity at primary-substation scale, and putting uncertainty and a multi-day horizon
-in the same forecast at substation level.** Teng et al. need a population of fully-metered
-substations to transfer from, and
-are given the existence and capacity of each renewable facility rather than inferring it; Gouveia et
-al. infer the capacity but at low-voltage substations, and produce a capacity figure rather than a
-forecast; NESO's forecast attaches no uncertainty and covers GB as one region.
-
 ### 8. Disaggregating other distributed energy resources: heat pumps, electric-vehicle chargers, and batteries
 
 #### The challenge
@@ -869,11 +849,6 @@ substation level". The same trial found that "the detection of ASHP [air-source 
 frustrated by the low levels of adoption". So the spiky, synchronised charging that makes electric
 vehicles hard to
 *forecast* is what makes them easy to *detect* in aggregate; heat pumps are the reverse.
-
-**Where the gaps are: forecast skill at substation aggregation, and the tariff-driven peak.**
-Nothing we found forecasts an aggregate of heat pumps, chargers, and batteries behind a GB primary
-substation, states its own uncertainty, and is scored against the evening peak that the network
-actually cares about.
 
 ## How we will know whether each of these worked
 
