@@ -1013,3 +1013,65 @@ NWP?"). Example tags:
 > procurement, one for curtailment — designed in
 > [Estimating the money a better forecast saves](cost-savings-metrics.md). They are deliberately
 > rough proxies, not a cost analysis.
+
+## Reporting commitments
+
+**Nine commitments govern how results leave this project, and they are collected here because a
+commitment that lives only in a literature review is one nobody implements.** The reasoning behind
+each is in [Publishing results that others can compare
+against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
+Four of the nine are already implemented by machinery described above on this page, and are listed
+as pointers rather than restated.
+
+**Every ratio comes with its reference forecast, the population it was scored on, and the number of
+ensemble members that produced it.** [Weigel et al. (2007)](https://doi.org/10.1175/MWR3280.1) show
+that a ranked probability skill score is biased downwards by an amount that depends on ensemble
+size, so a score from our 51 members is not comparable with one from a study using 10 until the
+correction is applied. The fair, finite-ensemble-unbiased CRPS in the [metrics
+table](#evaluation-metrics) is the form that carries this correction, and PICP is judged against the
+finite-ensemble calibrated reference rather than the nominal rate for the same reason.
+
+**Accuracy is reported separately for each class of asset** — grid supply points, bulk supply
+points, primary substations, and metered generators — each against its own stated naive baseline. A
+single project-wide accuracy target would mean different things at different levels, and the
+unweighted `mae__all` aggregate is dominated by the grid supply points for exactly that reason. The
+`time_series_type` tag under [Grouping the results](#grouping-the-results) is what carries the
+split.
+
+**The battery, the gas generator, and the biofuel plant are reported separately** from the wind and
+solar sites, because those three are dispatched on market signals that no weather forecast contains,
+so pooling them with weather-driven generators hides how well either group is forecast.
+
+**The fraction of series that beat their naive baseline is published alongside the average error,
+never the average alone.** An average error across a population can improve while the model gets
+worse at a substantial minority of series, and the minority is what an operator notices.
+
+**Coverage — how often reality fell inside the range the forecast claimed — is broken down by
+season, by forecast lead time, and by how heavily loaded the substation was.** A coverage figure
+averaged over a year can read as a healthy 90% while being 99% in the quiet months and 70% at the
+winter peaks, and the winter peaks are the only periods NGED buys flexibility for. Conformal
+prediction does not remove the need for the breakdown: [Foygel Barber et al.
+(2020)](https://doi.org/10.1093/imaiai/iaaa017) prove that a distribution-free guarantee holds only
+on average across all conditions, never separately for the conditions that matter, so a conformal
+forecast can promise 90% coverage overall while failing at the peaks.
+
+**Each metered generator's series is normalised by its estimated effective capacity before
+training** — unless the comparison described under [effective-capacity
+estimation](capacity-estimation.md) shows the normalisation is not needed — and that estimate is
+tracked as it changes. Normalising the *metric* by effective capacity is a separate thing, described
+under [Normalising NMAE by `effective_capacity`](#normalising-nmae-by-effective_capacity).
+
+**Negative results are published too**, including whether an off-the-shelf model given none of our
+data matches our own, and whether sustained experimentation stops yielding improvements.
+
+**We publish the telemetry, the evaluation protocol, the metric definitions, and the code that
+computes them**, so that someone outside the project can check the results rather than take them on
+trust.
+
+Two further commitments are already implemented above and are not restated here. **A peak-aware
+score is reported alongside a proper scoring rule, never instead of one**, and the peak-events slice
+is marked diagnostic-only so it can never drive a ranking — both under [Evaluation
+metrics](#evaluation-metrics). **The tail is scored with a threshold-weighted continuous ranked
+probability score** above a fixed per-series threshold, rather than by selecting the periods in
+which an exceedance happened — see [Tail & exceedance
+metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
