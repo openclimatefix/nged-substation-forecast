@@ -257,40 +257,76 @@ it evaluated model families. Two results cut the other way, though neither is an
 trees: team Rnt finished third in HEFTCom's forecasting track using no tree-based model at all,
 feeding embeddings from machine-learned weather-forecasting models they built in-house into
 downstream neural networks that predicted wind and solar generation — a route that rests on building
-and running a weather model, not on a different downstream model family. And [Nguyen and Müsgens
-(2026)](https://doi.org/10.1063/5.0300682) meta-analyse 4,687 skill scores extracted from 188 solar
-forecasting papers. Their baseline class is classic statistical time-series models — the
-autoregressive integrated moving average (ARIMA) family, exponential smoothing (ETS, for error,
-trend, and seasonality), and multivariate relatives such as autoregressive models with exogenous
-inputs (ARX). Beyond 6 hours ahead, two classes beat that baseline. Ensemble-hybrid models gain 7.0
-percentage points of skill score. An ensemble-hybrid chains one model's output into the next as an
-input, and also averages several models together. Pure ensemble models gain 8.3 points. A pure
-ensemble runs several models and aggregates their outputs, without the chaining. Individual
-machine-learning models (including gradient-boosted trees) and regressions show no significant
-advantage at all over classic statistical time-series models beyond 6 hours ahead, and taking the
-weather model's own output as the forecast scores significantly worse, 14.3 percentage points of
-skill score below that baseline. That class is the numerical weather prediction irradiance field
-itself — usually global horizontal irradiance, at most post-processed or averaged across several
-weather models — used as the forecast rather than fed as an input to a fitted model. Of the 188
-papers in their sample, 118 forecast irradiance rather than plant output and only 70 forecast the
-output of a photovoltaic plant, so for most of the sample the weather model's irradiance field is
-directly comparable to the thing being forecast and no power curve is involved at all. Their
-regression carries the model class and the forecast target as separate variables, so the 14.3-point
-penalty is estimated with the target held constant, but they never report which targets the
-numerical-weather-prediction papers were forecasting. Their own advice is to exhaust the simple
-models first, because classical statistical time-series methods "still have very good performance
-compared to more complex methods such as individual ML models".
+and running a weather model, not on a different downstream model family.
 
-**Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
-we found confirms the importance of NWP inputs at the lead times Flexpectation cares about.** [Nguyen and Müsgens
-(2026)](https://doi.org/10.1063/5.0300682) fit a separate regression for each horizon band for solar
-power forecasting, and beyond 6 hours ahead numerical weather prediction as an input is worth 11.6
-percentage points of skill score — the largest input effect they measure — while lagged power
-*reduces* performance by 6.4 percentage points beyond 6 hours ahead, having *increased* performance
-by 8.2 pp at intra-day horizons. Their sample is deterministic forecasting of irradiance or plant
-output rather than probabilistic substation net demand, and their beyond-6-hours band covers the
-whole of NGED's 1-to-14-day window in one category, so the figures say which inputs earn their keep
-at long range rather than how much.
+**The largest meta-analysis of solar forecasting we found puts individual machine-learning models
+level with classic statistical ones at the range NGED acts on, and only combinations ahead.**
+[Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) meta-analyse 4,687 skill scores extracted
+from 188 solar forecasting papers, fitting a separate regression for each horizon band. Their
+baseline class is classic statistical time-series models — the autoregressive integrated moving
+average (ARIMA) family, exponential smoothing (ETS, for error, trend, and seasonality), and
+multivariate relatives such as autoregressive models with exogenous inputs (ARX) — and every figure
+in the table is percentage points of skill score against that baseline.
+
+| Model class | Intra-hour (up to 1 hour) | Intra-day (1 to 6 hours) | Day-ahead (over 6 hours) |
+|---|---|---|---|
+| Ensemble-hybrid: average several models, and chain one model's output into the next as an input | +12.8 | +21.2 | **+7.0** |
+| Pure ensemble: aggregate several models, without the chaining | not significant | −7.0 | **+8.3** |
+| Hybrid: the chaining without the aggregating | +8.6 | −19.3 | −11.3 |
+| Image-based: sky or satellite imagery | not significant | +10.3 | not significant |
+| Individual machine learning, including gradient-boosted trees | −3.1 | not significant | not significant |
+| Regression | −11.0 | −5.3 | not significant |
+| The weather model's own irradiance field, used directly as the forecast | not significant | −17.4 | **−14.3** |
+
+The whole of NGED's 1-to-14-day window falls in the day-ahead column, which is one category covering
+everything beyond 6 hours, so the column says which model classes earn their keep at long range
+rather than how much they earn at day 10. The figures are the regression coefficients from the
+paper's Table 3; the paper's own summary text gives the ensemble-hybrid intra-hour and intra-day
+figures the other way round, and rounds the day-ahead ensemble gain to 8.5. Their model classes
+follow each paper's own nomenclature, so the boundary between an ensemble and a hybrid is fuzzy by
+their own account.
+
+**Read that table as the effect of the model class alone, not of the model plus its data.** Model
+class and input are separate variables in the same regression, so each model-class figure is
+estimated with the inputs held constant, and their time-series class is not weather-blind: it
+explicitly includes autoregressive models with exogenous inputs and vector autoregressive models,
+which is where a weather forecast enters a classical model. The comparison is therefore between a
+time-series model and a machine-learning model given the same data, and at day-ahead range the
+machine-learning model wins nothing — the weather forecast itself is worth far more than the model
+wrapped around it, as the next table shows. Two limits come with that reading. Their regression
+carries no interaction between model class and input, so it cannot detect whether a machine-learning
+model exploits a weather forecast better than an autoregressive one does, which is the question that
+matters for Flexpectation. And only 19% of the 4,687 observations use numerical weather prediction
+as an input at all, against 91% that use lagged power, so most of the evidence separating the model
+classes comes from models with no weather forecast in them.
+
+**The bottom row is the weather model used raw, and for most of that sample no power curve is
+involved.** The class is the numerical weather prediction irradiance field itself — usually global
+horizontal irradiance, at most post-processed or averaged across several weather models — used as
+the forecast rather than fed as an input to a fitted model. Of the 188 papers in their sample, 118
+forecast irradiance rather than plant output and only 70 forecast the output of a photovoltaic
+plant, so for most of the sample the weather model's irradiance field is directly comparable to the
+thing being forecast. Their regression carries the model class and the forecast target as separate
+variables, so the 14.3-point penalty is estimated with the target held constant, but they never
+report which targets the numerical-weather-prediction papers were forecasting. Their own advice is
+to exhaust the simple models first, because classical statistical time-series methods "still have
+very good performance compared to more complex methods such as individual ML models".
+
+**Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting we
+found confirms the importance of NWP inputs at the lead times Flexpectation cares about.** Numerical
+weather prediction is the largest input effect [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) measure, and the inputs that pay at short range carry
+the opposite sign at day-ahead range. Percentage points of skill score again:
+
+| Input | Intra-hour (up to 1 hour) | Intra-day (1 to 6 hours) | Day-ahead (over 6 hours) |
+|---|---|---|---|
+| Numerical weather prediction | −9.0 | −2.3 | **+11.6** |
+| Locally measured weather | not significant | +9.1 | +5.1 |
+| Lagged solar power | +5.7 | +8.2 | **−6.4** |
+| Data from neighbouring sites | +3.6 | +3.9 | −5.5 |
+
+Each input is a yes-or-no variable rather than a choice between alternatives, so one model can carry
+several. Their sample is deterministic forecasting of irradiance or plant output rather than
+probabilistic substation net demand.
 
 **For generators, the measured prize from better weather-to-power physics is largest at short lead
 times.** Differentiable physics (DP) attacks the weather-to-power half of the error, so on [Dantas
@@ -439,19 +475,22 @@ operator, but detect it in the gap between the substation's own meter and a seco
 same load, built from smart-meter and bulk-customer readings taken below the substation. A Korean
 series of four papers detects load transfers on a distribution feeder from that feeder's own load
 alone. All four papers are open access, and all four score against the same nine logged transfers on
-one feeder in Gangwon province. [Kim et al. (2020)](https://doi.org/10.3390/en13174358) flag a
-transfer where the measured load departs from a neural network's prediction for the same feeder,
-finding 7 of the 9. [Kim et al. (2022)](https://doi.org/10.3390/en15041441) detect the same events
-from polynomial and standard-pattern preprocessing, finding 7 of 9 on that feeder and 7 of 7 on a
-second, which averages to 88.89%. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873)
-subtracts a seasonal-trend decomposition and thresholds the residual on a moving average and a
-moving standard deviation, finding 8 of the 9. [Kim
-(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) runs a robust seasonal-trend decomposition,
-then changepoint detection, then an isolation forest over each candidate changepoint — close to the
-pipeline Flexpectation plans — finding 7 of the 9, an average detection rate of 78%. Every one of
-those numbers is the share of logged events found, and no paper in the series reports a false-alarm
-rate. The scores do not track how elaborate the method is: the simplest of the four, a threshold on
-a decomposition residual, found the most events. Electricity North West's
+the Kimhwa distribution feeder in Gangwon province, measured hourly through 2019.
+
+| Paper | Method | Logged transfers found |
+|---|---|---|
+| [Kim et al. (2020)](https://doi.org/10.3390/en13174358) | Long short-term memory network, flagging where measured load departs from its prediction | 7 of 9 |
+| [Kim et al. (2022)](https://doi.org/10.3390/en15041441) | Polynomial and standard-pattern preprocessing | 7 of 9, and 7 of 7 on a second feeder |
+| [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) | A moving average and a moving standard deviation, thresholding the residual of a seasonal-trend decomposition | **8 of 9** |
+| [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) | Robust seasonal-trend decomposition, then Pruned Exact Linear Time changepoints, then an isolation forest over each candidate | 7 of 9 |
+
+Every one of those counts is the share of logged events found, and no paper in the series reports a
+false-alarm rate. The scores do not track how elaborate the method is: the simplest of the four, a
+threshold on a decomposition residual, found the most events, and [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757)'s pipeline — the one closest to what
+Flexpectation plans — found 7 of the 9, an average detection rate of 78%.
+
+Electricity North West's
 [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted step changes into
 faulty metering and network reconfigurations on GB substations in 2016, from power measurements
 alone, and published no precision or recall for either rule.

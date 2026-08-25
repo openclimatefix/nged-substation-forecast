@@ -374,43 +374,79 @@ model at all, feeding embeddings from machine-learned weather-forecasting models
 driven by station observations, radar, satellite imagery, and numerical-weather-prediction analysis
 — into downstream neural networks that predicted wind and solar generation. Rnt's route therefore
 rests on building and running a machine-learned weather model, which is a far larger undertaking
-than swapping one downstream model family for another. And [Nguyen and Müsgens
-(2026)](https://doi.org/10.1063/5.0300682) meta-analyse 4,687 skill scores extracted from 188 solar
-forecasting papers. Their baseline class is classic statistical time-series models — the
-autoregressive integrated moving average (ARIMA) family, exponential smoothing (ETS, for error,
-trend, and seasonality), and multivariate relatives such as autoregressive models with exogenous
-inputs (ARX). Beyond 6 hours ahead, two classes beat that baseline. Ensemble-hybrid models gain 7.0
-percentage points of skill score. An ensemble-hybrid chains one model's output into the next as an
-input, and also averages several models together. Pure ensemble models gain 8.3 points. A pure
-ensemble runs several models and aggregates their outputs, without the chaining. Individual
-machine-learning models (including gradient-boosted trees) and regressions show no significant
-advantage at all over classic statistical time-series models beyond 6 hours ahead, and taking the
-weather model's own output as the forecast scores significantly worse, 14.3 percentage points of
-skill score below that baseline. That class is the numerical weather prediction irradiance field
-itself — usually global horizontal irradiance, at most post-processed or averaged across several
-weather models — used as the forecast rather than fed as an input to a fitted model. Of the 188
-papers in their sample, 118 forecast irradiance rather than plant output and only 70 forecast the
-output of a photovoltaic plant, so for most of the sample the weather model's irradiance field is
-directly comparable to the thing being forecast and no power curve is involved at all. Their
-regression carries the model class and the forecast target as separate variables, so the 14.3-point
-penalty is estimated with the target held constant, but they never report which targets the
-numerical-weather-prediction papers were forecasting. Their model classes follow each paper's own
-nomenclature, so the boundary between an ensemble and a hybrid is fuzzy by their own account. Their
-own advice is to exhaust the simple models first, because classical statistical time-series methods
-"still have very good performance compared to more complex methods such as individual ML models".
+than swapping one downstream model family for another.
+
+**The largest meta-analysis of solar forecasting we found puts individual machine-learning models
+level with classic statistical ones at the range NGED acts on, and only combinations ahead.**
+[Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) meta-analyse 4,687 skill scores
+extracted from 188 solar forecasting papers, fitting a separate regression for each horizon band.
+Their baseline class is classic statistical time-series models — the autoregressive integrated
+moving average (ARIMA) family, exponential smoothing (ETS, for error, trend, and seasonality), and
+multivariate relatives such as autoregressive models with exogenous inputs (ARX) — and every figure
+in the table is percentage points of skill score against that baseline.
+
+| Model class | Intra-hour (up to 1 hour) | Intra-day (1 to 6 hours) | Day-ahead (over 6 hours) |
+|---|---|---|---|
+| Ensemble-hybrid: average several models, and chain one model's output into the next as an input | +12.8 | +21.2 | **+7.0** |
+| Pure ensemble: aggregate several models, without the chaining | not significant | −7.0 | **+8.3** |
+| Hybrid: the chaining without the aggregating | +8.6 | −19.3 | −11.3 |
+| Image-based: sky or satellite imagery | not significant | +10.3 | not significant |
+| Individual machine learning, including gradient-boosted trees | −3.1 | not significant | not significant |
+| Regression | −11.0 | −5.3 | not significant |
+| The weather model's own irradiance field, used directly as the forecast | not significant | −17.4 | **−14.3** |
+
+The whole of NGED's 1-to-14-day window falls in the day-ahead column, which is one category covering
+everything beyond 6 hours, so the column says which model classes earn their keep at long range
+rather than how much they earn at day 10. The figures are the regression coefficients from the
+paper's Table 3; the paper's own summary text gives the ensemble-hybrid intra-hour and intra-day
+figures the other way round, and rounds the day-ahead ensemble gain to 8.5. Their model classes
+follow each paper's own nomenclature, so the boundary between an ensemble and a hybrid is fuzzy by
+their own account.
+
+**Read that table as the effect of the model class alone, not of the model plus its data.** Model
+class and input are separate variables in the same regression, so each model-class figure is
+estimated with the inputs held constant, and their time-series class is not weather-blind: it
+explicitly includes autoregressive models with exogenous inputs and vector autoregressive models,
+which is where a weather forecast enters a classical model. The comparison is therefore between a
+time-series model and a machine-learning model given the same data, and at day-ahead range the
+machine-learning model wins nothing — the weather forecast itself is worth far more than the model
+wrapped around it, as the next table shows. Two limits come with that reading. Their regression
+carries no interaction between model class and input, so it cannot detect whether a machine-learning
+model exploits a weather forecast better than an autoregressive one does, which is the question that
+matters for Flexpectation. And only 19% of the 4,687 observations use numerical weather prediction
+as an input at all, against 91% that use lagged power, so most of the evidence separating the model
+classes comes from models with no weather forecast in them.
+
+**The bottom row is the weather model used raw, and for most of that sample no power curve is
+involved.** The class is the numerical weather prediction irradiance field itself — usually global
+horizontal irradiance, at most post-processed or averaged across several weather models — used as
+the forecast rather than fed as an input to a fitted model. Of the 188 papers in their sample, 118
+forecast irradiance rather than plant output and only 70 forecast the output of a photovoltaic
+plant, so for most of the sample the weather model's irradiance field is directly comparable to the
+thing being forecast. Their regression carries the model class and the forecast target as separate
+variables, so the 14.3-point penalty is estimated with the target held constant, but they never
+report which targets the numerical-weather-prediction papers were forecasting. Their own advice is
+to exhaust the simple models first, because classical statistical time-series methods "still have
+very good performance compared to more complex methods such as individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
-puts the weight on exactly the input Flexpectation is built around.** [Nguyen and Müsgens
-(2026)](https://doi.org/10.1063/5.0300682) fit a separate regression for each horizon band, and
-beyond 6 hours ahead numerical weather prediction as an input is worth 11.6 percentage points of
-skill score — the largest input effect they measure — with locally measured meteorological data
-worth a further 5.1. The inputs that pay at short range carry the opposite sign out there: lagged
-power costs 6.4 percentage points beyond 6 hours where it gains 8.2 within the day, and data from
-neighbouring sites costs 5.5 where it gains 3.9. Two scope limits travel with those numbers. Their
-sample is deterministic forecasting of solar irradiance or plant output rather than probabilistic
-substation net demand, and their beyond-6-hours band lumps the whole of NGED's 1-to-14-day window
-into a single category, so the figures say which inputs earn their keep at long range, not how much
-they earn at day 10.
+puts the weight on exactly the input Flexpectation is built around.** Numerical weather prediction
+is the largest input effect [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) measure,
+and the inputs that pay at short range carry the opposite sign at day-ahead range. Percentage points
+of skill score again:
+
+| Input | Intra-hour (up to 1 hour) | Intra-day (1 to 6 hours) | Day-ahead (over 6 hours) |
+|---|---|---|---|
+| Numerical weather prediction | −9.0 | −2.3 | **+11.6** |
+| Locally measured weather | not significant | +9.1 | +5.1 |
+| Lagged solar power | +5.7 | +8.2 | **−6.4** |
+| Data from neighbouring sites | +3.6 | +3.9 | −5.5 |
+
+Each input is a yes-or-no variable rather than a choice between alternatives, so one model can carry
+several. Two scope limits travel with these numbers. Their sample is deterministic forecasting of
+solar irradiance or plant output rather than probabilistic substation net demand, and their
+day-ahead band lumps the whole of NGED's 1-to-14-day window into a single category, so the figures
+say which inputs earn their keep at long range, not how much they earn at day 10.
 
 **A caution on carrying any of these numbers across to GB.** Skill score is meant to normalise away
 location, but [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) find it does not: their
@@ -758,24 +794,26 @@ own.
 author, and every method works one series at a time.** All four papers score against the same nine
 logged transfers on the Kimhwa distribution feeder in Gangwon province, measured hourly at the
 circuit breaker on the substation's outgoing feeder, so the whole line of work rests on one feeder
-in one year. [Kim et al. (2020)](https://doi.org/10.3390/en13174358) train a long short-term memory
-network on that feeder's own past load, treat its prediction as the normal state, and flag a
-transfer where the measurement departs from that prediction: "the predicted load is set as the
-reference value, which is considered as normal state. Finally, the actual measured data is compared
-with the predicted data, and detect it as a load transfer if the difference between them exceeds the
-threshold." That detector finds 7 of the 9. [Kim et al. (2022)](https://doi.org/10.3390/en15041441)
-detect the same events from polynomial and standard-pattern preprocessing rather than from a trained
-model, finding 7 of 9 on Kimhwa and 7 of 7 on a second feeder, which their abstract averages to
-88.89%. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) drops the trained model
-altogether: subtract a seasonal-trend decomposition, then threshold the residual on a moving average
-and a moving standard deviation. That method finds 8 of the 9, the best score in the series. [Kim
-(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) replaces the threshold with a pipeline close
-to the one this project plans — robust seasonal-trend decomposition, then Pruned Exact Linear Time
-changepoint detection, then an isolation forest over 15 statistical features of each candidate
-changepoint — detecting transfers "using only load time series data", and finds 7 of the 9, an
-average detection rate of 78%. All four papers are open access under a Creative Commons licence and
-we read them in full, though the digital object identifiers of the two Korean-language papers
-resolve to a paywalled aggregator rather than to the society's own portal, which serves them free.
+in one year.
+
+| Paper | Method | Logged transfers found |
+|---|---|---|
+| [Kim et al. (2020)](https://doi.org/10.3390/en13174358) | Long short-term memory network, flagging where measured load departs from its prediction | 7 of 9 |
+| [Kim et al. (2022)](https://doi.org/10.3390/en15041441) | Polynomial and standard-pattern preprocessing | 7 of 9, and 7 of 7 on a second feeder |
+| [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) | A moving average and a moving standard deviation, thresholding the residual of a seasonal-trend decomposition | **8 of 9** |
+| [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) | Robust seasonal-trend decomposition, then Pruned Exact Linear Time changepoints, then an isolation forest over each candidate | 7 of 9 |
+
+[Kim et al. (2020)](https://doi.org/10.3390/en13174358) treat the neural network's prediction as the
+normal state: "the predicted load is set as the reference value, which is considered as normal
+state. Finally, the actual measured data is compared with the predicted data, and detect it as a
+load transfer if the difference between them exceeds the threshold." [Kim et al.
+(2022)](https://doi.org/10.3390/en15041441)'s abstract averages its two feeders to 88.89%. [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) computes 15 statistical features per candidate
+changepoint, detects transfers "using only load time series data", and reports an average detection
+rate of 78%; its pipeline is the closest published thing to what this project plans. All four papers
+are open access under a Creative Commons licence and we read them in full, though the digital object
+identifiers of the two Korean-language papers resolve to a paywalled aggregator rather than to the
+society's own portal, which serves them free.
 
 **Read every one of those figures for what it is — the share of logged events found — because no
 paper in the series reports a false-alarm rate.** [Kim
@@ -791,13 +829,10 @@ other way round. A missed transfer that moved almost no load costs almost nothin
 uncounted surplus flag is expensive, because a false flag would have us treat a normal period as
 abnormal and discard or correct data the forecaster should have learned from.
 
-**Being more elaborate did not make the detector better on this benchmark.** The simplest method in
-the series — subtract a decomposition, threshold the residual on a moving average — found 8 of the
-9, while both the long short-term memory network and the wavelet, changepoint and isolation-forest
-pipeline found 7. Over nine events that difference is a single event and settles nothing on its own,
-but it is a reason to run the threshold on a decomposition residual as the baseline that
-Flexpectation's own switching detector has to beat, rather than assuming a changepoint pipeline
-starts ahead.
+**Being more elaborate did not make the detector better on this benchmark.** Over nine events the
+one-event gap between the moving-average threshold and the other three methods settles nothing on
+its own, but it is a reason to run that threshold as the baseline Flexpectation's own switching
+detector has to beat, rather than assuming a changepoint pipeline starts ahead.
 
 **A GB network operator separated switching from bad data in 2016, with cruder tools and no
 published accuracy.** Electricity North West's
