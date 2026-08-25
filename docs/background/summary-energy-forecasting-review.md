@@ -83,7 +83,7 @@ evidence behind each row.
 | Challenge | Closest published precedent | Where the gap is |
 |---|---|---|
 | 1. Probabilistic net-demand forecasts at substations | [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) at 551 primary substations, [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) at 96,989 Portuguese secondary substations, [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) at 13 | No study we found drives substation uncertainty from a weather ensemble across a full 14-day horizon |
-| 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 GB wind farms from the ECMWF ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Nothing we found forecasts a distribution-connected battery, gas generator, or biofuel plant inside a net-demand forecast |
+| 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 GB wind farms from the ECMWF ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Nothing we found forecasts a distribution-connected battery or gas generator inside a net-demand forecast; the closest case for the biofuel plant is a biomass forecast at Austrian primary substations |
 | 3. Estimating the effective capacity of metered generators | A method for each generation technology separately, most of them working from a revenue meter alone | None of it run across a mixed fleet of individually metered generators at a distribution network, or tested for whether estimating capacity improves the forecast |
 | 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers on one feeder; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | Detection from the substation's own meter alone, scored on precision as well as recall, using the fact that the load has to move to a neighbouring substation |
 | 5. Forecasting through an abnormal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Nobody we found feeds a model switching-contaminated history deliberately, as information rather than as damage |
@@ -124,7 +124,7 @@ method carries from one network to another.
 | [Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) | Load, GB | 4 levels: primary substation down to household | Day-ahead | Combining forecasts gained **0.0–0.4% averaged over all periods**, but **5.7–9.0% when restricted to peaks** | None at all |
 | [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | 13 primary substations, plus their bulk supply points and their 33 kV and 11 kV feeders | 30 minutes to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted  | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
 | [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondary substations | Day-ahead to week-ahead at primary, evaluated to 11 days; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method  | Real forecasts at primary; none in the published secondary results |
-| [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Substation | Day-ahead | **3–8% mean absolute percentage error** against no stated baseline, so not a target; varying with how industrial and how large the supplied area was; linear and Gaussian regression preferred over the alternatives tested (abstract only) | Not stated in the abstract |
+| [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Primary substations, count not stated | Day-ahead | **3 to 8% mean absolute percentage error** for load, against no baseline the paper states, so not a target; varying with how industrial and how large the supplied area was. Generation is forecast per technology: photovoltaic to **1 to 5% of installed power**, run-of-river and biomass to **5 to 15%** mean absolute percentage error. Linear and Gaussian regression preferred over tree regression and a neural network | Real forecasts of global radiation, temperature, and precipitation, from a weather station chosen per substation |
 | [Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) | Active power in the medium-voltage grid, Netherlands | Trained on 312 Alliander substations over 10 years; tested on 6 chosen for difficult forecasting behaviour | 2 days | **Mean relative mean absolute error 0.07** at the 50th quantile, against 0.08 for a gradient-boosted machine and 0.09 for a linear model — both OpenSTEF models already in production at Alliander. Error scaled by the signal's own 1st and 99th percentiles, not by a rating | Open-Meteo, 4 variables; their model trained on actual weather where the two baselines trained on 1-hour-ahead forecasts |
 
 #### What this means for Flexpectation
@@ -289,8 +289,10 @@ on market prices and operator decisions.
 #### What the literature says
 
 Forecasting wind and solar from a weather forecast is a well-studied area, and one paper matches
-Flexpectation's challenge closely. Nothing we found forecasts a distribution-connected battery, gas
-generator, or biofuel plant inside a net-demand forecast.
+Flexpectation's challenge closely. Nothing we found forecasts a distribution-connected battery or
+gas generator inside a net-demand forecast; the closest case for the biofuel plant is a biomass
+forecast at Austrian primary substations, [Ruhhütl et al.
+(2023)](https://doi.org/10.1049/icp.2023.0476).
 
 #### What this means for Flexpectation
 
@@ -453,12 +455,19 @@ Flexpectation therefore estimates no single orientation per substation: the flee
 the aggregate as a learned mixture of east-, south-, and west-facing basis shapes, with a soft clip
 standing in for many differently-sized inverters saturating in turn.
 
-**Where the gap is: nothing we found forecasts a distribution-connected battery, gas generator, or
-biofuel plant inside a net-demand forecast.** For the battery there is at least a method to borrow.
+**Where the gap is: nothing we found forecasts a distribution-connected battery or gas generator
+inside a net-demand forecast; the closest case for the biofuel plant is a biomass forecast at
+Austrian primary substations, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476).** For
+the battery there is at least a method to borrow.
 [Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469) recover a price-taking storage
 operator's own optimisation parameters from historical prices and observed dispatch. We found no
-method worth borrowing for the gas generator or the biofuel plant; what little exists forecasts a
-gas or biofuel plant's own output directly rather than as a component of a substation's net demand.
+method worth borrowing for the gas generator, and what little exists forecasts a gas plant's own
+output directly rather than as a component of a substation's net demand. For the biofuel plant,
+[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast biomass generation behind
+each Austrian primary substation from the previous day's generation, scaled to installed power and
+spread across the day as a constant band, to a mean absolute percentage error of 5 to 15% — the same
+shape of problem, though a biomass station burning solid fuel is not the same plant as a biofuel
+one.
 
 ### 3. Estimating the effective capacity of metered generators
 
@@ -640,7 +649,19 @@ configured describe a different scenario from the scenario being forecast.
 Researchers respond in one of three ways: leaving the level shifts in and paying for them, as
 [Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405) do; rewriting the
 history, as [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) do; or adapting
-to the new level, as [de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) do. We
+to the new level, as [de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) do.
+
+**One published system chose its model on robustness to switching rather than on accuracy.**
+[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) compared linear, tree, Gaussian, and
+neural network regressions for day-ahead load at Austrian primary substations, and report that the
+Gaussian model "has the lowest MAPE of all regression models" but "is barely able to calculate
+predictions when there is a major deviation from the normal switching status", while linear
+regression "is a little less accurate but is very flexible in terms of deviations from the switching
+status". The authors also clean "major deviations of the normal switching status" out of the
+training data before fitting, which is the rewrite-the-history response applied to the training set
+rather than to the forecast. Neither the size of the accuracy sacrifice nor the size of the
+switching failure is quantified, so the paper shows that an operator traded accuracy for switching
+robustness without saying what the trade cost. We
 found one substation study that conditions its forecast on an operating-state label, for a switch of
 a different kind, and none that both hands a model the record of when the network was abnormal and
 refuses to let the model predict those periods.
