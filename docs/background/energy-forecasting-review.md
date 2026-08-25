@@ -2085,18 +2085,27 @@ networks, and we would rather build on it than rebuild it — a shared evaluatio
 GB networks would be worth more to both than two separate ones.
 
 **Flexpectation is nonetheless attempting more than Artificial Forecasting's published material
-describes, which is the case for running both.** Artificial Forecasting's Beta registration claims
-load disaggregation as one of its innovations — "a novel approach to forecasting HV load, separately
-modelling gross demand and distributed generation" — so the two projects overlap on forecasting net
-demand and on separating generation from demand. Four of Flexpectation's eight challenges have no
-counterpart we could find. Searching every Artificial Forecasting deliverable published on the
-Smarter Networks Portal across Discovery, Alpha, and Beta, save one file that holds a single blank
-page, returns no hit for "switching", "abnormal", or "reconfiguration", which are challenges 4 and
-5; none for "effective capacity" or "derating", which is challenge 3; none for "faulty metering" or
-"metering fault", which is challenge 6; and none for "unmetered", which is the half of challenge 7
-that estimates the output of generators nobody meters. Flexpectation also delivers 1st and 99th
-percentiles where Artificial Forecasting's published bands run from the 5th to the 95th, and the
-curtailment decisions NGED describe turn on those outer levels.
+describes, which is the case for running both.** The two projects overlap on forecasting net demand
+at primary substations and on forecasting metered generation. Artificial Forecasting's Beta
+registration also claims load disaggregation as an innovation — "a novel approach to forecasting HV
+load, separately modelling gross demand and distributed generation" — but the deliverables describe
+forecasting two series that are each already measured. The Beta annual progress report produces net
+demand "by independently modelling customer export data", the Alpha technical report covers "all 160
+substations where both gross demand and customer export data were available", and the Embedded
+Capacity Register enters the model as an input feature, listing what is registered rather than
+estimating what is not. Flexpectation's challenges 7 and 8 are the different problem of inferring an
+unmetered generator's half-hourly output from a substation's net flow, which is blind source
+separation. Six of Flexpectation's eight challenges therefore have no counterpart we could find.
+Searching every Artificial Forecasting deliverable published on the Smarter Networks Portal across
+Discovery, Alpha, and Beta, save one file that holds a single blank page, returns no hit for
+"unmetered", "rooftop", "non-intrusive", "blind source", or "source separation", which are
+challenges 7 and 8; none for "switching", "abnormal", or "reconfiguration", which are challenges 4
+and 5; none for "effective capacity" or "derating", which is challenge 3; and none for "faulty
+metering" or "metering fault", which is challenge 6. Heat pumps and electric vehicles do appear, as
+drivers of demand growth and as model features rather than as quantities separated out of a net
+flow. Flexpectation also delivers 1st and 99th percentiles where Artificial Forecasting's published
+bands run from the 5th to the 95th, and the curtailment decisions NGED describe turn on those outer
+levels.
 
 ## Set against this literature, what we plan is ambitious, and here is why we think it can be done
 
