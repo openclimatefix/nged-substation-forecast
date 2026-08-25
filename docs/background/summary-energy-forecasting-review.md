@@ -98,9 +98,14 @@ evidence behind each row.
 Flexpectation, we plan to forecast net demand at every grid supply point, bulk supply point, and
 primary substation in NGED's licence areas. Our forecasts will be half-hourly, 14 days ahead,
 updated every 6 hours, and probabilistic. NGED acts on the forecast 1 to 10 days ahead, and the
-question NGED asks of the forecast is "how likely is load to exceed the substation's capacity?"
-rather than "what is the most likely load?". Forecasting net demand is the highest priority of the
-eight challenges, and the other seven exist mainly to improve our net-demand forecast.
+question NGED asks of the forecast is "how likely is net demand to run outside the substation's firm
+capacity?" rather than "what is the most likely net demand?". Two costs hang on the answer, and NGED
+rates the second at least as highly as the first: what NGED spends procuring flexibility to hold
+demand under the limit, and what curtailing embedded generators costs to hold export under it. Both
+costs sit in the tails of the forecast distribution rather than at its centre, so both are bought by
+the same thing — extreme quantiles that are calibrated, at both ends. Forecasting net demand is the
+highest priority of the eight challenges, and the other seven exist mainly to improve our net-demand
+forecast.
 
 #### What the literature says
 
@@ -196,9 +201,10 @@ forecast at 83–87% of network-owned secondary substations but at only 66–70%
 **NGED's primary substations may not behave the same way, because a primary substation aggregates
 far more customers than a Portuguese secondary substation does.** A forecast at a primary substation
 may also carry a larger percentage error than one at a grid supply point and still support
-flexibility procurement just as well, because what NGED needs from the forecast is a reliable answer
-to "will this substation exceed its firm capacity?". Whether decision-usefulness really is flat
-across voltage levels is something this project can measure, and we intend to.
+flexibility procurement and curtailment decisions just as well, because what NGED needs from the
+forecast is a reliable answer to "will this substation run outside its firm capacity?". Whether
+decision-usefulness really is flat across voltage levels is something this project can measure, and
+we intend to.
 
 **On the rest of the Flexpectation specification — a weather ensemble driving substation-level
 uncertainty all the way out to 14 days — we found no published result to lean on, for or against,
@@ -224,14 +230,16 @@ measured on upper-air variables, not on the near-surface temperature and irradia
 substation load.
 
 **Almost every substation-load study we found optimises average accuracy, but NGED's question is
-about the top of the distribution, and that is the one place where the literature gives a direct
+about both ends of the distribution, and that is the one place where the literature gives a direct
 warning.** [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) is the only study we found
-that models the upper tail explicitly, and they find that "below 1% and above 99% the forecasts
-based on quantile regression only are not calibrated at any GSP [grid supply point] Group.
-Therefore, these quantiles are not suitable for use in decision-making" — and that was with 5 years
-of half-hourly data, across regions far larger than a substation. Above those percentiles Browell
-and Fasiolo switch to a fitted parametric tail, and Flexpectation plans to follow Browell and
-Fasiolo and fit a parametric tail rather than reading extreme quantiles straight off the model.
+that models the tails explicitly, and they find that "below 1% and above 99% the forecasts based on
+quantile regression only are not calibrated at any GSP [grid supply point] Group. Therefore, these
+quantiles are not suitable for use in decision-making" — and that was with 5 years of half-hourly
+data, across regions far larger than a substation. Outside those percentiles Browell and Fasiolo
+switch to a fitted parametric tail at each end, and Flexpectation plans to follow Browell and
+Fasiolo and fit parametric tails rather than reading extreme quantiles straight off the model. The
+lower tail is the one curtailment turns on, because a substation runs closest to its export limit
+when embedded generation is high and demand is low.
 
 **All the text above is a verdict on Flexpectation version 1.** The three more sophisticated ML
 model families we plan to research in 2027 — pre-trained encoders, connectivity-map models, and
@@ -567,7 +575,7 @@ than a single farm, and they report that at 5-minute resolution the running maxi
 robust estimate of one farm's installed capacity, so the fitting earns its advantage on hourly,
 region-aggregated data. Whichever estimator wins, normalising by effective capacity stays a
 hypothesis to test rather than a settled preprocessing step, because no study we found has measured
-whether it improves the forecast NGED buys flexibility against.
+whether it improves the forecast NGED acts on.
 
 ### 4. Detecting switching events
 
@@ -915,14 +923,16 @@ Estimating something nobody measures — an effective capacity, an unmetered sol
 possible substitutes for ground truth, of which this literature uses four. Detecting rare events has
 good academic practice and, in GB, no precedent that measured anything at all.
 
-**Standard accuracy measures rewarded flat forecasts that would be of little use for flexibility
-procurement, so a peak-aware score belongs alongside a proper score rather than instead of one.** A
-forecast that predicts the right peak at the wrong time is penalised twice by mean absolute error —
-once for the peak it predicted that did not happen, and once for the peak that did happen and the
-forecast missed. A flat, featureless forecast avoids both penalties. Meteorologists named that
-effect the double penalty decades ago, and their conclusion transfers: a score that forgives a peak
-predicted an hour late is generally no longer a *proper scoring rule* — a score a forecaster cannot
-improve by publishing anything other than what they genuinely believe.
+**Standard accuracy measures rewarded flat forecasts that would be of little use for either
+flexibility procurement or curtailment decisions, so a peak-aware score belongs alongside a proper
+score rather than instead of one.** A forecast that predicts the right peak at the wrong time is
+penalised twice by mean absolute error — once for the peak it predicted that did not happen, and
+once for the peak that did happen and the forecast missed. A flat, featureless forecast avoids both
+penalties. Meteorologists named that effect the double penalty decades ago, and their conclusion
+transfers: a score that forgives a peak predicted an hour late is generally no longer a *proper
+scoring rule* — a score a forecaster cannot improve by publishing anything other than what they
+genuinely believe. The same argument runs at the other end of the distribution: the half-hours of
+deepest export are the ones curtailment turns on, and a flat forecast hides those too.
 
 **Two teams independently concluded that mean absolute error was the wrong measure for peaks.**
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) adopted a peak-aware error
@@ -948,7 +958,9 @@ slides, and one length rule is worth adopting outright.** [Pinheiro et al.
 (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) held out the whole of 2019 and note that
 "one year is the minimum acceptable to test a forecasting model whose target value shows annual
 seasonality". Substation load shows exactly that seasonality, so any fold shorter than a year cannot
-tell us whether a model handles winter, and winter is when NGED buys flexibility.
+tell us whether a model handles both ends of the year, and NGED needs both: winter is when NGED buys
+flexibility, and summer, when embedded solar output is highest against the lowest demand, is when
+export constraints bind and generators are curtailed.
 
 **Not one of the papers we read addresses the leakage a frequently reissued forecast creates, and
 Flexpectation is the most exposed design of the lot.** When a forecast covering 14 days is reissued
@@ -1242,8 +1254,8 @@ would be worth more to both than two separate protocols.
 **Measured against the studies we found, the plan sits outside the published literature in five ways
 at once.** That gap says more about where our search fell short than about the quality of the work
 that fills the rest of the field. No study in this review drives a substation forecast from a
-weather ensemble across a 14-day horizon. None models the upper tail explicitly at substation level;
-the one study that models it explicitly at all works on regions far larger than a substation. None
+weather ensemble across a 14-day horizon. None models the tails explicitly at substation level; the
+one study that models them explicitly at all works on regions far larger than a substation. None
 puts unmetered generation inside a probabilistic forecast at substation level over a multi-day
 horizon, though unmetered generation, probabilistic forecasting at substation level, and a multi-day
 horizon each exist on their own. None tracks the available capacity of a mixed fleet of solar, wind,

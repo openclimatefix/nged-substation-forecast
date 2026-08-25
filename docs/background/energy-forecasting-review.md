@@ -263,12 +263,12 @@ though neither names a resolution or a horizon.
 
 **Almost every study here optimises average accuracy, but NGED's question is about the top of the
 distribution.** [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) is the one study here
-that models the upper tail explicitly, and what they found is a warning rather than a reassurance:
-they work across risk levels from 0.01% to 0.25%, one of which — 0.05%, or one part in two thousand
-— corresponds to reserve being sufficient in all but about four hours a year — but they also find
-that "below 1% and above 99% the forecasts based on quantile regression only are not calibrated at
-any GSP Group. Therefore, these quantiles are not suitable for use in decision-making", even with
-five years of half-hourly data across regions far larger than a substation. Above the 1st and 99th
+that models the tails explicitly, and what they found is a warning rather than a reassurance: they
+work across risk levels from 0.01% to 0.25%, one of which — 0.05%, or one part in two thousand —
+corresponds to reserve being sufficient in all but about four hours a year — but they also find that
+"below 1% and above 99% the forecasts based on quantile regression only are not calibrated at any
+GSP Group. Therefore, these quantiles are not suitable for use in decision-making", even with five
+years of half-hourly data across regions far larger than a substation. Above the 1st and 99th
 percentiles, Browell and Fasiolo switch to a fitted parametric tail.
 
 **[Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) report the same kind of failure
@@ -2079,15 +2079,15 @@ GB networks would be worth more to both than two separate ones.
 **Measured against the studies we found, the plan sits outside the published literature in five ways
 at once — which is a statement about where the gaps in our search are, rather than about the quality
 of the work that fills the rest of the field.** No study in this review drives a substation forecast
-from a weather ensemble across a 14-day horizon. None models the upper tail explicitly at substation
-level; the one study that models it explicitly at all works on regions far larger than a substation.
-None puts unmetered generation inside a probabilistic forecast at substation level over a multi-day
-horizon, though unmetered generation, probabilistic forecasting at substation level, and a multi-day
-horizon each exist on their own. None tracks the available capacity of a mixed fleet of solar, wind,
-and dispatchable generators at one distribution network, or measures whether doing so improves the
-forecast. None turns switching-contaminated history into a useful input rather than deleting it,
-rewriting it, or absorbing the cost of leaving it in. Flexpectation attempts all eight challenges
-above, across four families of model:
+from a weather ensemble across a 14-day horizon. None models the tails explicitly at substation
+level; the one study that models them explicitly at all works on regions far larger than a
+substation. None puts unmetered generation inside a probabilistic forecast at substation level over
+a multi-day horizon, though unmetered generation, probabilistic forecasting at substation level, and
+a multi-day horizon each exist on their own. None tracks the available capacity of a mixed fleet of
+solar, wind, and dispatchable generators at one distribution network, or measures whether doing so
+improves the forecast. None turns switching-contaminated history into a useful input rather than
+deleting it, rewriting it, or absorbing the cost of leaving it in. Flexpectation attempts all eight
+challenges above, across four families of model:
 
 - a heavily-tuned version of the gradient-boosting approach that wins most tabular forecasting
   competitions, and which NGED's own EFFS project independently selected;
