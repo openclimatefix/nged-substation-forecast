@@ -155,7 +155,7 @@ evidence behind each row.
 | 1. Probabilistic net-demand forecasts at substations | [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) at 551 primary substations, [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) at 96,989 Portuguese secondary substations, [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) at 13 | No study we found drives substation uncertainty from a weather ensemble across a full 14-day horizon |
 | 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 GB wind farms from the ECMWF ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Nothing we found forecasts a distribution-connected battery or gas generator inside a net-demand forecast; the closest case for the biofuel plant is a biomass forecast at Austrian primary substations |
 | 3. Estimating the effective capacity of metered generators | A method for each generation technology separately, most of them working from a revenue meter alone | None of it run across a mixed fleet of individually metered generators at a distribution network, or tested for whether estimating capacity improves the forecast |
-| 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers on one feeder; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | Detection from the substation's own meter alone, scored on precision as well as recall, using the fact that the load has to move to a neighbouring substation |
+| 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers, three on one feeder and one on two; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | Detection from the substation's own meter alone, scored on precision as well as recall, using the fact that the load has to move to a neighbouring substation |
 | 5. Forecasting a substation as if it were always in its normal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Nobody we found feeds a model switching-contaminated history deliberately, as information rather than as damage |
 | 6. Detecting faulty metering | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s Dutch dataset, the one public labelled set we found, which merges metering faults and switching into a single class | A fault taxonomy that separates the two, a GB detector with a measured accuracy, and a reference series to detect against |
 | 7. Disaggregating unmetered solar and wind | [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) transferring from fully-metered Dutch substations, and [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/), this work's direct predecessor | Doing it with no metered training set, inferring the capacity rather than being told it, and putting uncertainty and a multi-day horizon in the same forecast |
@@ -897,8 +897,8 @@ segmentation on its own.
 **Detecting a load transfer from metered load alone has been published four times by the same first
 author, and every method works one series at a time.** All four papers score against the same nine
 logged transfers on the Kimhwa distribution feeder in Gangwon province, measured hourly at the
-circuit breaker on the substation's outgoing feeder, so the whole line of work rests on one feeder
-in one year.
+circuit breaker on the substation's outgoing feeder, and one of the four against a second feeder as
+well, so the whole line of work rests on one or two feeders in one year.
 
 | Paper | Method | Logged transfers found |
 |---|---|---|
@@ -954,11 +954,10 @@ importance of visual sense checks of the obtained processed demand data".
 
 ### 5. Forecasting a substation as if it were always in its normal running arrangement
 
-**In summary.** Researchers respond in one of three ways: leaving the level shifts in and paying for
-them, as [Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405) do;
-rewriting the history, as [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) do;
-or adapting to the new level, as [de Vilmarest et al.
-(2024)](https://doi.org/10.1109/TPWRS.2023.3310280) do.
+**In summary.** Researchers respond in one of three ways: leaving the level shifts in, as
+[Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405) do; rewriting the
+history, as [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) do; or adapting
+to the new level, as [de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) do.
 
 **One published system chose its model on robustness to switching rather than on accuracy.**
 [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) compared linear, tree, Gaussian, and
@@ -1575,7 +1574,7 @@ whether the leaderboard is still open.
 | Global Energy Forecasting Competitions 2012, 2014, and 2017 ([Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979)) | Hierarchical load, price, wind, and solar, with the data published alongside the papers introducing each competition | Varies, up to national | Hundreds of contestants from more than 60 countries | Closed |
 | The second track of GEFCom2017 ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) | Probabilistic load | 183 delivery-point meters of a US utility — the closest of these to a distribution network | 177 entrants across both tracks | Closed |
 | BigDEAL Challenge 2022 ([Shukla and Hong (2024)](https://doi.org/10.1049/stg2.12162)) | The timing of peak demand rather than its size; the final match asked for the magnitude, timing, and shape of daily peak load | Three neighbouring local distribution companies — whole utilities, well above a primary substation | 78 teams from 27 countries | Closed |
-| HEFTCom ([Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)) | The combined day-ahead output of one GB wind-and-solar portfolio | One 3.6 GW portfolio: a single offshore wind farm plus a regional solar aggregate — the data closest to NGED's | Not stated in what we read | Closed; the competition period was 3 months |
+| HEFTCom ([Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)) | The combined day-ahead output of one GB wind-and-solar portfolio | One 3.6 GW portfolio: a single offshore wind farm plus a regional solar aggregate — the data closest to NGED's | Over 170 teams registered, 66 submitted, 24 completed | Closed; the competition period was 3 months |
 | Three competitions NGED funded with Energy Systems Catapult ([McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541)) | One-minute peaks inside half-hourly averages; the daily peak a hidden population of electric-vehicle chargers added; missing values. None was a load forecast | NGED's own grid supply point, bulk supply points, and primary-substation feeders | 37 teams, over 2,500 submissions | Closed between December 2021 and April 2022, though the pages and data are still readable on CodaLab |
 | Energy-Arena ([Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705)) | The paper describes deterministic day-ahead tasks; the running platform today carries 24 challenges across prices, load, wind, and solar — 8 scored as point forecasts, 8 as quantiles, 8 as ensembles | Not a distribution network | Not stated in what we read | Standing |
 | TS-Arena ([Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)) | 186 live energy series | Not a distribution network | 13 foundation models and 3 statistical baselines run by the platform team, plus outside entries | Standing |
@@ -1748,25 +1747,26 @@ numbers to flatter what happens at scale, and should say so each time we publish
 
 **Two things follow from how long those benchmarks took to produce a step change.** A leaderboard's
 first product is usually a credible measured plateau rather than a breakthrough, and in CASP's case
-a fourteen-year plateau is what made the later jump believable ([Kryshtafovych et al.
-(2021)](https://doi.org/10.1002/prot.26237)). And a benchmark of 32 series is small enough that the
-constraint on what can be learned from it is likely to be its size, which is an argument for
-extending it to the wider network as soon as the data allows rather than for running more
-experiments against the trial area.
+the long plateau before it is what made the later jump believable ([Kryshtafovych et al.
+(2021)](https://doi.org/10.1002/prot.26237), whose full text we could not obtain). And a benchmark
+of 32 series is small enough that the constraint on what can be learned from it is likely to be its
+size, which is an argument for extending it to the wider network as soon as the data allows rather
+than for running more experiments against the trial area.
 
 **What a leaderboard without entrants cannot do, we should not claim it does.** Three of the
-strongest results in the benchmarks above are unavailable to us. CASP's finding that its field
-plateaued for fourteen years is a statement about protein structure prediction only because dozens
-of groups were trying independently; a plateau on our leaderboard would be ambiguous between a hard
-problem and a team that did not think of the right idea.
+strongest results in the benchmarks above are unavailable to us. CASP's reading of how long its
+field went without a breakthrough is a statement about protein structure prediction only because
+dozens of groups were trying independently; a plateau on our leaderboard would be ambiguous between
+a hard problem and a team that did not think of the right idea.
 
 **The M competitions' conclusions about whole classes of method rest on the same independence.**
-That complex methods do not typically beat simpler ones, and that combining methods beats the
-methods combined ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)), describe what
-many independent people chose to try, and no single team's leaderboard can support that kind of
-claim. And the reassurance about adaptive overfitting comes from competitions with at least a
-thousand submissions each, entered independently against a private split held back until the end —
-neither of which our leaderboard has.
+That complex methods do not typically beat simpler ones — a finding of the first M-competition that
+the M3 competition did not go on to support — and that combining methods beats the methods combined
+([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)), describe what many independent
+people chose to try, and no single team's leaderboard can support that kind of claim. And the
+reassurance about adaptive overfitting comes from competitions with at least a thousand submissions
+each, entered independently against a private split held back until the end — neither of which our
+leaderboard has.
 
 **What our leaderboard can do is narrower and still worth having.** The leaderboard can show which
 approaches beat a stated baseline on NGED's own data, under one protocol, with the forecasts, the
