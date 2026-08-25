@@ -24,8 +24,8 @@ different beneficiaries. We compute them as **two metrics, reported as two numbe
 them up:
 
 1. **Flexibility procurement.** NGED pay flexible customers to reduce demand when a site risks
-   running beyond its limit. They told us they are risk-averse and knowingly over-procure. A
-   sharper forecast buys less flexibility for the same security. This is money NGED spend.
+   running beyond its limit. Procurement today is deliberately conservative, so a sharper forecast
+   buys less flexibility for the same security. This is money NGED spend.
 2. **Curtailment of generation.** Generators are curtailed to keep exports within network limits.
    Curtailment avoided is generation sold, priced as a whole-system cost rather than a saving to
    NGED or the connected generator specifically — see [curtailment price
@@ -45,8 +45,8 @@ figure NGED hold in a form we can use.
 So we invert the question. **Models are aimed at equal safety, and we compare what each one spends
 to get there.** Each model may be as conservative as it likes, and we tune that conservatism until
 it leaves the same small amount of risk unaddressed. Then the only thing left to compare is cost.
-This matches what NGED described: the problem is not a breach they currently suffer, it is
-over-buying to avoid one.
+This matches the framing the design is built on: the risk to manage is unnecessary spend, not an
+unaddressed breach.
 
 The knob is the **procurement quantile** $\tau$ — how far up its own forecast distribution a model
 looks when deciding to act. A timid model uses a high $\tau$, buys a lot, and is rarely caught out.
@@ -232,8 +232,8 @@ would silently score £0 for every generator meter in the trial area.
 Every model's cost is reported beside two reference points, computed on the same series and
 half-hours:
 
-- **Manual review** — NGED's method today: the 13-analogue ensemble, read off a plot, taking the
-  95th percentile if a single number is needed ([the incumbent
+- **Manual review** — the incumbent method: the 13-analogue ensemble, summarised at the 95th
+  percentile if a single number is needed ([the incumbent
   forecast](../background/nged-incumbent-forecast.md); we have not confirmed that the 95th
   percentile is what they use, and [this is still an open question](#questions-for-nged)). It is
   scored at that
@@ -263,8 +263,9 @@ in the constrained direction, labelled `historical_p99` to keep it distinct from
 forecast-quantile label `p99` — one is a fixed power level derived from history, the other a level
 of the forecast distribution.
 
-This is the rung NGED described ("set capacity at the 99th percentile, and assume everything is
-slightly overloaded in winter"), and it is the same single rung the [tail and exceedance
+This mirrors a percentile-of-history convention already used for capacity setting, treating winter
+as close to the limit throughout, and it is the same single rung the [tail
+and exceedance
 metrics](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
 use, so the leaderboard carries one threshold concept rather than several. The percentile sets the
 absolute size of every £ figure on this page — a lower rung would multiply them — which is another
@@ -333,11 +334,11 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
 - **Nothing is validated against real spend**, except the Tavistock flex-procurement [case
   study](#case-studies). The curtailment metric has no equivalent validation yet, and cannot until
   Tier 3 exists.
-- **Asset failure and outage costs are excluded.** NGED identified outage quantification as
-  valuable but harder; it is not in this design.
-- **Over-procurement has a deliberate component.** NGED told us they over-buy partly to stimulate
-  the flexibility market and to support their capital programme. That portion is policy, not
-  forecast error, and a better forecast should not be credited with removing it.
+- **Asset failure and outage costs are excluded.** Outage quantification is valuable but harder,
+  and is not in this design.
+- **Over-procurement has a deliberate component.** Some over-procurement is understood to be
+  deliberate policy — supporting flexibility-market development and the capital programme — rather
+  than forecast error, and a better forecast should not be credited with removing it.
 
 ## Questions for NGED
 
@@ -351,8 +352,8 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
   specifically by NGED or by the curtailed generator; see [curtailment price
   basis](#curtailment-price-basis).
 - **Case-study data availability** — Tavistock Primary (`CMZ_T9A_SWE_0050`) has real procurement
-  history and a seasonal transformer rating, and anchors how much NGED currently over-procure at a
-  real site; see [case studies](#case-studies).
+  history and a seasonal transformer rating, and anchors the flexibility-procurement metric against
+  a real site; see [case studies](#case-studies).
 - **Whether curtailment can be validated against a real event today** — no, not below [Tier
   3](#tier-3-full-power-flow-modelling).
 
