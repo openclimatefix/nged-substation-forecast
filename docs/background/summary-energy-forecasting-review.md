@@ -2,9 +2,8 @@
 
 This is a short version of a literature review Open Climate Fix carried out for National Grid
 Electricity Distribution (NGED), as part of the Flexpectation project. This summary is meant to be
-readable
-on its own. The full review, which cites 99 sources and gives the evidence behind every claim here,
-is [published
+readable on its own. The full review, which cites 101 sources and gives the evidence behind every
+claim here, is [published
 online](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/),
 and is referred to below as "the full review".
 
@@ -58,9 +57,9 @@ Python scripts to download data published in the literature to confirm results, 
 
 We're confident the facts in Claude's "research notes" are accurate because we configured Claude to
 check against the downloaded PDFs (rather than half-remembering information embedded in the LLM's
-weights), and because we ran on the order of 100 rounds of agentic adversarial review and
-hundreds of manual fact checks. (The "literature review" process we developed is written up as a
-Claude Code "skill", viewable
+weights), and because we ran on the order of 100 rounds of agentic adversarial review and hundreds
+of manual fact checks. (The "literature review" process we developed is written up as a Claude Code
+"skill", viewable
 [here](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.claude/skills/literature-review/SKILL.md)).
 
 But — to our tastes — Claude struggles to write readable prose. So the text below has been heavily
@@ -83,7 +82,7 @@ evidence behind each row.
 | Challenge | Closest published precedent | What this means for Flexpectation |
 |---|---|---|
 | 1. Probabilistic net-demand forecasts at substations | [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) at 551 primary substations, [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) at 96,989 Portuguese secondary substations, [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) at 13 | A gradient-boosted tree (GBT) is a defensible default for Flexpectation version 1, but the literature paints GBTs as a sensible starting point rather than a proven winner |
-| 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 GB wind farms from the ECMWF ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Gradient-boosted trees fitted separately for each kind of generator are the standard approach, and what won when teams were scored against each other on the same data. A higher-resolution deterministic forecast beat the ensemble at short lead times |
+| 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 wind farms in Great Britain (GB) from the ECMWF ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Gradient-boosted trees fitted separately for each kind of generator are the standard approach, and what won when teams were scored against each other on the same data. A higher-resolution deterministic forecast beat the ensemble at short lead times |
 | 3. Estimating the effective capacity of metered generators | A method for each generation technology separately, most of them working from a revenue meter alone | Flexpectation version 1 needs an estimator that can track effective capacity downwards, which is exactly where the two published wind methods differ |
 | 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers on one feeder; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | The one published result scoring both precision and recall reports F1.5 scores between about 0.2 and 0.5, from different detectors at different event lengths, and achieved with a second load estimate NGED does not have, so Flexpectation should expect worse rather than better |
 | 5. Forecasting a substation as if it were always in its normal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Every published solution throws information away. In contrast, Flexpectation version 1 makes the abnormal periods an input to the ML model, and masks the abnormal periods in the training target |
@@ -95,7 +94,7 @@ evidence behind each row.
 
 #### The challenge
 
-"Net" demand is "gross" demand minus whatever generation sits behind the substation. In
+*Net* demand is *gross* demand minus whatever generation sits behind the substation. In
 Flexpectation, we plan to forecast net demand at every grid supply point, bulk supply point, and
 primary substation in NGED's licence areas. Our forecasts will be half-hourly, 14 days ahead,
 updated every 6 hours, and probabilistic. NGED acts on the forecast 1 to 10 days ahead, and the
@@ -117,7 +116,7 @@ method carries from one network to another.
 
 | Source | What they forecast | Level and scale | Horizon | Result, and what it was compared against | Weather |
 |---|---|---|---|---|---|
-| [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) | Net load, Germany | 200 low-voltage feeders | 4 days | A general-purpose foundation model that had never seen the data beat every purpose-trained model on average error, 3.8 kW against 4.2 kW | Actual weather, after the fact |
+| [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) | Net load, Germany | 200 low-voltage feeders | 4 days | A general-purpose foundation model that had never seen the data beat every purpose-trained model on average error, 3.8 kW against 4.2 kW | 1–3 h forecasts, so effectively after the fact at the 4-day horizon |
 | [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) | Load, Germany and Portugal | Transmission, plus 200 low-voltage feeders and 287 individual customers | 4 days | Best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage feeders, 23.3% at individual customers | 1–3 h forecasts at the feeders, reanalysis elsewhere |
 | [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) | Regional net load, GB | Regional: 14 grid supply point groups | Day-ahead | Held the same risk with **up to 24.6% less upward reserve** than a fixed-tail alternative, falling to 3.2% at the least extreme risk level tested | Real forecasts |
 | [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) | Load, Portugal | 96,989 secondary substations | Day-ahead | 42–47% better than the reference benchmark at system level. **At substation level, beat a naive forecast on 83–87% of network-owned and 66–70% of customer-owned sites** (the paper reports two different pairs of figures for that statistic, and the ranges span both)  | Real forecasts, 7–8 h old |
@@ -166,9 +165,9 @@ considerably less feature engineering than what we plan to implement.** [Kaas et
 metadata, and nothing beyond that: no clear-sky index, no wind power curve, no monotone constraints.
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) ran the one comparison on
 equal terms — their GBT and their generalised additive model received the same features, but that
-shared feature set was itself short: a linear trend, load lagged 24 hours and 1 week, time of day,
-9 day types, the named public holidays, day of year, and temperature interacted with time of day
-and with day of year. It carried no irradiance and no wind, though the weather they downloaded held
+shared feature set was itself short: a linear trend, load lagged 24 hours and 1 week, time of day, 9
+day types, the named public holidays, day of year, and temperature interacted with time of day and
+with day of year. It carried no irradiance and no wind, though the weather they downloaded held
 both. So no published head-to-head we found gives a GBT the feature engineering we plan to implement
 in Flexpectation version 1.
 
@@ -206,11 +205,11 @@ uncertainty all the way out to 14 days — we found no published result to lean 
 and two published papers ask for exactly that.** [Haben et al.
 (2021)](https://arxiv.org/abs/2106.00006) end their review of 221 low-voltage papers by naming
 "post-processed weather ensemble predictions to generate multi-step probabilistic forecasts of load
-at different levels of the LV hierarchy" as an avenue of future research. Of those 221 papers, 3
-used a weather *forecast* and none used an *ensemble* of weather forecasts. [Pinheiro et al.
-(2023)](https://doi.org/10.1016/j.apenergy.2022.120493), published after that review closed, is a
-fourth paper using a real weather forecast, but its inputs are single point forecasts rather than an
-ensemble — so even the largest deployment in this review used no weather ensemble.
+at different levels of the LV [low-voltage] hierarchy" as an avenue of future research. Of those 221
+papers, 3 used a weather *forecast* and none used an *ensemble* of weather forecasts. [Pinheiro et
+al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493), published after that review closed, is
+a fourth paper using a real weather forecast, but its inputs are single point forecasts rather than
+an ensemble — so even the largest deployment in this review used no weather ensemble.
 
 **[Ludwig et al. (2023)](https://doi.org/10.1080/01605682.2022.2115411) built exactly that, for
 Great Britain's national demand 1 to 6 days ahead.** Their multi-step probabilistic load forecast is
@@ -218,9 +217,9 @@ driven by a post-processed weather ensemble, from the same 51-member ECMWF ensem
 uses, and they too ask for the method to be pushed down "to different layers of the energy
 hierarchy, including the low voltage level".
 
-**Flexpectation's 14-day horizon sits near the edge of what a weather ensemble can reliably forecast.**
-[Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) found that the lead time beyond
-which a weather ensemble stops beating a climatological distribution is 16 to 23 days ahead —
+**Flexpectation's 14-day horizon sits near the edge of what a weather ensemble can reliably
+forecast.** [Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) found that the lead time
+beyond which a weather ensemble stops beating a climatological distribution is 16 to 23 days ahead —
 measured on upper-air variables, not on the near-surface temperature and irradiance that drive
 substation load.
 
@@ -228,11 +227,11 @@ substation load.
 about the top of the distribution, and that is the one place where the literature gives a direct
 warning.** [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) is the only study we found
 that models the upper tail explicitly, and they find that "below 1% and above 99% the forecasts
-based on quantile regression only are not calibrated at any GSP Group. Therefore, these quantiles
-are not suitable for use in decision-making" — and that was with 5 years of half-hourly data,
-across regions far larger than a substation. Above those percentiles Browell and Fasiolo switch to a
-fitted parametric tail, and Flexpectation plans to follow Browell and Fasiolo and fit a parametric
-tail rather than reading extreme quantiles straight off the model.
+based on quantile regression only are not calibrated at any GSP [grid supply point] Group.
+Therefore, these quantiles are not suitable for use in decision-making" — and that was with 5 years
+of half-hourly data, across regions far larger than a substation. Above those percentiles Browell
+and Fasiolo switch to a fitted parametric tail, and Flexpectation plans to follow Browell and
+Fasiolo and fit a parametric tail rather than reading extreme quantiles straight off the model.
 
 **All the text above is a verdict on Flexpectation version 1.** The three more sophisticated ML
 model families we plan to research in 2027 — pre-trained encoders, connectivity-map models, and
@@ -323,11 +322,11 @@ trains on a clean weather signal.
 
 #### The challenge
 
-Of the 32 series in the trial area, 12 are individually metered generators — 6 solar farms,
-3 wind farms, a biofuel plant, a battery, and a gas generator — and each needs the same
-probabilistic, half-hourly, 14-day forecast as a substation. Solar and wind are driven by weather
-the ensemble supplies directly. The battery, the gas generator, and the biofuel plant are probably dispatched
-on market prices and operator decisions.
+Of the 32 series in the trial area, 12 are individually metered generators — 6 solar farms, 3 wind
+farms, a biofuel plant, a battery, and a gas generator — and each needs the same probabilistic,
+half-hourly, 14-day forecast as a substation. Solar and wind are driven by weather the ensemble
+supplies directly. The battery, the gas generator, and the biofuel plant are probably dispatched on
+market prices and operator decisions.
 
 #### What the literature says
 
@@ -340,15 +339,14 @@ forecast at Austrian primary substations, [Ruhhütl et al.
 #### What this means for Flexpectation
 
 **A warning for a project built on a numerical weather prediction (NWP) ensemble.** [Dantas and
-Browell
-(2026)](https://doi.org/10.1002/we.70079) forecast 73 wind farms in GB — 34 onshore, 39 offshore —
-from the ECMWF ensemble, seamlessly from 6 to 162 hours (6.75 days) ahead, and two of their
-conclusions bear on Flexpectation. Whether weather-forecast error or weather-to-power conversion
-error dominates flips with lead time. Weather-to-power uncertainty dominates the short term, and
-weather-forecast uncertainty dominates the mid-term. The transition between the two typically falls
-2 to 3 days ahead, arrives earlier for offshore farms than for onshore farms, and varies
-dramatically between farms. And a
-deterministic forecast at higher resolution beat the ensemble at short lead times.
+Browell (2026)](https://doi.org/10.1002/we.70079) forecast 73 wind farms in GB — 34 onshore, 39
+offshore — from the ECMWF ensemble, seamlessly from 6 to 162 hours (6.75 days) ahead, and two of
+their conclusions bear on Flexpectation. Whether weather-forecast error or weather-to-power
+conversion error dominates flips with lead time. Weather-to-power uncertainty dominates the short
+term, and weather-forecast uncertainty dominates the mid-term. The transition between the two
+typically falls 2 to 3 days ahead, arrives earlier for offshore farms than for onshore farms, and
+varies dramatically between farms. And a deterministic forecast at higher resolution beat the
+ensemble at short lead times.
 
 **Gradient-boosted trees, fitted separately for each kind of generator, is the standard approach in
 the literature, and what won when teams were scored against each other on the same data.** [Dantas
@@ -369,10 +367,10 @@ running a weather model, not on a different downstream model family.
 
 **The largest meta-analysis of solar forecasting we found puts individual machine-learning models
 level with classic statistical ones at the range NGED acts on, and only combinations ahead.**
-[Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) meta-analyse 4,687 skill scores extracted
-from 188 solar forecasting papers, fitting a separate regression for each horizon band. Their
-baseline class is classic statistical time-series models — the autoregressive integrated moving
-average (ARIMA) family, exponential smoothing (ETS, for error, trend, and seasonality), and
+[Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) meta-analyse 4,687 skill scores
+extracted from 188 solar forecasting papers, fitting a separate regression for each horizon band.
+Their baseline class is classic statistical time-series models — the autoregressive integrated
+moving average (ARIMA) family, exponential smoothing (ETS, for error, trend, and seasonality), and
 multivariate relatives such as autoregressive models with exogenous inputs (ARX) — and every figure
 in the table is percentage points of skill score against that baseline.
 
@@ -406,20 +404,20 @@ comes from models with no weather forecast in them.
 involved.** The class is the numerical weather prediction irradiance field itself — usually global
 horizontal irradiance, at most post-processed or averaged across several weather models — used as
 the forecast rather than fed as an input to a fitted model. Of the 188 papers in their sample, 118
-forecast irradiance rather than PV plant output. Only 70 papers forecast the output of a
+forecast irradiance rather than photovoltaic plant output. Only 70 papers forecast the output of a
 photovoltaic plant, so for most of the sample the weather model's irradiance field is directly
 comparable to the irradiance those papers forecast. Their regression separates the model class and
-the forecast
-target as separate variables, so the 14.3-point penalty is estimated with the target held constant,
-but the authors never report which targets the numerical-weather-prediction papers were forecasting.
-Their
-own advice is to exhaust the simple models first, because classical statistical time-series methods
-"still have very good performance compared to more complex methods such as individual ML models".
+the forecast target as separate variables, so the 14.3-point penalty is estimated with the target
+held constant, but the authors never report which targets the numerical-weather-prediction papers
+were forecasting. Their own advice is to exhaust the simple models first, because classical
+statistical time-series methods "still have very good performance compared to more complex methods
+such as individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting we
 found confirms the importance of NWP inputs at the lead times Flexpectation cares about.** Numerical
-weather prediction is the largest input effect [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) measure, and the inputs that pay at short range carry
-the opposite sign at day-ahead range. Percentage points of skill score again:
+weather prediction is the largest input effect [Nguyen and Müsgens
+(2026)](https://doi.org/10.1063/5.0300682) measure, and the inputs that pay at short range carry the
+opposite sign at day-ahead range. Percentage points of skill score again:
 
 | Input | Intra-hour (up to 1 hour) | Intra-day (1 to 6 hours) | Day-ahead (over 6 hours) |
 |---|---|---|---|
@@ -506,15 +504,14 @@ standing in for many differently-sized inverters saturating in turn.
 **The trial area's battery, gas generator, and biofuel plant each need a method, and the literature
 supplies one to borrow for the battery, none for the gas generator, and a partial one for the
 biofuel plant.** For the battery, [Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469)
-recover a price-taking storage
-operator's own optimisation parameters from historical prices and observed dispatch. We found no
-method worth borrowing for the gas generator, and what little exists forecasts a gas plant's own
-output directly rather than as a component of a substation's net demand. For the biofuel plant,
-[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast biomass generation behind
-each Austrian primary substation from the previous day's generation, scaled to installed power and
-spread across the day as a constant band, to a mean absolute percentage error of 5 to 15% — the same
-shape of problem, though a biomass station burning solid fuel is not the same plant as a biofuel
-one.
+recover a price-taking storage operator's own optimisation parameters from historical prices and
+observed dispatch. We found no method worth borrowing for the gas generator, and what little exists
+forecasts a gas plant's own output directly rather than as a component of a substation's net demand.
+For the biofuel plant, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast
+biomass generation behind each Austrian primary substation from the previous day's generation,
+scaled to installed power and spread across the day as a constant band, to a mean absolute
+percentage error of 5 to 15% — the same shape of problem, though a biomass station burning solid
+fuel is not the same plant as a biofuel one.
 
 ### 3. Estimating the effective capacity of metered generators
 
@@ -522,8 +519,8 @@ one.
 
 We call the amount of generation actually available at a metered site its *effective capacity*: the
 output it could produce right now if the weather allowed, as opposed to its nameplate rating.
-Turbines go out for repair, inverters degrade. A 20 MW wind farm that has been limited to 14 MW for a
-month is, for forecasting purposes, a different wind farm, and a model trained on its nameplate
+Turbines go out for repair, inverters degrade. A 20 MW wind farm that has been limited to 14 MW for
+a month is, for forecasting purposes, a different wind farm, and a model trained on its nameplate
 rating cannot see the difference.
 
 #### What the literature says
@@ -536,20 +533,17 @@ scale.
 #### What this means for Flexpectation
 
 **Flexpectation version 1 needs an estimator that can track effective capacity downwards, and that
-is
-exactly where the two published wind methods differ.** [Dantas and Browell
+is exactly where the two published wind methods differ.** [Dantas and Browell
 (2026)](https://doi.org/10.1002/we.70079) needed available capacity for the same reason we do, and
 rather than use a nameplate rating they estimate a time series of available capacity for each farm
 from that farm's own metered production, needing no capacity register and no outage messages. The
 general shape of that capacity-estimation rule is a running maximum of production, which ratchets
-upwards and never
-comes back down. [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) fit the most likely
-capacity time series instead, by quadratic optimisation against a capacity factor simulated from
-reanalysis weather and a power curve, and they publish a monotonic variant alongside a non-monotonic
-one. The direction of travel is what matters for NGED: a turbine out for repair for a month makes
-effective capacity *fall*, and a ratchet cannot follow it down. Flexpectation version 1 will
-therefore
-implement estimators that can fall as well as rise.
+upwards and never comes back down. [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) fit the
+most likely capacity time series instead, by quadratic optimisation against a capacity factor
+simulated from reanalysis weather and a power curve, and they publish a monotonic variant alongside
+a non-monotonic one. The direction of travel is what matters for NGED: a turbine out for repair for
+a month makes effective capacity *fall*, and a ratchet cannot follow it down. Flexpectation version
+1 will therefore implement estimators that can fall as well as rise.
 
 **The published numbers favour fitting over ratcheting, and the variant Flexpectation needs is the
 variant that gave the better forecast.** [Viotti et al. (2026)](https://doi.org/10.1002/we.70136)
@@ -582,11 +576,10 @@ whether it improves the forecast NGED buys flexibility against.
 When a cable fault or planned maintenance moves part of a network from one substation to another,
 the load the first substation meters steps down. Each substation that picks up part of that
 transferred load records a matching rise, with no change in the underlying demand. The pick-up is
-usually shared across two or three
-neighbouring substations rather than landing on one. NGED's substations spend roughly a tenth of
-their operating time in an abnormal running arrangement. Switching labels exist for the trial area
-but not for the wider network, so any method meant to scale to the wider network has to work from
-power measurements alone.
+usually shared across two or three neighbouring substations rather than landing on one. NGED's
+substations spend roughly a tenth of their operating time in an abnormal running arrangement.
+Switching labels exist for the trial area but not for the wider network, so any method meant to
+scale to the wider network has to work from power measurements alone.
 
 #### What the literature says
 
@@ -612,10 +605,9 @@ threshold on a decomposition residual, found the most events, and [Kim
 (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757)'s pipeline — the one closest to what
 Flexpectation plans — found 7 of the 9, an average detection rate of 78%.
 
-Electricity North West's
-[ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted step changes into
-faulty metering and network reconfigurations on GB substations in 2016, from power measurements
-alone, and published no precision or recall for either rule.
+Electricity North West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project
+sorted step changes into erroneous data and network reconfigurations on GB substations in 2016, from
+power measurements alone, and published no precision or recall for either rule.
 
 #### What this means for Flexpectation
 
@@ -686,16 +678,13 @@ closest precedent — but we could not obtain the full text to check, and the ab
 #### The challenge
 
 NGED plan their network against what each substation would carry under its normal running
-arrangement,
-and that same quantity is what Flexpectation has to predict — including for a substation that has
-been sitting in an
-abnormal arrangement for weeks. Forecasting *through* an abnormal arrangement is a weaker
-requirement, and not the one NGED have. A model can take lagged power inputs from inside an abnormal
-period and stay well-behaved anyway, yet still report what the substation will carry rather than
-what the substation would have carried under its normal arrangement. Predicting that quantity
-makes the forecasting target something that
-was never metered, and leaves the training history contaminated: past readings taken while the
-network was abnormally
+arrangement, and that same quantity is what Flexpectation has to predict — including for a
+substation that has been sitting in an abnormal arrangement for weeks. Forecasting *through* an
+abnormal arrangement is a weaker requirement, and not the one NGED have. A model can take lagged
+power inputs from inside an abnormal period and stay well-behaved anyway, yet still report what the
+substation will carry rather than what the substation would have carried under its normal
+arrangement. Predicting that quantity makes the forecasting target something that was never metered,
+and leaves the training history contaminated: past readings taken while the network was abnormally
 configured describe a different scenario from the scenario being forecast.
 
 #### What the literature says
@@ -708,10 +697,10 @@ to the new level, as [de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.
 **One published system chose its model on robustness to switching rather than on accuracy.**
 [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) compared linear, tree, Gaussian, and
 neural network regressions for day-ahead load at Austrian primary substations, and report that the
-Gaussian model "has the lowest MAPE of all regression models" but "is barely able to calculate
-predictions when there is a major deviation from the normal switching status", while linear
-regression "is a little less accurate but is very flexible in terms of deviations from the switching
-status".
+Gaussian model "has the lowest MAPE [mean absolute percentage error] of all regression models" but
+"is barely able to calculate predictions when there is a major deviation from the normal switching
+status", while linear regression "is a little less accurate but is very flexible in terms of
+deviations from the switching status".
 
 **Ruhhütl et al. also clean "major deviations of the normal switching status" out of the training
 data before fitting, which is the rewrite-the-history response applied to the training set rather
@@ -775,10 +764,9 @@ meter never saw is mature where demand is censored — airline revenue managemen
 unconstraining, and retail and electric-vehicle-charging work calls it censored-demand recovery, as
 in [Hüttel et al. (2023)](https://arxiv.org/abs/2301.06418) — but censoring is one-sided, so the
 observed value bounds the latent demand from below, whereas an abnormal running arrangement
-substitutes
-a different set of customers and can read either side of the normal-arrangement demand. We found no
-published model that recovers a latent normal-running-arrangement demand for a distribution
-substation.
+substitutes a different set of customers and can read either side of the normal-arrangement demand.
+We found no published model that recovers a latent normal-running-arrangement demand for a
+distribution substation.
 
 ### 6. Detecting faulty metering
 
@@ -795,9 +783,9 @@ history was stuck is worse than one that says it is degraded.
 #### What the literature says
 
 Faulty metering is usually a data-cleaning step mentioned in passing rather than a problem in its
-own right. The only public labelled dataset we found is Dutch. This network's predecessor attempted
-to recover the direction of flow from a magnitude-only meter, and its automatic version is still
-open.
+own right. The only public labelled dataset we found is Dutch. Western Power Distribution, NGED's
+predecessor, attempted to recover the direction of flow from a magnitude-only meter, and an
+automatic version of that recovery is still open.
 
 #### What this means for Flexpectation
 
@@ -813,8 +801,8 @@ sign-recovery technique addresses NGED's magnitude-only meters directly.** [Boum
 things that must be filtered out before substation measurements can be used, and detect both on the
 same residual. Three network-innovation projects in GB tackled faulty metering substantively, one of
 them as its whole subject — Electricity North West's ATLAS, UK Power Networks' Distribution Network
-Visibility, and this network's own Time Series Data Quality. None of the three reports how often its
-checks are right, and none published its labels.
+Visibility, and NGED's own Time Series Data Quality. None of the three reports how often its checks
+are right, and none published its labels.
 
 ### 7. Disaggregating unmetered solar and wind from a substation's net flow
 
@@ -836,22 +824,18 @@ and a multi-day horizon each appear in this literature, but never together.
 #### What this means for Flexpectation
 
 **No other challenge has a predecessor as close as UK Power Networks' Power Flow to Solar Capacity,
-which
-used the same method on the same kind of GB data and was delivered by Open Climate Fix, the partner
-delivering Flexpectation.** The warning is not to read
-published transfer-learning accuracy as achievable here: [Teng et al.
-(2023)](https://doi.org/10.1016/j.rser.2023.113662) are given a population of fully-metered
-substations to learn from and are told each site's capacity, whereas inferring that capacity is half
-of what NGED needs.
+which used the same method on the same kind of GB data and was delivered by Open Climate Fix, the
+partner delivering Flexpectation.** The warning is not to read published transfer-learning accuracy
+as achievable here: [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) are given a
+population of fully-metered substations to learn from and are told each site's capacity, whereas
+inferring that capacity is half of what NGED needs.
 
 **The direct predecessor of this work is running now in GB.** [UK Power Networks' Power Flow to
 Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) (2024–2026, £0.4
-million),
-which Open Climate Fix worked on, infers the capacity of unmetered solar sitting behind each primary
-substation from half-hourly substation load and weather, then forecasts that generation. Open
-Climate Fix is a partner in both Power Flow to Solar Capacity and Flexpectation, so Flexpectation
-starts from the
-Power Flow to Solar Capacity method rather than from scratch.
+million), which Open Climate Fix worked on, infers the capacity of unmetered solar sitting behind
+each primary substation from half-hourly substation load and weather, then forecasts that
+generation. Open Climate Fix is a partner in both Power Flow to Solar Capacity and Flexpectation, so
+Flexpectation starts from the Power Flow to Solar Capacity method rather than from scratch.
 
 **The nearest published method splits unmetered wind and solar out of substation measurements, but
 needs exactly what NGED lacks.** [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662)
@@ -898,30 +882,30 @@ them separately rather than letting them sit inside net demand.
 Heat pumps, chargers, and batteries are the largest gap in the review and the largest deliberate
 omission from our search. In the one study we found that measures charger forecast skill against
 aggregation, [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1), only the site
-with more than 100 charge points was significantly better than a
-naive benchmark, though some models at one much smaller site also beat it. Heat-pump diversity is
-untested in the cold weather that matters, and no diversity factor helps for domestic batteries at
-all.
+with more than 100 charge points was significantly better than a naive benchmark, though some models
+at one much smaller site also beat it. Heat-pump diversity is untested in the cold weather that
+matters, and no diversity factor helps for domestic batteries at all.
 
 #### What this means for Flexpectation
 
 **The realistic Flexpectation version 1 position is that heat pumps, chargers, and batteries stay
 inside net demand rather than being forecast separately.** The one measurement we found says a
-day-ahead charger forecast only
-clearly beat a naive benchmark above about 100 charge points, and forecast uncertainty grows with
-lead time, so at the 14 days NGED needs that threshold should be expected to be higher rather than
-the same. The first deliverable on this strand is reading the electrification literature properly,
-not a model.
+day-ahead charger forecast only clearly beat a naive benchmark above about 100 charge points, and
+forecast uncertainty grows with lead time, so at the 14 days NGED needs that threshold should be
+expected to be higher rather than the same. The first deliverable on this strand is reading the
+electrification literature properly, not a model.
 
 **Detecting heat pumps, chargers, and batteries and forecasting them are separately hard, and not in
 the order we expected.** Northern Powergrid's [smart-meter detection
 trial](https://smarter.energynetworks.org/projects/npg_nia_-49/), on 1,500 monitored premises, found
-that "EV identification at premises level was found to be relatively straightforward" and that
-"aggregation does mask some signals, although EV usage is still clearly identifiable at feeder and
-substation level". The same trial found that "the detection of ASHP [air-source heat pumps] is
-frustrated by the low levels of adoption". So the spiky, synchronised charging that makes electric
-vehicles hard to
-*forecast* is what makes them easy to *detect* in aggregate; heat pumps are the reverse.
+that "EV [electric vehicle] identification at premises level was found to be relatively
+straightforward", though "a lack of ground truth, such as registered charging points, precluded
+formal validation", and that "aggregation does mask some signals, although EV usage is still clearly
+identifiable at feeder and substation level". The same trial found that "the detection of ASHP
+[air-source heat pumps] is frustrated by the low levels of adoption (<1% of premises) and
+differences in operation (low-slow vs high-fast)". So the spiky, synchronised charging that makes
+electric vehicles hard to *forecast* is what makes them easy to *detect* in aggregate; heat pumps
+are the reverse.
 
 ## How we will know whether each of these worked
 
@@ -976,26 +960,24 @@ the leakage as an open methodological question rather than a solved one.
 
 **There is no ground truth for an effective capacity or an unmetered solar output, and the papers
 that estimate them say so.** This literature uses four substitutes for truth, each of which fails
-differently, and does not use two others. The four in use are to hold out sites that are
-metered and pretend they are not; to inject a change into real data and see whether the method
-recovers it; to compare against an independent tool rather than against truth; and to measure
-whether the estimate improves the forecast it was built to improve. The two it does not use are to
-check an estimate against physics rather than against an answer, and to meter one substation
-completely for a period and use it only as validation.
+differently, and does not use two others. The four in use are to hold out sites that are metered and
+pretend they are not; to inject a change into real data and see whether the method recovers it; to
+compare against an independent tool rather than against truth; and to measure whether the estimate
+improves the forecast it was built to improve. The two it does not use are to check an estimate
+against physics rather than against an answer, and to meter one substation completely for a period
+and use it only as validation.
 
 **Flexpectation will run all six substitutes and treat agreement between the six as the signal,
 because no one substitute is trustworthy alone.** The six substitutes are not six attempts at the
-same measurement. Every number we publish will say which of the six substitutes produced
-it.
+same measurement. Every number we publish will say which of the six substitutes produced it.
 
 **Detection needs different metrics, and the best-worked example in this review chose them
 deliberately.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score precision (the share
 of flagged events that are real), recall (the share of real events that get flagged), and an F-score
 combining the two, with β set to 1.5 rather than 1, "to give a higher importance to the recall term,
-as the
-potential impact of a false negative is higher than that of a false positive in power grid expansion
-planning". That asymmetry holds for Flexpectation too: a missed switching event silently corrupts
-the history a model trains on, whereas a false alarm costs an engineer a look.
+as the potential impact of a false negative is higher than that of a false positive in power grid
+expansion planning". That asymmetry holds for Flexpectation too: a missed switching event silently
+corrupts the history a model trains on, whereas a false alarm costs an engineer a look.
 
 **The honest headline from the one paper that measured properly is that detecting switching and
 metering faults is hard.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) report F-scores
@@ -1007,25 +989,21 @@ chart.
 
 **None of the three GB metering-fault projects named above offers a number to compare against — a
 gap we confirmed by checking each one, rather than assumed.** Publishing precision and recall
-against a stated label set, with the labels
-released, would therefore be the first time we know of that a GB network has done so, and it is the
-cheapest of this review's commitments to keep.
+against a stated label set, with the labels released, would therefore be the first time we know of
+that a GB network has done so, and it is the cheapest of this review's commitments to keep.
 
 ## What published leaderboards did, and what a single team can borrow from them
 
-**What Flexpectation is building is a
-leaderboard, not a competition, and the distinction changes which published lessons apply.** Our
-leaderboards carry our own experiments, one per class of time series. Solar farms, wind farms,
-batteries, and the demand at primary substations each get their own board, and grid and bulk supply
-points share a board because their measurements are the same kind of thing. The leaderboards will be
-public to view and reproducible, but we are not inviting other teams to submit entries. Anyone who
-wants to
-benchmark against us can rerun the setup for themselves. Not inviting outside entries means the
-published lessons about attracting entrants, prize pots, and qualifying rounds do not apply to us,
-while the lessons about
-protocol — what makes a comparison trustworthy — apply with more force, because a competition gets
-some of its integrity free from having rivals who would like to catch each other out, and we will
-not have any.
+**What Flexpectation is building is a leaderboard, not a competition, and the distinction changes
+which published lessons apply.** Our leaderboards carry our own experiments, one per class of time
+series. Solar farms, wind farms, batteries, and the demand at primary substations each get their own
+board, and grid and bulk supply points share a board because their measurements are the same kind of
+thing. The leaderboards will be public to view and reproducible, but we are not inviting other teams
+to submit entries. Anyone who wants to benchmark against us can rerun the setup for themselves. Not
+inviting outside entries means the published lessons about attracting entrants, prize pots, and
+qualifying rounds do not apply to us, while the lessons about protocol — what makes a comparison
+trustworthy — apply with more force, because a competition gets some of its integrity free from
+having rivals who would like to catch each other out, and we will not have any.
 
 **Energy forecasting has run competitions on common data for over a decade, and only one of them
 forecast at anything like the level NGED acts on.** The last row of the table is what Flexpectation
@@ -1039,7 +1017,7 @@ whether the leaderboard is still open.
 | BigDEAL Challenge 2022 ([Shukla and Hong (2024)](https://doi.org/10.1049/stg2.12162)) | The timing of peak demand rather than its size; the final match asked for the magnitude, timing, and shape of daily peak load | Three neighbouring local distribution companies — whole utilities, well above a primary substation | 78 teams from 27 countries | Closed |
 | HEFTCom ([Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)) | The combined day-ahead output of one GB wind-and-solar portfolio | One 3.6 GW portfolio: a single offshore wind farm plus a regional solar aggregate — the data closest to NGED's | Not stated in what we read | Closed; the competition period was 3 months |
 | Three competitions NGED funded with Energy Systems Catapult ([McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541)) | One-minute peaks inside half-hourly averages; the daily peak a hidden population of electric-vehicle chargers added; missing values. None was a load forecast | NGED's own grid supply point, bulk supply points, and primary-substation feeders | 37 teams, over 2,500 submissions | Closed between December 2021 and April 2022, though the pages and data are still readable on CodaLab |
-| Energy-Arena ([Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705)) | 24 challenges across prices, load, wind, and solar — 8 scored as point forecasts, 8 as quantiles, 8 as ensembles | Not a distribution network | Not stated in what we read | Standing |
+| Energy-Arena ([Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705)) | The paper describes deterministic day-ahead tasks; the running platform today carries 24 challenges across prices, load, wind, and solar — 8 scored as point forecasts, 8 as quantiles, 8 as ensembles | Not a distribution network | Not stated in what we read | Standing |
 | TS-Arena ([Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)) | 186 live energy series | Not a distribution network | 13 foundation models and 3 statistical baselines run by the platform team, plus outside entries | Standing |
 | **Flexpectation's leaderboards** | Net demand at substations, and output at metered generators | One board per class of time series | Public to view and reproducible; outside entries not invited | Standing |
 
@@ -1078,22 +1056,22 @@ on the yardstick a new model has to reach.
 
 **Our own leaderboard has this problem today, and we would rather say so than discover it later.**
 The fold that Flexpectation currently reports serves as both the model-selection set and the
-reported result, so every hyperparameter choice and feature ablation is adjudicated on the same
-12 months the leaderboard publishes. With hundreds of experiments planned, the winner's reported
-skill will be optimistically biased. The structural fix is a final-test window that no model
-selection is allowed to touch, and it is scheduled. Until it lands, three things hold: leaderboard
-numbers are selection metrics rather than estimates of future skill, differences smaller than
-fold-level noise should not drive decisions, and the number of experiments run against a fold is
-itself a statistic worth publishing beside the fold's results.
+reported result, so every hyperparameter choice and feature ablation is adjudicated on the same 12
+months the leaderboard publishes. With hundreds of experiments planned, the winner's reported skill
+will be optimistically biased. The structural fix is a final-test window that no model selection is
+allowed to touch, and it is scheduled. Until it lands, three things hold: leaderboard numbers are
+selection metrics rather than estimates of future skill, differences smaller than fold-level noise
+should not drive decisions, and the number of experiments run against a fold is itself a statistic
+worth publishing beside the fold's results.
 
 **Rankings travel better than absolute numbers do.** Where a benchmark has enough data behind it,
 the ordering of models survives a change of test set even when the accuracy level does not, and that
 decides what a leaderboard should report as its headline. [Fildes
 (2020)](https://doi.org/10.1016/j.ijforecast.2019.04.012), reviewing the M4 competition, compared
 its daily micro series against a real retail forecasting problem and found the same method scoring
-1.665% on one and 11.1% on the other. His conclusion is a direct endorsement of what Flexpectation
-is doing: "each organization needs to organize its own forecasting competition for its own
-forecasting problems, and should not rely on even large benchmark data sets", with the published
+1.665% on one and 11.1% on the other. Fildes's conclusion is a direct endorsement of what
+Flexpectation is doing: "each organization needs to organize its own forecasting competition for its
+own forecasting problems, and should not rely on even large benchmark data sets", with the published
 competition useful for narrowing "the pool of methods to be considered" rather than for predicting
 your own error. So a leaderboard should lead with ranks and with margins over a stated baseline, and
 treat an absolute skill number as valid only on the distribution it was measured on.
@@ -1128,12 +1106,12 @@ rather than avoid them.
 
 [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) added spatial statistics derived from
 gridded numerical weather prediction to their model of 14 grid supply point groups in GB. Those
-spatial statistics helped significantly in 2 of the 14 regions, hurt significantly in 3, and
-made no measurable difference in the remaining 9. Weather itself was worth a great deal to them —
-adding wind and irradiance cut their pinball loss by 40% overall, and by 60% in North Scotland
-against 10% in London — so the question is not whether weather matters but whether *finer* weather
-does. Artificial Forecasting obtained postcode-level weather forecasts for two wind-connected
-primary substations after their wind-connected models had performed poorly, and reported that the
+spatial statistics helped significantly in 2 of the 14 regions, hurt significantly in 3, and made no
+measurable difference in the remaining 9. Weather itself was worth a great deal to them — adding
+wind and irradiance cut their pinball loss by 40% overall, and by 60% in North Scotland against 10%
+in London — so the question is not whether weather matters but whether *finer* weather does.
+Artificial Forecasting obtained postcode-level weather forecasts for two wind-connected primary
+substations after their wind-connected models had performed poorly, and reported that the
 postcode-level forecasts "did not notably improve model performance", naming better weather data as
 a next step.
 
@@ -1156,11 +1134,10 @@ demand well before the mid-2010s.
 [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) tested Chronos-2, a general-purpose
 time-series model that had never seen their data, against models trained on the first 160 of their
 200 German low-voltage feeders and scored, like Chronos-2, on all 200 feeders. Chronos-2 beat every
-purpose-trained competitor on
-mean absolute error, 3.8 kW against 4.2 kW. Their purpose-trained models were not heavily
-engineered, and challenge 1 above found only a modest return to model sophistication. But a model
-given a network's whole history, beaten by a model that saw none of that history, is still important
-information about the value of any programme of heavy engineering.
+purpose-trained competitor on mean absolute error, 3.8 kW against 4.2 kW. Their purpose-trained
+models were not heavily engineered, and challenge 1 above found only a modest return to model
+sophistication. But a model given a network's whole history, beaten by a model that saw none of that
+history, is still important information about the value of any programme of heavy engineering.
 
 ## What GB networks have already built
 
@@ -1193,15 +1170,13 @@ matches what Flexpectation is building.
 
 **NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost as the
 best balance of accuracy against effort.** That choice is the same starting point Flexpectation
-uses.
-[EFFS](https://smarter.energynetworks.org/projects/wpden03/) ran from 2018 to 2021 as a Network
-Innovation Competition project costing £3.3 million, and its forecasts carried no uncertainty at
-all. Adding that uncertainty is the step this project adds. [UK Power Networks' Power Flow to Solar
-Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) is the direct predecessor
-of Flexpectation's unmetered-solar work, and Open Climate Fix is a partner in both projects, so
-Flexpectation starts from the Power Flow to Solar Capacity method rather than from scratch.
+uses. [EFFS](https://smarter.energynetworks.org/projects/wpden03/) ran from 2018 to 2021 as a
+Network Innovation Competition project costing £3.3 million, and its forecasts carried no
+uncertainty at all. Adding that uncertainty is the step this project adds. [UK Power Networks' Power
+Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) is the direct
+predecessor of Flexpectation's unmetered-solar work, as challenge 7 above sets out.
 
-**Two deployments outside GB belong alongside the nine GB projects above.**
+**Two of the nine projects in the table are outside GB.**
 [OpenSTEF](https://lfenergy.org/projects/openstef/) is the only operational network forecasting
 system in this review whose code can be read rather than inferred from a deliverable.
 
@@ -1229,9 +1204,11 @@ end to end.
 Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) is an Ofgem Strategic
 Innovation Fund programme, with about £3.9 million of grant across its three phases, run by Northern
 Powergrid with Faculty, EV.energy, and Oaktree Power, the final Beta phase running to February 2027.
-Artificial Forecasting does much of what Flexpectation does at primary substations, and also covers
-secondary substations, which Flexpectation does not. At the time of writing, Artificial Forecasting
-is further ahead than Flexpectation.
+The Beta deliverables that the rest of this section draws on sit under a [separate project
+registration](https://smarter.energynetworks.org/projects/10145998/) from the Alpha ones. Artificial
+Forecasting does much of what Flexpectation does at primary substations, and also covers secondary
+substations, which Flexpectation does not. At the time of writing, Artificial Forecasting is further
+ahead than Flexpectation.
 
 **Artificial Forecasting has run operationally through a full winter flexibility procurement
 cycle.** A forecasting service for primary substations is deployed and has passed the network's
@@ -1254,21 +1231,20 @@ assumptions behind the value case, which "remains appropriate, subject to furthe
 **Artificial Forecasting is independent evidence that short-term substation forecasting is
 operationally useful**, that networks will change their procurement process around such a forecast,
 and that a benefits case has been made and accepted. Because Artificial Forecasting is public,
-operational, and
-benchmarked against a real incumbent method, Artificial Forecasting is also the clearest available
-example of what "working" looks like.
-Artificial Forecasting's core intellectual property is to be made available royalty-free to other GB
-networks, and we would rather build on that intellectual property than rebuild it — a shared
-evaluation protocol between two GB networks would be worth more to both than two separate protocols.
+operational, and benchmarked against a real incumbent method, Artificial Forecasting is also the
+clearest available example of what "working" looks like. Artificial Forecasting's core intellectual
+property is to be made available royalty-free to other GB networks, and we would rather build on
+that intellectual property than rebuild it — a shared evaluation protocol between two GB networks
+would be worth more to both than two separate protocols.
 
 ## Why we think this ambitious plan can be done
 
 **Measured against the studies we found, the plan sits outside the published literature in five ways
 at once.** That gap says more about where our search fell short than about the quality of the work
-that fills the rest of the field. No study in this review drives a substation forecast
-from a weather ensemble across a 14-day horizon. None models the upper tail explicitly at substation
-level; the one study that models it explicitly at all works on regions far larger than a substation.
-None puts unmetered generation inside a probabilistic forecast at substation level over a multi-day
+that fills the rest of the field. No study in this review drives a substation forecast from a
+weather ensemble across a 14-day horizon. None models the upper tail explicitly at substation level;
+the one study that models it explicitly at all works on regions far larger than a substation. None
+puts unmetered generation inside a probabilistic forecast at substation level over a multi-day
 horizon, though unmetered generation, probabilistic forecasting at substation level, and a multi-day
 horizon each exist on their own. None tracks the available capacity of a mixed fleet of solar, wind,
 and dispatchable generators at one distribution network, or measures whether doing so improves the
@@ -1295,8 +1271,7 @@ strands. Sizing the four strands as separate studies scopes the work rather than
 
 **Only the first of those four strands — the heavily-tuned gradient-boosting model — is in scope for
 Flexpectation version 1.** The other three strands belong to the network-wide scale-up from 2027, as
-does the
-disaggregation of unmetered generation.
+does the disaggregation of unmetered generation.
 
 **The main reason for attempting all eight at once is that they may be one challenge rather than
 eight.** A switching event, a turbine out for repair, and a stuck meter all surface in the same
@@ -1318,15 +1293,14 @@ this review makes.
 
 **Several of the four model families will not work.** Expecting that failure is what makes the four
 families research directions rather than engineering tasks. The honest expectation is that some
-deliver clearly, some produce a
-negative result worth publishing, and some are abandoned. Both NGED and this project count a
-negative result as an outcome: evidence that switching cannot be recovered from power data alone,
-for instance, would be worth having, because it would justify extracting switching labels from
-operational systems instead of continuing to look.
+deliver clearly, some produce a negative result worth publishing, and some are abandoned. Both NGED
+and this project count a negative result as an outcome: evidence that switching cannot be recovered
+from power data alone, for instance, would be worth having, because it would justify extracting
+switching labels from operational systems instead of continuing to look.
 
 ## References
 
-Every source cited above, in alphabetical order by first author. The full review cites 38 further
+Every source cited above, in alphabetical order by first author. The full review cites 37 further
 sources that this summary does not.
 
 - Bian, Y., Zheng, N., Zheng, Y., Xu, B. and Shi, Y. (2024). [Predicting Strategic Energy Storage
@@ -1455,6 +1429,8 @@ score](https://doi.org/10.1063/5.0300682). *Journal of Renewable and Sustainable
 phase](https://smarter.energynetworks.org/projects/npg_sif_006-1/).
 - Northern Powergrid (2024). [Detecting LCTs from Smart Meter Consumption
 Data](https://smarter.energynetworks.org/projects/npg_nia_-49/).
+- Northern Powergrid (2025). [Artificial Forecasting, Beta
+phase](https://smarter.energynetworks.org/projects/10145998/).
 - Ostermann, A. and Haug, T. (2024). [Probabilistic forecast of electric vehicle charging demand:
 analysis of different aggregation levels and energy
 procurement](https://doi.org/10.1186/s42162-024-00319-1). *Energy Informatics*.
