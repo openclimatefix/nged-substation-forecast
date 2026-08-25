@@ -2105,17 +2105,17 @@ rather than no response.
 
 **Four of Flexpectation's eight challenges have no counterpart we could find in that material:**
 tracking the effective capacity of metered generators; forecasting a substation as if it were always
-in its normal running arrangement, rather than dropping the periods when it was not; and inferring
-unmetered generation from a substation's net flow, solar and wind first and then heat pumps,
-chargers, and batteries. Across every Artificial Forecasting deliverable published on the Smarter
-Networks Portal — Discovery, Alpha, and Beta, save one file that holds a single blank page —
-"abnormal", "unmetered", "blind source" and "source separation" return nothing at all; "capacity"
-appears 180 times but never as an effective or derated capacity; and the seven occurrences of a
-"switch" stem are generators switching off, switchgear asset types, and switching over a data feed.
-Heat pumps and electric vehicles do appear, as drivers of demand growth and as model features rather
-than as quantities separated out of a net flow. Flexpectation also delivers 1st and 99th percentiles
-where Artificial Forecasting's published bands run from the 5th to the 95th, and the curtailment
-decisions NGED describes turn on those outer levels.
+in its normal running arrangement, rather than dropping the periods when it was not; inferring
+unmetered solar and wind from a substation's net flow; and doing the same for heat pumps, chargers,
+and batteries. Across every Artificial Forecasting deliverable published on the Smarter Networks
+Portal — Discovery, Alpha, and Beta, save one file that holds a single blank page — "abnormal",
+"unmetered", "blind source" and "source separation" return nothing at all; "capacity" appears 180
+times but never as an effective or derated capacity; and the seven occurrences of a "switch" stem
+are generators switching off, switchgear asset types, and switching over a data feed. Heat pumps and
+electric vehicles do appear, as drivers of demand growth and as model features rather than as
+quantities separated out of a net flow. Flexpectation also delivers 1st and 99th percentiles where
+Artificial Forecasting's published bands run from the 5th to the 95th, and the curtailment decisions
+NGED describes turn on those outer levels.
 
 ## Set against this literature, what we plan is ambitious, and here is why we think it can be done
 
