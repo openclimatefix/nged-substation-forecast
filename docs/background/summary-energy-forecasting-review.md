@@ -260,23 +260,30 @@ strong result, and we found nobody aggregating building thermal physics up to a 
 putting it inside a probabilistic forecast, though the ingredients exist separately.
 
 **The case for pre-training an encoder rests on results from computer vision and Earth observation
-rather than from energy forecasting.** [Siméoni et al. (2025)](https://arxiv.org/abs/2508.10104)
-describe DINOv3, a 7-billion-parameter vision model trained on unlabelled images. Siméoni et al.
-keep DINOv3 frozen throughout their evaluation and read every task off its representations,
-reporting that fine-tuning "is not necessary to obtain strong performance" on tasks as different as
-segmentation, depth estimation, and object detection. [Brown et al.
-(2025)](https://arxiv.org/abs/2507.22291) describe AlphaEarth Foundations, which encodes satellite
-and other Earth-observation data into one 64-byte embedding per 10-metre cell per year, and report
-that the embeddings cut error magnitude by about 24% on average against a representative sample of
-other featurisation methods, across a broad set of sparse-data mapping evaluations, without
-re-training on any of them.
+rather than from energy forecasting.** The idea is to train one model on a very large body of data
+until the model can turn a raw input into a compact numerical summary that keeps what matters and
+throws the rest away, and then to freeze that model so it never changes again. Every later job reads
+the frozen summary instead of the raw input, including jobs nobody had in mind while the model was
+training, and each job needs only a small model of its own and a modest amount of its own data. The
+expensive learning happens once and is then shared, instead of being repeated from scratch by every
+model that needs it.
 
-**What transfers to Flexpectation is the arrangement rather than the numbers.** One encoder is
-trained once on a large dataset, frozen, and read by a small model for each downstream task. The
-breadth matters as much as the freezing: DINOv3 and AlphaEarth Foundations are each a single encoder
-serving many different tasks rather than one encoder per task, and that is what Flexpectation plans
-for its own weather encoder — the same frozen representation feeding the substation net-demand
-forecast, the metered-generator forecasts, and the disaggregation of unmetered generation.
+**Two recent models show how well the arrangement works.** [Siméoni et al.
+(2025)](https://arxiv.org/abs/2508.10104) describe DINOv3, a 7-billion-parameter vision model
+trained on unlabelled images. Siméoni et al. keep DINOv3 frozen throughout their evaluation and read
+every task off its representations, reporting that fine-tuning "is not necessary to obtain strong
+performance" on tasks as different as segmentation, depth estimation, and object detection. [Brown
+et al. (2025)](https://arxiv.org/abs/2507.22291) describe AlphaEarth Foundations, which encodes
+satellite and other Earth-observation data into one 64-byte embedding per 10-metre cell per year,
+and report that the embeddings cut error magnitude by about 24% on average against a representative
+sample of other featurisation methods, across a broad set of sparse-data mapping evaluations,
+without re-training on any of them.
+
+**What transfers to Flexpectation is the arrangement rather than the numbers.** The breadth matters
+as much as the freezing: DINOv3 and AlphaEarth Foundations are each a single encoder serving many
+different tasks rather than one encoder per task, and that is what Flexpectation plans for its own
+weather encoder — the same frozen representation feeding the substation net-demand forecast, the
+metered-generator forecasts, and the disaggregation of unmetered generation.
 
 **Neither result promises that a pre-trained encoder beats hand-designed features.** Brown et al.
 report that learned featurisations "don't always outperform designed featurization methods in
