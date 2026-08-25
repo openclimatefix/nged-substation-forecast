@@ -103,9 +103,11 @@ capacity?" rather than "what is the most likely net demand?". Two costs hang on 
 rates the second at least as highly as the first: what NGED spends procuring flexibility to hold
 demand under the limit, and what curtailing embedded generators costs to hold export under it. Both
 costs sit in the tails of the forecast distribution rather than at its centre, so both are bought by
-the same thing — extreme quantiles that are calibrated, at both ends. Forecasting net demand is the
-highest priority of the eight challenges, and the other seven exist mainly to improve our net-demand
-forecast.
+the same thing — extreme quantiles that are calibrated, at both ends. A quantile is a level the
+forecast says net demand will stay below a stated fraction of the time, and a calibrated quantile is
+one the outturn crosses exactly that often: the level given as the 99th percentile is exceeded 1
+time in 100, no more and no less. Forecasting net demand is the highest priority of the eight
+challenges, and the other seven exist mainly to improve our net-demand forecast.
 
 #### What the literature says
 
@@ -122,9 +124,9 @@ method carries from one network to another.
 | Source | What they forecast | Level and scale | Horizon | Result, and what it was compared against | Weather |
 |---|---|---|---|---|---|
 | [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) | Net load, Germany | 200 low-voltage feeders | 4 days | A general-purpose foundation model that had never seen the data beat every purpose-trained model on average error, 3.8 kW against 4.2 kW | 1–3 h forecasts, so effectively after the fact at the 4-day horizon |
-| [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) | Load, Germany and Portugal | Transmission, plus 200 low-voltage feeders and 287 individual customers | 4 days | Best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage feeders, 23.3% at individual customers | 1–3 h forecasts at the feeders, reanalysis elsewhere |
+| [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) | Load, Germany and Portugal | Transmission, plus 200 low-voltage feeders and 287 individual customers | 4 days | Best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage feeders, 23.3% at individual customers | 1–3 h forecasts at the feeders, reanalysis (a modelled reconstruction of past weather) elsewhere |
 | [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) | Regional net load, GB | Regional: 14 grid supply point groups | Day-ahead | Held the same risk with **up to 24.6% less upward reserve** than a fixed-tail alternative, falling to 3.2% at the least extreme risk level tested | Real forecasts |
-| [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) | Load, Portugal | 96,989 secondary substations | Day-ahead | 42–47% better than the reference benchmark at system level. **At substation level, beat a naive forecast on 83–87% of network-owned and 66–70% of customer-owned sites** (the paper reports two different pairs of figures for that statistic, and the ranges span both)  | Real forecasts, 7–8 h old |
+| [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) | Load, Portugal | 96,989 secondary substations | Day-ahead | 42–47% better than the reference benchmark at system level. **At substation level, beat a naive forecast on 83–87% of network-owned and 66–70% of customer-owned sites** (the paper's body text and the caption of a figure on the next page give different pairs of numbers for that statistic, so the ranges span both)  | Real forecasts, 7–8 h old |
 | [Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) | Load, GB | 4 levels: primary substation down to household | Day-ahead | Combining forecasts gained **0.0–0.4% averaged over all periods**, but **5.7–9.0% when restricted to peaks** | None at all |
 | [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | 13 primary substations, plus their bulk supply points and their 33 kV and 11 kV feeders | 30 minutes to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted  | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
 | [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondary substations | Day-ahead to week-ahead at primary, evaluated to 11 days; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method  | Real forecasts at primary; none in the published secondary results |
@@ -134,11 +136,13 @@ method carries from one network to another.
 #### What this means for Flexpectation
 
 **Building Flexpectation version 1 on a gradient-boosted tree (GBT, such as XGBoost) is defensible,
-but the literature paints GBTs as a sensible default rather than a proven winner**. [NGED's own 2021
-EFFS project (Electricity Flexibility and Forecasting
-System)](https://smarter.energynetworks.org/projects/wpden03/) picked XGBoost on the balance of
-accuracy against effort, and no study we read shows a large, dependable margin for anything more
-sophisticated than XGBoost at substation level.
+but the literature paints GBTs as a sensible default rather than a proven winner**. A GBT builds its
+forecast from hundreds of small decision trees, each one fitted to the error the trees before it
+left behind. [NGED's own 2021 EFFS project (Electricity Flexibility and Forecasting
+System)](https://smarter.energynetworks.org/projects/wpden03/) picked XGBoost, which gave the best
+results of the three methods the project tested and was also the easiest to automate, and no study
+we read shows a large, dependable margin for anything more sophisticated than XGBoost at substation
+level.
 
 **Both network deployments that actually tried boosted trees kept a simpler model instead.**
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493), running a live system
@@ -157,7 +161,8 @@ gradient-boosted machine's 95th percentile forecast corresponded to the 80th per
 measured data, while a structured state space model and a linear quantile model both tracked the
 ideal calibration line closely. [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) make the
 same point from the other end of the sophistication scale, because their purpose-built Transformer
-variant lost to a standard encoder-decoder Transformer on all three of their datasets.
+variant — the neural-network architecture, not the electrical kind — lost to a standard
+encoder-decoder Transformer on all three of their datasets.
 
 **What did help was refitting the model every month rather than redesigning it.** On both datasets
 where [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) tried refitting, the retrained model
@@ -243,10 +248,11 @@ when embedded generation is high and demand is low.
 
 **All the text above is a verdict on Flexpectation version 1.** The three more sophisticated ML
 model families we plan to research in 2027 — pre-trained encoders, connectivity-map models, and
-differentiable physics — are planned to *simultaneously* disaggregate *unmetered* generators, infer
-switching state and demand together, which the pipelines of separate models in this literature
-cannot do. The closing section of this summary sets out the case for the work we plan in
-Flexpectation version 2.
+differentiable physics (building the known behaviour of a solar panel, a wind turbine, or a building
+into the model, so the model has to learn only what the physics cannot supply) — are planned to
+*simultaneously* disaggregate *unmetered* generators, infer switching state and demand together,
+which the pipelines of separate models in this literature cannot do. The closing section of this
+summary sets out the case for the work we plan in Flexpectation version 2.
 
 **The evidence behind those three ML model families is uneven.**
 
@@ -367,11 +373,11 @@ combining the two forecasts. And [Browell et al.
 remain competitive for day-ahead wind and solar forecasting, with performance depending heavily on
 implementation. NGED's own EFFS project selected XGBoost when it evaluated model families.
 
-**Two results cut the other way, though neither is an argument against trees.** The first is team
-Rnt, who finished third in HEFTCom's forecasting track using no tree-based model at all, feeding
-embeddings from machine-learned weather-forecasting models they built in-house into downstream
-neural networks that predicted wind and solar generation — a route that rests on building and
-running a weather model, not on a different downstream model family.
+**One result cuts the other way, though team Rnt's route is not an argument against trees.** Rnt
+finished third in HEFTCom's forecasting track using no tree-based model at all, feeding embeddings
+from machine-learned weather-forecasting models they built in-house into downstream neural networks
+that predicted wind and solar generation — a route that rests on building and running a weather
+model, not on a different downstream model family.
 
 **The largest meta-analysis of solar forecasting we found puts individual machine-learning models
 level with classic statistical ones at the range NGED acts on, and only combinations ahead.**
@@ -380,7 +386,8 @@ extracted from 188 solar forecasting papers, fitting a separate regression for e
 Their baseline class is classic statistical time-series models — the autoregressive integrated
 moving average (ARIMA) family, exponential smoothing (ETS, for error, trend, and seasonality), and
 multivariate relatives such as autoregressive models with exogenous inputs (ARX) — and every figure
-in the table is percentage points of skill score against that baseline.
+in the table is percentage points of skill score against that baseline. In that table "ensemble"
+means a combination of forecasting models, not a weather ensemble.
 
 | Model class | Intra-hour (up to 1 hour) | Intra-day (1 to 6 hours) | Day-ahead (over 6 hours) |
 |---|---|---|---|
@@ -561,9 +568,10 @@ quantifying capacity after a new wind farm connects.
 
 **The 27.2% is scored by their monotonic variant, which assumes capacity only ever rises.** They
 publish a non-monotonic variant alongside it, which can follow capacity down when a turbine goes out
-for repair, and that is the version NGED needs. On this test the non-monotonic variant is 31% worse.
-But the test only ever adds capacity: it simulates a new wind farm connecting, so it measures how
-well each variant spots a step *up*, and says nothing about how either handles a step down.
+for repair, and that is the version NGED needs. On this test the monotonic variant's error is 31%
+below the non-monotonic variant's. But the test only ever adds capacity: it simulates a new wind
+farm connecting, so it measures how well each variant spots a step *up*, and says nothing about how
+either handles a step down.
 
 **Downstream the ranking reverses.** The non-monotonic variant produced the lowest day-ahead
 forecast error, **2.0% below** a model normalised by the running maximum across Sweden as a whole,
@@ -711,12 +719,13 @@ status", while linear regression "is a little less accurate but is very flexible
 deviations from the switching status".
 
 **Ruhhütl et al. also clean "major deviations of the normal switching status" out of the training
-data before fitting, which is the rewrite-the-history response applied to the training set rather
-than to the forecast.** Neither the size of the accuracy sacrifice nor the size of the switching
-failure is quantified, so the paper shows that an operator traded accuracy for switching robustness
-without saying what the trade cost. We found one substation study that conditions its forecast on an
-operating-state label, for a switch of a different kind, and none that both hands a model the record
-of when the network was abnormal and refuses to let the model predict those periods.
+data before fitting, which removes those periods from the training set rather than correcting them
+to what the normal arrangement would have carried.** Neither the size of the accuracy sacrifice nor
+the size of the switching failure is quantified, so the paper shows that an operator traded accuracy
+for switching robustness without saying what the trade cost. We found one substation study that
+conditions its forecast on an operating-state label, for a switch of a different kind, and none that
+both hands a model the record of when the network was abnormal and refuses to let the model predict
+those periods.
 
 #### What this means for Flexpectation
 
@@ -957,10 +966,11 @@ future of its test data, with one exception, and the training window usually gro
 slides, and one length rule is worth adopting outright.** [Pinheiro et al.
 (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) held out the whole of 2019 and note that
 "one year is the minimum acceptable to test a forecasting model whose target value shows annual
-seasonality". Substation load shows exactly that seasonality, so any fold shorter than a year cannot
-tell us whether a model handles both ends of the year, and NGED needs both: winter is when NGED buys
-flexibility, and summer, when embedded solar output is highest against the lowest demand, is when
-export constraints bind and generators are curtailed.
+seasonality". Substation load shows exactly that seasonality, so any cross-validation fold — one
+train-then-test slice of the history — shorter than a year cannot tell us whether a model handles
+both ends of the year, and NGED needs both: winter is when NGED buys flexibility, and summer, when
+embedded solar output is highest against the lowest demand, is when export constraints bind and
+generators are curtailed.
 
 **Not one of the papers we read addresses the leakage a frequently reissued forecast creates, and
 Flexpectation is the most exposed design of the lot.** When a forecast covering 14 days is reissued
@@ -1060,11 +1070,12 @@ TS-Arena imposes on itself.
 
 **Run two baselines that bracket the answer, not one.** [Doubleday et al.
 (2020)](https://doi.org/10.1016/j.solener.2020.05.051) distinguish the two jobs a benchmark does: a
-yardstick, which need not be a good forecast, and a point on the yardstick, which "should be close
-to the state of the art". They recommend carrying both, so that a new method can be positioned
-between them rather than merely declared better than something. That is the shape our leaderboards
-take: persistence and climatology as the naive yardstick, and NGED's incumbent method as the point
-on the yardstick a new model has to reach.
+yardstick, which need not be a good forecast, and what they call a point on the yardstick — a target
+for a new method to beat, which "should be close to the state of the art". They recommend carrying
+both, so that a new method can be positioned between them rather than merely declared better than
+something. That is the shape our leaderboards take: persistence (tomorrow resembles a comparable
+recent day) and climatology (tomorrow resembles the historical average for the time of year) as the
+naive yardstick, and NGED's incumbent method as the point on the yardstick a new model has to reach.
 
 **Our own leaderboard has this problem today, and we would rather say so than discover it later.**
 The fold that Flexpectation currently reports serves as both the model-selection set and the
@@ -1180,13 +1191,19 @@ deterministic forecast was all it had, whereas NGED acts out to 14. And TRANSITI
 13-substation trial rather than a network-wide deployment. Everything else about TRANSITION's design
 matches what Flexpectation is building.
 
-**NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost as the
-best balance of accuracy against effort.** That choice is the same starting point Flexpectation
-uses. [EFFS](https://smarter.energynetworks.org/projects/wpden03/) ran from 2018 to 2021 as a
-Network Innovation Competition project costing £3.3 million, and its forecasts carried no
-uncertainty at all. Adding that uncertainty is the step this project adds. [UK Power Networks' Power
-Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) is the direct
-predecessor of Flexpectation's unmetered-solar work, as challenge 7 above sets out.
+**NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost, which
+won on accuracy and was also the easiest to automate.** The project compared XGBoost against a long
+short-term memory (LSTM) neural network and against ARIMA, and its evaluation report says XGBoost
+"provided the best results of the three methods tested, closely followed by LSTM", recommending
+XGBoost because it also allows simplified testing of features and can be easily automated. The
+report caveats that the LSTM could not be fully explored for want of graphics processing units, and
+expects that more testing would have brought the LSTM level with XGBoost rather than past it. That
+choice is the same starting point Flexpectation uses.
+[EFFS](https://smarter.energynetworks.org/projects/wpden03/) ran from 2018 to 2021 as a Network
+Innovation Competition project costing £3.3 million, and its forecasts carried no uncertainty at
+all. Adding that uncertainty is the step this project adds. [UK Power Networks' Power Flow to Solar
+Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) is the direct predecessor of
+Flexpectation's unmetered-solar work, as challenge 7 above sets out.
 
 **Two of the nine projects in the table are outside GB.**
 [OpenSTEF](https://lfenergy.org/projects/openstef/) is the only operational network forecasting
@@ -1202,13 +1219,13 @@ a decade.
 
 **Fitting a model to each transformer beat the method Enedis runs in production, which shares one
 substation forecast out across its transformers by fixed coefficients.** The per-transformer models
-scored 6.0% against 9.3% mean absolute percentage error on the day those coefficients were
-refreshed, and 8.1% against 13.0% across the whole test period, counting only the transformers whose
-coefficients then moved by less than 2.5%, with 84% of transformers better under their own model.
-Cordier et al. chose both comparisons deliberately, as the cases where the fixed-coefficient method
-is "the most relevant and the most difficult to outperform". Cordier et al. do not say what their
-percentage error is normalised by, and report that the complete pipeline has not yet been evaluated
-end to end.
+scored 6.0% mean absolute percentage error against 9.3% on the day those coefficients were
+refreshed, and 8.1% against 13.0% across the whole test period. That second comparison counts only
+the transformers whose coefficient then moved by less than 2.5%, and on that comparison 84% of
+transformers were more accurate under their own model. Cordier et al. chose both comparisons
+deliberately, as the cases where the fixed-coefficient method is "the most relevant and the most
+difficult to outperform". Cordier et al. do not say what their percentage error is normalised by,
+and report that the complete pipeline has not yet been evaluated end to end.
 
 ### Northern Powergrid's Artificial Forecasting is further ahead than Flexpectation
 

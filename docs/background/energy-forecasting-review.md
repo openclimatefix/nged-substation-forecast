@@ -434,14 +434,14 @@ gradient-boosted trees remain competitive for day-ahead wind and solar forecasti
 depending heavily on implementation. NGED's own forecasting system, EFFS, independently selected
 XGBoost when it evaluated model families.
 
-**Two results cut the other way, though neither is an argument against trees.** The first is team
-Rnt, who finished third in HEFTCom's forecasting track using no tree-based model at all, feeding
-embeddings from machine-learned weather-forecasting models they built in-house — a published
-deep-learning weather model extended to add solar irradiance and day-ahead lead times, driven by
-station observations, radar, satellite imagery, and numerical-weather-prediction analysis — into
-downstream neural networks that predicted wind and solar generation. Rnt's route therefore rests on
-building and running a machine-learned weather model, which is a far larger undertaking than
-swapping one downstream model family for another.
+**One result cuts the other way, though team Rnt's route is not an argument against trees.** Rnt
+finished third in HEFTCom's forecasting track using no tree-based model at all, feeding embeddings
+from machine-learned weather-forecasting models they built in-house — a published deep-learning
+weather model extended to add solar irradiance and day-ahead lead times, driven by station
+observations, radar, satellite imagery, and numerical-weather-prediction analysis — into downstream
+neural networks that predicted wind and solar generation. Rnt's route therefore rests on building
+and running a machine-learned weather model, which is a far larger undertaking than swapping one
+downstream model family for another.
 
 **The largest meta-analysis of solar forecasting we found puts individual machine-learning models
 level with classic statistical ones at the range NGED acts on, and only combinations ahead.**
@@ -720,11 +720,11 @@ better to 0.6% worse.
 
 **Which variant produced which figure matters to NGED, and the two point opposite ways.** The 27.2%
 capacity figure is scored by the monotonic variant, the one that still assumes capacity only rises,
-and their non-monotonic variant — which can track capacity downwards, as NGED needs — comes out 31%
-worse on that capacity test. The 2.0% forecast figure belongs to the simplified non-monotonic
-parameterisation instead, and the authors conclude that "normalization using the non-monotonic
-parameterization yields the best forecasts, possibly because it captures real changes in available
-capacity".
+and on that same test the monotonic variant's error is 31% below that of their non-monotonic variant
+— the variant that can track capacity downwards, as NGED needs. The 2.0% forecast figure belongs to
+the simplified non-monotonic parameterisation instead, and the authors conclude that "normalization
+using the non-monotonic parameterization yields the best forecasts, possibly because it captures
+real changes in available capacity".
 
 **Viotti et al.'s target throughout is a Swedish bidding zone or the whole Swedish market area
 rather than an individual farm.** They report that at 5-minute per-farm resolution the running
@@ -969,12 +969,13 @@ regression "is a little less accurate but is very flexible in terms of deviation
 status".
 
 **Ruhhütl et al. also clean "major deviations of the normal switching status" out of the training
-data before fitting, which is the rewrite-the-history response applied to the training set rather
-than to the forecast.** Neither the size of the accuracy sacrifice nor the size of the switching
-failure is quantified, so the paper shows that an operator traded accuracy for switching robustness
-without saying what the trade cost. We found one substation study that conditions its forecast on an
-operating-state label, for a switch of a different kind, and none that both hands a model the record
-of when the network was abnormal and refuses to let the model predict those periods.
+data before fitting, which removes those periods from the training set rather than correcting them
+to what the normal arrangement would have carried.** Neither the size of the accuracy sacrifice nor
+the size of the switching failure is quantified, so the paper shows that an operator traded accuracy
+for switching robustness without saying what the trade cost. We found one substation study that
+conditions its forecast on an operating-state label, for a switch of a different kind, and none that
+both hands a model the record of when the network was abnormal and refuses to let the model predict
+those periods.
 
 **The challenge.** NGED plan the network against what each substation would carry under its normal
 running arrangement, so that is what the forecast has to predict — including for a substation that
@@ -1976,8 +1977,14 @@ only the first four days, so from day four to day ten a single deterministic for
 had, whereas NGED acts out to fourteen. And TRANSITION was a 13-substation trial rather than a
 network-wide deployment. Everything else in its design is the shape Flexpectation is building.
 
-**NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost** as the
-best balance of accuracy against effort, which is the same starting point Flexpectation uses.
+**NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost, which
+won on accuracy and was also the easiest to automate.** The project compared XGBoost against a long
+short-term memory (LSTM) neural network and against ARIMA, and its evaluation report says XGBoost
+"provided the best results of the three methods tested, closely followed by LSTM", recommending
+XGBoost because it also allows simplified testing of features and can be easily automated. The
+report caveats that the LSTM could not be fully explored for want of graphics processing units, and
+expects that more testing would have brought the LSTM level with XGBoost rather than past it. That
+choice is the same starting point Flexpectation uses.
 [EFFS](https://smarter.energynetworks.org/projects/wpden03/) ran from 2018 to 2021 as a Network
 Innovation Competition project with £3,338,896 of expenditure, and fed automated constraint
 identification. Its forecasts carried no uncertainty at all, which is the step this project adds.
@@ -2024,11 +2031,12 @@ about the engineering.
 
 **Fitting a model to each transformer beat the method Enedis runs in production, which shares one
 substation forecast out across its transformers by fixed coefficients.** The per-transformer models
-scored 6.0% against 9.3% mean absolute percentage error on the day those coefficients were
-refreshed, and 8.1% against 13.0% across the whole test period, counting only the transformers whose
-coefficients then moved by less than 2.5%, with 84% of transformers better under their own model.
-Cordier et al. chose both comparisons deliberately, as the cases where the fixed-coefficient method
-is "the most relevant and the most difficult to outperform".
+scored 6.0% mean absolute percentage error against 9.3% on the day those coefficients were
+refreshed, and 8.1% against 13.0% across the whole test period. That second comparison counts only
+the transformers whose coefficient then moved by less than 2.5%, and on that comparison 84% of
+transformers were more accurate under their own model. Cordier et al. chose both comparisons
+deliberately, as the cases where the fixed-coefficient method is "the most relevant and the most
+difficult to outperform".
 
 **Three things temper that result.** Cordier et al. do not say what their percentage error is
 normalised by. The medium-to-low-voltage step was tested on about 100 substations using measured
