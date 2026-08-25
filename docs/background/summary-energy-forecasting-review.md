@@ -14,7 +14,8 @@ Energy forecasting papers measure performance in different ways against differen
 literature cannot rank the approaches it contains — like an international football tournament where
 every team plays by different rules, with different size goals. Energy forecasting researchers have
 done great work over the years, and the lack of comparability is nobody's fault: it's a systemic
-failure, the industry is already aware of it, and people are trying to fix it.
+failure, the industry is already aware of it, and people are trying to fix it. We review several
+substantial efforts to compare forecasting approaches fairly.
 
 **What the literature *does* show is that the machine learning approach Flexpectation version 1 uses
 — a gradient-boosted tree — is a sensible place to start.** The literature provides no conclusive
@@ -22,10 +23,16 @@ evidence that anything more sophisticated buys a large, dependable improvement o
 gradient-boosted tree at substation level. NGED's own Electricity Flexibility and Forecasting System
 reached the same choice independently in 2021.
 
-**Flexpectation is ambitious. Several aspects of Flexpectation have no precedent in the literature
-we reviewed.** For example, we found no papers driving a probabilistic substation forecast from a
-weather ensemble across a 14-day horizon, none modelling the tails explicitly at substation level,
-and none explicitly modelling unmetered generation inside such a forecast.
+**In terms of machine learning research, Flexpectation is ambitious.** Several aspects of
+Flexpectation have no precedent in the literature we reviewed. For example, we found no papers
+driving a probabilistic substation forecast from a weather ensemble across a 14-day horizon, none
+modelling the tails of the distribution explicitly at substation level, none aggregating building
+thermal physics up to a substation and putting that physics inside a probabilistic forecast, and
+none reading a substation forecast off a pre-trained weather encoder. That said, we are confident
+this ambition is justified because it allows us to build an ML model that can reason simultaneously
+about the various causes of variation in substation demand. And we are confident we can deliver on
+this ambitious vision because we have already built the foundations of an MLOps framework that will
+allow us to run ML experiments efficiently.
 
 **Northern Powergrid's Artificial Forecasting project is further ahead than Flexpectation. But four
 of the eight challenges in Flexpectation have no counterpart we could find in Artificial
@@ -39,6 +46,21 @@ goal — doing the same for heat pumps, chargers, and batteries.
 **The value NGED gets from the forecast sits in both tails of the distribution**: the upper tail,
 where flexibility procurement holds demand under a limit, and the lower tail, where curtailment
 holds export under that same limit.
+
+**The literature holds a wealth of knowledge on measuring the performance of power forecasts, and
+several traps to avoid.** Mean absolute error rewards flat forecasts that are of little use for
+either flexibility or curtailment decisions: a peak predicted an hour late is penalised twice, once
+for the peak that did not happen and once for the peak that was missed, and a featureless forecast
+avoids both penalties. Two teams reached that conclusion independently, and both went on to score
+the peaks separately. Ranking well on one measure also says little about the others: across 200
+German low-voltage feeders, the two models that came first and second on the peaks in an
+overload-decision metric stated their own uncertainty badly, their 90% ranges containing the true
+value less than half the time at exactly those peaks.
+
+**Three published results point against parts of Flexpectation's plan, and we intend to test all
+three rather than avoid them**. Finer-grained weather has not always improved performance; weather
+data have improved performance less than expected at low voltage in the past; and a pre-trained ML
+model trained on none of NGED's data may match models trained on all of it.
 
 **Whilst the literature we found does not tell us exactly which algorithms provide the best
 forecasting performance, the literature *is* clear on how to *research and develop* a state of the
