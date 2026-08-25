@@ -9,28 +9,27 @@ and is referred to below as "the full review".
 
 ## Executive summary
 
-**No published work matches what Flexpectation is being asked to build, and no honest review of this
-literature can name a canonical state of the art.** Energy forecasting papers measure performance in
-different ways against different datasets, so the literature cannot rank the approaches it contains.
-What it does show is that a gradient-boosted tree is the sensible place to start — the choice NGED's
-own Electricity Flexibility and Forecasting System reached independently in 2021 — while giving no
-evidence of a large, dependable margin for anything more sophisticated at substation level. We found
-no study driving a probabilistic substation forecast from a weather ensemble across a 14-day
-horizon, none modelling the tails explicitly at substation level, and none putting unmetered
-generation inside such a forecast.
+**No honest review of this literature can name a canonical state of the art.** Energy forecasting
+papers measure performance in different ways against different datasets, so the literature cannot
+rank the approaches it contains. What it does show is that a gradient-boosted tree is the sensible
+place to start — the choice NGED's own Electricity Flexibility and Forecasting System reached
+independently in 2021 — while giving no evidence of a large, dependable margin for anything more
+sophisticated at substation level. We found no study driving a probabilistic substation forecast
+from a weather ensemble across a 14-day horizon, none modelling the tails explicitly at substation
+level, and none explicitly modelling unmetered generation inside such a forecast.
 
-**One concurrent GB project is further ahead than Flexpectation, and six of Flexpectation's eight
+**One concurrent GB project is further ahead than Flexpectation, and four of Flexpectation's eight
 challenges have no counterpart in that project's published material.** Northern Powergrid's
 Artificial Forecasting has run operationally through a full winter flexibility procurement cycle,
 which is the clearest available evidence that a forecast of this kind changes what a network does.
-The six challenges Artificial Forecasting's published material leaves untouched are detecting
-switching events; forecasting a substation as if it were always in its normal running arrangement;
-tracking the effective capacity of metered generators; spotting faulty metering; inferring unmetered
-solar and wind from a substation's net flow; and doing the same for heat pumps, chargers, and
-batteries. Three published results point against parts of the plan, and we intend to test all three
-rather than avoid them. Throughout, the value NGED gets from the forecast sits in both tails of the
-distribution: the upper tail, where flexibility procurement holds demand under a limit, and the
-lower tail, where curtailment holds export under that same limit.
+The four challenges Artificial Forecasting's published material leaves untouched are tracking the
+effective capacity of metered generators; forecasting a substation as if it were always in its
+normal running arrangement; inferring unmetered solar and wind from a substation's net flow; and
+doing the same for heat pumps, chargers, and batteries. Three published results point against parts
+of the plan, and we intend to test all three rather than avoid them. Throughout, the value NGED gets
+from the forecast sits in both tails of the distribution: the upper tail, where flexibility
+procurement holds demand under a limit, and the lower tail, where curtailment holds export under
+that same limit.
 
 The caveat above is worth spelling out. In 2026, no honest review of the energy forecasting
 literature can claim to reveal the canonical "state of the art"! That is because (almost) all energy
@@ -1315,17 +1314,27 @@ substations where both gross demand and customer export data were available", an
 Capacity Register enters the model as an input feature, listing what is registered rather than
 estimating what is not. Flexpectation's challenges 7 and 8 are the different problem of inferring an
 unmetered generator's half-hourly output from a substation's net flow, which is blind source
-separation. Six of Flexpectation's eight challenges therefore have no counterpart we could find.
-Searching every Artificial Forecasting deliverable published on the Smarter Networks Portal across
-Discovery, Alpha, and Beta, save one file that holds a single blank page, returns no hit for
-"unmetered", "rooftop", "non-intrusive", "blind source", or "source separation", which are
-challenges 7 and 8; none for "switching", "abnormal", or "reconfiguration", which are challenges 4
-and 5; none for "effective capacity" or "derating", which is challenge 3; and none for "faulty
-metering" or "metering fault", which is challenge 6. Heat pumps and electric vehicles do appear, as
-drivers of demand growth and as model features rather than as quantities separated out of a net
-flow. Flexpectation also delivers 1st and 99th percentiles where Artificial Forecasting's published
-bands run from the 5th to the 95th, and the curtailment decisions NGED describes turn on those outer
-levels.
+separation. Two more of Flexpectation's challenges do have a counterpart there. The Beta annual
+progress report describes automated health checks and dashboards that "highlight substations where
+input data is degraded (e.g. faulty sensors, frozen or anomalous values)" and an
+extract-transform-load pipeline that "flags frozen/spiky SCADA data before modelling", which is
+challenge 6; and the Alpha user research treats planned and unplanned outages as data worth bringing
+in and as a reason to widen the error margin, which is a different response to challenge 4's problem
+rather than no response.
+
+**Four of Flexpectation's eight challenges have no counterpart we could find in that material:**
+tracking the effective capacity of metered generators; forecasting a substation as if it were always
+in its normal running arrangement, rather than dropping the periods when it was not; and inferring
+unmetered generation from a substation's net flow, solar and wind first and then heat pumps,
+chargers, and batteries. Across every Artificial Forecasting deliverable published on the Smarter
+Networks Portal — Discovery, Alpha, and Beta, save one file that holds a single blank page —
+"abnormal", "unmetered", "blind source" and "source separation" return nothing at all; "capacity"
+appears 180 times but never as an effective or derated capacity; and the seven occurrences of a
+"switch" stem are generators switching off, switchgear asset types, and switching over a data feed.
+Heat pumps and electric vehicles do appear, as drivers of demand growth and as model features rather
+than as quantities separated out of a net flow. Flexpectation also delivers 1st and 99th percentiles
+where Artificial Forecasting's published bands run from the 5th to the 95th, and the curtailment
+decisions NGED describes turn on those outer levels.
 
 ## Why we think this ambitious plan can be done
 
