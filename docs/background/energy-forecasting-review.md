@@ -1913,8 +1913,11 @@ scale Flexpectation reaches in 2027 is therefore a decade old somewhere else, wh
 about the engineering. Fitting a model to each transformer beat the method Enedis runs in
 production, which shares one substation forecast out across its transformers by fixed coefficients.
 The per-transformer models scored 6.0% against 9.3% mean absolute percentage error on the day those
-coefficients were refreshed, and 8.1% against 13.0% across the whole test period, with 84% of
-transformers better under their own model. Three things temper that result. Cordier et al. do not
+coefficients were refreshed, and 8.1% against 13.0% across the whole test period, counting only the
+transformers whose coefficients then moved by less than 2.5%, with 84% of transformers better under
+their own model. Cordier et al. chose both comparisons deliberately, as the cases where the
+fixed-coefficient method is "the most relevant and the most difficult to outperform". Three things
+temper that result. Cordier et al. do not
 say what their percentage error is normalised by. The medium-to-low-voltage step was tested on about
 100 substations using measured rather than forecast inputs, so it measures the disaggregation rather
 than the forecast. And the authors report that "the performance of the complete pipeline has not yet
