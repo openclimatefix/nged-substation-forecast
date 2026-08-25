@@ -256,6 +256,24 @@ connectivity, so whether NGED's own connectivity map improves a forecast is stil
 strong result, and we found nobody aggregating building thermal physics up to a substation and
 putting it inside a probabilistic forecast, though the ingredients exist separately.
 
+**The case for pre-training an encoder rests on results from computer vision and Earth
+observation rather than from energy forecasting.** [Siméoni et al.
+(2025)](https://arxiv.org/abs/2508.10104) keep DINOv3, a 7-billion-parameter vision model trained on
+unlabelled images, frozen throughout their evaluation and read every task off its representations,
+reporting that fine-tuning "is not necessary to obtain strong performance" on tasks as different as
+segmentation, depth estimation, and object detection. [Brown et al.
+(2025)](https://arxiv.org/abs/2507.22291) encode satellite and other Earth-observation data into one
+64-byte embedding per 10-metre cell per year, and report that the embeddings cut error magnitude by
+about 24% on average against a representative sample of other featurisation methods, across a broad
+set of sparse-data mapping evaluations, without re-training on any of them. What transfers to
+Flexpectation is the arrangement rather than the numbers: one encoder trained once on a large
+dataset, frozen, and read by a small model for each downstream task.
+
+**Neither result promises that a pre-trained encoder beats hand-designed features.** Brown et al.
+report that learned featurisations "don't always outperform designed featurization methods in
+scarce data regimes", and AlphaEarth Foundations was the one that did across their evaluation set.
+The gradient-boosted tree on hand-designed features stays the baseline the encoders have to beat.
+
 **The encoders Flexpectation plans to pre-train cover weather and time, and possibly a third for
 place, and the machinery for the weather encoder has been built separately from any energy
 forecast.** We plan to research a neural network that turns the raw ECMWF ensemble into a calibrated
@@ -1274,6 +1292,8 @@ Smart Grid*.
 - Browell, J., van der Meer, D., Kälvegren, H., Haglund, S., Simioni, E., Bessa, R. J. and Wang, Y.
 (2025). [The hybrid renewable energy forecasting and trading competition
 2024](https://doi.org/10.1016/j.ijforecast.2025.10.005). *International Journal of Forecasting*.
+- Brown, C. F. et al. (2025). [AlphaEarth Foundations: An embedding field model for accurate and
+efficient global mapping from sparse label data](https://arxiv.org/abs/2507.22291).
 - Buizza, R. and Leutbecher, M. (2015). [The forecast skill
 horizon](https://doi.org/10.1002/qj.2619). *Quarterly Journal of the Royal Meteorological
 Society*.
@@ -1416,6 +1436,7 @@ Forecasting*.
 4](https://smarter.energynetworks.org/projects/10166254/).
 - Shukla, S. and Hong, T. (2024). [BigDEAL Challenge 2022: Forecasting peak timing of electricity
 demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
+- Siméoni, O. et al. (2025). [DINOv3](https://arxiv.org/abs/2508.10104).
 - SP Energy Networks (2023).
 [Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/).
 - Teng, S., Cambier van Nooten, C., van Doorn, J., Ottenbros, A., Huijbregts, M. and Jansen, J.
