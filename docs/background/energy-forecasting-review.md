@@ -2065,7 +2065,9 @@ of which one is at substation scale — [Mesarcik et al.
 (2025)](https://doi.org/10.1049/icp.2025.1968), day-ahead, on ten years of measurements from 312
 Dutch substations, written by a team all of whom are at Alliander — the same Dutch network operator
 that employs two of the six authors of [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164),
-cited under challenges 4 and 6 above. Nothing scores the upper tail, nothing keeps
+cited under challenges 4 and 6 above, whose other four authors are at Radboud University. Agreement
+between the two papers is therefore not independent evidence about how a method carries from one
+network to another. Nothing scores the upper tail, nothing keeps
 switching-contaminated history
 usable, and nothing estimates how much of a generator's capacity is available. The closest paper to
 our own challenge *among the ones this exclusion covers*, [Ruhhütl et al.
