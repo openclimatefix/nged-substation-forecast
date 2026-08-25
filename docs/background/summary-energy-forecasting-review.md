@@ -1266,6 +1266,20 @@ property is to be made available royalty-free to other GB networks, and we would
 that intellectual property than rebuild it — a shared evaluation protocol between two GB networks
 would be worth more to both than two separate protocols.
 
+**Flexpectation is nonetheless attempting more than Artificial Forecasting's published material
+describes, which is the case for running both.** Artificial Forecasting's Beta registration claims
+load disaggregation as one of its innovations — "a novel approach to forecasting HV load, separately
+modelling gross demand and distributed generation" — so the two projects overlap on forecasting net
+demand and on separating generation from demand. Four of Flexpectation's eight challenges have no
+counterpart we could find. Searching every Artificial Forecasting deliverable published on the
+Smarter Networks Portal across Discovery, Alpha, and Beta, save one scanned deck whose text would
+not extract, returns no hit for "switching", "abnormal", or "reconfiguration", which are challenges
+4 and 5; none for "effective capacity" or "derating", which is challenge 3; none for "faulty
+metering" or "metering fault", which is challenge 6; and none for "unmetered", which is the half of
+challenge 7 that estimates the output of generators nobody meters. Flexpectation also delivers 1st
+and 99th percentiles where Artificial Forecasting's published bands run from the 5th to the 95th,
+and the curtailment decisions NGED describe turn on those outer levels.
+
 ## Why we think this ambitious plan can be done
 
 **Measured against the studies we found, the plan sits outside the published literature in five ways
