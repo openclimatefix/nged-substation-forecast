@@ -88,7 +88,7 @@ evidence behind each row.
 | 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers on one feeder; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | The one published result scoring both precision and recall reports F1.5 scores between about 0.2 and 0.5, from different detectors at different event lengths, and achieved with a second load estimate NGED does not have, so Flexpectation should expect worse rather than better |
 | 5. Forecasting a substation as if it were always in its normal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Every published solution throws information away. In contrast, Flexpectation version 1 makes the abnormal periods an input to the ML model, and masks the abnormal periods in the training target |
 | 6. Detecting faulty metering | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s Dutch dataset, the one public labelled set we found, which merges metering faults and switching into a single class | There is no GB number to beat, so whatever precision and recall Flexpectation publishes becomes the first — cheap to do and worth doing |
-| 7. Disaggregating unmetered solar and wind | [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) transferring from fully-metered Dutch substations, and [UK Power Networks' NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/), this work's direct predecessor | UK Power Networks' unmetered-solar project used the same method on the same kind of GB data, and Open Climate Fix delivered that project too, so Flexpectation starts from that method rather than from scratch |
+| 7. Disaggregating unmetered solar and wind | [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) transferring from fully-metered Dutch substations, and [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/), this work's direct predecessor | UK Power Networks' Power Flow to Solar Capacity used the same method on the same kind of GB data, and Open Climate Fix delivered that project too, so Flexpectation starts from that method rather than from scratch |
 | 8. Disaggregating heat pumps, chargers, and batteries | [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1) on aggregated charging demand day-ahead | Heat pumps, chargers, and batteries stay inside net demand in Flexpectation version 1 rather than being forecast separately |
 
 ### 1. Probabilistic forecasts of net demand at substations
@@ -130,32 +130,35 @@ method carries from one network to another.
 #### What this means for Flexpectation
 
 **Building Flexpectation version 1 on a gradient-boosted tree (GBT, such as XGBoost) is defensible,
-but the
-literature paints GBTs as a sensible default rather than a proven winner**. [NGED's own 2021 EFFS
-project (Electricity Flexibility and Forecasting
+but the literature paints GBTs as a sensible default rather than a proven winner**. [NGED's own 2021
+EFFS project (Electricity Flexibility and Forecasting
 System)](https://smarter.energynetworks.org/projects/wpden03/) picked XGBoost on the balance of
 accuracy against effort, and no study we read shows a large, dependable margin for anything more
-sophisticated than XGBoost at substation level. Both network deployments that actually tried boosted
-trees kept a simpler model instead. [Pinheiro et al.
-(2023)](https://doi.org/10.1016/j.apenergy.2022.120493), running a live system drawing on 96,989
-Portuguese secondary substations, scored 199 MW root-mean-square error at system level with a tuned
-gradient-boosted tree against 191 MW for a generalised additive model — the boosted tree 4% worse —
-and rejected the boosted tree on the cost of tuning it and on the interpretability given up with it.
-[Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) kept the
-simpler model when forecasting customer export at primary substations: measured against the Bayesian
-ridge regression they went on to adopt, boosted trees "helped some substations but harmed others".
-[Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) raise a separate caution, about the
-uncertainty a boosted tree reports rather than the accuracy it reaches: on the one substation whose
-calibration they plot, their gradient-boosted machine's 95th percentile forecast corresponded to the
-80th percentile of the measured data, while a structured state space model and a linear quantile
-model both tracked the ideal calibration line closely. [Hertel et al.
-(2026)](https://arxiv.org/abs/2607.15705) make the same point from the other end of the
-sophistication scale, because their purpose-built Transformer variant lost to a standard
-encoder-decoder Transformer on all three of their datasets. What did help [Hertel et al.
-(2026)](https://arxiv.org/abs/2607.15705) was refitting the model every month rather than
-redesigning it: on both datasets where they tried it, the retrained model beat the static one. So,
-for Flexpectation, the literature suggests that the choice of model family may matter less than the
-data, the feature engineering, and how often the model is refitted.
+sophisticated than XGBoost at substation level.
+
+**Both network deployments that actually tried boosted trees kept a simpler model instead.**
+[Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493), running a live system
+drawing on 96,989 Portuguese secondary substations, scored 199 MW root-mean-square error at system
+level with a tuned gradient-boosted tree against 191 MW for a generalised additive model — the
+boosted tree 4% worse — and rejected the boosted tree on the cost of tuning it and on the
+interpretability given up with it. [Artificial
+Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) kept the simpler model when
+forecasting customer export at primary substations: measured against the Bayesian ridge regression
+they went on to adopt, boosted trees "helped some substations but harmed others".
+
+**Neither end of the sophistication scale is a safe bet.** [Mesarcik et al.
+(2025)](https://doi.org/10.1049/icp.2025.1968) caution about the uncertainty a boosted tree reports
+rather than the accuracy it reaches: on the one substation whose calibration they plot, their
+gradient-boosted machine's 95th percentile forecast corresponded to the 80th percentile of the
+measured data, while a structured state space model and a linear quantile model both tracked the
+ideal calibration line closely. [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) make the
+same point from the other end of the sophistication scale, because their purpose-built Transformer
+variant lost to a standard encoder-decoder Transformer on all three of their datasets.
+
+**What did help was refitting the model every month rather than redesigning it.** On both datasets
+where [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) tried refitting, the retrained model
+beat the static one. So, for Flexpectation, the literature suggests that the choice of model family
+may matter less than the data, the feature engineering, and how often the model is refitted.
 
 **Read those results knowing that when a paper says "XGBoost" it usually means a model with
 considerably less feature engineering than what we plan to implement.** [Kaas et al.
@@ -188,7 +191,7 @@ model did not get worse, the problem got harder. [Pinheiro et al.
 (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) show what that costs at the individual site,
 in the one study we found reporting results substation by substation at scale. Their model beat a
 "same time yesterday" forecast at 83–87% of network-owned secondary substations but at only 66–70%
-of customer-owned ones, and we know that only because the authors reported it. NGED's primary
+of customer-owned ones. NGED's primary
 substations may not behave the same way, because a primary substation aggregates far more customers
 than a Portuguese secondary substation does. A forecast at a primary substation may also carry a
 larger percentage error than one at a grid supply point and still support flexibility procurement
@@ -774,7 +777,8 @@ and a multi-day horizon each appear in this literature, but never together.
 
 #### What this means for Flexpectation
 
-**No other challenge has a predecessor as close as UK Power Networks' unmetered-solar project, which
+**No other challenge has a predecessor as close as UK Power Networks' Power Flow to Solar Capacity,
+which
 used the same method on the same kind of GB data and was delivered by Open Climate Fix, the partner
 delivering Flexpectation.** The warning is not to read
 published transfer-learning accuracy as achievable here: [Teng et al.
@@ -782,12 +786,14 @@ published transfer-learning accuracy as achievable here: [Teng et al.
 substations to learn from and are told each site's capacity, whereas inferring that capacity is half
 of what NGED needs.
 
-**The direct predecessor of this work is running now in GB.** [UK Power Networks'
-NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/) (2024–2026, £0.4 million),
+**The direct predecessor of this work is running now in GB.** [UK Power Networks' Power Flow to
+Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) (2024–2026, £0.4
+million),
 which Open Climate Fix worked on, infers the capacity of unmetered solar sitting behind each primary
 substation from half-hourly substation load and weather, then forecasts that generation. Open
-Climate Fix is a partner in both NIA_UKPN0104 and Flexpectation, so Flexpectation starts from
-NIA_UKPN0104's method rather than from scratch.
+Climate Fix is a partner in both Power Flow to Solar Capacity and Flexpectation, so Flexpectation
+starts from the
+Power Flow to Solar Capacity method rather than from scratch.
 
 **The nearest published method splits unmetered wind and solar out of substation measurements, but
 needs exactly what NGED lacks.** [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662)
@@ -1104,7 +1110,7 @@ says so rather than being left blank.
 | [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) (Northern Powergrid) | Demand and customer export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondary substations | Day-ahead to 11 days at primary; week- to month-ahead at secondary | Half-hourly, with 5th-to-95th-percentile bands |
 | [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) | Net load, split into demand and generation and recombined | 13 primary substations, their bulk supply points, and their 33 kV and 11 kV feeders | 30 minutes to 10 days | A 40-member ICON-EU ensemble to 4 days, one deterministic forecast after that |
 | [NGED's EFFS](https://smarter.energynetworks.org/projects/wpden03/) | Grid supply points, bulk supply points, primary substation transformers, and generation sites | Network-wide | 1 hour to 6 months | None |
-| [UK Power Networks' NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/) | The capacity of unmetered solar behind each primary substation, then that solar's generation | Not stated in what we read | Not stated in what we read | Not stated in what we read |
+| [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) | The capacity of unmetered solar behind each primary substation, then that solar's generation | Not stated in what we read | Not stated in what we read | Not stated in what we read |
 | [SSEN FastTrack](https://smarter.energynetworks.org/projects/10166254/) | How the connections queue, around 180 GW, will load the network | Primary substations up to the grid supply point | A planning horizon rather than an operational one | A probability that a queued connection becomes real load |
 | [SP Energy Networks' Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/) | Network faults, not load | Per district | Up to 7 days | A probability distribution driven by a weather ensemble |
 | [Fox et al. (2018)](https://doi.org/10.34890/134) (SP Energy Networks) | The effect of weather on past peak demand, not a forward forecast | 13 primary substations in the proof of concept, almost 400 in production | Backwards over 10 years | None |
@@ -1126,10 +1132,10 @@ best balance of accuracy against effort.** That choice is the same starting poin
 uses.
 [EFFS](https://smarter.energynetworks.org/projects/wpden03/) ran from 2018 to 2021 as a Network
 Innovation Competition project costing £3.3 million, and its forecasts carried no uncertainty at
-all. Adding that uncertainty is the step this project adds. [UK Power Networks'
-NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/) is the direct predecessor
+all. Adding that uncertainty is the step this project adds. [UK Power Networks' Power Flow to Solar
+Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) is the direct predecessor
 of Flexpectation's unmetered-solar work, and Open Climate Fix is a partner in both projects, so
-Flexpectation starts from NIA_UKPN0104's method rather than from scratch.
+Flexpectation starts from the Power Flow to Solar Capacity method rather than from scratch.
 
 **Two deployments outside GB belong alongside the nine GB projects above.**
 [OpenSTEF](https://lfenergy.org/projects/openstef/) is the only operational network forecasting
@@ -1274,9 +1280,9 @@ Society*.
 - Campagne, E., Amara-Ouali, Y., Goude, Y., Zehavi, I. and Kalogeratos, A. (2025). [Graph Neural
 Networks for Electricity Load Forecasting](https://arxiv.org/abs/2507.03690).
 - Cordier, G. et al. (2024). [Methods and techniques used to produce electricity forecasts on
-  Enedis’ distribution network at a finer grid than the HV/MV
-  substation](https://doi.org/10.1049/icp.2024.2058). *CIRED 2024 Vienna Workshop*, in *IET
-  Conference Proceedings*.
+Enedis’ distribution network at a finer grid than the HV/MV
+substation](https://doi.org/10.1049/icp.2024.2058). *CIRED 2024 Vienna Workshop*, in *IET
+Conference Proceedings*.
 - Dantas, G. and Browell, J. (2026). [Seamless Short‐ to Mid‐Term Probabilistic Wind Power
 Forecasting](https://doi.org/10.1002/we.70079). *Wind Energy*.
 - de Vilmarest, J., Browell, J., Fasiolo, M., Goude, Y. and Wintenberger, O. (2024). [Adaptive
@@ -1362,10 +1368,10 @@ Innovative Smart Grid Technologies Europe*.
 - Meng, B., Loonen, R. and Hensen, J. L. M. (2020). [Data-driven inference of unknown tilt and
 azimuth of distributed PV systems](https://doi.org/10.1016/j.solener.2020.09.077). *Solar Energy*.
 - Mesarcik, M., Loke, J., Wildeboer, J. and Lucassen, B. (2025). [Probabilistic day-ahead power
-  forecasting in the medium-voltage grid using state space
-  models](https://doi.org/10.1049/icp.2025.1968). *CIRED 2025*, in *IET Conference Proceedings*. The
-  version of record is paywalled; we read the authors' own copy, which is titled "…Using Structured
-  State Space Models".
+forecasting in the medium-voltage grid using state space
+models](https://doi.org/10.1049/icp.2025.1968). *CIRED 2025*, in *IET Conference Proceedings*. The
+version of record is paywalled; we read the authors' own copy, which is titled "…Using Structured
+State Space Models".
 - Messner, J. W., Pinson, P., Browell, J., Bjerregård, M. B. and Schicker, I. (2020). [Evaluation of
 wind power forecasts — An up-to-date view](https://doi.org/10.1002/we.2497). *Wind Energy*.
 - Meyer, M., Kaltenpoth, S., Albers, H., Zalipski, K. and Müller, O. (2026). [TS-Arena: A Live
@@ -1395,8 +1401,8 @@ substations](https://doi.org/10.1016/j.apenergy.2022.120493). *Applied Energy*.
 - Rasp, S. and Lerch, S. (2018). [Neural networks for post-processing ensemble weather
 forecasts](https://arxiv.org/abs/1805.09091). *Monthly Weather Review*.
 - Ruhhütl, M., Schmaranz, R. and Dietrichsteiner, T. (2023). [Load and generation forecast on
-  substation level](https://doi.org/10.1049/icp.2023.0476). *CIRED 2023, Rome*, in *IET Conference
-  Proceedings*.
+substation level](https://doi.org/10.1049/icp.2023.0476). *CIRED 2023, Rome*, in *IET Conference
+Proceedings*.
 - Saint-Drenan, Y.-M., Bofinger, S., Fritz, R., Vogt, S., Good, G. H. and Dobschinski, J. (2015).
 [An empirical approach to parameterizing photovoltaic plants for power forecasting and
 simulation](https://doi.org/10.1016/j.solener.2015.07.024). *Solar Energy*.
@@ -1416,7 +1422,8 @@ demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
 (2023). [Near real-time predictions of renewable electricity production at substation level via
 domain adaptation zero-shot learning in sequence](https://doi.org/10.1016/j.rser.2023.113662).
 *Renewable and Sustainable Energy Reviews*.
-- UK Power Networks. [NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/).
+- UK Power Networks. [Power Flow to Solar Capacity
+(NIA_UKPN0104)](https://smarter.energynetworks.org/projects/nia_ukpn0104/).
 - Viotti, O., Arnqvist, J. and Olauson, J. (2026). [Estimating Wind‐Power Capacity Time Series From
 Production Data Using a Power Curve Model and Quadratic
 Optimization](https://doi.org/10.1002/we.70136). *Wind Energy*.
