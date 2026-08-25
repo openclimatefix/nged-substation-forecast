@@ -21,7 +21,7 @@ Secondly - and perhaps most importantly - the fact that the industry doesn't yet
 
 ## What we read
 
-This review cites 98 sources. We read most of the ones an argument rests on in full; the rest were
+This review cites 99 sources. We read most of the ones an argument rests on in full; the rest were
 available to us only as an abstract, a preprint, or part of a paper, and wherever a claim rests on a
 partial read we say so at the point the claim is made. We also read the published deliverables of
 twelve network-innovation projects in GB. The selection was deliberate rather than systematic: a
@@ -388,12 +388,16 @@ advantage at all over classic statistical time-series models beyond 6 hours ahea
 weather model's own output as the forecast scores significantly worse, 14.3 percentage points of
 skill score below that baseline. That class is the numerical weather prediction irradiance field
 itself — usually global horizontal irradiance, at most post-processed or averaged across several
-weather models — used as the forecast rather than fed as an input to a fitted model. Most of the
-papers in their sample forecast irradiance rather than plant output, so for those papers no power
-curve is involved at all. Their model classes follow each paper's own nomenclature, so the boundary
-between an ensemble and a hybrid is fuzzy by their own account. Their own advice is to exhaust the
-simple models first, because classical statistical time-series methods "still have very good
-performance compared to more complex methods such as individual ML models".
+weather models — used as the forecast rather than fed as an input to a fitted model. Of the 188
+papers in their sample, 118 forecast irradiance rather than plant output and only 70 forecast the
+output of a photovoltaic plant, so for most of the sample the weather model's irradiance field is
+directly comparable to the thing being forecast and no power curve is involved at all. Their
+regression carries the model class and the forecast target as separate variables, so the 14.3-point
+penalty is estimated with the target held constant, but they never report which targets the
+numerical-weather-prediction papers were forecasting. Their model classes follow each paper's own
+nomenclature, so the boundary between an ensemble and a hybrid is fuzzy by their own account. Their
+own advice is to exhaust the simple models first, because classical statistical time-series methods
+"still have very good performance compared to more complex methods such as individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
 puts the weight on exactly the input Flexpectation is built around.** [Nguyen and Müsgens
@@ -750,28 +754,50 @@ combination did not inherit statistical process control's strength on short even
 shortest bands the combined detectors scored only marginally better than binary segmentation on its
 own.
 
-**Detecting a load transfer from a substation's own metered load has been published several times,
-and every method we could read works one series at a time.** [Kim et al.
-(2020)](https://doi.org/10.3390/en13174358) train a long short-term memory network on a Korean
-distribution line's own past load, treat its prediction as the normal state, and flag a transfer
-where the measurement departs from that prediction: "the predicted load is set as the reference
-value, which is considered as normal state. Finally, the actual measured data is compared with the
-predicted data, and detect it as a load transfer if the difference between them exceeds the
-threshold." A later paper in the same line, [Kim
-(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), drops the trained model for a pipeline close
+**Detecting a load transfer from metered load alone has been published four times by the same first
+author, and every method works one series at a time.** All four papers score against the same nine
+logged transfers on the Kimhwa distribution feeder in Gangwon province, measured hourly at the
+circuit breaker on the substation's outgoing feeder, so the whole line of work rests on one feeder
+in one year. [Kim et al. (2020)](https://doi.org/10.3390/en13174358) train a long short-term memory
+network on that feeder's own past load, treat its prediction as the normal state, and flag a
+transfer where the measurement departs from that prediction: "the predicted load is set as the
+reference value, which is considered as normal state. Finally, the actual measured data is compared
+with the predicted data, and detect it as a load transfer if the difference between them exceeds the
+threshold." That detector finds 7 of the 9. [Kim et al. (2022)](https://doi.org/10.3390/en15041441)
+detect the same events from polynomial and standard-pattern preprocessing rather than from a trained
+model, finding 7 of 9 on Kimhwa and 7 of 7 on a second feeder, which their abstract averages to
+88.89%. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) drops the trained model
+altogether: subtract a seasonal-trend decomposition, then threshold the residual on a moving average
+and a moving standard deviation. That method finds 8 of the 9, the best score in the series. [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) replaces the threshold with a pipeline close
 to the one this project plans — robust seasonal-trend decomposition, then Pruned Exact Linear Time
-changepoint detection, then an isolation forest over features of each candidate changepoint —
-detecting transfers "using only load time series data". [Kim et al.
-(2022)](https://doi.org/10.3390/en15041441), also open access, detect the same events from
-polynomial and standard-pattern preprocessing rather than from a trained model, and report 7 of 9
-logged transfers found on one Korean distribution line and 7 of 7 on another, which their abstract
-averages to 88.89%. Read that figure for what it is — the share of logged events found, over 16
-events on two lines in one year, with no false-alarm rate given. [Kim et al.
-(2020)](https://doi.org/10.3390/en13174358) report the same kind of figure on the same first line,
-finding 7 of 9 planned transfers, and likewise give no false-alarm rate, so recall is the only thing
-either paper measures. Both Energies papers are open access under a Creative Commons licence and we
-read them in full; [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) sits behind a
-subscription, so we read only its abstract.
+changepoint detection, then an isolation forest over 15 statistical features of each candidate
+changepoint — detecting transfers "using only load time series data", and finds 7 of the 9, an
+average detection rate of 78%. All four papers are open access under a Creative Commons licence and
+we read them in full, though the digital object identifiers of the two Korean-language papers
+resolve to a paywalled aggregator rather than to the society's own portal, which serves them free.
+
+**Read every one of those figures for what it is — the share of logged events found — because no
+paper in the series reports a false-alarm rate.** [Kim
+(2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) states that the method flagged more transfers
+than the nine that were logged, and attributes the surplus to unplanned operational switching that
+the log does not record rather than counting the surplus as false positives. [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) reports that the isolation forest's
+probability score separated true positives from false positives, which concedes that false positives
+existed, but puts no number on them. Both papers explain their misses the same way: the transfers
+they did not catch moved too little load to show up, and both argue that a transfer carrying no
+material load change matters less. For Flexpectation the ranking of those two error types is the
+other way round. A missed transfer that moved almost no load costs almost nothing, whereas an
+uncounted surplus flag is expensive, because a false flag would have us treat a normal period as
+abnormal and discard or correct data the forecaster should have learned from.
+
+**Being more elaborate did not make the detector better on this benchmark.** The simplest method in
+the series — subtract a decomposition, threshold the residual on a moving average — found 8 of the
+9, while both the long short-term memory network and the wavelet, changepoint and isolation-forest
+pipeline found 7. Over nine events that difference is a single event and settles nothing on its own,
+but it is a reason to run the threshold on a decomposition residual as the baseline that
+Flexpectation's own switching detector has to beat, rather than assuming a changepoint pipeline
+starts ahead.
 
 **A GB network operator separated switching from bad data in 2016, with cruder tools and no
 published accuracy.** Electricity North West's
@@ -2181,9 +2207,14 @@ Every source cited above, in alphabetical order by first author.
 - Kim, J.-H., Joung, J.-M. and Lee, B.-S. (2022). [A Study on the Preprocessing Method for Power
   System Applications Based on Polynomial and Standard Patterns](https://doi.org/10.3390/en15041441).
   *Energies*.
-- Kim, J.-H. (2025). [Unsupervised Load Transfer Detection Based on Wavelet Change Point
-  Analysis and Isolation Forest](https://doi.org/10.5370/KIEE.2025.74.11.1757). *The
-  Transactions of The Korean Institute of Electrical Engineers*.
+- Kim, J.-H. (2024). [A Study on the Detection Method of Load Transfer in Distribution System Using
+  Time Series Decomposition](https://doi.org/10.5370/KIEE.2024.73.11.1873). *The Transactions of The
+  Korean Institute of Electrical Engineers*. Open access from the society's own journal portal; the
+  digital object identifier resolves to a paywalled aggregator.
+- Kim, J.-H. (2025). [Unsupervised Load Transfer Detection Based on Wavelet Change Point Analysis
+  and Isolation Forest](https://doi.org/10.5370/KIEE.2025.74.11.1757). *The Transactions of The
+  Korean Institute of Electrical Engineers*. Open access from the society's own journal portal; the
+  digital object identifier resolves to a paywalled aggregator.
 - Kleinebrahm, M. et al. (2026). [Energy-Arena: A Dynamic Benchmark for Operational Energy
   Forecasting](https://arxiv.org/abs/2604.24705). *2026 International Conference on the European
   Energy Market*.

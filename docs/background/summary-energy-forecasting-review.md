@@ -2,7 +2,7 @@
 
 This is a short version of a literature review Open Climate Fix carried out for National Grid
 Electricity Distribution, as part of the Flexpectation project. This summary is meant to be readable
-on its own. The full review, which cites 98 sources and gives the evidence behind every claim here,
+on its own. The full review, which cites 99 sources and gives the evidence behind every claim here,
 is [published
 online](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/),
 and is referred to below as "the full review".
@@ -271,11 +271,15 @@ advantage at all over classic statistical time-series models beyond 6 hours ahea
 weather model's own output as the forecast scores significantly worse, 14.3 percentage points of
 skill score below that baseline. That class is the numerical weather prediction irradiance field
 itself — usually global horizontal irradiance, at most post-processed or averaged across several
-weather models — used as the forecast rather than fed as an input to a fitted model. Most of the
-papers in their sample forecast irradiance rather than plant output, so for those papers no power
-curve is involved at all. Their own advice is to exhaust the simple models first, because classical
-statistical time-series methods "still have very good performance compared to more complex methods
-such as individual ML models".
+weather models — used as the forecast rather than fed as an input to a fitted model. Of the 188
+papers in their sample, 118 forecast irradiance rather than plant output and only 70 forecast the
+output of a photovoltaic plant, so for most of the sample the weather model's irradiance field is
+directly comparable to the thing being forecast and no power curve is involved at all. Their
+regression carries the model class and the forecast target as separate variables, so the 14.3-point
+penalty is estimated with the target held constant, but they never report which targets the
+numerical-weather-prediction papers were forecasting. Their own advice is to exhaust the simple
+models first, because classical statistical time-series methods "still have very good performance
+compared to more complex methods such as individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
 we found confirms the importance of NWP inputs at the lead times Flexpectation cares about.** [Nguyen and Müsgens
@@ -433,19 +437,24 @@ Switching detection from metered load has been published more than once, always 
 time. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) detect switching at a real network
 operator, but detect it in the gap between the substation's own meter and a second estimate of the
 same load, built from smart-meter and bulk-customer readings taken below the substation. A Korean
-line of work detects load transfers on a distribution line from that line's own load alone. The two
-earlier papers are open access: [Kim et al. (2020)](https://doi.org/10.3390/en13174358) flag a
-transfer where the measured load departs from a neural network's prediction for the same line,
-finding 7 of 9 logged transfers on one Korean distribution line, and [Kim et al.
-(2022)](https://doi.org/10.3390/en15041441) detect the same events from polynomial and
-standard-pattern preprocessing, finding 7 of 9 on that line and 7 of 7 on a second, averaged to
-88.89%. Both numbers are the share of logged events found, and neither paper gives a false-alarm
-rate. The most recent paper, [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), runs a
-robust seasonal-trend decomposition, then changepoint detection, then an isolation forest over each
-candidate changepoint — close to the pipeline Flexpectation plans — but only its abstract is open.
-Electricity North West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project
-sorted step changes into faulty metering and network reconfigurations on GB substations in 2016,
-from power measurements alone, and published no precision or recall for either rule.
+series of four papers detects load transfers on a distribution feeder from that feeder's own load
+alone. All four papers are open access, and all four score against the same nine logged transfers on
+one feeder in Gangwon province. [Kim et al. (2020)](https://doi.org/10.3390/en13174358) flag a
+transfer where the measured load departs from a neural network's prediction for the same feeder,
+finding 7 of the 9. [Kim et al. (2022)](https://doi.org/10.3390/en15041441) detect the same events
+from polynomial and standard-pattern preprocessing, finding 7 of 9 on that feeder and 7 of 7 on a
+second, which averages to 88.89%. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873)
+subtracts a seasonal-trend decomposition and thresholds the residual on a moving average and a
+moving standard deviation, finding 8 of the 9. [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) runs a robust seasonal-trend decomposition,
+then changepoint detection, then an isolation forest over each candidate changepoint — close to the
+pipeline Flexpectation plans — finding 7 of the 9, an average detection rate of 78%. Every one of
+those numbers is the share of logged events found, and no paper in the series reports a false-alarm
+rate. The scores do not track how elaborate the method is: the simplest of the four, a threshold on
+a decomposition residual, found the most events. Electricity North West's
+[ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted step changes into
+faulty metering and network reconfigurations on GB substations in 2016, from power measurements
+alone, and published no precision or recall for either rule.
 
 #### What this means for Flexpectation
 
@@ -1322,6 +1331,9 @@ sources that this summary does not.
 - Kim, J.-H., Joung, J.-M. and Lee, B.-S. (2022). [A Study on the Preprocessing Method for Power
   System Applications Based on Polynomial and Standard Patterns](https://doi.org/10.3390/en15041441).
   *Energies*.
+- Kim, J.-H. (2024). [A Study on the Detection Method of Load Transfer in Distribution System Using
+  Time Series Decomposition](https://doi.org/10.5370/KIEE.2024.73.11.1873). *The Transactions of The
+  Korean Institute of Electrical Engineers*.
 - Kim, J.-H. (2025). [Unsupervised Load Transfer Detection Based on Wavelet Change Point
   Analysis and Isolation Forest](https://doi.org/10.5370/KIEE.2025.74.11.1757). *The
   Transactions of The Korean Institute of Electrical Engineers*.
