@@ -2126,9 +2126,10 @@ weather encoder — the same frozen representation feeding the substation net-de
 metered-generator forecasts, and the disaggregation of unmetered generation.
 
 **Neither result promises that a pre-trained encoder beats hand-designed features.** Brown et al.
-report that learned featurisations "don't always outperform designed featurization methods in
-scarce data regimes", and AlphaEarth Foundations was the one that did across their evaluation set.
-The gradient-boosted tree on hand-designed features stays the baseline the encoders have to beat.
+report that learned featurisations "don't always outperform designed featurization methods in scarce
+data regimes", and present AlphaEarth Foundations as the exception on their own evidence: the one
+learned featurisation in their comparison that consistently beat the alternatives they tested. The
+gradient-boosted tree on hand-designed features stays the baseline the encoders have to beat.
 
 **The encoders Flexpectation plans to pre-train cover weather and time, and possibly a third for
 place, and the machinery for the weather one has been built separately from any energy forecast.**
