@@ -180,6 +180,16 @@ def _available_nwp_init_times(settings: Settings) -> list[datetime]:
     rendering that drops the fractional seconds (whole-second ``init_time``s have no fractional
     part to keep) parses the same as one that keeps them — ``strptime``'s ``%f`` requires at
     least one fractional digit and would raise on that rendering.
+
+    Deliberately uncaught: a partition value that ``_parse_utc_init_time`` cannot parse means our
+    own write path (``delta_store.nwp.write_nwp``) corrupted its own metadata, not that some
+    outside system misbehaved, and the inherent-stability rule reserves raising for exactly that
+    case. It is also consistent with ``select_nwp_init_time``, which already raises when no
+    available run qualifies. Nothing here needs a fail-open path of its own: ``live_forecasts``
+    calls this directly and is meant to fail loudly, and the one caller that must stay
+    fail-open — ``live_forecasts_are_healthy`` — already wraps the whole evaluation in
+    ``except BaseException``, so a corrupt key degrades that check to a warning instead of turning
+    a warning into a hard failure.
     """
     delta_table = DeltaTable(
         settings.nwp_data_path, storage_options=typeddict_to_dict(settings.storage_options)
