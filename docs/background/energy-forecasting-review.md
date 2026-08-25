@@ -161,7 +161,7 @@ evidence behind each row.
 | 7. Disaggregating unmetered solar and wind | [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) transferring from fully-metered Dutch substations, and [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/), this work's direct predecessor | Doing it with no metered training set, inferring the capacity rather than being told it, and putting uncertainty and a multi-day horizon in the same forecast |
 | 8. Disaggregating heat pumps, chargers, and batteries | [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1) on aggregated charging demand day-ahead | Forecast skill at substation aggregation, and the peak an automated tariff creates |
 
-### 1. Probabilistic forecasts of net demand at substations
+### 1. Producing probabilistic forecasts of net demand at substations
 
 **In summary.** A large literature forecasts substation load, but very little of what we read can be
 compared with the rest of it, and we found none of it driving a probabilistic substation forecast
