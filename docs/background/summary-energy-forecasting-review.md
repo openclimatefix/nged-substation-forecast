@@ -107,7 +107,13 @@ eight challenges, and the other seven exist mainly to improve our net-demand for
 
 A large literature exists on the topic of forecasting substation load, but very little of what we
 read can be compared with the rest of that literature, and we found no papers driving a
-probabilistic substation forecast from a weather ensemble across a 14-day horizon.
+probabilistic substation forecast from a weather ensemble across a 14-day horizon. Two of the
+sources this review draws on share a network operator: all four authors of [Mesarcik et al.
+(2025)](https://doi.org/10.1049/icp.2025.1968) are at Alliander, the Dutch distribution network
+operator, and two of the six authors of [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) —
+cited under challenges 4 and 6 below — are at Alliander as well, the other four being at Radboud
+University. Agreement between the two papers is therefore not independent evidence about how a
+method carries from one network to another.
 
 | Source | What they forecast | Level and scale | Horizon | Result, and what it was compared against | Weather |
 |---|---|---|---|---|---|

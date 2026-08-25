@@ -2063,7 +2063,10 @@ the long-horizon load forecasts in the proceedings are annual planning forecasts
 14-day forecast predicts feeder faults rather than load. Fourteen forecast probabilistically at all,
 of which one is at substation scale — [Mesarcik et al.
 (2025)](https://doi.org/10.1049/icp.2025.1968), day-ahead, on ten years of measurements from 312
-Dutch substations. Nothing scores the upper tail, nothing keeps switching-contaminated history
+Dutch substations, written by a team all of whom are at Alliander — the same Dutch network operator
+that employs two of the six authors of [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164),
+cited under challenges 4 and 6 above. Nothing scores the upper tail, nothing keeps
+switching-contaminated history
 usable, and nothing estimates how much of a generator's capacity is available. The closest paper to
 our own challenge *among the ones this exclusion covers*, [Ruhhütl et al.
 (2023)](https://doi.org/10.1049/icp.2023.0476), appears in the table under challenge 1 above; its
