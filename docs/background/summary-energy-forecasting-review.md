@@ -187,17 +187,19 @@ day-type persistence baseline on three datasets — a German transmission contro
 low-voltage feeders, and 287 individual Portuguese clients — and the margin over that baseline
 shrank from 59.6% to 42.3% to 23.3% as aggregation fell. Their own gloss is that it is easier to
 beat a simple approach on highly aggregated data than on volatile feeder- and client-level data: the
-model did not get worse, the problem got harder. [Pinheiro et al.
-(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) show what that costs at the individual site,
-in the one study we found reporting results substation by substation at scale. Their model beat a
-"same time yesterday" forecast at 83–87% of network-owned secondary substations but at only 66–70%
-of customer-owned ones. NGED's primary
-substations may not behave the same way, because a primary substation aggregates far more customers
-than a Portuguese secondary substation does. A forecast at a primary substation may also carry a
-larger percentage error than one at a grid supply point and still support flexibility procurement
-just as well, because what NGED needs from the forecast is a reliable answer to "will this
-substation exceed its firm capacity?". Whether decision-usefulness really is flat across voltage
-levels is something this project can measure, and we intend to.
+model did not get worse, the problem got harder.
+
+**The one study we found reporting results substation by substation at scale shows what the
+shrinking headroom costs at an individual site.** [Pinheiro et al.
+(2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s model beat a "same time yesterday"
+forecast at 83–87% of network-owned secondary substations but at only 66–70% of customer-owned ones.
+
+**NGED's primary substations may not behave the same way, because a primary substation aggregates
+far more customers than a Portuguese secondary substation does.** A forecast at a primary substation
+may also carry a larger percentage error than one at a grid supply point and still support
+flexibility procurement just as well, because what NGED needs from the forecast is a reliable answer
+to "will this substation exceed its firm capacity?". Whether decision-usefulness really is flat
+across voltage levels is something this project can measure, and we intend to.
 
 **On the rest of the Flexpectation specification — a weather ensemble driving substation-level
 uncertainty all the way out to 14 days — we found no published result to lean on, for or against,
@@ -279,17 +281,20 @@ place, and the machinery for the weather encoder has been built separately from 
 forecast.** We plan to research a neural network that turns the raw ECMWF ensemble into a calibrated
 probabilistic weather forecast in physical units, which a substation model then reads, alongside a
 time encoder that learns how people use the calendar — e.g. that Christmas is not an ordinary day —
-and possibly a space encoder holding the standing geographic context of each substation. Both halves
-of the weather encoder have been built. [Rasp and Lerch (2018)](https://arxiv.org/abs/1805.09091)
-built the first: a neural network that post-processes a 50-member ECMWF ensemble into calibrated
-probabilistic 2-metre temperature at 537 German stations 48 hours ahead, cutting mean continuous
-ranked probability score from 1.16 for the raw ensemble to 0.78, with a learned per-station
-embedding one of the two components the authors credit for the gain. [Mitra and Ramavajjala
-(2023)](https://arxiv.org/abs/2312.00290) built the second: they freeze a weather autoencoder and
-train small models on the frozen representation alone, at accuracy comparable to purpose-built
-models, though the targets they predict are further weather variables rather than anything on a
-network. The nearest we found anyone joining the two is one entrant in HEFTCom, a competition to
-forecast a GB wind-and-solar portfolio day-ahead: [Browell et al.
+and possibly a space encoder holding the standing geographic context of each substation.
+
+**Both halves of the weather encoder have been built.** [Rasp and Lerch
+(2018)](https://arxiv.org/abs/1805.09091) built the first: a neural network that post-processes a
+50-member ECMWF ensemble into calibrated probabilistic 2-metre temperature at 537 German stations 48
+hours ahead, cutting mean continuous ranked probability score from 1.16 for the raw ensemble to
+0.78, with a learned per-station embedding one of the two components the authors credit for the
+gain. [Mitra and Ramavajjala (2023)](https://arxiv.org/abs/2312.00290) built the second: they freeze
+a weather autoencoder and train small models on the frozen representation alone, at accuracy
+comparable to purpose-built models, though the targets they predict are further weather variables
+rather than anything on a network.
+
+**The nearest we found anyone joining the two is one entrant in HEFTCom, a competition to forecast a
+GB wind-and-solar portfolio day-ahead.** [Browell et al.
 (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed embeddings from
 their own AI weather models into downstream neural networks and finished third of the ranked
 entrants. What we found nobody doing is pre-training a weather encoder against observations and then
@@ -434,25 +439,27 @@ capacity of a region. When an export-cable fault cut that wind farm's available 
 mid-competition, the winning team clipped its quantiles to the capacity implied by the outage
 notices the farm is obliged to publish, while the organisers' benchmark ignored the fault and, in
 [Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
-extremely poorly as a result". NGED's embedded generators publish no such notices. NGED's Embedded
-Capacity Register does give a registered capacity for generation of 50 kW and above: in the August
-2026 edition, 5,598 connected generators totalling 11,456 MW, of which 4,202 sites and 5,958 MW are
-solar. But a registered capacity is *contractual* rather than operational — the export limit is the
-one "permitted as per the connection agreement" — and the register carries no panel tilt, panel
-azimuth, or ratio of direct-current to alternating-current rating. A differentiable model could
-infer both the operational capacity and the panel orientation of each generator, and each of those
-two inferences has been made to work on its own: [Pierrot and Pinson
-(2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind
-farm's capacity as a time-varying bound fitted jointly with the forecast, and beat probabilistic
-persistence by 34.2% on continuous ranked probability score over a 5-month test period, drawn from
-14 months of data, at the Anholt offshore wind farm, though their one clean test of tracking the
-bound
-on its own gained 2.43%, and [Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077)
-infer the tilt and azimuth of 13 roof photovoltaic systems in the Netherlands to mean absolute
-errors of 4.3° and 4.5°, matching the shape of each system's hourly output against plane-of-array
-irradiance from a station up to 195 km away. Because both curves are normalised before matching,
-their method needs no nameplate rating. Neither method sits inside a substation's net-demand
-forecast. Flexpectation would have to put the method there itself.
+extremely poorly as a result". NGED's embedded generators publish no such notices.
+
+**NGED's Embedded Capacity Register gives a registered capacity for generation of 50 kW and above,
+and none of the physics.** The August 2026 edition lists 5,598 connected generators totalling 11,456
+MW, of which 4,202 sites and 5,958 MW are solar. But a registered capacity is *contractual* rather
+than operational — the export limit is the one "permitted as per the connection agreement" — and the
+register carries no panel tilt, panel azimuth, or ratio of direct-current to alternating-current
+rating.
+
+**A differentiable model could infer both the operational capacity and the panel orientation of each
+generator, and each of those two inferences has been made to work on its own.** [Pierrot and Pinson
+(2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind farm's capacity as a
+time-varying bound fitted jointly with the forecast, and beat probabilistic persistence by 34.2% on
+continuous ranked probability score over a 5-month test period, drawn from 14 months of data, at the
+Anholt offshore wind farm, though their one clean test of tracking the bound on its own gained
+2.43%, and [Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and
+azimuth of 13 roof photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°,
+matching the shape of each system's hourly output against plane-of-array irradiance from a station
+up to 195 km away. Because both curves are normalised before matching, their method needs no
+nameplate rating. Neither method sits inside a substation's net-demand forecast. Flexpectation would
+have to put the method there itself.
 
 **What better orientation metadata is worth to a forecast is a number we have not found in the
 literature, so Flexpectation treats it as a hypothesis to test rather than a settled prize.** [Meng
@@ -526,24 +533,27 @@ implement estimators that can fall as well as rise.
 
 **The published numbers favour fitting over ratcheting, and the variant Flexpectation needs is the
 variant that gave the better forecast.** [Viotti et al. (2026)](https://doi.org/10.1002/we.70136)
-say
-the running maximum "requires monotonically increasing capacity and relies on frequent high wind
+say the running maximum "requires monotonically increasing capacity and relies on frequent high wind
 events", and report **27.2% lower normalised mean absolute error** than the running maximum at
-quantifying capacity after a new wind farm connects. The 27.2% is scored by their monotonic variant,
-which assumes capacity only ever rises. They publish a non-monotonic variant alongside it, which can
-follow capacity down when a turbine goes out for repair, and that is the version NGED needs. On this
-test the non-monotonic variant is 31% worse. But the test only ever adds capacity: it simulates a
-new wind farm connecting, so it measures how well each variant spots a step *up*, and says nothing
-about how either handles a step down. Downstream the ranking reverses: the non-monotonic variant
-produced the lowest day-ahead forecast error, **2.0% below** a model normalised by the running
-maximum across Sweden as a whole, and the authors read that 2.0% gap as the non-monotonic variant
-picking up real changes in available capacity. Two things temper both figures for NGED. Their target
-is a
-Swedish bidding zone rather than a single farm, and they report that at 5-minute resolution the
-running maximum is already a robust estimate of one farm's installed capacity, so the fitting earns
-its advantage on hourly, region-aggregated data. Whichever estimator wins, normalising by effective
-capacity stays a hypothesis to test rather than a settled preprocessing step, because no study we
-found has measured whether it improves the forecast NGED buys flexibility against.
+quantifying capacity after a new wind farm connects.
+
+**The 27.2% is scored by their monotonic variant, which assumes capacity only ever rises.** They
+publish a non-monotonic variant alongside it, which can follow capacity down when a turbine goes out
+for repair, and that is the version NGED needs. On this test the non-monotonic variant is 31% worse.
+But the test only ever adds capacity: it simulates a new wind farm connecting, so it measures how
+well each variant spots a step *up*, and says nothing about how either handles a step down.
+
+**Downstream the ranking reverses.** The non-monotonic variant produced the lowest day-ahead
+forecast error, **2.0% below** a model normalised by the running maximum across Sweden as a whole,
+and the authors read that 2.0% gap as the non-monotonic variant picking up real changes in available
+capacity.
+
+**Two things temper both figures for NGED.** Viotti et al.'s target is a Swedish bidding zone rather
+than a single farm, and they report that at 5-minute resolution the running maximum is already a
+robust estimate of one farm's installed capacity, so the fitting earns its advantage on hourly,
+region-aggregated data. Whichever estimator wins, normalising by effective capacity stays a
+hypothesis to test rather than a settled preprocessing step, because no study we found has measured
+whether it improves the forecast NGED buys flexibility against.
 
 ### 4. Detecting switching events
 
@@ -628,23 +638,26 @@ below the substation.
 one-substation-at-a-time method cannot see: the power has to go *somewhere*.** [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164) score each substation against its own history — "the
 current analysis considers one year of measurements for one station at a time" — so nothing in their
-method asks whether the power that left one substation turned up at another. Flexpectation intends
-to look for both sides of the transfer: when one substation's metered power drops, the substations
-that picked the load up should rise at the same moment, and their rises should sum to the drop. A
-step whose rise and drop fail to balance is more likely a meter fault or a one-off than a switch.
-That mismatch is where a per-substation detector spends its false positives. The catch is that an
-NGED transfer
-usually fans out across two or three neighbours, so the search runs over subsets of neighbours
-rather than over pairs, and the balance holds only approximately. We looked for a method that checks
-both sides, across OpenAlex, Semantic Scholar, Crossref, arXiv, the works citing [Bouman et al.
+method asks whether the power that left one substation turned up at another.
+
+**Flexpectation intends to look for both sides of the transfer.** When one substation's metered
+power drops, the substations that picked the load up should rise at the same moment, and their rises
+should sum to the drop. A step whose rise and drop fail to balance is more likely a meter fault or a
+one-off than a switch. That mismatch is where a per-substation detector spends its false positives.
+The catch is that an NGED transfer usually fans out across two or three neighbours, so the search
+runs over subsets of neighbours rather than over pairs, and the balance holds only approximately.
+
+**We looked for a method that checks both sides, and found none.** The search ran across OpenAlex,
+Semantic Scholar, Crossref, arXiv, the works citing [Bouman et al.
 (2024)](https://arxiv.org/abs/2405.16164), and the project titles on the Energy Networks
-Association's Smarter Networks Portal, and found none. The closest is [Willis et al.
-(1984)](https://doi.org/10.1109/TPAS.1984.318713), a regression that corrects annual peak-load curve
-fits for long-range planning rather than detecting an event at a point in time, and that needs
-neither the size nor the direction of a transfer as an input. The title names a "load transfer
-coupling" regression, which suggests the fit couples the substations that exchange load — the
-feature that would make it the closest precedent — but we could not obtain the full text to check,
-and the abstract does not say.
+Association's Smarter Networks Portal.
+
+**The closest published precedent is a 1984 regression written for long-range planning.** [Willis et
+al. (1984)](https://doi.org/10.1109/TPAS.1984.318713) correct annual peak-load curve fits rather
+than detecting an event at a point in time, and their regression needs neither the size nor the
+direction of a transfer as an input. The title names a "load transfer coupling" regression, which
+suggests the fit couples the substations that exchange load — the feature that would make it the
+closest precedent — but we could not obtain the full text to check, and the abstract does not say.
 
 ### 5. Forecasting a substation as if it were always in its normal running arrangement
 
