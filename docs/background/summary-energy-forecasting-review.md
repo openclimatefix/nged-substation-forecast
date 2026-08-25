@@ -11,12 +11,13 @@ and is referred to below as "the full review".
 
 **No honest review of this literature can name a canonical state of the art.** Energy forecasting
 papers measure performance in different ways against different datasets, so the literature cannot
-rank the approaches it contains. What it does show is that a gradient-boosted tree is the sensible
-place to start — the choice NGED's own Electricity Flexibility and Forecasting System reached
-independently in 2021 — while giving no evidence of a large, dependable margin for anything more
-sophisticated at substation level. We found no study driving a probabilistic substation forecast
-from a weather ensemble across a 14-day horizon, none modelling the tails explicitly at substation
-level, and none explicitly modelling unmetered generation inside such a forecast.
+rank the approaches it contains — like an international football tournament where every team plays
+by different rules, with different size goals. What it does show is that a gradient-boosted tree is
+the sensible place to start — the choice NGED's own Electricity Flexibility and Forecasting System
+reached independently in 2021 — while giving no evidence of a large, dependable margin for anything
+more sophisticated at substation level. We found no study driving a probabilistic substation
+forecast from a weather ensemble across a 14-day horizon, none modelling the tails explicitly at
+substation level, and none explicitly modelling unmetered generation inside such a forecast.
 
 **One concurrent GB project is further ahead than Flexpectation, and four of Flexpectation's eight
 challenges have no counterpart in that project's published material.** Northern Powergrid's
@@ -31,18 +32,10 @@ from the forecast sits in both tails of the distribution: the upper tail, where 
 procurement holds demand under a limit, and the lower tail, where curtailment holds export under
 that same limit.
 
-The caveat above is worth spelling out. In 2026, no honest review of the energy forecasting
-literature can claim to reveal the canonical "state of the art"! That is because (almost) all energy
-forecasting papers measure performance in different ways, against different datasets. It's like an
-international football tournament where every team plays by different rules, with different size
-goals.
-
-Energy forecasting researchers have done great work over the years. But, unfortunately, the
-literature does not tell us how those approaches compare against each other, especially in messy
-"real world" energy forecasting scenarios. This isn't anyone's fault; it's a systemic failure. And
-the industry is already aware of this problem, and people are trying to fix it. But, at the time of
-writing, the literature cannot yet tell us the current state of the art solutions for the challenges
-that NGED cares about.
+Energy forecasting researchers have done great work over the years, and the lack of comparability is
+nobody's fault: it's a systemic failure, the industry is already aware of it, and people are trying
+to fix it. But the literature still does not tell us how those approaches compare against each
+other, especially in messy "real world" energy forecasting scenarios.
 
 Having said that, there have been some valiant attempts to compare multiple forecasting approaches
 against the same dataset. But none of these attempts directly address the main challenges relevant
