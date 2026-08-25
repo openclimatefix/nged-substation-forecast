@@ -1841,7 +1841,7 @@ says so rather than being left blank.
 | [SP Energy Networks' Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/) | Network faults, not load | Per district | Up to 7 days | A probability distribution driven by a weather ensemble |
 | [Fox et al. (2018)](https://doi.org/10.34890/134) (SP Energy Networks) | The effect of weather on past peak demand, not a forward forecast | 13 primary substations in the proof of concept, almost 400 in production | Backwards over 10 years | None |
 | [OpenSTEF](https://lfenergy.org/projects/openstef/) (Alliander, the Netherlands) | Net load, with a splitter into solar, wind, and residual parts | Thousands of grid connection points | To 48 hours | Yes; the framework is built for probabilistic forecasting |
-| [Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058) (Enedis, France) | Consumption and generation | All 2,300 high-voltage-to-medium-voltage substations | Not stated in the abstract | Not stated in the abstract |
+| [Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058) (Enedis, France) | Consumption and generation at the substation since 2015; the finer-grid method the paper describes covers consumption only | All 2,300 high-voltage-to-medium-voltage substations, extending to 3,678 of the more than 5,000 transformers inside them, and towards 750,000 medium-to-low-voltage substations | Not stated in the paper; the forecasts run at 10- or 30-minute resolution | None stated in the paper |
 | **Flexpectation** | Net demand, with unmetered generation inferred | 32 series in the trial area; 52 grid supply points, 271 bulk supply points, and 1,161 primary substations at network scale | 14 days, updated every 6 hours | A 51-member ECMWF ensemble across the whole horizon |
 
 **Scottish and Southern Electricity Networks' TRANSITION is the closest precedent for
@@ -1891,11 +1891,19 @@ component splitter that breaks a net-load forecast into solar, wind, and residua
 operational relative of challenge 7, though a far simpler one than [Teng et al.
 (2023)](https://doi.org/10.1016/j.rser.2023.113662) describe. And Enedis, the French distribution
 network operator, has forecast all 2,300 of its high-voltage-to-medium-voltage substations since
-2015, a level broadly equivalent to a GB primary substation, and is now extending that to a finer
-geographic grid ([Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058), whose abstract we
-read rather than the full paper). Forecasting operationally at the scale Flexpectation reaches in
-2027 is therefore a decade old somewhere else, which is reassuring about the engineering and says
-nothing about the forecast quality, because the abstract we read reports no accuracy figures.
+2015, a level broadly equivalent to a GB primary substation, and is now extending that forecast
+below the substation: to 3,678 of the more than 5,000 transformers inside those substations, each
+with its own XGBoost model, and towards the 750,000 medium-to-low-voltage substations beyond them
+([Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058)). Forecasting operationally at the
+scale Flexpectation reaches in 2027 is therefore a decade old somewhere else, which is reassuring
+about the engineering. Fitting a model to each transformer beat the method Enedis runs in
+production, which shares one substation forecast out across its transformers by fixed coefficients:
+6.0% against 9.3% mean absolute percentage error on the day those coefficients were refreshed, and
+8.1% against 13.0% across the whole test period, with 84% of transformers better under their own
+model. Three things temper that result. Cordier et al. do not say what their percentage error is
+normalised by; the medium-to-low-voltage step was tested on about 100 substations using measured
+rather than forecast inputs, so it measures the disaggregation rather than the forecast; and the
+authors report that "the performance of the complete pipeline has not yet been evaluated".
 
 ### Northern Powergrid's Artificial Forecasting is further ahead, and sets the bar
 
