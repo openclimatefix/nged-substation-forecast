@@ -1,64 +1,60 @@
 # The current state of the art in energy forecasting: a summary
 
 This is a short version of a literature review Open Climate Fix carried out for National Grid
-Electricity Distribution (NGED), as part of the Flexpectation project. This summary is meant to be
-readable on its own. The full review, which cites 101 sources and gives the evidence behind every
-claim here, is [published
+Electricity Distribution (NGED), as part of the Flexpectation NIA project. This summary is readable
+on its own. The full literature review, which cites over 100 sources and gives the evidence behind
+every claim in this shorter summary, is [published
 online](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/),
 and is referred to below as "the full review".
 
 ## Executive summary
 
-**No honest review of this literature can name a canonical state of the art.** Energy forecasting
-papers measure performance in different ways against different datasets, so the literature cannot
-rank the approaches it contains — like an international football tournament where every team plays
-by different rules, with different size goals. What it does show is that a gradient-boosted tree is
-the sensible place to start — the choice NGED's own Electricity Flexibility and Forecasting System
-reached independently in 2021 — while giving no evidence of a large, dependable margin for anything
-more sophisticated at substation level. We found no study driving a probabilistic substation
-forecast from a weather ensemble across a 14-day horizon, none modelling the tails explicitly at
-substation level, and none explicitly modelling unmetered generation inside such a forecast.
+**No honest review of the energy forecasting literature can name a canonical state of the art.**
+Energy forecasting papers measure performance in different ways against different datasets, so the
+literature cannot rank the approaches it contains — like an international football tournament where
+every team plays by different rules, with different size goals. Energy forecasting researchers have
+done great work over the years, and the lack of comparability is nobody's fault: it's a systemic
+failure, the industry is already aware of it, and people are trying to fix it. 
 
-**One concurrent GB project is further ahead than Flexpectation, and four of Flexpectation's eight
-challenges have no counterpart in that project's published material.** Northern Powergrid's
-Artificial Forecasting has run operationally through a full winter flexibility procurement cycle,
-which is the clearest available evidence that a forecast of this kind changes what a network does.
-The four challenges Artificial Forecasting's published material leaves untouched are tracking the
-effective capacity of metered generators; forecasting a substation as if it were always in its
-normal running arrangement; inferring unmetered solar and wind from a substation's net flow; and
-doing the same for heat pumps, chargers, and batteries. Three published results point against parts
-of the plan, and we intend to test all three rather than avoid them. Throughout, the value NGED gets
-from the forecast sits in both tails of the distribution: the upper tail, where flexibility
-procurement holds demand under a limit, and the lower tail, where curtailment holds export under
-that same limit.
+**What the literature *does* show is that the machine learning approach Flexpectation version 1 uses
+— a gradient-boosted tree — is a sensible place to start**. The literature provides no conclusive
+evidence of a large, dependable improvement for anything more sophisticated at substation level.
 
-Energy forecasting researchers have done great work over the years, and the lack of comparability is
-nobody's fault: it's a systemic failure, the industry is already aware of it, and people are trying
-to fix it. But the literature still does not tell us how those approaches compare against each
-other, especially in messy "real world" energy forecasting scenarios.
+**Flexpectation is ambitious. Several aspects of Flexpectation have no precedent in the literature
+we reviewed.** For example, we found no papers driving a probabilistic substation forecast from a
+weather ensemble across a 14-day horizon, none modelling the tails explicitly at substation level,
+and none explicitly modelling unmetered generation inside such a forecast.
 
-Having said that, there have been some valiant attempts to compare multiple forecasting approaches
-against the same dataset. But none of these attempts directly address the main challenges relevant
-to Flexpectation. Before we discuss those attempts, we must emphasise two reasons for optimism:
+**Northern Powergrid's Artificial Forecasting project is further ahead than Flexpectation. But four
+of the eight challenges in Flexpectation have no counterpart in Artificial Forecasting's published
+material.** Northern Powergrid's Artificial Forecasting has run operationally through a full winter
+flexibility procurement cycle, which is the clearest available evidence that a forecast of this kind
+changes what a DNO does. The four challenges that Flexpectation proposes to solve that are not
+mentioned in Artificial Forecasting's published material are: tracking the effective capacity of
+metered generators; forecasting a substation as if it were always in its normal running arrangement;
+inferring unmetered solar and wind from a substation's net flow; and — as a stretch goal — doing the
+same for heat pumps, chargers, and batteries.
 
-## Reasons for optimism
+**The value NGED gets from the forecast sits in both tails of the distribution**: the upper tail,
+where flexibility procurement holds demand under a limit, and the lower tail, where curtailment
+holds export under that same limit.
 
-Firstly, whilst we might not know exactly which algorithms provide the best forecasting performance,
-we *do* know how to *research and develop* a state of the art forecast. There's no magic. Machine
-learning is an empirical science, and most research ideas fail. John Jumper, who shared the 2024
-Nobel Prize in Chemistry for his work on AlphaFold, puts the share of research ideas that fail at
-around 90%, and treats that rate as an ordinary and necessary feature of doing research rather than
-as evidence of doing it badly ([Nobel Week interview](https://youtu.be/nNM1QdmFwIs?t=852), 6
-December 2024, from 14:12). So progress comes largely from being able to quickly test many ideas
-under identical conditions and carefully measure performance. We have built an MLOps framework that
-should allow us to test research ideas as efficiently as possible.
+**Whilst the literature we found does not tell us exactly which algorithms provide the best
+forecasting performance, the literature *is* clear on how to *research and develop* a state of the
+art forecast**. There's no magic. Machine learning is an empirical science, and most research ideas
+fail. John Jumper, who shared the 2024 Nobel Prize in Chemistry for his work on AlphaFold, puts the
+share of research ideas that fail at around 90%, and treats that rate as an ordinary and necessary
+feature of doing research rather than as evidence of doing it badly ([Nobel Week
+interview](https://youtu.be/nNM1QdmFwIs?t=852), 6 December 2024, from 14:12). So progress comes
+largely from being able to quickly test many ideas under identical conditions and carefully measure
+performance. We have built an MLOps framework that should allow us to test research ideas as
+efficiently as possible.
 
-Secondly — and perhaps most importantly — the fact that the industry doesn't yet know the state of
-the art is a huge opportunity for the Flexpectation project: We are in a very privileged position
-where we can try hundreds of ideas, and test the best ideas in the real world. We have a fantastic
-opportunity to make a significant contribution to the energy forecasting industry by publishing our
-"leaderboards of ML experiments", and hence help the industry as a whole to better understand how
-multiple approaches perform.
+**The fact that the industry doesn't yet know the state of the art is a huge opportunity for the
+Flexpectation project.** We are in a very privileged position where we can try hundreds of ideas,
+and test the best ideas in the real world. We have a fantastic opportunity to make a significant
+contribution to the energy forecasting industry by publishing our "leaderboards of ML experiments",
+and hence help the industry as a whole to better understand how multiple approaches perform.
 
 ## AI disclosure
 
