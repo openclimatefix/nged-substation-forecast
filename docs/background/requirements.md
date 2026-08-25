@@ -32,8 +32,10 @@ phenomena *implicitly*. That said, explicit estimates are genuinely wanted where
 them:
 
 * Track the **effective capacity** of metered generators over time (turbine failures, inverter
-  faults, PV panel degradation), ignoring NGED-imposed ANM curtailment — including detecting
-  misbehaving generators.
+  faults, PV panel degradation), ignoring NGED-imposed Active Network Management curtailment —
+  including detecting misbehaving generators. Curtailment is excluded here because a curtailed
+  generator is being held down rather than broken, and the point of a better forecast is to
+  curtail it less often.
 * Detect and compensate for **switching events** — where power is diverted from one substation
   to another due to maintenance, changing the local demand signature. (Whether this ships as a
   discrete event table or as continuous switching-state signals is an open question — see
@@ -51,15 +53,24 @@ decide unilaterally.
 
 ### The worst case matters most: forecasting threshold exceedance
 
-NGED's need for these forecasts is driven by **flexibility procurement**: deciding, days
-ahead, whether to pay flexible customers to reduce their demand when a substation risks
-running beyond its capability. So the question users ask of a forecast is rarely "what is the
-most likely load?" and usually "**how likely is load to cross this limit?**" — NGED's
-[incumbent forecasting tool](nged-incumbent-forecast.md#the-operators-view) literally plots
-demand as headroom below a constraint line. The project's value therefore concentrates in the
-**upper tail** of each forecast distribution: a model that is excellent on typical half-hours
-but unreliable in the handful of near-limit hours has failed at the job. This is why the
-delivery quantiles are deliberately tail-heavy, and why evaluation includes
+NGED put two costs on these forecasts and rate them at least equally. The first is
+**flexibility procurement**: deciding, days ahead, whether to pay flexible customers to reduce
+their demand when a substation risks running beyond its capability. The second is **generator
+curtailment**: holding embedded generation down through Active Network Management when export
+risks running beyond that same capability. So the question users ask of a forecast is rarely
+"what is the most likely load?" and usually "**how likely is net demand to cross this
+limit?**" — NGED's [incumbent forecasting tool](nged-incumbent-forecast.md#the-operators-view)
+literally plots demand as headroom below a constraint line.
+
+The project's value therefore concentrates in **both tails** of each forecast distribution: a
+model that is excellent on typical half-hours but unreliable in the handful of near-limit
+hours has failed at the job, and the near-limit hours sit at both ends. Flexibility
+procurement turns on the upper tail, where demand rises towards firm capacity, and bites in
+winter. Curtailment turns on the lower tail, where export rises towards that same capability
+because embedded generation is high and demand is low, and bites in summer. The 13
+`DELIVERY_QUANTILES` are deliberately tail-heavy at both ends and symmetric about the median —
+p1, p2 and p5 matching p95, p98 and p99 — so the delivery shape already serves both decisions.
+This is why evaluation includes
 [tail & exceedance metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
 alongside average-error metrics. (One honest complication: a substation's real limit is not a
 single number — it varies with ambient temperature and with how long an overload lasts — so
