@@ -7,11 +7,36 @@ claim here, is [published
 online](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/),
 and is referred to below as "the full review".
 
-Before we discuss the literature, there is a very important caveat to admit up-front: In 2026, no
-honest review of the energy forecasting literature can claim to reveal the canonical "state of the
-art"! That is because (almost) all energy forecasting papers measure performance in different ways,
-against different datasets. It's like an international football tournament where every team plays by
-different rules, with different size goals.
+## Executive summary
+
+**No published work matches what Flexpectation is being asked to build, and no honest review of this
+literature can name a canonical state of the art.** Energy forecasting papers measure performance in
+different ways against different datasets, so the literature cannot rank the approaches it contains.
+What it does show is that a gradient-boosted tree is the sensible place to start — the choice NGED's
+own Electricity Flexibility and Forecasting System reached independently in 2021 — while giving no
+evidence of a large, dependable margin for anything more sophisticated at substation level. We found
+no study driving a probabilistic substation forecast from a weather ensemble across a 14-day
+horizon, none modelling the tails explicitly at substation level, and none putting unmetered
+generation inside such a forecast.
+
+**One concurrent GB project is further ahead than Flexpectation, and six of Flexpectation's eight
+challenges have no counterpart in that project's published material.** Northern Powergrid's
+Artificial Forecasting has run operationally through a full winter flexibility procurement cycle,
+which is the clearest available evidence that a forecast of this kind changes what a network does.
+The six challenges Artificial Forecasting's published material leaves untouched are detecting
+switching events; forecasting a substation as if it were always in its normal running arrangement;
+tracking the effective capacity of metered generators; spotting faulty metering; inferring unmetered
+solar and wind from a substation's net flow; and doing the same for heat pumps, chargers, and
+batteries. Three published results point against parts of the plan, and we intend to test all three
+rather than avoid them. Throughout, the value NGED gets from the forecast sits in both tails of the
+distribution: the upper tail, where flexibility procurement holds demand under a limit, and the
+lower tail, where curtailment holds export under that same limit.
+
+The caveat above is worth spelling out. In 2026, no honest review of the energy forecasting
+literature can claim to reveal the canonical "state of the art"! That is because (almost) all energy
+forecasting papers measure performance in different ways, against different datasets. It's like an
+international football tournament where every team plays by different rules, with different size
+goals.
 
 Energy forecasting researchers have done great work over the years. But, unfortunately, the
 literature does not tell us how those approaches compare against each other, especially in messy
@@ -112,9 +137,9 @@ other seven exist mainly to improve our net-demand forecast.
 
 #### What the literature says
 
-A large literature exists on the topic of forecasting substation load, but very little of what we
+**A large literature exists on the topic of forecasting substation load, but very little of what we
 read can be compared with the rest of that literature, and we found no papers driving a
-probabilistic substation forecast from a weather ensemble across a 14-day horizon. Two of the
+probabilistic substation forecast from a weather ensemble across a 14-day horizon.** Two of the
 sources this review draws on share a network operator: all four authors of [Mesarcik et al.
 (2025)](https://doi.org/10.1049/icp.2025.1968) are at Alliander, the Dutch distribution network
 operator, and two of the six authors of [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) —
@@ -348,8 +373,8 @@ market prices and operator decisions.
 
 #### What the literature says
 
-Forecasting wind and solar from a weather forecast is a well-studied area, and one paper matches
-Flexpectation's challenge closely. Nothing we found forecasts a distribution-connected battery or
+**Forecasting wind and solar from a weather forecast is a well-studied area, and one paper matches
+Flexpectation's challenge closely.** Nothing we found forecasts a distribution-connected battery or
 gas generator inside a net-demand forecast; the closest case for the biofuel plant is a biomass
 forecast at Austrian primary substations, [Ruhhütl et al.
 (2023)](https://doi.org/10.1049/icp.2023.0476).
@@ -545,10 +570,10 @@ rating cannot see the difference.
 
 #### What the literature says
 
-A method exists for each generation technology separately, but we found none run across a mixed
+**A method exists for each generation technology separately, but we found none run across a mixed
 fleet of individually metered generators at a distribution network, and the two studies that measure
 what estimating capacity is worth downstream measure it for wind alone, at national or single-farm
-scale.
+scale.**
 
 #### What this means for Flexpectation
 
@@ -604,8 +629,8 @@ scale to the wider network has to work from power measurements alone.
 
 #### What the literature says
 
-We found several papers on detecting switching events from metered load, but all these approaches
-only consider one substation at a time. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)
+**We found several papers on detecting switching events from metered load, but all these approaches
+only consider one substation at a time.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)
 detect switching at a real network operator, but detect it in the gap between the substation's own
 meter and a second estimate of the same load, built from smart-meter and bulk-customer readings
 taken below the substation. A Korean series of four papers detects load transfers on a distribution
@@ -698,10 +723,10 @@ closest precedent — but we could not obtain the full text to check, and the ab
 
 #### The challenge
 
-NGED plan their network against what each substation would carry under its normal running
+NGED plans its network against what each substation would carry under its normal running
 arrangement, and that same quantity is what Flexpectation has to predict — including for a
 substation that has been sitting in an abnormal arrangement for weeks. Forecasting *through* an
-abnormal arrangement is a weaker requirement, and not the one NGED have. A model can take lagged
+abnormal arrangement is a weaker requirement, and not the one NGED has. A model can take lagged
 power inputs from inside an abnormal period and stay well-behaved anyway, yet still report what the
 substation will carry rather than what the substation would have carried under its normal
 arrangement. Predicting that quantity makes the forecasting target something that was never metered,
@@ -710,7 +735,7 @@ configured describe a different scenario from the scenario being forecast.
 
 #### What the literature says
 
-Researchers respond in one of three ways: leaving the level shifts in and paying for them, as
+**Researchers respond in one of three ways:** leaving the level shifts in and paying for them, as
 [Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405) do; rewriting the
 history, as [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) do; or adapting
 to the new level, as [de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) do.
@@ -804,8 +829,8 @@ history was stuck is worse than one that says it is degraded.
 
 #### What the literature says
 
-Faulty metering is usually a data-cleaning step mentioned in passing rather than a problem in its
-own right. The only public labelled dataset we found is Dutch. Western Power Distribution, NGED's
+**Faulty metering is usually a data-cleaning step mentioned in passing rather than a problem in its
+own right.** The only public labelled dataset we found is Dutch. Western Power Distribution, NGED's
 predecessor, attempted to recover the direction of flow from a magnitude-only meter, and an
 automatic version of that recovery is still open.
 
@@ -838,10 +863,10 @@ stretch goal for the trial area and a requirement for the network-wide scale-up.
 
 #### What the literature says
 
-Splitting generation out of a substation's net flow has been done where the generation is metered or
-its capacity is read from a register. Inferring the capacity from the net flow instead has also been
-done, but at low-voltage substations serving tens of customers rather than at a primary. Uncertainty
-and a multi-day horizon each appear in this literature, but never together.
+**Splitting generation out of a substation's net flow has been done where the generation is metered
+or its capacity is read from a register.** Inferring the capacity from the net flow instead has also
+been done, but at low-voltage substations serving tens of customers rather than at a primary.
+Uncertainty and a multi-day horizon each appear in this literature, but never together.
 
 #### What this means for Flexpectation
 
@@ -901,8 +926,8 @@ them separately rather than letting them sit inside net demand.
 
 #### What the literature says
 
-Heat pumps, chargers, and batteries are the largest gap in the review and the largest deliberate
-omission from our search. In the one study we found that measures charger forecast skill against
+**Heat pumps, chargers, and batteries are the largest gap in the review and the largest deliberate
+omission from our search.** In the one study we found that measures charger forecast skill against
 aggregation, [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1), only the site
 with more than 100 charge points was significantly better than a naive benchmark, though some models
 at one much smaller site also beat it. Heat-pump diversity is untested in the cold weather that
@@ -1299,7 +1324,7 @@ and 5; none for "effective capacity" or "derating", which is challenge 3; and no
 metering" or "metering fault", which is challenge 6. Heat pumps and electric vehicles do appear, as
 drivers of demand growth and as model features rather than as quantities separated out of a net
 flow. Flexpectation also delivers 1st and 99th percentiles where Artificial Forecasting's published
-bands run from the 5th to the 95th, and the curtailment decisions NGED describe turn on those outer
+bands run from the 5th to the 95th, and the curtailment decisions NGED describes turn on those outer
 levels.
 
 ## Why we think this ambitious plan can be done

@@ -977,10 +977,10 @@ conditions its forecast on an operating-state label, for a switch of a different
 both hands a model the record of when the network was abnormal and refuses to let the model predict
 those periods.
 
-**The challenge.** NGED plan the network against what each substation would carry under its normal
+**The challenge.** NGED plans the network against what each substation would carry under its normal
 running arrangement, so that is what the forecast has to predict — including for a substation that
 has been sitting in an abnormal arrangement for weeks. Forecasting *through* an abnormal arrangement
-is a weaker requirement, and not the one NGED have. A model can take lagged power inputs from inside
+is a weaker requirement, and not the one NGED has. A model can take lagged power inputs from inside
 an abnormal period and stay well-behaved anyway, yet still report what the substation will carry
 rather than what the substation would have carried under its normal arrangement. That makes the
 target a quantity that was never metered, and it makes the training history contaminated: past
@@ -1027,7 +1027,7 @@ and they stop being a target.** The plan is to label each substation's abnormal 
 explicitly, hand those labels to the model as features so it can read its own lagged power inputs
 correctly when a lag falls inside an abnormal period, and drop the abnormal half-hours from the
 training target, so the model is never asked to predict an abnormal arrangement and learns the
-normal-arrangement quantity NGED plan against.
+normal-arrangement quantity NGED plans against.
 
 **The nearest published precedent for the first half sits inside a substation, where the
 never-metered-target problem does not arise.** [Liu et al.
@@ -2104,7 +2104,7 @@ and 5; none for "effective capacity" or "derating", which is challenge 3; and no
 metering" or "metering fault", which is challenge 6. Heat pumps and electric vehicles do appear, as
 drivers of demand growth and as model features rather than as quantities separated out of a net
 flow. Flexpectation also delivers 1st and 99th percentiles where Artificial Forecasting's published
-bands run from the 5th to the 95th, and the curtailment decisions NGED describe turn on those outer
+bands run from the 5th to the 95th, and the curtailment decisions NGED describes turn on those outer
 levels.
 
 ## Set against this literature, what we plan is ambitious, and here is why we think it can be done
