@@ -7,7 +7,7 @@ over 100 sources and gives the evidence behind every claim in this shorter summa
 online](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/),
 and is referred to below as "the full review".
 
-## Executive summary
+## Summary
 
 **No honest review of the energy forecasting literature can name a canonical state of the art.**
 Energy forecasting papers measure performance in different ways against different datasets, so the
@@ -31,8 +31,8 @@ thermal physics up to a substation and putting that physics inside a probabilist
 none reading a substation forecast off a pre-trained weather encoder. That said, we are confident
 this ambition is justified because it allows us to build an ML model that can reason simultaneously
 about the various causes of variation in substation demand. And we are confident we can deliver on
-this ambitious vision because we have already built the foundations of an MLOps framework that will
-allow us to run ML experiments efficiently.
+this ambitious vision because we have already built the foundations of a software framework that
+will allow us to run ML experiments efficiently.
 
 **Northern Powergrid's Artificial Forecasting project is further ahead than Flexpectation. But four
 of the eight challenges in Flexpectation have no counterpart we could find in Artificial
@@ -45,15 +45,16 @@ goal — doing the same for heat pumps, chargers, and batteries.
 
 **The value NGED gets from the forecast sits in both tails of the distribution**: the upper tail,
 where flexibility procurement holds demand under a limit, and the lower tail, where curtailment
-holds export under that same limit.
+holds export under that same limit. Yet, most energy forecasting research is focused on the *middle*
+of the distribution.
 
 **The literature holds a wealth of knowledge on measuring the performance of power forecasts, and
 several traps to avoid.** Mean absolute error rewards flat forecasts that are of little use for
 either flexibility or curtailment decisions: a peak predicted an hour late is penalised twice, once
-for the peak that did not happen and once for the peak that was missed, and a featureless forecast
-avoids both penalties. Two teams reached that conclusion independently, and both went on to score
-the peaks separately. Ranking well on one measure also says little about the others: across 200
-German low-voltage feeders, the two models that came first and second on the peaks in an
+for the peak that did not happen and once for the peak that was missed, and an overly smooth
+forecast avoids both penalties. Two teams reached that conclusion independently, and both went on to
+score the peaks separately. Ranking well on one measure also says little about other measures:
+across 200 German low-voltage feeders, the two models that came first and second on the peaks in an
 overload-decision metric stated their own uncertainty badly, their 90% ranges containing the true
 value less than half the time at exactly those peaks.
 
@@ -75,9 +76,9 @@ efficiently as possible.
 
 **The fact that the industry doesn't yet know the state of the art is a huge opportunity for the
 Flexpectation project.** We are in a very privileged position where we can try hundreds of ideas,
-and test the best ideas in the real world. We have a fantastic opportunity to make a significant
-contribution to the energy forecasting industry by publishing our "leaderboards of ML experiments",
-and hence help the industry as a whole to better understand how multiple approaches perform.
+and test the best ideas in the real world. We have an opportunity to make a significant contribution
+to the energy forecasting industry by publishing leaderboards of ML experiments, and hence help the
+industry as a whole to better understand how multiple approaches perform.
 
 ## AI disclosure
 
@@ -158,17 +159,68 @@ cited under challenges 4 and 6 below — are at Alliander as well, the other fou
 University. Agreement between the two papers is therefore not independent evidence about how a
 method carries from one network to another.
 
-| Source | What they forecast | Level and scale | Horizon | Result, and what it was compared against | Weather |
-|---|---|---|---|---|---|
-| [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) | Net load, Germany | 200 low-voltage feeders | 4 days | A general-purpose foundation model that had never seen the data beat every purpose-trained model on average error, 3.8 kW against 4.2 kW | 1–3 h forecasts, so effectively after the fact at the 4-day horizon |
-| [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) | Load, Germany and Portugal | Transmission, plus 200 low-voltage feeders and 287 individual customers | 4 days | Best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage feeders, 23.3% at individual customers | 1–3 h forecasts at the feeders, reanalysis (a modelled reconstruction of past weather) elsewhere |
-| [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) | Regional net load, GB | Regional: 14 grid supply point groups | Day-ahead | Held the same risk with **up to 24.6% less upward reserve** than a fixed-tail alternative, falling to 3.2% at the least extreme risk level tested | Real forecasts |
-| [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) | Load, Portugal | 96,989 secondary substations | Day-ahead | 42–47% better than the reference benchmark at system level. **At substation level, beat a naive forecast on 83–87% of network-owned and 66–70% of customer-owned sites** (the paper's body text and the caption of a figure on the next page give different pairs of numbers for that statistic, so the ranges span both)  | Real forecasts, 7–8 h old |
-| [Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) | Load, GB | 4 levels: primary substation down to household | Day-ahead | Combining forecasts gained **0.0–0.4% averaged over all periods**, but **5.7–9.0% when restricted to peaks** | None at all |
-| [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | 13 primary substations, plus their bulk supply points and their 33 kV and 11 kV feeders | 30 minutes to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted  | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
-| [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondary substations | Day-ahead to week-ahead at primary, evaluated to 11 days; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method  | Real forecasts at primary; none in the published secondary results |
-| [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Primary substations, count not stated | Day-ahead | **3–8% mean absolute percentage error** for load, against no baseline the paper states, so not a target; varying with how industrial and how large the supplied area was. Generation is forecast per technology: photovoltaic to **1–5% of installed power**, run-of-river and biomass to **5–15%** mean absolute percentage error. Linear and Gaussian regression preferred over tree regression and a neural network | Real forecasts of global radiation, temperature, and precipitation, from a weather station chosen per substation |
-| [Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) | Active power in the medium-voltage grid, Netherlands | Trained on 312 Alliander substations over 10 years; tested on 6 chosen for difficult forecasting behaviour | 2 days | **Mean relative mean absolute error 0.07** at the 50th quantile, against 0.08 for a gradient-boosted machine and 0.09 for a linear model — both OpenSTEF models already in production at Alliander. Error scaled by the signal's own 1st and 99th percentiles, not by a rating | Open-Meteo, 4 variables; their model trained on actual weather where the two baselines trained on 1-hour-ahead forecasts |
+**Nine sources report a result specific enough to record. Each entry below gives what was forecast
+and at what scale, the horizon, the result and the baseline the result was measured against, and the
+weather input.**
+
+**[Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) — net load at 200 low-voltage feeders in
+Germany, 4 days ahead.** A general-purpose foundation model that had never seen the data beat every
+purpose-trained model on average error, 3.8 kW against 4.2 kW. Weather: 1–3 h forecasts, so
+effectively after the fact at the 4-day horizon.
+
+**[Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) — load in Germany and Portugal, at
+transmission level, 200 low-voltage feeders, and 287 individual customers, 4 days ahead.** Their
+best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage
+feeders, and 23.3% at individual customers. Weather: 1–3 h forecasts at the feeders, reanalysis (a
+modelled reconstruction of past weather) elsewhere.
+
+**[Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) — regional net load at 14 grid
+supply point groups in GB, day-ahead.** Their forecast held the same risk with **up to 24.6% less
+upward reserve** than a fixed-tail alternative, falling to 3.2% at the least extreme risk level
+tested. Weather: real forecasts.
+
+**[Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) — load at 96,989
+secondary substations in Portugal, day-ahead.** Their forecast was 42–47% better than the reference
+benchmark at system level, and **at substation level beat a naive forecast on 83–87% of
+network-owned and 66–70% of customer-owned sites** (the paper's body text and the caption of a
+figure on the next page give different pairs of numbers for that statistic, so the ranges span
+both). Weather: real forecasts, 7–8 h old.
+
+**[Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) — load in GB at 4 levels, primary
+substation down to household, day-ahead.** Combining forecasts gained **0.0–0.4% averaged over all
+periods**, but **5.7–9.0% when restricted to peaks**. Weather: none at all.
+
+**[SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) — net load in Oxfordshire at 13
+primary substations, plus their bulk supply points and their 33 kV and 11 kV feeders, 30 minutes to
+10 days ahead.** The project reported **11 of 13 primary substation models below 10%** mean absolute
+percentage error when fitted. Weather: 40-member ICON-EU ensemble to 4 days, then one deterministic
+forecast to 10 days.
+
+**[Artificial Forecasting (Northern
+Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) — demand and export at 551
+primary substations with export data, 171 of them modelled, and active power at 729 secondary
+substations; day-ahead to week-ahead at primary, evaluated to 11 days, and week- to month-ahead at
+secondary.** The published results give **about 8% lower mean absolute error** of utilisation rate
+than the network's existing method. Weather: real forecasts at primary; none in the published
+secondary results.
+
+**[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) — load and generation at Austrian
+primary substations, count not stated, day-ahead.** The paper reports **3–8% mean absolute
+percentage error** for load, against no baseline the paper states, so not a target; varying with how
+industrial and how large the supplied area was. Generation is forecast per technology: photovoltaic
+to **1–5% of installed power**, run-of-river and biomass to **5–15%** mean absolute percentage
+error. Linear and Gaussian regression were preferred over tree regression and a neural network.
+Weather: real forecasts of global radiation, temperature, and precipitation, from a weather station
+chosen per substation.
+
+**[Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) — active power in the
+medium-voltage grid in the Netherlands, trained on 312 Alliander substations over 10 years and
+tested on 6 chosen for difficult forecasting behaviour, 2 days ahead.** Their model reached a **mean
+relative mean absolute error of 0.07** at the 50th quantile, against 0.08 for a gradient-boosted
+machine and 0.09 for a linear model — both OpenSTEF models already in production at Alliander. Error
+scaled by the signal's own 1st and 99th percentiles, not by a rating. Weather: Open-Meteo, 4
+variables; their model trained on actual weather where the two baselines trained on 1-hour-ahead
+forecasts.
 
 #### What this means for Flexpectation
 
@@ -220,7 +272,7 @@ with day of year. That shared feature set carried no irradiance and no wind, tho
 downloaded held both. So no published head-to-head we found gives a GBT the feature engineering we
 plan to implement in Flexpectation version 1.
 
-**None of the numbers in the table above is a target for Flexpectation, because the studies cannot
+**None of the numbers above is a target for Flexpectation, because the studies cannot
 be compared even with each other.** [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) and
 [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) name different models as best, even though
 they use data from the same 200 low-voltage feeders in Germany. Inside [Kaas et al.
