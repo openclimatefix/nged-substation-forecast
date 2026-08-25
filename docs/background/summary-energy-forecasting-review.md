@@ -259,6 +259,8 @@ connectivity, so whether NGED's own connectivity map improves a forecast is stil
 strong result, and we found nobody aggregating building thermal physics up to a substation and
 putting it inside a probabilistic forecast, though the ingredients exist separately.
 
+##### Pre-trained encoders
+
 **The case for pre-training an encoder rests on results from computer vision and Earth observation
 rather than from energy forecasting.** The idea is to train one model on a very large body of data
 until the model can turn a raw input into a compact numerical summary that keeps what matters and
