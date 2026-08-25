@@ -82,13 +82,13 @@ evidence behind each row.
 
 | Challenge | Closest published precedent | What this means for Flexpectation |
 |---|---|---|
-| 1. Probabilistic net-demand forecasts at substations | [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) at 551 primary substations, [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) at 96,989 Portuguese secondary substations, [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) at 13 | A gradient-boosted tree is a defensible default for Flexpectation version 1, but the literature paints one as a sensible starting point rather than a proven winner |
+| 1. Probabilistic net-demand forecasts at substations | [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) at 551 primary substations, [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) at 96,989 Portuguese secondary substations, [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) at 13 | A gradient-boosted tree (GBT) is a defensible default for Flexpectation version 1, but the literature paints GBTs as a sensible starting point rather than a proven winner |
 | 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 GB wind farms from the ECMWF ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Gradient-boosted trees fitted separately for each kind of generator are the standard approach, and what won when teams were scored against each other on the same data; a higher-resolution deterministic forecast beat the ensemble at short lead times |
 | 3. Estimating the effective capacity of metered generators | A method for each generation technology separately, most of them working from a revenue meter alone | Flexpectation version 1 needs an estimator that can track effective capacity downwards, which is exactly where the two published wind methods differ |
 | 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers on one feeder; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | The one published result scoring both precision and recall reports an F1.5 score of about 0.2 to 0.5, achieved with a second load estimate NGED does not have, so Flexpectation should expect worse rather than better |
-| 5. Forecasting through an abnormal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Every published solution throws information away, so Flexpectation version 1 makes the abnormal periods an input and stops making them a target |
+| 5. Forecasting a substation as if it were always in its normal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Every published solution throws information away. In contrast, Flexpectation version 1 makes the abnormal periods an input to the ML model, and masks the abnormal periods in the training target |
 | 6. Detecting faulty metering | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s Dutch dataset, the one public labelled set we found, which merges metering faults and switching into a single class | There is no GB number to beat, so whatever precision and recall Flexpectation publishes becomes the first — cheap to do and worth doing |
-| 7. Disaggregating unmetered solar and wind | [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) transferring from fully-metered Dutch substations, and [UK Power Networks' NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/), this work's direct predecessor | NIA_UKPN0104 used the same method on the same kind of GB data with the same delivery partner, so Flexpectation starts from its method rather than from scratch |
+| 7. Disaggregating unmetered solar and wind | [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) transferring from fully-metered Dutch substations, and [UK Power Networks' NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/), this work's direct predecessor | UK Power Networks' unmetered-solar project used the same method on the same kind of GB data with the same delivery partner, so Flexpectation starts from that method rather than from scratch |
 | 8. Disaggregating heat pumps, chargers, and batteries | [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1) on aggregated charging demand day-ahead | Heat pumps, chargers, and batteries stay inside net demand in Flexpectation version 1 rather than being forecast separately |
 
 ### 1. Probabilistic forecasts of net demand at substations
@@ -633,7 +633,11 @@ NGED plan their network against what each substation would carry under its norma
 arrangement,
 and that same quantity is what Flexpectation has to predict — including for a substation that has
 been sitting in an
-abnormal arrangement for weeks. Predicting that quantity makes the forecasting target something that
+abnormal arrangement for weeks. Forecasting *through* an abnormal arrangement is the weaker
+requirement and not the one NGED have: a model whose lagged power inputs fall inside an abnormal
+period, and which stays well-behaved anyway, still reports what the substation will carry rather
+than what the substation would have carried under its normal arrangement. Predicting that quantity
+makes the forecasting target something that
 was never metered, and leaves the training history contaminated: past readings taken while the
 network was abnormally
 configured describe a different scenario from the scenario being forecast.
@@ -1264,8 +1268,9 @@ Society*.
 - Campagne, E., Amara-Ouali, Y., Goude, Y., Zehavi, I. and Kalogeratos, A. (2025). [Graph Neural
 Networks for Electricity Load Forecasting](https://arxiv.org/abs/2507.03690).
 - Cordier, G. et al. (2024). [Methods and techniques used to produce electricity forecasts on
-Enedis’ distribution network at a finer grid than the HV/MV
-substation](https://doi.org/10.1049/icp.2024.2058). *IET Conference Proceedings*.
+  Enedis’ distribution network at a finer grid than the HV/MV
+  substation](https://doi.org/10.1049/icp.2024.2058). *CIRED 2024 Vienna Workshop*, in *IET
+  Conference Proceedings*.
 - Dantas, G. and Browell, J. (2026). [Seamless Short‐ to Mid‐Term Probabilistic Wind Power
 Forecasting](https://doi.org/10.1002/we.70079). *Wind Energy*.
 - de Vilmarest, J., Browell, J., Fasiolo, M., Goude, Y. and Wintenberger, O. (2024). [Adaptive
@@ -1351,9 +1356,10 @@ Innovative Smart Grid Technologies Europe*.
 - Meng, B., Loonen, R. and Hensen, J. L. M. (2020). [Data-driven inference of unknown tilt and
 azimuth of distributed PV systems](https://doi.org/10.1016/j.solener.2020.09.077). *Solar Energy*.
 - Mesarcik, M., Loke, J., Wildeboer, J. and Lucassen, B. (2025). [Probabilistic day-ahead power
-forecasting in the medium-voltage grid using state space
-models](https://doi.org/10.1049/icp.2025.1968). *IET Conference Proceedings*. The version of record
-is paywalled; we read the authors' own copy, which is titled "…Using Structured State Space Models".
+  forecasting in the medium-voltage grid using state space
+  models](https://doi.org/10.1049/icp.2025.1968). *CIRED 2025*, in *IET Conference Proceedings*. The
+  version of record is paywalled; we read the authors' own copy, which is titled "…Using Structured
+  State Space Models".
 - Messner, J. W., Pinson, P., Browell, J., Bjerregård, M. B. and Schicker, I. (2020). [Evaluation of
 wind power forecasts — An up-to-date view](https://doi.org/10.1002/we.2497). *Wind Energy*.
 - Meyer, M., Kaltenpoth, S., Albers, H., Zalipski, K. and Müller, O. (2026). [TS-Arena: A Live
@@ -1383,7 +1389,8 @@ substations](https://doi.org/10.1016/j.apenergy.2022.120493). *Applied Energy*.
 - Rasp, S. and Lerch, S. (2018). [Neural networks for post-processing ensemble weather
 forecasts](https://arxiv.org/abs/1805.09091). *Monthly Weather Review*.
 - Ruhhütl, M., Schmaranz, R. and Dietrichsteiner, T. (2023). [Load and generation forecast on
-substation level](https://doi.org/10.1049/icp.2023.0476). *IET Conference Proceedings*.
+  substation level](https://doi.org/10.1049/icp.2023.0476). *CIRED 2023, Rome*, in *IET Conference
+  Proceedings*.
 - Saint-Drenan, Y.-M., Bofinger, S., Fritz, R., Vogt, S., Good, G. H. and Dobschinski, J. (2015).
 [An empirical approach to parameterizing photovoltaic plants for power forecasting and
 simulation](https://doi.org/10.1016/j.solener.2015.07.024). *Solar Energy*.
