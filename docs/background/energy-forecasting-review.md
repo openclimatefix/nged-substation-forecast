@@ -295,12 +295,14 @@ That is why a summation constraint is not enough for Flexpectation. The nearest 
 exception we found is [Jung et al. (2026)](https://doi.org/10.1109/ACCESS.2026.3678038), who feed
 which busbar connects to which into a graph neural network: one node per bus, one edge per physical
 line, taken from a real feeder in Gyeonggi-do, South Korea. Jung et al. forecast voltage magnitude
-and phase angle directly rather than load, and beat the conventional pipeline — a long short-term
-memory load forecast followed by a Newton-Raphson power flow — only under rapidly increasing load;
+and phase angle directly rather than load. Their method beat the conventional pipeline — a long
+short-term memory load forecast followed by a Newton-Raphson power flow — only under rapidly
+increasing load;
 under steady load the difference was "not statistically significant". Two things limit how far the
 result carries to Flexpectation. The voltages Jung et al. train and score against are computed by
 power flow rather than metered, on a 10-bus radial feeder they call modified and simplified. And
-they assume "the network topology remains fixed throughout the analysis", noting that in practice
+Jung et al. assume "the network topology remains fixed throughout the analysis", noting that in
+practice
 "the topology may change over time due to switching operations, fault restoration procedures, or
 maintenance activities" — which is the case challenge 4 is about.
 
@@ -914,9 +916,9 @@ those periods.
 **The challenge.** NGED plan the network against what each substation would carry under its normal
 running arrangement, so that is what the forecast has to predict — including for a substation that
 has been sitting in an abnormal arrangement for weeks. Forecasting *through* an abnormal arrangement
-is the weaker requirement and not the one NGED have: a model whose lagged power inputs fall inside
-an abnormal period, and which stays well-behaved anyway, still reports what the substation will
-carry rather than what the substation would have carried under its normal arrangement. That makes
+is a weaker requirement, and not the one NGED have. A model can take lagged power inputs from inside
+an abnormal period and stay well-behaved anyway, yet still report what the substation will carry
+rather than what the substation would have carried under its normal arrangement. That makes
 the target a quantity that was
 never metered, and it makes the training history contaminated: past readings taken while the network
 was abnormally configured describe a different substation from the one being forecast.
@@ -1909,13 +1911,14 @@ with its own XGBoost model, and towards the 750,000 medium-to-low-voltage substa
 ([Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058)). Forecasting operationally at the
 scale Flexpectation reaches in 2027 is therefore a decade old somewhere else, which is reassuring
 about the engineering. Fitting a model to each transformer beat the method Enedis runs in
-production, which shares one substation forecast out across its transformers by fixed coefficients:
-6.0% against 9.3% mean absolute percentage error on the day those coefficients were refreshed, and
-8.1% against 13.0% across the whole test period, with 84% of transformers better under their own
-model. Three things temper that result. Cordier et al. do not say what their percentage error is
-normalised by; the medium-to-low-voltage step was tested on about 100 substations using measured
-rather than forecast inputs, so it measures the disaggregation rather than the forecast; and the
-authors report that "the performance of the complete pipeline has not yet been evaluated".
+production, which shares one substation forecast out across its transformers by fixed coefficients.
+The per-transformer models scored 6.0% against 9.3% mean absolute percentage error on the day those
+coefficients were refreshed, and 8.1% against 13.0% across the whole test period, with 84% of
+transformers better under their own model. Three things temper that result. Cordier et al. do not
+say what their percentage error is normalised by. The medium-to-low-voltage step was tested on about
+100 substations using measured rather than forecast inputs, so it measures the disaggregation rather
+than the forecast. And the authors report that "the performance of the complete pipeline has not yet
+been evaluated".
 
 ### Northern Powergrid's Artificial Forecasting is further ahead, and sets the bar
 
