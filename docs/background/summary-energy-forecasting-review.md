@@ -125,11 +125,12 @@ method carries from one network to another.
 | [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | 13 primary substations, plus their bulk supply points and their 33 kV and 11 kV feeders | 30 minutes to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted  | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
 | [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondary substations | Day-ahead to week-ahead at primary, evaluated to 11 days; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method  | Real forecasts at primary; none in the published secondary results |
 | [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Substation | Day-ahead | **3–8% mean absolute percentage error** against no stated baseline, so not a target; varying with how industrial and how large the supplied area was; linear and Gaussian regression preferred over the alternatives tested (abstract only) | Not stated in the abstract |
-| [Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) | Power in the medium-voltage grid, Netherlands | 312 substations, from 10 years of measurements | Day-ahead | Not stated in the abstract | Not stated in the abstract |
+| [Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) | Active power in the medium-voltage grid, Netherlands | Trained on 312 Alliander substations over 10 years; tested on 6 chosen for difficult forecasting behaviour | 2 days | **Mean relative mean absolute error 0.07** at the 50th quantile, against 0.08 for a gradient-boosted machine and 0.09 for a linear model — both OpenSTEF models already in production at Alliander. Error scaled by the signal's own 1st and 99th percentiles, not by a rating | Open-Meteo, 4 variables; their model trained on actual weather where the two baselines trained on 1-hour-ahead forecasts |
 
 #### What this means for Flexpectation
 
-**Building Flexpectation version 1 on a gradient-boosted tree (GBT, such as XGBoost) is defensible, but the
+**Building Flexpectation version 1 on a gradient-boosted tree (GBT, such as XGBoost) is defensible,
+but the
 literature paints GBTs as a sensible default rather than a proven winner**. [NGED's own 2021 EFFS
 project (Electricity Flexibility and Forecasting
 System)](https://smarter.energynetworks.org/projects/wpden03/) picked XGBoost on the balance of
@@ -143,8 +144,13 @@ and rejected the boosted tree on the cost of tuning it and on the interpretabili
 [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) kept the
 simpler model when forecasting customer export at primary substations: measured against the Bayesian
 ridge regression they went on to adopt, boosted trees "helped some substations but harmed others".
-[Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) make the same point from the other end of
-the sophistication scale, because their purpose-built Transformer variant lost to a standard
+[Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) raise a separate caution, about the
+uncertainty a boosted tree reports rather than the accuracy it reaches: on the one substation whose
+calibration they plot, their gradient-boosted machine's 95th percentile forecast corresponded to the
+80th percentile of the measured data, while a structured state space model and a linear quantile
+model both tracked the ideal calibration line closely. [Hertel et al.
+(2026)](https://arxiv.org/abs/2607.15705) make the same point from the other end of the
+sophistication scale, because their purpose-built Transformer variant lost to a standard
 encoder-decoder Transformer on all three of their datasets. What did help [Hertel et al.
 (2026)](https://arxiv.org/abs/2607.15705) was refitting the model every month rather than
 redesigning it: on both datasets where they tried it, the retrained model beat the static one. So,
@@ -1241,165 +1247,167 @@ Every source cited above, in alphabetical order by first author. The full review
 sources that this summary does not.
 
 - Bian, Y., Zheng, N., Zheng, Y., Xu, B. and Shi, Y. (2024). [Predicting Strategic Energy Storage
-  Behaviors](https://doi.org/10.1109/TSG.2023.3303469). *IEEE Transactions on Smart Grid*.
+Behaviors](https://doi.org/10.1109/TSG.2023.3303469). *IEEE Transactions on Smart Grid*.
 - Bouman, R., Schmeitz, L., Buise, L., Heres, J., Shapovalova, Y. and Heskes, T. (2024). [Acquiring
-  Better Load Estimates by Combining Anomaly and Change Point Detection in Power Grid Time-series
-  Measurements](https://arxiv.org/abs/2405.16164). *Sustainable Energy, Grids and Networks*.
+Better Load Estimates by Combining Anomaly and Change Point Detection in Power Grid Time-series
+Measurements](https://arxiv.org/abs/2405.16164). *Sustainable Energy, Grids and Networks*.
 - Browell, J. and Fasiolo, M. (2021). [Probabilistic Forecasting of Regional Net-load with
-  Conditional Extremes and Gridded NWP](https://arxiv.org/abs/2103.10335). *IEEE Transactions on
-  Smart Grid*.
-- Browell, J., van der Meer, D., Kälvegren, H., Haglund, S., Simioni, E., Bessa, R. J. and Wang, Y. (2025). [The hybrid renewable energy forecasting and trading competition
-  2024](https://doi.org/10.1016/j.ijforecast.2025.10.005). *International Journal of Forecasting*.
+Conditional Extremes and Gridded NWP](https://arxiv.org/abs/2103.10335). *IEEE Transactions on
+Smart Grid*.
+- Browell, J., van der Meer, D., Kälvegren, H., Haglund, S., Simioni, E., Bessa, R. J. and Wang, Y.
+(2025). [The hybrid renewable energy forecasting and trading competition
+2024](https://doi.org/10.1016/j.ijforecast.2025.10.005). *International Journal of Forecasting*.
 - Buizza, R. and Leutbecher, M. (2015). [The forecast skill
-  horizon](https://doi.org/10.1002/qj.2619). *Quarterly Journal of the Royal Meteorological
-  Society*.
+horizon](https://doi.org/10.1002/qj.2619). *Quarterly Journal of the Royal Meteorological
+Society*.
 - Campagne, E., Amara-Ouali, Y., Goude, Y., Zehavi, I. and Kalogeratos, A. (2025). [Graph Neural
-  Networks for Electricity Load Forecasting](https://arxiv.org/abs/2507.03690).
+Networks for Electricity Load Forecasting](https://arxiv.org/abs/2507.03690).
 - Cordier, G. et al. (2024). [Methods and techniques used to produce electricity forecasts on
-  Enedis’ distribution network at a finer grid than the HV/MV
-  substation](https://doi.org/10.1049/icp.2024.2058). *IET Conference Proceedings*.
+Enedis’ distribution network at a finer grid than the HV/MV
+substation](https://doi.org/10.1049/icp.2024.2058). *IET Conference Proceedings*.
 - Dantas, G. and Browell, J. (2026). [Seamless Short‐ to Mid‐Term Probabilistic Wind Power
-  Forecasting](https://doi.org/10.1002/we.70079). *Wind Energy*.
+Forecasting](https://doi.org/10.1002/we.70079). *Wind Energy*.
 - de Vilmarest, J., Browell, J., Fasiolo, M., Goude, Y. and Wintenberger, O. (2024). [Adaptive
-  Probabilistic Forecasting of Electricity (Net-)Load](https://doi.org/10.1109/TPWRS.2023.3310280).
-  *IEEE Transactions on Power Systems*.
+Probabilistic Forecasting of Electricity (Net-)Load](https://doi.org/10.1109/TPWRS.2023.3310280).
+*IEEE Transactions on Power Systems*.
 - Doubleday, K., Van Scyoc Hernandez, V. and Hodge, B. M. (2020). [Benchmark probabilistic solar
-  forecasts: Characteristics and recommendations](https://doi.org/10.1016/j.solener.2020.05.051).
-  *Solar Energy*.
+forecasts: Characteristics and recommendations](https://doi.org/10.1016/j.solener.2020.05.051).
+*Solar Energy*.
 - Electricity North West (2018). [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/).
 - Fildes, R. (2020). [Learning from forecasting
-  competitions](https://doi.org/10.1016/j.ijforecast.2019.04.012). *International Journal of
-  Forecasting*.
+competitions](https://doi.org/10.1016/j.ijforecast.2019.04.012). *International Journal of
+Forecasting*.
 - Fox, J., Plecas, M., Neilson, D., Cannon, D. and Parr, J. (2018). [Analysis of local demand trends
-  and forecasting through weather correction and benefit to DSO transistion and
-  microgrids](https://doi.org/10.34890/134). *CIRED Workshop, Ljubljana*.
+and forecasting through weather correction and benefit to DSO transistion and
+microgrids](https://doi.org/10.34890/134). *CIRED Workshop, Ljubljana*.
 - Gijón, A., Eiraudo, S., Manjavacas, A., Schiera, D. S., Molina-Solana, M. and Gómez-Romero, J.
-  (2025). [Integrating Physics and Data-Driven Approaches: An Explainable and Uncertainty-Aware
-  Hybrid Model for Wind Turbine Power Prediction](https://arxiv.org/abs/2502.07344). *Computer
-  Physics Communications*.
+(2025). [Integrating Physics and Data-Driven Approaches: An Explainable and Uncertainty-Aware
+Hybrid Model for Wind Turbine Power Prediction](https://arxiv.org/abs/2502.07344). *Computer
+Physics Communications*.
 - Gilbert, C., Browell, J. and Stephen, B. (2023). [Probabilistic load forecasting for the low
-  voltage network: forecast fusion and daily peaks](https://arxiv.org/abs/2206.11745). *Sustainable
-  Energy, Grids and Networks*.
+voltage network: forecast fusion and daily peaks](https://arxiv.org/abs/2206.11745). *Sustainable
+Energy, Grids and Networks*.
 - Gouveia, A. M. V., Hashmi, M. U., D’hulst, R. and Van Hertem, D. (2026). [Installed PV capacity
-  detection on LV substations: Comparison of Data-Driven and Model-Based
-  methods](https://doi.org/10.1016/j.ijepes.2026.111848). *International Journal of Electrical Power
-  and Energy Systems*.
+detection on LV substations: Comparison of Data-Driven and Model-Based
+methods](https://doi.org/10.1016/j.ijepes.2026.111848). *International Journal of Electrical Power
+and Energy Systems*.
 - Haben, S., Giasemidis, G., Ziel, F. and Arora, S. (2019). [Short term load forecasting and the
-  effect of temperature at the low voltage level](https://doi.org/10.1016/j.ijforecast.2018.10.007).
-  *International Journal of Forecasting*.
+effect of temperature at the low voltage level](https://doi.org/10.1016/j.ijforecast.2018.10.007).
+*International Journal of Forecasting*.
 - Haben, S., Arora, S., Giasemidis, G., Voss, M. and Greetham, D. V. (2021). [Review of Low Voltage
-  Load Forecasting: Methods, Applications, and Recommendations](https://arxiv.org/abs/2106.00006).
-  *Applied Energy*.
+Load Forecasting: Methods, Applications, and Recommendations](https://arxiv.org/abs/2106.00006).
+*Applied Energy*.
 - Hertel, M., Pütz, S., Kolar, J., Schäfer, B., Mikut, R. and Hagenmeyer, V. (2026). [A Benchmark
-  for Electrical Load Forecasting Across Grid Levels: Time-Series Transformers Outperform
-  Established Methods](https://arxiv.org/abs/2607.15705).
+for Electrical Load Forecasting Across Grid Levels: Time-Series Transformers Outperform
+Established Methods](https://arxiv.org/abs/2607.15705).
 - Hong, T., Pinson, P., Wang, Y., Weron, R., Yang, D. and Zareipour, H. (2020). [Energy Forecasting:
-  A Review and Outlook](https://doi.org/10.1109/OAJPE.2020.3029979). *IEEE Open Access Journal of
-  Power and Energy*.
+A Review and Outlook](https://doi.org/10.1109/OAJPE.2020.3029979). *IEEE Open Access Journal of
+Power and Energy*.
 - Hüttel, F. B., Rodrigues, F. and Pereira, F. C. (2023). [Mind the Gap: Modelling Difference
-  Between Censored and Uncensored Electric Vehicle Charging
-  Demand](https://arxiv.org/abs/2301.06418). *Transportation Research Part C: Emerging
-  Technologies*.
+Between Censored and Uncensored Electric Vehicle Charging
+Demand](https://arxiv.org/abs/2301.06418). *Transportation Research Part C: Emerging
+Technologies*.
 - Huyghues-Beaufond, N., Tindemans, S., Falugi, P., Sun, M. and Strbac, G. (2020). [Robust and
-  automatic data cleansing method for short-term load forecasting of distribution
-  feeders](https://doi.org/10.1016/j.apenergy.2019.114405). *Applied Energy*.
+automatic data cleansing method for short-term load forecasting of distribution
+feeders](https://doi.org/10.1016/j.apenergy.2019.114405). *Applied Energy*.
 - Hyndman, R. J. (2020). [A brief history of forecasting
-  competitions](https://doi.org/10.1016/j.ijforecast.2019.03.015). *International Journal of
-  Forecasting*.
+competitions](https://doi.org/10.1016/j.ijforecast.2019.03.015). *International Journal of
+Forecasting*.
 - Jumper, J. (2024). [Nobel Week interview](https://youtu.be/nNM1QdmFwIs?t=852). Nobel Prize YouTube
-  channel, 6 December 2024.
+channel, 6 December 2024.
 - Kaas, B., Treutlein, M., Gerber, H. B., Neumann, O., Phatthanakhuha, C., Resch, O., Mikut, R. and
-  Hagenmeyer, V. (2026). [Probabilistic Low-Voltage Peak Load Forecasting with Time Series
-  Foundation Models Evaluated on Application-Oriented Metrics](https://arxiv.org/abs/2607.01966).
+Hagenmeyer, V. (2026). [Probabilistic Low-Voltage Peak Load Forecasting with Time Series
+Foundation Models Evaluated on Application-Oriented Metrics](https://arxiv.org/abs/2607.01966).
 - Kim, J.-H., Lee, B.-S. and Kim, C.-H. (2020). [A Study on the Development of Machine-Learning
-  Based Load Transfer Detection Algorithm for Distribution Planning](https://doi.org/10.3390/en13174358).
-  *Energies*.
+Based Load Transfer Detection Algorithm for Distribution
+Planning](https://doi.org/10.3390/en13174358).
+*Energies*.
 - Kim, J.-H., Joung, J.-M. and Lee, B.-S. (2022). [A Study on the Preprocessing Method for Power
-  System Applications Based on Polynomial and Standard Patterns](https://doi.org/10.3390/en15041441).
-  *Energies*.
+System Applications Based on Polynomial and Standard Patterns](https://doi.org/10.3390/en15041441).
+*Energies*.
 - Kim, J.-H. (2024). [A Study on the Detection Method of Load Transfer in Distribution System Using
-  Time Series Decomposition](https://doi.org/10.5370/KIEE.2024.73.11.1873). *The Transactions of The
-  Korean Institute of Electrical Engineers*.
+Time Series Decomposition](https://doi.org/10.5370/KIEE.2024.73.11.1873). *The Transactions of The
+Korean Institute of Electrical Engineers*.
 - Kim, J.-H. (2025). [Unsupervised Load Transfer Detection Based on Wavelet Change Point
-  Analysis and Isolation Forest](https://doi.org/10.5370/KIEE.2025.74.11.1757). *The
-  Transactions of The Korean Institute of Electrical Engineers*.
+Analysis and Isolation Forest](https://doi.org/10.5370/KIEE.2025.74.11.1757). *The
+Transactions of The Korean Institute of Electrical Engineers*.
 - Kleinebrahm, M. et al. (2026). [Energy-Arena: A Dynamic Benchmark for Operational Energy
-  Forecasting](https://arxiv.org/abs/2604.24705). *2026 International Conference on the European
-  Energy Market*.
+Forecasting](https://arxiv.org/abs/2604.24705). *2026 International Conference on the European
+Energy Market*.
 - Kryshtafovych, A., Schwede, T., Topf, M., Fidelis, K. and Moult, J. (2021). [Critical assessment
-  of methods of protein structure prediction (CASP) — Round
-  XIV](https://doi.org/10.1002/prot.26237). *Proteins: Structure, Function, and Bioinformatics*.
+of methods of protein structure prediction (CASP) — Round
+XIV](https://doi.org/10.1002/prot.26237). *Proteins: Structure, Function, and Bioinformatics*.
 - LF Energy. [OpenSTEF](https://lfenergy.org/projects/openstef/).
 - Liu, H., Wang, Y., Wei, C., Li, J. and Lin, Y. (2019). [Two-Stage Short-Term Load Forecasting for
-  Power Transformers Under Different Substation Operating
-  Conditions](https://doi.org/10.1109/ACCESS.2019.2951422). *IEEE Access*.
+Power Transformers Under Different Substation Operating
+Conditions](https://doi.org/10.1109/ACCESS.2019.2951422). *IEEE Access*.
 - Ludwig, N., Arora, S. and Taylor, J. W. (2023). [Probabilistic load forecasting using
-  post-processed weather ensemble predictions](https://doi.org/10.1080/01605682.2022.2115411).
-  *Journal of the Operational Research Society*.
+post-processed weather ensemble predictions](https://doi.org/10.1080/01605682.2022.2115411).
+*Journal of the Operational Research Society*.
 - McSweeney, L., Haben, S. and Young, S. (2023). [Data Science Challenges; A Whole Systems Lens for
-  Energy Network Solutions](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541). *2023 IEEE PES
-  Innovative Smart Grid Technologies Europe*.
+Energy Network Solutions](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541). *2023 IEEE PES
+Innovative Smart Grid Technologies Europe*.
 - Meng, B., Loonen, R. and Hensen, J. L. M. (2020). [Data-driven inference of unknown tilt and
-  azimuth of distributed PV systems](https://doi.org/10.1016/j.solener.2020.09.077). *Solar Energy*.
+azimuth of distributed PV systems](https://doi.org/10.1016/j.solener.2020.09.077). *Solar Energy*.
 - Mesarcik, M., Loke, J., Wildeboer, J. and Lucassen, B. (2025). [Probabilistic day-ahead power
-  forecasting in the medium-voltage grid using state space
-  models](https://doi.org/10.1049/icp.2025.1968). *IET Conference Proceedings*. Paywalled; we read
-  only the abstract.
+forecasting in the medium-voltage grid using state space
+models](https://doi.org/10.1049/icp.2025.1968). *IET Conference Proceedings*. The version of record
+is paywalled; we read the authors' own copy, which is titled "…Using Structured State Space Models".
 - Messner, J. W., Pinson, P., Browell, J., Bjerregård, M. B. and Schicker, I. (2020). [Evaluation of
-  wind power forecasts — An up-to-date view](https://doi.org/10.1002/we.2497). *Wind Energy*.
+wind power forecasts — An up-to-date view](https://doi.org/10.1002/we.2497). *Wind Energy*.
 - Meyer, M., Kaltenpoth, S., Albers, H., Zalipski, K. and Müller, O. (2026). [TS-Arena: A Live
-  Forecast Pre-Registration Platform](https://arxiv.org/abs/2512.20761). *Proceedings of the 32nd
-  ACM SIGKDD Conference on Knowledge Discovery and Data Mining*.
+Forecast Pre-Registration Platform](https://arxiv.org/abs/2512.20761). *Proceedings of the 32nd
+ACM SIGKDD Conference on Knowledge Discovery and Data Mining*.
 - Mitra, P. and Ramavajjala, V. (2023). [Learning to forecast diagnostic parameters using
-  pre-trained weather embedding](https://arxiv.org/abs/2312.00290).
+pre-trained weather embedding](https://arxiv.org/abs/2312.00290).
 - National Energy System Operator. [Embedded wind and solar
-  forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts).
+forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts).
 - Nguyen, T. N. and Müsgens, F. (2026). [A meta-analysis of solar forecasting based on skill
-  score](https://doi.org/10.1063/5.0300682). *Journal of Renewable and Sustainable Energy*.
+score](https://doi.org/10.1063/5.0300682). *Journal of Renewable and Sustainable Energy*.
 - Northern Powergrid (2024). [Artificial Forecasting, Alpha
-  phase](https://smarter.energynetworks.org/projects/npg_sif_006-1/).
+phase](https://smarter.energynetworks.org/projects/npg_sif_006-1/).
 - Northern Powergrid (2024). [Detecting LCTs from Smart Meter Consumption
-  Data](https://smarter.energynetworks.org/projects/npg_nia_-49/).
+Data](https://smarter.energynetworks.org/projects/npg_nia_-49/).
 - Ostermann, A. and Haug, T. (2024). [Probabilistic forecast of electric vehicle charging demand:
-  analysis of different aggregation levels and energy
-  procurement](https://doi.org/10.1186/s42162-024-00319-1). *Energy Informatics*.
+analysis of different aggregation levels and energy
+procurement](https://doi.org/10.1186/s42162-024-00319-1). *Energy Informatics*.
 - Paredes, G. and Vargas, L. (2017). [Adjustment of discrete load changes in feeder databases for
-  improving medium‐term demand forecasting](https://doi.org/10.1049/iet-gtd.2017.0129). *IET
-  Generation, Transmission & Distribution*.
+improving medium‐term demand forecasting](https://doi.org/10.1049/iet-gtd.2017.0129). *IET
+Generation, Transmission & Distribution*.
 - Pierrot, A. and Pinson, P. (2024). [On Tracking Varying Bounds When Forecasting Bounded Time
-  Series](https://doi.org/10.1080/00401706.2024.2350421). *Technometrics*.
+Series](https://doi.org/10.1080/00401706.2024.2350421). *Technometrics*.
 - Pinheiro, M. G., Madeira, S. C. and Francisco, A. P. (2023). [Short-term electricity load
-  forecasting—A systematic approach from system level to secondary
-  substations](https://doi.org/10.1016/j.apenergy.2022.120493). *Applied Energy*.
+forecasting—A systematic approach from system level to secondary
+substations](https://doi.org/10.1016/j.apenergy.2022.120493). *Applied Energy*.
 - Rasp, S. and Lerch, S. (2018). [Neural networks for post-processing ensemble weather
-  forecasts](https://arxiv.org/abs/1805.09091). *Monthly Weather Review*.
+forecasts](https://arxiv.org/abs/1805.09091). *Monthly Weather Review*.
 - Ruhhütl, M., Schmaranz, R. and Dietrichsteiner, T. (2023). [Load and generation forecast on
-  substation level](https://doi.org/10.1049/icp.2023.0476). *IET Conference Proceedings*.
+substation level](https://doi.org/10.1049/icp.2023.0476). *IET Conference Proceedings*.
 - Saint-Drenan, Y.-M., Bofinger, S., Fritz, R., Vogt, S., Good, G. H. and Dobschinski, J. (2015).
-  [An empirical approach to parameterizing photovoltaic plants for power forecasting and
-  simulation](https://doi.org/10.1016/j.solener.2015.07.024). *Solar Energy*.
+[An empirical approach to parameterizing photovoltaic plants for power forecasting and
+simulation](https://doi.org/10.1016/j.solener.2015.07.024). *Solar Energy*.
 - Salinas, D., Flunkert, V., Gasthaus, J. and Januschowski, T. (2020). [DeepAR:
-  Probabilistic forecasting with autoregressive recurrent
-  networks](https://doi.org/10.1016/j.ijforecast.2019.07.001). *International Journal of
-  Forecasting*.
+Probabilistic forecasting with autoregressive recurrent
+networks](https://doi.org/10.1016/j.ijforecast.2019.07.001). *International Journal of
+Forecasting*.
 - Scottish and Southern Electricity Networks (2021).
-  [TRANSITION](https://ssen-innovation.co.uk/transition/).
+[TRANSITION](https://ssen-innovation.co.uk/transition/).
 - Scottish and Southern Electricity Networks (2025). [FastTrack, Alpha Round
-  4](https://smarter.energynetworks.org/projects/10166254/).
+4](https://smarter.energynetworks.org/projects/10166254/).
 - Shukla, S. and Hong, T. (2024). [BigDEAL Challenge 2022: Forecasting peak timing of electricity
-  demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
+demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
 - SP Energy Networks (2023).
-  [Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/).
+[Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/).
 - Teng, S., Cambier van Nooten, C., van Doorn, J., Ottenbros, A., Huijbregts, M. and Jansen, J.
-  (2023). [Near real-time predictions of renewable electricity production at substation level via
-  domain adaptation zero-shot learning in sequence](https://doi.org/10.1016/j.rser.2023.113662).
-  *Renewable and Sustainable Energy Reviews*.
+(2023). [Near real-time predictions of renewable electricity production at substation level via
+domain adaptation zero-shot learning in sequence](https://doi.org/10.1016/j.rser.2023.113662).
+*Renewable and Sustainable Energy Reviews*.
 - UK Power Networks. [NIA_UKPN0104](https://smarter.energynetworks.org/projects/nia_ukpn0104/).
 - Viotti, O., Arnqvist, J. and Olauson, J. (2026). [Estimating Wind‐Power Capacity Time Series From
-  Production Data Using a Power Curve Model and Quadratic
-  Optimization](https://doi.org/10.1002/we.70136). *Wind Energy*.
+Production Data Using a Power Curve Model and Quadratic
+Optimization](https://doi.org/10.1002/we.70136). *Wind Energy*.
 - Western Power Distribution (2021). [Electricity Flexibility and Forecasting System
-  (EFFS)](https://smarter.energynetworks.org/projects/wpden03/).
+(EFFS)](https://smarter.energynetworks.org/projects/wpden03/).
 - Willis, H. L., Powell, R. D. and Wall, D. L. (1984). [Load Transfer Coupling Regression
-  Curve Fitting for Distribution Load Forecasting](https://doi.org/10.1109/TPAS.1984.318713).
-  *IEEE Transactions on Power Apparatus and Systems*.
+Curve Fitting for Distribution Load Forecasting](https://doi.org/10.1109/TPAS.1984.318713).
+*IEEE Transactions on Power Apparatus and Systems*.

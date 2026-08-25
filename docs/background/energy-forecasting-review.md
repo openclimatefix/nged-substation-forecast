@@ -179,6 +179,7 @@ and irradiance that drive substation load.
 | [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | Primary substation: 13, plus their bulk supply points and their 33 kV and 11 kV feeders | 30 min to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted (note 2) | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
 | [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | Primary substation: 551 with export data, 171 modelled; secondary: 729 | Day-ahead to 11 days at primary; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method (note 3) | Real forecasts at primary; none in the published secondary results |
 | [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Substation | Day-ahead | **3 to 8% mean absolute percentage error**, varying with how industrial and how large the supplied area was; linear and Gaussian regression preferred over the alternatives tested (abstract only, note 5) | Not stated in the abstract |
+| [Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) | Active power in the medium-voltage grid, Netherlands | Trained on 312 Alliander substations over 10 years; tested on 6 chosen for difficult forecasting behaviour | 2 days | **Mean relative mean absolute error 0.07** at the 50th quantile, against 0.08 for a gradient-boosted machine and 0.09 for a linear model — both OpenSTEF models already in production at Alliander. Error scaled by the signal's own 1st and 99th percentiles, not by a rating | Open-Meteo, 4 variables; their model trained on actual weather where the two baselines trained on 1-hour-ahead forecasts |
 
 *Notes.* **1.** The 24.6% saving is at the most extreme tail level [Browell and Fasiolo
 (2021)](https://arxiv.org/abs/2103.10335) tested, and falls to 3.2% at the least extreme. **2.** The
@@ -236,7 +237,7 @@ resolution, per substation, across a full 14-day horizon — and both [Haben et 
 though neither names a resolution or a horizon.
 
 **Almost every study here optimises average accuracy, but NGED's question is about the top of the
-distribution.**  [Browell and Fasiolo
+distribution.** [Browell and Fasiolo
 (2021)](https://arxiv.org/abs/2103.10335) is the one study here that models the upper tail
 explicitly, and what they found is a warning rather than a reassurance: they work across risk levels
 from 0.01% to 0.25%, one of which — 0.05%, or one part in two thousand — corresponds to reserve
@@ -244,7 +245,11 @@ being sufficient in all but about four hours a year — but they also find that 
 99% the forecasts based on quantile regression only are not calibrated at any GSP Group. Therefore,
 these quantiles are not suitable for use in decision-making", even with five years of half-hourly
 data across regions far larger than a substation. Above the 1st and 99th percentiles, Browell and
-Fasiolo switch to a fitted parametric tail.
+Fasiolo switch to a fitted parametric tail. [Mesarcik et al.
+(2025)](https://doi.org/10.1049/icp.2025.1968) report the same kind of failure from a different
+model family: on the one substation whose calibration they plot, a gradient-boosted machine's 95th
+percentile forecast corresponded to the 80th percentile of the measured data, while their structured
+state space model and a linear quantile model both tracked the ideal calibration line closely.
 
 **A decision metric that holds risk constant and prices it in money has been published at
 distribution level once, on a synthetic network.** [Bernecker et al.
@@ -2062,8 +2067,9 @@ produces an operational load or generation forecast in the days-to-fortnight ban
 the long-horizon load forecasts in the proceedings are annual planning forecasts, and the only
 14-day forecast predicts feeder faults rather than load. Fourteen forecast probabilistically at all,
 of which one is at substation scale — [Mesarcik et al.
-(2025)](https://doi.org/10.1049/icp.2025.1968), day-ahead, on ten years of measurements from 312
-Dutch substations, written by a team all of whom are at Alliander — the same Dutch network operator
+(2025)](https://doi.org/10.1049/icp.2025.1968), trained on ten years of measurements from 312 Dutch
+substations and tested on six of them, written by a team all of whom are at Alliander — the same
+Dutch network operator
 that employs two of the six authors of [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164),
 cited under challenges 4 and 6 above, whose other four authors are at Radboud University. Agreement
 between the two papers is therefore not independent evidence about how a method carries from one
@@ -2073,8 +2079,10 @@ usable, and nothing estimates how much of a generator's capacity is available. T
 our own challenge *among the ones this exclusion covers*, [Ruhhütl et al.
 (2023)](https://doi.org/10.1049/icp.2023.0476), appears in the table under challenge 1 above; its
 result is a further instance of finding 1, and of the aggregation effect that finding 2 explains. We
-read only the abstracts of it and of [Mesarcik et al.
-(2025)](https://doi.org/10.1049/icp.2025.1968), because both full texts are paywalled. The Brussels
+read only its abstract, because the full text is paywalled. The version of record of [Mesarcik et
+al. (2025)](https://doi.org/10.1049/icp.2025.1968) is paywalled too, but the authors publish their
+own copy, so that paper is read in full and appears in the table under challenge 1 above. The
+Brussels
 titles of June 2026 change none of those absences: 23 of the 305 name forecasting or prediction,
 none names an ensemble, and the only short-horizon forecast named is day-ahead; the three others
 that name a horizon at all name long-term planning. Two of the 23 apply time-series foundation
