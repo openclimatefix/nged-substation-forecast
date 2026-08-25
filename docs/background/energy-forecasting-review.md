@@ -21,7 +21,7 @@ Secondly - and perhaps most importantly - the fact that the industry doesn't yet
 
 ## What we read
 
-This review cites 96 sources. We read most of the ones an argument rests on in full; the rest were
+This review cites 98 sources. We read most of the ones an argument rests on in full; the rest were
 available to us only as an abstract, a preprint, or part of a paper, and wherever a claim rests on a
 partial read we say so at the point the claim is made. We also read the published deliverables of
 twelve network-innovation projects in GB. The selection was deliberate rather than systematic: a
@@ -262,7 +262,7 @@ distribution network, though, is denominated in energy volumes or in spare capac
 money.
 
 **Topology enters this literature almost entirely as one thing: the summation constraint in
-hierarchical forecast reconciliation.** [Nespoli et al. (2019)](https://arxiv.org/abs/1910.03976)
+hierarchical forecast reconciliation.** [Nespoli et al. (2020)](https://arxiv.org/abs/1910.03976)
 apply it to real secondary substations and cabinets in a Swiss distribution grid and gain up to 10%
 in root-mean-square error at the upper levels of the hierarchy, and under 1% at the bottom. A
 summation constraint carries no information about which substation neighbours which, and it stops
@@ -384,12 +384,16 @@ percentage points of skill score. An ensemble-hybrid chains one model's output i
 input, and also averages several models together. Pure ensemble models gain 8.3 points. A pure
 ensemble runs several models and aggregates their outputs, without the chaining. Individual
 machine-learning models (including gradient-boosted trees) and regressions show no significant
-advantage at all over classic statistical time-series models beyond 6 hours ahead, and models whose
-forecast is numerical weather prediction itself score significantly worse — 14.3 percentage points
-of skill score below that baseline. Their model classes follow each paper's own nomenclature, so the
-boundary between an ensemble and a hybrid is fuzzy by their own account. Their own advice is to
-exhaust the simple models first, because classical statistical time-series methods "still have very
-good performance compared to more complex methods such as individual ML models".
+advantage at all over classic statistical time-series models beyond 6 hours ahead, and taking the
+weather model's own output as the forecast scores significantly worse, 14.3 percentage points of
+skill score below that baseline. That class is the numerical weather prediction irradiance field
+itself — usually global horizontal irradiance, at most post-processed or averaged across several
+weather models — used as the forecast rather than fed as an input to a fitted model. Most of the
+papers in their sample forecast irradiance rather than plant output, so for those papers no power
+curve is involved at all. Their model classes follow each paper's own nomenclature, so the boundary
+between an ensemble and a hybrid is fuzzy by their own account. Their own advice is to exhaust the
+simple models first, because classical statistical time-series methods "still have very good
+performance compared to more complex methods such as individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting
 puts the weight on exactly the input Flexpectation is built around.** [Nguyen and Müsgens
@@ -959,8 +963,10 @@ cheaply, because the trial area is small enough to label by hand.
 ### 7. Disaggregating unmetered solar and wind from a substation's net flow
 
 **In summary.** Splitting generation out of a substation's net flow has been done where the
-generation is metered or its capacity is read from a register, and uncertainty and a multi-day
-horizon each appear in this literature, but never together.
+generation is metered or its capacity is read from a register. Inferring the capacity from the net
+flow instead has also been done, but at low-voltage substations serving tens of customers rather
+than at a primary. Uncertainty and a multi-day horizon each appear in this literature, but never
+together.
 
 **The challenge.** Rooftop panels and small turbines appear only as a dent in a substation's net
 flow. Recovering both the half-hourly output of that unmetered generation and its installed
@@ -1006,8 +1012,31 @@ splitting model in the OpenSTEF software package" on the same data and report th
 Alliander, the operator that builds OpenSTEF, so it is a like-for-like statement from the team that
 maintains both.
 
-**GB already has an operational forecast of unmetered generation, at national scale.** NESO
-publishes [embedded wind and solar
+**Inferring installed photovoltaic capacity from a substation's own measurements has been
+benchmarked properly, one voltage level below NGED's.** [Gouveia et al.
+(2026)](https://doi.org/10.1016/j.ijepes.2026.111848) compare data-driven estimators against
+model-based ones for the photovoltaic capacity aggregated behind a low-voltage substation, using
+only the net load and irradiance series a network already holds, and no register at all. Their
+substations serve 10 to 100 consumers, against the thousands behind a GB primary, and their two new
+model-based methods exploit the linear relationship between net load and irradiance. Three results
+carry across. The data-driven estimators were comparable to the model-based ones even when net load
+and irradiance were both accurate, and "substantially outperform" them under noisy data, which is
+the condition NGED's telemetry is in. Models trained on a Belgian dataset and applied unseen to
+Pecan Street in the United States and AusGrid in Australia, with only approximate irradiance, stayed
+under 5% mean absolute percentage error once the linear models were regularised, which is the
+closest thing in this literature to evidence that a capacity estimator transfers between networks.
+And they report sensitivity separately to photovoltaic penetration, number of consumers, measurement
+noise, sampling rate, seasonality, and irradiance error — the sensitivity axes Flexpectation would
+have to test on its own data. What they produce is a capacity figure rather than a forecast. **The
+same group argues separately that the estimate is worth maintaining, not merely computing.**
+[Gouveia et al. (2026b)](https://arxiv.org/abs/2604.13926) set out why aggregated capacity estimated
+at low-voltage aggregation points is the practical route to knowing what is connected, given that
+"limited observability, incomplete topology information, and restricted access to customer-level
+data make it difficult to maintain accurate DER registries", and link that estimate to forecasting,
+congestion management, flexibility quantification, and hosting-capacity assessment. That is a
+preprint rather than a peer-reviewed paper, and it argues a case rather than measuring one. **GB
+already has an operational forecast of unmetered generation, at national scale.** NESO publishes
+[embedded wind and solar
 forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts) half-hourly, from
 within-day to 14 days ahead, updated hourly — the same resolution and horizon Flexpectation
 delivers. "Embedded" means precisely the generation this challenge is about: wind and solar sitting
@@ -2048,9 +2077,10 @@ Every source cited above, in alphabetical order by first author.
   Electrification*.
 - Bouman, R., Schmeitz, L., Buise, L., Heres, J., Shapovalova, Y. and Heskes, T. (2024). [Acquiring
   Better Load Estimates by Combining Anomaly and Change Point Detection in Power Grid Time-series
-  Measurements](https://arxiv.org/abs/2405.16164).
+  Measurements](https://arxiv.org/abs/2405.16164). *Sustainable Energy, Grids and Networks*.
 - Browell, J. and Fasiolo, M. (2021). [Probabilistic Forecasting of Regional Net-load with
-  Conditional Extremes and Gridded NWP](https://arxiv.org/abs/2103.10335).
+  Conditional Extremes and Gridded NWP](https://arxiv.org/abs/2103.10335). *IEEE Transactions on
+  Smart Grid*.
 - Browell, J., van der Meer, D., Kälvegren, H., Haglund, S., Simioni, E., Bessa, R. J. and Wang, Y.
   (2025). [The hybrid renewable energy forecasting and trading competition
   2024](https://doi.org/10.1016/j.ijforecast.2025.10.005). *International Journal of Forecasting*.
@@ -2095,12 +2125,20 @@ Every source cited above, in alphabetical order by first author.
   Change with Machine Learning*.
 - Gijón, A., Eiraudo, S., Manjavacas, A., Schiera, D. S., Molina-Solana, M. and Gómez-Romero, J.
   (2025). [Integrating Physics and Data-Driven Approaches: An Explainable and Uncertainty-Aware
-  Hybrid Model for Wind Turbine Power Prediction](https://arxiv.org/abs/2502.07344).
+  Hybrid Model for Wind Turbine Power Prediction](https://arxiv.org/abs/2502.07344). *Computer
+  Physics Communications*.
 - Gilbert, C., Browell, J. and Stephen, B. (2023). [Probabilistic load forecasting for the low
-  voltage network: forecast fusion and daily peaks](https://arxiv.org/abs/2206.11745).
+  voltage network: forecast fusion and daily peaks](https://arxiv.org/abs/2206.11745). *Sustainable
+  Energy, Grids and Networks*.
 - Gneiting, T. and Ranjan, R. (2011). [Comparing Density Forecasts Using Threshold- and
   Quantile-Weighted Scoring Rules](https://doi.org/10.1198/jbes.2010.08110). *Journal of Business &
   Economic Statistics*.
+- Gouveia, A. M. V., Hashmi, M. U., D’hulst, R. and Van Hertem, D. (2026). [Installed PV capacity
+  detection on LV substations: Comparison of Data-Driven and Model-Based
+  methods](https://doi.org/10.1016/j.ijepes.2026.111848). *International Journal of Electrical Power
+  and Energy Systems*.
+- Gouveia, A. M. V., Hashmi, M. U., D’hulst, R. and Van Hertem, D. (2026b). [Importance of
+  Aggregated DER Installed Capacity in Distribution Networks](https://arxiv.org/abs/2604.13926).
 - Haben, S., Ward, J., Vukadinovic Greetham, D., Singleton, C. and Grindrod, P. (2014). [A new error
   measure for forecasts of household-level, high resolution electrical energy
   consumption](https://doi.org/10.1016/j.ijforecast.2013.08.002). *International Journal of
@@ -2110,6 +2148,7 @@ Every source cited above, in alphabetical order by first author.
   *International Journal of Forecasting*.
 - Haben, S., Arora, S., Giasemidis, G., Voss, M. and Greetham, D. V. (2021). [Review of Low Voltage
   Load Forecasting: Methods, Applications, and Recommendations](https://arxiv.org/abs/2106.00006).
+  *Applied Energy*.
 - Haben, S., Voß, M. and Holderbaum, W. (2023). [Core Concepts and Methods in Load Forecasting: With
   Applications in Distribution Networks](https://doi.org/10.1007/978-3-031-27852-5). *Springer*.
 - Hertel, M., Pütz, S., Kolar, J., Schäfer, B., Mikut, R. and Hagenmeyer, V. (2026). [A Benchmark
@@ -2118,9 +2157,10 @@ Every source cited above, in alphabetical order by first author.
 - Hong, T., Pinson, P., Wang, Y., Weron, R., Yang, D. and Zareipour, H. (2020). [Energy Forecasting:
   A Review and Outlook](https://doi.org/10.1109/OAJPE.2020.3029979). *IEEE Open Access Journal of
   Power and Energy*.
-- Hüttel, F. B., Rodrigues, F. and Pereira, F. C. (2023). [Mind the Gap: Modelling
-  Difference Between Censored and Uncensored Electric Vehicle Charging
-  Demand](https://arxiv.org/abs/2301.06418).
+- Hüttel, F. B., Rodrigues, F. and Pereira, F. C. (2023). [Mind the Gap: Modelling Difference
+  Between Censored and Uncensored Electric Vehicle Charging
+  Demand](https://arxiv.org/abs/2301.06418). *Transportation Research Part C: Emerging
+  Technologies*.
 - Huyghues-Beaufond, N., Tindemans, S., Falugi, P., Sun, M. and Strbac, G. (2020). [Robust and
   automatic data cleansing method for short-term load forecasting of distribution
   feeders](https://doi.org/10.1016/j.apenergy.2019.114405). *Applied Energy*.
@@ -2145,7 +2185,8 @@ Every source cited above, in alphabetical order by first author.
   Analysis and Isolation Forest](https://doi.org/10.5370/KIEE.2025.74.11.1757). *The
   Transactions of The Korean Institute of Electrical Engineers*.
 - Kleinebrahm, M. et al. (2026). [Energy-Arena: A Dynamic Benchmark for Operational Energy
-  Forecasting](https://arxiv.org/abs/2604.24705).
+  Forecasting](https://arxiv.org/abs/2604.24705). *2026 International Conference on the European
+  Energy Market*.
 - Kryshtafovych, A., Schwede, T., Topf, M., Fidelis, K. and Moult, J. (2021). [Critical assessment
   of methods of protein structure prediction (CASP) — Round
   XIV](https://doi.org/10.1002/prot.26237). *Proteins*.
@@ -2179,7 +2220,8 @@ Every source cited above, in alphabetical order by first author.
 - Messner, J. W., Pinson, P., Browell, J., Bjerregård, M. B. and Schicker, I. (2020). [Evaluation of
   wind power forecasts — An up-to-date view](https://doi.org/10.1002/we.2497). *Wind Energy*.
 - Meyer, M., Kaltenpoth, S., Albers, H., Zalipski, K. and Müller, O. (2026). [TS-Arena: A Live
-  Forecast Pre-Registration Platform](https://arxiv.org/abs/2512.20761).
+  Forecast Pre-Registration Platform](https://arxiv.org/abs/2512.20761). *Proceedings of the 32nd
+  ACM SIGKDD Conference on Knowledge Discovery and Data Mining*.
 - Meyers, B., Deceglie, M., Deline, C. and Jordan, D. (2020). [Signal Processing on PV Time-Series
   Data: Robust Degradation Analysis Without Physical
   Models](https://doi.org/10.1109/JPHOTOV.2019.2957646). *IEEE Journal of Photovoltaics*.
@@ -2194,8 +2236,9 @@ Every source cited above, in alphabetical order by first author.
   (NIA2_NGESO002)](https://smarter.energynetworks.org/projects/nia2_ngeso002/).
 - National Energy System Operator (2024). [Solar NowCasting innovation project improves solar
   forecasting](https://www.neso.energy/news/solar-nowcasting-innovation-project-improves-solar-forecasting).
-- Nespoli, L., Medici, V., Lopatichki, K. and Sossan, F. (2019). [Hierarchical Demand Forecasting
-  Benchmark for the Distribution Grid](https://arxiv.org/abs/1910.03976).
+- Nespoli, L., Medici, V., Lopatichki, K. and Sossan, F. (2020). [Hierarchical Demand Forecasting
+  Benchmark for the Distribution Grid](https://arxiv.org/abs/1910.03976). *Electric Power Systems
+  Research*.
 - Nguyen, T. N. and Müsgens, F. (2026). [A meta-analysis of solar forecasting based on skill
   score](https://doi.org/10.1063/5.0300682). *Journal of Renewable and Sustainable Energy*.
 - Northern Powergrid (2024). [Artificial Forecasting, Alpha
@@ -2228,7 +2271,8 @@ Every source cited above, in alphabetical order by first author.
 - Rasp, S. and Lerch, S. (2018). [Neural networks for post-processing ensemble weather
   forecasts](https://arxiv.org/abs/1805.09091). *Monthly Weather Review*.
 - Recht, B., Roelofs, R., Schmidt, L. and Shankar, V. (2019). [Do ImageNet Classifiers Generalize to
-  ImageNet?](https://arxiv.org/abs/1902.10811)
+  ImageNet?](https://arxiv.org/abs/1902.10811) *Proceedings of the 36th International Conference on
+  Machine Learning*.
 - Richardson, D. S. (2000). [Skill and relative economic value of the ECMWF ensemble prediction
   system](https://doi.org/10.1002/qj.49712656313). *Quarterly Journal of the Royal Meteorological
   Society*.
