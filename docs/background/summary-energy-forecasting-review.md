@@ -119,6 +119,7 @@ probabilistic substation forecast from a weather ensemble across a 14-day horizo
 | [SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) | Net load, Oxfordshire | 13 primary substations, plus their bulk supply points and their 33 kV and 11 kV feeders | 30 minutes to 10 days | **11 of 13 primary substation models below 10%** mean absolute percentage error when fitted  | 40-member ICON-EU ensemble to 4 days, then one deterministic forecast to 10 days |
 | [Artificial Forecasting (Northern Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) | Demand and export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondary substations | Day-ahead to week-ahead at primary, evaluated to 11 days; week- to month-ahead at secondary | **About 8% lower mean absolute error** of utilisation rate than the network's existing method  | Real forecasts at primary; none in the published secondary results |
 | [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) | Load and generation, Austria | Substation | Day-ahead | **3–8% mean absolute percentage error** against no stated baseline, so not a target; varying with how industrial and how large the supplied area was; linear and Gaussian regression preferred over the alternatives tested (abstract only) | Not stated in the abstract |
+| [Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) | Power in the medium-voltage grid, Netherlands | 312 substations, from 10 years of measurements | Day-ahead | Not stated in the abstract | Not stated in the abstract |
 
 #### What this means for Flexpectation
 
@@ -1230,7 +1231,7 @@ operational systems instead of continuing to look.
 
 ## References
 
-Every source cited above, in alphabetical order by first author. The full review cites 39 further
+Every source cited above, in alphabetical order by first author. The full review cites 38 further
 sources that this summary does not.
 
 - Bian, Y., Zheng, N., Zheng, Y., Xu, B. and Shi, Y. (2024). [Predicting Strategic Energy Storage
@@ -1334,6 +1335,10 @@ sources that this summary does not.
   Innovative Smart Grid Technologies Europe*.
 - Meng, B., Loonen, R. and Hensen, J. L. M. (2020). [Data-driven inference of unknown tilt and
   azimuth of distributed PV systems](https://doi.org/10.1016/j.solener.2020.09.077). *Solar Energy*.
+- Mesarcik, M., Loke, J., Wildeboer, J. and Lucassen, B. (2025). [Probabilistic day-ahead power
+  forecasting in the medium-voltage grid using state space
+  models](https://doi.org/10.1049/icp.2025.1968). *IET Conference Proceedings*. Paywalled; we read
+  only the abstract.
 - Messner, J. W., Pinson, P., Browell, J., Bjerregård, M. B. and Schicker, I. (2020). [Evaluation of
   wind power forecasts — An up-to-date view](https://doi.org/10.1002/we.2497). *Wind Energy*.
 - Meyer, M., Kaltenpoth, S., Albers, H., Zalipski, K. and Müller, O. (2026). [TS-Arena: A Live
