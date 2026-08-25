@@ -8,7 +8,8 @@ description: >-
   superlative, number, attribution), the reviewer personas and how to brief sub-agents so their
   findings are checkable, and the mechanical checks — citation closure, wrap-tolerant edits,
   render verification. Load before starting a literature review or a state-of-the-art section,
-  before adding a paper to one, or before running a review round over one.
+  before adding a paper to one, before hunting down a paper that looks paywalled, or before running
+  a review round over one.
 ---
 
 # Writing a literature review that someone else will publish
@@ -63,29 +64,86 @@ paper for one fact while contradicting that paper's account of a second, three s
 the absence claim it made was refuted on a page it had already quoted from. When you open a source,
 read what it says about the neighbouring claims too, not only the sentence you came for.
 
-**Only legitimate routes.** Never use a pirate mirror. In rough order of yield:
+**Only legitimate routes. Never use a pirate mirror.** The routes divide into two kinds, and the
+division matters far more than the order within either kind.
 
-- **Unpaywall** — `https://api.unpaywall.org/v2/<doi>?email=<address>` names every open location
-  a paper has, including repository copies the publisher page does not link to.
-- **OpenAlex** — `https://api.openalex.org/works/doi:<doi>` gives `best_oa_location` and the
-  full location list.
-- **Semantic Scholar** — `https://api.semanticscholar.org/graph/v1/paper/DOI:<doi>?fields=title,openAccessPdf,externalIds`
-- **arXiv** — the preprint is often the same content; check the version and say which you read
-  if the published version differs.
-- **CORE** and **Crossref** for repository copies and metadata.
+**The first kind indexes papers, and a sweep across the whole kind costs about a minute:**
+
+- **Unpaywall** — `https://api.unpaywall.org/v2/<doi>?email=<address>` names every open location a
+  paper has, including repository copies the publisher page does not link to.
+- **OpenAlex** — `https://api.openalex.org/works/doi:<doi>` gives `best_oa_location` and the full
+  `locations` list, which is often richer than `best_oa_location` alone.
+- **Semantic Scholar** —
+  `https://api.semanticscholar.org/graph/v1/paper/DOI:<doi>?fields=title,openAccessPdf,externalIds`.
+  An explicit `"status": "CLOSED"` is stronger evidence than an absent field.
+- **arXiv, CORE, Crossref, OpenAIRE, and Zenodo**, for preprints, repository copies, and metadata.
 - **Institutional repositories** directly, when an author's university is known.
-- **The author's own conference slides**, which are often posted openly and sometimes carry the
-  number the paper puts behind a paywall.
-- **Network-operator innovation projects** are usually published openly: in GB, the Energy
-  Networks Association Smarter Networks Portal and Ofgem's site, free and without registration.
 
-**When a paper cannot be obtained, say so in the review at the point of citation**, and record it
-in the library's README with what was tried. A documented negative is a result; a quiet reliance
-on an abstract is a defect waiting for a reviewer to find. Do not let an unobtainable paper carry
-a load-bearing claim.
+**A "closed" answer from every route in the first kind is a statement about indexed routes, not
+about the paper.** Aggregators, repositories, and preprint servers all work by indexing, so a copy
+on somebody's own web page is invisible to every one of them by construction. Mesarcik et al. (2025)
+was recorded as unobtainable after Unpaywall, OpenAlex, Semantic Scholar, OpenAIRE, Crossref, arXiv,
+Zenodo, CORE, the CIRED repository, and two university repositories all came back empty; the paper
+was on a co-author's personal website the whole time. The first sweep is the cheap opening move,
+never the search.
+
+**The second kind is indexed by nobody, and is where the copy usually turns out to be:**
+
+- **Each author's own web page.** Search every author's name separately, not only the first.
+- **The publisher's or the learned society's own portal.** Unpaywall and OpenAlex both reported two
+  Korean load-transfer papers `closed` while the Korean Institute of Electrical Engineers served
+  them free, under a Creative Commons licence, from its own journal portal.
+- **The employer's website, in the employer's own language,** when the authors work in industry
+  rather than at a university. A utility posts conference papers under *Veröffentlichungen* or
+  *Publikationen*, not under "publications".
+- **The authors' own conference slides**, which are often posted openly and sometimes carry the
+  number the paper puts behind a paywall.
+- **Network-operator innovation projects**, usually published openly: in GB, the Energy Networks
+  Association Smarter Networks Portal and Ofgem's site, free and without registration.
+
+**An author profile that lists the author's other papers but not the one being hunted is real
+evidence of absence.** One author of Ruhhütl et al. (2023) has a university profile that loads and
+names that author 11 times, yet carries no hit for the paper's title, for "forecast", or "CIRED".
+A route that answers is worth far more than a route that stays silent, so prefer the routes that can
+say no.
+
+**Watch for the namesake.** An ORCID and Zenodo trail under the right surname belonged to a radio
+astronomer rather than to the network-operator engineer being searched for, and that false trail is
+what made a wrong negative look convincing. Confirm a profile belongs to the right person — by
+affiliation, by co-authors, by field — before drawing any conclusion from what the profile does or
+does not list.
+
+**Say which version was read.** An author copy can differ from the version of record: the copy of
+Mesarcik et al. (2025) served by the authors' own site is titled "…Using *Structured* State Space
+Models", where the published title drops "Structured".
 
 **Never bypass a bot challenge** to reach a document, and never let an agent do it. If a route is
-gated, it is closed.
+gated, the route is closed: record the URL so a person can open the page themselves, and move on.
+Publisher portals, ResearchGate, LinkedIn, and several university search interfaces all refuse a
+command-line client, and a 403 from any of them says nothing about whether the paper is open behind
+it.
+
+**Prove the search ran before recording a negative.** A mistyped path, a wrong directory, a bare
+domain that does not resolve, or a results page rendered in JavaScript all print exactly what a
+genuine absence prints. Quote the field values actually read, and give a control hit count from a
+string known to be present. `cired-repository.org` does not resolve without `www`, and a bare-domain
+failure looks identical to a dead route.
+
+**When the free routes are exhausted, paying is a legitimate next step, and so is asking.** A
+conference paper behind a publisher's fee usually costs less than the hour already spent hunting it.
+Two questions come first. Does the organisation the review is written for hold an institutional
+subscription covering the venue, which would settle every future paper from that venue too? And will
+the authors send a copy, which they nearly always will, and which sometimes yields more than the
+file, because the people who ran the study can say what baseline they used.
+
+**When a paper cannot be obtained, say so in the review at the point of citation**, and record it in
+the library's README with what was tried. A documented negative is a result; a quiet reliance on an
+abstract is a defect waiting for a reviewer to find. Do not let an unobtainable paper carry a
+load-bearing claim.
+
+**To hand this search to a sub-agent, fill in [`find-paper-brief.md`](find-paper-brief.md)** rather
+than writing a brief from scratch. The template carries the constraints, the two kinds of route, and
+the reporting format that makes a negative checkable.
 
 ## Reading the PDFs: three traps that silently corrupt what you quote
 
