@@ -57,17 +57,25 @@ NGED put two costs on these forecasts and rate them at least equally. The first 
 **flexibility procurement**: deciding, days ahead, whether to pay flexible customers to reduce
 their demand when a substation risks running beyond its capability. The second is **generator
 curtailment**: holding embedded generation down through Active Network Management when export
-risks running beyond that same capability. So the question users ask of a forecast is rarely
-"what is the most likely load?" and usually "**how likely is net demand to cross this
-limit?**" — NGED's [incumbent forecasting tool](nged-incumbent-forecast.md#the-operators-view)
-literally plots demand as headroom below a constraint line.
+risks running beyond a limit. That limit is usually not the substation's own: a generation
+constraint typically binds above the primary, driven by the aggregated flow across several
+substations rather than by any single meter in isolation, so the forecasts that matter for
+curtailment are the ones that net and sum correctly up the hierarchy — which is why
+[curtailment scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at
+one primary before summing up the substation hierarchy. The money is counted differently too —
+curtailment today is priced as a whole-system cost rather than as NGED's own spend — but NGED
+rate the saving as highly, so the forecast requirement is unchanged. So the question users ask
+of a forecast is rarely "what is the most likely load?" and usually "**how likely is net
+demand to cross this limit?**" — NGED's [incumbent forecasting
+tool](nged-incumbent-forecast.md#the-operators-view) literally plots demand as headroom below
+a constraint line.
 
 The project's value therefore concentrates in **both tails** of each forecast distribution: a
 model that is excellent on typical half-hours but unreliable in the handful of near-limit
 hours has failed at the job, and the near-limit hours sit at both ends. Flexibility
 procurement turns on the upper tail, where demand rises towards firm capacity, and bites in
-winter. Curtailment turns on the lower tail, where export rises towards that same capability
-because embedded generation is high and demand is low, and bites in summer. The 13
+winter. Curtailment turns on the lower tail, where export rises towards whichever limit binds because
+embedded generation is high and demand is low, and bites in summer. The 13
 `DELIVERY_QUANTILES` are deliberately tail-heavy at both ends and symmetric about the median —
 p1, p2 and p5 matching p95, p98 and p99 — so the delivery shape already serves both decisions.
 This is why evaluation includes
