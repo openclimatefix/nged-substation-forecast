@@ -271,9 +271,8 @@ absolute size of every £ figure on this page — a lower rung would multiply th
 reason to read these numbers as a ranking instrument rather than a total.
 
 `historical_p99` is a closer proxy to a real network rating than an arbitrary percentile would be:
-NGED told us that real ratings are themselves set as a percentile of history with outliers removed
-by eye, so the synthetic limit is methodologically close to the practice it stands in for, not just
-a convenient round number.
+this is methodologically consistent with how comparable network ratings are typically derived, so
+the synthetic limit is close to the practice it stands in for, not just a convenient round number.
 
 Where NGED supply a real firm or flex rating we will compute the same metrics against it, as a
 case study. A rating never breached during the scored window is not useless here — procurement
@@ -298,8 +297,8 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
 - **Curtailment (Metric 2) is currently blocked, not merely unscheduled.** Validating it against a
   real curtailment event needs Tier 3 power-flow modelling to map the event to a specific location —
   see [Tier 3](#tier-3-full-power-flow-modelling). The trial area has two nominal flexibility zones
-  with an export-side constraint, but both have near-zero historical dispatched utilisation, so
-  neither would validate a curtailment metric even as a stopgap.
+  with an export-side constraint, but neither has enough dispatch history to validate a curtailment
+  metric, even as a stopgap.
 
 ## What these numbers do not capture
 
