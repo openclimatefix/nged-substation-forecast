@@ -886,13 +886,14 @@ drop those periods from the training target — a combination no published metho
 one that targets the quantity NGED needs and reports a measured benefit for doing so.**
 [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) rewrite the history to the
 level it would have had if the switch had never happened, across 169 real feeders, and report better
-medium-term forecasts for it. Artificial Forecasting rewrites its history too, in step 6 of the
-data-preparation pipeline set out in its Alpha deliverable *WP2-D2 Results Scope Item 2*, which
-rescales a block of older readings to align its median with the median of the most recent block
-whenever the older block's median falls outside the 10th-to-90th-percentile range of the recent one.
-Northern Powergrid hold no readily accessible record of their own network configuration changes, so
-that pipeline hypothesises the timestamps from the load itself and confirms them with the control
-room — the position NGED is in outside the trial area.
+medium-term forecasts for it. Northern Powergrid's Artificial Forecasting project rewrites its
+history too, in step 6 of the data-preparation pipeline set out in its [Alpha
+deliverable](https://smarter.energynetworks.org/projects/npg_sif_006-1/) *WP2-D2 Results Scope Item
+2*, which rescales a block of older readings to align its median with the median of the most recent
+block whenever the older block's median falls outside the 10th-to-90th-percentile range of the
+recent one. Northern Powergrid hold no readily accessible record of their own network configuration
+changes, so that pipeline hypothesises the timestamps from the load itself and confirms them with
+the control room — the position NGED is in outside the trial area.
 
 **The fix is a level shift applied to the *older* half of each series.** Paredes and Vargas measure
 how far average demand moved across the step and add that difference to every reading before it, and
@@ -903,15 +904,15 @@ models are the live alternative — they track a new level once it arrives, incl
 abruptly — but a model that simply adapts to a new load level cannot report what the substation
 would have carried under its normal arrangement, which is the quantity NGED needs.
 
-**Flexpectation version 1 feeds the model its switching-contaminated history deliberately, as
-information rather than as damage: the abnormal periods become an input, and they stop being a
-target.** First, take each substation's abnormal running arrangements from the detector of challenge
-4 rather than from an operational log, and hand those periods to the model as a flag on each lagged
-power input, so the model can read a lag that falls inside an abnormal period correctly. Second,
-drop the abnormal half-hours from the training target, so the model is never asked to predict an
-abnormal arrangement. An alternative worth testing early is to skip the flag and give the model
-challenge 4's reference time series alongside the lagged power, leaving the model to notice for
-itself where a lagged reading departs from what the reference series expected.
+**Flexpectation version 1 feeds the model its switching-contaminated history deliberately: the
+abnormal periods are an input to the ML model but are removed from the training target.** First,
+take each substation's abnormal running arrangements from the detector of challenge 4 rather than
+from an operational log, and hand those periods to the model as a flag on each lagged power input,
+so the model can read a lag that falls inside an abnormal period correctly. Second, drop the
+abnormal half-hours from the training target, so the model is never asked to predict an abnormal
+arrangement. An alternative worth testing early is to skip the flag and give the model challenge 4's
+reference time series alongside the lagged power, leaving the model to notice for itself where a
+lagged reading departs from what the reference series expected.
 
 **The nearest published precedent we found for the first half sits inside a substation, where the
 never-metered-target problem does not arise.** [Liu et al.
@@ -926,7 +927,7 @@ OpenAlex, Crossref, and arXiv, we found no load-forecasting study reporting what
 contaminated periods from the training target is worth, so Flexpectation will have to measure that
 itself.
 
-**Flexpectation version 2 will go further and treat the normal-arrangement demand as a latent
+**Flexpectation version 2 plans to go further and treat the normal-arrangement demand as a latent
 variable to be inferred for every metered substation, rather than a series to be repaired first**,
 through a differentiable-physics model of each substation with separate photovoltaic, wind, and
 demand components. Recovering a demand the meter never saw is mature where demand is censored —
