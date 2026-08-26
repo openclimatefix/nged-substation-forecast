@@ -122,6 +122,21 @@ and never buy elegance with a referent the reader has to hunt for. The same rule
 numbers: write "Flexpectation v1" and "Flexpectation v2", never a bare "v1" or "v2", which could be
 a version of anything.
 
+**"Thing" is never the right noun.** Every use of "thing" or "things" has a specific noun waiting
+behind it, and the specific noun carries information the placeholder throws away: "the two
+contaminants that must be filtered out", not "the two things"; "Two caveats temper both figures",
+not "Two things temper"; "the closest work already published", not "the closest thing already
+published". A bolded lead opening "Two things follow" wastes the one sentence a skim-reader is
+guaranteed to read.
+
+**Describe performance in performance terms, not in money metaphors.** A forecast does not "pay",
+an input does not "buy" accuracy, and a modelling choice does not "cost" anything unless real money
+changes hands. Write what actually moved: "the inputs that improve skill at short range", "adding
+the physics model made the forecast interpretable without making it less accurate", "rejected the
+gradient-boosted tree on the effort of tuning it". Keep "cost" and "price" for money — what NGED
+spends procuring flexibility is a cost, and calling a lost percentage point of skill a cost as well
+makes the page ambiguous exactly where it has to be exact.
+
 **Put the words in the order that cannot be misread.** "73 wind farms in GB" says what it means;
 "73 GB wind farms" makes the reader parse a noun-pile and can be read as a unit of measure. Where a
 qualifier can attach to more than one noun, move it or add the word that pins it down.
@@ -171,7 +186,23 @@ model beat a same-time-yesterday rule by 10 to 20%", not "sophisticated models b
 A law-like sentence claims far more than the evidence supports, and the first reader who knows a
 counter-example stops trusting the rest of the page. The same applies to claims that something does
 *not* exist: an absence claim is only ever as good as the search behind it, so say what was searched
-and let the reader judge, rather than asserting that nobody has done a thing.
+and let the reader judge, rather than asserting that nobody has tried the approach.
+
+**Don't claim a set has exactly one member unless you have enumerated the set.** "The only study",
+"the one paper", "the first network to publish", "nobody has done this", "the closest precedent" —
+each asserts that a search was exhaustive, and a search almost never is. Absence of evidence is not
+evidence of absence: we may only be aware of one instance, which is a different claim from there
+being only one. Say what was looked at and what turned up — "the one paper we found that measured
+properly", "the closest of the four", "labels that none of the GB projects we checked published".
+Superlatives need the same treatment, because "the most useful method" ranks a whole field on a
+survey nobody ran: scope the superlative to a set you have listed, or state the basis of the
+judgement instead, as in "the published method that fits NGED's telemetry most closely".
+
+**Don't commit the project to work it has not agreed to.** A page explaining what the literature
+found, what a technique does, or how a subsystem works is not a project plan, and a sentence like
+"Flexpectation will therefore label the telemetry by hand" turns a description into a promise a
+funder can hold us to. Describe what is known and what the options are, and leave what we will do
+to the roadmap, the issue tracker, and the documents that own those commitments.
 
 **Lead each paragraph with a bolded sentence that states its conclusion.** The reader should get the
 argument from the bolded leads alone, then read on only where they want the reasoning. This is why

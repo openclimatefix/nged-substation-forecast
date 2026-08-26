@@ -6,6 +6,7 @@ buries the real edit in a diff nobody can review, so this script rewraps only th
 anchor phrase identifies, and asserts that nothing but the wrapping changed.
 """
 
+import re
 import sys
 from pathlib import Path
 from typing import Final
@@ -16,9 +17,32 @@ WIDTH: Final[int] = 100
 SKIP_PREFIXES: Final[tuple[str, ...]] = ("#", "|", "```", "- ", "* ", ">", "    ")
 """Block openings whose line breaks carry meaning, so they must never be rewrapped."""
 
+LINK: Final[re.Pattern[str]] = re.compile(r"\[[^\]]*\]\([^)\s]*\)")
+"""A complete markdown link, which is wrapped as one token so a line break cannot fall inside it."""
+
+
+def _tokenise(text: str) -> list[str]:
+    """Split `text` on whitespace, but keep each markdown link whole.
+
+    `check_citations.py` matches a citation and its link on one line, so a line break between
+    `[Author (year)]` and `(url)` reads to that check as a citation nobody hyperlinked. Wrapping
+    the link as a single token keeps the two halves together.
+    """
+    tokens: list[str] = []
+    cursor = 0
+    for match in LINK.finditer(text):
+        tokens.extend(text[cursor : match.start()].split())
+        tokens.append(match.group())
+        cursor = match.end()
+    tokens.extend(text[cursor:].split())
+    return tokens
+
 
 def _wrap(words: list[str]) -> list[str]:
     """Greedily wrap `words` to `WIDTH`, keeping any line from starting with a `#`.
+
+    A token may be a whole markdown link and so exceed `WIDTH` on its own, in which case the link
+    takes a line of its own rather than being broken.
 
     Python-Markdown reads a line starting `#` as a heading even without the space CommonMark
     requires, so a wrapped link whose continuation lands on `#anchor](url)` renders as a heading.
@@ -66,7 +90,7 @@ def reflow(path: Path, anchors: list[str]) -> int:
             continue
         if paragraph.lstrip().startswith(SKIP_PREFIXES) or paragraph.startswith("    "):
             continue
-        paragraphs[i] = "\n".join(_wrap(words=flat.split()))
+        paragraphs[i] = "\n".join(_wrap(words=_tokenise(text=flat)))
         reflowed += 1
 
     rewritten = "\n\n".join(paragraphs)
