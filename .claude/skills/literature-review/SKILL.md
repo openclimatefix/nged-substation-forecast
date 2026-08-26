@@ -145,7 +145,7 @@ load-bearing claim.
 than writing a brief from scratch. The template carries the constraints, the two kinds of route, and
 the reporting format that makes a negative checkable.
 
-## Reading the PDFs: three traps that silently corrupt what you quote
+## Reading the PDFs: five traps that silently corrupt what you quote
 
 Each of these produces plausible-looking text, so nothing warns you that the sentence you are
 about to quote is not the sentence in the paper.
@@ -172,6 +172,25 @@ grepping for "forecasting" misses "fore-casting". Strip them before searching:
 ```bash
 pdftotext -layout paper.pdf - | sed 's/\xc2\xad//g' | tr '\014' '\n' > paper.txt
 ```
+
+**A running side-stamp lands in the middle of a sentence.** PubMed Central author manuscripts
+carry a vertical "Author Manuscript" stamp down the margin of every page, and `pdftotext` puts
+that stamp into the text in reading order — often mid-sentence. A CASP paper's definition of its
+targets extracted as "the experimental structure is about **Author Manuscript** to be solved",
+so a search for the whole phrase returned nothing even after whitespace normalisation, which is
+exactly what a misquotation would return. **Search on a short fragment either side of the gap
+before concluding a quotation is wrong**, and strip the stamp before quoting:
+
+```bash
+sed 's/Author Manuscript//g' paper.txt
+```
+
+**`file` under-reports the page count, so a complete PDF looks truncated.** `file` guesses by
+counting `/Type /Page` in the raw stream, which misses every page whose entry sits in a
+compressed object stream: it called a 21-page paper 4 pages. A brief written on that number sent
+a sub-agent hunting for text it thought had been cut off. Use `pdfinfo`, which reads the
+catalogue, and check the page count against the version of record's page range before deciding a
+download is incomplete.
 
 Cache the cleaned text next to the PDF. Reviewers will need to check the same passages, and
 re-extracting per query wastes their time and yours.

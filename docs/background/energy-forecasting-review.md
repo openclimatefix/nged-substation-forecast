@@ -2652,7 +2652,8 @@ demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
 domain adaptation zero-shot learning in sequence](https://doi.org/10.1016/j.rser.2023.113662).
 *Renewable and Sustainable Energy Reviews*.
 - UK Power Networks. [Power Flow to Solar Capacity
-(NIA_UKPN0104)](https://smarter.energynetworks.org/projects/nia_ukpn0104/).
+(NIA_UKPN0104)](https://smarter.energynetworks.org/projects/nia_ukpn0104/), listed on the portal as
+"AI for Visibility and Forecasting of Renewable Generation".
 - UK Power Networks and PPA Energy and Capula (2014). [Distribution Network Visibility: LCN Fund
 Tier 1 Close Down
 Report](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_version_3.0_270214.pdf).

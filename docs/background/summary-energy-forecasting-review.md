@@ -28,11 +28,13 @@ Flexpectation have no precedent in the literature we reviewed. For example, we f
 driving a probabilistic substation forecast from a weather ensemble across a 14-day horizon, none
 modelling the tails of the distribution explicitly at substation level, none aggregating building
 thermal physics up to a substation and putting that physics inside a probabilistic forecast, and
-none reading a substation forecast off a pre-trained weather encoder. That said, we are confident
-this ambition is justified because it allows us to build an ML model that can reason simultaneously
-about the various causes of variation in substation demand. And we are confident we can deliver on
-this ambitious vision because we have already built the foundations of a software framework that
-will allow us to run ML experiments efficiently.
+none reading a substation forecast off a pre-trained weather encoder, though team Rnt came close in
+HEFTCom, a Great Britain wind-and-solar forecasting competition, finishing third by feeding
+embeddings from their own machine-learned weather models into downstream neural networks. That said,
+we are confident this ambition is justified because it allows us to build an ML model that can
+reason simultaneously about the various causes of variation in substation demand. And we are
+confident we can deliver on this ambitious vision because we have already built the foundations of a
+software framework that will allow us to run ML experiments efficiently.
 
 **Northern Powergrid's Artificial Forecasting project is further ahead than Flexpectation. But four
 of the eight challenges in Flexpectation have no counterpart we could find in Artificial
@@ -1632,7 +1634,8 @@ demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
 domain adaptation zero-shot learning in sequence](https://doi.org/10.1016/j.rser.2023.113662).
 *Renewable and Sustainable Energy Reviews*.
 - UK Power Networks. [Power Flow to Solar Capacity
-(NIA_UKPN0104)](https://smarter.energynetworks.org/projects/nia_ukpn0104/).
+(NIA_UKPN0104)](https://smarter.energynetworks.org/projects/nia_ukpn0104/), listed on the portal as
+"AI for Visibility and Forecasting of Renewable Generation".
 - Viotti, O., Arnqvist, J. and Olauson, J. (2026). [Estimating Wind‐Power Capacity Time Series From
 Production Data Using a Power Curve Model and Quadratic
 Optimization](https://doi.org/10.1002/we.70136). *Wind Energy*.
