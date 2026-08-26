@@ -136,6 +136,17 @@ subscription covering the venue, which would settle every future paper from that
 the authors send a copy, which they nearly always will, and which sometimes yields more than the
 file, because the people who ran the study can say what baseline they used.
 
+**Every PDF you download goes into the library, under the library's naming pattern, whether or not
+the review ends up citing it.** In this repo that means `literature/papers/` for academic papers,
+named `<first-author-surname>-<year>-<short-title>.pdf`, with a `.txt` cache of the same stem
+beside it. A paper you read and set aside is still evidence about what was searched, and it is the
+answer to the next person who asks the same question — a library holding only the citations is a
+record of the conclusions, not of the work. Never leave a download in the session scratchpad: the
+scratchpad is under `/tmp`, which is tmpfs here and is lost on reboot, and "I already checked that
+one" is worth nothing once the file is gone. Where you hold both a preprint and the version of
+record, keep both and suffix them `-arxiv`/`-preprint` and `-published`; suffix an author's
+conference deck `-slides`.
+
 **When a paper cannot be obtained, say so in the review at the point of citation**, and record it in
 the library's README with what was tried. A documented negative is a result; a quiet reliance on an
 abstract is a defect waiting for a reviewer to find. Do not let an unobtainable paper carry a
@@ -370,6 +381,14 @@ def rsub(pat, rep, n=1):
 
 The assertion is the point: a silent zero-match edit is the commonest way a batch of fixes half
 lands.
+
+**Rewrap the paragraphs you edited, and nothing else.** A substitution leaves the paragraph's line
+breaks where they were, so the edited lines overrun the file's width while the rest of the document
+stays put. `scripts/reflow_paragraphs.py <file.md> "<anchor phrase>" [...]` reflows only the
+paragraphs containing an anchor phrase, skips headings, tables, code blocks and list items, guards
+the MkDocs trap where a continuation line starting `#` becomes a heading, and asserts that only the
+wrapping changed and not the text. Reflowing the whole file instead buries the real edit in a diff
+nobody can review.
 
 **A span anchored by its opening and closing words deletes the wrong thing when the closing words
 recur.** Deleting by line number goes stale after the first cut, so the natural fix is to anchor a
