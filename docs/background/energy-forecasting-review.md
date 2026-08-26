@@ -1108,10 +1108,14 @@ exports. A model trained on uncleaned data learns the fault, and a forecast that
 because its recent history was stuck is worse than one that says it is degraded.
 
 **The published method that fits NGED's telemetry most closely treats faulty metering and switching
-as one challenge.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) treat measurement
-errors and switch events as the two contaminants that must be filtered out before substation
-measurements can be used, detect both on the same residual.. Their sign-recovery technique addresses
-exactly the non-directional metering defect described above.
+as one challenge, but the step that recovers a magnitude-only meter's sign needs the second load
+estimate NGED does not have.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) treat
+measurement errors and switch events as the two contaminants that must be filtered out before
+substation measurements can be used, and detect both on the same residual. Some of their substations
+carry the same defect as NGED's, measuring only the absolute current, and Bouman et al. recover the
+sign by taking it from the bottom-up estimate wherever the meter reads positive throughout while the
+bottom-up estimate goes negative — so the recovery rests on the smart-meter estimate rather than on
+the substation's own meter.
 
 **One other group has made faulty metering its subject, one voltage level down.** [Moriano et al.
 (2016)](https://doi.org/10.3390/s16010085) and [Martín et al.
