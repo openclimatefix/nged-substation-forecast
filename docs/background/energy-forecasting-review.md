@@ -1147,8 +1147,10 @@ and along its feeders failed to reconcile by more than a threshold. The plotting
 were automated, but a candidate directional error was confirmed and corrected by an engineer,
 feeding a rectification list rather than an end-to-end detector, and no accuracy is reported for it.
 The automatable version of that objective is nine years old and still available. A GB labelled set,
-with a taxonomy that separates metering faults from switching, is a gap this project can close
-cheaply, because the trial area is small enough to label by hand.
+with a taxonomy that separates metering faults from switching, stays unpublished, and Flexpectation
+is not producing one: with no labels, Flexpectation's cleaning rules are judged by whether excluding
+the periods they flag improves forecast accuracy on held-out data, rather than by a precision and a
+recall.
 
 ### 7. Disaggregating unmetered solar and wind from a substation's net flow
 
@@ -1182,8 +1184,9 @@ Feed-In Tariff closed.
 Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) (2024–2026, £389,444),
 which Open Climate Fix worked on, infers the capacity of unmetered solar sitting behind each primary
 substation from half-hourly substation load and weather, then forecasts that generation. Open
-Climate Fix is a partner in both Power Flow to Solar Capacity and Flexpectation, so Flexpectation
-starts from the Power Flow to Solar Capacity method rather than from scratch.
+Climate Fix is a partner in both Power Flow to Solar Capacity and Flexpectation, so what Power Flow
+to Solar Capacity found about inferring solar capacity from GB primary-substation data reaches
+Flexpectation directly rather than only through what has been published.
 
 **A Dutch network operator has published a method that splits unmetered wind and solar out of
 substation measurements, by transferring from substations that do meter them.** [Teng et al.
@@ -1541,9 +1544,9 @@ chart.
 rather than assumed.** Across Electricity North West's ATLAS — both its 2016 methodology and its
 2018 closedown report — UK Power Networks' Distribution Network Visibility and this network's own
 Time Series Data Quality, the words precision, recall, F-score, true positive, and false positive do
-not appear at all. Publishing precision and recall against a stated label set, with the labels
-released, would therefore be the first time we know of that a GB network has done so, and it is the
-cheapest of this review's commitments to keep.
+not appear at all. That absence is a gap in the published GB record rather than a target
+Flexpectation is setting itself: scoring a metering-fault detector needs labels that nobody has
+published, and Flexpectation is not producing them.
 
 ## What published leaderboards did, and what a single team can borrow from them
 
@@ -1997,8 +2000,8 @@ identification. Its forecasts carried no uncertainty at all, which is the step t
 **[UK Power Networks' Power Flow to Solar
 Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/)** is described under challenge
 7 above, as the direct predecessor of Flexpectation's unmetered-solar work; Open Climate Fix is a
-partner in both projects, so Flexpectation starts from the Power Flow to Solar Capacity method
-rather than from scratch.
+partner in both projects, so what Power Flow to Solar Capacity found reaches Flexpectation directly
+rather than only through what has been published.
 
 **[SSEN FastTrack](https://smarter.energynetworks.org/projects/10166254/) and [SP Energy Networks'
 Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/) are both probabilistic,
