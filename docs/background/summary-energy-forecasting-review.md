@@ -54,15 +54,14 @@ of the distribution.
 several traps to avoid.** Mean absolute error rewards flat forecasts that are of little use for
 either flexibility or curtailment decisions: a peak predicted an hour late is penalised twice, once
 for the peak that did not happen and once for the peak that was missed, and an overly smooth
-forecast avoids both penalties. Two teams reached that conclusion independently, and both went on to
-score the peaks separately. Ranking well on one measure also says little about other measures:
+forecast avoids both penalties. Ranking well on one measure also says little about other measures:
 across 200 German low-voltage feeders, the two models that came first and second on the peaks in the
 quantile version of an overload-decision metric stated their own uncertainty badly, their 90% ranges
 containing the true value less than half the time at exactly those peaks.
 
 **Three published results point against parts of Flexpectation's plan, and we intend to test all
-three rather than avoid them**. Finer-grained weather has not always improved performance; weather
-data have improved performance less than expected at low voltage in the past; and a pre-trained ML
+three rather than avoid them.** Finer-grained weather has not always improved performance; weather
+data has improved performance less than expected at low voltage in the past; and a pre-trained ML
 model trained on none of NGED's data may match models trained on all of it.
 
 **Whilst the literature we found does not tell us exactly which algorithms provide the best
@@ -79,7 +78,7 @@ efficiently as possible.
 **The fact that the industry doesn't yet know the state of the art is a huge opportunity for the
 Flexpectation project.** We are in a very privileged position where we can try hundreds of ideas,
 and test the best ideas in the real world. We have an opportunity to make a significant contribution
-to the energy forecasting industry by publishing leaderboards of ML experiments, and hence help the
+to the energy forecasting community by publishing leaderboards of ML experiments, and hence help the
 industry as a whole to better understand how multiple approaches perform.
 
 ## AI disclosure
@@ -101,22 +100,20 @@ review and hundreds of manual fact checks. (The "literature review" process we d
 up as a Claude Code "skill", viewable
 [here](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.claude/skills/literature-review/SKILL.md)).
 
-But — to our tastes — Claude struggles to write readable prose. So the text below has been heavily
+But — to our tastes — Claude struggles to write readable prose. So the text has been heavily
 re-written (and cut down) by hand.
 
 ## What the literature says about the eight challenges Flexpectation aims to solve
 
 Flexpectation's specification breaks into eight challenges. This section takes each in turn: what
-the challenge is, what the literature says, and what that means for Flexpectation — followed by the
-published results the summary rests on, and what those results do not cover. The coverage is uneven.
-The first challenge (probabilistic forecasts of net demand at substations) has enough published
-results to tabulate, and the second challenge (forecasting metered generators) is the most mature
-field on the list. For most of the remaining six we found no published result that could be compared
-against anything, so those are described in prose.
+the challenge is, what the literature says, and what that means for Flexpectation. The coverage is
+uneven. The first challenge (probabilistic forecasts of net demand at substations) has a large body
+of literature, and the second challenge (forecasting metered generators) is the most mature field on
+the list. 
 
-**The table below is the whole argument of this section in one screen: for each challenge, the
-closest thing already published, and what is missing from it.** The sections that follow give the
-evidence behind each row.
+**The table below is a summary of this entire section: the table describes, for each challenge, the
+most relevant papers we found, and the implications for Flexpectation.** The sections that follow
+give the evidence behind each row.
 
 | Challenge | Closest published precedent | What this means for Flexpectation |
 |---|---|---|
