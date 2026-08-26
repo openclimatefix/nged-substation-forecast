@@ -100,6 +100,14 @@ by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised expor
 These rules apply to everything we write in prose: `docs/` pages, READMEs, `SKILL.md` files,
 docstrings, code comments, GitHub issue and PR bodies, and anything we write for an outside reader.
 
+**This is technical writing, not poetry: precision first, concision second, elegance last.** Every
+page here is a reference document, read by someone who is about to act on it, so a sentence that can
+be read two ways will eventually be read the wrong way and built on. Precision wins every contest it
+enters: repeat the noun, restate the qualifier, name the units, and accept a sentence flatter than a
+writer would like. Concision comes next, and is bought by cutting whole sentences rather than by
+clipping words out of a sentence that needs them. Most of the rules below are that order of
+priorities applied to one recurring case.
+
 **Be concrete and plain; write for a skim-reader.** Assume the reader is skimming and wants the
 meaning to jump off the page, not to spend effort decoding a clever, abstract or metaphorical
 phrase. Name the actual thing — the asset, the column, the number, the failure — rather than
