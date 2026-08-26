@@ -669,16 +669,15 @@ is what matters for NGED: a turbine out for repair for a month makes effective c
 a ratchet cannot follow it down. Flexpectation version 1 will therefore implement estimators that
 can fall as well as rise.
 
-**The published numbers favour fitting over ratcheting, and the variant Flexpectation needs is the
-variant that gave the better forecast.** [Viotti et al. (2026)](https://doi.org/10.1002/we.70136)
-say that estimating capacity using a running maximum "requires monotonically increasing capacity and
-relies on frequent high wind events". Viotti et al. publish a non-monotonic capacity estimator, which
-can follow capacity down when a turbine goes out for repair. The non-monotonic variant produced the
-lowest day-ahead forecast error, **2.0% below** a model normalised by the running maximum across
-Sweden as a whole, and the authors say the non-monotonic variant yields the best forecasts "possibly
-because it captures real changes in available capacity or corrects seasonal wind-speed biases",
-while cautioning that the difference in forecast error may not reflect the quality of the
-normalisation at all.
+**The published numbers favour fitting over ratcheting.** [Viotti et al.
+(2026)](https://doi.org/10.1002/we.70136) say that estimating capacity using a running maximum
+"requires monotonically increasing capacity and relies on frequent high wind events". Viotti et al.
+publish a non-monotonic capacity estimator, which can follow capacity down when a turbine goes out
+for repair. The non-monotonic variant produced the lowest day-ahead forecast error, **2.0% below** a
+model normalised by the running maximum across Sweden as a whole, and the authors say the
+non-monotonic variant yields the best forecasts "possibly because it captures real changes in
+available capacity or corrects seasonal wind-speed biases", while cautioning that the difference in
+forecast error may not reflect the quality of the normalisation at all.
 
 **Two caveats temper both figures for NGED.** Viotti et al.'s target is a Swedish bidding zone
 rather than a single farm, and they report that at 5-minute resolution the running maximum is
