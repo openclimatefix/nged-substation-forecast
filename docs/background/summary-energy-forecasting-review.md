@@ -48,14 +48,10 @@ the deliverable, and every idea above has to beat it on held-out data before it 
 an operational forecast. The machinery for running those experiments is already built, so an idea
 that fails costs one run on a leaderboard rather than a milestone.
 
-**Northern Powergrid's Artificial Forecasting project is further ahead than Flexpectation. But four
-of the eight challenges in Flexpectation have no counterpart we could find in Artificial
-Forecasting's published material.** Artificial Forecasting has run operationally through a full
-winter flexibility procurement cycle, which is the clearest available evidence that a forecast of
-this kind changes what a network operator does. Those four challenges are: tracking the effective
-capacity of metered generators; forecasting a substation as if it were always in its normal running
-arrangement; inferring unmetered solar and wind from a substation's net flow; and — as a stretch
-goal — doing the same for heat pumps, chargers, and batteries.
+**Northern Powergrid's Artificial Forecasting project is further ahead than Flexpectation.**
+Artificial Forecasting has run operationally through a full winter flexibility procurement cycle,
+which is the clearest available evidence that a forecast of this kind changes what a network
+operator does.
 
 **The value NGED gets from the forecast sits in both tails of the distribution**: the upper tail,
 where flexibility procurement holds demand under a limit, and the lower tail, where curtailment
