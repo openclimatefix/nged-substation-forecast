@@ -539,17 +539,18 @@ forecast itself is the largest source of error.
 
 **Adding a learned residual to a physical generator model is established practice, and the physical
 model can be fitted to the power data rather than read off a specification sheet.**
-[Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) keep the actuator-disc equation for a
-turbine's power, `P = ½·Cp·ρ·A·v³`, and treat the air density ρ and the area A swept by the blades
-as known. The power coefficient Cp — the aerodynamic term the equation does not fix — is a neural
-network of wind speed, pitch angle, and rotor speed, held below the Betz limit by its output layer
-and trained against the measured power of a wind farm of four turbines, so the gradient of the power
+[Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) write the actuator-disc equation for a
+turbine's power output, `P = ½·Cp·ρ·A·v³`, into a TensorFlow model, and treat the air density ρ and
+the area A swept by the blades as known. The power coefficient Cp — the aerodynamic term the
+equation does not fix — is estimated from wind speed, pitch angle, and rotor speed by a neural
+network whose sigmoid output layer holds Cp below the Betz limit of 0.5926. That neural network is
+trained against the measured power of a wind farm of four turbines, so the gradient of the power
 error passes back through the physical equation itself. A second neural network is then trained on
 the residual, cutting the physics model's mean absolute percentage error by 37% and its mean
-absolute error by 28%, with conformalised quantile regression supplying the uncertainty. The hybrid
-gains that margin over the physics model alone; against a purely data-driven model given the same
-eight inputs it "essentially matches" rather than beats, so adding the physics model made the
-forecast interpretable without making it less accurate.
+absolute error by 28%, with conformalised quantile regression supplying the uncertainty. Gijón et
+al. also compare their hybrid model against a purely data-driven model given the same eight inputs,
+and report that the hybrid model "essentially matches" the data-driven model rather than beating it,
+so adding the physics model made the forecast interpretable without making it less accurate.
 
 **But Gijón et al. predict power from measured wind rather than forecasting it days ahead.** Their
 inputs are the turbine's own measurements at the moment being predicted, so their accuracy says how
@@ -560,7 +561,7 @@ of a generator inside a distribution network's probabilistic net-demand forecast
 **A second reason to try differentiable physics on generators, beyond the accuracy gain above, is to
 infer the engineering parameters NGED does not hold: the capacity a site can actually export today,
 a solar array's tilt and azimuth, a turbine's power curve.** The generation forecasts in this
-literature are handed those parameters:
+literature are handed those engineering parameters:
 [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each site's capacity, and
 HEFTCom's portfolio was one named 1.2 GW offshore wind farm plus the solar capacity of a region.
 When an export-cable fault cut that wind farm's available capacity mid-competition, the winning team
@@ -570,7 +571,7 @@ while the organisers' benchmark ignored the fault and, in
 extremely poorly as a result". NGED's embedded generators publish no outage notices of that kind.
 
 **NGED's Embedded Capacity Register gives a registered capacity for generation of 50 kW and above,
-and none of the physics.** The August 2026 edition lists 5,598 connected generators totalling 11,456
+and none of the physics.** NGED's August 2026 ECR lists 5,598 connected generators totalling 11,456
 MW, of which 4,202 sites and 5,958 MW are solar. But a registered capacity is *contractual* rather
 than operational — the export limit is the one "permitted as per the connection agreement" — and the
 register carries no panel tilt, panel azimuth, or ratio of direct-current to alternating-current

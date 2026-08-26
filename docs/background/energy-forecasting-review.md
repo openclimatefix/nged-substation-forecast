@@ -534,19 +534,21 @@ it, where the weather forecast itself is the binding constraint.
 
 **Adding a learned residual to a physical generator model is established practice, and the physical
 model can be fitted to the power data rather than read off a specification sheet.**
-[Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) keep the actuator-disc equation for a
-turbine's power, `P = ½·Cp·ρ·A·v³`, and treat the air density ρ and the area A swept by the blades
-as known. The power coefficient Cp — the aerodynamic term the equation does not fix — is a neural
-network of wind speed, pitch angle, and rotor speed, held below the Betz limit by its output layer
-and trained against the measured power of a wind farm of four turbines, so the gradient of the power
-error passes back through the physical equation itself and the fitted power coefficient can be read
+[Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) write the actuator-disc equation for a
+turbine's power output, `P = ½·Cp·ρ·A·v³`, into a TensorFlow model, and treat the air density ρ and
+the area A swept by the blades as known. The power coefficient Cp — the aerodynamic term the
+equation does not fix — is estimated from wind speed, pitch angle, and rotor speed by a neural
+network whose sigmoid output layer holds Cp below the Betz limit of 0.5926. That neural network is
+trained against the measured power of a wind farm of four turbines, so the gradient of the power
+error passes back through the physical equation itself, and the fitted power coefficient can be read
 out afterwards as a curve against tip-speed ratio. A second neural network is then trained on the
 residual, reading those three variables plus the outdoor, nacelle, and rotor temperatures, the vane
 angle, and the wind direction; adding that second network cuts the physics model's mean absolute
 percentage error by 37% and its mean absolute error by 28%, with conformalised quantile regression
-supplying the uncertainty. The hybrid gains that margin over the physics model alone; against a
-purely data-driven model given the same eight inputs it "essentially matches" rather than beats, so
-what the physics adds here is interpretability, with no loss of accuracy.
+supplying the uncertainty. Gijón et al. also compare their hybrid model against a purely data-driven
+model given the same eight inputs, and report that the hybrid model "essentially matches" the
+data-driven model rather than beating it, so adding the physics model made the forecast
+interpretable without making it less accurate.
 
 **But Gijón et al. predict power from measured wind rather than forecasting it days ahead.** Their
 inputs are the turbine's own measurements at the moment being predicted, so their accuracy says how
