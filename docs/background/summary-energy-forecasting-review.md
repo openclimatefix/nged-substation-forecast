@@ -879,9 +879,9 @@ substation was in an abnormal arrangement and refuses to let the model predict t
 **Every published solution we found throws information away.** Leaving the level shifts in the data
 hurts performance, rewriting history erases the level shifts, and adapting to the new level forgets
 that a switch happened. Adapting is disqualifying here, because the quantity NGED needs is what the
-substation *would* have carried under its normal arrangement. Flexpectation will therefore condition
-the model on when each substation was in an abnormal arrangement, which no published method we found
-does.
+substation *would* have carried under its normal arrangement. Flexpectation version 1 will therefore
+detect the abnormal periods automatically, flag the lagged power inputs that fall inside one, and
+drop those periods from the training target — a combination no published method we found uses.
 
 **Rewriting the history is the fallback, because among the three published responses it is the only
 one that targets the quantity NGED needs and reports a measured benefit for doing so.** [Paredes and
@@ -900,12 +900,13 @@ would have carried under its normal arrangement, which is the quantity NGED need
 
 **Flexpectation version 1 feeds the model its switching-contaminated history deliberately, as
 information rather than as damage: the abnormal periods become an input, and they stop being a
-target.** Instead of correcting the series, the forecasting model can be fed the difference between
-what a substation actually metered and what a topology-blind reference model expected it to meter.
-First, label each substation's abnormal running arrangements explicitly and hand those labels to the
-model as features, so the model can read its own lagged power inputs correctly when a lag falls
-inside an abnormal period. Second, drop the abnormal half-hours from the training target, so the
-model is never asked to predict an abnormal arrangement.
+target.** First, take each substation's abnormal running arrangements from the detector of challenge
+4 rather than from an operational log, and hand those periods to the model as a flag on each lagged
+power input, so the model can read a lag that falls inside an abnormal period correctly. Second,
+drop the abnormal half-hours from the training target, so the model is never asked to predict an
+abnormal arrangement. An alternative worth testing early is to skip the flag and give the model
+challenge 4's reference time series alongside the lagged power, leaving the model to notice for
+itself where a lagged reading departs from what the reference series expected.
 
 **The nearest published precedent we found for the first half sits inside a substation, where the
 never-metered-target problem does not arise.** [Liu et al.
@@ -920,16 +921,16 @@ OpenAlex, Crossref, and arXiv, we found no load-forecasting study reporting what
 contaminated periods from the training target is worth, so Flexpectation will have to measure that
 itself.
 
-**Later research will go further and treat the normal-arrangement demand as a latent variable to be
-inferred, rather than a series to be repaired first**, through a differentiable-physics model of
-each substation with separate photovoltaic, wind, and demand components. Recovering a demand the
-meter never saw is mature where demand is censored — airline revenue management calls it
-unconstraining, and retail and electric-vehicle-charging work calls it censored-demand recovery, as
-in [Hüttel et al. (2023)](https://arxiv.org/abs/2301.06418) — but censoring is one-sided, so the
-observed value bounds the latent demand from below, whereas an abnormal running arrangement
-substitutes a different set of customers and can read either side of the normal-arrangement demand.
-We found no published model that recovers a latent normal-running-arrangement demand for a
-distribution substation.
+**Flexpectation version 2 will go further and treat the normal-arrangement demand as a latent
+variable to be inferred for every metered substation, rather than a series to be repaired first**,
+through a differentiable-physics model of each substation with separate photovoltaic, wind, and
+demand components. Recovering a demand the meter never saw is mature where demand is censored —
+airline revenue management calls it unconstraining, and retail and electric-vehicle-charging work
+calls it censored-demand recovery, as in [Hüttel et al. (2023)](https://arxiv.org/abs/2301.06418) —
+but censoring is one-sided, so the observed value bounds the latent demand from below, whereas an
+abnormal running arrangement substitutes a different set of customers and can read either side of
+the normal-arrangement demand. We found no published model that recovers a latent
+normal-running-arrangement demand for a distribution substation.
 
 ### 6. Detecting faulty metering
 
