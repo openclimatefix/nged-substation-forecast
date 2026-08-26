@@ -1208,13 +1208,13 @@ in terms of who the best forecaster truly is." HEFTCom's own competition period 
 
 **What a leaderboard without entrants cannot do, we should not claim it does.** Two of the strongest
 results in the benchmarks above are unavailable to us. The Critical Assessment of Structure
-Prediction (CASP) competition's reading of how long its field went without a breakthrough
-([Kryshtafovych et al. (2021)](https://doi.org/10.1002/prot.26237), whose full text we could not
-obtain) is a statement about protein structure prediction only because dozens of groups were trying
-independently. A plateau on our leaderboard would be ambiguous between a hard problem and a team
-that did not think of the right idea. The first M-competition's conclusions about whole classes of
-method — that complex methods do not typically beat simpler ones, which the M3 competition did not
-go on to support, and that combining methods beats the methods combined ([Hyndman
+Prediction (CASP) competition's 14-year plateau in one of its scored categories ([Kryshtafovych et
+al. (2021)](https://doi.org/10.1002/prot.26237)) is evidence about the difficulty of protein
+structure prediction only because dozens of groups were attacking the problem independently. A
+plateau on our leaderboard would be ambiguous between a hard problem and a team that did not think
+of the right idea. The first M-competition's conclusions about whole classes of method — that
+complex methods do not typically beat simpler ones, which the M3 competition did not go on to
+support, and that combining methods beats the methods combined ([Hyndman
 (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) — describe what many independent people
 chose to try, and no single team's leaderboard can support that kind of claim. What our leaderboard
 can do is narrower and still worth having: show which approaches beat a stated baseline on NGED's

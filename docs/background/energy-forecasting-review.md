@@ -1747,17 +1747,21 @@ numbers to flatter what happens at scale, and should say so each time we publish
 
 **Two things follow from how long those benchmarks took to produce a step change.** A leaderboard's
 first product is usually a credible measured plateau rather than a breakthrough, and in CASP's case
-the long plateau before it is what made the later jump believable ([Kryshtafovych et al.
-(2021)](https://doi.org/10.1002/prot.26237), whose full text we could not obtain). And a benchmark
-of 32 series is small enough that the constraint on what can be learned from it is likely to be its
-size, which is an argument for extending it to the wider network as soon as the data allows rather
-than for running more experiments against the trial area.
+the measured plateau is what made the later jump believable: in the category that scores which pairs
+of amino acids touch, accuracy on the most confidently predicted long-range contacts stayed at
+around 20% for about 14 years, from 2000 to 2014, in spite of the far greater quantity of sequence
+data that became available over that period, and the major jump in three-dimensional accuracy came
+only once deep learning arrived in 2018 ([Kryshtafovych et al.
+(2021)](https://doi.org/10.1002/prot.26237)). And a benchmark of 32 series is small enough that the
+constraint on what can be learned from it is likely to be its size, which is an argument for
+extending it to the wider network as soon as the data allows rather than for running more
+experiments against the trial area.
 
 **What a leaderboard without entrants cannot do, we should not claim it does.** Three of the
-strongest results in the benchmarks above are unavailable to us. CASP's reading of how long its
-field went without a breakthrough is a statement about protein structure prediction only because
-dozens of groups were trying independently; a plateau on our leaderboard would be ambiguous between
-a hard problem and a team that did not think of the right idea.
+strongest results in the benchmarks above are unavailable to us. CASP's plateau is evidence about
+the difficulty of protein structure prediction only because dozens of groups were attacking the
+problem independently; a plateau on our leaderboard would be ambiguous between a hard problem and a
+team that did not think of the right idea.
 
 **The M competitions' conclusions about whole classes of method rest on the same independence.**
 That complex methods do not typically beat simpler ones — a finding of the first M-competition that
