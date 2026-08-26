@@ -23,30 +23,34 @@ evidence that anything more sophisticated buys a large, dependable improvement o
 gradient-boosted tree at substation level. NGED's own Electricity Flexibility and Forecasting System
 reached the same choice independently in 2021.
 
-**In terms of machine learning research, Flexpectation is ambitious: several of the things it plans
-to attempt have no precedent in the literature we reviewed.** We found no published model that
-recovers a latent normal-running-arrangement demand for a distribution substation; no method that
-detects a switching event by checking that the power leaving one substation arrives at its
-neighbours; no capacity estimator run across a mixed fleet of individually metered generators at one
-distribution network; no paper driving a probabilistic substation forecast from a weather ensemble
-across a 14-day horizon; none modelling the tails of the distribution explicitly at substation
-level; none aggregating building thermal physics up to a substation and putting that physics inside
-a probabilistic forecast; and none reading a substation forecast off a pre-trained weather encoder.
+**In terms of machine learning research, Flexpectation is ambitious: several of our research ideas
+have no precedent in the literature we reviewed.** We found no published model that recovers a
+latent normal-running-arrangement demand for a distribution substation; no method that detects a
+switching event by checking that the power leaving one substation arrives at its neighbours; no
+capacity estimator run across a mixed fleet of individually metered generators at one distribution
+network; no paper driving a probabilistic substation forecast from a weather ensemble across a
+14-day horizon; none modelling the tails of the distribution explicitly at substation level; none
+aggregating building thermal physics up to a substation and putting that physics inside a
+probabilistic forecast; and none reading a substation forecast off a pre-trained weather encoder.
 Most striking of all, every study we reviewed that touches more than one of the eight challenges
 solves them as a pipeline, freezing each stage's output before the next stage sees it — so a mistake
 made early can never be put right by what a later stage learns.
 
-**Every one of those is planned research rather than a result, and research fails.** Each absence
-above says that we did not find prior work, not that the approach will succeed, and some of these
-ideas will turn out to be worse than the gradient-boosted tree Flexpectation version 1 starts from.
-A negative result, published clearly, is a real outcome of the project rather than a failure of it.
-What makes the ambition worth attempting is that the eight challenges surface in the same place — as
-a discrepancy between what a substation metered and what the weather and the calendar say it should
-have metered — so one model reasoning about several at once has information that a pipeline throws
-away. None of that risk falls on the forecast NGED receives: version 1's gradient-boosted tree is
-the deliverable, and every idea above has to beat it on held-out data before it goes anywhere near
-an operational forecast. The machinery for running those experiments is already built, so an idea
-that fails costs one run on a leaderboard rather than a milestone.
+**Every one of our research ideas is planned research rather than a result, and research fails.**
+Each absence above says that we did not find prior work, not that the approach will succeed, and
+some of these ideas will turn out to be worse than the gradient-boosted tree Flexpectation version 1
+starts from. A negative result, published clearly, is a real outcome of the project rather than a
+failure of it. What makes the ambition worth attempting is that the eight challenges surface in the
+same place — as a discrepancy between what a substation metered and what the weather and the
+calendar say it should have metered — so one model reasoning about several at once has information
+that a serial pipeline throws away. None of that risk falls on the forecast NGED receives: version
+1's gradient-boosted tree is the deliverable, and every idea above has to beat it on held-out data
+before it goes anywhere near an operational forecast.
+
+**The platform for running those experiments is already built, and built for speed.**
+Flexpectation has hundreds of ML ideas to test, so the software platform is designed to
+make each experiment quick to run, quick to validate, and directly comparable with every experiment
+before it. This make failure cheap, which is what makes trying hundreds of them realistic.
 
 **Northern Powergrid's Artificial Forecasting project is further ahead than Flexpectation.**
 Artificial Forecasting has run operationally through a full winter flexibility procurement cycle,
