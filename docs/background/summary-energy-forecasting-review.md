@@ -871,8 +871,7 @@ the size of the switching failure is quantified, so the paper shows that an oper
 for switching robustness without saying how much accuracy the trade gave up. We found one substation
 study that conditions its forecast on an operating-state label —
 [Liu et al. (2019)](https://doi.org/10.1109/ACCESS.2019.2951422), for switching that moves load
-between transformers inside a single substation — and none that both conditions a model on when a
-substation was in an abnormal arrangement and refuses to let the model predict those periods.
+between transformers inside a single substation.
 
 #### What this means for Flexpectation
 
@@ -884,10 +883,16 @@ detect the abnormal periods automatically, flag the lagged power inputs that fal
 drop those periods from the training target — a combination no published method we found uses.
 
 **Rewriting the history is the fallback, because among the three published responses it is the only
-one that targets the quantity NGED needs and reports a measured benefit for doing so.** [Paredes and
-Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) rewrite the history to the level it would
-have had if the switch had never happened, across 169 real feeders, and report better medium-term
-forecasts for it; Artificial Forecasting does the same in its data-preparation pipeline.
+one that targets the quantity NGED needs and reports a measured benefit for doing so.**
+[Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) rewrite the history to the
+level it would have had if the switch had never happened, across 169 real feeders, and report better
+medium-term forecasts for it. Artificial Forecasting rewrites its history too, in step 6 of the
+data-preparation pipeline set out in its Alpha deliverable *WP2-D2 Results Scope Item 2*, which
+rescales a block of older readings to align its median with the median of the most recent block
+whenever the older block's median falls outside the 10th-to-90th-percentile range of the recent one.
+Northern Powergrid hold no readily accessible record of their own network configuration changes, so
+that pipeline hypothesises the timestamps from the load itself and confirms them with the control
+room — the position NGED is in outside the trial area.
 
 **The fix is a level shift applied to the *older* half of each series.** Paredes and Vargas measure
 how far average demand moved across the step and add that difference to every reading before it, and
