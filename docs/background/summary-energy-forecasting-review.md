@@ -645,9 +645,10 @@ spread across the day as a constant band, to a mean absolute percentage error of
 shape of problem, though a biomass station burning solid fuel is not the same plant as a biofuel generator.
 
 **A GB gas-network project has tested the declared-schedule route on embedded gas generators, and
-what stopped it was data rather than modelling.** SGN and Northern Gas Networks'
-[Forecaster for Embedded Generation (FEmGE)](https://portal.futureenergynetworks.org.uk/content/projects/NIA2_SGN0081)
-reconstructed those generators' electricity output from the Physical Notifications each plant gives
+what stopped it was data rather than modelling.** SGN and Northern Gas Networks' [Forecaster for
+Embedded Generation
+(FEmGE)](https://portal.futureenergynetworks.org.uk/content/projects/NIA2_SGN0081) 2026 NIA project
+reconstructed gas generators' electricity output from the Physical Notifications each plant gives
 the National Energy System Operator (NESO), plus the balancing bids and offers NESO accepts. Plants
 that self-dispatch rather than trade through the Balancing Mechanism were placed out of scope as
 harder still, and no public record matches a plant's electricity meter number to its NESO unit
@@ -751,24 +752,14 @@ power measurements alone, but published no precision or recall for either rule.
 #### What this means for Flexpectation
 
 **Only one published result we found scores switching detection on both precision and recall, and
-the scores it reports are low.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score
-their detectors with the F1.5 score, which blends precision — the share of flagged points that
-really were switching — with recall — the share of switched points the detector flagged — weighting
-recall the more heavily of the two. An F1.5 score of 1 is a perfect detector and 0 is a useless one,
-so higher is better.
-
-**On events shorter than 3 days Bouman et al.'s best detector reaches about 0.2, and on events of 42
-days or longer about 0.5.** Those two scores come from different detectors, because no single method
-they tried wins across the range. Both figures were achieved on a Dutch network, with the help of a
-second load estimate constructed bottom-up from smart meter data.
-
-**NGED's switches are usually partial and fan out to two or three substations, so we should expect
-worse F1.5 scores than 0.2 to 0.5 rather than better.** Do not judge the difficulty from how obvious
-a switch looks on a chart. A negative result is worth having here, because evidence that switching
-cannot be recovered from power measurements alone would justify extracting switching labels from
-NGED's operational systems instead of continuing to infer them. That said, Flexpectation also plans
-to improve our detection by examining multiple substations together - see the last few paragraphs of
-this section.
+its scores are low: about 0.2 on events shorter than 3 days, and about 0.5 on events of 42 days or
+longer.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score their detectors with the
+F1.5 score, which blends precision — the share of flagged points that really were switching — with
+recall — the share of switched points the detector flagged — weighting recall the more heavily of
+the two. An F1.5 score of 1 is a perfect detector and 0 is a useless one, so higher is better. Those
+two scores come from different detectors, because no single method they tried wins across the range.
+Both figures were achieved on a Dutch network, with the help of a second load estimate constructed
+bottom-up from smart meter data.
 
 **The one directly useful paper detects switching but never forecasts, and forecasting is the half
 Flexpectation would add.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164), working with
@@ -790,29 +781,34 @@ switching event cannot contaminate the expected-power estimate. Neither route ne
 below the substation.
 
 **Flexpectation also plans to investigate using a signal that Bouman et al.'s
-one-substation-at-a-time method cannot see: the power has to go *somewhere*.** [Bouman et al.
-(2024)](https://arxiv.org/abs/2405.16164) score each substation against its own history — "the
-current analysis considers one year of measurements for one station at a time" — so nothing in their
-method asks whether the power that left one substation turned up at another.
+one-substation-at-a-time method cannot see: the power has to go *somewhere*.**
+[Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score each substation against its own
+history — "the current analysis considers one year of measurements for one station at a time" — so
+nothing in their method asks whether the power that left one substation turned up at another. When
+one substation's metered power drops, the substations that picked the load up should rise at the
+same moment, and their rises should sum to the drop. A step whose rise and drop fail to balance is
+more likely a meter fault or a one-off than a switch. That mismatch is where a per-substation
+detector spends its false positives. The catch is that an NGED transfer usually fans out across two
+or three neighbours, so the search runs over subsets of neighbours rather than over pairs, and the
+balance holds only approximately.
 
-**Flexpectation intends to look for both sides of the transfer.** When one substation's metered
-power drops, the substations that picked the load up should rise at the same moment, and their rises
-should sum to the drop. A step whose rise and drop fail to balance is more likely a meter fault or a
-one-off than a switch. That mismatch is where a per-substation detector spends its false positives.
-The catch is that an NGED transfer usually fans out across two or three neighbours, so the search
-runs over subsets of neighbours rather than over pairs, and the balance holds only approximately.
+**We looked for a method that checks both sides and found none, and the closest published precedent
+is a 1984 regression written for long-range planning.** The search ran across OpenAlex, Semantic
+Scholar, Crossref, arXiv, the works citing [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164),
+and the project titles on the Energy Networks Association's Smarter Networks Portal.
+[Willis et al. (1984)](https://doi.org/10.1109/TPAS.1984.318713) correct annual peak-load curve fits
+rather than detecting an event at a point in time, and their regression needs neither the size nor
+the direction of a transfer as an input. The title names a "load transfer coupling" regression,
+which suggests the fit couples the substations that exchange load — the feature that would make it
+the closest precedent — but we could not obtain the full text to check, and the abstract does not
+say.
 
-**We looked for a method that checks both sides, and found none.** The search ran across OpenAlex,
-Semantic Scholar, Crossref, arXiv, the works citing [Bouman et al.
-(2024)](https://arxiv.org/abs/2405.16164), and the project titles on the Energy Networks
-Association's Smarter Networks Portal.
-
-**The closest published precedent is a 1984 regression written for long-range planning.** [Willis et
-al. (1984)](https://doi.org/10.1109/TPAS.1984.318713) correct annual peak-load curve fits rather
-than detecting an event at a point in time, and their regression needs neither the size nor the
-direction of a transfer as an input. The title names a "load transfer coupling" regression, which
-suggests the fit couples the substations that exchange load — the feature that would make it the
-closest precedent — but we could not obtain the full text to check, and the abstract does not say.
+**NGED's switches are usually partial and fan out to two or three substations, so we should expect
+worse F1.5 scores than Bouman et al.'s 0.2 to 0.5, not better, even with the two additions above.**
+Do not judge the difficulty from how obvious a switch looks on a chart. A negative result is worth
+having here, because evidence that switching cannot be recovered from power measurements alone would
+justify extracting switching labels from NGED's operational systems instead of continuing to infer
+them.
 
 ### 5. Forecasting a substation as if it were always in its normal running arrangement
 
