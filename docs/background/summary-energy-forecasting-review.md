@@ -23,18 +23,30 @@ evidence that anything more sophisticated buys a large, dependable improvement o
 gradient-boosted tree at substation level. NGED's own Electricity Flexibility and Forecasting System
 reached the same choice independently in 2021.
 
-**In terms of machine learning research, Flexpectation is ambitious.** Several aspects of
-Flexpectation have no precedent in the literature we reviewed. For example, we found no papers
-driving a probabilistic substation forecast from a weather ensemble across a 14-day horizon, none
-modelling the tails of the distribution explicitly at substation level, none aggregating building
-thermal physics up to a substation and putting that physics inside a probabilistic forecast, and
-none reading a substation forecast off a pre-trained weather encoder, though team Rnt came close in
-HEFTCom, a Great Britain wind-and-solar forecasting competition, finishing third by feeding
-embeddings from their own machine-learned weather models into downstream neural networks. That said,
-we are confident this ambition is justified because it allows us to build an ML model that can
-reason simultaneously about the various causes of variation in substation demand. And we are
-confident we can deliver on this ambitious vision because we have already built the foundations of a
-software framework that will allow us to run ML experiments efficiently.
+**In terms of machine learning research, Flexpectation is ambitious: several of the things it plans
+to attempt have no precedent in the literature we reviewed.** We found no published model that
+recovers a latent normal-running-arrangement demand for a distribution substation; no method that
+detects a switching event by checking that the power leaving one substation arrives at its
+neighbours; no capacity estimator run across a mixed fleet of individually metered generators at one
+distribution network; no paper driving a probabilistic substation forecast from a weather ensemble
+across a 14-day horizon; none modelling the tails of the distribution explicitly at substation
+level; none aggregating building thermal physics up to a substation and putting that physics inside
+a probabilistic forecast; and none reading a substation forecast off a pre-trained weather encoder.
+Most striking of all, every study we reviewed that touches more than one of the eight challenges
+solves them as a pipeline, freezing each stage's output before the next stage sees it — so a mistake
+made early can never be put right by what a later stage learns.
+
+**Every one of those is planned research rather than a result, and research fails.** Each absence
+above says that we did not find prior work, not that the approach will succeed, and some of these
+ideas will turn out to be worse than the gradient-boosted tree Flexpectation version 1 starts from.
+A negative result, published clearly, is a real outcome of the project rather than a failure of it.
+What makes the ambition worth attempting is that the eight challenges surface in the same place — as
+a discrepancy between what a substation metered and what the weather and the calendar say it should
+have metered — so one model reasoning about several at once has information that a pipeline throws
+away. None of that risk falls on the forecast NGED receives: version 1's gradient-boosted tree is
+the deliverable, and every idea above has to beat it on held-out data before it goes anywhere near
+an operational forecast. The machinery for running those experiments is already built, so an idea
+that fails costs one run on a leaderboard rather than a milestone.
 
 **Northern Powergrid's Artificial Forecasting project is further ahead than Flexpectation. But four
 of the eight challenges in Flexpectation have no counterpart we could find in Artificial
@@ -941,11 +953,11 @@ normal-running-arrangement demand for a distribution substation.
 
 NGED's telemetry carries stuck values that repeat unchanged for hours or days, zeros that mean "no
 reading" rather than "no load", physically impossible values, and gaps running from a single
-half-hour to several months. Of the 32 series in the trial area, 10 are metered in apparent power
-only, so they report magnitude without direction and reverse flow appears as a rise: at one primary
-substation the meter bounces off zero on sunny days, when a solar farm behind it exports. A model
-trained on uncleaned data learns the fault, and a forecast that fails silently because its recent
-history was stuck is worse than one that says it is degraded.
+half-hour to several months. Furthermore, of the 32 series in the trial area, 10 are metered in
+apparent power only, so they report magnitude without direction and reverse flow appears as a rise:
+at one primary substation the meter bounces off zero on sunny days, when a solar farm behind it
+exports. A model trained on uncleaned data learns the fault, and a forecast that fails silently
+because its recent history was stuck is worse than one that says it is degraded.
 
 #### What the literature says
 
