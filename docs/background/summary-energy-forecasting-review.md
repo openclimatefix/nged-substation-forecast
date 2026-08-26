@@ -343,9 +343,14 @@ feed-forward, persistence, and foundation-model baselines on French regional loa
 distribution networks' open smart-meter feed — about 2 million meters and 50,000 substations across the areas of NGED and Scottish and Southern Electricity Networks (SSEN) — and the graph-aware models won on both. But their graphs are
 built from geographic distance or from correlation between series, never from electrical
 connectivity, so whether NGED's own connectivity map improves a forecast is still unanswered.
-- A search for **differentiable physics applied to substation demand forecasting** produced no
-strong result, and we found nobody aggregating building thermal physics up to a substation and
-putting it inside a probabilistic forecast, though the ingredients exist separately.
+- **Differentiable physics** is established for a generator's own output:
+  [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) fit a turbine model to a wind farm's
+  metered production, and [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421)
+  fit a wind farm's capacity jointly with the forecast, so what would be new for Flexpectation is
+  the substation rather than the method. A search for differentiable physics applied to substation
+  demand forecasting produced no strong result, and we found nobody aggregating building thermal
+  physics up to a substation and putting it inside a probabilistic forecast, though the ingredients
+  exist separately.
 
 ##### Pre-trained encoders
 
@@ -496,21 +501,22 @@ involved.** The class represented by the bottom row in the table above is the nu
 prediction irradiance field itself — usually global horizontal irradiance, at most post-processed or
 averaged across several weather models — used as the forecast rather than fed as an input to a
 fitted model. Of the 188 papers surveyed by
-[Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) , 118 forecast irradiance rather than
-photovoltaic (PV) power output. Only 70 papers forecast PV power output, so for most of the sample
-the weather model's irradiance field is directly comparable to the irradiance those papers forecast.
-Their regression separates the model class and the forecast target as separate variables, so the
-14.3-point penalty is estimated with the target held constant, but the authors never report which
-targets the numerical-weather-prediction papers were forecasting. Nguyen and Müsgens's advice is to
-exhaust the simple models first, because classical statistical time-series methods "still have very
-good performance compared to more complex methods such as individual ML models".
+[Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682), 118 forecast irradiance rather than
+photovoltaic (PV) power output. Only 70 papers in the survey forecast PV power output, so for most
+of the sample the weather model's irradiance field is directly comparable to the irradiance those
+papers forecast. The authors' regression separates the model class and the forecast target as
+separate variables, so the 14.3-point penalty is estimated with the target held constant, but the
+authors never report which targets the numerical-weather-prediction papers were forecasting. Nguyen
+and Müsgens's advice is to exhaust the simple models first, because classical statistical
+time-series methods "still have very good performance compared to more complex methods such as
+individual ML models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting we
 found confirms the importance of NWP inputs at the lead times Flexpectation cares about.** Numerical
-weather prediction is the largest input effect
-[Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) measure, and the inputs that improve
-skill at short range carry the opposite sign at day-ahead range. Percentage points of skill score
-again:
+weather prediction is the largest input effect [Nguyen and Müsgens
+(2026)](https://doi.org/10.1063/5.0300682) measure, and the inputs that improve skill at short range
+carry the opposite sign at day-ahead range. The table below shows percentage points of skill score
+improvement over the classical statistical baseline:
 
 | Input | Intra-hour (up to 1 hour) | Intra-day (1 to 6 hours) | Day-ahead (over 6 hours) |
 |---|---|---|---|
@@ -527,24 +533,31 @@ probabilistic substation net demand.
 Differentiable physics (DP) attacks the weather-to-power half of the error, so on [Dantas and
 Browell (2026)](https://doi.org/10.1002/we.70079)'s measurement DP has most to offer inside the
 first 2 to 3 days of the 1-to-10-day window NGED acts on, and less beyond it, where the weather
-forecast itself is the binding constraint.
+forecast itself is the largest source of error.
 
-**Adding a learned residual to a physical generator model is established practice.** [Gijón et al.
-(2025)](https://arxiv.org/abs/2502.07344) fit a physics-inspired power model to a wind farm of four
-turbines and train a second model on the residual, cutting the physics model's mean absolute
-percentage error by 37% and its mean absolute error by 28%, with conformalised quantile regression
-supplying the uncertainty. The hybrid gains that margin over the physics model alone; against a
-purely data-driven model given the same eight inputs it "essentially matches" rather than beats, so
-adding the physics model made the forecast interpretable without making it less accurate.
+**Adding a learned residual to a physical generator model is established practice, and the physical
+model can be fitted to the power data rather than read off a specification sheet.**
+[Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) keep the actuator-disc equation for a
+turbine's power, `P = ½·Cp·ρ·A·v³`, and treat the air density ρ and the area A swept by the blades
+as known. The power coefficient Cp — the aerodynamic term the equation does not fix — is a neural
+network of wind speed, pitch angle, and rotor speed, held below the Betz limit by its output layer
+and trained against the measured power of a wind farm of four turbines, so the gradient of the power
+error passes back through the physical equation itself. A second network is then trained on the
+residual, cutting the physics model's mean absolute percentage error by 37% and its mean absolute
+error by 28%, with conformalised quantile regression supplying the uncertainty. The hybrid gains
+that margin over the physics model alone; against a purely data-driven model given the same eight
+inputs it "essentially matches" rather than beats, so adding the physics model made the forecast
+interpretable without making it less accurate.
 
-**But Gijón et al. predict power from measured wind rather than forecasting it days ahead.** We
-found nobody putting a differentiable model of a generator inside a network's probabilistic
-net-demand forecast. On lead time alone, then, the larger differentiable-physics prize for
-Flexpectation would be on the demand side rather than the generation side.
+**But Gijón et al. predict power from measured wind rather than forecasting it days ahead.** Their
+inputs are the turbine's own measurements at the moment being predicted, so their accuracy says how
+well a fitted turbine model turns a known wind speed into power, not how well a forecast of that
+wind speed turns into a forecast of power days ahead. We found nobody putting a differentiable model
+of a generator inside a network's probabilistic net-demand forecast.
 
 **A second reason to try differentiable physics on generators, beyond the accuracy gain above, is to
-infer the metadata Flexpectation is not given.** The generation forecasts in this literature are
-given metadata about each generator: [Teng et al.
+infer the engineering parameters of each generator.** The generation forecasts in this literature are
+given engineering parameters of each generator: [Teng et al.
 (2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each site's capacity, and HEFTCom's
 portfolio was one named 1.2 GW offshore wind farm plus the solar capacity of a region. When an
 export-cable fault cut that wind farm's available capacity mid-competition, the winning team clipped
@@ -1437,6 +1450,8 @@ challenges above, across four families of model:
 - differentiable physics — building known physical behaviour directly into the model, so that it has
   to learn only what the physics cannot supply: the response of a solar panel and of a wind turbine
   on the generation side, and the thermal response of buildings on the demand side.
+  [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) fit a model of that kind to a single
+  wind farm.
 
 **By the standard of scope in this literature, each of the four strands is a separate piece of
 work.** Almost every study reviewed above takes on one of the eight challenges, at one voltage

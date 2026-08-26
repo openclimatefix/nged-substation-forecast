@@ -532,18 +532,27 @@ the error, so on [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079)'s
 most to offer inside the first 2 to 3 days of the 1-to-10-day window NGED acts on, and less beyond
 it, where the weather forecast itself is the binding constraint.
 
-**Adding a learned residual to a physical generator model is established practice.** [Gijón et al.
-(2025)](https://arxiv.org/abs/2502.07344) fit a physics-inspired power model to a wind farm of four
-turbines and train a second model on the residual, cutting the physics model's mean absolute
-percentage error by 37% and its mean absolute error by 28%, with conformalised quantile regression
-supplying the uncertainty. The hybrid gains that margin over the physics model alone; against a
-purely data-driven model given the same eight inputs it "essentially matches" rather than beats, so
-what the physics adds here is interpretability, with no loss of accuracy.
+**Adding a learned residual to a physical generator model is established practice, and the physical
+model can be fitted to the power data rather than read off a specification sheet.**
+[Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) keep the actuator-disc equation for a
+turbine's power, `P = ½·Cp·ρ·A·v³`, and treat the air density ρ and the area A swept by the blades
+as known. The power coefficient Cp — the aerodynamic term the equation does not fix — is a neural
+network of wind speed, pitch angle, and rotor speed, held below the Betz limit by its output layer
+and trained against the measured power of a wind farm of four turbines, so the gradient of the power
+error passes back through the physical equation itself and the fitted power coefficient can be read
+out afterwards as a curve against tip-speed ratio. A second network is then trained on the residual,
+reading those three variables plus the outdoor, nacelle, and rotor temperatures, the vane angle, and
+the wind direction; adding that second network cuts the physics model's mean absolute percentage
+error by 37% and its mean absolute error by 28%, with conformalised quantile regression supplying
+the uncertainty. The hybrid gains that margin over the physics model alone; against a purely
+data-driven model given the same eight inputs it "essentially matches" rather than beats, so what
+the physics adds here is interpretability, with no loss of accuracy.
 
-**But Gijón et al. predict power from measured wind rather than forecasting it days ahead.** We
-found nobody putting a differentiable generator model inside a network's probabilistic net-demand
-forecast. On lead time alone, then, the larger differentiable-physics prize for Flexpectation would
-be on the demand side rather than the generation side.
+**But Gijón et al. predict power from measured wind rather than forecasting it days ahead.** Their
+inputs are the turbine's own measurements at the moment being predicted, so their accuracy says how
+well a fitted turbine model turns a known wind speed into power, not how well a forecast of that
+wind speed turns into a forecast of power days ahead. We found nobody putting a differentiable
+generator model inside a network's probabilistic net-demand forecast.
 
 **The second reason to try differentiable physics on generators is the metadata NGED does not
 have.** The generation forecasts in this literature are handed the numbers we lack: [Teng et al.
@@ -2147,6 +2156,8 @@ all eight challenges above, across four families of model:
 - differentiable physics — building known physical behaviour directly into the model, so that it has
   to learn only what the physics cannot supply: the response of a solar panel and of a wind turbine
   on the generation side, and the thermal response of buildings on the demand side.
+  [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) fit a model of that kind to a single
+  wind farm, so what would be new here is the substation rather than the method.
 
 **By the standard of scope in this literature, each of the four strands is a separate piece of
 work.** Almost every study reviewed above takes on one of the eight challenges, at one voltage
@@ -2283,9 +2294,12 @@ detecting that switching happened, is the live alternative to detecting switchin
 treat it as the approach our switching work has to beat.
 
 **Differentiable physics applied to substation demand forecasting produced no strong result** in our
-search, though the ingredients exist separately. What we did not find is anyone aggregating building
-thermal physics up to a substation and putting it inside a probabilistic forecast, which is the
-version this project would need.
+search, though the ingredients exist separately: challenge 3 above describes a fitted turbine model
+inside a forecast of a wind farm's own output (
+[Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) ) and a wind farm's capacity fitted jointly
+with the forecast ( [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) ).
+What we did not find is anyone aggregating building thermal physics up to a substation and putting
+it inside a probabilistic forecast, which is the version this project would need.
 
 **Heat pumps, electric-vehicle chargers, and domestic batteries were not searched at all**, which
 challenge 8 above names as this review's largest deliberate omission. Our searches were framed
