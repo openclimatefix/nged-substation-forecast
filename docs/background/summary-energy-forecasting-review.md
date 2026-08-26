@@ -429,9 +429,10 @@ market prices and operator decisions.
 
 **Forecasting wind and solar from a weather forecast is a well-studied area, and one paper matches
 Flexpectation's challenge closely.** Nothing we found forecasts a distribution-connected battery or
-gas generator inside a net-demand forecast; the closest case for the biofuel plant is a biomass
-forecast at Austrian primary substations, [Ruhhütl et al.
-(2023)](https://doi.org/10.1049/icp.2023.0476).
+gas generator. The closest cases are both at Austrian primary substations, where
+[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast biomass generation from the
+previous day's output, and forecast market-dispatched pumped-storage hydro from the generation
+schedule its operator is obliged to provide.
 
 #### What this means for Flexpectation
 
@@ -618,33 +619,39 @@ differently-sized inverters saturating in turn. Challenge 7, below, discusses di
 detail.
 
 **The trial area's battery, gas generator, and biofuel plant each need a method, and the literature
-supplies one to borrow for the battery, none for the gas generator, and a partial method for the
-biofuel plant.** For the battery, [Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469)
-recover a price-taking storage operator's own optimisation parameters from historical prices and
-observed dispatch. We found no method for forecasting the gas generator, and what little literature
-exists forecasts a gas plant's own output directly rather than as a component of a substation's net
-demand. For the biofuel plant, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476)
-forecast biomass generation behind each Austrian primary substation from the previous day's
-generation, scaled to installed power and spread across the day as a constant band, to a mean
-absolute percentage error of 5 to 15% — the same shape of problem, though a biomass station burning
-solid fuel is not the same plant as a biofuel one.
+supplies one to borrow for the battery, one that needs a declared generation schedule for the gas
+generator, and a partial method for the biofuel plant.** For the battery,
+[Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469) recover a price-taking storage
+operator's own optimisation parameters from historical prices and observed dispatch. We found no
+forecast of a gas generator, and the closest published case is a market-dispatched plant of a
+different technology: [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) call predicting
+pumped-storage hydro "almost impossible", because the plant follows continuously changing market
+prices and the operator's own strategy, and forecast it instead by linear regression on the
+generation schedule its operator is obliged to provide, together with temperature. They report no
+accuracy figure for that class of plant, saying only that such plants "depend highly on the accuracy
+of the provided schedule", so what the method needs is a schedule rather than a better model. For
+the biofuel plant, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast biomass
+generation behind each Austrian primary substation from the previous day's generation, scaled to
+installed power and spread across the day as a constant band, to a mean absolute percentage error of
+5 to 15% — the same shape of problem, though a biomass station burning solid fuel is not the same
+plant as a biofuel generator.
 
 ### 3. Estimating the effective capacity of metered generators
 
 #### The challenge
 
 We call the amount of generation actually available at a metered site its *effective capacity*: the
-output it could produce right now if the weather allowed, as opposed to its nameplate rating.
-Turbines go out for repair, inverters degrade. A 20 MW wind farm that has been limited to 14 MW for
-a month is, for forecasting purposes, a different wind farm, and a model trained on its nameplate
-rating cannot see the difference.
+power output a generator could produce right now if the weather allowed, as opposed to its nameplate
+rating. Turbines go out for repair, inverters degrade. A 20 MW wind farm that has been limited to 14
+MW for a month is, for forecasting purposes, a different wind farm, and a model trained on its
+nameplate rating cannot see the difference.
 
 #### What the literature says
 
-**A method exists for each generation technology separately, but we found none run across a mixed
+A method exists for each generation technology separately, but we found none run across a mixed
 fleet of individually metered generators at a distribution network, and the two studies that measure
 what estimating capacity is worth downstream measure it for wind alone, at national or single-farm
-scale.**
+scale.
 
 #### What this means for Flexpectation
 
@@ -654,32 +661,24 @@ is exactly where the two published wind methods differ.** [Dantas and Browell
 rather than use a nameplate rating they estimate a time series of available capacity for each farm
 from that farm's own metered production, needing no capacity register and no outage messages. The
 general shape of that capacity-estimation rule is a running maximum of production, which ratchets
-upwards and never comes back down. [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) fit the
-most likely capacity time series instead, by quadratic optimisation against a capacity factor
-simulated from reanalysis weather and a power curve, and they publish a monotonic variant alongside
-a non-monotonic one. The direction of travel is what matters for NGED: a turbine out for repair for
-a month makes effective capacity *fall*, and a ratchet cannot follow it down. Flexpectation version
-1 will therefore implement estimators that can fall as well as rise.
+upwards and never comes back down. In contrast, [Viotti et al.
+(2026)](https://doi.org/10.1002/we.70136) fit the most likely capacity time series instead, by
+quadratic optimisation against a capacity factor simulated from reanalysis weather and a power
+curve, and they publish a monotonic variant alongside a non-monotonic one. The direction of travel
+is what matters for NGED: a turbine out for repair for a month makes effective capacity *fall*, and
+a ratchet cannot follow it down. Flexpectation version 1 will therefore implement estimators that
+can fall as well as rise.
 
 **The published numbers favour fitting over ratcheting, and the variant Flexpectation needs is the
 variant that gave the better forecast.** [Viotti et al. (2026)](https://doi.org/10.1002/we.70136)
-say the running maximum "requires monotonically increasing capacity and relies on frequent high wind
-events", and report **27.2% lower normalised mean absolute error** than the running maximum at
-quantifying capacity after a new wind farm connects.
-
-**The 27.2% is scored by their monotonic variant, which assumes capacity only ever rises.** They
-publish a non-monotonic variant alongside it, which can follow capacity down when a turbine goes out
-for repair, and that is the version NGED needs. On this test the monotonic variant's error is 31%
-below the non-monotonic variant's. But the test only ever adds capacity: it simulates a new wind
-farm connecting, so it measures how well each variant spots a step *up*, and says nothing about how
-either handles a step down.
-
-**Downstream the ranking reverses.** The non-monotonic variant produced the lowest day-ahead
-forecast error, **2.0% below** a model normalised by the running maximum across Sweden as a whole,
-and the authors say the non-monotonic variant yields the best forecasts "possibly because it
-captures real changes in available capacity or corrects seasonal wind-speed biases", while
-cautioning that the difference in forecast error may not reflect the quality of the normalisation at
-all.
+say that estimating capacity using a running maximum "requires monotonically increasing capacity and
+relies on frequent high wind events". Viotti et al. publish a non-monotonic capacity estimator, which
+can follow capacity down when a turbine goes out for repair. The non-monotonic variant produced the
+lowest day-ahead forecast error, **2.0% below** a model normalised by the running maximum across
+Sweden as a whole, and the authors say the non-monotonic variant yields the best forecasts "possibly
+because it captures real changes in available capacity or corrects seasonal wind-speed biases",
+while cautioning that the difference in forecast error may not reflect the quality of the
+normalisation at all.
 
 **Two caveats temper both figures for NGED.** Viotti et al.'s target is a Swedish bidding zone
 rather than a single farm, and they report that at 5-minute resolution the running maximum is

@@ -153,7 +153,7 @@ evidence behind each row.
 | Challenge | Closest published precedent | Where the gap is |
 |---|---|---|
 | 1. Probabilistic net-demand forecasts at substations | [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) at 551 primary substations, [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) at 96,989 Portuguese secondary substations, [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) at 13 | No study we found drives substation uncertainty from a weather ensemble across a full 14-day horizon |
-| 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 GB wind farms from the ECMWF ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Nothing we found forecasts a distribution-connected battery or gas generator inside a net-demand forecast; the closest case for the biofuel plant is a biomass forecast at Austrian primary substations |
+| 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 GB wind farms from the ECMWF ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Nothing we found forecasts a distribution-connected battery or gas generator; the closest cases are a biomass forecast and a schedule-driven pumped-storage hydro forecast, both at Austrian primary substations |
 | 3. Estimating the effective capacity of metered generators | [Viotti et al. (2026)](https://doi.org/10.1002/we.70136), fitting a wind farm's capacity against a capacity factor simulated from reanalysis weather, and [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079), ratcheting a running maximum of the farm's own metered production. Every method we found covers one generation technology, and most work from a revenue meter alone | None of it run across a mixed fleet of individually metered generators at a distribution network, or tested for whether estimating capacity improves the forecast |
 | 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers, three on one feeder and one on two; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | Detection from the substation's own meter alone, scored on precision as well as recall, using the fact that the load has to move to a neighbouring substation |
 | 5. Forecasting a substation as if it were always in its normal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Nobody we found feeds a model switching-contaminated history deliberately, as information rather than as damage |
@@ -350,9 +350,10 @@ has used that map as a forecast input.
 
 **In summary.** Forecasting wind and solar from a weather forecast is the mature case, and one paper
 matches Flexpectation's challenge closely; nothing we found forecasts a distribution-connected
-battery or gas generator inside a net-demand forecast; the closest case for the biofuel plant is a
-biomass forecast at Austrian primary substations, [Ruhhütl et al.
-(2023)](https://doi.org/10.1049/icp.2023.0476).
+battery or gas generator. The closest cases are both at Austrian primary substations, where
+[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast biomass generation from the
+previous day's output, and forecast market-dispatched pumped-storage hydro from the generation
+schedule its operator is obliged to provide.
 
 **The challenge.** Twelve of the 32 series in the trial area are individually metered generators —
 six solar farms, three wind farms, a biofuel plant, a battery, and a gas generator — and each needs
@@ -663,21 +664,32 @@ That soft clip is also how the ratio of direct-current to alternating-current ra
 model: as a learned aggregate limit and a learned curvature, rather than as a register value NGED
 does not hold.
 
-**Where the gap is: nothing we found forecasts a distribution-connected battery or gas generator
-inside a net-demand forecast; the closest case for the biofuel plant is a biomass forecast at
-Austrian primary substations, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476).** For
-the battery there is at least a method to borrow. [Bian et al.
-(2024)](https://doi.org/10.1109/TSG.2023.3303469) recover a price-taking storage operator's own
-optimisation parameters by gradient descent on historical prices and observed dispatch, and prove
-the recovered parameters converge to the true ones for a class of storage models.
+**Where the gap is: nothing we found forecasts a distribution-connected battery or gas generator.
+The closest cases are both at Austrian primary substations, where
+[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast biomass generation from the
+previous day's output, and forecast market-dispatched pumped-storage hydro from the generation
+schedule its operator is obliged to provide. ** For the battery there is at least a method to
+borrow. [Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469) recover a price-taking
+storage operator's own optimisation parameters by gradient descent on historical prices and observed
+dispatch, and prove the recovered parameters converge to the true ones for a class of storage
+models.
 
-**We found no method worth borrowing for the gas generator, and what little exists forecasts a gas
-plant's own output directly rather than as a component of a substation's net demand.** For the
-biofuel plant, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast biomass
-generation behind each Austrian primary substation from the previous day's generation, scaled to
-installed power and spread across the day as a constant band, to a mean absolute percentage error of
-5 to 15% — the same shape of problem, though a biomass station burning solid fuel is not the same
-plant as a biofuel one.
+**The closest published case for the gas generator forecasts a market-dispatched plant from the
+schedule its operator provides, not from weather or from the plant's own history.**
+[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) call predicting pumped-storage hydro
+"almost impossible", because the plant follows continuously changing market prices and the
+operator's own strategy, and forecast it instead by linear regression on the generation schedule its
+operator is obliged to provide, together with temperature. They report no accuracy figure for that
+class of plant, saying only that such plants "depend highly on the accuracy of the provided
+schedule". A gas generator dispatched on price is the same shape of problem, and the method needs a
+schedule rather than a better model.
+
+**For the biofuel plant the same paper supplies a partial method.**
+[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast biomass generation behind
+each Austrian primary substation from the previous day's generation, scaled to installed power and
+spread across the day as a constant band, to a mean absolute percentage error of 5 to 15% — the same
+shape of problem, though a biomass station burning solid fuel is not the same plant as a biofuel
+one.
 
 **Otherwise the closest the literature comes is a warning rather than a method.** [Pinheiro et al.
 (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) found that sites serving a single customer
