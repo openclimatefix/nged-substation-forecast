@@ -129,6 +129,23 @@ not "Two things temper"; "the closest work already published", not "the closest 
 published". A bolded lead opening "Two things follow" wastes the one sentence a skim-reader is
 guaranteed to read.
 
+**"Metadata" hides the fields that carry the information; list them.** The fault is the same as
+"thing": a reader told that a model was given "the site's metadata" learns nothing, because the
+fields are the information. Write "the panel tilt, the panel azimuth, and the ratio of
+direct-current to alternating-current rating", not "the site's metadata"; write "six columns
+describing each low-voltage feeder — among them how many housing units it serves", not "metadata
+covariates". Where the fields are not worth listing in full, name the ones that matter and say how
+many there are. The same goes for every other umbrella noun that stands in for a list the reader
+wants: "parameters", "attributes", "characteristics", "data quality issues".
+
+**Say which kind of network you mean, every time.** This project forecasts an electricity network
+using neural networks, so a bare "network" makes the reader stop and work out which one is meant.
+Qualify it on both sides: "electricity network", "distribution network", "network operator" for the
+wires, and "neural network", "graph neural network", "long short-term memory neural network" for the
+model. Where a sentence would otherwise pile up the qualifier, name the thing instead — "a model
+trained on the feeders' own history" beats "a model given a network's whole history". Any other word
+this project uses for two different things gets the same treatment.
+
 **Describe performance in performance terms, not in money metaphors.** A forecast does not "pay",
 an input does not "buy" accuracy, and a modelling choice does not "cost" anything unless real money
 changes hands. Write what actually moved: "the inputs that improve skill at short range", "adding
