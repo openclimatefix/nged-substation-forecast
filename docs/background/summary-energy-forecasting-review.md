@@ -914,18 +914,15 @@ arrangement. An alternative worth testing early is to skip the flag and give the
 reference time series alongside the lagged power, leaving the model to notice for itself where a
 lagged reading departs from what the reference series expected.
 
-**The nearest published precedent we found for the first half sits inside a substation, where the
-never-metered-target problem does not arise.** [Liu et al.
-(2019)](https://doi.org/10.1109/ACCESS.2019.2951422) fit a separate regression per substation
-operating condition, though their switching moves load between transformers inside one substation,
-so the substation total stays metered throughout.
-
-**For the second half, the mechanism has a canonical statement outside energy.** [Salinas et al.
-(2020)](https://doi.org/10.1016/j.ijforecast.2019.07.001) state the mechanism for a probabilistic
-forecaster, motivated by retail stock-outs, and say they omitted the experiments for it. Searching
-OpenAlex, Crossref, and arXiv, we found no load-forecasting study reporting what dropping
-contaminated periods from the training target is worth, so Flexpectation will have to measure that
-itself.
+**The nearest published precedent for each half of the plan sits outside the problem NGED has.** For
+the first half, [Liu et al. (2019)](https://doi.org/10.1109/ACCESS.2019.2951422) fit a separate
+regression per substation operating condition, though their switching moves load between
+transformers inside one substation, so the substation total stays metered throughout. For the second
+half, [Salinas et al. (2020)](https://doi.org/10.1016/j.ijforecast.2019.07.001) state the mechanism
+for a probabilistic forecaster, motivated by retail stock-outs, and say they omitted the experiments
+for it. Searching OpenAlex, Crossref, and arXiv, we found no load-forecasting study reporting what
+dropping contaminated periods from the training target is worth, so Flexpectation will have to
+measure that itself.
 
 **Flexpectation version 2 plans to go further and treat the normal-arrangement demand as a latent
 variable to be inferred for every metered substation, rather than a series to be repaired first**,
