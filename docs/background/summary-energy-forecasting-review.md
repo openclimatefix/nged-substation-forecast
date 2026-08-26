@@ -569,13 +569,16 @@ clipped its quantiles to the capacity implied by the outage notices the farm is 
 while the organisers' benchmark ignored the fault and, in
 [Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
 extremely poorly as a result". NGED's embedded generators publish no outage notices of that kind.
+Estimating each generator's available capacity from its own metered output instead is challenge 3
+below, which sets out the published methods in detail.
 
 **NGED's Embedded Capacity Register gives a registered capacity for generation of 50 kW and above,
 and none of the physics.** NGED's August 2026 ECR lists 5,598 connected generators totalling 11,456
 MW, of which 4,202 sites and 5,958 MW are solar. But a registered capacity is *contractual* rather
 than operational — the export limit is the one "permitted as per the connection agreement" — and the
 register carries no panel tilt, panel azimuth, or ratio of direct-current to alternating-current
-rating.
+rating. Hence Flexpectation plans to infer those engineering parameters from the power data, using
+differentiable physics.
 
 **A differentiable model could infer both the operational capacity and the panel orientation of each
 generator, and each of those two inferences has been made to work on its own.** [Pierrot and Pinson
@@ -605,8 +608,9 @@ tilt and azimuth that make the forecast right.
 **The two cases Flexpectation faces need different machinery, and the dividing line is the limit
 Saint-Drenan et al. state.** For a single metered site, fitting tilt, azimuth, and the effective
 direct- and alternating-current capacities is the plan — by gradient descent inside the forecast
-rather than by grid search, so that the fit stays joint and probabilistic. For unmetered solar
-behind a substation their algorithm "performs poorly", because it assumes one orientation per plant
+rather than by grid search, so that the fit stays joint and probabilistic. Challenge 3 below sets
+out how that effective capacity would be estimated. For unmetered solar behind a substation,
+Saint-Drenan et al.'s algorithm "performs poorly", because it assumes one orientation per plant
 where the series is "the aggregated production of modules with different orientations".
 Flexpectation therefore estimates no single orientation per substation: the fleet model represents
 the aggregate as a learned mixture of east-, south-, and west-facing basis shapes, with a soft clip

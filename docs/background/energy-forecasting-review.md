@@ -565,7 +565,9 @@ When an export-cable fault cut that wind farm's available capacity mid-competiti
 clipped its quantiles to the capacity implied by the outage notices the farm is obliged to publish,
 while the organisers' benchmark ignored the fault and, in
 [Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
-extremely poorly as a result". NGED's embedded generators publish no such notices.
+extremely poorly as a result". NGED's embedded generators publish no such notices. Estimating each
+generator's available capacity from its own metered output instead is challenge 3 below, which sets
+out the published methods in detail.
 
 **NGED's Embedded Capacity Register gives a registered capacity for generation of 50 kW and above,
 and none of the physics.** The August 2026 edition lists 5,598 connected generators totalling 11,456
@@ -635,17 +637,17 @@ rather than from metered plants — neither our horizon nor our question, and th
 are known throughout rather than estimated.
 
 **Two findings from that search shape what Flexpectation should build, and they separate the two
-cases the project faces.** [Saint-Drenan et al.
-(2015)](https://doi.org/10.1016/j.solener.2015.07.024) report that an azimuth fitted 5° from the
-true one gave better simulations than the true value, because the fit balances the systematic error
-of the physical model, concluding that the output "should be seen as a set of parameters that lead
-to the best simulation and not necessarily as the actual characteristics of the PV plant". That
-makes accuracy in degrees the wrong target for Flexpectation: what a differentiable plant model
-needs is an effective tilt and azimuth that make the forecast right, which is measurable against the
-forecast we already score. For a single metered site, fitting tilt, azimuth, and the effective
-direct- and alternating-current capacities is the plan — by gradient descent inside the forecast
-rather than by the grid search Saint-Drenan et al. use, so that the fit stays joint and
-probabilistic.
+cases the project faces.**
+[Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024) report that an azimuth
+fitted 5° from the true one gave better simulations than the true value, because the fit balances
+the systematic error of the physical model, concluding that the output "should be seen as a set of
+parameters that lead to the best simulation and not necessarily as the actual characteristics of the
+PV plant". That makes accuracy in degrees the wrong target for Flexpectation: what a differentiable
+plant model needs is an effective tilt and azimuth that make the forecast right, which is measurable
+against the forecast we already score. For a single metered site, fitting tilt, azimuth, and the
+effective direct- and alternating-current capacities is the plan — by gradient descent inside the
+forecast rather than by the grid search Saint-Drenan et al. use, so that the fit stays joint and
+probabilistic. Challenge 3 below sets out how that effective capacity would be estimated.
 
 **Their second finding rules out applying the same fit to a substation, and points at what to do
 instead.** Saint-Drenan et al. name Flexpectation's unmetered case as their method's failure mode:
