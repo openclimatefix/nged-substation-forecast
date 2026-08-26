@@ -486,29 +486,30 @@ more than the model wrapped around it, as the next table shows.
 
 **Two limits come with reading the table this way.** Their regression carries no interaction between
 model class and input, so it cannot detect whether a machine-learning model exploits a weather
-forecast better than an autoregressive model does. That question is the one that matters for
-Flexpectation. And only 19% of the 4,687 observations use numerical weather prediction as an input
-at all, against 91% that use lagged power, so most of the evidence separating the model classes
-comes from models with no weather forecast in them.
+forecast better than an autoregressive model does. That question matters for Flexpectation. And only
+19% of the 4,687 observations in Nguyen and Müsgens (2026) use numerical weather prediction as an
+input at all, against 91% that use lagged power, so most of the evidence separating the model
+classes comes from models with no weather forecast in them.
 
 **The bottom row is the weather model used raw, and for most of that sample no power curve is
-involved.** The class is the numerical weather prediction irradiance field itself — usually global
-horizontal irradiance, at most post-processed or averaged across several weather models — used as
-the forecast rather than fed as an input to a fitted model. Of the 188 papers in their sample, 118
-forecast irradiance rather than photovoltaic plant output. Only 70 papers forecast the output of a
-photovoltaic plant, so for most of the sample the weather model's irradiance field is directly
-comparable to the irradiance those papers forecast. Their regression separates the model class and
-the forecast target as separate variables, so the 14.3-point penalty is estimated with the target
-held constant, but the authors never report which targets the numerical-weather-prediction papers
-were forecasting. Their own advice is to exhaust the simple models first, because classical
-statistical time-series methods "still have very good performance compared to more complex methods
-such as individual ML models".
+involved.** The class represented by the bottom row in the table above is the numerical weather
+prediction irradiance field itself — usually global horizontal irradiance, at most post-processed or
+averaged across several weather models — used as the forecast rather than fed as an input to a
+fitted model. Of the 188 papers surveyed by Nguyen and Müsgens (2026), 118 forecast irradiance
+rather than photovoltaic (PV) power output. Only 70 papers forecast PV power output, so for most of
+the sample the weather model's irradiance field is directly comparable to the irradiance those
+papers forecast. Their regression separates the model class and the forecast target as separate
+variables, so the 14.3-point penalty is estimated with the target held constant, but the authors
+never report which targets the numerical-weather-prediction papers were forecasting. Nguyen and
+Müsgens's advice is to exhaust the simple models first, because classical statistical time-series
+methods "still have very good performance compared to more complex methods such as individual ML
+models".
 
 **Most of NGED's metered generators are solar, and the largest meta-analysis of solar forecasting we
 found confirms the importance of NWP inputs at the lead times Flexpectation cares about.** Numerical
 weather prediction is the largest input effect [Nguyen and Müsgens
-(2026)](https://doi.org/10.1063/5.0300682) measure, and the inputs that pay at short range carry the
-opposite sign at day-ahead range. Percentage points of skill score again:
+(2026)](https://doi.org/10.1063/5.0300682) measure, and the inputs that improve performance at short
+range carry the opposite sign at day-ahead range. Percentage points of skill score again:
 
 | Input | Intra-hour (up to 1 hour) | Intra-day (1 to 6 hours) | Day-ahead (over 6 hours) |
 |---|---|---|---|
