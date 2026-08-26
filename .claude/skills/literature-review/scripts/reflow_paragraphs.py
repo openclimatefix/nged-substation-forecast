@@ -20,22 +20,26 @@ SKIP_PREFIXES: Final[tuple[str, ...]] = ("#", "|", "```", "- ", "* ", ">", "    
 LINK: Final[re.Pattern[str]] = re.compile(r"\[[^\]]*\]\([^)\s]*\)")
 """A complete markdown link, which is wrapped as one token so a line break cannot fall inside it."""
 
+PLACEHOLDER: Final[re.Pattern[str]] = re.compile(r"\x00(\d+)\x00")
+"""The marker `_tokenise` leaves where it lifted a link out, holding that link's index."""
+
 
 def _tokenise(text: str) -> list[str]:
     """Split `text` on whitespace, but keep each markdown link whole.
 
     `check_citations.py` matches a citation and its link on one line, so a line break between
-    `[Author (year)]` and `(url)` reads to that check as a citation nobody hyperlinked. Wrapping
-    the link as a single token keeps the two halves together.
+    `[Author (year)]` and `(url)` reads to that check as a citation nobody hyperlinked. Each link is
+    replaced by a placeholder before splitting and restored afterwards, so the link survives as one
+    token and the punctuation touching either side of the link stays welded to it.
     """
-    tokens: list[str] = []
-    cursor = 0
-    for match in LINK.finditer(text):
-        tokens.extend(text[cursor : match.start()].split())
-        tokens.append(match.group())
-        cursor = match.end()
-    tokens.extend(text[cursor:].split())
-    return tokens
+    links: list[str] = []
+
+    def stash(match: re.Match[str]) -> str:
+        links.append(match.group())
+        return f"\x00{len(links) - 1}\x00"
+
+    masked = LINK.sub(stash, text)
+    return [PLACEHOLDER.sub(lambda m: links[int(m.group(1))], token) for token in masked.split()]
 
 
 def _wrap(words: list[str]) -> list[str]:

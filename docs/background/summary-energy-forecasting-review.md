@@ -217,16 +217,16 @@ results of the three methods the project tested and was also the easiest to auto
 we read shows a large, dependable margin for anything more sophisticated than XGBoost at substation
 level.
 
-**Both network deployments that actually tried boosted trees kept a simpler model instead.**
-[Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493), running a live system
-forecasting 96,989 Portuguese secondary substations, scored 199 MW root-mean-square error at system
-level with a tuned gradient-boosted tree against 191 MW for a generalised additive model — the
-boosted tree 4% worse — and rejected the boosted tree on the effort of tuning it and on the
-interpretability given up with it. [Artificial
-Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) kept the simpler model when
-forecasting customer export at primary substations: measured against the Bayesian ridge regression
-they went on to adopt (a linear model that shrinks its coefficients and reports uncertainty on
-them), boosted trees "helped some substations but harmed others".
+**Both deployments by network operators that actually tried boosted trees kept a simpler model
+instead.** [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493), running a live
+system forecasting 96,989 Portuguese secondary substations, scored 199 MW root-mean-square error at
+system level with a tuned gradient-boosted tree against 191 MW for a generalised additive model —
+the boosted tree 4% worse — and rejected the boosted tree on the effort of tuning it and on the
+interpretability given up with it.
+[Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) kept the
+simpler model when forecasting customer export at primary substations: measured against the Bayesian
+ridge regression they went on to adopt (a linear model that shrinks its coefficients and reports
+uncertainty on them), boosted trees "helped some substations but harmed others".
 
 **Neither end of the sophistication scale is a safe bet.** [Mesarcik et al.
 (2025)](https://doi.org/10.1049/icp.2025.1968) caution about the uncertainty a boosted tree reports
@@ -244,9 +244,11 @@ So, for Flexpectation, the literature suggests that the choice of model family m
 the data, the feature engineering, and how often the model is refitted.
 
 **Read those results knowing that when a paper says "XGBoost" it usually means a model with
-considerably less feature engineering than what we plan to implement.** [Kaas et al.
-(2026)](https://arxiv.org/abs/2607.01966) give their ML model lagged power, weather, time, and
-metadata, and nothing beyond that: no clear-sky index, no wind power curve, no monotone constraints.
+considerably less feature engineering than what we plan to implement.**
+[Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) give their ML model lagged power, weather,
+time, and six columns describing each low-voltage feeder — among them how many housing units,
+industrial and commercial units, and photovoltaic systems the feeder serves — and nothing beyond
+that: no clear-sky index, no wind power curve, no monotone constraints.
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) ran the only comparison on
 equal terms we found — their GBT and their generalised additive model — a regression that fits a
 separate smooth curve for each input and adds the curves together — received the same features, but
@@ -393,16 +395,16 @@ probabilistic weather forecast in physical units, which a substation model then 
 time encoder that learns how people use the calendar — e.g. that Christmas is not an ordinary day —
 and possibly a space encoder holding the standing geographic context of each substation.
 
-**Both halves of the weather encoder have been built.** [Rasp and Lerch
-(2018)](https://arxiv.org/abs/1805.09091) built a neural network that post-processes a 50-member
-ECMWF ensemble into calibrated probabilistic 2-metre temperature at 537 German weather stations 48
-hours ahead, cutting mean continuous ranked probability score — a single number scoring a whole
-forecast distribution against what actually happened, where lower is better — from 1.16 for the raw
-ensemble to 0.78, with a learned per-station embedding one of the two components the authors credit
-for the gain. [Mitra and Ramavajjala (2023)](https://arxiv.org/abs/2312.00290) built the second:
-they freeze a weather autoencoder and train small models on the frozen representation alone, at
-accuracy comparable to purpose-built models, though the targets they predict are further weather
-variables rather than anything on a network.
+**Both halves of the weather encoder have been built.**
+[Rasp and Lerch (2018)](https://arxiv.org/abs/1805.09091) built a neural network that post-processes
+a 50-member ECMWF ensemble into calibrated probabilistic 2-metre temperature at 537 German weather
+stations 48 hours ahead, cutting mean continuous ranked probability score — a single number scoring
+a whole forecast distribution against what actually happened, where lower is better — from 1.16 for
+the raw ensemble to 0.78, with a learned per-station embedding one of the two components the authors
+credit for the gain. [Mitra and Ramavajjala (2023)](https://arxiv.org/abs/2312.00290) built the
+second: they freeze a weather autoencoder and train small models on the frozen representation alone,
+at accuracy comparable to purpose-built models, though the targets they predict are further weather
+variables rather than anything on an electricity network.
 
 **The nearest we found anyone joining the two is one entrant in HEFTCom, a competition to forecast a
 GB wind-and-solar portfolio day-ahead.** [Browell et al.
@@ -542,29 +544,30 @@ turbine's power, `P = ½·Cp·ρ·A·v³`, and treat the air density ρ and the 
 as known. The power coefficient Cp — the aerodynamic term the equation does not fix — is a neural
 network of wind speed, pitch angle, and rotor speed, held below the Betz limit by its output layer
 and trained against the measured power of a wind farm of four turbines, so the gradient of the power
-error passes back through the physical equation itself. A second network is then trained on the
-residual, cutting the physics model's mean absolute percentage error by 37% and its mean absolute
-error by 28%, with conformalised quantile regression supplying the uncertainty. The hybrid gains
-that margin over the physics model alone; against a purely data-driven model given the same eight
-inputs it "essentially matches" rather than beats, so adding the physics model made the forecast
-interpretable without making it less accurate.
+error passes back through the physical equation itself. A second neural network is then trained on
+the residual, cutting the physics model's mean absolute percentage error by 37% and its mean
+absolute error by 28%, with conformalised quantile regression supplying the uncertainty. The hybrid
+gains that margin over the physics model alone; against a purely data-driven model given the same
+eight inputs it "essentially matches" rather than beats, so adding the physics model made the
+forecast interpretable without making it less accurate.
 
 **But Gijón et al. predict power from measured wind rather than forecasting it days ahead.** Their
 inputs are the turbine's own measurements at the moment being predicted, so their accuracy says how
 well a fitted turbine model turns a known wind speed into power, not how well a forecast of that
 wind speed turns into a forecast of power days ahead. We found nobody putting a differentiable model
-of a generator inside a network's probabilistic net-demand forecast.
+of a generator inside a distribution network's probabilistic net-demand forecast.
 
 **A second reason to try differentiable physics on generators, beyond the accuracy gain above, is to
-infer the engineering parameters of each generator.** The generation forecasts in this literature are
-given engineering parameters of each generator: [Teng et al.
-(2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each site's capacity, and HEFTCom's
-portfolio was one named 1.2 GW offshore wind farm plus the solar capacity of a region. When an
-export-cable fault cut that wind farm's available capacity mid-competition, the winning team clipped
-its quantiles to the capacity implied by the outage notices the farm is obliged to publish, while
-the organisers' benchmark ignored the fault and, in [Browell et al.
-(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed extremely poorly as a
-result". NGED's embedded generators publish no outage notices of that kind.
+infer the engineering parameters NGED does not hold: the capacity a site can actually export today,
+a solar array's tilt and azimuth, a turbine's power curve.** The generation forecasts in this
+literature are handed those parameters:
+[Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each site's capacity, and
+HEFTCom's portfolio was one named 1.2 GW offshore wind farm plus the solar capacity of a region.
+When an export-cable fault cut that wind farm's available capacity mid-competition, the winning team
+clipped its quantiles to the capacity implied by the outage notices the farm is obliged to publish,
+while the organisers' benchmark ignored the fault and, in
+[Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
+extremely poorly as a result". NGED's embedded generators publish no outage notices of that kind.
 
 **NGED's Embedded Capacity Register gives a registered capacity for generation of 50 kW and above,
 and none of the physics.** The August 2026 edition lists 5,598 connected generators totalling 11,456
@@ -586,17 +589,17 @@ up to 195 km away. Because both curves are normalised before matching, their met
 nameplate rating. Neither method sits inside a substation's net-demand forecast. Flexpectation would
 have to put the method there itself.
 
-**What better orientation metadata is worth to a forecast is a number we have not found in the
-literature, so Flexpectation treats it as a hypothesis to test rather than a settled prize.** [Meng
-et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan et al.
-(2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's tilt and azimuth from
-its metered alternating-current power output paired with an irradiance series measured somewhere
-else — a weather station up to 195 km away for Meng et al., the HelioClim-3 satellite database for
-Saint-Drenan et al. — and land within a few degrees, but report their accuracy in degrees alone.
-Saint-Drenan et al. also found that an azimuth fitted 5° from the true azimuth gave better
-simulations than the true value, because the fit balances the systematic error of the physical model
-— so accuracy in degrees is the wrong target. What matters is an *effective* tilt and azimuth that
-make the forecast right.
+**What a better tilt and azimuth are worth to a forecast is a number we have not found in the
+literature, so Flexpectation treats it as a hypothesis to test rather than a settled prize.**
+[Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and
+[Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's
+tilt and azimuth from its metered alternating-current power output paired with an irradiance series
+measured somewhere else — a weather station up to 195 km away for Meng et al., the HelioClim-3
+satellite database for Saint-Drenan et al. — and land within a few degrees, but report their
+accuracy in degrees alone. Saint-Drenan et al. also found that an azimuth fitted 5° from the true
+azimuth gave better simulations than the true value, because the fit balances the systematic error
+of the physical model — so accuracy in degrees is the wrong target. What matters is an *effective*
+tilt and azimuth that make the forecast right.
 
 **The two cases Flexpectation faces need different machinery, and the dividing line is the limit
 Saint-Drenan et al. state.** For a single metered site, fitting tilt, azimuth, and the effective
@@ -704,7 +707,7 @@ measured hourly through 2019, and one of the four against a second feeder as wel
 
 | Paper | Method | Logged transfers found |
 |---|---|---|
-| [Kim et al. (2020)](https://doi.org/10.3390/en13174358) | Long short-term memory network, flagging where measured load departs from its prediction | 7 of 9 |
+| [Kim et al. (2020)](https://doi.org/10.3390/en13174358) | Long short-term memory neural network, flagging where measured load departs from its prediction | 7 of 9 |
 | [Kim et al. (2022)](https://doi.org/10.3390/en15041441) | Polynomial and standard-pattern preprocessing | 7 of 9, and 7 of 7 on a second feeder |
 | [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) | A moving average and a moving standard deviation, thresholding the residual of a seasonal-trend decomposition | **8 of 9** |
 | [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) | Robust seasonal-trend decomposition, a Haar wavelet transform of the residual, then Pruned Exact Linear Time changepoints, then an isolation forest over each candidate | 7 of 9 |
@@ -1285,8 +1288,8 @@ time-series model that had never seen their data, against models trained on the 
 200 German low-voltage feeders and scored, like Chronos-2, on all 200 feeders. Chronos-2 beat every
 purpose-trained competitor on mean absolute error, 3.8 kW against 4.2 kW. Their purpose-trained
 models were not heavily engineered, and challenge 1 above found only a modest return to model
-sophistication. But a model given a network's whole history, beaten by a model that saw none of that
-history, is still important information about the value of any programme of heavy engineering.
+sophistication. But a model trained on the feeders' own history, beaten by a model that saw none of
+that history, is still important information about the value of any programme of heavy engineering.
 
 ## What GB networks have already built
 
@@ -1332,8 +1335,9 @@ Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) is the dire
 Flexpectation's unmetered-solar work, as challenge 7 above sets out.
 
 **Two of the nine projects in the table are outside GB: OpenSTEF in the Netherlands and Enedis in
-France.** [OpenSTEF](https://lfenergy.org/projects/openstef/) is also the only operational network
-forecasting system in this review whose code can be read rather than inferred from a deliverable.
+France.** [OpenSTEF](https://lfenergy.org/projects/openstef/) is also the only operational
+forecasting system run by a network operator in this review whose code can be read rather than
+inferred from a deliverable.
 
 **Enedis has forecast every one of its high-voltage-to-medium-voltage substations since 2015, and is
 now extending the forecast below the substation.** The French distribution network operator covers

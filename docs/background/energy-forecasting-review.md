@@ -540,29 +540,30 @@ as known. The power coefficient Cp — the aerodynamic term the equation does no
 network of wind speed, pitch angle, and rotor speed, held below the Betz limit by its output layer
 and trained against the measured power of a wind farm of four turbines, so the gradient of the power
 error passes back through the physical equation itself and the fitted power coefficient can be read
-out afterwards as a curve against tip-speed ratio. A second network is then trained on the residual,
-reading those three variables plus the outdoor, nacelle, and rotor temperatures, the vane angle, and
-the wind direction; adding that second network cuts the physics model's mean absolute percentage
-error by 37% and its mean absolute error by 28%, with conformalised quantile regression supplying
-the uncertainty. The hybrid gains that margin over the physics model alone; against a purely
-data-driven model given the same eight inputs it "essentially matches" rather than beats, so what
-the physics adds here is interpretability, with no loss of accuracy.
+out afterwards as a curve against tip-speed ratio. A second neural network is then trained on the
+residual, reading those three variables plus the outdoor, nacelle, and rotor temperatures, the vane
+angle, and the wind direction; adding that second network cuts the physics model's mean absolute
+percentage error by 37% and its mean absolute error by 28%, with conformalised quantile regression
+supplying the uncertainty. The hybrid gains that margin over the physics model alone; against a
+purely data-driven model given the same eight inputs it "essentially matches" rather than beats, so
+what the physics adds here is interpretability, with no loss of accuracy.
 
 **But Gijón et al. predict power from measured wind rather than forecasting it days ahead.** Their
 inputs are the turbine's own measurements at the moment being predicted, so their accuracy says how
 well a fitted turbine model turns a known wind speed into power, not how well a forecast of that
 wind speed turns into a forecast of power days ahead. We found nobody putting a differentiable
-generator model inside a network's probabilistic net-demand forecast.
+generator model inside a distribution network's probabilistic net-demand forecast.
 
-**The second reason to try differentiable physics on generators is the metadata NGED does not
-have.** The generation forecasts in this literature are handed the numbers we lack: [Teng et al.
-(2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each site's capacity, and HEFTCom's
-portfolio was one named 1.2 GW offshore wind farm plus the solar capacity of a region. When an
-export-cable fault cut that wind farm's available capacity mid-competition, the winning team clipped
-its quantiles to the capacity implied by the outage notices the farm is obliged to publish, while
-the organisers' benchmark ignored the fault and, in [Browell et al.
-(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed extremely poorly as a
-result". NGED's embedded generators publish no such notices.
+**The second reason to try differentiable physics on generators is the engineering parameters NGED
+does not hold: the capacity a site can actually export today, a solar array's tilt and azimuth, a
+turbine's power curve.** The generation forecasts in this literature are handed those parameters:
+[Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each site's capacity, and
+HEFTCom's portfolio was one named 1.2 GW offshore wind farm plus the solar capacity of a region.
+When an export-cable fault cut that wind farm's available capacity mid-competition, the winning team
+clipped its quantiles to the capacity implied by the outage notices the farm is obliged to publish,
+while the organisers' benchmark ignored the fault and, in
+[Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
+extremely poorly as a result". NGED's embedded generators publish no such notices.
 
 **NGED's Embedded Capacity Register gives a registered capacity for generation of 50 kW and above,
 and none of the physics.** The August 2026 edition lists 5,598 connected generators totalling 11,456
@@ -586,7 +587,7 @@ of each system's hourly output against plane-of-array irradiance computed for ev
 orientation, from a station up to 195 km away.
 
 **Two details of Meng et al. matter to Flexpectation.** Because both curves are normalised before
-matching, the method needs no nameplate rating, which is the one piece of metadata it might
+matching, the method needs no nameplate rating, which is the one engineering parameter it might
 otherwise have demanded. And it reports its accuracy only in degrees: Meng et al. never convert an
 orientation error into a power error. Their own stated limitation is that all 13 systems sit on the
 same standardised 42° roof, so the tilt figure is tested against a single true tilt; the
@@ -607,12 +608,12 @@ the extremes of 32,400 chains rather than a typical penalty, and every plant's t
 from its design documentation and stayed fixed, so Mayer and Gróf bound how much accuracy the wrong
 physical model loses, not how much not knowing a system's orientation loses.
 
-**What better orientation metadata is worth to a forecast is a number we have not found in the
-literature, and the four papers closest to the question each stop short of it.** [Meng et al.
-(2020)](https://doi.org/10.1016/j.solener.2020.09.077) and [Saint-Drenan et al.
-(2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's tilt and azimuth from
-its metered alternating-current power output paired with an irradiance series measured somewhere
-else, never from the power series alone.
+**What a better tilt and azimuth are worth to a forecast is a number we have not found in the
+literature, and the four papers closest to the question each stop short of it.**
+[Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and
+[Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's
+tilt and azimuth from its metered alternating-current power output paired with an irradiance series
+measured somewhere else, never from the power series alone.
 
 **Meng et al. and Saint-Drenan et al. both report their accuracy in degrees alone.** Meng et al.
 match normalised hourly power against normalised plane-of-array irradiance on the clearest day of
@@ -911,7 +912,7 @@ well, so the whole line of work rests on one or two feeders in one year.
 
 | Paper | Method | Logged transfers found |
 |---|---|---|
-| [Kim et al. (2020)](https://doi.org/10.3390/en13174358) | Long short-term memory network, flagging where measured load departs from its prediction | 7 of 9 |
+| [Kim et al. (2020)](https://doi.org/10.3390/en13174358) | Long short-term memory neural network, flagging where measured load departs from its prediction | 7 of 9 |
 | [Kim et al. (2022)](https://doi.org/10.3390/en15041441) | Polynomial and standard-pattern preprocessing | 7 of 9, and 7 of 7 on a second feeder |
 | [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) | A moving average and a moving standard deviation, thresholding the residual of a seasonal-trend decomposition | **8 of 9** |
 | [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) | Robust seasonal-trend decomposition, a Haar wavelet transform of the residual, then Pruned Exact Linear Time changepoints, then an isolation forest over each candidate | 7 of 9 |
@@ -1823,11 +1824,12 @@ the model every month rather than redesigning it.
 
 **"XGBoost" in these papers is a lighter model than the one Flexpectation plans, so read a loss by a
 boosted tree with that in mind.** [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) give theirs
-lagged power, weather, time, and metadata covariates and nothing beyond that: no clear-sky index, no
-photovoltaic power proxy, no wind power curve, no monotone constraints, and holidays only as a
-binary flag — on feeders whose target is net load with heavy solar feed-in. Their headline is better
-read as a foundation model beating a lightly-featurised gradient booster than as a verdict on
-gradient boosting.
+lagged power, weather, time, and six columns describing each low-voltage feeder — among them how
+many housing units, industrial and commercial units, and photovoltaic systems the feeder serves —
+and nothing beyond that: no clear-sky index, no photovoltaic power proxy, no wind power curve, no
+monotone constraints, and holidays only as a binary flag — on feeders whose target is net load with
+heavy solar feed-in. Their headline is better read as a foundation model beating a
+lightly-featurised gradient booster than as a verdict on gradient boosting.
 
 **[Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) are the exception, and
 the more uncomfortable result for us.** Their booster and their generalised additive model were
@@ -2032,11 +2034,11 @@ negative, so demand there fell as temperature rose. [Fox et al.
 forward, but it is the GB precedent for putting gridded weather onto individual primary substations.
 
 **Two deployments outside GB belong alongside these.**
-[OpenSTEF](https://lfenergy.org/projects/openstef/) is the only operational network forecasting
-system in this review whose code can be read rather than inferred from a deliverable, and it ships a
-component splitter that breaks a net-load forecast into solar, wind, and residual parts — the
-operational relative of challenge 7, though a far simpler one than [Teng et al.
-(2023)](https://doi.org/10.1016/j.rser.2023.113662) describe.
+[OpenSTEF](https://lfenergy.org/projects/openstef/) is the only operational forecasting system run
+by a network operator in this review whose code can be read rather than inferred from a deliverable,
+and it ships a component splitter that breaks a net-load forecast into solar, wind, and residual
+parts — the operational relative of challenge 7, though a far simpler one than
+[Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) describe.
 
 **Enedis has forecast every one of its high-voltage-to-medium-voltage substations since 2015, and is
 now extending the forecast below the substation.** The French distribution network operator covers
@@ -2211,15 +2213,15 @@ forecast in physical units, which a substation model then reads, alongside a tim
 learns how people use the calendar — that Christmas is not an ordinary Thursday — and possibly a
 space encoder holding the standing geographic context of each substation.
 
-**Both halves of the weather encoder have been built.** [Rasp and Lerch
-(2018)](https://arxiv.org/abs/1805.09091) built the first: a neural network that post-processes a
-50-member ECMWF ensemble into calibrated probabilistic 2-metre temperature at 537 German stations 48
-hours ahead, cutting mean continuous ranked probability score from 1.16 for the raw ensemble to
-0.78, with a learned per-station embedding one of the two components the authors credit for the
-gain. [Mitra and Ramavajjala (2023)](https://arxiv.org/abs/2312.00290) built the second: they freeze
-a weather autoencoder and train small models on the frozen representation alone, at accuracy
-comparable to purpose-built models, though the targets they predict are further weather variables
-rather than anything on a network.
+**Both halves of the weather encoder have been built.**
+[Rasp and Lerch (2018)](https://arxiv.org/abs/1805.09091) built the first: a neural network that
+post-processes a 50-member ECMWF ensemble into calibrated probabilistic 2-metre temperature at 537
+German stations 48 hours ahead, cutting mean continuous ranked probability score from 1.16 for the
+raw ensemble to 0.78, with a learned per-station embedding one of the two components the authors
+credit for the gain. [Mitra and Ramavajjala (2023)](https://arxiv.org/abs/2312.00290) built the
+second: they freeze a weather autoencoder and train small models on the frozen representation alone,
+at accuracy comparable to purpose-built models, though the targets they predict are further weather
+variables rather than anything on an electricity network.
 
 **A network operator has already fine-tuned a pre-trained weather model on its own sensors.**
 [Bodnar et al. (2025)](https://arxiv.org/abs/2509.25268) post-train Silurian AI's
