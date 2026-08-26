@@ -619,8 +619,8 @@ differently-sized inverters saturating in turn. Challenge 7, below, discusses di
 detail.
 
 **The trial area's battery, gas generator, and biofuel plant each need a method, and the literature
-supplies one to borrow for the battery, one that needs a declared generation schedule for the gas
-generator, and a partial method for the biofuel plant.** For the battery,
+supplies one to borrow for the battery, two for the gas generator that each need something we do not
+yet hold, and a partial method for the biofuel plant.** For the battery,
 [Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469) recover a price-taking storage
 operator's own optimisation parameters from historical prices and observed dispatch. We found no
 forecast of a gas generator, and the closest published case is a market-dispatched plant of a
@@ -629,12 +629,34 @@ pumped-storage hydro "almost impossible", because the plant follows continuously
 prices and the operator's own strategy, and forecast it instead by linear regression on the
 generation schedule its operator is obliged to provide, together with temperature. They report no
 accuracy figure for that class of plant, saying only that such plants "depend highly on the accuracy
-of the provided schedule", so what the method needs is a schedule rather than a better model. For
-the biofuel plant, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast biomass
-generation behind each Austrian primary substation from the previous day's generation, scaled to
-installed power and spread across the day as a constant band, to a mean absolute percentage error of
-5 to 15% — the same shape of problem, though a biomass station burning solid fuel is not the same
-plant as a biofuel generator.
+of the provided schedule", so what the method needs is a schedule rather than a better model.
+[Short et al. (2017)](https://doi.org/10.1016/j.apenergy.2016.04.052) model how a decentralised
+combined heat and power plant picks its own output, as a mixed-integer linear program over a
+piecewise-linear fuel cost, ramp limits, and a start-up cost, maximising profit against day-ahead
+and intra-day prices. Fitting a model of that shape to an embedded generator's metered output is
+what Bian et al. do for storage, and we found nobody doing it for a gas generator. What could
+transfer to Flexpectation's differentiable-physics work is the structure rather than the solver:
+Short et al. approximate the fuel cost by three affine pieces chosen "to ensure convexity", so the
+economic-dispatch half of their model is a linear program a gradient can pass back through, while
+the on/off unit-commitment decisions would have to be smoothed first. For the biofuel plant,
+[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast biomass generation behind
+each Austrian primary substation from the previous day's generation, scaled to installed power and
+spread across the day as a constant band, to a mean absolute percentage error of 5 to 15% — the same
+shape of problem, though a biomass station burning solid fuel is not the same plant as a biofuel generator.
+
+**A GB gas-network project has tested the declared-schedule route on embedded gas generators, and
+what stopped it was data rather than modelling.** SGN and Northern Gas Networks'
+[Forecaster for Embedded Generation (FEmGE)](https://portal.futureenergynetworks.org.uk/content/projects/NIA2_SGN0081)
+reconstructed those generators' electricity output from the Physical Notifications each plant gives
+the National Energy System Operator (NESO), plus the balancing bids and offers NESO accepts. Plants
+that self-dispatch rather than trade through the Balancing Mechanism were placed out of scope as
+harder still, and no public record matches a plant's electricity meter number to its NESO unit
+identifier, with many small plants sitting inside aggregated units whose composition is unpublished.
+Forecasting performance also "reduced significantly" when transmission-connected plant was excluded,
+because distribution-connected generators are a small part of a zonal total — a problem NGED does
+not have, because NGED meters its gas generator directly. FEmGE published no accuracy figure, and
+concluded that more complex modelling would not improve accuracy without wider access to embedded
+generators' own data.
 
 ### 3. Estimating the effective capacity of metered generators
 
@@ -690,13 +712,13 @@ whether it improves the forecast NGED acts on.
 
 #### The challenge
 
-When a cable fault or planned maintenance moves part of a network from one substation to another,
-the load the first substation meters steps down. Each substation that picks up part of that
-transferred load records a matching rise, with no change in the underlying demand. The pick-up is
-usually shared across two or three neighbouring substations rather than landing on one. NGED's
-substations spend roughly a tenth of their operating time in an abnormal running arrangement.
-Switching labels exist for the trial area but not for the wider network, so any method meant to
-scale to the wider network has to work from power measurements alone.
+When a cable fault or planned maintenance moves part of a distribution network from one substation
+to another, the load the first substation meters steps down. Each substation that picks up part of
+that transferred load records a rise, with no change in the underlying demand. The pick-up is
+usually shared across two or three neighbouring substations. NGED's substations spend roughly a
+tenth of their operating time in an abnormal running arrangement. Switching labels exist for the
+Flexpectation trial area but not for NGED's entire network, so any method meant to scale to the
+wider network has to work from power measurements alone.
 
 #### What the literature says
 
@@ -705,13 +727,13 @@ only consider one substation at a time.** [Bouman et al. (2024)](https://arxiv.o
 detect switching at a real network operator, but detect it in the gap between the substation's own
 meter and a second estimate of the same load, built from smart-meter and bulk-customer readings
 taken below the substation. A Korean series of four papers detects load transfers on a distribution
-feeder from that feeder's own load alone. All four papers are open access, and all four score
+feeder from that feeder's own load alone. All four Korean papers are open access, and all four score
 against the same nine logged transfers on the Kimhwa distribution feeder in Gangwon province,
 measured hourly through 2019, and one of the four against a second feeder as well.
 
 | Paper | Method | Logged transfers found |
 |---|---|---|
-| [Kim et al. (2020)](https://doi.org/10.3390/en13174358) | Long short-term memory neural network, flagging where measured load departs from its prediction | 7 of 9 |
+| [Kim et al. (2020)](https://doi.org/10.3390/en13174358) | Long short-term memory (LSTM) neural network, flagging where measured load departs from its prediction | 7 of 9 |
 | [Kim et al. (2022)](https://doi.org/10.3390/en15041441) | Polynomial and standard-pattern preprocessing | 7 of 9, and 7 of 7 on a second feeder |
 | [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) | A moving average and a moving standard deviation, thresholding the residual of a seasonal-trend decomposition | **8 of 9** |
 | [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) | Robust seasonal-trend decomposition, a Haar wavelet transform of the residual, then Pruned Exact Linear Time changepoints, then an isolation forest over each candidate | 7 of 9 |
@@ -724,7 +746,7 @@ Flexpectation plans — found 7 of the 9, an average detection rate of 78%.
 
 Electricity North West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project
 sorted step changes into erroneous data and network reconfigurations on GB substations in 2016, from
-power measurements alone, and published no precision or recall for either rule.
+power measurements alone, but published no precision or recall for either rule.
 
 #### What this means for Flexpectation
 
@@ -738,13 +760,15 @@ so higher is better.
 **On events shorter than 3 days Bouman et al.'s best detector reaches about 0.2, and on events of 42
 days or longer about 0.5.** Those two scores come from different detectors, because no single method
 they tried wins across the range. Both figures were achieved on a Dutch network, with the help of a
-second load estimate NGED does not have.
+second load estimate constructed bottom-up from smart meter data.
 
 **NGED's switches are usually partial and fan out to two or three substations, so we should expect
 worse F1.5 scores than 0.2 to 0.5 rather than better.** Do not judge the difficulty from how obvious
 a switch looks on a chart. A negative result is worth having here, because evidence that switching
 cannot be recovered from power measurements alone would justify extracting switching labels from
-NGED's operational systems instead of continuing to infer them.
+NGED's operational systems instead of continuing to infer them. That said, Flexpectation also plans
+to improve our detection by examining multiple substations together - see the last few paragraphs of
+this section.
 
 **The one directly useful paper detects switching but never forecasts, and forecasting is the half
 Flexpectation would add.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164), working with
@@ -752,8 +776,8 @@ the Dutch network operator Alliander, study 180 primary substations at 15-minute
 roughly a year, detecting events that run from a few minutes to several months. Alliander's purpose
 is capacity planning: a switch pushes the maximum and minimum load a substation records to the wrong
 value, and those two extremes decide whether the substation needs a bigger transformer, so the
-detected periods are cut out of the history before the extremes are read off. Flexpectation needs a
-forecast that keeps running through a switching event instead.
+detected periods are cut out of the history before the extremes are read off. In contrast,
+Flexpectation needs a forecast that keeps running through a switching event.
 
 **Flexpectation will model its own reference series rather than measure one.** Alliander's bottom-up
 estimate gives [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) a second opinion on what
@@ -1006,11 +1030,11 @@ forecast, so the half Flexpectation adds is putting that estimate inside a proba
 forecast.
 
 **GB already has an operational forecast of unmetered generation, but only at national scale and
-without uncertainty.** The National Energy System Operator (NESO) publishes [embedded wind and solar
-forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts) half-hourly to 14
-days ahead, the same resolution and horizon Flexpectation delivers. The forecast is a single number
-per half-hour, with no uncertainty attached, and it covers GB as one region rather than substation
-by substation.
+without uncertainty.** NESO publishes
+[embedded wind and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts)
+half-hourly to 14 days ahead, the same resolution and horizon Flexpectation delivers. The forecast
+is a single number per half-hour, with no uncertainty attached, and it covers GB as one region
+rather than substation by substation.
 
 ### 8. Disaggregating other distributed energy resources: heat pumps, electric-vehicle chargers, and batteries
 
@@ -1660,6 +1684,11 @@ Forecasting*.
 [TRANSITION](https://ssen-innovation.co.uk/transition/).
 - Scottish and Southern Electricity Networks (2025). [FastTrack, Alpha Round
 4](https://smarter.energynetworks.org/projects/10166254/).
+- SGN and Northern Gas Networks (2026). [Forecaster for Embedded Generation (FEmGE),
+NIA2_SGN0081](https://portal.futureenergynetworks.org.uk/content/projects/NIA2_SGN0081).
+- Short, M., Crosbie, T., Dawood, M. and Dawood, N. (2017). [Load forecasting and dispatch
+optimisation for decentralised co-generation plant with dual energy
+storage](https://doi.org/10.1016/j.apenergy.2016.04.052). *Applied Energy*, 186, 304-320.
 - Shukla, S. and Hong, T. (2024). [BigDEAL Challenge 2022: Forecasting peak timing of electricity
 demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
 - Siméoni, O. et al. (2025). [DINOv3](https://arxiv.org/abs/2508.10104).
