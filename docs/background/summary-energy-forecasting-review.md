@@ -841,13 +841,13 @@ them.
 
 #### The challenge
 
-NGED plans its network against what each substation would carry under its normal running arrangement
-(NRA). As such, Flexpectation aims to forecast substations as if they were always in their NRA,
-including a substation that has been sitting in an abnormal arrangement for weeks. Predicting the
-power flow under NRA makes the forecasting target something that, during periods of abnormal
-running, is simply not measured, and leaves the training history contaminated: past readings taken
-while the network was abnormally configured describe a different scenario from the scenario being
-forecast.
+NGED plans its network against what each substation would carry under its normal running
+arrangement. As such, Flexpectation aims to forecast substations as if they were always in their
+normal running arrangement, including a substation that has been sitting in an abnormal arrangement
+for weeks. Predicting the power flow under the normal running arrangement makes the forecasting
+target something that, during periods of abnormal running, is simply not measured, and leaves the
+training history contaminated: past readings taken while the network was abnormally configured
+describe a different scenario from the scenario being forecast.
 
 #### What the literature says
 
@@ -870,17 +870,17 @@ to what the normal arrangement would have carried.** Neither the size of the acc
 the size of the switching failure is quantified, so the paper shows that an operator traded accuracy
 for switching robustness without saying how much accuracy the trade gave up. We found one substation
 study that conditions its forecast on an operating-state label —
-[Liu et al. (2019)](https://doi.org/10.1109/ACCESS.2019.2951422), for a switch of a different kind —
-and none that both hands a model the record of when the network was abnormal and refuses to let the
-model predict those periods.
+[Liu et al. (2019)](https://doi.org/10.1109/ACCESS.2019.2951422), for switching that moves load
+between transformers inside a single substation — and none that both conditions a model on when a
+substation was in an abnormal arrangement and refuses to let the model predict those periods.
 
 #### What this means for Flexpectation
 
 **Every published solution we found throws information away.** Leaving the level shifts in the data
 hurts performance, rewriting history erases the level shifts, and adapting to the new level forgets
 that a switch happened. Adapting is disqualifying here, because the quantity NGED needs is what the
-substation *would* have carried under its normal arrangement. Flexpectation will therefore record
-when the network was abnormal and hand that record to the model, which no published method we found
+substation *would* have carried under its normal arrangement. Flexpectation will therefore condition
+the model on when each substation was in an abnormal arrangement, which no published method we found
 does.
 
 **Rewriting the history is the fallback, because among the three published responses it is the only
