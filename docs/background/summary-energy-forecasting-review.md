@@ -573,12 +573,12 @@ Estimating each generator's available capacity from its own metered output inste
 below, which sets out the published methods in detail.
 
 **NGED's Embedded Capacity Register gives a registered capacity for generation of 50 kW and above,
-and none of the physics.** NGED's August 2026 ECR lists 5,598 connected generators totalling 11,456
-MW, of which 4,202 sites and 5,958 MW are solar. But a registered capacity is *contractual* rather
-than operational — the export limit is the one "permitted as per the connection agreement" — and the
-register carries no panel tilt, panel azimuth, or ratio of direct-current to alternating-current
-rating. Hence Flexpectation plans to infer those engineering parameters from the power data, using
-differentiable physics.
+but provides no other engineering parameters.** NGED's August 2026 ECR lists 5,598 connected generators
+totalling 11,456 MW, of which 4,202 sites and 5,958 MW are solar. But a registered capacity is
+*contractual* rather than operational — the export limit is the one "permitted as per the connection
+agreement" — and the register carries no panel tilt, panel azimuth, or ratio of direct-current to
+alternating-current rating. Hence Flexpectation plans to infer those engineering parameters from the
+power data, using differentiable physics.
 
 **A differentiable model could infer both the operational capacity and the panel orientation of each
 generator, and each of those two inferences has been made to work on its own.** [Pierrot and Pinson
@@ -586,16 +586,15 @@ generator, and each of those two inferences has been made to work on its own.** 
 time-varying bound fitted jointly with the forecast, and beat probabilistic persistence by 34.2% on
 continuous ranked probability score over a 5-month test period, drawn from 14 months of data, at the
 Anholt offshore wind farm, though their one clean test of tracking the bound on its own gained
-2.43%, and [Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and
+2.43%. [Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and
 azimuth of 13 roof photovoltaic systems in the Netherlands to mean absolute errors of 4.3° and 4.5°,
-matching the shape of each system's hourly output against plane-of-array irradiance from a station
-up to 195 km away. Because both curves are normalised before matching, their method needs no
-nameplate rating. Neither method sits inside a substation's net-demand forecast. Flexpectation would
-have to put the method there itself.
+matching the shape of each system's hourly output against plane-of-array irradiance from a weather
+station up to 195 km away. Because both curves are normalised before matching, their method needs no
+nameplate rating. But Meng et al. do not forecast PV power. They only infer tilt and azimuth.
 
-**What a better tilt and azimuth are worth to a forecast is a number we have not found in the
-literature, so Flexpectation treats it as a hypothesis to test rather than a settled prize.**
-[Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and
+**We have not found any evidence in the literature to tell us how much a PV power forecast would be
+improved by inferring tilt and azimuth, so Flexpectation treats it as a hypothesis to test rather
+than a settled prize.** [Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) and
 [Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024) both recover a system's
 tilt and azimuth from its metered alternating-current power output paired with an irradiance series
 measured somewhere else — a weather station up to 195 km away for Meng et al., the HelioClim-3
@@ -605,28 +604,30 @@ azimuth gave better simulations than the true value, because the fit balances th
 of the physical model — so accuracy in degrees is the wrong target. What matters is an *effective*
 tilt and azimuth that make the forecast right.
 
-**The two cases Flexpectation faces need different machinery, and the dividing line is the limit
-Saint-Drenan et al. state.** For a single metered site, fitting tilt, azimuth, and the effective
-direct- and alternating-current capacities is the plan — by gradient descent inside the forecast
-rather than by grid search, so that the fit stays joint and probabilistic. Challenge 3 below sets
-out how that effective capacity would be estimated. For unmetered solar behind a substation,
+**Inferring the engineering parameters of a generator needs different machinery depending on whether
+the generator has site-specific metering, compared to disaggregating unmetered generators from
+substation power flow.** For a single metered site, fitting tilt, azimuth, and the effective direct-
+and alternating-current capacities is the plan for Flexpectation — by gradient descent inside the
+forecast rather than by grid search, so that the fit is joint and probabilistic. Challenge 3 below
+sets out how that effective capacity would be estimated. For unmetered solar behind a substation,
 Saint-Drenan et al.'s algorithm "performs poorly", because it assumes one orientation per plant
 where the series is "the aggregated production of modules with different orientations".
-Flexpectation therefore estimates no single orientation per substation: the fleet model represents
-the aggregate as a learned mixture of east-, south-, and west-facing basis shapes, with a soft clip
-standing in for many differently-sized inverters saturating in turn.
+Flexpectation therefore plans to implement a fleet model representing the aggregate as a learned
+mixture of east-, south-, and west-facing basis shapes, with a soft clip standing in for many
+differently-sized inverters saturating in turn. Challenge 7, below, discusses disaggregation in more
+detail.
 
 **The trial area's battery, gas generator, and biofuel plant each need a method, and the literature
-supplies one to borrow for the battery, none for the gas generator, and a partial one for the
+supplies one to borrow for the battery, none for the gas generator, and a partial method for the
 biofuel plant.** For the battery, [Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469)
 recover a price-taking storage operator's own optimisation parameters from historical prices and
-observed dispatch. We found no method worth borrowing for the gas generator, and what little exists
-forecasts a gas plant's own output directly rather than as a component of a substation's net demand.
-For the biofuel plant, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) forecast
-biomass generation behind each Austrian primary substation from the previous day's generation,
-scaled to installed power and spread across the day as a constant band, to a mean absolute
-percentage error of 5 to 15% — the same shape of problem, though a biomass station burning solid
-fuel is not the same plant as a biofuel one.
+observed dispatch. We found no method for forecasting the gas generator, and what little literature
+exists forecasts a gas plant's own output directly rather than as a component of a substation's net
+demand. For the biofuel plant, [Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476)
+forecast biomass generation behind each Austrian primary substation from the previous day's
+generation, scaled to installed power and spread across the day as a constant band, to a mean
+absolute percentage error of 5 to 15% — the same shape of problem, though a biomass station burning
+solid fuel is not the same plant as a biofuel one.
 
 ### 3. Estimating the effective capacity of metered generators
 
