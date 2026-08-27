@@ -971,18 +971,20 @@ version of that recovery is still open.
 
 #### What this means for Flexpectation
 
-**The literature offers two shapes of detector, and which shape is available depends on whether a
-second measurement of the same power exists.** One family tests a measurement against a physical
-relationship it has to satisfy: UK Power Networks' Distribution Network Visibility checked 377
-remote terminal units against the physics their readings have to obey rather than against a
-forecast, and found 95% obeyed it within 15 kVA. [Bouman et al.
-(2024)](https://arxiv.org/abs/2405.16164) do the same with a second estimate of a substation's load,
-built from smart meters. The other family tests the measurement against a forecast of what it should
-have read, which is how [Moriano et al. (2016)](https://doi.org/10.3390/s16010085) and [Martín et
-al. (2018)](https://doi.org/10.3390/s18113947) find calibration drift in secondary-substation
-monitoring equipment. The physics route needs a redundant measurement of the same power, which
-NGED's primary-substation telemetry rarely carries; the forecast route needs only the series itself,
-though a genuinely unusual day can then be flagged as a metering fault.
+**The literature offers two shapes of detector — test a reading against a redundant measurement of
+the same power, or against a forecast of what that reading should have been — and NGED's
+primary-substation telemetry rarely carries the redundant measurement, which leaves the forecast
+route.** One family tests a measurement against a physical relationship it has to satisfy: UK Power
+Networks' Distribution Network Visibility checked 377 remote terminal units against the physics
+their readings have to obey rather than against a forecast, and found 95% obeyed it within 15 kVA.
+[Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) do the same with a second estimate of a
+substation's load, built from smart meters. The other family tests the measurement against a
+forecast of what it should have read, which is how
+[Moriano et al. (2016)](https://doi.org/10.3390/s16010085) and
+[Martín et al. (2018)](https://doi.org/10.3390/s18113947) find calibration drift in
+secondary-substation monitoring equipment. The physics route needs a redundant measurement of the
+same power, which NGED's primary-substation telemetry rarely carries; the forecast route needs only
+the series itself, though a genuinely unusual day can then be flagged as a metering fault.
 
 **The published method that fits NGED's telemetry most closely treats faulty metering and switching
 as one challenge, but the step that recovers a magnitude-only meter's sign needs the second load
