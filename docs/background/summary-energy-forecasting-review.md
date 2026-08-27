@@ -954,15 +954,14 @@ normal-running-arrangement demand for a distribution substation.
 NGED's telemetry carries stuck values that repeat unchanged for hours or days, zeros that mean "no
 reading" rather than "no load", physically impossible values, and gaps running from a single
 half-hour to several months. Furthermore, of the 32 series in the trial area, 10 are metered in
-apparent power only, so they report magnitude without direction and reverse flow appears as a rise:
-at one primary substation the meter bounces off zero on sunny days, when a solar farm behind it
+apparent power only, so they report magnitude without direction hence reverse flow appears as a rise where the meter bounces off zero on sunny days, when a solar farm behind it
 exports. A model trained on uncleaned data learns the fault, and a forecast that fails silently
 because its recent history was stuck is worse than one that says it is degraded.
 
 #### What the literature says
 
-**Faulty metering is usually a data-cleaning step mentioned in passing rather than a problem in its
-own right.** The only public labelled dataset we found is Dutch. Western Power Distribution, NGED's
+**Faulty metering is usually a data-cleaning step mentioned in passing rather than a research problem in its
+own right.** The only public labelled dataset we found with labelled faults is Dutch. Western Power Distribution, NGED's
 predecessor, attempted to recover the direction of flow from a magnitude-only meter, and an
 automatic version of that recovery is still open.
 
