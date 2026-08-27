@@ -960,10 +960,14 @@ because its recent history was stuck is worse than one that says it is degraded.
 
 #### What the literature says
 
-**Faulty metering is usually a data-cleaning step mentioned in passing rather than a research problem in its
-own right.** The only public labelled dataset we found with labelled faults is Dutch. Western Power Distribution, NGED's
-predecessor, attempted to recover the direction of flow from a magnitude-only meter, and an
-automatic version of that recovery is still open.
+**Faulty metering is usually a data-cleaning step mentioned in passing rather than a research
+problem in its own right.** The only public dataset with labelled faults we found is
+[Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s, published through the Dutch network
+operator Alliander's open data portal. Another project with Western Power Distribution, NGED's predecessor, set out in the 2017
+[Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/) NIA project to "first
+detect then assign directions to power flows where absent", and automated the plotting and the
+flagging, but an engineer confirmed and corrected each candidate directional error, so an automatic
+version of that recovery is still open.
 
 #### What this means for Flexpectation
 
@@ -1741,6 +1745,8 @@ domain adaptation zero-shot learning in sequence](https://doi.org/10.1016/j.rser
 - Viotti, O., Arnqvist, J. and Olauson, J. (2026). [Estimating Wind‐Power Capacity Time Series From
 Production Data Using a Power Curve Model and Quadratic
 Optimization](https://doi.org/10.1002/we.70136). *Wind Energy*.
+- Western Power Distribution (2017). [Time Series Data
+Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/).
 - Western Power Distribution (2021). [Electricity Flexibility and Forecasting System
 (EFFS)](https://smarter.energynetworks.org/projects/wpden03/).
 - Willis, H. L., Powell, R. D. and Wall, D. L. (1984). [Load Transfer Coupling Regression
