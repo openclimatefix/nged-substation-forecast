@@ -1073,11 +1073,18 @@ from gross demand, metered generation, and unmetered generation, and compares th
 reconstruction against the apparent-power reading, so the bounce is predicted rather than removed.
 Recovering a signal from the magnitude of a transform of that signal is the phase-retrieval problem,
 which [Dong et al. (2023)](https://doi.org/10.1109/MSP.2022.3219240) describe as non-convex because
-a signal satisfying the magnitude equation is always one of a family of solutions — for
-Flexpectation, a family of two. What Flexpectation adds is not the formulation but the information
-that breaks the ambiguity. The reconstruction's solar module has to track irradiance, and a prior
-holds the direction of flow to persist for hours rather than flickering from one half-hour to the
-next.
+a signal satisfying the magnitude equation is always one of a family of solutions. An apparent-power
+meter takes the magnitude half-hour by half-hour, so nothing in the measurement couples one
+half-hour's sign to the next, and the family holds one member for every assignment of signs across
+the window rather than two. Dong et al.'s uniqueness results do not rescue the problem either: those
+results turn on how far the number of measurements exceeds the number of unknowns, and an
+apparent-power meter gives exactly one reading per unknown — the ratio at which Dong et al. call
+Fourier phase retrieval "fundamentally ill-posed as we only know amplitudes". Dong et al.'s own
+prescription for that regime is the one Flexpectation is following, to "leverage a priori
+information on the object", so what Flexpectation adds is not the formulation but the information
+that breaks the ambiguity — and that information carries the whole weight. The reconstruction's
+solar module has to track irradiance, and a prior holds the direction of flow to persist for hours
+rather than flickering from one half-hour to the next.
 
 **Apparent power is the magnitude of real power only near unity power factor, and the approximation
 is weakest exactly at the bounce the reconstruction is trying to explain.** As real power passes
@@ -1234,8 +1241,34 @@ probabilistic multi-day forecast.
 without uncertainty.** NESO publishes
 [embedded wind and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts)
 half-hourly to 14 days ahead, the same resolution and horizon Flexpectation delivers. The forecast
-is a single number per half-hour, with no uncertainty attached, and the forecast covers GB as one
-region rather than substation by substation.
+is a single number per half-hour, with no uncertainty attached, and the forecast covers GB as one region rather than substation by substation.
+
+**Fields that have separated superposed signals for decades agree on one warning: a small residual
+against the measured total is not evidence that the components were separated correctly.** Fitting a
+sum of physically parameterised components to one measurement is routine in observational cosmology,
+where the technique is called component separation.
+[Hensley and Bull (2018)](https://doi.org/10.3847/1538-4357/aae69c) show that giving the *nuisance*
+component too simple a model biases the component of interest, and that the fit does not announce
+the bias: "models that are strongly biased but still yield low chi-squared values are the most
+dangerous". Two things follow for Flexpectation. Effort spent making the demand model richer is
+justified on separation grounds even where it does not improve the fit to the substation's net flow,
+and the diagnostic to watch is the joint distribution over the components rather than the residual.
+[Wieland et al. (2021)](https://doi.org/10.1016/j.coisb.2021.03.005) add the matching warning about
+uncertainty: confidence intervals read off the curvature at the optimum, which a differentiable
+model gives cheaply, are "insensitive to practical non-identifiabilities" and can look reassuringly
+finite for a parameter the data do not constrain at all.
+
+**The condition under which such a fit is identifiable at all is that each component is observed
+alone somewhere, and Flexpectation can test whether that condition holds before fitting anything.**
+Hyperspectral unmixing, which splits one mixed image pixel into the spectra of the materials
+composing it, states the condition as the pure-pixel assumption: for each component there is at
+least one observation containing only that component.
+[Bioucas-Dias et al. (2012)](https://doi.org/10.1109/JSTARS.2012.2194696) show that on a data set
+holding no such observations the recovered components come out systematically too small, rather than
+merely uncertain. Flexpectation's pure observations are the half-hours when nature switches one
+component off — night for solar, calm hours for wind, and the substations carrying no embedded
+generation at all — so whether a given substation has them is a question the telemetry can answer on
+its own.
 
 ### 9. Disaggregating other distributed energy resources: heat pumps, electric-vehicle chargers, and batteries
 
@@ -1735,6 +1768,10 @@ presence of current magnitude measurements](https://doi.org/10.1109/59.575721). 
 on Power Systems*.
 - Bian, Y., Zheng, N., Zheng, Y., Xu, B. and Shi, Y. (2024). [Predicting Strategic Energy Storage
 Behaviors](https://doi.org/10.1109/TSG.2023.3303469). *IEEE Transactions on Smart Grid*.
+- Bioucas-Dias, J. M., Plaza, A., Dobigeon, N., Parente, M., Du, Q., Gader, P. and Chanussot, J.
+(2012). [Hyperspectral Unmixing Overview: Geometrical, Statistical, and Sparse Regression-Based
+Approaches](https://doi.org/10.1109/JSTARS.2012.2194696). *IEEE Journal of Selected Topics in
+Applied Earth Observations and Remote Sensing*.
 - Bouman, R., Schmeitz, L., Buise, L., Heres, J., Shapovalova, Y. and Heskes, T. (2024). [Acquiring
 Better Load Estimates by Combining Anomaly and Change Point Detection in Power Grid Time-series
 Measurements](https://arxiv.org/abs/2405.16164). *Sustainable Energy, Grids and Networks*.
@@ -1796,6 +1833,9 @@ effect of temperature at the low voltage level](https://doi.org/10.1016/j.ijfore
 - Haben, S., Arora, S., Giasemidis, G., Voss, M. and Greetham, D. V. (2021). [Review of Low Voltage
 Load Forecasting: Methods, Applications, and Recommendations](https://arxiv.org/abs/2106.00006).
 *Applied Energy*.
+- Hensley, B. S. and Bull, P. (2018). [Mitigating Complex Dust Foregrounds in Future Cosmic
+Microwave Background Polarization Experiments](https://doi.org/10.3847/1538-4357/aae69c). *The
+Astrophysical Journal*.
 - Hertel, M., Pütz, S., Kolar, J., Schäfer, B., Mikut, R. and Hagenmeyer, V. (2026). [A Benchmark
 for Electrical Load Forecasting Across Grid Levels: Time-Series Transformers Outperform
 Established Methods](https://arxiv.org/abs/2607.15705).
@@ -1938,6 +1978,9 @@ Optimization](https://doi.org/10.1002/we.70136). *Wind Energy*.
 Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/).
 - Western Power Distribution (2021). [Electricity Flexibility and Forecasting System
 (EFFS)](https://smarter.energynetworks.org/projects/wpden03/).
+- Wieland, F.-G., Hauber, A. L., Rosenblatt, M., Tönsing, C. and Timmer, J. (2021). [On structural
+and practical identifiability](https://doi.org/10.1016/j.coisb.2021.03.005). *Current Opinion in
+Systems Biology*.
 - Willis, H. L., Powell, R. D. and Wall, D. L. (1984). [Load Transfer Coupling Regression Curve Fitting for Distribution Load Forecasting](https://doi.org/10.1109/TPAS.1984.318713). *IEEE Transactions on Power Apparatus and Systems*.
 - Zhang, X. Y., Watkins, C. and Kuenzel, S. (2022). [Multi-quantile recurrent neural network for
 feeder-level probabilistic energy disaggregation considering roof-top solar
