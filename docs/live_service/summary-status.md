@@ -72,10 +72,9 @@ service, because that measurement cannot be reconstructed after the fact.
 ## What comes next
 
 **Three milestones follow, ordered so that measurement precedes improvement.** Version 0.3 builds
-the performance analysis: the full metric set, including two cost-savings figures in pounds — one
-for flexibility procurement and one for curtailment — persistence and climatology baselines that
-make a score interpretable, time-slice breakdowns from nowcasting to 14 days, and a versioned suite
-of failure scenarios that score each candidate model on degraded inputs as well as healthy ones.
+the performance analysis: the full metric set, persistence and climatology baselines that make a
+score interpretable, time-slice breakdowns from nowcasting to 14 days, and a versioned suite of
+failure scenarios that score each candidate model on degraded inputs as well as healthy ones.
 Version 0.4 adds automatic cleaning of NGED's power data, and surfaces what the cleaning finds to
 NGED as warnings alongside the forecast. Version 0.5 is the first milestone whose object is forecast
 skill: a backlog of XGBoost experiments, run against the leaderboard version 0.3 provides.
@@ -83,8 +82,6 @@ skill: a backlog of XGBoost experiments, run against the leaderboard version 0.3
 **Running the experiments before the measurement exists would mean choosing a champion model
 blind.** A leaderboard that cannot say whether a candidate model beats persistence, or how it
 behaves when the weather feed is stale, cannot settle which of two models to put in front of NGED.
-Building the measurement first is what makes the version 0.5 experiments decidable, and it is also
-what lets NGED see the value of a forecast improvement in pounds rather than in error percentages.
 
 ## See also
 
