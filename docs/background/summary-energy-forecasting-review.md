@@ -1135,6 +1135,23 @@ inference at low-voltage substations serving tens of customers rather than at a 
 Networks' [Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/)
 is inferring the capacity behind GB primary substations now, and is still running.
 
+**The one result we found at a real distribution substation separated solar from demand using that
+substation's own reactive power, which is a measurement NGED could ask for.**
+[Kara et al. (2018)](https://doi.org/10.1016/j.segan.2017.11.001) estimate the solar generation
+downstream of a substation in Riverside, California, from the substation's active and reactive power
+together with a proxy irradiance, and report a root-mean-square error of 6% of installed capacity
+across all sky conditions, without being told the installed capacity or the panel geometry.
+Regressing the load's active power on the measured reactive power is what makes the separation work:
+the simpler alternative, assuming the power factor measured at night holds through the day, is
+broken by the solar plant's own reactive power consumption, which Kara et al. found responsible for
+about 25% of the overestimation at its peak. Two features of the setup limit how far the 6% carries.
+The generation behind that substation is a single 7.5 MW site, "the only generation asset located at
+this substation", rather than a fleet of differently-oriented rooftops, and the ground truth comes
+from a second measurement device at that site's own point of interconnection. Kara et al. also had
+to detect and compensate capacitor-bank switching before the reactive power was usable, and their
+accuracy was still improving as the sampling rate rose to one sample every five minutes, which puts
+NGED's half-hourly data below the rate at which their errors settled.
+
 **Uncertainty and a multi-day horizon each appear in the disaggregation work we found, but never in
 the same forecast.** [Zhang et al. (2022)](https://doi.org/10.1016/j.engappai.2022.104707) attach
 uncertainty, disaggregating rooftop solar out of net load at grid supply point and feeder level with
@@ -1152,9 +1169,18 @@ one study we found that varies the level of aggregation directly: across 5, 10 a
 customers per aggregated series, the solar side's mean absolute scaled error stays between 1.56 and
 2.20 — larger than the average change between consecutive readings — with solar mean absolute
 percentage error of 24 to 43%. Results reported elsewhere at an aggregate level are usually sums of
-individually metered households rather than a measurement taken at a real aggregation point, so the
-ladder this literature has climbed stops far below the thousands of customers behind a GB primary
-substation.
+individually metered households rather than a measurement taken at a real aggregation point, so the ladder this literature has climbed stops far below the thousands of customers behind a GB primary substation.
+
+**Whether more customers behind a substation makes the estimate easier or harder is unsettled, and
+the one study we found that varied the number directly does not settle it.**
+[Tang et al. (2024)](https://doi.org/10.1016/j.segan.2024.101396) estimate installed photovoltaic
+capacity from 24-hour net-load curves for feeders of 20 to 80 London households, and report "a
+general trend of increasing RMSE values as the number of households increases". That trend is weaker
+evidence than it first appears: the error is in kilowatts against a total capacity that itself rises
+with the household count, the percentage error moves the other way, and the trend reverses sharply
+between 70 and 80 households. The load and the household count are real, but the solar is simulated
+at a single south-facing orientation, so every array in the study shares a profile that a real
+street would not.
 
 #### What this means for Flexpectation
 
@@ -1784,6 +1810,10 @@ channel, 6 December 2024.
 - Kaas, B., Treutlein, M., Gerber, H. B., Neumann, O., Phatthanakhuha, C., Resch, O., Mikut, R. and
 Hagenmeyer, V. (2026). [Probabilistic Low-Voltage Peak Load Forecasting with Time Series
 Foundation Models Evaluated on Application-Oriented Metrics](https://arxiv.org/abs/2607.01966).
+- Kara, E. C., Roberts, C. M., Tabone, M., Alvarez, L., Callaway, D. S. and Stewart, E. M. (2018).
+[Disaggregating solar generation from feeder-level
+measurements](https://doi.org/10.1016/j.segan.2017.11.001). *Sustainable Energy, Grids and
+Networks*. Read as the preprint, arXiv:1607.02919, which carries a different title.
 - Kim, J.-H., Lee, B.-S. and Kim, C.-H. (2020). [A Study on the Development of Machine-Learning
 Based Load Transfer Detection Algorithm for Distribution
 Planning](https://doi.org/10.3390/en13174358).
@@ -1878,6 +1908,9 @@ demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
 - Siméoni, O. et al. (2025). [DINOv3](https://arxiv.org/abs/2508.10104).
 - SP Energy Networks (2023).
 [Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/).
+- Tang, L., Ashtine, M., Hua, W. and Wallom, D. C. H. (2024). [Sensitivity analysis of distributed
+photovoltaic system capacity estimation based on artificial neural
+network](https://doi.org/10.1016/j.segan.2024.101396). *Sustainable Energy, Grids and Networks*.
 - Teng, S., Cambier van Nooten, C., van Doorn, J., Ottenbros, A., Huijbregts, M. and Jansen, J.
 (2023). [Near real-time predictions of renewable electricity production at substation level via
 domain adaptation zero-shot learning in sequence](https://doi.org/10.1016/j.rser.2023.113662).
