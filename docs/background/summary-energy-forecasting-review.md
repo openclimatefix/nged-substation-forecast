@@ -1353,13 +1353,28 @@ measurement taken at a real substation.
 [Wang et al. (2022)](https://doi.org/10.1109/TIA.2022.3144244) separate behind-the-meter
 photovoltaic generation and battery charging jointly by contextually supervised source separation —
 the method family Kara et al. extended for solar under challenge 8, which suggests the battery
-problem and the solar problem are the same problem with another component added. Of the two papers
-we hold Gao et al.'s abstract, introduction, and dataset description from the publisher's landing
-page, and only Wang et al.'s abstract, so the Wang et al. citation carries no more weight than the
-existence of the work. Both full texts are closed on Unpaywall with no repository copy, as are the
-two nearest alternatives, and the two heat-pump disaggregation papers listed as open access each
-returned a gated response from the publisher and from the repository holding the second copy, which
-we did not attempt to work around.
+problem and the solar problem are the same problem with another component added. Of the Gao et al.
+and Wang et al. papers we hold Gao et al.'s abstract, introduction, and dataset description from the
+publisher's landing page, and Wang et al.'s abstract, so the Wang et al. citation carries no more
+weight than the existence of the work. Both full texts are closed on Unpaywall with no repository
+copy, as are the two nearest alternatives.
+
+**The two heat-pump disaggregation papers we obtained separate a heat pump from the total load of
+the single premises the heat pump sits in, and the widest aggregate either paper reports is five
+households.** [Brudermueller et al. (2023)](https://doi.org/10.1145/3600100.3623731) estimated the
+heat pump's own 15-minute energy in 363 Swiss single-family houses, each fitted with a second meter
+on the heat pump and none fitted with photovoltaics, explaining 83% of the variance in that second
+meter's readings across households held out of training, against 63% for the better of the two
+published baseline algorithms in the comparison.
+[Gisiger et al. (2026)](https://doi.org/10.1016/j.egyai.2026.100691) ran the same task over 7,021
+Swiss premises with heat pumps through one heating season of 15-minute readings, and summed the
+estimated heat-pump load of five of those premises, drawn at random from the dataset and treated as
+sharing one transformer, to within 6% of the metered total over an evening peak of 17:00 to 21:00.
+Gisiger et al.'s error, normalised by the mean metered heat-pump load, rose from 0.69 on the Swiss
+data the model was trained on to 1.24 on a German dataset of single-family houses with heat pumps,
+which Gisiger et al. attribute to differences in heat pump types, building stock, occupancy
+patterns, and data collection methods — measured evidence that a heat-pump model does not survive a
+change of country and building stock unaltered.
 
 #### What this means for Flexpectation
 
@@ -1379,6 +1394,13 @@ points, precluded formal validation", and that "aggregation does mask some signa
 usage is still clearly identifiable at feeder and substation level". The same trial found that "the
 detection of ASHP [air-source heat pumps] is frustrated by the low levels of adoption (<1% of
 premises) and differences in operation (low-slow vs high-fast)".
+[Gisiger et al. (2026)](https://doi.org/10.1016/j.egyai.2026.100691) detected a heat pump at a
+single premises from one week of 15-minute readings with a precision of 0.896 by a rule counting
+sharp rises in power and 0.953 by a convolutional neural network, and found detection easier in
+colder weeks, when heat pumps run more. Gisiger et al. assembled that evaluation set around premises
+known to have heat pumps without reporting how many premises without one the set held, so the
+precision does not carry to the fewer than one premises in a hundred Northern Powergrid was
+searching.
 
 ## Evaluating the performance of power forecasts
 
@@ -1856,6 +1878,10 @@ Smart Grid*.
 2024](https://doi.org/10.1016/j.ijforecast.2025.10.005). *International Journal of Forecasting*.
 - Brown, C. F. et al. (2025). [AlphaEarth Foundations: An embedding field model for accurate and
 efficient global mapping from sparse label data](https://arxiv.org/abs/2507.22291).
+- Brudermueller, T., Breer, F. and Staake, T. (2023). [Disaggregation of Heat Pump Load Profiles
+From Low-Resolution Smart Meter Data](https://doi.org/10.1145/3600100.3623731). *Proceedings of the
+10th ACM International Conference on Systems for Energy-Efficient Buildings, Cities, and
+Transportation (BuildSys)*.
 - Buizza, R. and Leutbecher, M. (2015). [The forecast skill
 horizon](https://doi.org/10.1002/qj.2619). *Quarterly Journal of the Royal Meteorological
 Society*.
@@ -1900,6 +1926,9 @@ Physics Communications*.
 - Gilbert, C., Browell, J. and Stephen, B. (2023). [Probabilistic load forecasting for the low
 voltage network: forecast fusion and daily peaks](https://arxiv.org/abs/2206.11745). *Sustainable
 Energy, Grids and Networks*.
+- Gisiger, O., Melillo, A. and Schuetz, P. (2026). [Heat pump detection and load disaggregation in
+low-resolution smart meter data with convolutional neural
+networks](https://doi.org/10.1016/j.egyai.2026.100691). *Energy and AI*.
 - Gouveia, A. M. V., Hashmi, M. U., D’hulst, R. and Van Hertem, D. (2026). [Installed PV capacity
 detection on LV substations: Comparison of Data-Driven and Model-Based
 methods](https://doi.org/10.1016/j.ijepes.2026.111848). *International Journal of Electrical Power
