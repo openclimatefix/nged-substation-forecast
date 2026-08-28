@@ -1412,22 +1412,20 @@ them inside net demand.
 
 The number of each installed grows fast enough to matter within Flexpectation's own lifetime. Every
 figure below is the Holistic Transition pathway of NESO's [Future Energy
-Scenarios](https://www.neso.energy/publications/future-energy-scenarios-fes), for GB unless the row
-says otherwise.
+Scenarios](https://www.neso.energy/publications/future-energy-scenarios-fes):
 
 | What | 2024 | 2030 |
 |---|---|---|
-| Battery-electric cars on the road | 1.4 million | 8.2 million |
-| Heat pump stock | 361,000 | 2.3 million |
-| Battery storage below 1 MW | 191 MW | 975 MW |
-| Battery storage below 1 MW, in the 2024 scenarios rather than the 2025 ones | 138 MW | 862 MW |
-| The same 2024 figure, allocated to the four grid supply point groups NGED serves | 49 MW | 308 MW |
+| Battery-electric cars on the road in GB | 1.4 million | 8.2 million |
+| Heat pump stock in GB | 361,000 | 2.3 million |
+| Battery storage below 1 MW in GB | 191 MW | 975 MW |
+| The same class in the 2024 scenarios, allocated to the four grid supply point groups NGED serves | 49 MW of GB's 138 MW | 308 MW of GB's 862 MW |
 
 Electric cars and heat pumps each rise roughly sixfold over those six years. "Below 1 MW" is NESO's
 own class boundary, and NESO defines the class as generation and storage under 1 MW that therefore
 "includes some larger commercial installations", so the class is wider than the batteries that fall
 below the Embedded Capacity Register's 50 kW floor. How much of the 191 MW sits below that floor is
-a question the scenarios cannot answer: the register covering the band below 50 kW is the
+a question the FES scenarios cannot answer: the register covering the band below 50 kW is the
 Microgeneration Certification Scheme's installation database, which Ofgem's [asset visibility
 consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
 says certifies battery storage up to 50 kW.
