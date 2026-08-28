@@ -1821,7 +1821,7 @@ over the numerical weather prediction cells covering the region, alongside a tem
 taken from the single cell of highest population density. What Browell and Fasiolo added on top was
 the *spread* of the weather across those cells — the spatial standard deviation, minimum, and
 maximum of the gridded fields. Measured by the Diebold-Mariano test against the same model without
-the spread features, adding them improved the pinball score significantly in 2 of the 14 regions,
+the spread features, adding the spread improved the pinball score significantly in 2 of the 14 regions,
 worsened the pinball score significantly in 3, and made no significant difference in the remaining
 9. Browell and Fasiolo report that cross-validation had suggested a small gain which "is not
 consistently reproduced on test data and therefore inconclusive", and conclude that gridded
@@ -1830,18 +1830,32 @@ probabilistic net-load forecasts in the present framework" — while allowing th
 that other forecasting methods would be able to extract value from this data by constructing
 different features".
 
-Weather itself mattered a great deal to their model. Adding the regionally-averaged wind and
-irradiance to a model carrying only calendar features and the point temperature cut the pinball
-score — the single-quantile equivalent of the continuous ranked probability score — by 40% overall,
-by 60% in North Scotland, where embedded wind capacity exceeds peak load, and by 10% in Greater
-London, where there is little embedded generation. So the question this result puts to Flexpectation
-is not if weather matters but if the spread of the weather across a region does.
+Weather itself mattered a great deal to Browell and Fasiol's model. Adding the regionally-averaged
+wind and irradiance to a model carrying only calendar features and the point temperature cut the
+pinball score — the single-quantile equivalent of the continuous ranked probability score — by 40%
+overall, by 60% in North Scotland, where embedded wind capacity exceeds peak load, and by 10% in
+Greater London, where there is little embedded generation. So the question this result puts to
+Flexpectation is not if weather matters but if the spread of the weather across a region does.
 
 Artificial Forecasting obtained postcode-level weather forecasts for two wind-connected primary
 substations after the deliverable reported that its wind-connected models had performed poorly, and
-found that the postcode-level forecasts "did not notably improve model performance". The deliverable
-nonetheless names better weather data as a next step, without saying what would be better than
-postcode-level.
+found that the postcode-level forecasts "did not notably improve model performance". The deliverable nonetheless names better weather data as a next step, without saying what would be better than postcode-level.
+
+[Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) point the other way, and their result
+separates the ensemble from its resolution. Dantas and Browell forecast 73 GB wind farms from the
+ECMWF deterministic model, taken from the operational archive at full spatial and temporal
+resolution, and from the ECMWF ensemble, taken from the TIGGE archive, which "only stores a limited
+set of atmospheric variables at 6-hour/0.5° resolution". The deterministic-driven model beat the
+ensemble-driven one "for all forecast horizons and case studies". Dantas and Browell then
+constrained the deterministic model to the ensemble's 6-hourly steps and its single 10 m wind level,
+leaving the horizontal grid untouched, and the advantage held at the offshore farms and at only some
+of the onshore ones, which Dantas and Browell read as evidence that "all ENS-based methods presented
+here could be improved with access to the full-resolution model data". Two limits govern how far
+that carries to Flexpectation. The comparison never matched the horizontal grids, so the comparison
+does not separate the ensemble from the resolution as cleanly as the temporal constraint does. And
+once the ensemble was calibrated, the ensemble-driven method overtook the deterministic one "from
+around 4 days ahead" at onshore farms and "from 3 days ahead" offshore, with some offshore farms
+best served by the ensemble at every horizon, while Flexpectation forecasts 14 days out.
 
 ### Weather improved low-voltage forecasts less than expected in the past
 
