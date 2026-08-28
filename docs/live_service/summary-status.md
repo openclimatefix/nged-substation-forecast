@@ -54,10 +54,10 @@ reaches the Dagster checks page rather than an operator.
 
 **The accuracy of the forecast the service produces today should not be read as a statement of what
 the project can achieve.** The deployed model is the deliberately naive baseline: one XGBoost model
-per time series, trained on lightly cleaned data, with no hyperparameter tuning, no comparison
-against a baseline forecaster, no detection of switching events, and no estimate of how much of each
-generator's capacity is available on the day. Improving forecast quality was explicitly out of scope
-for versions 0.1 and 0.2.
+per time series, trained on raw telemetry with no data cleaning whatsoever, with no hyperparameter
+tuning, no comparison against a baseline forecaster, no detection of switching events, and no
+estimate of how much of each generator's capacity is available on the day. Improving forecast
+quality was explicitly out of scope for versions 0.1 and 0.2.
 
 **What versions 0.1 and 0.2 built instead is the machinery for running machine-learning experiments
 quickly and putting a model into production safely.** Every experiment is scored on fixed
@@ -76,9 +76,9 @@ the performance analysis: the full metric set, including two cost-savings figure
 for flexibility procurement and one for curtailment — persistence and climatology baselines that
 make a score interpretable, time-slice breakdowns from nowcasting to 14 days, and a versioned suite
 of failure scenarios that score each candidate model on degraded inputs as well as healthy ones.
-Version 0.4 improves the automatic cleaning of NGED's power data, and surfaces what the cleaning
-finds to NGED as warnings alongside the forecast. Version 0.5 is the first milestone whose object is
-forecast skill: a backlog of XGBoost experiments, run against the leaderboard version 0.3 provides.
+Version 0.4 adds automatic cleaning of NGED's power data, and surfaces what the cleaning finds to
+NGED as warnings alongside the forecast. Version 0.5 is the first milestone whose object is forecast
+skill: a backlog of XGBoost experiments, run against the leaderboard version 0.3 provides.
 
 **Running the experiments before the measurement exists would mean choosing a champion model
 blind.** A leaderboard that cannot say whether a candidate model beats persistence, or how it
