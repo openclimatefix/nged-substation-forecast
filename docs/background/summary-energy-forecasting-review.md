@@ -1323,18 +1323,26 @@ that matters, and domestic batteries responding to a common price signal do not 
 of them are added.
 
 **A targeted search for disaggregating heat pumps, chargers, and batteries from substation
-measurements found the work split by asset and mostly out of reach: heat pumps are separated at the
-premises, batteries and chargers at the feeder or substation, and the substation-level papers are
-paywalled.** [Gao et al. (2024)](https://doi.org/10.1016/j.apenergy.2024.123361) work at substation
-level on flexible load, and [Wang et al. (2022)](https://doi.org/10.1109/TIA.2022.3144244) separate
-behind-the-meter photovoltaic generation and battery charging jointly by contextually supervised
-source separation — the method family Kara et al. extended for solar under challenge 8, which
-suggests the battery problem and the solar problem are the same problem with another component
-added. We read the abstract of Wang et al. and obtained neither full text. Both papers are closed on
-Unpaywall with no repository copy, as are the two nearest alternatives, and the two heat-pump
-disaggregation papers listed as open access each returned a gated response from the publisher and
-from the repository holding the second copy, which we did not attempt to work around. Neither
-citation carries more weight than the existence of the work.
+measurements found the work split by asset, and found "substation level" used for aggregations far
+smaller than a GB primary substation.**
+[Gao et al. (2024)](https://doi.org/10.1016/j.apenergy.2024.123361) disaggregate thermostatically
+controlled loads — air conditioners, heating and ventilation units, and furnaces — from an
+aggregated residential load by contrastive sequence-to-point learning, report a mean absolute
+percentage error as low as 8.78%, and generalise the same model to photovoltaic generation and
+electric-vehicle charging. Gao et al.'s aggregate is the sum of the Pecan Street dataset's 25
+individually metered homes in Austin, Texas, and 25 in New York — two orders of magnitude below the
+thousands of customers behind a GB primary substation, and a sum of household meters rather than a
+measurement taken at a real substation.
+[Wang et al. (2022)](https://doi.org/10.1109/TIA.2022.3144244) separate behind-the-meter
+photovoltaic generation and battery charging jointly by contextually supervised source separation —
+the method family Kara et al. extended for solar under challenge 8, which suggests the battery
+problem and the solar problem are the same problem with another component added. Of the two papers
+we hold Gao et al.'s abstract, introduction, and dataset description from the publisher's landing
+page, and only Wang et al.'s abstract, so the Wang et al. citation carries no more weight than the
+existence of the work. Both full texts are closed on Unpaywall with no repository copy, as are the
+two nearest alternatives, and the two heat-pump disaggregation papers listed as open access each
+returned a gated response from the publisher and from the repository holding the second copy, which
+we did not attempt to work around.
 
 #### What this means for Flexpectation
 
@@ -1866,7 +1874,8 @@ and forecasting through weather correction and benefit to DSO transistion and
 microgrids](https://doi.org/10.34890/134). *CIRED Workshop, Ljubljana*.
 - Gao, A., Zheng, J., Mei, F. and Liu, Y. (2024). [Toward intelligent demand-side energy management
 via substation-level flexible load disaggregation](https://doi.org/10.1016/j.apenergy.2024.123361).
-*Applied Energy*. Not obtained; cited for the existence of the work.
+*Applied Energy*. Full text not obtained; read as the abstract, highlights, introduction, and
+dataset description on the publisher's landing page.
 - Gijón, A., Eiraudo, S., Manjavacas, A., Schiera, D. S., Molina-Solana, M. and Gómez-Romero, J.
 (2025). [Integrating Physics and Data-Driven Approaches: An Explainable and Uncertainty-Aware
 Hybrid Model for Wind Turbine Power Prediction](https://arxiv.org/abs/2502.07344). *Computer
