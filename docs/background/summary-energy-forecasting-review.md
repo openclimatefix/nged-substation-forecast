@@ -1488,12 +1488,15 @@ searching.
 
 ## Evaluating the performance of power forecasts
 
-The nine challenges above need three different kinds of evaluation, and this literature is far
-stronger on the first than on the other two. Forecasting has settled practice we can adopt.
-Estimating something the network does not meter — an effective capacity, an unmetered solar output,
-a signed net flow behind an apparent-power meter — has six possible substitutes for ground truth, of
-which this literature uses four. Detecting rare events has good academic practice and, in GB, no
-precedent that measured anything at all.
+The nine challenges above need three different kinds of evaluation — scoring a forecast, checking an
+estimate of a quantity nobody meters, and scoring the detection of a rare event — and this
+literature is far stronger on scoring forecasts than on the other two. Scoring a forecast has
+settled practice Flexpectation can adopt. Checking an estimate of a quantity NGED does not meter —
+the effective capacity of a metered generator, the half-hourly output of unmetered solar, the
+direction of flow behind an apparent-power meter — has six possible substitutes for ground truth, of
+which this literature uses four. Scoring the detection of a rare event, such as a switching event or
+a metering fault, has good academic practice, and none of the GB projects we checked published a
+number to compare against.
 
 **Standard accuracy measures rewarded flat forecasts that would be of little use for either
 flexibility procurement or curtailment decisions, so a peak-aware score belongs alongside a proper
@@ -1707,19 +1710,19 @@ forecasts for two wind-connected primary substations after their wind-connected 
 poorly, and reported that the postcode-level forecasts "did not notably improve model performance",
 naming better weather data as a next step.
 
-### Weather has bought less than expected at low voltage in the past
+### Weather improved low-voltage forecasts less than expected in the past
 
 [Haben et al. (2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) tested 100 real low-voltage
 feeders with both forecast and observed temperature, and found that temperature had no effect on
-forecast accuracy, or a negative one. [Haben et al.
-(2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) used data collected in 2014 and 2015. We
-expect how much weather matters at a substation to be changing quickly, because embedded solar
-generation and heat pumps are what make a substation weather-dependent, and there are far more of
-both on the network now than there were then. That expectation is a prediction, though, not a
-measurement — and the Scottish primary-substation sensitivities of [Fox et al.
-(2018)](https://doi.org/10.34890/134), measured on the 10 years of weather and network data before
-its publication and described in the full review, say weather was already moving primary substation
-demand well before the mid-2010s.
+forecast accuracy, or a negative one.
+[Haben et al. (2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) used data collected in 2014
+and 2015. We expect how much weather matters at a substation to be changing quickly, because
+embedded solar generation and heat pumps are what make a substation weather-dependent, and there are
+far more of both on the distribution network now than there were then. That expectation is a
+prediction, though, not a measurement — and the Scottish primary-substation sensitivities of
+[Fox et al. (2018)](https://doi.org/10.34890/134), measured on the 10 years of weather and
+substation data before its publication and described in the full review, say weather was already
+moving primary substation demand well before the mid-2010s.
 
 ### A model trained on none of NGED's data may match a model trained on all of it
 
@@ -1756,9 +1759,9 @@ each substation's net load — demand minus whatever generation behind that subs
 produce — into demand and generation, forecast the two separately, then recombined them. Two
 capabilities TRANSITION did not set out to build are what Flexpectation adds. TRANSITION's ensemble
 covered only the first 4 days, so from day 4 to day 10 a single deterministic forecast was all it
-had, whereas NGED acts out to 14. And TRANSITION was a 13-substation trial rather than a
-network-wide deployment. Everything else about TRANSITION's design matches what Flexpectation is
-building.
+had, whereas NGED acts out to 14. And TRANSITION was a 13-substation trial rather than a deployment
+across a whole distribution network. Everything else about TRANSITION's design matches what
+Flexpectation is building.
 
 **NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost, which
 won on accuracy and was also the easiest to automate.** The project compared XGBoost against a long
@@ -1810,14 +1813,15 @@ substations, which Flexpectation does not. At the time of writing, Artificial Fo
 ahead than Flexpectation.
 
 **Artificial Forecasting has run operationally through a full winter flexibility procurement
-cycle.** A forecasting service for primary substations is deployed and has passed the network's
-architecture review board, data governance, and information security checks for its current
-deployment. It was used operationally by Northern Powergrid's System Forecasting team through a full
-winter flexibility procurement cycle to support week-ahead dispatch decisions. It produces
-half-hourly probabilistic forecasts with 5th-to-95th-percentile bands, flags forecast exceedances of
-firm capacity, and is benchmarked against the network's existing growth-based and persistence
-methods and a rolling 4-week baseline. The deliverable states that performance did not materially
-degrade on average across the 11-day horizon, without publishing the figures behind that claim.
+cycle.** A forecasting service for primary substations is deployed and has passed Northern
+Powergrid's architecture review board, data governance, and information security checks for its
+current deployment. It was used operationally by Northern Powergrid's System Forecasting team
+through a full winter flexibility procurement cycle to support week-ahead dispatch decisions. It
+produces half-hourly probabilistic forecasts with 5th-to-95th-percentile bands, flags forecast
+exceedances of firm capacity, and is benchmarked against Northern Powergrid's existing growth-based
+and persistence methods and a rolling 4-week baseline. The deliverable states that performance did
+not materially degrade on average across the 11-day horizon, without publishing the figures behind
+that claim.
 
 **Artificial Forecasting's value case puts whole-life net present value at around £60 million for
 one network, or £250 million if three further networks adopt Artificial Forecasting.** That value
@@ -1909,8 +1913,8 @@ strands. Sizing the four strands as separate studies scopes the work rather than
 — how many of the strands survive contact with the data is exactly what the project has to find out.
 
 **Only the first of those four strands — the heavily-tuned gradient-boosting model — is in scope for
-Flexpectation version 1.** The other three strands belong to the network-wide scale-up from 2027, as
-does the disaggregation of unmetered generation.
+Flexpectation version 1.** The other three strands belong to the scale-up across NGED's whole
+distribution network from 2027, as does the disaggregation of unmetered generation.
 
 **The main reason for attempting all eight at once is that they may be one challenge rather than
 eight.** A switching event, a turbine out for repair, and a stuck meter all surface in the same
