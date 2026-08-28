@@ -996,14 +996,15 @@ licence area recording only zeros, and 63% of new solar sites' analogues not com
 A detector built on the assumption that faults are rare is the wrong shape for this telemetry.
 
 **None of the three GB projects reports how often its checks are right.** Electricity North West's
-[ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/), UK Power Networks'
-[Distribution Network Visibility](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_version_3.0_270214.pdf),
+[ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/), UK Power Networks' [Distribution
+Network
+Visibility](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_version_3.0_270214.pdf),
 and NGED's own [Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/)
-all tackled faulty metering substantively, Time Series Data Quality as its only subject, and none of
-the three published an accuracy figure or a label set, so the GB record says what to look for rather
-than how well any of it worked. What Distribution Network Visibility did publish is the shape of the
-output: a daily health report ranking units for maintenance. A run of implausible values is a fault
-to a forecaster and a real event to a control engineer, and only the purpose settles which.
+all tackled faulty metering substantively. None of the three published an accuracy figure or a label
+set, so the GB record tells us what to look for rather than how well the approaches worked. What
+Distribution Network Visibility did publish is the shape of the output: a daily health report
+ranking units for maintenance. A run of implausible values is a fault to a forecaster and a real
+event to a control engineer, and only the purpose settles which.
 
 ### 7. Recovering signed power from apparent-power meters
 
@@ -1289,10 +1290,10 @@ prize pots, and qualifying rounds do not apply to us, while the lessons about pr
 a comparison trustworthy — apply with more force, because a competition gets some of its integrity
 free from having rivals who would like to catch each other out, and we will not have any.
 
-**Energy forecasting has run competitions on common data for over a decade, and only one of them
-forecast at anything like the level NGED acts on.** The last row of the table is what Flexpectation
-is building. The two columns that decide whether a precedent exists are the aggregation level and
-whether the leaderboard is still open.
+**Energy forecasting has run competitions on common data for over a decade, and only the second
+track of GEFCom2017 forecast at anything like the level NGED acts on.** The last row of the table is
+what Flexpectation is building. The two columns that decide whether a precedent exists are the
+aggregation level and whether the leaderboard is still open.
 
 | Leaderboard | What entrants forecast | Aggregation level, set against a primary substation | Take-up | Standing or closed |
 |---|---|---|---|---|
