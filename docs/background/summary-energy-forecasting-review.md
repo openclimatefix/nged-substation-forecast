@@ -1411,24 +1411,32 @@ forecast heat pumps, electric-vehicle (EV) chargers, and batteries separately ra
 them inside net demand.
 
 The number of each installed grows fast enough to matter within Flexpectation's own lifetime. Every
-figure below is the Holistic Transition pathway of NESO's [Future Energy
-Scenarios](https://www.neso.energy/publications/future-energy-scenarios-fes):
+figure below is the Holistic Transition pathway of NESO's
+[Future Energy Scenarios (FES)](https://www.neso.energy/publications/future-energy-scenarios-fes):
 
 | What | 2024 | 2030 |
 |---|---|---|
 | Battery-electric cars on the road in GB | 1.4 million | 8.2 million |
 | Heat pump stock in GB | 361,000 | 2.3 million |
 | Battery storage below 1 MW in GB | 191 MW | 975 MW |
-| The same class in the 2024 scenarios, allocated to the four grid supply point groups NGED serves | 49 MW of GB's 138 MW | 308 MW of GB's 862 MW |
+| The same class in the 2024 scenarios, allocated to the four grid supply point groups NGED serves | 49 MW  | 308 MW  |
 
 Electric cars and heat pumps each rise roughly sixfold over those six years. "Below 1 MW" is NESO's
 own class boundary, and NESO defines the class as generation and storage under 1 MW that therefore
 "includes some larger commercial installations", so the class is wider than the batteries that fall
 below the Embedded Capacity Register's 50 kW floor. How much of the 191 MW sits below that floor is
-a question the FES scenarios cannot answer: the register covering the band below 50 kW is the
-Microgeneration Certification Scheme's installation database, which Ofgem's [asset visibility
-consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
-says certifies battery storage up to 50 kW.
+a question the FES scenarios cannot answer. Ofgem's
+[asset visibility consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
+says the Microgeneration Certification Scheme's installation database certifies battery storage up
+to 50 kW, and the Department for Energy Security and Net Zero publishes
+[counts drawn from that database](https://www.gov.uk/government/statistics/mcs-certified-domestic-battery-installation-statistics):
+73,987 domestic retrofit battery installations between September 2023, when the series starts, and
+March 2026, rising from 24,242 in the 2024/25 financial year to 44,033 in 2025/26, with the 72,459
+installations that passed outlier testing holding 666,880 kWh between them. Those figures cannot be
+subtracted from the 191 MW, because the figures measure stored energy rather than power, count
+domestic retrofits rather than every installation below 50 kW, and accumulate from September 2023
+rather than reporting a stock. The series carries no projection, so the 2030 figure has no
+counterpart outside the FES scenarios.
 
 Scaling the GB figures to NGED is only approximate. NESO's [regional breakdown of the 2024
 scenarios](https://www.neso.energy/data-portal/regional-breakdown-fes-data-electricity) allocates
@@ -1448,9 +1456,9 @@ individual site, the postal code, the transmission system operator's zone, and t
 Eight machine-learning and deep-learning models are set against a naive benchmark that predicts the
 average of the same quarter-hour on the same weekday. Of the five individual sites, only the one
 with 145 charge points beat that benchmark by a clear margin; at the site with 8 charge points some
-models beat it, and at the sites with 3, 4, and 14 charge points none did. We found no measurement
-of heat-pump diversity in the cold weather that matters, and none of whether domestic batteries
-responding to a common price signal average out as more are added.
+models beat it, and at the sites with 3, 4, and 14 charge points none did. On the topic of heat
+pumps, we found no measurement of heat-pump diversity in cold weather, and none of
+whether domestic batteries responding to a common price signal average out as more are added.
 
 **A targeted literature search for disaggregating heat pumps, chargers, and batteries from
 substation measurements found the work split by asset, and found "substation level" used for
@@ -2055,6 +2063,8 @@ Forecasting](https://doi.org/10.1002/we.70079). *Wind Energy*.
 - de Vilmarest, J., Browell, J., Fasiolo, M., Goude, Y. and Wintenberger, O. (2024). [Adaptive
 Probabilistic Forecasting of Electricity (Net-)Load](https://doi.org/10.1109/TPWRS.2023.3310280).
 *IEEE Transactions on Power Systems*.
+- Department for Energy Security and Net Zero (2026). [MCS certified domestic battery
+installation statistics](https://www.gov.uk/government/statistics/mcs-certified-domestic-battery-installation-statistics).
 - Department for Energy Security and Net Zero (2026). [Solar photovoltaics
 deployment](https://www.gov.uk/government/statistics/solar-photovoltaics-deployment).
 - Dong, J., Valzania, L., Maillard, A., Pham, T., Gigan, S. and Unser, M. (2023). [Phase Retrieval:
