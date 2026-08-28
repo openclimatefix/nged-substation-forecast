@@ -1110,9 +1110,19 @@ required to do. Ofgem's December 2025
 [consultation on asset visibility](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
 estimates that distribution network operators "are aware of less than half" of the consumer and
 distributed energy resources on their networks, a figure the Department for Energy Security and Net
-Zero attributes to the operators' own engagement rather than to a measurement. None of these
-registers records the panel tilt, the panel azimuth, or the ratio of direct-current to
-alternating-current rating.
+Zero attributes to the operators' own engagement rather than to a measurement. None of these registers records the panel tilt, the panel azimuth, or the ratio of direct-current to alternating-current rating.
+
+The register now being built will not close the gap either. Ofgem appointed Elexon in 2025 to
+deliver Flexibility Market Asset Registration, digital infrastructure due by the third quarter of
+2027 that will collect, store and share data on assets participating in flexibility markets, aimed
+first at assets under 1 MW. Its inclusion criterion is close to the complement of this challenge's
+problem. Ofgem's design collects data on assets "when they are first registered into a DSO or NESO
+flexibility market" — the market of a distribution system operator, or of the National Energy System
+Operator — so a rooftop array that never trades flexibility never enters the register, and the
+arrays this challenge has to find are the ones nobody has registered anywhere. Where an asset does
+enter a flexibility market that NGED itself runs, NGED is the counterparty and already holds the
+data; what Flexibility Market Asset Registration adds there is one standardised record across
+markets rather than a generator NGED could not previously see.
 
 #### What the literature says
 
