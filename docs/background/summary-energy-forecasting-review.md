@@ -608,7 +608,7 @@ infer the engineering parameters NGED does not hold: the capacity a site can act
 a solar array's tilt and azimuth, a turbine's power curve.** The generation forecasts in this
 literature are handed those engineering parameters:
 [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) are given each site's capacity, and
-HEFTCom's portfolio was one named 1.2 GW offshore wind farm plus the solar capacity of a region.
+HEFTCom's portfolio was the 1.2 GW Hornsea 1 offshore wind farm plus the solar capacity of a region.
 When an export-cable fault cut that wind farm's available capacity mid-competition, the winning team
 clipped its quantiles to the capacity implied by the outage notices the farm is obliged to publish,
 while the organisers' benchmark ignored the fault and, in
@@ -1326,7 +1326,7 @@ GB as one region rather than substation by substation.
 both give the same warning: a small residual against the measured total is not evidence that the
 components were separated correctly.** Fitting a sum of physically parameterised components to one
 measurement is routine in observational cosmology, where the technique is called **component
-separation**. [Hensley and Bull (2018)](https://doi.org/10.3847/1538-4357/aae69c) show that giving
+separation**. [Hensley and Bull (2018)](https://doi.org/10.3847/1538-4357/aaa489) show that giving
 the *nuisance* component too simple a model biases the component of interest, and that the fit does
 not announce the bias: "models that are strongly biased but still yield low χ² values are the most
 dangerous". Two consequences follow for Flexpectation. Effort spent making the demand model richer
@@ -1622,8 +1622,8 @@ the aggregation level and whether the leaderboard is still open.
 | Global Energy Forecasting Competitions 2012, 2014, and 2017 ([Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979)) | Hierarchical load, price, wind, and solar, with the data published alongside the papers introducing each competition | Varies, up to national | Hundreds of contestants from more than 60 countries | Closed |
 | The second track of GEFCom2017 ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) | Probabilistic load | 183 delivery-point meters of a US utility — the closest of the leaderboards in this table to a distribution network's aggregation level | 177 entrants across both tracks | Closed |
 | BigDEAL Challenge 2022 ([Shukla and Hong (2024)](https://doi.org/10.1049/stg2.12162)) | The timing of peak demand rather than its size; the final match asked for the magnitude, timing, and shape of daily peak load | Three neighbouring local distribution companies — whole utilities, well above a primary substation | 78 teams from 27 countries | Closed |
-| HEFTCom ([Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)) | The combined day-ahead output of one GB wind-and-solar portfolio | A single 3.6 GW portfolio: one offshore wind farm plus a regional solar aggregate — the generation mix closest to NGED's, though at portfolio rather than substation level | Over 170 teams registered, 66 submitted, 24 completed | Closed; the competition period was 3 months |
-| Three competitions NGED funded with Energy Systems Catapult ([McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541)) | 1-minute peaks inside half-hourly averages; the daily peak a hidden population of electric-vehicle chargers added; and missing values. None was a load forecast | NGED's own grid supply point, bulk supply points, and primary-substation feeders | 37 teams, over 2,500 submissions | Closed between December 2021 and April 2022, though the pages and data are still readable on CodaLab |
+| HEFTCom ([Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)) | The combined day-ahead output of one GB wind-and-solar portfolio | A single 3.6 GW portfolio: the 1.2 GW Hornsea 1 offshore wind farm plus a regional solar aggregate — the generation mix closest to NGED's, though at portfolio rather than substation level | Over 170 teams registered, 66 submitted, 24 completed | Closed; the competition period was 3 months |
+| Three competitions NGED funded with Energy Systems Catapult ([McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541)) | 1-minute peaks inside half-hourly averages; the daily peak a hidden population of electric-vehicle chargers added; and missing values. None was a load forecast | NGED's own grid supply point, bulk supply points, and primary-substation feeders | 37 teams, over 2,500 submissions | Closed, though the pages and data are still readable on CodaLab |
 | Energy-Arena ([Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705)) | The paper describes deterministic day-ahead tasks; the running platform today carries 24 challenges across prices, load, wind, and solar — 8 scored as point forecasts, 8 as quantiles, and 8 as ensembles | Not a distribution network | Not stated in what we read | Standing |
 | TS-Arena ([Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)) | 186 live energy series | Not a distribution network | 13 foundation models and 3 statistical baselines run by the platform team, plus outside entries | Standing |
 | **Flexpectation's leaderboards** | Net demand at substations, and output at metered generators | One board per class of time series, with grid and bulk supply points sharing one | Public to view and reproducible; outside entries not invited | Standing |
@@ -1918,9 +1918,12 @@ generation inside a probabilistic forecast at substation level over a multi-day 
 unmetered generation, probabilistic forecasting at substation level, and a multi-day horizon each
 exist on their own. No study we read tracks the available capacity of a mixed fleet of solar, wind,
 and dispatchable generators at one distribution network, or measures whether doing so improves the
-forecast. No study we read turns switching-contaminated history into a useful input rather than
-deleting it, rewriting it, or absorbing the accuracy loss of leaving it in. Flexpectation attempts
-all nine challenges above, across four families of model:
+forecast. No study we read turns switching-contaminated history at a substation into a useful input
+rather than deleting it, rewriting it, or absorbing the accuracy loss of leaving it in; the nearest
+precedent, [Liu et al. (2019)](https://doi.org/10.1109/ACCESS.2019.2951422), conditions a forecast
+on an operating-state label, but for switching between transformers inside one substation, where the
+substation total stays metered throughout. Flexpectation attempts all nine challenges above, across
+four families of model:
 
 - a heavily-tuned version of the gradient-boosting approach that won the tabular forecasting competitions reviewed above, and which NGED's own EFFS project independently selected;
 - weather and time encoders pre-trained on large datasets, so that a model for one substation can
@@ -1934,11 +1937,11 @@ all nine challenges above, across four families of model:
 
 **By the standard of scope in this literature, each of the four strands is a separate piece of
 work.** Almost every study reviewed above takes on one of the nine challenges, at one voltage level,
-with one family of model; the few that touch more than one solve those challenges as a pipeline
-rather than together. Pre-training weather and time encoders and then reading a substation's
-probabilistic forecast off them would be a full study by that standard, and so would each of the
-other three strands. Sizing the four strands as separate studies scopes the work rather than
-promising an output — how many of the strands survive contact with the data is exactly what the
+with one family of model; the few that touch more than one almost all solve those challenges as a
+pipeline rather than together. Pre-training weather and time encoders and then reading a
+substation's probabilistic forecast off them would be a full study by that standard, and so would
+each of the other three strands. Sizing the four strands as separate studies scopes the work rather
+than promising an output — how many of the strands survive contact with the data is exactly what the
 project has to find out.
 
 **Only the heavily-tuned gradient-boosting model, the first of the four strands, is in scope for
@@ -1948,10 +1951,13 @@ distribution network from 2027, as does the disaggregation of unmetered generati
 **The main reason for attempting all nine challenges at once is that the nine may be one challenge
 rather than nine.** A switching event, a turbine out for repair, and a stuck meter all surface in
 the same place: as a discrepancy between what a substation metered and what the weather and the
-calendar say it should have metered. Every study reviewed above that touches more than one of the
-nine challenges solves those challenges as a pipeline. In every case one stage's output is frozen
-before the next stage sees it, so an error made early cannot be corrected later and the forecast
-error never gets to tell the capacity estimator it was wrong.
+calendar say it should have metered. Almost every study reviewed above that touches more than one of
+the nine challenges solves those challenges as a pipeline, and the exception we found,
+[Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421), fits one wind farm's
+time-varying capacity jointly with its probabilistic forecast rather than a substation's several
+challenges together. In the pipelines one stage's output is frozen before the next stage sees it, so
+an error made early cannot be corrected later and the forecast error never gets to tell the capacity
+estimator it was wrong.
 
 **The question we want to answer is whether one model that estimates capacity, switching state, and
 demand together beats the serial pipeline every study we read used.** NGED's specification leaves
@@ -2067,7 +2073,7 @@ effect of temperature at the low voltage level](https://doi.org/10.1016/j.ijfore
 Load Forecasting: Methods, Applications, and Recommendations](https://arxiv.org/abs/2106.00006).
 *Applied Energy*.
 - Hensley, B. S. and Bull, P. (2018). [Mitigating Complex Dust Foregrounds in Future Cosmic
-Microwave Background Polarization Experiments](https://doi.org/10.3847/1538-4357/aae69c). *The
+Microwave Background Polarization Experiments](https://doi.org/10.3847/1538-4357/aaa489). *The
 Astrophysical Journal*.
 - Hertel, M., Pütz, S., Kolar, J., Schäfer, B., Mikut, R. and Hagenmeyer, V. (2026). [A Benchmark
 for Electrical Load Forecasting Across Grid Levels: Time-Series Transformers Outperform
