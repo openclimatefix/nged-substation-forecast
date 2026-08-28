@@ -999,11 +999,11 @@ A detector built on the assumption that faults are rare is the wrong shape for t
 [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/), UK Power Networks'
 [Distribution Network Visibility](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_version_3.0_270214.pdf),
 and NGED's own [Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/)
-all tackled faulty metering substantively, one of them as its whole subject, and none published an
-accuracy figure or a label set, so the GB record says what to look for rather than how well any of
-it worked. What Distribution Network Visibility did publish is the shape of the output: a daily
-health report ranking units for maintenance. A run of implausible values is a fault to a forecaster
-and a real event to a control engineer, and only the purpose settles which.
+all tackled faulty metering substantively, Time Series Data Quality as its only subject, and none of
+the three published an accuracy figure or a label set, so the GB record says what to look for rather
+than how well any of it worked. What Distribution Network Visibility did publish is the shape of the
+output: a daily health report ranking units for maintenance. A run of implausible values is a fault
+to a forecaster and a real event to a control engineer, and only the purpose settles which.
 
 ### 7. Recovering signed power from apparent-power meters
 
