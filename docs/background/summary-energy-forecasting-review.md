@@ -1797,14 +1797,15 @@ competition's 14-year plateau in one of its scored categories
 of protein structure prediction only because dozens of groups were attacking the problem
 independently. A plateau on our leaderboard would be ambiguous between a hard problem and a team
 that did not think of the right idea. The first M-competition's conclusions about whole classes of
-method — that complex methods do not typically beat simpler ones, which the M3 competition did not
-go on to support, and that combining methods beats the methods combined
-([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) — describe what many
-independent people chose to try, and no single team's leaderboard can support a claim about whole
-classes of method. What our leaderboard can do is narrower and still worth having: show which
-approaches beat a stated baseline on NGED's own data, under one protocol, with the forecasts, the
-metric definitions, and the code published so that anyone can check the arithmetic or rerun the
-comparison themselves.
+method — that statistically sophisticated or complex methods do not typically forecast more
+accurately than simpler ones, which the M3 competition did not go on to support, and that a
+combination of several methods forecasts more accurately, on average, than the individual methods
+going into the combination ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) —
+describe what many independent people chose to try, and no single team's leaderboard can support a
+conclusion about a whole class of method. What our leaderboard can do is narrower and still worth
+having: show which approaches beat a stated baseline on NGED's own data, under one protocol, with
+the forecasts, the metric definitions, and the code published so that anyone can check the
+arithmetic or rerun the comparison themselves.
 
 ## Three published results that point against this project's plan
 
