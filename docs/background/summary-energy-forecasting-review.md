@@ -1157,29 +1157,35 @@ metered, but TRANSITION read each installation's capacity from a list of Feed-In
 installations. Flexpectation has no register that would carry it as far, for the reasons set out
 under "The challenge" above.
 
-**Inferring the capacity from the net flow instead has been measured only a voltage level below
-NGED's.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark that
+**The one published benchmark we found of inferring capacity from the net flow sits a voltage level
+below NGED's, and the GB project doing the same at primary substations has not yet published a
+result.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark that
 inference at low-voltage substations serving tens of customers rather than at a primary. UK Power
 Networks' [Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/)
-project (with Open Climate Fix) infers solar PV capacity behind UK Power Networks' primary
+project (with Open Climate Fix) infers solar photovoltaic capacity behind UK Power Networks' primary
 substations.
 
 **The one result we found at a real distribution substation separated solar from demand using that
 substation's own reactive power.** [Kara et al. (2018)](https://doi.org/10.1016/j.segan.2017.11.001)
 estimate the solar generation downstream of a substation in Riverside, California, from the
-substation's active and reactive power together with a proxy irradiance, and report a
-root-mean-square error of 6% of installed capacity across all sky conditions, without being told the
-installed capacity or the panel geometry. Regressing the load's active power on the measured
-reactive power is what makes the separation work: the simpler alternative, assuming the power factor
-measured at night holds through the day, is broken by the solar plant's own reactive power
-consumption, which Kara et al. found responsible for about 25% of the overestimation at its peak.
-Two features of the setup limit how far their work is applicable to Flexpectation. The generation
-behind that substation is a single 7.5 MW solar site, "the only generation asset located at this
-substation", rather than a fleet of differently-oriented rooftops, and the ground truth comes from a
-second measurement device at that site's own point of interconnection. Kara et al. also had to
-detect and compensate capacitor-bank switching before the reactive power was usable, and their
-accuracy was still improving as the sampling rate rose to one sample every five minutes, which puts
-NGED's half-hourly data below the rate at which their errors settled.
+substation's active and reactive power, and report a root-mean-square error of 6% of installed
+capacity across all sky conditions. The estimator is given neither the installed capacity nor the
+panel geometry, but it does need one input NGED would struggle to supply at most substations: the
+metered output of a second photovoltaic plant, four miles away on a different feeder and low-pass
+filtered, standing in for irradiance. Regressing the load's active power on the measured reactive
+power is what makes the separation work: the simpler alternative, assuming the power factor measured
+at night holds through the day, is broken by the solar plant's own reactive power consumption, which
+the preprint version of Kara et al. found responsible for about 25% of the overestimation at its
+peak. Two features of the setup limit how far Kara et al.'s result carries to Flexpectation. The
+generation behind that substation is a single 7.5 MW solar site, "the only generation asset located
+at this substation", rather than a fleet of differently-oriented rooftops, and the ground truth
+comes from a second measurement device at that site's own point of interconnection. Kara et al. also
+had to detect and compensate capacitor-bank switching before the reactive power was usable, and
+their accuracy was still improving as the sampling rate rose to one sample every five minutes, which
+puts NGED's half-hourly data below the rate at which the errors settled. Kara et al. name the amount
+of photovoltaic capacity behind the substation, its volatility, and its spatial spread as factors
+whose effect on their method they had not studied — the three respects in which a GB primary
+substation differs most from their test case.
 
 **Uncertainty and a multi-day horizon each appear in the disaggregation work we found, but not in
 the same forecast.** [Zhang et al. (2022)](https://doi.org/10.1016/j.engappai.2022.104707) attach
@@ -1189,7 +1195,7 @@ and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar
 half-hourly to 14 days ahead, as a single number per half-hour with no uncertainty attached.
 
 **A larger literature disaggregates rooftop solar from smart-meter data, but at individual premises
-rather than at a substation, and its methods lean on advantages NGED does not have.**
+rather than at a substation, and the methods lean on advantages NGED does not have.**
 [Cheung et al. (2023)](https://doi.org/10.1109/TSUSC.2022.3192456) use the consumption patterns of
 neighbouring customers known to have no panels, which NGED cannot observe, and Cheung et al. are the
 one study we found that varies how many individually metered customers are summed into a single
@@ -1197,8 +1203,8 @@ series: across 5, 10, and 20 Australian customers per aggregated series, the sol
 scaled error stays between 1.56 and 2.20 — larger than the average change between consecutive
 readings — with solar mean absolute percentage error of 24 to 43%. Results reported elsewhere at an
 aggregate level are usually sums of individually metered households rather than a measurement taken
-at a real aggregation point, so this literature stops far below the thousands of customers behind a
-GB primary substation.
+at a real aggregation point, so the smart-meter literature stops far below the thousands of
+customers behind a GB primary substation.
 
 **Whether more customers behind a substation makes the estimate easier or harder is unsettled, and
 the one study we found that varied the number of households behind a feeder does not settle the
@@ -1214,8 +1220,7 @@ profile that a real street would not.
 #### What this means for Flexpectation
 
 **UK Power Networks' "Power Flow to Solar Capacity" project is highly relevant to Flexpectation: the
-project used the same kind of GB data and was delivered by Open Climate Fix, the partner delivering
-Flexpectation.**
+project works on the same kind of GB data, and Open Climate Fix is a partner in both projects.**
 [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/)
 (2024 to 2026, £0.4 million) infers the capacity of unmetered solar sitting behind each primary
 substation from half-hourly substation load and weather, then forecasts that generation. Open
@@ -1270,11 +1275,11 @@ uncertainty: confidence intervals read off the curvature at the optimum, which a
 model gives cheaply, are "insensitive to practical non-identifiabilities" and can look reassuringly
 finite for a parameter the data do not constrain at all.
 
-**The condition those fields lean on for identifiability is that each component is observed alone
-somewhere, and Flexpectation can test whether that condition holds before fitting a forward model.**
-Hyperspectral unmixing, which splits one mixed image pixel into the spectra of the materials
-composing it, calls the condition the pure-pixel assumption: for each component there is at least
-one observation containing only that component.
+**The condition cosmology and hyperspectral unmixing lean on for identifiability is that each
+component is observed alone somewhere, and Flexpectation can test whether that condition holds
+before fitting a forward model.** Hyperspectral unmixing, which splits one mixed image pixel into
+the spectra of the materials composing it, calls the condition the pure-pixel assumption: for each
+component there is at least one observation containing only that component.
 [Bioucas-Dias et al. (2012)](https://doi.org/10.1109/JSTARS.2012.2194696) set out a weaker
 sufficient condition too, and show what happens when neither holds — on a highly mixed data set with
 no observations near the extremes, the fitted simplex comes out smaller than the true one, so the
@@ -1289,12 +1294,14 @@ half-hours is a question the telemetry can answer on its own.
 
 Heat pumps, electric-vehicle chargers, and price-sensitive domestic batteries change the shape of a
 substation's load in ways a model trained on history cannot anticipate, because the number installed
-behind any given substation is growing quickly. The stretch goal is to disaggregate and forecast heat pumps, electric-vehicle (EV) chargers, and batteries separately rather than leaving them inside net demand.
+behind any given substation is growing quickly. A stretch goal is to disaggregate and forecast heat
+pumps, electric-vehicle (EV) chargers, and batteries separately rather than leaving them inside net
+demand.
 
-The stock grows fast enough to matter inside Flexpectation's own lifetime. NESO's
+The number of each installed grows fast enough to matter within Flexpectation's own lifetime. NESO's
 [Future Energy Scenarios 2025](https://www.neso.energy/publications/future-energy-scenarios-fes) put
 1.4 million electric cars on GB roads in 2024 and 8.2 million by 2030, and the GB heat pump stock at
-361,000 in 2024 and 2.3 million by 2030 — close to a sixfold rise in each over six years. Battery
+361,000 in 2024 and 2.3 million by 2030 — roughly a sixfold rise in each over six years. Battery
 storage below 1 MW, the class that sits behind a substation without reaching the Embedded Capacity
 Register's 50 kW floor, rises from 191 MW to 975 MW over the same period. Scaling those GB figures
 to NGED is only approximate: NESO's
@@ -1302,31 +1309,32 @@ to NGED is only approximate: NESO's
 allocates 36% of GB's sub-1 MW battery capacity to the four grid supply point groups NGED serves, 49
 MW of 138 MW in 2024 rising to 308 MW of 862 MW by 2030, but that 36% is held constant across every
 forecast year, so the regional number is an allocation of the GB total rather than a forecast of
-NGED's own area. NGED serves nearly 8 million customers, a little over a quarter of GB's.
+NGED's own area. NGED serves nearly 8 million customers, a little over a quarter of the GB total.
 
 #### What the literature says
 
-**Heat pumps, EV chargers, and batteries are the largest gap in the review and the largest
-deliberate omission from our search, narrowed by one targeted search rather than closed.** In the
-one study we found that measures charger forecast skill against aggregation,
+**Heat pumps, EV chargers, and batteries have the thinnest evidence behind them of any of the nine
+challenges, and one targeted search narrowed that gap rather than closing it.** In the one study we
+found that measures charger forecast skill against aggregation,
 [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1), only the site with more
 than 100 charge points was significantly better than a naive benchmark, though some models at one
 much smaller site also beat the naive benchmark. Heat-pump diversity is untested in the cold weather
-that matters, and no diversity factor helps for domestic batteries at all.
+that matters, and domestic batteries responding to a common price signal do not average out as more
+of them are added.
 
-**A targeted search for disaggregating these three from substation measurements found the work split
-by asset and mostly out of reach: heat pumps are separated at the premises, batteries and chargers
-at the feeder or substation, and the substation-level papers are paywalled.**
-[Gao et al. (2024)](https://doi.org/10.1016/j.apenergy.2024.123361) work at substation level on
-flexible load, and [Wang et al. (2022)](https://doi.org/10.1109/TIA.2022.3144244) separate
+**A targeted search for disaggregating heat pumps, chargers, and batteries from substation
+measurements found the work split by asset and mostly out of reach: heat pumps are separated at the
+premises, batteries and chargers at the feeder or substation, and the substation-level papers are
+paywalled.** [Gao et al. (2024)](https://doi.org/10.1016/j.apenergy.2024.123361) work at substation
+level on flexible load, and [Wang et al. (2022)](https://doi.org/10.1109/TIA.2022.3144244) separate
 behind-the-meter photovoltaic generation and battery charging jointly by contextually supervised
 source separation — the method family Kara et al. extended for solar under challenge 8, which
 suggests the battery problem and the solar problem are the same problem with another component
-added. We read the abstract of Wang et al. and could obtain neither full text: both papers are
-closed on Unpaywall with no repository copy, as are the two nearest alternatives, and the one
-open-access heat-pump disaggregation paper we found returned a gated response from the publisher and
-from its repository, which we did not attempt to work around. Neither citation here carries more
-weight than the existence of the work.
+added. We read the abstract of Wang et al. and obtained neither full text. Both papers are closed on
+Unpaywall with no repository copy, as are the two nearest alternatives, and the two heat-pump
+disaggregation papers listed as open access each returned a gated response from the publisher and
+from the repository holding the second copy, which we did not attempt to work around. Neither
+citation carries more weight than the existence of the work.
 
 #### What this means for Flexpectation
 
@@ -1906,7 +1914,9 @@ Foundation Models Evaluated on Application-Oriented Metrics](https://arxiv.org/a
 - Kara, E. C., Roberts, C. M., Tabone, M., Alvarez, L., Callaway, D. S. and Stewart, E. M. (2018).
 [Disaggregating solar generation from feeder-level
 measurements](https://doi.org/10.1016/j.segan.2017.11.001). *Sustainable Energy, Grids and
-Networks*. Read as the preprint, arXiv:1607.02919, which carries a different title.
+Networks*. Read as the accepted manuscript of the version of record, and as the preprint
+(arXiv:1607.02919, which carries a different title). The preprint's power-factor-based estimator,
+the source of the 25% figure cited above, does not appear in the published version.
 - Kim, J.-H., Lee, B.-S. and Kim, C.-H. (2020). [A Study on the Development of Machine-Learning
 Based Load Transfer Detection Algorithm for Distribution
 Planning](https://doi.org/10.3390/en13174358).
