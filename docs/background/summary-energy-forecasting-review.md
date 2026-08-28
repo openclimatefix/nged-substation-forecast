@@ -1019,9 +1019,11 @@ built on the assumption that faults are rare is the wrong shape for NGED's telem
 [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/), UK Power Networks'
 [Distribution Network Visibility](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_version_3.0_270214.pdf),
 and NGED's own [Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/)
-all tackled faulty metering substantively. None of the three published an accuracy figure or a label
-set, so the GB record tells us what to look for rather than how well the approaches worked. What
-Distribution Network Visibility did publish is the shape of the output: a daily health report
+all tackled faulty metering substantively. None of the three published a figure for how often a
+flagged reading really was faulty, nor a label set to measure that against. Distribution Network
+Visibility's 95% is the share of units whose readings obeyed the expected logic, not a detection
+accuracy, so the GB record tells us what to look for rather than how well the approaches worked.
+What Distribution Network Visibility did publish is the shape of the output: a daily health report
 ranking units for maintenance. A run of implausible values is a fault to a forecaster and a real
 event to a control engineer, and only the purpose of the analysis settles which.
 
@@ -1322,11 +1324,10 @@ figure rather than a forecast, so what Flexpectation adds is putting the capacit
 probabilistic multi-day forecast, and disaggregating the full shape of the unmetered generation.
 
 **GB already has an operational forecast of unmetered generation, but only at national scale and
-without uncertainty.** NESO publishes
-[embedded wind and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts)
-half-hourly to 14 days ahead, the same resolution and horizon Flexpectation is specified to deliver.
-The forecast is a single number per half-hour, with no uncertainty attached, and the forecast covers
-GB as one region rather than substation by substation.
+without uncertainty.** NESO's
+[embedded wind and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts),
+described under "What the literature says" above, match the resolution and horizon Flexpectation is
+specified to deliver, but cover GB as one region rather than substation by substation.
 
 **Observational cosmology and systems biology have separated superposed signals for decades, and
 both give the same warning: a small residual against the measured total is not evidence that the
@@ -1416,9 +1417,11 @@ Register's 50 kW floor, rises from 191 MW to 975 MW over the same period. Scalin
 to NGED is only approximate: NESO's
 [regional breakdown of the 2024 scenarios](https://www.neso.energy/data-portal/regional-breakdown-fes-data-electricity)
 allocates 36% of GB's sub-1 MW battery capacity to the four grid supply point groups NGED serves, 49
-MW of 138 MW in 2024 rising to 308 MW of 862 MW by 2030, but that 36% is held constant across every
-forecast year, so the regional number is an allocation of the GB total rather than a forecast of
-NGED's own area. NGED serves nearly 8 million customers, a little over a quarter of the GB total.
+MW of 138 MW in 2024 rising to 308 MW of 862 MW by 2030. Those GB totals are lower than the 191 MW
+and 975 MW above because the regional breakdown is built on the 2024 scenarios rather than the 2025
+ones, but that 36% is held constant across every forecast year, so the regional number is an
+allocation of the GB total rather than a forecast of NGED's own area. NGED serves nearly 8 million
+customers, a little over a quarter of the GB total.
 
 #### What the literature says
 
@@ -1587,8 +1590,7 @@ an engineer's time to dismiss, so detection should be scored with recall weighte
 events that are real), recall (the share of real events that get flagged), and an F-score combining
 the two, with β set to 1.5 rather than 1, "to give a higher importance to the recall term, as the
 potential impact of a false negative is higher than that of a false positive in power grid expansion
-planning". That asymmetry holds for Flexpectation too: a missed switching event silently corrupts
-the history a model trains on, whereas a false alarm only takes an engineer's time to dismiss.
+planning". That asymmetry holds for Flexpectation too.
 
 **Detecting switching and metering faults is hard: the one paper we found that scores both precision
 and recall reports F-scores of 0.2 to 0.5.**
@@ -1790,9 +1792,10 @@ each substation's net load — demand minus whatever generation behind that subs
 produce — into demand and generation, forecast the two separately, then recombined them.
 Flexpectation adds an ensemble that spans the whole 14-day horizon, and deployment across a whole
 distribution network; TRANSITION set out to build neither. TRANSITION's ensemble covered the first 4
-days, so from day 4 to day 10 a single deterministic forecast was all it had, whereas NGED acts out
-to 14. And TRANSITION was a 13-substation trial rather than a deployment across a whole distribution
-network. The rest of TRANSITION's published design matches what Flexpectation is building.
+days, so from day 4 to day 10 a single deterministic forecast was all TRANSITION had, and
+Flexpectation's forecast horizon runs to 14 days. And TRANSITION was a 13-substation trial rather
+than a deployment across a whole distribution network. The rest of TRANSITION's published design
+matches what Flexpectation is building.
 
 **NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost, which
 its evaluation reported as the most accurate of the three methods tested and as easy to automate.**
@@ -1813,13 +1816,12 @@ France.** [OpenSTEF](https://lfenergy.org/projects/openstef/) is also the only o
 forecasting system run by a network operator in this review whose code can be read rather than
 inferred from a deliverable.
 
-**Enedis has forecast every one of its high-voltage-to-medium-voltage substations since 2015, and is
-now extending the forecast below the substation.** The French distribution network operator covers
-all 2,300 of those substations, and is extending the forecast to 3,678 of the more than 5,000
-transformers inside those substations, and towards the 750,000 medium-to-low-voltage substations
-beyond them ([Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058)). Forecasting
-operationally at the scale Flexpectation reaches in 2027 has therefore already existed elsewhere for
-a decade.
+**Enedis has forecast all 2,300 of its high-voltage-to-medium-voltage substations since 2015, and is
+now extending the forecast below the substation**
+([Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058)). The extension reaches 3,678 of the
+more than 5,000 transformers inside those substations, and is heading towards the 750,000
+medium-to-low-voltage substations beyond them. Enedis has therefore been forecasting operationally,
+at the scale Flexpectation reaches in 2027, for a decade.
 
 **Fitting a model to each transformer beat the method Enedis runs in production, which shares one
 substation forecast out across its transformers by fixed coefficients.** The per-transformer models
