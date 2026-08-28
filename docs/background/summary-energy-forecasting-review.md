@@ -3,9 +3,11 @@
 This is a short version of a literature review Open Climate Fix carried out for National Grid
 Electricity Distribution (NGED), as part of the Flexpectation project, funded through the Network
 Innovation Allowance. This summary is readable on its own. The full literature review, which cites
-over 100 sources and gives the evidence behind every claim in this shorter summary, is [published
-online](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/),
-and is referred to below as "the full review".
+over 100 sources, is
+[published online](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/),
+and is referred to below as "the full review". This summary is not a strict subset of the full
+review: it covers one further challenge, recovering signed power from apparent-power meters, and
+cites 24 sources the full review does not.
 
 ## Summary
 
@@ -21,7 +23,7 @@ substantial efforts to compare forecasting approaches fairly.
 — a gradient-boosted tree — is a sensible place to start.** The literature provides no conclusive
 evidence that anything more sophisticated buys a large, dependable improvement over a
 gradient-boosted tree at substation level. NGED's own Electricity Flexibility and Forecasting System
-reached the same choice independently in 2021.
+reached the same choice independently in 2019.
 
 **In terms of machine learning research, Flexpectation is ambitious: several of our research ideas
 have no precedent in the literature we reviewed.** We found no published model that recovers a
@@ -67,9 +69,9 @@ several traps to avoid.** Mean absolute error rewards flat forecasts that are of
 either flexibility or curtailment decisions: a peak predicted an hour late is penalised twice, once
 for the peak that did not happen and once for the peak that was missed, and an overly smooth
 forecast avoids both penalties. Ranking well on one measure also says little about other measures:
-across 200 German low-voltage feeders, the two models that came first and second on the peaks in the
-quantile version of an overload-decision metric stated their own uncertainty badly, their 90% ranges
-containing the true value less than half the time at exactly those peaks.
+across 200 German low-voltage feeders, the two models that came first and second on consumer peaks
+in the quantile version of an overload-decision metric stated their own uncertainty badly, their 90%
+ranges containing the true value less than half the time at those consumer peaks.
 
 **Three published results point against parts of Flexpectation's plan, and we intend to test all
 three rather than avoid them.** Finer-grained weather has not always improved performance; weather
@@ -229,7 +231,7 @@ forecasts.
 but the literature paints GBTs as a sensible default rather than a proven winner**. A GBT builds its
 forecast from hundreds of small decision trees, each one fitted to the error the trees before it
 left behind.
-[NGED's own 2021 Electricity Flexibility and Forecasting System (EFFS) project](https://smarter.energynetworks.org/projects/wpden03/)
+[NGED's own Electricity Flexibility and Forecasting System (EFFS) project](https://smarter.energynetworks.org/projects/wpden03/)
 picked XGBoost, which gave the best results of the three methods the project tested and was also
 easy to automate, and no study we read shows a large, dependable margin for anything more
 sophisticated than XGBoost at substation level.
