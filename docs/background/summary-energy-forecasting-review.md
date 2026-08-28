@@ -1147,22 +1147,6 @@ NGED only when the installer notifies NGED, as installers are required to do. No
 registers records the panel tilt, the panel azimuth, or the ratio of direct-current to
 alternating-current rating.
 
-One register being built now is worth ruling out explicitly, because the register sounds as though
-it should help. Ofgem [appointed Elexon in
-2025](https://www.ofgem.gov.uk/decision/decision-flexibility-market-asset-registration) to deliver
-**Flexibility Market Asset Registration**, digital infrastructure due by the third quarter of
-2027 that will collect, store, and share data on assets participating in flexibility markets, aimed
-first at assets under 1 MW. That register's inclusion criterion is close to the complement of this
-challenge's problem. Ofgem's [asset visibility
-consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
-says the register collects data on assets "when they are first registered into a DSO or NESO
-flexibility market" — the market of a distribution system operator, or of the National Energy System
-Operator — so a rooftop array that never trades flexibility never enters the register, and the
-arrays this challenge has to find are the ones nobody has registered anywhere. Where an asset does
-enter a flexibility market that NGED itself runs, NGED is the counterparty and already holds the
-data; what Flexibility Market Asset Registration adds there is one standardised record across
-markets rather than a generator NGED could not previously see.
-
 #### What the literature says
 
 **Splitting generation out of a substation's net flow has been done at GB primary substations, but
@@ -1177,6 +1161,22 @@ load into demand and generation, forecast the two separately, and recombined the
 rooftop solar is not metered, but TRANSITION read each installation's capacity from a list of
 Feed-In Tariff installations. Flexpectation has no register that would carry it as far, for the
 reasons set out under "The challenge" above.
+
+**Flexibility Market Asset Registration, the register being built now that sounds as though it
+should close this gap, will record the assets that trade flexibility, which is close to the
+complement of the arrays this challenge has to find.** Ofgem [appointed Elexon in
+2025](https://www.ofgem.gov.uk/decision/decision-flexibility-market-asset-registration) to deliver
+Flexibility Market Asset Registration, digital infrastructure due by the third quarter of 2027 that
+will collect, store, and share data on assets participating in flexibility markets, aimed first at
+assets under 1 MW. Ofgem's [asset visibility
+consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
+says the register collects data on assets "when they are first registered into a DSO or NESO
+flexibility market" — the market of a distribution system operator, or of the National Energy System
+Operator — so a rooftop array that never trades flexibility never enters the register, and the
+arrays this challenge has to find are the ones nobody has registered anywhere. Where an asset does
+enter a flexibility market that NGED itself runs, NGED is the counterparty and already holds the
+data; what Flexibility Market Asset Registration adds there is one standardised record across
+markets rather than a generator NGED could not previously see.
 
 **The published benchmarks we found of inferring capacity from the net flow work on individually
 metered premises, sit at a voltage level below NGED's, or do not say what aggregation they worked
@@ -1406,9 +1406,9 @@ half-hours is a question the telemetry can answer on its own.
 
 Heat pumps, electric-vehicle chargers, and price-sensitive domestic batteries change the shape of a
 substation's load in ways a model trained on history cannot anticipate, because the number installed
-behind any given substation is growing quickly. A stretch goal is to disaggregate and forecast heat
-pumps, electric-vehicle (EV) chargers, and batteries separately rather than leaving them inside net
-demand.
+behind any given substation is growing quickly. A Flexpectation stretch goal is to disaggregate and
+forecast heat pumps, electric-vehicle (EV) chargers, and batteries separately rather than leaving
+them inside net demand.
 
 The number of each installed grows fast enough to matter within Flexpectation's own lifetime. NESO's
 [Future Energy Scenarios 2025](https://www.neso.energy/publications/future-energy-scenarios-fes) put
