@@ -150,7 +150,7 @@ running on AWS.*
 
 ---
 
-## v0.4 — Improved Automatic Data Cleaning
+## v0.4 — Automatic Data Cleaning
 
 *Epic: [#150](https://github.com/openclimatefix/nged-substation-forecast/issues/150)*
 
