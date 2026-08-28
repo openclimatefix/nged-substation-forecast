@@ -119,11 +119,13 @@ re-written (and cut down) by hand.
 
 ## What the literature says about the nine challenges Flexpectation aims to solve
 
-Flexpectation's specification breaks into nine challenges. This section takes each in turn: what
-the challenge is, what the literature says, and what that means for Flexpectation. The coverage is
+Flexpectation's specification breaks into nine challenges. This section takes each in turn: what the
+challenge is, what the literature says, and what that means for Flexpectation. The coverage is
 uneven. The first challenge (probabilistic forecasts of net demand at substations) has a large body
-of literature, and the second challenge (forecasting metered generators) is the most mature field on
-the list.
+of literature, the second challenge (forecasting metered generators) is the most mature field on the
+list, and the eighth challenge (disaggregating unmetered solar and wind) needs the longest
+treatment, because the published work sits either side of the aggregation level NGED meters at and
+the review borrows from three fields outside energy forecasting.
 
 **The table below is a summary of this entire section: the table describes, for each challenge, the
 most relevant papers we found, and the implications for Flexpectation.** The sections that follow
@@ -1770,17 +1772,18 @@ improve accuracy.
 
 **Nine projects run by electricity network operators have already built a forecasting capability
 that overlaps Flexpectation's, and one of the nine — Northern Powergrid's Artificial Forecasting —
-is deployed where Flexpectation is not.** The last row of the table is Flexpectation itself, so the
-comparison is direct. Where a project's published deliverables do not answer a column, the cell says
-so rather than being left blank.
+is deployed where Flexpectation is not, which is why that project gets a subsection of its own at
+the end of this section.** The last row of the table is Flexpectation itself, so the comparison is
+direct. Where a project's published deliverables do not answer a column, the cell says so rather
+than being left blank.
 
 | Project | What the project forecasts | Scale | Horizon | Uncertainty published |
 |---|---|---|---|---|
 | [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) (Northern Powergrid) | Demand and customer export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondary substations | Day-ahead to week-ahead at primary, evaluated to 11 days; week- to month-ahead at secondary | Half-hourly, with 5th-to-95th-percentile bands |
 | [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) | Net load, split into demand and generation, then recombined | 13 primary substations, their bulk supply points, and their 33 kV and 11 kV feeders | 30 minutes to 10 days | A 40-member ICON-EU ensemble to 4 days, one deterministic forecast after that |
+| [SSEN FastTrack](https://smarter.energynetworks.org/projects/10166254/) | How the connections queue, around 180 GW, will load the distribution network | Primary substations up to the grid supply point | A planning horizon rather than an operational one | A probability that a queued connection becomes real load |
 | [NGED's EFFS](https://smarter.energynetworks.org/projects/wpden03/) | Grid supply points, bulk supply points, primary substation transformers, and generation sites | Across NGED's whole distribution network | 1 hour to 6 months | None |
 | [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) | The capacity of unmetered solar behind each primary substation, then that solar's generation | Not stated in what we read | Not stated in what we read | Not stated in what we read |
-| [SSEN FastTrack](https://smarter.energynetworks.org/projects/10166254/) | How the connections queue, around 180 GW, will load the distribution network | Primary substations up to the grid supply point | A planning horizon rather than an operational one | A probability that a queued connection becomes real load |
 | [SP Energy Networks' Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/) | Electricity network faults, not load | Per district | Up to 7 days | A probability distribution driven by a weather ensemble |
 | [Fox et al. (2018)](https://doi.org/10.34890/134) (SP Energy Networks) | The effect of weather on past peak demand, not a forward forecast | 13 primary substations in the proof of concept, almost 400 in production | Backwards over 10 years | None |
 | [OpenSTEF](https://lfenergy.org/projects/openstef/) (Alliander, the Netherlands) | Net load, with a splitter into solar, wind, and residual parts | Thousands of grid connection points | To 48 hours | Yes; the framework is built for probabilistic forecasting |
