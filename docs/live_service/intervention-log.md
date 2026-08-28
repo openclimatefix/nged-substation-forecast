@@ -92,8 +92,9 @@ empty log with no stated period is indistinguishable from a log nobody kept.
 | 2026-07-15 18:00 UTC → 2026-08-14 00:00 UTC | v0.1 | 28 time series, 6-hourly `live_forecasts` on AWS | 1 | No — pre-v1.0 |
 | 2026-08-14 00:00 UTC → ongoing | v0.2 | 31 time series, 6-hourly `live_forecasts` on AWS, with `live_forecasts_are_healthy` reporting on each slot | 0 | No — pre-v1.0 |
 
-Figures below are stated as of **07:00 UTC on 14 August 2026**. Every count in this section moves
-within the day, so the as-of instant is part of the measurement rather than a formality.
+Figures below are stated as of **08:00 UTC on 28 August 2026**, after that day's 06:00 UTC slot.
+Every count in this section moves within the day, so the as-of instant is part of the measurement
+rather than a formality.
 
 ### v0.1 on AWS, 2026-07-15 to 2026-08-13
 
@@ -108,9 +109,9 @@ operator action in the window was the NWP backfill logged above, so the period i
 unattended but not entirely so.
 
 *Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` and
-`experiment_name = "xgboost_cv_0001"` — v0.1's promoted model — in the `power_forecasts` Delta
-table on S3. All 117 scheduled slots are present, every consecutive pair is exactly six hours
-apart, and all 28 time series appear in every one of the 117.
+`experiment_name = "xgboost_cv_0001"` — v0.1's promoted model — in the `power_forecasts` Delta table
+on S3. All 117 scheduled slots are present, every consecutive pair is exactly six hours apart, and
+all 28 time series appear in every one of the 117.
 
 ### The 9 August ECMWF run, and what it shows
 
@@ -160,8 +161,17 @@ Its first `live_forecasts` run was the 00:00 UTC slot on 14 August 2026, which i
 starts. The deployment itself is a deliberate upgrade, so it is not an intervention and has no row
 in [the log](#the-log).
 
-v0.2 forecasts 31 time series, three more than v0.1, under the promoted model
-`xgboost_cv_0003`. The 00:00 and 06:00 UTC slots on 14 August both carry all 31.
+v0.2 forecasts 31 time series, three more than v0.1, under the promoted model `xgboost_cv_0003`.
+From the 00:00 UTC slot on 14 August 2026 to the 06:00 UTC slot on 28 August 2026 the schedule
+called for 58 consecutive 6-hourly slots, and **every one of them produced a forecast for all 31
+time series**. No NWP run was missed: every slot in the window forecast from NWP between 12 and 30
+hours old, the healthy band for a once-daily ECMWF run.
+
+*Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` and
+`experiment_name = "xgboost_cv_0003"` — v0.2's promoted model — in the `power_forecasts` Delta table
+on S3, the same query that verified the v0.1 window. All 58 scheduled slots are present, every
+consecutive pair is exactly six hours apart, all 31 time series appear in every one of the 58, and
+no slot's `nwp_init_time` is more than 30 hours before its `power_fcst_init_time`.
 
 Three things make the next stretch better evidence than the last. `live_forecasts_are_healthy`
 reads each succeeding slot's rows back and reports missed NWP runs, so a slot forecasting from

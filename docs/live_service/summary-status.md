@@ -26,15 +26,19 @@ reconstructable afterwards because every forecast row records which weather run 
 Restoring the missing run by hand is the only human intervention the service has needed, and it cost
 about a minute.
 
-**The upgrade from version 0.1 to version 0.2 on 13 August 2026 went in without incident.** The
-version 0.1 stack was retired at about 19:00 UTC that evening, and version 0.2's first forecast slot
-ran at 00:00 UTC the following morning, covering 31 time series — three more than version 0.1, under
-a newly promoted model. No intervention has been logged since.
+**The upgrade from version 0.1 to version 0.2 on 13 August 2026 went in without incident, and
+version 0.2 has served every slot since.** The version 0.1 stack was retired at about 19:00 UTC that
+evening, and version 0.2's first forecast slot ran at 00:00 UTC the following morning, covering 31
+time series — three more than version 0.1, under a newly promoted model. From then to the 06:00 UTC
+slot on 28 August 2026 the schedule called for 58 consecutive slots, and all 58 produced a forecast
+for all 31 time series. No weather run was missed in that window: every slot forecast from weather
+data between 12 and 30 hours old, which is the healthy band for a once-daily run. No human
+intervention has been needed since the upgrade.
 
-| Period | Version | Time series | Interventions |
-|---|---|---|---|
-| 15 July 2026 to 13 August 2026 | 0.1 | 28 | 1 |
-| 14 August 2026 to date | 0.2 | 31 | 0 |
+| Period | Version | Time series | Forecast slots served | Interventions |
+|---|---|---|---|---|
+| 15 July to 13 August 2026 | 0.1 | 28 | 117 of 117 | 1 |
+| 14 to 28 August 2026 | 0.2 | 31 | 58 of 58 | 0 |
 
 **Version 0.2 adds the telemetry version 0.1 did not have.** An automated check now reads each
 slot's forecast rows back and reports how many weather runs were missed, so a slot forecasting from
