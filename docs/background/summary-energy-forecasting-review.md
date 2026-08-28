@@ -1191,8 +1191,25 @@ substation differs most from their test case.
 the same forecast.** [Zhang et al. (2022)](https://doi.org/10.1016/j.engappai.2022.104707) attach
 uncertainty, disaggregating rooftop solar out of net load at grid supply point and feeder level with
 a multi-quantile recurrent neural network scored on reliability and sharpness. NESO's [embedded wind
-and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts) are
-half-hourly to 14 days ahead, as a single number per half-hour with no uncertainty attached.
+and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts) are half-hourly to 14 days ahead, as a single number per half-hour with no uncertainty attached.
+
+**An uncertainty estimate earns its place only if it grows where the answer gets worse, and the one
+substation-level disaggregation we found that tested that property reports it holding — until the
+generation pattern is unlike anything in training.**
+[Yi and Wang (2022)](https://arxiv.org/abs/2207.03490) summarise their two journal papers on
+disaggregating behind-the-meter solar at substations, and pose the problem as one of *partial
+labels*: for some aggregate measurements the operator knows which load types are present, but never
+their individual values. Yi and Wang's Bayesian dictionary-learning estimator reaches a total error
+rate of 8.97%, against 20.61% and 37.12% for two methods that need fully labelled training data, and
+its error weighted so that the estimates the method is unsure about count less — 0.13 to 0.16 —
+comes out far below its unweighted root-mean-square error of 5.19 to 6.20, which Yi and Wang read as
+showing that the estimates carrying the largest errors are the ones carrying the largest
+uncertainty. Where the test period's solar pattern is unlike any pattern in the training data,
+however, Yi and Wang report that the true load may fall outside the 99.7% confidence interval — the
+failure mode that matters most to Flexpectation, whose substations will carry generation mixes that
+no training substation had. The validation runs on 360 generated training samples covering two
+industrial loads and one solar generation, not on measurements from a real substation, and carries
+no forecast horizon.
 
 **A larger literature disaggregates rooftop solar from smart-meter data, but at individual premises
 rather than at a substation, and the methods lean on advantages NGED does not have.**
@@ -2051,6 +2068,10 @@ Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/).
 and practical identifiability](https://doi.org/10.1016/j.coisb.2021.03.005). *Current Opinion in
 Systems Biology*.
 - Willis, H. L., Powell, R. D. and Wall, D. L. (1984). [Load Transfer Coupling Regression Curve Fitting for Distribution Load Forecasting](https://doi.org/10.1109/TPAS.1984.318713). *IEEE Transactions on Power Apparatus and Systems*.
+- Yi, M. and Wang, M. (2022). [Recent Results of Energy Disaggregation with Behind-the-Meter Solar
+Generation](https://arxiv.org/abs/2207.03490). *11th Bulk Power Systems Dynamics and Control
+Symposium (IREP), Banff*. The authors' own summary of their two *IEEE Transactions on Power Systems*
+papers on the same work, both of which are closed.
 - Zhang, X. Y., Watkins, C. and Kuenzel, S. (2022). [Multi-quantile recurrent neural network for
 feeder-level probabilistic energy disaggregation considering roof-top solar
 energy](https://doi.org/10.1016/j.engappai.2022.104707). *Engineering Applications of Artificial
