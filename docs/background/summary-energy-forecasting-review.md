@@ -446,7 +446,7 @@ variables rather than anything on an electricity network.
 
 **The nearest we found anyone joining the two is one entrant in HEFTCom, a competition to forecast a
 GB wind-and-solar portfolio day-ahead.** [Browell et al.
-(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed embeddings from
+(2026)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed embeddings from
 their own AI weather models into downstream neural networks and finished third of the ranked
 entrants. What we found nobody doing is pre-training a weather encoder against observations and then
 reading a substation's probabilistic load forecast off it, or using a differentiable model of a
@@ -493,7 +493,7 @@ quantile regression on gradient-boosted trees, fitting a separate model for each
 HEFTCom the winning team fitted gradient-boosted trees separately for wind and for solar and
 separately for each weather source. Of the top 10 teams, 9 forecast wind and solar separately before
 combining the two forecasts. And [Browell et al.
-(2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005) conclude that gradient-boosted trees
+(2026)](https://doi.org/10.1016/j.ijforecast.2025.10.005) conclude that gradient-boosted trees
 remain competitive for day-ahead wind and solar forecasting, with performance depending heavily on
 implementation. NGED's own EFFS project selected XGBoost when it evaluated model families.
 
@@ -614,7 +614,7 @@ HEFTCom's portfolio was the 1.2 GW Hornsea 1 offshore wind farm plus the solar c
 When an export-cable fault cut that wind farm's available capacity mid-competition, the winning team
 clipped its quantiles to the capacity implied by the outage notices the farm is obliged to publish,
 while the organisers' benchmark ignored the fault and, in
-[Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
+[Browell et al. (2026)](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s words, "performed
 extremely poorly as a result". NGED's embedded generators publish no outage notices of that kind.
 Estimating each generator's available capacity from its own metered output instead is challenge 3
 below, which sets out the published methods in detail.
@@ -1633,7 +1633,7 @@ the aggregation level and whether the leaderboard is still open.
 | Global Energy Forecasting Competitions 2012, 2014, and 2017 ([Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979)) | Hierarchical load, price, wind, and solar, with the data published alongside the papers introducing each competition | Varies, up to national | Hundreds of contestants from more than 60 countries | Closed |
 | The second track of GEFCom2017 ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) | Probabilistic load | 183 delivery-point meters of a US utility — the closest of the leaderboards in this table to a distribution network's aggregation level | 177 entrants across both tracks | Closed |
 | BigDEAL Challenge 2022 ([Shukla and Hong (2024)](https://doi.org/10.1049/stg2.12162)) | The timing of peak demand rather than its size; the final match asked for the magnitude, timing, and shape of daily peak load | Three neighbouring local distribution companies — whole utilities, well above a primary substation | 78 teams from 27 countries | Closed |
-| HEFTCom ([Browell et al. (2025)](https://doi.org/10.1016/j.ijforecast.2025.10.005)) | The combined day-ahead output of one GB wind-and-solar portfolio | A single 3.6 GW portfolio: the 1.2 GW Hornsea 1 offshore wind farm plus a regional solar aggregate — the generation mix closest to NGED's, though at portfolio rather than substation level | Over 170 teams registered, 66 submitted, 24 completed | Closed; the competition period was 3 months |
+| HEFTCom ([Browell et al. (2026)](https://doi.org/10.1016/j.ijforecast.2025.10.005)) | The combined day-ahead output of one GB wind-and-solar portfolio | A single 3.6 GW portfolio: the 1.2 GW Hornsea 1 offshore wind farm plus a regional solar aggregate — the generation mix closest to NGED's, though at portfolio rather than substation level | Over 170 teams registered, 66 submitted, 24 completed | Closed; the competition period was 3 months |
 | Three competitions NGED funded with Energy Systems Catapult ([McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541)) | 1-minute peaks inside half-hourly averages; the daily peak a hidden population of electric-vehicle chargers added; and missing values. None was a load forecast | NGED's own grid supply point, bulk supply points, and primary-substation feeders | 37 teams, over 2,500 submissions | Closed, though the pages and data are still readable on CodaLab |
 | Energy-Arena ([Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705)) | The paper describes deterministic day-ahead tasks; the running platform today carries 24 challenges across prices, load, wind, and solar — 8 scored as point forecasts, 8 as quantiles, and 8 as ensembles | Not a distribution network | Not stated in what we read | Standing |
 | TS-Arena ([Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)) | 186 live energy series | Not a distribution network | 13 foundation models and 3 statistical baselines run by the platform team, plus outside entries | Standing |
@@ -2009,7 +2009,7 @@ Measurements](https://arxiv.org/abs/2405.16164). *Sustainable Energy, Grids and 
 Conditional Extremes and Gridded NWP](https://arxiv.org/abs/2103.10335). *IEEE Transactions on
 Smart Grid*.
 - Browell, J., van der Meer, D., Kälvegren, H., Haglund, S., Simioni, E., Bessa, R. J. and Wang, Y.
-(2025). [The hybrid renewable energy forecasting and trading competition
+(2026). [The hybrid renewable energy forecasting and trading competition
 2024](https://doi.org/10.1016/j.ijforecast.2025.10.005). *International Journal of Forecasting*.
 - Brown, C. F. et al. (2025). [AlphaEarth Foundations: An embedding field model for accurate and
 efficient global mapping from sparse label data](https://arxiv.org/abs/2507.22291).
