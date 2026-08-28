@@ -1166,13 +1166,13 @@ in the GB projects that have published a result the generation was either metere
 read from a register, rather than inferred from the net flow.** Northern Powergrid's
 [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) models gross
 demand and customer export independently at primary substations, but that customer export is
-metered, and the generation baseline Artificial Forecasting works against comes from Northern
-Powergrid's own installed-capacity projection per substation.
-[SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/) split net load into demand and
-generation, forecast the two separately, and recombined them; TRANSITION's rooftop solar is not
-metered, but TRANSITION read each installation's capacity from a list of Feed-In Tariff
-installations. Flexpectation has no register that would carry it as far, for the reasons set out
-under "The challenge" above.
+metered, and the baseline Artificial Forecasting measures its customer-export models against is an
+extrapolation from Northern Powergrid's own Distribution Future Energy Scenarios, not a capacity
+inferred from the net flow. [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/) split net
+load into demand and generation, forecast the two separately, and recombined them; TRANSITION's
+rooftop solar is not metered, but TRANSITION read each installation's capacity from a list of
+Feed-In Tariff installations. Flexpectation has no register that would carry it as far, for the
+reasons set out under "The challenge" above.
 
 **The published benchmarks we found of inferring capacity from the net flow work on individually
 metered premises, sit at a voltage level below NGED's, or do not say what aggregation they worked
@@ -1261,12 +1261,15 @@ leans on a neighbouring-customer comparison NGED cannot make.**
 [Cheung et al. (2023)](https://doi.org/10.1109/TSUSC.2022.3192456) use the consumption patterns of
 neighbouring customers known to have no panels, which NGED cannot observe, and Cheung et al. are the
 one study we found that varies the aggregation count on measured household data: across 5, 10, and
-20 Australian customers per aggregated series, the solar's mean absolute scaled error stays between
-1.56 and 2.20 — larger than the average change between consecutive readings — with solar mean
-absolute percentage error of 24 to 43%. Results reported elsewhere at an aggregate level are usually
-sums of individually metered households rather than a measurement taken at a real aggregation point,
-so the smart-meter literature stops far below the thousands of customers behind a GB primary
-substation.
+20 Australian customers per aggregated series, their own method's solar mean absolute scaled error
+stays between 1.02 and 1.28 — around the average change between consecutive readings — with solar
+mean absolute percentage error of 21 to 25%, and Cheung et al. report that both measures stayed
+"almost the same as aggregation level varied". The Kara-derived baseline they re-implemented for
+comparison degraded instead, from a mean absolute scaled error of 1.47 at 5 customers to 2.20 at 20,
+and from 28% to 43% mean absolute percentage error. Results reported elsewhere at an aggregate level
+are usually sums of individually metered households rather than a measurement taken at a real
+aggregation point, so the smart-meter literature stops far below the thousands of customers behind a
+GB primary substation.
 
 **Whether more customers behind a substation makes the estimate easier or harder is unsettled, and
 the one study we found that varies the aggregation count on a simulated feeder does not settle the
@@ -1276,8 +1279,9 @@ report "a general trend of increasing RMSE [root-mean-square error] values as th
 households increases". The rising root-mean-square error is weaker evidence than the trend first
 appears: the error is in kilowatts against a total capacity that itself rises with the household
 count, the percentage error moves the other way, and the trend reverses sharply between 70 and 80
-households. The load and the household count are real, but the solar is simulated at a single
-south-facing orientation, so every array in the study shares a profile that a real street would not.
+households. The load and the household count are real, but the solar is simulated at three azimuths,
+45°, 0°, and −45°, all of them southerly, so the study has none of the north- and east-west-facing
+roofs a real street would carry.
 
 #### What this means for Flexpectation
 
@@ -1296,10 +1300,10 @@ measurements, but needs each site's installed capacity.**
 carry complete renewable metering, then predict solar and wind power separately at substations with
 none, from the substation's measured total load, weather, geospatial position, and each site's known
 renewable capacity, at 15-minute resolution — a root-mean-square error of 0.07 against 0.70 for a
-default transfer-learning model, on a min-max-scaled target. The paper reads 0.07 as 7%, but does
-not say what the scaling divides by, so the figure does not transfer to another dataset. The 0.07
-should not be read as achievable here: Teng et al. are told each site's capacity, whereas inferring
-the capacity is half of what Flexpectation plans to achieve.
+default transfer-learning model, on a min-max-scaled target. The 0.07 reads as 7% only if the scale
+runs from 0 to 1, and Teng et al. do not say what the scaling divides by, so the figure does not
+transfer to another dataset. The 0.07 should not be read as achievable here: Teng et al. are told
+each site's capacity, whereas inferring the capacity is half of what Flexpectation plans to achieve.
 
 **Inferring the capacity from the net flow alone has been measured, at a smaller scale than
 NGED's.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark
@@ -1770,7 +1774,7 @@ so rather than being left blank.
 
 | Project | What the project forecasts | Scale | Horizon | Uncertainty published |
 |---|---|---|---|---|
-| [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) (Northern Powergrid) | Demand and customer export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondary substations | Day-ahead to 11 days at primary; week- to month-ahead at secondary | Half-hourly, with 5th-to-95th-percentile bands |
+| [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) (Northern Powergrid) | Demand and customer export at primary substations; active power at secondary | 551 primary substations with export data, 171 modelled; 729 secondary substations | Day-ahead to week-ahead at primary, evaluated to 11 days; week- to month-ahead at secondary | Half-hourly, with 5th-to-95th-percentile bands |
 | [SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) | Net load, split into demand and generation, then recombined | 13 primary substations, their bulk supply points, and their 33 kV and 11 kV feeders | 30 minutes to 10 days | A 40-member ICON-EU ensemble to 4 days, one deterministic forecast after that |
 | [NGED's EFFS](https://smarter.energynetworks.org/projects/wpden03/) | Grid supply points, bulk supply points, primary substation transformers, and generation sites | Across NGED's whole distribution network | 1 hour to 6 months | None |
 | [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) | The capacity of unmetered solar behind each primary substation, then that solar's generation | Not stated in what we read | Not stated in what we read | Not stated in what we read |
@@ -1901,10 +1905,10 @@ inferring unmetered solar and wind from a substation's net flow; and doing the s
 chargers, and batteries. Across every Artificial Forecasting deliverable published on the Smarter
 Networks Portal — Discovery, Alpha, and Beta, save one file that holds a single blank page —
 "abnormal", "unmetered", "apparent power", "non-directional", "blind source", and "source
-separation" return nothing at all; "capacity" appears 180 times but never as an effective or derated
-capacity; and the seven occurrences of a "switch" stem are generators switching off, switchgear
-asset types, and switching over a data feed. Heat pumps and electric vehicles do appear, as drivers
-of demand growth and as model features rather than as quantities separated out of a net flow.
+separation" return nothing at all; "capacity" appears 123 times but never as an effective or derated
+capacity; and the five occurrences of a "switch" stem are generators switching off, switchgear asset
+types, and switching over a data feed. Heat pumps and electric vehicles do appear, as drivers of
+demand growth and as model features rather than as quantities separated out of a net flow.
 Flexpectation also delivers 1st and 99th percentiles where Artificial Forecasting's published bands
 run from the 5th to the 95th, and the curtailment decisions NGED describes turn on those outer
 levels.
