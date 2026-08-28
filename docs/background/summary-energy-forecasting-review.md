@@ -1,10 +1,5 @@
 # The current state of the art in energy forecasting: a summary
 
-This is a short version of a literature review Open Climate Fix carried out for National Grid
-Electricity Distribution (NGED), as part of the Flexpectation project, funded through the Network
-Innovation Allowance. This summary stands on its own: every claim below is sourced from the
-reference list at the end.
-
 ## Summary
 
 **No honest review of the energy forecasting literature can name a canonical state of the art.**
@@ -1904,15 +1899,16 @@ so rather than being left blank.
 | [Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058) (Enedis, France) | Consumption and generation at the substation since 2015; the finer-grid method the paper describes covers consumption, not generation | All 2,300 high-voltage-to-medium-voltage substations, extending to 3,678 of the more than 5,000 transformers inside them, and towards 750,000 medium-to-low-voltage substations | Not stated in the paper; the forecasts run at 10- or 30-minute resolution | None stated in the paper |
 | **Flexpectation** | Net demand, with unmetered generation inferred | 32 series in the trial area; 52 grid supply points, 271 bulk supply points, and 1,161 primary substations across NGED's whole distribution network from 2027 | 14 days, updated every 6 hours | A 51-member ECMWF ensemble across the whole horizon |
 
-**SSEN's TRANSITION is the closest precedent we found for Flexpectation's method.** TRANSITION split
-each substation's net load — demand minus whatever generation behind that substation happened to
-produce — into demand and generation, forecast the two separately, then recombined them.
-Flexpectation adds an ensemble that spans the whole 14-day horizon, and deployment across a whole
-distribution network; TRANSITION set out to build neither. TRANSITION's ensemble covered the first 4
-days, so from day 4 to day 10 a single deterministic forecast was all TRANSITION had, and
-Flexpectation's forecast horizon runs to 14 days. And TRANSITION was a 13-substation trial rather
-than a deployment across a whole distribution network. The rest of TRANSITION's published design
-matches what Flexpectation is building.
+**[SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) (2018 - 2021; £14.5 million) is the
+closest precedent we found for Flexpectation's method.** TRANSITION split each substation's net load
+— demand minus whatever generation behind that substation happened to produce — into demand and
+generation, forecast the two separately, then recombined them. Flexpectation adds an ensemble that
+spans the whole 14-day horizon, and deployment across a whole distribution network; TRANSITION set
+out to build neither. TRANSITION's ensemble covered the first 4 days, so from day 4 to day 10 a
+single deterministic forecast was all TRANSITION had, and Flexpectation's forecast horizon runs to
+14 days. And TRANSITION was a 13-substation trial rather than a deployment across a whole
+distribution network. The rest of TRANSITION's published design matches what Flexpectation is
+building.
 
 **NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost, which
 its evaluation reported as the most accurate of the three methods tested and as easy to automate.**
@@ -1950,18 +1946,18 @@ deliberately, as the cases where the fixed-coefficient method is "the most relev
 difficult to outperform". Cordier et al. do not say what their percentage error is normalised by,
 and report that the complete pipeline has not yet been evaluated end to end.
 
-### Northern Powergrid's Artificial Forecasting is already operational, where Flexpectation is not
+### Northern Powergrid's Artificial Forecasting is already operational
 
 **Northern Powergrid's Artificial Forecasting is the closest concurrent project we found to
-Flexpectation.**
-[Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) is an Ofgem
-Strategic Innovation Fund programme, with about £3.9 million of grant across its three phases, run
-by Northern Powergrid with Faculty, EV.energy, and Oaktree Power, the final Beta phase running to
-February 2027. The Beta deliverables that the rest of this section draws on sit under a
-[separate project registration](https://smarter.energynetworks.org/projects/10145998/) from the
-Alpha ones. Artificial Forecasting does much of what Flexpectation does at primary substations, and
-also covers secondary substations, which Flexpectation does not. At the time of writing, Artificial
-Forecasting is further ahead than Flexpectation.
+Flexpectation.** [Artificial
+Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) is an Ofgem Strategic
+Innovation Fund (SIF) programme, with about £3.9 million of grant across its three phases, run by
+Northern Powergrid with Faculty, EV.energy, and Oaktree Power, the final Beta phase running to
+February 2027. The Beta deliverables that the rest of this section draws on sit under a [separate
+project registration](https://smarter.energynetworks.org/projects/10145998/) from the Alpha
+deliverables. Artificial Forecasting does much of what Flexpectation does at primary substations,
+and also covers secondary substations, which Flexpectation does not. At the time of writing,
+Artificial Forecasting is further ahead than Flexpectation.
 
 **Artificial Forecasting has run operationally through a full winter flexibility procurement
 cycle.** A forecasting service for primary substations is deployed and has passed Northern
@@ -1971,18 +1967,17 @@ through a full winter flexibility procurement cycle to support week-ahead dispat
 service produces half-hourly probabilistic forecasts with 5th-to-95th-percentile bands, flags
 forecast exceedances of firm capacity, and is benchmarked against Northern Powergrid's existing
 growth-based and persistence methods and a rolling 4-week baseline. The deliverable states that
-performance did not materially degrade on average across the 11-day horizon. The deliverable does
-not publish the figures behind that statement.
+performance did not materially degrade on average across the 11-day horizon. 
 
 **Artificial Forecasting's value case puts whole-life net present value at around £60 million for
 one distribution network operator, or £250 million if three further operators adopt Artificial
 Forecasting.** The net present value comes from a 3% reduction in spending on reinforcement —
 building bigger transformers and cables — in the current price-control period, rising to 6% in the
-next, and from a 25% improvement in the cost-effectiveness of contracted flexibility. None of the
-four benefit categories in Artificial Forecasting's benefits assessment is curtailment. The forecast
-covers customer export at primary substations, but the one published value case in this review puts
-no money on curtailment, which NGED now values alongside the flexibility it procures. The project
-pairs those figures with a direct caveat: it reports early Beta evidence, from one winter
+next, and from a 25% improvement in the cost-effectiveness of contracted flexibility. Curtailment is
+not included in Artificial Forecasting's four benefit categories. The forecast covers customer
+export at primary substations, but the one published value case in this review puts no money on
+curtailment, which NGED values alongside the flexibility it procures. The Artificial Forecasting
+project pairs those figures with a direct caveat: it reports early Beta evidence, from one winter
 procurement cycle, supporting the performance assumptions behind the value case, which "remains
 appropriate, subject to further validation".
 
@@ -1992,29 +1987,27 @@ half-hourly probabilistic substation forecast, and that a benefits case has been
 Because Artificial Forecasting is public, operational, and benchmarked against a real incumbent
 method, Artificial Forecasting is also the clearest example we found of what "working" looks like.
 Artificial Forecasting's core intellectual property is to be made available royalty-free to other GB
-distribution network operators, and we would rather build on that intellectual property than rebuild
-it — a shared evaluation protocol between two GB distribution network operators would be worth more
-to both than two separate protocols.
+distribution network operators.
 
 **Flexpectation is nonetheless attempting more than Artificial Forecasting's published deliverables
-describe, which is the case for running both.** The two projects overlap on forecasting net demand
-at primary substations and on forecasting metered generation. Artificial Forecasting's Beta
-registration also claims load disaggregation as an innovation — "a novel approach to forecasting HV
-[high-voltage] load, separately modelling gross demand and distributed generation" — but the
-deliverables we read describe forecasting two series that are each already measured. The Beta annual
-progress report produces net demand "by independently modelling customer export data", the Alpha
-technical report covers "all 160 substations where both gross demand and customer export data were
-available", and the Embedded Capacity Register enters the model as an input feature, listing what is
-registered rather than estimating what is not. Flexpectation's challenges 8 and 9 are the different
-problem of inferring an unmetered generator's half-hourly output from a substation's net flow, which
-is blind source separation. Two more of Flexpectation's challenges do have a counterpart in
-Artificial Forecasting's deliverables. The Beta annual progress report describes automated health
-checks and dashboards that "highlight substations where input data is degraded (e.g. faulty sensors,
-frozen or anomalous values)" and an extract-transform-load pipeline that "flags frozen/spiky SCADA
-[supervisory control and data acquisition] data before modelling", which is challenge 6; and the
-Alpha user research treats planned and unplanned outages as data worth bringing in and as a reason
-to widen the error margin, which is a different response to challenge 4's problem rather than no
-response.
+describe.** The two projects overlap on forecasting net demand at primary substations and on
+forecasting metered generation. Artificial Forecasting's Beta registration also claims load
+disaggregation as an innovation — "a novel approach to forecasting HV [high-voltage] load,
+separately modelling gross demand and distributed generation" — but the deliverables we read
+describe forecasting two series that are each already measured. The Beta annual progress report
+produces net demand "by independently modelling customer export data", the Alpha technical report
+covers "all 160 substations where both gross demand and customer export data were available", and
+the Embedded Capacity Register enters the model as an input feature, listing what is registered
+rather than estimating what is not. In contrast, Flexpectation's challenges 8 and 9 are the
+different problem of inferring an unmetered generator's half-hourly output from a substation's net
+flow, which is blind source separation. Two more of Flexpectation's challenges do have a counterpart
+in Artificial Forecasting's deliverables. The Artificial Forecasting Beta annual progress report
+describes automated health checks and dashboards that "highlight substations where input data is
+degraded (e.g. faulty sensors, frozen or anomalous values)" and an extract-transform-load (ETL)
+pipeline that "flags frozen/spiky SCADA [supervisory control and data acquisition] data before
+modelling", which is Flexpectation's challenge 6; and the Alpha user research treats planned and
+unplanned outages as data worth bringing in and as a reason to widen the error margin, which is a
+different response to challenge 4's problem rather than no response.
 
 **Five of Flexpectation's nine challenges have no counterpart we could find in Artificial
 Forecasting's published deliverables:** tracking the effective capacity of metered generators;
@@ -2022,34 +2015,33 @@ forecasting a substation as if it were always in its normal running arrangement,
 dropping the periods when it was not; recovering signed net demand from an apparent-power meter;
 inferring unmetered solar and wind from a substation's net flow; and doing the same for heat pumps,
 chargers, and batteries. Across every Artificial Forecasting deliverable published on the Smarter
-Networks Portal — Discovery, Alpha, and Beta, save one file that holds a single blank page —
-"abnormal", "unmetered", "apparent power", "non-directional", "blind source", and "source
-separation" return nothing at all; "capacity" appears 123 times but never as an effective or derated
-capacity; and the five occurrences of a "switch" stem are generators switching off, switchgear asset
-types, and switching over a data feed. Heat pumps and electric vehicles do appear, as drivers of
-demand growth and as model features rather than as quantities separated out of a net flow.
-Flexpectation also delivers 1st and 99th percentiles where Artificial Forecasting's published bands
-run from the 5th to the 95th, and the curtailment decisions NGED describes turn on those outer
-levels.
+Networks Portal — Discovery, Alpha, and Beta — searches for "abnormal", "unmetered", "apparent
+power", "non-directional", "blind source", and "source separation" return nothing at all; "capacity"
+appears 123 times but never as an effective or derated capacity; and the five occurrences of a
+"switch" stem are generators switching off, switchgear asset types, and switching over a data feed.
+Heat pumps and electric vehicles do appear, as drivers of demand growth and as model features rather
+than as quantities separated out of a net flow. Flexpectation also delivers 1st and 99th percentiles
+where Artificial Forecasting's published bands run from the 5th to the 95th, and the curtailment
+decisions NGED describes turn on those outer levels.
 
 ## Why we think this ambitious plan can be done
 
-**Measured against the studies we found, the plan sits outside the published literature in five ways
-at once.** The distance between Flexpectation's plan and the published literature says more about
-where our search fell short than about the quality of the work that fills the rest of the field. No
-study in this review drives a substation forecast from a weather ensemble across a 14-day horizon.
-No study we read models the tails explicitly at substation level; the one study that models them
-explicitly at all works on regions far larger than a substation. No study we read puts unmetered
-generation inside a probabilistic forecast at substation level over a multi-day horizon, though
-unmetered generation, probabilistic forecasting at substation level, and a multi-day horizon each
-exist on their own. No study we read tracks the available capacity of a mixed fleet of solar, wind,
-and dispatchable generators at one distribution network, or measures whether doing so improves the
-forecast. No study we read turns switching-contaminated history at a substation into a useful input
-rather than deleting it, rewriting it, or absorbing the accuracy loss of leaving it in; the nearest
-precedent, [Liu et al. (2019)](https://doi.org/10.1109/ACCESS.2019.2951422), conditions a forecast
-on an operating-state label, but for switching between transformers inside one substation, where the
-substation total stays metered throughout. Flexpectation attempts all nine challenges above, across
-four families of model:
+**Measured against the studies we found, the plan for Flexpectation sits outside the published
+literature in five ways at once.** The distance between Flexpectation's plan and the published
+literature says more about where our search fell short than about the quality of the work that fills
+the rest of the field. No study in this review drives a substation forecast from a weather ensemble
+across a 14-day horizon. No study we read models the tails explicitly at substation level; the one
+study that models them explicitly at all works on regions far larger than a substation. No study we
+read puts unmetered generation inside a probabilistic forecast at substation level over a multi-day
+horizon, though unmetered generation, probabilistic forecasting at substation level, and a multi-day
+horizon each exist on their own. No study we read tracks the available capacity of a mixed fleet of
+solar, wind, and dispatchable generators at one distribution network, or measures whether doing so
+improves the forecast. No study we read turns switching-contaminated history at a substation into a
+useful input rather than deleting it, rewriting it, or absorbing the accuracy loss of leaving it in;
+the nearest precedent, [Liu et al. (2019)](https://doi.org/10.1109/ACCESS.2019.2951422), conditions
+a forecast on an operating-state label, but for switching between transformers inside one
+substation, where the substation total stays metered throughout. Flexpectation attempts all nine
+challenges above, across four families of model:
 
 - a heavily-tuned version of the gradient-boosting approach that won the tabular forecasting competitions reviewed above, and which NGED's own EFFS project independently selected;
 - weather and time encoders pre-trained on large datasets, so that a model for one substation can
@@ -2065,8 +2057,8 @@ four families of model:
 work.** Almost every study reviewed above takes on one of the nine challenges, at one voltage level,
 with one family of model; the few that touch more than one almost all solve those challenges as a
 pipeline rather than together. Pre-training weather and time encoders and then reading a
-substation's probabilistic forecast off them would be a full study by that standard, and so would
-each of the other three strands. Sizing the four strands as separate studies scopes the work rather
+substation's probabilistic forecast off them would be a full paper by that standard, and so would
+each of the other three strands. Sizing the four strands as separate papers scopes the work rather
 than promising an output — how many of the strands survive contact with the data is exactly what the
 project has to find out.
 
