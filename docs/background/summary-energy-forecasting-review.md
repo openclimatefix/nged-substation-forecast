@@ -1097,33 +1097,35 @@ that explains the soft floor with demand that was never there.
 
 #### The challenge
 
-Rooftop panels and small wind turbines appear only as a dent in a substation's net power flow.
+Rooftop solar panels and small wind turbines appear only as a dent in a substation's net power flow.
 Recovering both the half-hourly output of that unmetered generation and its installed capacity, from
-the net flow alone, is what we call *disaggregation*. Disaggregation is a different task from estimating how much of a *metered* generator's capacity is available today, which is challenge 3.
+the substation's net flow alone, is what we call *disaggregation*. Disaggregation is a different
+task from estimating how much of a *metered* generator's capacity is available today, which is
+challenge 3.
 
-NGED cannot look the missing capacity up. NGED's Embedded Capacity Register records generation of 50
-kW and above and names the primary substation each site sits behind, which is the level
-Flexpectation forecasts at, but the capacity recorded is the export limit "permitted as per the
-connection agreement" rather than what a site can generate. Below 50 kW the register is silent, and
-that is where most of the panels are: of the 22,560 MW of solar photovoltaic capacity installed in
-GB by the end of July 2026, 8,503 MW — 38% of the total — sits in arrays smaller than 50 kW, spread
-across 2,058,822 of the 2,068,186 installations, on the Department for Energy Security and Net
-Zero's
-[solar deployment statistics](https://www.gov.uk/government/statistics/solar-photovoltaics-deployment).
-The other registers each cover part of the gap: the Renewable Energy Planning Database is
-planning-driven and starts at 150 kW, the Feed-In Tariff register stopped taking new applicants in
-2019, and a domestic array reaches NGED only when the installer notifies NGED, as installers are
-required to do. Ofgem's December 2025
-[consultation on asset visibility](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
+**DNOs do now know exactly how much capacity is installed**. NGED's Embedded Capacity Register
+records generation of 50 kW and above and names the primary substation each site sits behind
+but the capacity recorded is the export limit "permitted as
+per the connection agreement" rather than what a site can generate. Below 50 kW the register is
+silent, and that is where most of the panels are: of the 22,560 MW of solar photovoltaic capacity
+installed in GB by the end of July 2026, 8,503 MW — 38% of the total — sits in arrays smaller than
+50 kW, spread across 2,058,822 of the 2,068,186 installations, on the Department for Energy Security and Net Zero's [solar deployment statistics](https://www.gov.uk/government/statistics/solar-photovoltaics-deployment). The other registers each cover part of the gap. The Renewable Energy Planning Database tracks projects through the planning system and starts at 150 kW, a threshold lowered from 1 MW only in 2021, so smaller projects that cleared planning before 2021 may be absent. The Feed-In Tariff register closed to new applicants on 1 April 2019. And a domestic array reaches NGED only when the installer notifies NGED, as installers are required to do. Ofgem's
+December 2025 [consultation on asset
+visibility](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
 estimates that distribution network operators "are aware of less than half" of the consumer and
-distributed energy resources on their networks, a figure the Department for Energy Security and Net
-Zero attributes to the operators' own engagement rather than to a measurement. None of these registers records the panel tilt, the panel azimuth, or the ratio of direct-current to alternating-current rating.
+distributed energy resources on their networks, a figure Ofgem attributes to the Department for Energy Security and Net Zero's engagement with the operators rather than to a measurement, and which that department's own footnote traces to estimates the operators derived from other datasets, from sales volumes, and from grants processed. None of these
+registers records the panel tilt, the panel azimuth, or the ratio of direct-current to
+alternating-current rating.
 
-The register now being built will not close the gap either. Ofgem appointed Elexon in 2025 to
-deliver Flexibility Market Asset Registration, digital infrastructure due by the third quarter of
-2027 that will collect, store and share data on assets participating in flexibility markets, aimed
-first at assets under 1 MW. Its inclusion criterion is close to the complement of this challenge's
-problem. Ofgem's design collects data on assets "when they are first registered into a DSO or NESO
+One register being built now is worth ruling out explicitly, because the register sounds as though
+it should help. Ofgem
+[appointed Elexon in 2025](https://www.ofgem.gov.uk/decision/decision-flexibility-market-asset-registration)
+to deliver Flexibility Market Asset Registration, digital infrastructure due by the third quarter of
+2027 that will collect, store, and share data on assets participating in flexibility markets, aimed
+first at assets under 1 MW. That register's inclusion criterion is close to the complement of this
+challenge's problem. Ofgem's
+[asset visibility consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
+says the register collects data on assets "when they are first registered into a DSO or NESO
 flexibility market" — the market of a distribution system operator, or of the National Energy System
 Operator — so a rooftop array that never trades flexibility never enters the register, and the
 arrays this challenge has to find are the ones nobody has registered anywhere. Where an asset does
@@ -1243,32 +1245,33 @@ without uncertainty.** NESO publishes
 half-hourly to 14 days ahead, the same resolution and horizon Flexpectation delivers. The forecast
 is a single number per half-hour, with no uncertainty attached, and the forecast covers GB as one region rather than substation by substation.
 
-**Fields that have separated superposed signals for decades agree on one warning: a small residual
-against the measured total is not evidence that the components were separated correctly.** Fitting a
-sum of physically parameterised components to one measurement is routine in observational cosmology,
-where the technique is called component separation.
+**Two fields that have separated superposed signals for decades give the same warning: a small
+residual against the measured total is not evidence that the components were separated correctly.**
+Fitting a sum of physically parameterised components to one measurement is routine in observational
+cosmology, where the technique is called component separation.
 [Hensley and Bull (2018)](https://doi.org/10.3847/1538-4357/aae69c) show that giving the *nuisance*
 component too simple a model biases the component of interest, and that the fit does not announce
-the bias: "models that are strongly biased but still yield low chi-squared values are the most
-dangerous". Two things follow for Flexpectation. Effort spent making the demand model richer is
-justified on separation grounds even where it does not improve the fit to the substation's net flow,
-and the diagnostic to watch is the joint distribution over the components rather than the residual.
+the bias: "models that are strongly biased but still yield low χ² values are the most dangerous".
+Two consequences follow for Flexpectation. Effort spent making the demand model richer is justified
+on separation grounds even where it does not improve the fit to the substation's net flow, and the
+diagnostic to watch is the joint distribution over the components rather than the residual.
 [Wieland et al. (2021)](https://doi.org/10.1016/j.coisb.2021.03.005) add the matching warning about
 uncertainty: confidence intervals read off the curvature at the optimum, which a differentiable
 model gives cheaply, are "insensitive to practical non-identifiabilities" and can look reassuringly
 finite for a parameter the data do not constrain at all.
 
-**The condition under which such a fit is identifiable at all is that each component is observed
-alone somewhere, and Flexpectation can test whether that condition holds before fitting anything.**
+**The condition those fields lean on for identifiability is that each component is observed alone
+somewhere, and Flexpectation can test whether that condition holds before fitting anything.**
 Hyperspectral unmixing, which splits one mixed image pixel into the spectra of the materials
-composing it, states the condition as the pure-pixel assumption: for each component there is at
-least one observation containing only that component.
-[Bioucas-Dias et al. (2012)](https://doi.org/10.1109/JSTARS.2012.2194696) show that on a data set
-holding no such observations the recovered components come out systematically too small, rather than
-merely uncertain. Flexpectation's pure observations are the half-hours when nature switches one
-component off — night for solar, calm hours for wind, and the substations carrying no embedded
-generation at all — so whether a given substation has them is a question the telemetry can answer on
-its own.
+composing it, calls the condition the pure-pixel assumption: for each component there is at least
+one observation containing only that component.
+[Bioucas-Dias et al. (2012)](https://doi.org/10.1109/JSTARS.2012.2194696) set out a weaker
+sufficient condition too, and show what happens when neither holds — on a highly mixed data set with
+no observations near the extremes, the fitted simplex comes out smaller than the true one, so the
+recovered components are biased rather than merely uncertain. Flexpectation's pure observations are
+the half-hours when nature switches one component off — night for solar, calm hours for wind, and
+the substations carrying no embedded generation at all — so whether a given substation has them is a
+question the telemetry can answer on its own.
 
 ### 9. Disaggregating other distributed energy resources: heat pumps, electric-vehicle chargers, and batteries
 
@@ -1919,6 +1922,7 @@ phase](https://smarter.energynetworks.org/projects/npg_sif_006-1/).
 Data](https://smarter.energynetworks.org/projects/npg_nia_-49/).
 - Northern Powergrid (2025). [Artificial Forecasting, Beta
 phase](https://smarter.energynetworks.org/projects/10145998/).
+- Ofgem (2025). [Decision: flexibility market asset registration](https://www.ofgem.gov.uk/decision/decision-flexibility-market-asset-registration).
 - Ofgem (2025). [Enhancing asset visibility: Distribution Network Operator options
 consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf).
 - Ostermann, A. and Haug, T. (2024). [Probabilistic forecast of electric vehicle charging demand:
