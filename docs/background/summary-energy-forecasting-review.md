@@ -1090,19 +1090,39 @@ that explains the soft floor with demand that was never there.
 
 #### The challenge
 
-Rooftop panels and small turbines appear only as a dent in a substation's net flow. Recovering both
-the half-hourly output of that unmetered generation and its installed capacity, from the net flow
-alone, is what we call *disaggregation*. Disaggregation is a different task from estimating how much
-of a *metered* generator's capacity is available today, which is challenge 3. Disaggregation is a
-stretch goal for the trial area and a requirement for the network-wide scale-up.
+Rooftop panels and small wind turbines appear only as a dent in a substation's net power flow.
+Recovering both the half-hourly output of that unmetered generation and its installed capacity, from
+the net flow alone, is what we call *disaggregation*. Disaggregation is a different task from
+estimating how much of a *metered* generator's capacity is available today, which is challenge 3.
 
 #### What the literature says
 
-**Splitting generation out of a substation's net flow has been done where the generation is metered,
-or where the generation's capacity is read from a register.** Inferring the capacity from the net
-flow instead has also been done, but at low-voltage substations serving tens of customers rather
-than at a primary. Uncertainty and a multi-day horizon each appear in the disaggregation literature,
-but never together.
+**Splitting generation out of a substation's net flow has been done at GB primary substations, but
+in the projects we found the generation was either metered or its capacity read from a register,
+rather than inferred from the net flow.** Northern Powergrid's
+[Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) models gross
+demand and customer export independently at primary substations, but that customer export is
+metered, and the generation baseline Artificial Forecasting works against comes from Northern
+Powergrid's own installed-capacity projection per substation.
+[SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/) split net load into demand and
+generation, forecast the two separately, and recombined them; TRANSITION's rooftop solar is not
+metered, but TRANSITION read each installation's capacity from a list of Feed-In Tariff
+installations. Reading a capacity out of a subsidy register is the step Flexpectation cannot take,
+because the Feed-In Tariff register stopped being complete when the Feed-In Tariff closed.
+
+**Inferring the capacity from the net flow instead has been measured only a voltage level below
+NGED's.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark that
+inference at low-voltage substations serving tens of customers rather than at a primary. UK Power
+Networks' [Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/)
+is inferring the capacity behind GB primary substations now, and is still running.
+
+**Uncertainty and a multi-day horizon each appear in the disaggregation work we found, but never in
+the same forecast.** [Zhang et al. (2022)](https://doi.org/10.1016/j.engappai.2022.104707) do the
+probabilistic half, disaggregating rooftop solar out of net load at grid supply point and feeder
+level with a multi-quantile recurrent neural network, scored on reliability and sharpness. NESO's
+[embedded wind and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts)
+do the multi-day half, half-hourly to 14 days ahead, as a single number per half-hour with no
+uncertainty attached.
 
 #### What this means for Flexpectation
 
@@ -1835,6 +1855,8 @@ Optimization](https://doi.org/10.1002/we.70136). *Wind Energy*.
 Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/).
 - Western Power Distribution (2021). [Electricity Flexibility and Forecasting System
 (EFFS)](https://smarter.energynetworks.org/projects/wpden03/).
-- Willis, H. L., Powell, R. D. and Wall, D. L. (1984). [Load Transfer Coupling Regression
-Curve Fitting for Distribution Load Forecasting](https://doi.org/10.1109/TPAS.1984.318713).
-*IEEE Transactions on Power Apparatus and Systems*.
+- Willis, H. L., Powell, R. D. and Wall, D. L. (1984). [Load Transfer Coupling Regression Curve Fitting for Distribution Load Forecasting](https://doi.org/10.1109/TPAS.1984.318713). *IEEE Transactions on Power Apparatus and Systems*.
+- Zhang, X. Y., Watkins, C. and Kuenzel, S. (2022). [Multi-quantile recurrent neural network for
+feeder-level probabilistic energy disaggregation considering roof-top solar
+energy](https://doi.org/10.1016/j.engappai.2022.104707). *Engineering Applications of Artificial
+Intelligence*.
