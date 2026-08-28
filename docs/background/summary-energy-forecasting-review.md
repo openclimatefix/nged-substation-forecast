@@ -1790,22 +1790,20 @@ forecaster, it should be remembered that even periods of several months may stil
 in terms of who the best forecaster truly is." HEFTCom's own competition period was 3 months.
 
 **A leaderboard with no outside entrants cannot support two kinds of claim the competitions above
-can, and Flexpectation should not make them.** Two kinds of claim the benchmarks above can make,
-Flexpectation's leaderboards cannot. The Critical Assessment of Structure Prediction (CASP)
-competition's 14-year plateau in one of its scored categories
-([Kryshtafovych et al. (2021)](https://doi.org/10.1002/prot.26237)) is evidence about the difficulty
-of protein structure prediction only because dozens of groups were attacking the problem
-independently. A plateau on our leaderboard would be ambiguous between a hard problem and a team
-that did not think of the right idea. The first M-competition's conclusions about whole classes of
-method — that statistically sophisticated or complex methods do not typically forecast more
-accurately than simpler ones, which the M3 competition did not go on to support, and that a
-combination of several methods forecasts more accurately, on average, than the individual methods
-going into the combination ([Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) —
-describe what many independent people chose to try, and no single team's leaderboard can support a
-conclusion about a whole class of method. What our leaderboard can do is narrower and still worth
-having: show which approaches beat a stated baseline on NGED's own data, under one protocol, with
-the forecasts, the metric definitions, and the code published so that anyone can check the
-arithmetic or rerun the comparison themselves.
+can, and Flexpectation should not make them.** The Critical Assessment of Structure Prediction
+(CASP) competition's 14-year plateau in one of its scored categories ([Kryshtafovych et al.
+(2021)](https://doi.org/10.1002/prot.26237)) is evidence about the difficulty of protein structure
+prediction only because dozens of groups were attacking the problem independently. A plateau on our
+leaderboard would be ambiguous between a hard problem and a team that did not think of the right
+idea. The first M-competition's conclusions about whole classes of method — that statistically
+sophisticated methods do not typically forecast more accurately than simpler ones, which
+the M3 competition did not go on to support, and that a combination of several methods forecasts
+more accurately, on average, than the individual methods going into the combination ([Hyndman
+(2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) — describe what many independent people
+chose to try, and no single team's leaderboard can support a conclusion about a whole class of
+method. What our leaderboard can do is narrower and still worth having: show which approaches beat a
+stated baseline on NGED's own data, under one protocol, with the forecasts, the metric definitions,
+and the code published so that anyone can check the arithmetic or rerun the comparison themselves.
 
 ## Three published results that point against this project's plan
 
@@ -1814,18 +1812,36 @@ rather than avoid them.
 
 ### Finer-grained weather data has not always improved the forecast
 
-[Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) added spatial statistics derived from
-gridded numerical weather prediction to their model of 14 grid supply point groups in GB. Adding
-those spatial statistics improved the score significantly in 2 of the 14 regions, worsened the score
-significantly in 3, and made no measurable difference in the remaining 9. Weather itself mattered a
-great deal to their model — adding wind and irradiance cut their pinball loss — the single-quantile
-equivalent of the continuous ranked probability score — by 40% overall, by 60% in North Scotland,
-and by 10% in London — so the question is not whether weather matters but whether *finer* weather
-does. Artificial Forecasting obtained postcode-level weather forecasts for two wind-connected
-primary substations after the deliverable reported that its wind-connected models had performed
-poorly, and found that the postcode-level forecasts "did not notably improve model performance". The
-deliverable nonetheless names better weather data as a next step, without saying what would be
-better than postcode-level.
+[Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) forecast day-ahead net load — demand
+minus embedded generation — half-hourly for each of GB's 14 grid supply point groups over 2014 to
+2018, from the European Centre for Medium-Range Weather Forecasts' high-resolution run issued at
+midnight and available around 06:00 UTC. The model Browell and Fasiolo were trying to improve
+already used the weather across the whole of each region: wind speed and solar irradiance averaged
+over the numerical weather prediction cells covering the region, alongside a temperature forecast
+taken from the single cell of highest population density. What Browell and Fasiolo added on top was
+the *spread* of the weather across those cells — the spatial standard deviation, minimum, and
+maximum of the gridded fields. Measured by the Diebold-Mariano test against the same model without
+the spread features, adding them improved the pinball score significantly in 2 of the 14 regions,
+worsened the pinball score significantly in 3, and made no significant difference in the remaining
+9. Browell and Fasiolo report that cross-validation had suggested a small gain which "is not
+consistently reproduced on test data and therefore inconclusive", and conclude that gridded
+numerical weather prediction "does not appear to add significant value to deterministic and
+probabilistic net-load forecasts in the present framework" — while allowing that "it is possible
+that other forecasting methods would be able to extract value from this data by constructing
+different features".
+
+Weather itself mattered a great deal to their model. Adding the regionally-averaged wind and
+irradiance to a model carrying only calendar features and the point temperature cut the pinball
+score — the single-quantile equivalent of the continuous ranked probability score — by 40% overall,
+by 60% in North Scotland, where embedded wind capacity exceeds peak load, and by 10% in Greater
+London, where there is little embedded generation. So the question this result puts to Flexpectation
+is not if weather matters but if the spread of the weather across a region does.
+
+Artificial Forecasting obtained postcode-level weather forecasts for two wind-connected primary
+substations after the deliverable reported that its wind-connected models had performed poorly, and
+found that the postcode-level forecasts "did not notably improve model performance". The deliverable
+nonetheless names better weather data as a next step, without saying what would be better than
+postcode-level.
 
 ### Weather improved low-voltage forecasts less than expected in the past
 
