@@ -1513,34 +1513,36 @@ change of country degrading it further still.
 
 **For Flexpectation version 1: heat pumps, chargers, and batteries stay inside net demand rather
 than being forecast separately.** In the one measurement we found, the only site size that clearly
-beat a naive benchmark 24 hours ahead was 145 charge points. Forecast uncertainty grows with lead time, so over the 14 days NGED needs, a site would probably have to be larger than 145 charge points before a separate charger forecast was worth making.
+beat a naive benchmark 24 hours ahead was 145 charge points. Forecast uncertainty grows with lead
+time, so over the 14 days NGED needs, a site would probably have to be larger than 145 charge points
+before a separate charger forecast was worth making.
 
-**Flexpectation version 2 plans to invert which half of the problem is learned: the disaggregation
-methods in this challenge's literature learn each resource's signature from premises where that
-resource is separately metered, whereas a differentiable physical model of each distributed energy
-resource writes the physics down and learns only the parameters.** Gao et al. train on the Pecan
-Street homes' individually metered appliances, Brudermueller et al. on 363 Swiss houses each fitted
-with a second meter on the heat pump, and Gisiger et al. on 7,021 Swiss premises with heat pumps,
-while Ebrahimi et al. need the charging power and stored energy of 19 vehicles metered live.
-Exogenous inputs already appear in that work — Ebrahimi et al. take the hourly energy price and the
-ambient temperature, and Gisiger et al. find detection easier in colder weeks — but each paper uses
-those inputs as features feeding a mapping learned from metered examples, so what the model knows
-about a heat pump is what heat pumps looked like in the training set. A differentiable physical
-model states the relationship between outdoor temperature and heat-pump electrical demand as an
-equation instead, and fits the building's parameters. The measured argument for that inversion sits
-in this challenge's own literature: Gisiger et al.'s error, normalised by the mean metered heat-pump
-load, rose from 0.69 on the data the model was trained on to 1.24 on a German dataset, which Gisiger
-et al. attribute to differences in heat pump types, building stock, occupancy patterns, and data
-collection methods — differences that change a learned signature but not the equations behind that
-signature. The inversion also supplies the separability an aggregate needs, because each resource
-answers to a different driver: outdoor temperature moves the heat pumps, irradiance and panel
-orientation move the solar, and price moves the batteries. Whether a given substation's mixture is
-separable in practice is a property of the measurements rather than of the optimiser, which is the
-test challenge 8 borrows from exploration geophysics and from hyperspectral unmixing. Two limits
-ride along: the thermal physics of the thousands of premises behind a primary substation is not one
-building's physics repeated, and a differentiable physical model removes the need for submetered
-training examples at every substation without removing the need for something to check the answer
-against.
+**Compared to the literature we found, Flexpectation version 2 plans to invert which half of the
+problem is learned: the disaggregation methods in this challenge's literature learn each resource's
+signature from premises where that resource is separately metered, whereas we plan to use a
+differentiable physical model of each distributed energy resource where we write the physics in code
+and learn only the parameters.** Gao et al. train on the Pecan Street homes' individually metered
+appliances, Brudermueller et al. on 363 Swiss houses each fitted with a second meter on the heat
+pump, and Gisiger et al. on 7,021 Swiss premises with heat pumps, while Ebrahimi et al. need the
+charging power and stored energy of 19 vehicles metered live. Exogenous inputs already appear in
+that work — Ebrahimi et al. take the hourly energy price and the ambient temperature, and Gisiger et
+al. find detection easier in colder weeks — but each paper uses those inputs as features feeding a
+mapping learned from metered examples, so what the model knows about a heat pump is what heat pumps
+looked like in the training set. A differentiable physical model states the relationship between
+outdoor temperature and heat-pump electrical demand as an equation instead, and fits the building's
+parameters. The measured argument for that inversion sits in this challenge's own literature:
+Gisiger et al.'s error, normalised by the mean metered heat-pump load, rose from 0.69 on the data
+the model was trained on to 1.24 on a German dataset, which Gisiger et al. attribute to differences
+in heat pump types, building stock, occupancy patterns, and data collection methods — differences
+that change a learned signature but not the equations behind that signature. The inversion also
+supplies the separability an aggregate needs, because each resource answers to a different driver:
+outdoor temperature moves the heat pumps, irradiance and panel orientation move the solar, and price
+moves the batteries. Whether a given substation's mixture is separable in practice is a property of
+the measurements rather than of the optimiser, which is the test challenge 8 borrows from
+exploration geophysics and from hyperspectral unmixing. Two limits ride along: the thermal physics
+of the thousands of premises behind a primary substation is not one building's physics repeated, and
+a differentiable physical model removes the need for submetered training examples at every
+substation without removing the need for something to check the answer against.
 
 **The spiky, synchronised charging that makes electric-vehicle load hard to *forecast* is what makes
 that load easy to *detect* in aggregate, while heat pumps are hard to detect at all.** Northern
@@ -1576,12 +1578,13 @@ procurement or curtailment decisions, so a peak-aware score belongs alongside a 
 than instead of one.** A forecast that predicts the right peak at the wrong time is penalised twice
 by mean absolute error — once for the peak it predicted that did not happen, and once for the peak
 that did happen and the forecast missed. A flat, featureless forecast avoids both penalties.
-Meteorologists named that effect the double penalty, and the meteorologists' conclusion transfers to
-substation forecasting: a score that forgives a peak predicted an hour late is generally no longer a
-*proper scoring rule* — a score a forecaster cannot improve by publishing anything other than what
-they genuinely believe. The same argument runs at the other end of the distribution: the half-hours
-of deepest export are the ones curtailment turns on, and a flat forecast hides the deepest export
-half-hours too.
+Meteorologists named that effect the "double penalty", and the meteorologists' conclusion transfers
+to substation forecasting: a score that forgives a peak predicted an hour late is generally no
+longer a *proper scoring rule* — a score whose expected value is optimised when the forecaster
+publishes the predictive distribution the forecaster actually believes, so that no hedged forecast,
+flatter or later-peaking, scores better on average. The same argument runs at the other end of the
+distribution: the half-hours of deepest export are the ones curtailment turns on, and a flat
+forecast hides the deepest export half-hours too.
 
 **Two teams independently concluded that mean absolute error was the wrong measure for peaks.**
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) adopted a peak-aware error
