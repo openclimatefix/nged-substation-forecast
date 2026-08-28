@@ -1425,18 +1425,19 @@ Electric cars and heat pumps each rise roughly sixfold over those six years. "Be
 own class boundary, and NESO defines the class as generation and storage under 1 MW that therefore
 "includes some larger commercial installations", so the class is wider than the batteries that fall
 below the Embedded Capacity Register's 50 kW floor. How much of the 191 MW sits below that floor is
-a question the FES scenarios cannot answer. Ofgem's
-[asset visibility consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
-says the Microgeneration Certification Scheme's installation database certifies battery storage up
-to 50 kW, and the Department for Energy Security and Net Zero publishes
-[counts drawn from that database](https://www.gov.uk/government/statistics/mcs-certified-domestic-battery-installation-statistics):
+a question the FES scenarios cannot answer. Ofgem's [asset visibility
+consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
+says the Microgeneration Certification Scheme's (MCS) installation database certifies battery
+storage up to 50 kW, and the Department for Energy Security and Net Zero (DESNZ) publishes [counts
+drawn from the MCS
+database](https://www.gov.uk/government/statistics/mcs-certified-domestic-battery-installation-statistics):
 73,987 domestic retrofit battery installations between September 2023, when the series starts, and
 March 2026, rising from 24,242 in the 2024/25 financial year to 44,033 in 2025/26, with the 72,459
-installations that passed outlier testing holding 666,880 kWh between them. Those figures cannot be
-subtracted from the 191 MW, because the figures measure stored energy rather than power, count
-domestic retrofits rather than every installation below 50 kW, and accumulate from September 2023
-rather than reporting a stock. The series carries no projection, so the 2030 figure has no
-counterpart outside the FES scenarios.
+installations that passed outlier testing holding 666,880 kWh between them. The DESNZ figures cannot
+be subtracted from the FES figure of 191 MW, because the DESNZ figures measure stored energy rather
+than power, and count domestic retrofits rather than every installation below 50 kW, and accumulate
+from September 2023 rather than reporting a stock. The DESNZ series carries no projection, so the
+2030 figure has no counterpart outside the FES scenarios.
 
 Scaling the GB figures to NGED is only approximate. NESO's [regional breakdown of the 2024
 scenarios](https://www.neso.energy/data-portal/regional-breakdown-fes-data-electricity) allocates
@@ -1456,9 +1457,9 @@ individual site, the postal code, the transmission system operator's zone, and t
 Eight machine-learning and deep-learning models are set against a naive benchmark that predicts the
 average of the same quarter-hour on the same weekday. Of the five individual sites, only the one
 with 145 charge points beat that benchmark by a clear margin; at the site with 8 charge points some
-models beat it, and at the sites with 3, 4, and 14 charge points none did. On the topic of heat
-pumps, we found no measurement of heat-pump diversity in cold weather, and none of
-whether domestic batteries responding to a common price signal average out as more are added.
+models beat it, and at the sites with 3, 4, and 14 charge points none did. We found no papers
+discussing whether domestic batteries responding to a common price signal average out as more are
+added. On the topic of heat pumps, we found no measurement of heat-pump diversity in cold weather,
 
 **A targeted literature search for disaggregating heat pumps, chargers, and batteries from
 substation measurements found the work split by asset, and found "substation level" used for
@@ -1488,8 +1489,7 @@ the method family Kara et al. extended for solar under challenge 8, which sugges
 problem and the solar problem are the same problem with another component added. Of the Gao et al.
 and Wang et al. papers we hold Gao et al.'s abstract, introduction, and dataset description from the
 publisher's landing page, and Wang et al.'s abstract, so the Wang et al. citation carries no more
-weight than the existence of the work. Both full texts are closed on Unpaywall with no repository
-copy, as are the two nearest alternatives.
+weight than the existence of the work. Both full texts are closed.
 
 **The two heat-pump disaggregation papers we obtained separate a heat pump from the total load of
 the single premises the heat pump sits in, and the widest aggregate either paper reports is five
@@ -1511,12 +1511,11 @@ change of country degrading it further still.
 
 #### What this means for Flexpectation
 
-**The realistic Flexpectation version 1 position is that heat pumps, chargers, and batteries stay
-inside net demand rather than being forecast separately.** The one measurement we found says a
-day-ahead charger forecast only clearly beat a naive benchmark above about 100 charge points, and
-forecast uncertainty grows with lead time, so at the 14 days NGED needs, the charge-point threshold
-is likely to be higher rather than the same. The first deliverable on heat pumps, chargers, and
-batteries is reading the electrification literature properly, not a model.
+**For Flexpectation version 1: heat pumps, chargers, and batteries stay inside net demand rather
+than being forecast separately.** In the one measurement we found, the only site size that clearly
+beat a naive benchmark 24 hours ahead was 145 charge points. Forecast uncertainty grows with lead
+time, so over the 14 days NGED needs, a site would probably have to be larger than 145 charge points
+before a separate charger forecast was worth making.
 
 **The spiky, synchronised charging that makes electric-vehicle load hard to *forecast* is what makes
 that load easy to *detect* in aggregate, while heat pumps are hard to detect at all.** Northern
