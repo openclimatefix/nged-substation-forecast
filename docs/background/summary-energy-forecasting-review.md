@@ -1170,11 +1170,24 @@ metered, but TRANSITION read each installation's capacity from a list of Feed-In
 installations. Flexpectation has no register that would carry it as far, for the reasons set out
 under "The challenge" above.
 
-**The published benchmarks we found of inferring capacity from the net flow work on individually metered premises, or at a voltage level below NGED's, and the GB project doing the same at primary substations has not yet published a result.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark that
-inference at low-voltage substations serving tens of customers rather than at a primary. UK Power
-Networks' [Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/)
-project (with Open Climate Fix) infers solar photovoltaic capacity behind UK Power Networks' primary
-substations.
+**The published benchmarks we found of inferring capacity from the net flow work on individually
+metered premises, sit at a voltage level below NGED's, or do not say what aggregation they worked
+at, and the GB project doing the same at primary substations has not yet published a result.**
+[Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark that inference at
+low-voltage substations serving tens of customers rather than at a primary. UK Power Networks'
+[Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) project
+(with Open Climate Fix) infers solar photovoltaic capacity behind UK Power Networks' primary
+substations. [Kanchana et al. (2026)](https://doi.org/10.1016/j.epsr.2026.113279) separate load,
+photovoltaic generation, and energy storage from one aggregated net-load series, and report doing so
+"without requiring capital-intensive customer-level metering", which is NGED's position exactly. We
+hold the publisher's landing page for Kanchana et al. rather than the full text, and that page names
+no customer count, no country, no time resolution, and no comparison method, so how far the reported
+errors of 8.14% for load, 5.12% for photovoltaic generation, and 11.51% for storage would carry to a
+GB primary substation cannot be judged from what we have read. The same page says a generative
+adversarial network fills gaps in the load measurements while a variational autoencoder generates
+synthetic photovoltaic profiles, and that "observed net-load profiles are assembled to create
+validation scenarios", so whether the mixture being separated is one a meter recorded is a question
+the page leaves open.
 
 **The one result we found at a real distribution substation separated solar from demand using that
 substation's own reactive power.** [Kara et al. (2018)](https://doi.org/10.1016/j.segan.2017.11.001)
@@ -1226,6 +1239,15 @@ failure mode that matters most to Flexpectation, whose substations will carry ge
 no training substation had. The validation runs on 360 generated training samples covering two
 industrial loads and one solar generation, not on measurements from a real substation, and carries
 no forecast horizon.
+
+**Erdener et al.'s table of net-load disaggregation studies runs at individually metered premises or
+at a whole balancing area, with nothing in between.**
+[Erdener et al. (2022)](https://doi.org/10.1016/j.rser.2022.112224) tabulate eight studies that
+recover photovoltaic capacity, panel tilt, or panel azimuth by disaggregating net load. Seven work
+on individually metered premises — two photovoltaic plants in Switzerland, and customer sets of 40,
+100, 183, 197, 300, and 1,300 — and the eighth works on the zone of Independent System Operator New
+England that covers the state of Maine. A GB primary substation sits between those two aggregation
+levels, at a level Erdener et al.'s table does not cover.
 
 **A larger literature disaggregates rooftop solar from smart-meter data, but at individual premises
 rather than at a substation, and the methods lean on advantages NGED does not have.**
@@ -1305,8 +1327,47 @@ on separation grounds even where it does not improve the fit to the substation's
 diagnostic to watch is the joint distribution over the components rather than the residual.
 [Wieland et al. (2021)](https://doi.org/10.1016/j.coisb.2021.03.005) add the matching warning about
 uncertainty: confidence intervals read off the curvature at the optimum, which a differentiable
-model gives cheaply, are "insensitive to practical non-identifiabilities" and can look reassuringly
-finite for a parameter the data do not constrain at all.
+model gives cheaply, are "insensitive to practical non-identifiabilities" and can look reassuringly finite for a parameter the data do not constrain at all.
+
+**Fitting a differentiable physical forward model to measurements is routine in exploration
+geophysics, and that field reports that the order in which the fit admits fine detail decides
+whether the fit converges at all.** Full-waveform inversion recovers the properties of the rock
+beneath a seismic survey — chiefly the speed at which sound travels through each point of the
+subsurface — by simulating the seismograms those properties would produce and adjusting the
+properties until the simulation matches the recording, which is the procedure Flexpectation version
+2 applies to a substation's net flow. [Virieux and Operto (2009)](https://doi.org/10.1190/1.3238367)
+report a failure mode the field calls cycle skipping: because a seismogram oscillates, a starting
+model that mis-predicts an arrival by more than half a period leads the optimiser to match the wrong
+cycle, and "the so-called cycle-skipping artifacts will lead to convergence toward a local minimum".
+The remedy Virieux and Operto report as standard practice is a multi-scale schedule that inverts the
+low frequencies first, "because low frequencies are less sensitive to cycle-skipping artifacts",
+then admits successively higher frequencies, each stage starting from the model the previous stage
+produced. The arithmetic relating frequency to recovered detail belongs to wavefields and does not
+carry to a half-hourly power series, but the local-minimum mechanism does: a substation's net flow
+is periodic on a daily cycle, so fitting the slowest-varying structure of each component before
+admitting half-hourly detail is the transferable precaution.
+
+**Whether two simultaneously fitted components can be told apart is a property of the measurements
+rather than of the optimiser, and exploration geophysics tests for that coupling before fitting and
+orders the fit around the answer.** [Virieux and Operto (2009)](https://doi.org/10.1190/1.3238367)
+report that adding a second class of physical parameter makes the problem more ill-posed, because
+"more degrees of freedom are considered in the parameterization" and because "the sensitivity of the
+inversion can change significantly from one parameter class to the next", and that "different
+parameter classes can be more or less coupled as a function of the aperture angle" — the angle at
+which a source and a receiver view the same point in the rock. Coupling of that kind "can be
+assessed by plotting the radiation pattern of each parameter class", so the field tests separability
+in advance rather than discovering it afterwards. Where the speed of sound and the rock's density
+carry the same signature at short apertures, "these two parameters are difficult to reconstruct from
+short-offset data", and Virieux and Operto cite a study concluding that the speed of sound and the
+rock's absorption "cannot be imaged simultaneously from short-aperture data". The response Virieux
+and Operto report is to order the parameter classes rather than run the joint fit for longer: one
+study they cite recommends fitting the speed of sound, denoted VP, alone first and fitting the speed
+of sound with the absorption jointly second, "because the reliability of the attenuation
+reconstruction strongly depends on the accuracy of the starting VP model". One limit rides along: a
+seismic survey chooses where to put its sources and its receivers, and the long offsets and wide
+apertures that break the coupling are a design choice, whereas Flexpectation takes the telemetry
+NGED already collects, so what transfers is the test for coupling and the fitting order rather than
+the survey design.
 
 **The condition cosmology and hyperspectral unmixing lean on for identifiability is that each
 component is observed alone somewhere, and Flexpectation can test whether that condition holds
@@ -1366,6 +1427,13 @@ electric-vehicle charging. Gao et al.'s aggregate is the sum of the Pecan Street
 individually metered homes in Austin, Texas, and 25 in New York — two orders of magnitude below the
 thousands of customers behind a GB primary substation, and a sum of household meters rather than a
 measurement taken at a real substation.
+[Ebrahimi et al. (2022)](https://doi.org/10.1109/TII.2021.3118101) split electric-vehicle charging
+out of a feeder-head load hour by hour, and needed the charging power and stored energy of 19
+vehicles metered live, alongside the hourly energy price and the ambient temperature, to do it. The
+feeder-head load Ebrahimi et al. worked on was assembled rather than measured: hourly demand
+published by Independent System Operator New England for its Connecticut zone, peaking at about
+1,455 kW, added to a simulated charging schedule built from the plug-in and plug-out records of 201
+Nissan LEAFs in the My Electric Avenue trial.
 [Wang et al. (2022)](https://doi.org/10.1109/TIA.2022.3144244) separate behind-the-meter
 photovoltaic generation and battery charging jointly by contextually supervised source separation —
 the method family Kara et al. extended for solar under challenge 8, which suggests the battery
@@ -1923,6 +1991,10 @@ From Computational Imaging to Machine Learning: A Tutorial](https://doi.org/10.1
 - Doubleday, K., Van Scyoc Hernandez, V. and Hodge, B. M. (2020). [Benchmark probabilistic solar
 forecasts: Characteristics and recommendations](https://doi.org/10.1016/j.solener.2020.05.051).
 *Solar Energy*.
+- Ebrahimi, M., Rastegar, M. and Arefi, M. M. (2022). [Real-Time Estimation Frameworks for
+Feeder-Level Load Disaggregation and PEVs' Charging Behavior Characteristics
+Extraction](https://doi.org/10.1109/TII.2021.3118101). *IEEE Transactions on Industrial
+Informatics*. Read as the author-posted accepted manuscript.
 - Electricity North West (2018). [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/).
 - Erdener, B. C., Feng, C., Doubleday, K., Florita, A. and Hodge, B.-M. (2022). [A review of
 behind-the-meter solar forecasting](https://doi.org/10.1016/j.rser.2022.112224). *Renewable and
@@ -1987,6 +2059,11 @@ channel, 6 December 2024.
 - Kaas, B., Treutlein, M., Gerber, H. B., Neumann, O., Phatthanakhuha, C., Resch, O., Mikut, R. and
 Hagenmeyer, V. (2026). [Probabilistic Low-Voltage Peak Load Forecasting with Time Series
 Foundation Models Evaluated on Application-Oriented Metrics](https://arxiv.org/abs/2607.01966).
+- Kanchana, W., Singh, J. G. and Ongsakul, W. (2026). [A non-intrusive net-load disaggregation
+framework for behind-the-meter DER capacity estimation using a generative adversarial network data
+curation](https://doi.org/10.1016/j.epsr.2026.113279). *Electric Power Systems Research*. Full text
+not obtained; read as the highlights, abstract, introduction, and section snippets on the
+publisher's landing page.
 - Kara, E. C., Roberts, C. M., Tabone, M., Alvarez, L., Callaway, D. S. and Stewart, E. M. (2018).
 [Disaggregating solar generation from feeder-level
 measurements](https://doi.org/10.1016/j.segan.2017.11.001). *Sustainable Energy, Grids and
@@ -2106,6 +2183,8 @@ Report](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_versio
 - Viotti, O., Arnqvist, J. and Olauson, J. (2026). [Estimating Wind‐Power Capacity Time Series From
 Production Data Using a Power Curve Model and Quadratic
 Optimization](https://doi.org/10.1002/we.70136). *Wind Energy*.
+- Virieux, J. and Operto, S. (2009). [An overview of full-waveform inversion in exploration
+geophysics](https://doi.org/10.1190/1.3238367). *Geophysics*.
 - Wang, F., Ge, X., Dong, Z., Yan, J., Li, K., Xu, F., Lu, X., Shen, H. and Tao, P. (2022). [Joint
 Energy Disaggregation of Behind-the-Meter PV and Battery Storage: A Contextually Supervised Source
 Separation Approach](https://doi.org/10.1109/TIA.2022.3144244). *IEEE Transactions on Industry
