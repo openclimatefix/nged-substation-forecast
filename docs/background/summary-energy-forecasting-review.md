@@ -152,10 +152,10 @@ likely is net demand to run outside the substation's firm capacity?" rather than
 likely net demand?". Two costs hang on the answer: what NGED spends procuring flexibility to hold
 demand under the substation's capacity, and what curtailing embedded generators costs to hold export
 under a substation's export capacity. Both costs sit in the tails of the forecast distribution
-rather than at its centre, so both are bought by the same feature — extreme quantiles that are
-calibrated, at both ends. A quantile is a level the forecast says net demand will stay below a
-stated fraction of the time, and a calibrated quantile is one the outturn crosses exactly that
-often: the level given as the 99th percentile is exceeded 1 time in 100, no more and no less.
+rather than at its centre, so the same property of the forecast reduces both — extreme quantiles
+that are calibrated, at both ends. A quantile is a level the forecast says net demand will stay
+below a stated fraction of the time, and a calibrated quantile is one the outturn crosses exactly
+that often: the level given as the 99th percentile is exceeded 1 time in 100, no more and no less.
 Forecasting net demand is the highest priority of the nine challenges, and the other eight exist
 mainly to improve our net-demand forecast.
 
@@ -202,7 +202,7 @@ Powergrid)](https://smarter.energynetworks.org/projects/npg_sif_006-1/) — dema
 primary substations with export data, 171 of them modelled, and active power at 729 secondary
 substations; day-ahead to week-ahead at primary, evaluated to 11 days, and week- to month-ahead at
 secondary.** The published results give **about 8% lower mean absolute error** of utilisation rate
-than the network's existing method. Weather: real forecasts at primary; none in the published
+than Northern Powergrid's existing method. Weather: real forecasts at primary; none in the published
 secondary results.
 - **[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) — load and generation at Austrian
 primary substations, count not stated, day-ahead.** The paper reports **3–8% mean absolute
@@ -298,8 +298,8 @@ they use data from the same 200 low-voltage feeders in Germany. Inside [Kaas et 
 different winners again. Neither disagreement is a mistake: the two papers test different sets of
 models at different time resolutions, and the two metrics answer different questions.
 
-**Accuracy got worse further down the network in every study that forecast more than one voltage
-level, but what shrank is the headroom above a naive rule rather than the usefulness of the
+**Accuracy got worse further down the electricity network in every study that forecast more than one
+voltage level, but what shrank is the headroom above a naive rule rather than the usefulness of the
 forecast.** [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) ran the same models against a
 day-type persistence baseline on three datasets — a German transmission control area, 200 German
 low-voltage feeders, and 287 individual Portuguese clients — and the margin over that baseline
@@ -317,9 +317,8 @@ ones.
 far more customers than a Portuguese secondary substation does.** A forecast at a primary substation
 may also carry a larger percentage error than one at a grid supply point and still support
 flexibility procurement and curtailment decisions just as well, because what NGED needs from the
-forecast is a reliable answer to "will this substation run outside its firm capacity?". Whether
-decision-usefulness really is flat across voltage levels is something this project can measure, and
-we intend to.
+forecast is a reliable answer to "will this substation run outside its firm capacity?". This project
+can measure whether decision-usefulness really is flat across voltage levels, and we intend to.
 
 ##### Horizon, ensembles, and tails
 
@@ -398,8 +397,8 @@ body of data until the encoder can turn a raw input into a compact numerical sum
 matters and throws the rest away, and then to freeze the encoder's weights. Every later job reads
 the frozen summary instead of the raw input, including jobs nobody had in mind while the encoder was
 being trained, and each job needs only a small model of its own and a modest amount of its own data.
-The expensive learning happens once (when training the encoder) and is then shared, instead of being
-repeated from scratch by every model that needs it.
+The heavy computation happens once, when the encoder is trained, and is then shared, instead of
+being repeated from scratch by every model that needs it.
 
 **Two recent models show how well the arrangement works.** [Siméoni et al.
 (2025)](https://arxiv.org/abs/2508.10104) describe DINOv3, a 7-billion-parameter vision model
@@ -663,10 +662,11 @@ differently-sized inverters saturating in turn. Challenge 8, below, discusses di
 ##### The battery, gas generator, and biofuel plant
 
 **The trial area's battery, gas generator, and biofuel plant each need a method, and the literature
-supplies one to borrow for the battery, two for the gas generator that each need something we do not
-yet hold, and a partial method for the biofuel plant.** For the battery,
-[Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469) recover a price-taking storage
-operator's own optimisation parameters from historical prices and observed dispatch.
+supplies one to borrow for the battery, two for the gas generator — one needing the operator's
+generation schedule, the other never yet fitted to an embedded generator — and a partial method for
+the biofuel plant.** For the battery, [Bian et al. (2024)](https://doi.org/10.1109/TSG.2023.3303469)
+recover a price-taking storage operator's own optimisation parameters from historical prices and
+observed dispatch.
 
 **The closest published case for the gas generator forecasts a market-dispatched plant from the
 schedule its operator provides, not from weather or from the plant's own history.**
@@ -723,9 +723,9 @@ nameplate rating cannot see the difference.
 #### What the literature says
 
 A method exists for each generation technology separately, but we found none run across a mixed
-fleet of individually metered generators at a distribution network, and the two studies that measure
-what estimating capacity is worth downstream measure it for wind alone, at national or single-farm
-scale.
+fleet of individually metered generators at a distribution network operator, and the two studies
+that measure what estimating capacity is worth downstream measure it for wind alone, at national or
+single-farm scale.
 
 #### What this means for Flexpectation
 
@@ -755,7 +755,7 @@ difference in forecast error may not reflect the quality of the normalisation at
 
 **Two caveats temper both figures for NGED.** Viotti et al.'s target is a Swedish bidding zone
 rather than a single farm, and they report that at 5-minute resolution the running maximum is
-already a robust estimate of one farm's installed capacity, so the fitting earns its advantage on
+already a robust estimate of one farm's installed capacity, so the fitting shows its advantage on
 hourly, region-aggregated data. Whichever estimator wins, normalising by effective capacity stays a
 hypothesis to test rather than a settled preprocessing step, because no study we found has measured
 whether it improves the forecast NGED acts on.
@@ -769,8 +769,8 @@ to another, the load the first substation meters steps down. Each substation tha
 that transferred load records a rise, with no change in the underlying demand. The pick-up is
 usually shared across two or three neighbouring substations. NGED's substations spend roughly a
 tenth of their operating time in an abnormal running arrangement. Switching labels exist for the
-Flexpectation trial area but not for NGED's entire network, so any method meant to scale to the
-wider network has to work from power measurements alone.
+Flexpectation trial area but not for NGED's entire distribution network, so any method meant to
+scale beyond the trial area has to work from power measurements alone.
 
 #### What the literature says
 
@@ -818,8 +818,8 @@ F1.5 score, which blends precision — the share of flagged points that really w
 recall — the share of switched points the detector flagged — weighting recall the more heavily of
 the two. An F1.5 score of 1 is a perfect detector and 0 is a useless one, so higher is better. Those
 two scores come from different detectors, because no single method they tried wins across the range.
-Both figures were achieved on a Dutch network, with the help of a second load estimate constructed
-bottom-up from smart meter data.
+Both figures were achieved on a Dutch distribution network, with the help of a second load estimate
+constructed bottom-up from smart meter data.
 
 **Flexpectation will model its own reference time series for each substation.** Alliander's
 bottom-up estimate gives [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) a second opinion
@@ -865,12 +865,12 @@ them.
 
 #### The challenge
 
-NGED plans its network against what each substation would carry under its normal running
-arrangement. As such, Flexpectation aims to forecast substations as if they were always in their
-normal running arrangement, including a substation that has been sitting in an abnormal arrangement
-for weeks. Predicting the power flow under the normal running arrangement makes the forecasting
-target something that, during periods of abnormal running, is simply not measured, and leaves the
-training history contaminated: past readings taken while the network was abnormally configured
+NGED plans its distribution network against what each substation would carry under its normal
+running arrangement. As such, Flexpectation aims to forecast substations as if they were always in
+their normal running arrangement, including a substation that has been sitting in an abnormal
+arrangement for weeks. Predicting the power flow under the normal running arrangement means the
+forecasting target goes unmeasured during periods of abnormal running, and leaves the training
+history contaminated: past readings taken while the distribution network was abnormally configured
 describe a different scenario from the scenario being forecast.
 
 #### What the literature says
@@ -911,13 +911,13 @@ one that targets the quantity NGED needs and reports a measured benefit for doin
 [Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) rewrite the history to the
 level it would have had if the switch had never happened, across 169 real feeders, and report better
 medium-term forecasts for it. Northern Powergrid's Artificial Forecasting project rewrites its
-history too, in step 6 of the data-preparation pipeline set out in its [Alpha
-deliverable](https://smarter.energynetworks.org/projects/npg_sif_006-1/) *WP2-D2 Results Scope Item
-2*, which rescales a block of older readings to align its median with the median of the most recent
-block whenever the older block's median falls outside the 10th-to-90th-percentile range of the
-recent one. Northern Powergrid hold no readily accessible record of their own network configuration
-changes, so that pipeline hypothesises the timestamps from the load itself and confirms them with
-the control room — the position NGED is in outside the trial area.
+history too, in step 6 of the data-preparation pipeline set out in its
+[Alpha deliverable](https://smarter.energynetworks.org/projects/npg_sif_006-1/) *WP2-D2 Results
+Scope Item 2*, which rescales a block of older readings to align its median with the median of the
+most recent block whenever the older block's median falls outside the 10th-to-90th-percentile range
+of the recent one. Northern Powergrid hold no readily accessible record of their own distribution
+network's configuration changes, so that pipeline hypothesises the timestamps from the load itself
+and confirms them with the control room — the position NGED is in outside the trial area.
 
 **The fix is a level shift applied to the *older* half of each series.** Paredes and Vargas measure
 how far average demand moved across the step and add that difference to every reading before it, and
@@ -998,8 +998,8 @@ faulty metering from switching.** [Bouman et al. (2024)](https://arxiv.org/abs/2
 measurement errors and switch events as the two contaminants that must be filtered out before
 substation measurements can be used, and detect both on the same residual. Detecting both on one
 residual is also what merges the two classes in the Dutch labels, so the Dutch dataset can train a
-detector but cannot settle whether a flag is a stuck meter or a network reconfiguration — the
-separation challenges 4 and 6 exist to make.
+detector but cannot settle whether a flag is a stuck meter or a distribution network reconfiguration
+— the separation challenges 4 and 6 exist to make.
 
 **The faults that dominate NGED's telemetry are not the faults the model-based detectors were built
 for, and the GB projects that met those faults used threshold rules.** Moriano et al. and Martín et
@@ -1007,9 +1007,9 @@ al. score calibration gain and offset drift plus outliers, injected into clean d
 found in the wild, whereas NGED's telemetry carries stuck values, false zeros, and multi-month gaps.
 NGED's own Time Series Data Quality searched for zeros, for "non-varying non-zero values, perhaps
 indicating a 'stuck' or incorrectly configured sensor", and for gaps, and found metering defects
-common rather than exceptional on this network's own data: 13.8% of analogues in the South West
-licence area recording only zeros, and 63% of new solar sites' analogues not commissioned correctly.
-A detector built on the assumption that faults are rare is the wrong shape for NGED's telemetry.
+common rather than exceptional on NGED's own data: 13.8% of analogues in the South West licence area
+recording only zeros, and 63% of new solar sites' analogues not commissioned correctly. A detector
+built on the assumption that faults are rare is the wrong shape for NGED's telemetry.
 
 **None of the three GB projects reports how often its checks are right.** Electricity North West's
 [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/), UK Power Networks'
@@ -1036,8 +1036,8 @@ the absolute value of signed net demand — and reports even the absolute value 
 
 #### What the literature says
 
-**A magnitude-only measurement leaves more than one network state consistent with the reading, a
-result power-system state estimation has worked with since the 1990s.**
+**A magnitude-only measurement leaves more than one state of the electricity network consistent with
+the reading, a result power-system state estimation has worked with since the 1990s.**
 [Abur and Expósito (1997)](https://doi.org/10.1109/59.575721) showed that a measurement set
 containing current magnitudes can admit multiple solutions, and
 [Ju et al. (2018)](https://doi.org/10.1109/TSG.2017.2709463) carry the result into distribution
