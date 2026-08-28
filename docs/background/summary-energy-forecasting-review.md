@@ -766,6 +766,28 @@ hourly, region-aggregated data. Whichever estimator wins, normalising by effecti
 hypothesis to test rather than a settled preprocessing step, because no study we found has measured
 whether it improves the forecast NGED acts on.
 
+**A competition on Norwegian wind confirms that normalising by capacity is what practitioners reach
+for, and also that the entrants were handed the capacity rather than having to estimate it.** WindAI
+asked for the hourly wind power of four Norwegian bidding zones two days ahead, and supplied wind
+park metadata alongside the weather and production data; [Authen et al.
+(2026)](https://doi.org/10.5617/nmi.13106) report that Statnett scored 5% of its weighted assessment
+on "robustness to changes in installed wind power capacity, evolving weather patterns, long-term
+climate variability". The two highest-placed teams both predicted capacity factor rather than
+absolute production, "to account for maintenance events and future capacity expansions", and both
+used Nord Pool unavailability messages to cover planned maintenance and outages. A team given an
+honourable mention fitted a physical power curve for each wind park under sequential Bayesian
+updating over a sliding window, to absorb "capacity changes or the commissioning of new wind parks",
+and initialised a new park's parameters from a prior built on the existing fleet — an answer to the
+cold-start problem an estimator faces at a generator that has just connected. Authen et al. decline
+to credit any of that with the differences in accuracy, because unavailability messages covered
+between 1% and 13% of timestamps depending on the bidding zone, so downtime events "represent only a
+limited fraction of the full dataset". Two conclusions follow for Flexpectation. Independent teams
+converging on capacity factor as the target is evidence about what practitioners believe rather than
+a measurement of what the belief is worth, so the hypothesis in the paragraph above stands
+unaltered. And the part WindAI could skip is the part NGED cannot: the Embedded Capacity Register
+records the export limit permitted by a site's connection agreement rather than what the site can
+generate, so Flexpectation has to estimate the effective capacity that WindAI's entrants were given.
+
 ### 4. Detecting switching events
 
 #### The challenge
