@@ -1107,8 +1107,14 @@ Powergrid's own installed-capacity projection per substation.
 [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/) split net load into demand and
 generation, forecast the two separately, and recombined them; TRANSITION's rooftop solar is not
 metered, but TRANSITION read each installation's capacity from a list of Feed-In Tariff
-installations. Reading a capacity out of a subsidy register is the step Flexpectation cannot take,
-because the Feed-In Tariff register stopped being complete when the Feed-In Tariff closed.
+installations. Flexpectation has no register that would carry it as far. The Feed-In Tariff register
+stopped being complete when the Feed-In Tariff closed, and the registers NGED does hold give only an
+approximate capacity: the Renewable Energy Planning Database and NGED's own Embedded Capacity
+Register both record a contractual export limit rather than what a site can generate, the Embedded
+Capacity Register starts at 50 kW, and a domestic array reaches NGED only when the installer
+notifies NGED, as installers are required to do. None of those registers records the panel tilt, the
+panel azimuth, or the ratio of direct-current to alternating-current rating, which is why challenge
+2 above proposes inferring the engineering parameters from the power data.
 
 **Inferring the capacity from the net flow instead has been measured only a voltage level below
 NGED's.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark that
