@@ -725,9 +725,10 @@ nameplate rating cannot see the difference.
 #### What the literature says
 
 A method exists for each generation technology separately, but we found none run across a mixed
-fleet of individually metered generators at a distribution network operator, and the two studies
-that measure what estimating capacity is worth downstream measure it for wind alone, at national or
-single-farm scale.
+fleet of individually metered generators at a distribution network operator. Only one study we found
+measures what estimating capacity is worth downstream, for wind alone and at the scale of a national
+bidding zone; the other estimates a wind farm's capacity but treats the estimate as a known input
+rather than measuring what getting it right is worth.
 
 #### What this means for Flexpectation
 
@@ -750,10 +751,11 @@ can fall as well as rise.
 running maximum "requires monotonically increasing capacity and relies on frequent high wind
 events". Viotti et al. publish a non-monotonic capacity estimator, which can follow capacity down
 when a turbine goes out for repair. The non-monotonic variant produced the lowest day-ahead forecast
-error, **2.0% below** a model normalised by the running maximum across Sweden as a whole, and the
-authors say the non-monotonic variant yields the best forecasts "possibly because it captures real
-changes in available capacity or corrects seasonal wind-speed biases", while cautioning that the
-difference in forecast error may not reflect the quality of the normalisation at all.
+error across Sweden as a whole, **2.0% below** a model normalised by the running maximum on mean
+absolute error and **2.3% below** it on root-mean-square error, and the authors say the
+non-monotonic variant yields the best forecasts "possibly because it captures real changes in
+available capacity or corrects seasonal wind-speed biases", while cautioning that the difference in
+forecast error may not reflect the quality of the normalisation at all.
 
 **Two caveats temper both figures for NGED.** Viotti et al.'s target is a Swedish bidding zone
 rather than a single farm, and they report that at 5-minute resolution the running maximum is
