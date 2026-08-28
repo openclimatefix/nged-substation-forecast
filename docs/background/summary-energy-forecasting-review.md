@@ -996,7 +996,9 @@ licence area recording only zeros, and 63% of new solar sites' analogues not com
 A detector built on the assumption that faults are rare is the wrong shape for this telemetry.
 
 **None of the three GB projects reports how often its checks are right.** Electricity North West's
-ATLAS, UK Power Networks' Distribution Network Visibility, and NGED's own Time Series Data Quality
+[ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/), UK Power Networks'
+[Distribution Network Visibility](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_version_3.0_270214.pdf),
+and NGED's own [Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/)
 all tackled faulty metering substantively, one of them as its whole subject, and none published an
 accuracy figure or a label set, so the GB record says what to look for rather than how well any of
 it worked. What Distribution Network Visibility did publish is the shape of the output: a daily
@@ -1057,9 +1059,8 @@ its own meter reports, real power where the meter is directional and apparent po
 is not, and flags the affected series to NGED alongside the forecast.** Forecasting the bounced
 trace is honest about what was measured, and at a substation whose generation never reverses the
 flow the apparent-power trace and the signed trace are identical. What forecasting the bounced trace
-cannot do is tell NGED whether a forecast midday peak is demand approaching the substation's import
-capacity or export approaching the substation's export capacity — the two costs challenge 1 sets
-out, at opposite ends of the distribution.
+cannot do is tell NGED whether a peak forecast at midday represents demand approaching the
+substation's import capacity or export approaching the substation's export capacity.
 
 **Flexpectation version 2 puts the meter's behaviour inside the model rather than repairing the
 series first.** The differentiable-physics forward model reconstructs a substation's signed net flow
@@ -1820,6 +1821,9 @@ domain adaptation zero-shot learning in sequence](https://doi.org/10.1016/j.rser
 - UK Power Networks. [Power Flow to Solar Capacity
 (NIA_UKPN0104)](https://smarter.energynetworks.org/projects/nia_ukpn0104/), listed on the portal as
 "AI for Visibility and Forecasting of Renewable Generation".
+- UK Power Networks and PPA Energy and Capula (2014). [Distribution Network Visibility: LCN Fund
+Tier 1 Close Down
+Report](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_version_3.0_270214.pdf).
 - Viotti, O., Arnqvist, J. and Olauson, J. (2026). [Estimating Wind‐Power Capacity Time Series From
 Production Data Using a Power Curve Model and Quadratic
 Optimization](https://doi.org/10.1002/we.70136). *Wind Energy*.
