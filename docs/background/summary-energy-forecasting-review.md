@@ -135,7 +135,7 @@ give the evidence behind each row.
 | 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers, three on one feeder and one on two; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | The one published result scoring both precision and recall reports F1.5 scores (a blend of precision and recall weighted towards recall, 0 for a useless detector and 1 for a perfect one) between about 0.2 and 0.5, from different detectors at different event lengths, and achieved with a second load estimate NGED does not have, so Flexpectation should expect worse rather than better |
 | 5. Forecasting a substation as if it were always in its normal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Every published solution throws information away. In contrast, Flexpectation version 1 makes the abnormal periods an input to the ML model, and masks the abnormal periods in the training target |
 | 6. Detecting faulty metering | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s Dutch dataset which merges metering faults and switching into a single class | No GB project publishes labels or an accuracy figure, and Flexpectation is not labelling NGED's telemetry either, so a precision and a recall are out of reach. Flexpectation judges its cleaning rules downstream instead, by whether excluding the periods a rule flags improves the forecast on held-out data |
-| 7. Recovering signed power from apparent-power meters | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) and Western Power Distribution's 2017 [Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/) both recover the sign from a second measurement of the same power; [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/) instead uses a meter's own 4-year average net demand together with a model of the generation behind that meter | Flexpectation version 1 forecasts the affected series in apparent power and flags those series to NGED; version 2 puts the magnitude inside a differentiable-physics forward model — the phase-retrieval formulation, whose sign ambiguity power-system state estimation has known about since the 1990s — and breaks that ambiguity with weather and with the persistence of flow direction |
+| 7. Recovering signed power from apparent-power meters | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) and Western Power Distribution's 2017 [Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/) both recover the sign from a second measurement of the same power; [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/) instead uses a meter's own 4-year average net demand together with a model of the generation behind that meter | Flexpectation version 1 forecasts the affected series in apparent power and flags those series to NGED; version 2 puts the magnitude inside a differentiable-physics forward model — the phase-retrieval formulation — and breaks the sign ambiguity with weather and with the persistence of flow direction |
 | 8. Disaggregating unmetered solar and wind | [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) transferring from fully-metered Dutch substations, and [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/), this work's direct predecessor | UK Power Networks' Power Flow to Solar Capacity attacked the same problem on the same kind of GB primary-substation data, and Open Climate Fix delivered that project too |
 | 9. Disaggregating heat pumps, chargers, and batteries (stretch goal) | [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1) on aggregated charging demand day-ahead | Heat pumps, chargers, and batteries stay inside net demand in Flexpectation version 1 rather than being forecast separately |
 
@@ -1007,55 +1007,48 @@ and a real event to a control engineer, and only the purpose settles which.
 
 #### The challenge
 
-NGED report that 10 sites in the trial area are metered in apparent power (MVA) rather than real
-power (MW), out of 20 substations and 12 metered generators. An apparent-power meter reports a
-magnitude with no direction, so when a solar farm behind the substation exports more than the
-substation's customers are drawing, the reading rises instead of going negative: the trace "bounces"
-off zero, and a midday export reads as a midday peak. One of the 10 sites has shown that bounce on
-sunny days, and two more are suspected. The meter is not faulty: reporting a magnitude is what an
-apparent-power meter was installed to do. The difficulty is that the quantity NGED needs forecast is
-signed net demand, while an apparent-power meter reports the absolute value of signed net demand —
-and reports even that absolute value only approximately.
+Of the trial area's 16 primary substations, 8 are metered in apparent power (MVA) rather than real
+power (MW), as are two of the three wind farms. An apparent-power meter reports a magnitude with no
+direction, so when a solar farm behind the substation exports more than the substation's customers
+are drawing, the substation's reading rises instead of going negative: the trace "bounces" off zero,
+and a midday export reads as a midday peak. NGED report that one of those 10 sites has shown that
+bounce on sunny days, with two more suspected. The meter is not faulty; the difficulty is that the
+quantity NGED needs forecast is signed net demand, while an apparent-power meter reports the
+absolute value of signed net demand — and reports even that only approximately.
 
 #### What the literature says
 
-**A magnitude-only measurement leaves more than one network state consistent with the reading, which
-power-system state estimation established three decades ago.**
+**A magnitude-only measurement leaves more than one network state consistent with the reading, a
+result power-system state estimation has worked with since the 1990s.**
 [Abur and Expósito (1997)](https://doi.org/10.1109/59.575721) showed that a measurement set
-containing current magnitudes "may lead to multiple solutions and therefore to the loss of unique
-observability for certain measurement configurations".
-[Ju et al. (2018)](https://doi.org/10.1109/TSG.2017.2709463) carry the same result into distribution
-networks: where branch current-magnitude measurements "are the only ones to make the branch
-observable", the state-estimation solution "is not unique", so those measurements can only sharpen
-an estimate that other measurements have already pinned down. The remedy that tradition settled on
-is redundancy — a snapshot of the whole network solved from many simultaneous measurements — which
-is the redundancy NGED's telemetry at a primary substation does not carry.
+containing current magnitudes can admit multiple solutions, and
+[Ju et al. (2018)](https://doi.org/10.1109/TSG.2017.2709463) carry the result into distribution
+networks with the remedy: where branch current-magnitude measurements "are the only ones to make the
+branch observable" the solution "is not unique", so such measurements can only sharpen an estimate
+that other measurements have already pinned down.
 
-**Two of the three published attempts we found at recovering direction rest on a second measurement
-of the same power.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s Dutch substations
-carry the same limitation, measuring only the absolute current, and Bouman et al. recover the sign
-from a bottom-up load estimate built from smart meters, wherever the substation meter reads
-non-negative throughout while the bottom-up estimate goes negative. Western Power Distribution,
-NGED's predecessor, set out in the 2017
-[Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/) NIA project to
-"first detect then assign directions to power flows where absent", and did so by reconciling summed
-current at a substation's transformers against summed current along its feeders, flipping "the
-direction/sense of a suitable candidate feeder" where the two disagreed by more than a threshold,
-with engineers reviewing each candidate. That project also measured how widespread the problem is on
-this network: 204 circuits in the South West licence area, and 326 across Western Power
-Distribution, "experience reverse flows which are not apparent from the existing analogue values".
+**Two of the three published attempts we found rest on a second measurement of the same power.**
+[Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s Dutch substations carry the same
+limitation as NGED's MVA-metered substations, measuring only the absolute current, and Bouman et al. recover the sign from a bottom-up
+load estimate built from smart meters, wherever the substation meter reads non-negative throughout
+while the bottom-up estimate goes negative. Western Power Distribution, NGED's predecessor, set out
+in the 2017 [Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/) NIA
+project to "first detect then assign directions to power flows where absent", and piloted a tool
+reconciling summed current at a substation's transformers against summed current along its feeders,
+flipping a candidate feeder's direction where the two disagreed by more than a threshold. That
+project also counted the circuits at stake on what is now NGED's network: 204 in the South West
+licence area and 326 company-wide "experience reverse flows which are not apparent from the existing
+analogue values".
 
 **The third attempt, and the closest to NGED's position, uses the meter's own history together with
 a model of the generation behind the meter.**
 [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/) met feeders metered in amperes only,
 where "the direction of the flow cannot be captured by the analogues", and settled the direction in
-three steps in its Load Forecasting Solution report: where modelled generation is too small to have
-pushed the flow negative, the reading is taken at face value; where modelled generation exceeds the
-average net demand that meter recorded over 4 years of history, the sign is flipped; and the result
-is checked against the requirement that underlying demand exceed net demand, flipping back where it
-does not. The report publishes no accuracy figure for the procedure, calling it "a satisfying
-initial level of automated computation", with further studies running on the cases the procedure is
-too simple for.
+three steps in its Load Forecasting Solution report: take the reading at face value where modelled
+generation is too small to have pushed the flow negative; flip the sign where modelled generation
+exceeds the average net demand that meter recorded over 4 years; then flip back wherever the
+recovered underlying demand comes out greater than net demand. The report gives no accuracy figure
+for the direction step, calling it "a satisfying initial level of automated computation".
 
 #### What this means for Flexpectation
 
@@ -1063,23 +1056,22 @@ too simple for.
 its own meter reports, real power where the meter is directional and apparent power where the meter
 is not, and flags the affected series to NGED alongside the forecast.** Forecasting the bounced
 trace is honest about what was measured, and at a substation whose generation never reverses the
-flow the apparent-power trace and the signed trace are the same trace. What forecasting the bounced
-trace cannot do is tell NGED whether a forecast midday peak is demand approaching the substation's
-import capacity or export approaching the substation's export capacity — demand over the import
-capacity is met by procuring flexibility, and export over the export capacity by curtailing a
-generator.
+flow the apparent-power trace and the signed trace are identical. What forecasting the bounced trace
+cannot do is tell NGED whether a forecast midday peak is demand approaching the substation's import
+capacity or export approaching the substation's export capacity — the two costs challenge 1 sets
+out, at opposite ends of the distribution.
 
 **Flexpectation version 2 puts the meter's behaviour inside the model rather than repairing the
 series first.** The differentiable-physics forward model reconstructs a substation's signed net flow
 from gross demand, metered generation, and unmetered generation, and compares the *magnitude* of the
 reconstruction against the apparent-power reading, so the bounce is predicted rather than removed.
 Recovering a signal from the magnitude of a transform of that signal is the phase-retrieval problem,
-and [Dong et al. (2023)](https://doi.org/10.1109/MSP.2022.3219240) set out why the magnitude makes
-the problem non-convex: if a signal satisfies the magnitude equation then so does a whole family of
-rotations of that signal, which for a real-valued signal collapses to the two signs. What
-Flexpectation adds is not the formulation but what resolves the ambiguity, weather and time: the
-reconstruction's solar module has to track irradiance, and a prior holds the direction of flow to
-persist for hours rather than flickering from one half-hour to the next.
+which [Dong et al. (2023)](https://doi.org/10.1109/MSP.2022.3219240) describe as non-convex because
+a signal satisfying the magnitude equation is always one of a family of solutions — for
+Flexpectation, a family of two. What Flexpectation adds is not the formulation but what resolves the
+ambiguity, weather and time: the reconstruction's solar module has to track irradiance, and a prior
+holds the direction of flow to persist for hours rather than flickering from one half-hour to the
+next.
 
 **Apparent power is the magnitude of real power only near unity power factor, and the approximation
 is weakest exactly at the bounce the reconstruction is trying to explain.** As real power passes
