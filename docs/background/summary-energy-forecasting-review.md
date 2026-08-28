@@ -2,12 +2,8 @@
 
 This is a short version of a literature review Open Climate Fix carried out for National Grid
 Electricity Distribution (NGED), as part of the Flexpectation project, funded through the Network
-Innovation Allowance. This summary is readable on its own. The full literature review, which cites
-over 100 sources, is
-[published online](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/),
-and is referred to below as "the full review". This summary is not a strict subset of the full
-review: it covers one further challenge, recovering signed power from apparent-power meters, and
-cites 24 sources the full review does not.
+Innovation Allowance. This summary stands on its own: every claim below is sourced from the
+reference list at the end.
 
 ## Summary
 
@@ -1862,20 +1858,20 @@ best served by the ensemble at every horizon, while Flexpectation forecasts 14 d
 ### Weather improved low-voltage forecasts less than expected in the past
 
 [Haben et al. (2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) forecast the demand of 100
-real low-voltage feeders in Bracknell up to four days ahead at hourly resolution, and tested
-temperature by running each of their methods twice, once without a temperature input and once with
-one. Both the observed temperature and a temperature forecast were tried, taken from a weather
-station about 16 km away. Adding temperature had "minimal effect on the forecast accuracy", and for
-three of the methods adding temperature made the forecast worse; Haben et al. suggest that
-temperature is correlated with seasonality, so a model can end up "erroneously training on the
-temperature as a surrogate for seasonality". The feeders carried an average of 45 households each,
-and the data were collected in 2014 and 2015. We expect how much weather matters at a substation to
-be changing quickly, because embedded solar generation and heat pumps are what make a substation
-weather-dependent, and there are far more of both on the distribution network now than there were
-then. That expectation is a prediction, though, not a measurement — and the Scottish
-primary-substation sensitivities of [Fox et al. (2018)](https://doi.org/10.34890/134), measured on
-the 10 years of weather and substation data before its publication and described in the full review,
-say weather was already moving primary substation demand well before the mid-2010s.
+real low-voltage feeders in Bracknell up to four days ahead at hourly resolution, and ran each of
+their methods twice, once without a temperature input and once with. Both the observed temperature
+and a temperature forecast were tried, taken from a weather station about 16 km away. Adding
+temperature had "minimal effect on the forecast accuracy", and for three of the methods adding
+temperature made the forecast worse; Haben et al. suggest that temperature is correlated with
+seasonality, so a model can end up "erroneously training on the temperature as a surrogate for
+seasonality". The feeders carried an average of 45 households each, and the data were collected in
+2014 and 2015. We expect how much weather matters at a substation to be changing quickly, because
+embedded solar generation and heat pumps make a substation considerably more weather-dependent, and
+there are far more of both on the distribution network now, in 2026, than there were in 2015. That
+expectation is a prediction, though, not a measurement — and the Scottish primary-substation
+sensitivities of [Fox et al. (2018)](https://doi.org/10.34890/134), measured on the 10 years of
+weather and substation data before its publication say weather was already moving primary substation
+demand well before the mid-2010s.
 
 ### A model trained on none of NGED's data may match a model trained on all of it
 
@@ -1891,11 +1887,9 @@ improve accuracy.
 ## What network operators have already built
 
 **Nine projects run by electricity network operators have already built a forecasting capability
-that overlaps Flexpectation's, and one of the nine — Northern Powergrid's Artificial Forecasting —
-is deployed where Flexpectation is not, which is why that project gets a subsection of its own at
-the end of this section.** The last row of the table is Flexpectation itself, so the comparison is
-direct. Where a project's published deliverables do not answer a column, the cell says so rather
-than being left blank.
+that overlaps Flexpectation's.** The last row of the table below is Flexpectation itself, so the
+comparison is direct. Where a project's published deliverables do not answer a column, the cell says
+so rather than being left blank.
 
 | Project | What the project forecasts | Scale | Horizon | Uncertainty published |
 |---|---|---|---|---|
@@ -2111,7 +2105,7 @@ switching labels from operational systems instead of continuing to look.
 
 ## References
 
-Every source cited above, in alphabetical order by first author. The full review cites 30 sources that this summary does not, and this summary cites 28 that the full review does not.
+Every source cited above, in alphabetical order by first author.
 
 - Abur, A. and Expósito, A. G. (1997). [Detecting multiple solutions in state estimation in the
 presence of current magnitude measurements](https://doi.org/10.1109/59.575721). *IEEE Transactions
