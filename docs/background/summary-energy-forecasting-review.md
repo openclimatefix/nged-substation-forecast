@@ -245,15 +245,25 @@ simpler model when forecasting customer export at primary substations: measured 
 ridge regression they went on to adopt (a linear model that shrinks its coefficients and reports
 uncertainty on them), boosted trees "helped some substations but harmed others".
 
-**Neither end of the sophistication scale is a safe bet.** [Mesarcik et al.
-(2025)](https://doi.org/10.1049/icp.2025.1968) caution about the uncertainty a boosted tree reports
-rather than the accuracy it reaches: on the one substation whose calibration they plot, their
-gradient-boosted machine's 95th percentile forecast corresponded to the 80th percentile of the
-measured data, while a structured state space model and a linear quantile model both tracked the
-ideal calibration line closely. [Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) make the
-same point from the other end of the sophistication scale, because their purpose-built Transformer
-variant — the neural-network architecture, not the electrical kind — lost to a standard
-encoder-decoder Transformer on all three of their datasets.
+**Neither end of the sophistication scale is a safe bet.**
+[Mesarcik et al. (2025)](https://doi.org/10.1049/icp.2025.1968) caution about the uncertainty a
+boosted tree reports rather than the accuracy it reaches: on the one substation whose calibration
+they plot, their gradient-boosted machine's 95th percentile forecast corresponded to the 80th
+percentile of the measured data, while a structured state space model and a linear quantile model
+both tracked the ideal calibration line closely.
+[Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) make the same point from the other end of
+the sophistication scale, because their purpose-built Transformer variant — the neural-network
+architecture, not the electrical kind — lost to a standard encoder-decoder Transformer on all three
+of their datasets. [Faustine et al. (2025)](https://doi.org/10.1109/TPWRS.2024.3400123) reach the
+same conclusion at Stentaway substation in Plymouth, a primary substation in NGED's own South West
+licence area: a multi-layer perceptron trained by quantile regression, the plainest feed-forward
+neural network there is, matched or beat N-BEATS, N-HiTS, and a long short-term memory neural
+network at Stentaway and at a low-voltage substation on Madeira serving about 100 consumers,
+reaching a normalised root-mean-square error of 0.08 and 0.07 day-ahead against each substation's
+installed capacity. Every model in that comparison was held to a comparable parameter count rather
+than tuned individually, the weather covariates are observed rather than forecast, and the 7-day
+figures come from feeding the day-ahead model its own output, so the margins bound how the
+architectures rank rather than what Flexpectation should expect.
 
 **What did help was refitting the model every month.** On both datasets where [Hertel et al.
 (2026)](https://arxiv.org/abs/2607.15705) tried refitting, the retrained model beat the static one.
@@ -266,14 +276,17 @@ considerably less feature engineering than what we plan to implement.**
 time, and six columns describing each low-voltage feeder — among them how many housing units,
 industrial and commercial units, and photovoltaic systems the feeder serves — and nothing beyond
 that: no clear-sky index, no wind power curve, no monotone constraints.
-[Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) ran the only comparison on
-equal terms we found — their GBT and their generalised additive model — a regression that fits a
-separate smooth curve for each input and adds the curves together — received the same features, but
-that shared feature set was itself short: a linear trend, load lagged 24 hours and 1 week, time of
-day, 9 day types, the named public holidays, day of year, and temperature interacted with time of
-day and with day of year. That shared feature set carried no irradiance and no wind. So no published
-head-to-head we found gives a GBT the feature engineering we plan to implement in Flexpectation
-version 1.
+[Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) ran one of the two
+comparisons on equal terms we found — their GBT and their generalised additive model — a regression
+that fits a separate smooth curve for each input and adds the curves together — received the same
+features, but that shared feature set was itself short: a linear trend, load lagged 24 hours and 1
+week, time of day, 9 day types, the named public holidays, day of year, and temperature interacted
+with time of day and with day of year. That shared feature set carried no irradiance and no wind.
+[Faustine et al. (2025)](https://doi.org/10.1109/TPWRS.2024.3400123) ran the other, giving CatBoost
+and a random forest the same lagged net load, irradiance, temperature, and calendar features as
+their neural networks, and holding every model to a comparable parameter count rather than tuning
+each one; that shared feature set carried no wind. So no published head-to-head we found gives a GBT
+the feature engineering we plan to implement in Flexpectation version 1.
 
 ##### Limits on the published numbers
 
@@ -1157,9 +1170,7 @@ metered, but TRANSITION read each installation's capacity from a list of Feed-In
 installations. Flexpectation has no register that would carry it as far, for the reasons set out
 under "The challenge" above.
 
-**The one published benchmark we found of inferring capacity from the net flow sits a voltage level
-below NGED's, and the GB project doing the same at primary substations has not yet published a
-result.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark that
+**The published benchmarks we found of inferring capacity from the net flow work on individually metered premises, or at a voltage level below NGED's, and the GB project doing the same at primary substations has not yet published a result.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark that
 inference at low-voltage substations serving tens of customers rather than at a primary. UK Power
 Networks' [Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/)
 project (with Open Climate Fix) infers solar photovoltaic capacity behind UK Power Networks' primary
@@ -1190,8 +1201,13 @@ substation differs most from their test case.
 **Uncertainty and a multi-day horizon each appear in the disaggregation work we found, but not in
 the same forecast.** [Zhang et al. (2022)](https://doi.org/10.1016/j.engappai.2022.104707) attach
 uncertainty, disaggregating rooftop solar out of net load at grid supply point and feeder level with
-a multi-quantile recurrent neural network scored on reliability and sharpness. NESO's [embedded wind
-and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts) are half-hourly to 14 days ahead, as a single number per half-hour with no uncertainty attached.
+a multi-quantile recurrent neural network scored on reliability and sharpness. NESO's
+[embedded wind and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts)
+are half-hourly to 14 days ahead, as a single number per half-hour with no uncertainty attached. A
+survey of behind-the-meter solar forecasting whose 162 sources reach 2021,
+[Erdener et al. (2022)](https://doi.org/10.1016/j.rser.2022.112224), judged that "the literature
+explicitly focused on uncertainty quantification within BTM [behind-the-meter] systems is immature",
+and recommended probabilistic approaches as the way to represent that uncertainty.
 
 **An uncertainty estimate earns its place only if it grows where the answer gets worse, and the one
 substation-level disaggregation we found that tested that property reports it holding — until the
@@ -1855,8 +1871,7 @@ switching labels from operational systems instead of continuing to look.
 
 ## References
 
-Every source cited above, in alphabetical order by first author. The full review cites 37 further
-sources that this summary does not.
+Every source cited above, in alphabetical order by first author. The full review cites 30 further sources that this summary does not.
 
 - Abur, A. and Expósito, A. G. (1997). [Detecting multiple solutions in state estimation in the
 presence of current magnitude measurements](https://doi.org/10.1109/59.575721). *IEEE Transactions
@@ -1909,6 +1924,12 @@ From Computational Imaging to Machine Learning: A Tutorial](https://doi.org/10.1
 forecasts: Characteristics and recommendations](https://doi.org/10.1016/j.solener.2020.05.051).
 *Solar Energy*.
 - Electricity North West (2018). [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/).
+- Erdener, B. C., Feng, C., Doubleday, K., Florita, A. and Hodge, B.-M. (2022). [A review of
+behind-the-meter solar forecasting](https://doi.org/10.1016/j.rser.2022.112224). *Renewable and
+Sustainable Energy Reviews*.
+- Faustine, A., Nunes, N. J. and Pereira, L. (2025). [Efficiency through Simplicity: MLP-based
+Approach for Net-Load Forecasting with Uncertainty Estimates in Low-Voltage Distribution
+Networks](https://doi.org/10.1109/TPWRS.2024.3400123). *IEEE Transactions on Power Systems*.
 - Fildes, R. (2020). [Learning from forecasting
 competitions](https://doi.org/10.1016/j.ijforecast.2019.04.012). *International Journal of
 Forecasting*.
