@@ -94,6 +94,7 @@ nav:
       - Connecting to the AWS control plane: live_service/connecting.md
       - Operating the live service: live_service/operations.md
       - Intervention log: live_service/intervention-log.md
+      - "Status of the live service (summary)": live_service/summary-status.md
       - Setting up Sentry telemetry: live_service/sentry.md
       - Configuration reference: live_service/setup.md
   - Roadmap:
