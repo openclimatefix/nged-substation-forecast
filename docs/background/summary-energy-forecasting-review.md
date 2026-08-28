@@ -1289,18 +1289,44 @@ half-hours is a question the telemetry can answer on its own.
 
 Heat pumps, electric-vehicle chargers, and price-sensitive domestic batteries change the shape of a
 substation's load in ways a model trained on history cannot anticipate, because the number installed
-behind any given substation is growing quickly. The stretch goal is to disaggregate and forecast
-heat pumps, electric-vehicle (EV) chargers, and batteries separately rather than leaving them inside
-net demand.
+behind any given substation is growing quickly. The stretch goal is to disaggregate and forecast heat pumps, electric-vehicle (EV) chargers, and batteries separately rather than leaving them inside net demand.
+
+The stock grows fast enough to matter inside Flexpectation's own lifetime. NESO's
+[Future Energy Scenarios 2025](https://www.neso.energy/publications/future-energy-scenarios-fes) put
+1.4 million electric cars on GB roads in 2024 and 8.2 million by 2030, and the GB heat pump stock at
+361,000 in 2024 and 2.3 million by 2030 — close to a sixfold rise in each over six years. Battery
+storage below 1 MW, the class that sits behind a substation without reaching the Embedded Capacity
+Register's 50 kW floor, rises from 191 MW to 975 MW over the same period. Scaling those GB figures
+to NGED is only approximate: NESO's
+[regional breakdown of the 2024 scenarios](https://www.neso.energy/data-portal/regional-breakdown-fes-data-electricity)
+allocates 36% of GB's sub-1 MW battery capacity to the four grid supply point groups NGED serves, 49
+MW of 138 MW in 2024 rising to 308 MW of 862 MW by 2030, but that 36% is held constant across every
+forecast year, so the regional number is an allocation of the GB total rather than a forecast of
+NGED's own area. NGED serves nearly 8 million customers, a little over a quarter of GB's.
 
 #### What the literature says
 
-**Heat pumps, EV chargers, and batteries are the largest gap in the review and the largest deliberate
-omission from our search.** In the one study we found that measures charger forecast skill against
-aggregation, [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1), only the site
-with more than 100 charge points was significantly better than a naive benchmark, though some models
-at one much smaller site also beat the naive benchmark. Heat-pump diversity is untested in the cold
-weather that matters, and no diversity factor helps for domestic batteries at all.
+**Heat pumps, EV chargers, and batteries are the largest gap in the review and the largest
+deliberate omission from our search, narrowed by one targeted search rather than closed.** In the
+one study we found that measures charger forecast skill against aggregation,
+[Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1), only the site with more
+than 100 charge points was significantly better than a naive benchmark, though some models at one
+much smaller site also beat the naive benchmark. Heat-pump diversity is untested in the cold weather
+that matters, and no diversity factor helps for domestic batteries at all.
+
+**A targeted search for disaggregating these three from substation measurements found the work split
+by asset and mostly out of reach: heat pumps are separated at the premises, batteries and chargers
+at the feeder or substation, and the substation-level papers are paywalled.**
+[Gao et al. (2024)](https://doi.org/10.1016/j.apenergy.2024.123361) work at substation level on
+flexible load, and [Wang et al. (2022)](https://doi.org/10.1109/TIA.2022.3144244) separate
+behind-the-meter photovoltaic generation and battery charging jointly by contextually supervised
+source separation — the method family Kara et al. extended for solar under challenge 8, which
+suggests the battery problem and the solar problem are the same problem with another component
+added. We read the abstract of Wang et al. and could obtain neither full text: both papers are
+closed on Unpaywall with no repository copy, as are the two nearest alternatives, and the one
+open-access heat-pump disaggregation paper we found returned a gated response from the publisher and
+from its repository, which we did not attempt to work around. Neither citation here carries more
+weight than the existence of the work.
 
 #### What this means for Flexpectation
 
@@ -1830,6 +1856,9 @@ Forecasting*.
 - Fox, J., Plecas, M., Neilson, D., Cannon, D. and Parr, J. (2018). [Analysis of local demand trends
 and forecasting through weather correction and benefit to DSO transistion and
 microgrids](https://doi.org/10.34890/134). *CIRED Workshop, Ljubljana*.
+- Gao, A., Zheng, J., Mei, F. and Liu, Y. (2024). [Toward intelligent demand-side energy management
+via substation-level flexible load disaggregation](https://doi.org/10.1016/j.apenergy.2024.123361).
+*Applied Energy*. Not obtained; cited for the existence of the work.
 - Gijón, A., Eiraudo, S., Manjavacas, A., Schiera, D. S., Molina-Solana, M. and Gómez-Romero, J.
 (2025). [Integrating Physics and Data-Driven Approaches: An Explainable and Uncertainty-Aware
 Hybrid Model for Wind Turbine Power Prediction](https://arxiv.org/abs/2502.07344). *Computer
@@ -1925,6 +1954,8 @@ pre-trained weather embedding](https://arxiv.org/abs/2312.00290).
 - Moriano, J., Rodríguez, F., Martín, P., Jiménez, J. and Vuksanovic, B. (2016). [A New Approach to Detection of Systematic Errors in Secondary Substation Monitoring Equipment Based on Short Term Load Forecasting](https://doi.org/10.3390/s16010085). *Sensors*.
 - National Energy System Operator. [Embedded wind and solar
 forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts).
+- National Energy System Operator (2025). [Future Energy Scenarios 2025](https://www.neso.energy/publications/future-energy-scenarios-fes).
+- National Energy System Operator (2025). [Regional breakdown of FES data (electricity)](https://www.neso.energy/data-portal/regional-breakdown-fes-data-electricity).
 - Nguyen, T. N. and Müsgens, F. (2026). [A meta-analysis of solar forecasting based on skill
 score](https://doi.org/10.1063/5.0300682). *Journal of Renewable and Sustainable Energy*.
 - Northern Powergrid (2024). [Artificial Forecasting, Alpha
@@ -1989,6 +2020,10 @@ Report](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_versio
 - Viotti, O., Arnqvist, J. and Olauson, J. (2026). [Estimating Wind‐Power Capacity Time Series From
 Production Data Using a Power Curve Model and Quadratic
 Optimization](https://doi.org/10.1002/we.70136). *Wind Energy*.
+- Wang, F., Ge, X., Dong, Z., Yan, J., Li, K., Xu, F., Lu, X., Shen, H. and Tao, P. (2022). [Joint
+Energy Disaggregation of Behind-the-Meter PV and Battery Storage: A Contextually Supervised Source
+Separation Approach](https://doi.org/10.1109/TIA.2022.3144244). *IEEE Transactions on Industry
+Applications*. Abstract only.
 - Western Power Distribution (2017). [Time Series Data
 Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/).
 - Western Power Distribution (2021). [Electricity Flexibility and Forecasting System
