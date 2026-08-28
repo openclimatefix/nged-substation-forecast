@@ -1410,43 +1410,65 @@ behind any given substation is growing quickly. A Flexpectation stretch goal is 
 forecast heat pumps, electric-vehicle (EV) chargers, and batteries separately rather than leaving
 them inside net demand.
 
-The number of each installed grows fast enough to matter within Flexpectation's own lifetime. NESO's
-[Future Energy Scenarios 2025](https://www.neso.energy/publications/future-energy-scenarios-fes) put
-1.4 million electric cars on GB roads in 2024 and 8.2 million by 2030, and the GB heat pump stock at
-361,000 in 2024 and 2.3 million by 2030 — roughly a sixfold rise in each over six years. Battery
-storage below 1 MW, the class that sits behind a substation without reaching the Embedded Capacity
-Register's 50 kW floor, rises from 191 MW to 975 MW over the same period. Scaling those GB figures
-to NGED is only approximate: NESO's
-[regional breakdown of the 2024 scenarios](https://www.neso.energy/data-portal/regional-breakdown-fes-data-electricity)
-allocates 36% of GB's sub-1 MW battery capacity to the four grid supply point groups NGED serves, 49
-MW of 138 MW in 2024 rising to 308 MW of 862 MW by 2030. Those GB totals are lower than the 191 MW
-and 975 MW above because the regional breakdown is built on the 2024 scenarios rather than the 2025
-ones, but that 36% is held constant across every forecast year, so the regional number is an
-allocation of the GB total rather than a forecast of NGED's own area. NGED serves nearly 8 million
-customers, a little over a quarter of the GB total.
+The number of each installed grows fast enough to matter within Flexpectation's own lifetime. Every
+figure below is the Holistic Transition pathway of NESO's [Future Energy
+Scenarios](https://www.neso.energy/publications/future-energy-scenarios-fes), for GB unless the row
+says otherwise.
+
+| What | 2024 | 2030 |
+|---|---|---|
+| Battery-electric cars on the road | 1.4 million | 8.2 million |
+| Heat pump stock | 361,000 | 2.3 million |
+| Battery storage below 1 MW | 191 MW | 975 MW |
+| Battery storage below 1 MW, in the 2024 scenarios rather than the 2025 ones | 138 MW | 862 MW |
+| The same 2024 figure, allocated to the four grid supply point groups NGED serves | 49 MW | 308 MW |
+
+Electric cars and heat pumps each rise roughly sixfold over those six years. "Below 1 MW" is NESO's
+own class boundary, and NESO defines the class as generation and storage under 1 MW that therefore
+"includes some larger commercial installations", so the class is wider than the batteries that fall
+below the Embedded Capacity Register's 50 kW floor. How much of the 191 MW sits below that floor is
+a question the scenarios cannot answer: the register covering the band below 50 kW is the
+Microgeneration Certification Scheme's installation database, which Ofgem's [asset visibility
+consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
+says certifies battery storage up to 50 kW.
+
+Scaling the GB figures to NGED is only approximate. NESO's [regional breakdown of the 2024
+scenarios](https://www.neso.energy/data-portal/regional-breakdown-fes-data-electricity) allocates
+36% of GB's sub-1 MW battery capacity to the four grid supply point groups NGED serves, and holds
+that 36% constant across every forecast year, so the regional number is an allocation of the GB
+total rather than a forecast of NGED's own area. NGED serves nearly 8 million customers, a little
+over a quarter of the GB total.
 
 #### What the literature says
 
 **Heat pumps, EV chargers, and batteries have the fewest directly relevant papers we could find of
-the nine challenges, and one targeted search narrowed the evidence gap rather than closing the
-gap.** In the one study we found that measures charger forecast skill against aggregation,
-[Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1), the site with more than 100
-charge points was the only one where the models beat a naive benchmark consistently, though some
-models also beat the benchmark at one much smaller site. We found no measurement of heat-pump
-diversity in the cold weather that matters, and none of whether domestic batteries responding to a
-common price signal average out as more are added.
+the nine challenges.** The one study we found that measures EV charger forecast skill against
+aggregation, [Ostermann and Haug (2024)](https://doi.org/10.1186/s42162-024-00319-1), forecasts
+charging demand over a 24-hour horizon at 15-minute resolution from 350,000 charging processes at
+more than 500 locations across Germany, and repeats the exercise at four aggregation levels: the
+individual site, the postal code, the transmission system operator's zone, and the whole portfolio.
+Eight machine-learning and deep-learning models are set against a naive benchmark that predicts the
+average of the same quarter-hour on the same weekday. Of the five individual sites, only the one
+with 145 charge points beat that benchmark by a clear margin; at the site with 8 charge points some
+models beat it, and at the sites with 3, 4, and 14 charge points none did. We found no measurement
+of heat-pump diversity in the cold weather that matters, and none of whether domestic batteries
+responding to a common price signal average out as more are added.
 
-**A targeted search for disaggregating heat pumps, chargers, and batteries from substation
-measurements found the work split by asset, and found "substation level" used for aggregations far
-smaller than a GB primary substation.**
+**A targeted literature search for disaggregating heat pumps, chargers, and batteries from
+substation measurements found the work split by asset, and found "substation level" used for
+aggregations far smaller than a GB primary substation.**
 [Gao et al. (2024)](https://doi.org/10.1016/j.apenergy.2024.123361) disaggregate thermostatically
 controlled loads — air conditioners, heating and ventilation units, and furnaces — from an
-aggregated residential load by contrastive sequence-to-point learning, report a mean absolute
-percentage error as low as 8.78%, and generalise the same model to photovoltaic generation and
-electric-vehicle charging. Gao et al.'s aggregate is the sum of the Pecan Street dataset's 25
-individually metered homes in Austin, Texas, and 25 in New York — two orders of magnitude below the
-thousands of customers behind a GB primary substation, and a sum of household meters rather than a
-measurement taken at a real substation.
+aggregated residential load by contrastive sequence-to-point learning, and generalise the same model
+to photovoltaic generation and electric-vehicle charging. The 8.78% Gao et al. report is a mean
+absolute percentage error between the estimated thermostatically controlled load and the metered
+thermostatically controlled load, so the denominator is the appliance load being recovered rather
+than the aggregate the load was pulled out of. Gao et al. give 8.78% as a best case for the
+bi-directional model structure and 11.26% as a best case for the unidirectional structure, and name
+no baseline either structure is measured against. Gao et al.'s aggregate is the sum of the Pecan
+Street dataset's 25 individually metered homes in Austin, Texas, and 25 in New York — two orders of
+magnitude below the thousands of customers behind a GB primary substation, and a sum of household
+meters rather than a measurement taken at a real substation.
 [Ebrahimi et al. (2022)](https://doi.org/10.1109/TII.2021.3118101) split electric-vehicle charging
 out of a feeder-head load hour by hour, and needed the charging power and stored energy of 19
 vehicles metered live, alongside the hourly energy price and the ambient temperature, to do it. The
