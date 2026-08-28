@@ -25,9 +25,9 @@ network; no paper driving a probabilistic substation forecast from a weather ens
 14-day horizon; none modelling the tails of the distribution explicitly at substation level; none
 aggregating building thermal physics up to a substation and putting that physics inside a
 probabilistic forecast; and none reading a substation forecast off a pre-trained weather encoder.
-Most striking of all, every study we reviewed that touches more than one of the nine challenges
-solves them as a pipeline, freezing each stage's output before the next stage sees it — so a mistake
-made early can never be put right by what a later stage learns.
+Most striking of all, almost every study we reviewed that touches more than one of the nine
+challenges solves them as a pipeline, freezing each stage's output before the next stage sees it —
+so a mistake made early can never be put right by what a later stage learns.
 
 **Every one of our research ideas is planned research rather than a result, and research fails.**
 Each absence above says that we did not find prior work, not that the approach will succeed, and
@@ -116,7 +116,7 @@ uneven. The first challenge (probabilistic forecasts of net demand at substation
 of literature, the second challenge (forecasting metered generators) is the most mature field on the
 list, and the eighth challenge (disaggregating unmetered solar and wind) needs the longest
 treatment, because the published work sits either side of the aggregation level NGED meters at and
-the review borrows from three fields outside energy forecasting.
+the review borrows from four fields outside energy forecasting.
 
 **The table below is a summary of this entire section: the table describes, for each challenge, the
 most relevant papers we found, and the implications for Flexpectation.** The sections that follow
@@ -128,7 +128,7 @@ give the evidence behind each row.
 | 2. Forecasting metered generators | [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) on 73 wind farms in Great Britain (GB) from the European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble, [HEFTCom](https://doi.org/10.1016/j.ijforecast.2025.10.005)'s day-ahead portfolio forecast, and [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682)'s meta-analysis of 4,687 skill scores from 188 solar forecasting papers | Gradient-boosted trees fitted separately for each kind of generator are the standard approach, and what won when teams were scored against each other on the same data. A higher-resolution deterministic forecast beat the ensemble at short lead times |
 | 3. Estimating the effective capacity of metered generators | [Viotti et al. (2026)](https://doi.org/10.1002/we.70136), fitting a wind farm's capacity against a capacity factor simulated from reanalysis weather, and [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079), ratcheting a running maximum of the farm's own metered production. Every method we found covers one generation technology, and most work from a revenue meter alone | Flexpectation version 1 needs an estimator that can track effective capacity downwards, which is exactly where the two published wind methods differ |
 | 4. Detecting switching events | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) at 180 Dutch primary substations, using a second load estimate built from smart meters; a Korean series of four papers, three on one feeder and one on two; [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) on GB substations in 2016 | The one published result scoring both precision and recall reports F1.5 scores (a blend of precision and recall weighted towards recall, 0 for a useless detector and 1 for a perfect one) between about 0.2 and 0.5, from different detectors at different event lengths, and achieved with a second load estimate NGED does not have, so Flexpectation should expect worse rather than better |
-| 5. Forecasting a substation as if it were always in its normal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Every published solution throws information away. In contrast, Flexpectation version 1 makes the abnormal periods an input to the ML model, and masks the abnormal periods in the training target |
+| 5. Forecasting a substation as if it were always in its normal running arrangement | Three published responses: leave the level shifts in ([Huyghues-Beaufond et al. (2020)](https://doi.org/10.1016/j.apenergy.2019.114405)), rewrite the history ([Paredes and Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129)), or adapt to the new level ([de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)) | Every published solution throws information away. In contrast, Flexpectation version 1 makes the abnormal periods an input to the ML model, and drops the abnormal periods from the training target |
 | 6. Detecting faulty metering | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s Dutch dataset which merges metering faults and switching into a single class | No GB project publishes labels or an accuracy figure, and Flexpectation is not labelling NGED's telemetry either, so a precision and a recall are out of reach. Flexpectation judges its cleaning rules downstream instead, by whether excluding the periods a rule flags improves the forecast on held-out data |
 | 7. Recovering signed power from apparent-power meters | [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) and Western Power Distribution's 2017 [Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/) both recover the sign from a second measurement of the same power; [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/) instead uses a meter's own 4-year average net demand together with a model of the generation behind that meter | Flexpectation version 1 forecasts the affected series in apparent power and flags those series to NGED; version 2 puts the magnitude inside a differentiable-physics forward model — the phase-retrieval formulation — and breaks the sign ambiguity with weather and with the persistence of flow direction |
 | 8. Disaggregating unmetered solar and wind | [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662) transferring from fully-metered Dutch substations, and [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/), this work's direct predecessor | UK Power Networks' Power Flow to Solar Capacity attacked the same problem on the same kind of GB primary-substation data, and Open Climate Fix delivered that project too |
@@ -167,8 +167,8 @@ the horizon, the result and the baseline the result was measured against, and th
 
 - **[Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) — net load at 200 low-voltage feeders in
 Germany, 4 days ahead.** A general-purpose foundation timeseries model (Chronos-2) that was not
-trained on the authors' data beat every purpose-trained model on average error, 3.8 kW against 4.2
-kW. Weather: 1–3 h forecasts, so effectively after the fact at the 4-day horizon.
+trained on the authors' data beat every purpose-trained model on mean absolute error, 3.8 kW against
+4.2 kW. Weather: 1–3 h forecasts, so effectively after the fact at the 4-day horizon.
 - **[Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) — load in Germany and Portugal, at
 transmission level, 200 low-voltage feeders, and 287 individual customers, 4 days ahead.** Their
 best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage
@@ -184,8 +184,7 @@ benchmark at system level, and **at substation level beat a naive forecast on 83
 network-owned and 66–70% of customer-owned sites** (the paper's body text and the caption of a
 figure on the next page give different pairs of numbers for that statistic, so the ranges span
 both). Weather: real forecasts, 7–8 h old.
-- **[Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) — load in GB at 4 levels, primary
-substation down to household, day-ahead.** Combining forecasts gained **0.0–0.4% averaged over all
+- **[Gilbert et al. (2023)](https://arxiv.org/abs/2206.11745) — load at 4 levels of a hypothetical GB network assembled from London smart meters, primary substation down to household, day-ahead.** Combining forecasts gained **0.0–0.4% averaged over all
 periods**, but **5.7–9.0% when restricted to peaks**. Weather: none at all.
 - **[SSEN TRANSITION 2021](https://ssen-innovation.co.uk/transition/) — net load in Oxfordshire at 13
 primary substations, plus their bulk supply points and their 33 kV and 11 kV feeders, 30 minutes to
@@ -720,9 +719,9 @@ nameplate rating cannot see the difference.
 
 A method exists for each generation technology separately, but we found none run across a mixed
 fleet of individually metered generators at a distribution network operator. Only one study we found
-measures what estimating capacity is worth downstream, for wind alone and at the scale of a national
-bidding zone; the other estimates a wind farm's capacity but treats the estimate as a known input
-rather than measuring what getting it right is worth.
+measures what estimating capacity is worth downstream, for wind alone and at the scale of a bidding
+zone; the other estimates a wind farm's capacity but treats the estimate as a known input rather
+than measuring what getting it right is worth.
 
 #### What this means for Flexpectation
 
@@ -757,7 +756,6 @@ already a robust estimate of one farm's installed capacity, so the fitting shows
 hourly, region-aggregated data. Whichever estimator wins, normalising by effective capacity stays a
 hypothesis to test rather than a settled preprocessing step, because no study we found has measured
 whether it improves the forecast NGED acts on.
-
 **A competition on Norwegian wind confirms that normalising by capacity is what practitioners reach
 for, and also that the entrants were handed the capacity rather than having to estimate it.** WindAI
 asked for the hourly wind power of four Norwegian bidding zones two days ahead, and supplied wind
@@ -765,20 +763,21 @@ park metadata alongside the weather and production data; [Authen et al.
 (2026)](https://doi.org/10.5617/nmi.13106) report that Statnett scored 5% of its weighted assessment
 on "robustness to changes in installed wind power capacity, evolving weather patterns, long-term
 climate variability". The two highest-placed teams both predicted capacity factor rather than
-absolute production, "to account for maintenance events and future capacity expansions", and both
-used Nord Pool unavailability messages to cover planned maintenance and outages. A team given an
-honourable mention fitted a physical power curve for each wind park under sequential Bayesian
-updating over a sliding window, to absorb "capacity changes or the commissioning of new wind parks",
-and initialised a new park's parameters from a prior built on the existing fleet — an answer to the
-cold-start problem an estimator faces at a generator that has just connected. Authen et al. decline
-to credit any of that with the differences in accuracy, because unavailability messages covered
-between 1% and 13% of timestamps depending on the bidding zone, so downtime events "represent only a
-limited fraction of the full dataset". Two conclusions follow for Flexpectation. Independent teams
-converging on capacity factor as the target is evidence about what practitioners believe rather than
-a measurement of what the belief is worth, so the hypothesis in the paragraph above stands
-unaltered. And the part WindAI could skip is the part NGED cannot: the Embedded Capacity Register
-records the export limit permitted by a site's connection agreement rather than what the site can
-generate, so Flexpectation has to estimate the effective capacity that WindAI's entrants were given.
+absolute production, which the winning team did "to account for maintenance events and future
+capacity expansions", and both used Nord Pool unavailability messages to cover planned maintenance
+and outages. A team given an honourable mention fitted a physical power curve for each wind park
+under sequential Bayesian updating over a sliding window, to absorb "capacity changes or the
+commissioning of new wind parks", and initialised a new park's parameters from a prior built on the
+existing fleet — an answer to the cold-start problem an estimator faces at a generator that has just
+connected. Authen et al. decline to credit any of that with the differences in accuracy, because
+unavailability messages covered between 1% and 13% of timestamps depending on the bidding zone, so
+downtime events "represent only a limited fraction of the full dataset". Two conclusions follow for
+Flexpectation. Independent teams converging on capacity factor as the target is evidence about what
+practitioners believe rather than a measurement of what the belief is worth, so the hypothesis in
+the paragraph above stands unaltered. And the part WindAI could skip is the part NGED cannot: the
+Embedded Capacity Register records the export limit permitted by a site's connection agreement
+rather than what the site can generate, so Flexpectation has to estimate the effective capacity that
+WindAI's entrants were given.
 
 ### 4. Detecting switching events
 
@@ -1457,8 +1456,10 @@ Scaling the GB figures to NGED is only approximate. NESO's [regional breakdown o
 scenarios](https://www.neso.energy/data-portal/regional-breakdown-fes-data-electricity) allocates
 36% of GB's sub-1 MW battery capacity to the four grid supply point groups NGED serves, and holds
 that 36% constant across every forecast year, so the regional number is an allocation of the GB
-total rather than a forecast of NGED's own area. NGED serves nearly 8 million customers, a little
-over a quarter of the GB total.
+total rather than a forecast of NGED's own area. The 2024 regional breakdown's own GB totals are
+lower than the figures in the table above, at 138 MW for 2024 and 863 MW for 2030, so the 49 MW and
+the 308 MW are 36% of those totals rather than of the 191 MW and the 975 MW. NGED serves nearly 8
+million customers, a little over a quarter of the GB total.
 
 #### What the literature says
 
@@ -1900,7 +1901,7 @@ so rather than being left blank.
 | [Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058) (Enedis, France) | Consumption and generation at the substation since 2015; the finer-grid method the paper describes covers consumption, not generation | All 2,300 high-voltage-to-medium-voltage substations, extending to 3,678 of the more than 5,000 transformers inside them, and towards 750,000 medium-to-low-voltage substations | Not stated in the paper; the forecasts run at 10- or 30-minute resolution | None stated in the paper |
 | **Flexpectation** | Net demand, with unmetered generation inferred | 32 series in the trial area; 52 grid supply points, 271 bulk supply points, and 1,161 primary substations across NGED's whole distribution network from 2027 | 14 days, updated every 6 hours | A 51-member ECMWF ensemble across the whole horizon |
 
-**[SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) (2018 - 2021; £14.5 million) is the
+**[SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) (2018 - 2023; £12.6 million) is the
 closest precedent we found for Flexpectation's method.** TRANSITION split each substation's net load
 — demand minus whatever generation behind that substation happened to produce — into demand and
 generation, forecast the two separately, then recombined them. Flexpectation adds an ensemble that
