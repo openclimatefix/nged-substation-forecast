@@ -1092,8 +1092,27 @@ that explains the soft floor with demand that was never there.
 
 Rooftop panels and small wind turbines appear only as a dent in a substation's net power flow.
 Recovering both the half-hourly output of that unmetered generation and its installed capacity, from
-the net flow alone, is what we call *disaggregation*. Disaggregation is a different task from
-estimating how much of a *metered* generator's capacity is available today, which is challenge 3.
+the net flow alone, is what we call *disaggregation*. Disaggregation is a different task from estimating how much of a *metered* generator's capacity is available today, which is challenge 3.
+
+NGED cannot look the missing capacity up. NGED's Embedded Capacity Register records generation of 50
+kW and above and names the primary substation each site sits behind, which is the level
+Flexpectation forecasts at, but the capacity recorded is the export limit "permitted as per the
+connection agreement" rather than what a site can generate. Below 50 kW the register is silent, and
+that is where most of the panels are: of the 22,560 MW of solar photovoltaic capacity installed in
+GB by the end of July 2026, 8,503 MW — 38% of the total — sits in arrays smaller than 50 kW, spread
+across 2,058,822 of the 2,068,186 installations, on the Department for Energy Security and Net
+Zero's
+[solar deployment statistics](https://www.gov.uk/government/statistics/solar-photovoltaics-deployment).
+The other registers each cover part of the gap: the Renewable Energy Planning Database is
+planning-driven and starts at 150 kW, the Feed-In Tariff register stopped taking new applicants in
+2019, and a domestic array reaches NGED only when the installer notifies NGED, as installers are
+required to do. Ofgem's December 2025
+[consultation on asset visibility](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
+estimates that distribution network operators "are aware of less than half" of the consumer and
+distributed energy resources on their networks, a figure the Department for Energy Security and Net
+Zero attributes to the operators' own engagement rather than to a measurement. None of these
+registers records the panel tilt, the panel azimuth, or the ratio of direct-current to
+alternating-current rating.
 
 #### What the literature says
 
@@ -1107,14 +1126,8 @@ Powergrid's own installed-capacity projection per substation.
 [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/) split net load into demand and
 generation, forecast the two separately, and recombined them; TRANSITION's rooftop solar is not
 metered, but TRANSITION read each installation's capacity from a list of Feed-In Tariff
-installations. Flexpectation has no register that would carry it as far. The Feed-In Tariff register
-stopped being complete when the Feed-In Tariff closed, and the registers NGED does hold give only an
-approximate capacity: the Renewable Energy Planning Database and NGED's own Embedded Capacity
-Register both record a contractual export limit rather than what a site can generate, the Embedded
-Capacity Register starts at 50 kW, and a domestic array reaches NGED only when the installer
-notifies NGED, as installers are required to do. None of those registers records the panel tilt, the
-panel azimuth, or the ratio of direct-current to alternating-current rating, which is why challenge
-2 above proposes inferring the engineering parameters from the power data.
+installations. Flexpectation has no register that would carry it as far, for the reasons set out
+under "The challenge" above.
 
 **Inferring the capacity from the net flow instead has been measured only a voltage level below
 NGED's.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark that
@@ -1123,12 +1136,25 @@ Networks' [Power Flow to Solar Capacity](https://smarter.energynetworks.org/proj
 is inferring the capacity behind GB primary substations now, and is still running.
 
 **Uncertainty and a multi-day horizon each appear in the disaggregation work we found, but never in
-the same forecast.** [Zhang et al. (2022)](https://doi.org/10.1016/j.engappai.2022.104707) do the
-probabilistic half, disaggregating rooftop solar out of net load at grid supply point and feeder
-level with a multi-quantile recurrent neural network, scored on reliability and sharpness. NESO's
+the same forecast.** [Zhang et al. (2022)](https://doi.org/10.1016/j.engappai.2022.104707) attach
+uncertainty, disaggregating rooftop solar out of net load at grid supply point and feeder level with
+a multi-quantile recurrent neural network scored on reliability and sharpness, but Zhang et al.
+disaggregate the present and state no lead time. NESO's
 [embedded wind and solar forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts)
 do the multi-day half, half-hourly to 14 days ahead, as a single number per half-hour with no
 uncertainty attached.
+
+**A larger literature disaggregates rooftop solar from smart-meter data, but at individual premises
+rather than at a substation, and its methods lean on advantages NGED does not have.**
+[Cheung et al. (2023)](https://doi.org/10.1109/TSUSC.2022.3192456) use the consumption patterns of
+neighbouring customers known to have no panels, which NGED cannot observe, and Cheung et al. are the
+one study we found that varies the level of aggregation directly: across 5, 10 and 20 Australian
+customers per aggregated series, the solar side's mean absolute scaled error stays between 1.56 and
+2.20 — larger than the average change between consecutive readings — with solar mean absolute
+percentage error of 24 to 43%. Results reported elsewhere at an aggregate level are usually sums of
+individually metered households rather than a measurement taken at a real aggregation point, so the
+ladder this literature has climbed stops far below the thousands of customers behind a GB primary
+substation.
 
 #### What this means for Flexpectation
 
@@ -1212,7 +1238,7 @@ usage is still clearly identifiable at feeder and substation level". The same tr
 detection of ASHP [air-source heat pumps] is frustrated by the low levels of adoption (<1% of
 premises) and differences in operation (low-slow vs high-fast)".
 
-## How we will know whether each of these worked
+## Evaluating the performance of power forecasts
 
 The nine challenges above need three different kinds of evaluation, and this literature is far
 stronger on the first than on the other two. Forecasting has settled practice we can adopt.
@@ -1306,7 +1332,7 @@ confirmed by checking each one rather than assumed.** That absence is a gap in t
 record rather than a target Flexpectation is setting itself: scoring a metering-fault detector needs
 labels that none of the GB projects we checked published, and Flexpectation is not producing them.
 
-## What published leaderboards did, and what a single team can borrow from them
+## Leaderboards of machine learning results
 
 **What Flexpectation is building is a leaderboard, not a competition, and the distinction changes
 which published lessons apply.** Our leaderboards carry our own experiments, one per class of time
@@ -1689,6 +1715,10 @@ horizon](https://doi.org/10.1002/qj.2619). *Quarterly Journal of the Royal Meteo
 Society*.
 - Campagne, E., Amara-Ouali, Y., Goude, Y., Zehavi, I. and Kalogeratos, A. (2025). [Graph Neural
 Networks for Electricity Load Forecasting](https://arxiv.org/abs/2507.03690).
+- Cheung, C. M., Kuppannagari, S. R., Srivastava, A., Kannan, R. and Prasanna, V. K. (2023).
+[Behind-the-Meter Solar Generation Disaggregation at Varying Aggregation Levels Using Consumer
+Mixture Models](https://doi.org/10.1109/TSUSC.2022.3192456). *IEEE Transactions on Sustainable
+Computing*.
 - Cordier, G. et al. (2024). [Methods and techniques used to produce electricity forecasts on
 Enedis’ distribution network at a finer grid than the HV/MV
 substation](https://doi.org/10.1049/icp.2024.2058). *CIRED 2024 Vienna Workshop*, in *IET
@@ -1698,6 +1728,8 @@ Forecasting](https://doi.org/10.1002/we.70079). *Wind Energy*.
 - de Vilmarest, J., Browell, J., Fasiolo, M., Goude, Y. and Wintenberger, O. (2024). [Adaptive
 Probabilistic Forecasting of Electricity (Net-)Load](https://doi.org/10.1109/TPWRS.2023.3310280).
 *IEEE Transactions on Power Systems*.
+- Department for Energy Security and Net Zero (2026). [Solar photovoltaics
+deployment](https://www.gov.uk/government/statistics/solar-photovoltaics-deployment).
 - Dong, J., Valzania, L., Maillard, A., Pham, T., Gigan, S. and Unser, M. (2023). [Phase Retrieval:
 From Computational Imaging to Machine Learning: A Tutorial](https://doi.org/10.1109/MSP.2022.3219240).
 *IEEE Signal Processing Magazine*.
@@ -1807,6 +1839,8 @@ phase](https://smarter.energynetworks.org/projects/npg_sif_006-1/).
 Data](https://smarter.energynetworks.org/projects/npg_nia_-49/).
 - Northern Powergrid (2025). [Artificial Forecasting, Beta
 phase](https://smarter.energynetworks.org/projects/10145998/).
+- Ofgem (2025). [Enhancing asset visibility: Distribution Network Operator options
+consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf).
 - Ostermann, A. and Haug, T. (2024). [Probabilistic forecast of electric vehicle charging demand:
 analysis of different aggregation levels and energy
 procurement](https://doi.org/10.1186/s42162-024-00319-1). *Energy Informatics*.
