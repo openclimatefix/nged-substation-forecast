@@ -341,7 +341,8 @@ measured on upper-air variables, not on the near-surface temperature and irradia
 substation load.
 
 **Almost every substation-load study we found optimises *average* accuracy, but NGED's question is
-about both ends of the distribution, and that is the literature gives a direct warning about this.**
+about both ends of the distribution, and that is where the literature gives a direct warning about
+this.**
 [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) is the only study we found that
 models the tails explicitly, and they find that "below 1% and above 99% the forecasts based on
 quantile regression only are not calibrated at any GSP [grid supply point] Group. Therefore, these
@@ -1432,7 +1433,7 @@ figure below is the Holistic Transition pathway of NESO's
 | Battery-electric cars on the road in GB | 1.4 million | 8.2 million |
 | Heat pump stock in GB | 361,000 | 2.3 million |
 | Battery storage below 1 MW in GB | 191 MW | 975 MW |
-| The same class in the 2024 scenarios, allocated to the four grid supply point groups NGED serves | 49 MW  | 308 MW  |
+| The same class in the 2024 scenarios, allocated to the four grid supply point groups NGED serves | 49 MW | 308 MW |
 
 Electric cars and heat pumps each rise roughly sixfold over those six years. "Below 1 MW" is NESO's
 own class boundary, and NESO defines the class as generation and storage under 1 MW that therefore
@@ -1472,7 +1473,7 @@ average of the same quarter-hour on the same weekday. Of the five individual sit
 with 145 charge points beat that benchmark by a clear margin; at the site with 8 charge points some
 models beat it, and at the sites with 3, 4, and 14 charge points none did. We found no papers
 discussing whether domestic batteries responding to a common price signal average out as more are
-added. On the topic of heat pumps, we found no measurement of heat-pump diversity in cold weather,
+added. On the topic of heat pumps, we found no measurement of heat-pump diversity in cold weather.
 
 **A targeted literature search for disaggregating heat pumps, chargers, and batteries from
 substation measurements found the work split by asset, and found "substation level" used for
@@ -1645,7 +1646,7 @@ against an independent tool rather than against truth; and to measure whether th
 the forecast it was built to improve. The two that appear in none of them are to check an estimate
 against a physical model, and to use a substation where every feeder and every embedded generator is
 metered, purely as validation. No one substitute for ground truth is trustworthy alone, so the best
-approach may be to run *multiple* proxy tests report where they disagree. Each test fails in a
+approach may be to run *multiple* proxy tests and report where they disagree. Each test fails in a
 different way, so an estimate that survives multiple tests is better supported than an estimate from
 the single best substitute.
 
@@ -1821,7 +1822,7 @@ probabilistic net-load forecasts in the present framework" — while allowing th
 that other forecasting methods would be able to extract value from this data by constructing
 different features".
 
-Weather itself mattered a great deal to Browell and Fasiol's model. Adding the regionally-averaged
+Weather itself mattered a great deal to Browell and Fasiolo's model. Adding the regionally-averaged
 wind and irradiance to a model carrying only calendar features and the point temperature cut the
 pinball score — the single-quantile equivalent of the continuous ranked probability score — by 40%
 overall, by 60% in North Scotland, where embedded wind capacity exceeds peak load, and by 10% in
@@ -1967,7 +1968,7 @@ through a full winter flexibility procurement cycle to support week-ahead dispat
 service produces half-hourly probabilistic forecasts with 5th-to-95th-percentile bands, flags
 forecast exceedances of firm capacity, and is benchmarked against Northern Powergrid's existing
 growth-based and persistence methods and a rolling 4-week baseline. The deliverable states that
-performance did not materially degrade on average across the 11-day horizon. 
+performance did not materially degrade on average across the 11-day horizon.
 
 **Artificial Forecasting's value case puts whole-life net present value at around £60 million for
 one distribution network operator, or £250 million if three further operators adopt Artificial
