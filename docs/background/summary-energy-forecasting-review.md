@@ -1618,70 +1618,40 @@ bind and generators are curtailed.
 **None of the papers we read addresses the leakage a frequently reissued forecast creates, and
 Flexpectation reissues its forecast often enough for the leakage to matter.** When a forecast
 covering 14 days is reissued every 6 hours, every target half-hour is covered by 56 separate
-forecasts. Count the 56 forecasts as independent, and a significance test will report a confidence
-the data does not support. Let a target half-hour fall on both sides of a train-test boundary, and
-the test set is contaminated outright. Flexpectation will publish the leakage-handling rule it used
-alongside every leaderboard result, rather than leaving the rule implicit, and treats the leakage as
-an open methodological question rather than a solved one.
+forecasts. The literature describes two traps: If we were to count the 56 forecasts as independent,
+then a significance test will report a confidence the data does not support. If we were to let a
+target half-hour fall on both sides of a train-test boundary, then the test set is contaminated
+outright. Flexpectation will treat the leakage as an open methodological question rather than a
+solved one.
 
-**There is no ground truth for an effective capacity or an unmetered solar output, and the papers
-that estimate effective capacity and unmetered solar output say so.** The papers we read use four
-substitutes for truth, each of which fails differently. Two further substitutes appear in none of
-them. The four in use are to hold out sites that are metered and pretend they are not; to inject a
-change into real data and see whether the method recovers it; to compare against an independent tool
-rather than against truth; and to measure whether the estimate improves the forecast it was built to
-improve. The two that appear in none of them are to check an estimate against physics rather than
-against an answer, and to use a substation where every feeder and every embedded generator is
-metered, purely as validation.
-
-**No one substitute for ground truth is trustworthy alone, so Flexpectation will run all five that
-need no new metering and report where the five disagree.** Each of the five fails in a different
-way, so an estimate that survives all five is better supported than an estimate from the single best
-substitute. Every number we publish will say which substitute produced it. The sixth substitute
-would anchor all the others, and none of the papers we read had one: a fully metered substation is a
-field deployment rather than an analysis.
-
-**A missed switching event corrupts the history a model trains on, whereas a false alarm only takes
-an engineer's time to dismiss, so detection should be scored with recall weighted above precision.**
-[Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score precision (the share of flagged
-events that are real), recall (the share of real events that get flagged), and an F-score combining
-the two, with β set to 1.5 rather than 1, "to give a higher importance to the recall term, as the
-potential impact of a false negative is higher than that of a false positive in power grid expansion
-planning". That asymmetry holds for Flexpectation too.
-
-**Detecting switching and metering faults is hard: the one paper we found that scores both precision
-and recall reports F-scores of 0.2 to 0.5.**
-[Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) report F-scores near 0.2 on the shortest
-events and around 0.5 on the longest, and conclude that performance "is relatively low across the
-board, even on the train data. This indicates that the problem is hard to learn, though it
-generalizes fairly well". Any target we set for challenges 4 and 6 should start from those F-scores
-rather than from an intuition about how obvious a switching event looks on a chart.
-
-**None of the three GB metering-fault projects covered under challenge 6 offers a number to compare
-against.** We checked ATLAS, Distribution Network Visibility, and NGED's own Time Series Data
-Quality one at a time rather than assuming the gap. The missing number sits in the published GB
-record. Flexpectation is not setting itself a detection target either, because scoring a
-metering-fault detector needs labels that none of the GB projects we checked published, and
-Flexpectation is not producing them.
+**We have no ground truth for the effective capacity of a metered generator, or an unmetered solar
+output.** The papers we read use four substitutes for truth, each of which fails differently. Two
+further substitutes appear in none of the papers. The four in use are to hold out sites that are
+metered; to inject a change into real data and see whether the method recovers it; to compare
+against an independent tool rather than against truth; and to measure whether the estimate improves
+the forecast it was built to improve. The two that appear in none of them are to check an estimate
+against a physical model, and to use a substation where every feeder and every embedded generator is
+metered, purely as validation. No one substitute for ground truth is trustworthy alone, so the best
+approach may be to run *multiple* proxy tests report where they disagree. Each test fails in a
+different way, so an estimate that survives multiple tests is better supported than an estimate from
+the single best substitute.
 
 ## Leaderboards of machine learning results
 
-**What Flexpectation is building is a leaderboard, not a competition, and the distinction changes
+**Flexpectation is building a leaderboard, not a public ML competition, and the distinction changes
 which published lessons apply.** Our leaderboards carry our own experiments, one per class of time
-series. Solar farms, wind farms, batteries, and the demand at primary substations each get their own
-board, and grid supply points and bulk supply points share a board because both measure the same
-kind of quantity. The leaderboards are public to view and reproducible, but we are not inviting
-other teams to submit entries. Anyone who wants to benchmark against us can rerun the setup for
-themselves. Not inviting outside entries means the published lessons about attracting entrants,
-prize pots, and qualifying rounds do not apply to us, while the lessons about protocol — what makes
-a comparison trustworthy — apply with more force, because rival entrants give a competition some of
-its integrity by wanting to catch each other out, and Flexpectation's leaderboards will have no
-rivals.
+series. For example, solar farms, wind farms, batteries, and the demand at primary substations each
+get their own leaderboard. The leaderboards are public to view and reproducible, but we are not
+inviting other teams to submit entries. Anyone who wants to benchmark against us can rerun the setup
+for themselves. Not inviting outside entries means the literature's lessons about attracting
+entrants, prize pots, and qualifying rounds do not apply to us, while the lessons about protocol —
+what makes a comparison trustworthy — apply with more force, because rival entrants give a
+competition some of its integrity by wanting to catch each other out.
 
 **Energy forecasting has run competitions on common data for over a decade, and only the second
 track of GEFCom2017 forecast at anything like the level NGED acts on.** The last row of the table
-describes what Flexpectation is building. The two columns that decide whether a precedent exists are
-the aggregation level and whether the leaderboard is still open.
+below describes what Flexpectation is building. The two columns that decide whether a precedent
+exists are the aggregation level and whether the leaderboard is still open.
 
 | Leaderboard | What entrants forecast | Aggregation level, set against a primary substation | Take-up | Standing or closed |
 |---|---|---|---|---|
@@ -1690,15 +1660,52 @@ the aggregation level and whether the leaderboard is still open.
 | BigDEAL Challenge 2022 ([Shukla and Hong (2024)](https://doi.org/10.1049/stg2.12162)) | The timing of peak demand rather than its size; the final match asked for the magnitude, timing, and shape of daily peak load | Three neighbouring local distribution companies — whole utilities, well above a primary substation | 78 teams from 27 countries | Closed |
 | HEFTCom ([Browell et al. (2026)](https://doi.org/10.1016/j.ijforecast.2025.10.005)) | The combined day-ahead output of one GB wind-and-solar portfolio | A single 3.6 GW portfolio: the 1.2 GW Hornsea 1 offshore wind farm plus a regional solar aggregate — the generation mix closest to NGED's, though at portfolio rather than substation level | Over 170 teams registered, 66 submitted, 24 completed | Closed; the competition period was 3 months |
 | Three competitions NGED funded with Energy Systems Catapult ([McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541)) | 1-minute peaks inside half-hourly averages; the daily peak a hidden population of electric-vehicle chargers added; and missing values. None was a load forecast | NGED's own grid supply point, bulk supply points, and primary-substation feeders | 37 teams, over 2,500 submissions | Closed, though the pages and data are still readable on CodaLab |
+| WindAI ([Authen et al. (2026)](https://doi.org/10.5617/nmi.13106)) | Hourly wind power for the whole of a target day two days ahead, submitted daily against an outturn that had not yet happened | Four bidding zones of a transmission network — regions far above a primary substation | 9 teams carry an average score in the competition summary | Closed; the live evaluation ran over 10 working days in autumn 2025 |
 | Energy-Arena ([Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705)) | The paper describes deterministic day-ahead tasks; the running platform today carries 24 challenges across prices, load, wind, and solar — 8 scored as point forecasts, 8 as quantiles, and 8 as ensembles | Not a distribution network | Not stated in what we read | Standing |
 | TS-Arena ([Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)) | 186 live energy series | Not a distribution network | 13 foundation models and 3 statistical baselines run by the platform team, plus outside entries | Standing |
-| **Flexpectation's leaderboards** | Net demand at substations, and output at metered generators | One board per class of time series, with grid and bulk supply points sharing one | Public to view and reproducible; outside entries not invited | Standing |
+| Predico ([Elia Group](https://innovation.eliagroup.eu/en/projects/predico-collaborative-forecasting-platform)) | Quarter-hourly probabilistic generation: Belgian solar out to 10 days ahead, and the German wind and solar markets 50Hertz runs day-ahead | National generation totals of two transmission networks | Forecasters join by application; the number taking part is not published | Standing |
+| **Flexpectation's leaderboards** | Net demand at substations, and output at metered generators | One board per class of time series | Public to view and reproducible; outside entries not invited | Standing |
 
-**What we found no example of is a standing leaderboard for substation forecasting** — one that
-keeps accepting entries after its competition closes. Two of the three competitions NGED funded sat
-at exactly the levels NGED forecasts, which is why the gap is scoped to forecasting rather than to
-the voltage level. Flexpectation's leaderboards are meant to fill that gap, though the search behind
-that statement is ours and we would be glad to be pointed at a counter-example.
+**We found no example of a standing leaderboard for substation forecasting** — one that keeps
+accepting entries after its competition closes. Two of the three competitions NGED funded sat at
+exactly the levels NGED forecasts, which is why the gap is scoped to forecasting rather than to the
+voltage level. Flexpectation's leaderboards are meant to fill that gap, though we would be glad to
+be pointed at a counter-example.
+
+**WindAI is the closest of these competitions to challenge 3's problem of a generator whose capacity
+keeps changing, because robustness to that change was a scored criterion rather than an
+afterthought.** Statnett, Norway's transmission system operator, asked entrants for the hourly wind
+power of each of four Norwegian bidding zones two days ahead, and [Authen et al.
+(2026)](https://doi.org/10.5617/nmi.13106) report a weighted assessment giving 65% to accuracy, 20%
+to trustworthiness and explainability, 10% to implementation and presentation, and 5% to "robustness
+to changes in installed wind power capacity, evolving weather patterns, long-term climate
+variability". The two highest-placed teams both predicted capacity factor rather than absolute
+production, which Authen et al. record as a way "to account for maintenance events and future
+capacity expansions", and one team given an honourable mention fitted a physical power curve for
+each wind park under sequential Bayesian updating to absorb "capacity changes or the commissioning
+of new wind parks". Two further results transfer. The top three entries all used gradient-boosted
+decision trees, and Authen et al. conclude that the more complex deep-learning architectures'
+"additional complexity did not translate into superior performance". And the placings did not follow
+the accuracy order — WindSight recorded a lower average root mean square error than Knowit, 216.22
+MW against 217.57 MW, and Knowit still took second place — which is what the other 35% of the
+assessment is for.
+
+**Predico is a standing leaderboard that pays its entrants, which is the one mechanism
+Flexpectation's leaderboards deliberately do without.** Elia Group describes
+[Predico](https://innovation.eliagroup.eu/en/projects/predico-collaborative-forecasting-platform) as
+"a collaborative forecasting market platform enabling entities with common interests to procure and
+sell forecasts", where buyers receive "skill-weighted aggregate market forecasts" and forecasters
+are remunerated on performance: the Belgian solar market carries €7,000 a month, split by accuracy
+rank and information contribution, with the best forecasters earning about €1,500 to €2,000 a month.
+Forecasts are quarter-hourly and probabilistic, given as the 10th, 50th, and 90th percentiles, out
+to 10 days ahead for Belgian solar generation and day-ahead for the German wind and solar markets
+50Hertz runs. The [platform documentation](https://predico-elia.inesctec.pt/docs/) scores the median
+submission by root mean square error and the 10th-to-90th percentile pair by the mean Winkler
+interval, and ranks forecasters monthly. Predico forecasts the national generation totals of two
+transmission networks rather than anything on a distribution network, and Elia Group describes the
+platform as a proof of concept in which participants cannot yet create their own markets, so what
+Predico offers Flexpectation is a worked example of a standing, publicly ranked board rather than a
+precedent at NGED's aggregation level.
 
 **The mechanism that makes a leaderboard trustworthy is time, not policing.** The central idea of
 [Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)'s TS-Arena is that a forecast is submitted
@@ -1715,9 +1722,8 @@ published comparisons: competing methods "are not always implemented or optimize
 so reported differences "may reflect differences in implementation quality rather than inherent
 methodological advantages". [Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979) put it
 more bluntly, that "sometimes the parameters are manipulated, so that the competing models are being
-dominated by the proposed ones". So we run every entry through the same evaluation interface, and
-run each baseline from its authors' own code at its authors' recommended defaults — the rule
-TS-Arena imposes on itself.
+dominated by the proposed ones". This is a large part of the reason why, in Flexpectation v1, we are
+putting effort into *optimising* our XGBoost forecasts before trying more novel approaches.
 
 **Carry two baselines, one below the achievable skill and one at it, rather than a single
 baseline.** [Doubleday et al. (2020)](https://doi.org/10.1016/j.solener.2020.05.051) distinguish the
@@ -2046,11 +2052,14 @@ switching labels from operational systems instead of continuing to look.
 
 ## References
 
-Every source cited above, in alphabetical order by first author. The full review cites 30 sources that this summary does not, and this summary cites 24 that the full review does not.
+Every source cited above, in alphabetical order by first author. The full review cites 30 sources that this summary does not, and this summary cites 28 that the full review does not.
 
 - Abur, A. and Expósito, A. G. (1997). [Detecting multiple solutions in state estimation in the
 presence of current magnitude measurements](https://doi.org/10.1109/59.575721). *IEEE Transactions
 on Power Systems*.
+- Authen, K., Riemer-Sørensen, S., Michałowska, K., Vedvik, E., Razick, S. and Visoka, K.
+(2026). [WindAI: Wind power forecasting in Norway – data competition summary](https://doi.org/10.5617/nmi.13106).
+*Nordic Machine Intelligence*.
 - Bian, Y., Zheng, N., Zheng, Y., Xu, B. and Shi, Y. (2024). [Predicting Strategic Energy Storage
 Behaviors](https://doi.org/10.1109/TSG.2023.3303469). *IEEE Transactions on Smart Grid*.
 - Bioucas-Dias, J. M., Plaza, A., Dobigeon, N., Parente, M., Du, Q., Gader, P. and Chanussot, J.
@@ -2105,6 +2114,7 @@ Feeder-Level Load Disaggregation and PEVs' Charging Behavior Characteristics
 Extraction](https://doi.org/10.1109/TII.2021.3118101). *IEEE Transactions on Industrial
 Informatics*. Read as the author-posted accepted manuscript.
 - Electricity North West (2018). [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/).
+- Elia Group (2026). [Predico: collaborative forecasting platform](https://innovation.eliagroup.eu/en/projects/predico-collaborative-forecasting-platform).
 - Erdener, B. C., Feng, C., Doubleday, K., Florita, A. and Hodge, B.-M. (2022). [A review of
 behind-the-meter solar forecasting](https://doi.org/10.1016/j.rser.2022.112224). *Renewable and
 Sustainable Energy Reviews*.
@@ -2160,6 +2170,7 @@ feeders](https://doi.org/10.1016/j.apenergy.2019.114405). *Applied Energy*.
 - Hyndman, R. J. (2020). [A brief history of forecasting
 competitions](https://doi.org/10.1016/j.ijforecast.2019.03.015). *International Journal of
 Forecasting*.
+- INESC TEC. [Predico documentation](https://predico-elia.inesctec.pt/docs/).
 - Ju, Y., Wu, W., Ge, F., Ma, K., Lin, Y. and Ye, L. (2018). [Fast Decoupled State Estimation for
 Distribution Networks Considering Branch Ampere
 Measurements](https://doi.org/10.1109/TSG.2017.2709463). *IEEE Transactions on Smart Grid*.
