@@ -1464,10 +1464,11 @@ Swiss premises with heat pumps through one heating season of 15-minute readings,
 estimated heat-pump load of five of those premises, drawn at random from the dataset and treated as
 sharing one transformer, to within 6% of the metered total over an evening peak of 17:00 to 21:00.
 Gisiger et al.'s error, normalised by the mean metered heat-pump load, rose from 0.69 on the Swiss
-data the model was trained on to 1.24 on a German dataset of single-family houses with heat pumps,
-which Gisiger et al. attribute to differences in heat pump types, building stock, occupancy
-patterns, and data collection methods — measured evidence that a heat-pump model does not survive a
-change of country and building stock unaltered.
+data the model was trained on to 0.78 on Brudermueller et al.'s separate Swiss dataset, and to 1.24
+on a German dataset of single-family houses with heat pumps, which Gisiger et al. attribute to
+differences in heat pump types, building stock, occupancy patterns, and data collection methods —
+measured evidence that a heat-pump model does not survive a change of dataset unaltered, with a
+change of country degrading it further still.
 
 #### What this means for Flexpectation
 
