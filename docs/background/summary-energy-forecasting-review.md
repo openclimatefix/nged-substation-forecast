@@ -1861,17 +1861,21 @@ best served by the ensemble at every horizon, while Flexpectation forecasts 14 d
 
 ### Weather improved low-voltage forecasts less than expected in the past
 
-[Haben et al. (2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) tested 100 real low-voltage
-feeders with both forecast and observed temperature, and found that temperature had no effect on
-forecast accuracy, or a negative one.
-[Haben et al. (2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) used data collected in 2014
-and 2015. We expect how much weather matters at a substation to be changing quickly, because
-embedded solar generation and heat pumps are what make a substation weather-dependent, and there are
-far more of both on the distribution network now than there were then. That expectation is a
-prediction, though, not a measurement — and the Scottish primary-substation sensitivities of
-[Fox et al. (2018)](https://doi.org/10.34890/134), measured on the 10 years of weather and
-substation data before its publication and described in the full review, say weather was already
-moving primary substation demand well before the mid-2010s.
+[Haben et al. (2019)](https://doi.org/10.1016/j.ijforecast.2018.10.007) forecast the demand of 100
+real low-voltage feeders in Bracknell up to four days ahead at hourly resolution, and tested
+temperature by running each of their methods twice, once without a temperature input and once with
+one. Both the observed temperature and a temperature forecast were tried, taken from a weather
+station about 16 km away. Adding temperature had "minimal effect on the forecast accuracy", and for
+three of the methods adding temperature made the forecast worse; Haben et al. suggest that
+temperature is correlated with seasonality, so a model can end up "erroneously training on the
+temperature as a surrogate for seasonality". The feeders carried an average of 45 households each,
+and the data were collected in 2014 and 2015. We expect how much weather matters at a substation to
+be changing quickly, because embedded solar generation and heat pumps are what make a substation
+weather-dependent, and there are far more of both on the distribution network now than there were
+then. That expectation is a prediction, though, not a measurement — and the Scottish
+primary-substation sensitivities of [Fox et al. (2018)](https://doi.org/10.34890/134), measured on
+the 10 years of weather and substation data before its publication and described in the full review,
+say weather was already moving primary substation demand well before the mid-2010s.
 
 ### A model trained on none of NGED's data may match a model trained on all of it
 
@@ -1880,7 +1884,7 @@ time-series model that had never seen their data, against models trained on the 
 200 German low-voltage feeders and scored, like Chronos-2, on all 200 feeders. Chronos-2 beat every
 purpose-trained competitor on mean absolute error, 3.8 kW against 4.2 kW. The authors describe their
 purpose-trained models as lightly engineered, and challenge 1 above found only a modest return to
-model sophistication. But a model trained on the feeders' own history, beaten by a model that saw
+model sophistication. But a model trained on the feeders' own history, beaten by a model trained on
 none of that history, still tells us how much any programme of heavy engineering is likely to
 improve accuracy.
 
@@ -2202,7 +2206,7 @@ methods](https://doi.org/10.1016/j.ijepes.2026.111848). *International Journal o
 and Energy Systems*.
 - Haben, S., Giasemidis, G., Ziel, F. and Arora, S. (2019). [Short term load forecasting and the
 effect of temperature at the low voltage level](https://doi.org/10.1016/j.ijforecast.2018.10.007).
-*International Journal of Forecasting*.
+*International Journal of Forecasting*. Read as the arXiv preprint.
 - Haben, S., Arora, S., Giasemidis, G., Voss, M. and Greetham, D. V. (2021). [Review of Low Voltage
 Load Forecasting: Methods, Applications, and Recommendations](https://arxiv.org/abs/2106.00006).
 *Applied Energy*.
