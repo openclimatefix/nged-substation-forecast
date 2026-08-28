@@ -74,9 +74,9 @@ in the quantile version of an overload-decision metric stated their own uncertai
 ranges containing the true value less than half the time at those consumer peaks.
 
 **Three published results point against parts of Flexpectation's plan, and we intend to test all
-three rather than avoid them.** Finer-grained weather has not always improved performance; weather
-data has improved performance less than expected at low voltage in the past; and a pre-trained ML
-model trained on none of NGED's data may match models trained on all of it.
+three rather than avoid them.** More detailed weather data has not always improved performance;
+weather data has improved performance less than expected at low voltage in the past; and a
+pre-trained ML model trained on none of NGED's data may match models trained on all of it.
 
 **Whilst the literature we found does not tell us exactly which algorithms provide the best
 forecasting performance, the literature *is* clear on how to *research and develop* a state of the
@@ -1810,7 +1810,7 @@ and the code published so that anyone can check the arithmetic or rerun the comp
 Three results in this literature point against Flexpectation's plan, and we intend to test all three
 rather than avoid them.
 
-### Finer-grained weather data has not always improved the forecast
+### More detailed weather data has not always improved the forecast
 
 [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) forecast day-ahead net load — demand
 minus embedded generation — half-hourly for each of GB's 14 grid supply point groups over 2014 to
@@ -1839,14 +1839,16 @@ Flexpectation is not if weather matters but if the spread of the weather across 
 
 Artificial Forecasting obtained postcode-level weather forecasts for two wind-connected primary
 substations after the deliverable reported that its wind-connected models had performed poorly, and
-found that the postcode-level forecasts "did not notably improve model performance". The deliverable nonetheless names better weather data as a next step, without saying what would be better than postcode-level.
+found that the postcode-level forecasts "did not notably improve model performance". The deliverable
+nonetheless names better weather data as a next step, without saying what would be better than
+postcode-level.
 
 [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) point the other way, and their result
-separates the ensemble from its resolution. Dantas and Browell forecast 73 GB wind farms from the
+separates the ensemble from its resolution. Dantas and Browell forecast 73 wind farms in GB from the
 ECMWF deterministic model, taken from the operational archive at full spatial and temporal
 resolution, and from the ECMWF ensemble, taken from the TIGGE archive, which "only stores a limited
 set of atmospheric variables at 6-hour/0.5° resolution". The deterministic-driven model beat the
-ensemble-driven one "for all forecast horizons and case studies". Dantas and Browell then
+ensemble-driven model "for all forecast horizons and case studies". Dantas and Browell then
 constrained the deterministic model to the ensemble's 6-hourly steps and its single 10 m wind level,
 leaving the horizontal grid untouched, and the advantage held at the offshore farms and at only some
 of the onshore ones, which Dantas and Browell read as evidence that "all ENS-based methods presented

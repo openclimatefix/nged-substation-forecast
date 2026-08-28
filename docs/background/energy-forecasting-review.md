@@ -1942,7 +1942,7 @@ words, "trivial or net negative" effects on every type of model they tried.
 Three results in this literature point against Flexpectation's plan, and we intend to test all three
 rather than route around them.
 
-### Finer-grained weather data has not always improved the forecast
+### More detailed weather data has not always improved the forecast
 
 [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) added spatial statistics derived from
 gridded numerical weather prediction to their model of 14 grid supply point groups in GB. Those
