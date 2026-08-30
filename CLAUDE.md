@@ -102,13 +102,13 @@ by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised expor
 These rules apply to everything we write in prose: `docs/` pages, READMEs, `SKILL.md` files,
 docstrings, code comments, GitHub issue and PR bodies, and anything we write for an outside reader.
 
-**These rules govern words and sentences; getting a whole document's order right needs a planning
-step of its own.** A badly ordered document reads fine sentence by sentence, so the rules below
-won't catch it and neither will a reviewer holding the whole document in context — such a reviewer
-already knows what a later section says while reading an earlier one, which is exactly the
-knowledge a first-time reader doesn't have. Load `long-form-prose` before drafting new prose longer
-than a few paragraphs, and `restructure-prose` before reordering or simplifying prose that already
-exists.
+**The prose rules in this section govern words and sentences; getting a whole document's order
+right needs a planning step of its own.** A badly ordered document reads fine sentence by sentence,
+so the rules below won't catch it and neither will a reviewer holding the whole document in
+context — such a reviewer already knows what a later section says while reading an earlier one,
+which is exactly the knowledge a first-time reader doesn't have. Load `long-form-prose` before
+drafting new prose longer than a few paragraphs, and `restructure-prose` before reordering or
+simplifying prose that already exists.
 
 **This is technical writing, not poetry: precision first, concision second, elegance last.** Every
 page here is a reference document, read by someone who is about to act on it, so a sentence that can
@@ -248,10 +248,10 @@ say why.
 **Don't introduce a name, a number, or an acronym before the reader has a use for it.** A fact that
 exists only to justify a claim belongs after the claim, not before it — a reader who meets the
 justification first has nothing yet to hang it on, and has to re-read once the claim finally
-arrives. Prefer "the forecast missed short peaks, an effect visible at the 15-minute NWP resolution
-but invisible at the 30-minute resolution we currently ingest" over opening the paragraph with the
-grid resolution and only later saying why it matters. This is the document-level form of leading
-with the conclusion: state the claim, then supply the detail that backs it, never the reverse.
+arrives. Prefer "ECMWF ENS coarsens from a 3-hour to a 6-hour step width at day 6, so a forecast
+built on days 6 to 10 sits on the coarse half of the grid" over opening the paragraph with the step
+widths and only later saying why they matter. This is the document-level form of leading with the
+conclusion: state the claim, then supply the detail that backs it, never the reverse.
 
 **Don't name individuals.** Write the rule, not who asked for it: "get a contract change agreed
 before making it", never "ask so-and-so before changing a contract". One person maintains this repo
