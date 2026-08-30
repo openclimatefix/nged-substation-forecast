@@ -4,10 +4,11 @@ description: >-
   How to restructure and simplify prose that already exists — most of it in `docs/`, most of it
   drafted originally by Claude — for readability, as a pass kept separate from fact-checking.
   Extract the document's bolded-lead sentences into a flat list and read only that list to test
-  whether the argument survives; run a first-stumble-reader sub-agent to find where an unfamiliar
-  reader gets lost; apply one CLAUDE.md prose-style rule at a time rather than a blanket rewrite.
-  Load before reordering or simplifying prose someone already wrote, especially a docs/ page nobody
-  has audited for structure since it was first drafted.
+  whether the argument survives, summarising each paragraph's conclusion first on the (usual) pages
+  written before the bolded-lead rule existed; run a first-stumble-reader sub-agent to find where an
+  unfamiliar reader gets lost; apply one CLAUDE.md prose-style rule at a time rather than a blanket
+  rewrite. Load before reordering or simplifying prose someone already wrote, especially a docs/
+  page nobody has audited for structure since it was first drafted.
 ---
 
 # Restructuring prose that already exists
@@ -35,6 +36,16 @@ Extracting the list is mechanical, not a judgement call, and it catches what a r
 whole document in context cannot see, because such a reviewer already knows what a later section
 says while reading an earlier one.
 
+**Most existing pages have no bolded leads to extract — summarise each paragraph instead.** The
+bolded-lead rule is recent, and most of `docs/` predates it, so this test usually starts from
+nothing. Where a paragraph has no bolded lead, write a one-sentence summary of its conclusion — not
+its topic — standing in for the lead it should have had, then build the same flat list from those
+summaries and read it the same way. Do the summarising paragraph by paragraph, blind to the
+document's overall argument as far as that's practical, so a summary reports what the paragraph
+actually concludes rather than what the summariser already expects the page to say. Once a
+restructure lands the bolded lead is worth adding to each paragraph outright — it makes this test
+free to re-run next time.
+
 ## Test 2: the first-stumble reader
 
 Spawn a fresh sub-agent with the document alone — no repository, no source papers, no conversation
@@ -51,7 +62,8 @@ The output is a list of stop points: an ordering-bug report, not a style critiqu
 
 - A stop point traced to a missing prerequisite → move the missing fact earlier, or move the
   stalling sentence later.
-- A bolded lead that doesn't fit the argument's order → move or cut the paragraph, not the sentence.
+- A lead (bolded, or summarised for this test) that doesn't fit the argument's order → move or cut
+  the paragraph, not the sentence.
 - Only once ordering is settled, apply CLAUDE.md's sentence- and word-level rules, one rule per
   pass — a pronoun-only pass whose output is a line number and a proposed replacement beats a pass
   that tries to fix pronouns, numerals, and metaphor together.
