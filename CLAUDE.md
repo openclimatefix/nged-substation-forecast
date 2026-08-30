@@ -64,6 +64,8 @@ needed one, the mistake is already written.
 | `implement-issue` | writing code for an approved plan: worktree, verify set, PR, up to two adversarial reviews, stop |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh pr merge`, or ship-time triage |
 | `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
+| `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
+| `restructure-prose` | reordering or simplifying prose that already exists, especially a `docs/` page nobody has audited for structure since it was first drafted |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
 
 ## Docs
@@ -99,6 +101,14 @@ by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised expor
 
 These rules apply to everything we write in prose: `docs/` pages, READMEs, `SKILL.md` files,
 docstrings, code comments, GitHub issue and PR bodies, and anything we write for an outside reader.
+
+**These rules govern words and sentences; getting a whole document's order right needs a planning
+step of its own.** A badly ordered document reads fine sentence by sentence, so the rules below
+won't catch it and neither will a reviewer holding the whole document in context — such a reviewer
+already knows what a later section says while reading an earlier one, which is exactly the
+knowledge a first-time reader doesn't have. Load `long-form-prose` before drafting new prose longer
+than a few paragraphs, and `restructure-prose` before reordering or simplifying prose that already
+exists.
 
 **This is technical writing, not poetry: precision first, concision second, elegance last.** Every
 page here is a reference document, read by someone who is about to act on it, so a sentence that can
@@ -234,6 +244,14 @@ argument from the bolded leads alone, then read on only where they want the reas
 we prefer sub-headings and short paragraphs over bullet lists: a list flattens the argument into
 items of equal weight, whereas a bolded lead says which claim matters and the sentences under it
 say why.
+
+**Don't introduce a name, a number, or an acronym before the reader has a use for it.** A fact that
+exists only to justify a claim belongs after the claim, not before it — a reader who meets the
+justification first has nothing yet to hang it on, and has to re-read once the claim finally
+arrives. Prefer "the forecast missed short peaks, an effect visible at the 15-minute NWP resolution
+but invisible at the 30-minute resolution we currently ingest" over opening the paragraph with the
+grid resolution and only later saying why it matters. This is the document-level form of leading
+with the conclusion: state the claim, then supply the detail that backs it, never the reverse.
 
 **Don't name individuals.** Write the rule, not who asked for it: "get a contract change agreed
 before making it", never "ask so-and-so before changing a contract". One person maintains this repo
