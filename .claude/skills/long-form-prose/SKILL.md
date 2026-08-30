@@ -84,4 +84,8 @@ outline's order wrong for the next reader who trips somewhere else.
 ## See also
 
 `restructure-prose` runs the same flat-list and first-stumble-reader checks over prose that already
-exists, for when there's a draft to fix rather than one to write.
+exists, for when there's a draft to fix rather than one to write. For a rewrite that adds whole new
+sections to an existing page, run `restructure-prose` on the existing text first, then outline the
+new sections here against the result — outlining new material against a page whose own structure
+hasn't been checked risks building the new sections on prerequisites the existing page never
+actually establishes.

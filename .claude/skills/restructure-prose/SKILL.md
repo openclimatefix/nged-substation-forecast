@@ -83,4 +83,7 @@ just once at the start.
 ## See also
 
 `long-form-prose` runs the same planning discipline before any prose exists, for drafting rather
-than reordering.
+than reordering. For a rewrite that adds whole new sections to an existing page, run this skill on
+the existing text first, then switch to `long-form-prose` to outline the new sections against the
+result — outlining new material against a page whose own structure hasn't been checked risks
+building the new sections on prerequisites the existing page never actually establishes.
