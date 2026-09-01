@@ -2065,10 +2065,10 @@ literature is far stronger on scoring forecasts than on the other two kinds of e
 forecast has settled practice Flexpectation can adopt. Checking an estimate of a quantity NGED does
 not meter — the effective capacity of a metered generator, the half-hourly output of unmetered
 solar, and the direction of flow behind an apparent-power meter — has no ground truth to score
-against, and each quantity needs its own basket of substitutes. Disaggregating unmetered solar has
-six possible substitutes, of which the disaggregation papers we read use three. Scoring the
-detection of a rare event, such as a switching event or a metering fault, has good academic
-practice, and none of the GB projects we checked published a number to compare against.
+against. Each quantity needs its own basket of substitutes. Disaggregating unmetered solar has six
+possible substitutes, of which the disaggregation papers we read use three. Scoring the detection of
+a rare event, such as a switching event or a metering fault, has good academic practice. None of the
+GB projects we checked published a number to compare against.
 
 **Mean absolute error rewards a flat forecast that would be of little use for either flexibility
 procurement or curtailment decisions, so a peak-aware score belongs alongside a proper score rather
@@ -2085,8 +2085,7 @@ hides the deepest export half-hours too.
 
 **Two teams independently concluded that mean absolute error was the wrong measure for peaks.**
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) adopted a peak-aware error
-measure for exactly this reason, and
-[Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) built a metric
+measure for exactly this reason. [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) built a metric
 over the top 10% of demand values, made that metric its primary measure for comparing models, and
 reported the metric both against actual demand and normalised to transformer rating.
 
@@ -2098,8 +2097,7 @@ on consumer peaks in the quantile variant of the overload-decision metric — Ch
 time-series foundation model, and a weekly-naive baseline — turned out to have 90% ranges containing
 the true value only 62% and 58% of the time across the series as a whole, and 43% and 49% of the
 time at the consumer peaks themselves. In [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966)'s
-results, a model that understates its uncertainty raises fewer false alarms, so it scores well on a
-threshold-crossing test while being exactly the model an operator should not trust near a capacity
+results, a model that understates its uncertainty raises fewer false alarms. That model scores well on a threshold-crossing test while being exactly the model an operator should not trust near a capacity
 limit.
 
 **A cross-validation fold shorter than a year cannot show whether a model handles both ends of the
@@ -2108,7 +2106,7 @@ year, which is one length rule worth adopting outright.**
 and note that "one year is the minimum acceptable to test a forecasting model whose target value
 shows annual seasonality". Substation load shows exactly that seasonality, so any cross-validation
 fold — one train-then-test slice of the history — shorter than a year cannot tell us whether a model
-handles both ends of the year, and NGED needs both: winter is when NGED buys flexibility, and
+handles both ends of the year. NGED needs both: winter is when NGED buys flexibility, and
 summer, when embedded solar output is highest against the lowest demand, is when export constraints
 bind and generators are curtailed.
 
@@ -2136,7 +2134,7 @@ its horizon is long — looking for a gap or buffer between training and test, a
 correction to the number of independent observations — and found one partial treatment. [Hertel et
 al. (2026)](https://arxiv.org/abs/2607.15705) compare models with Diebold-Mariano tests implemented
 after the R `forecast` package, whose variance estimator corrects for serial correlation in the loss
-differential when it is told the forecast horizon, but the paper does not say which horizon it
+differential when it is told the forecast horizon. The paper does not say which horizon it
 passes, so we cannot tell whether the correction was applied. The one paper the problem cannot reach
 is [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966), whose stride equals their horizon: their
 forecasts run 4 days each, so no two share a target. That is our inference from their design rather
@@ -2163,8 +2161,7 @@ the measured net flow; disaggregated solar must be zero at night and must sit un
 envelope; disaggregated wind must track wind speed rather than irradiance; and an inferred
 rooftop-solar capacity must be plausible for the area a substation serves. None of those checks
 needs a label, and a violation is a detectable error whatever the truth turns out to be. Using
-physical consistency to *score* an estimate, rather than to *shape* it, is close to absent from the
-papers we read, and physical-consistency scoring is the least effort of any evaluation on the list.
+physical consistency to *score* an estimate, rather than to *shape* it, is close to absent from the papers we read. Physical-consistency scoring is the least effort of any evaluation on the list.
 The sixth substitute stays out of reach, because a fully metered substation is a field deployment
 rather than an analysis.
 
@@ -2173,10 +2170,8 @@ rather than an analysis.
 estimate that survives multiple tests is better supported than an estimate from the single best
 substitute.
 
-**The five are not five attempts at the same measurement.** The hold-out is biased towards the sites
-that happen to be metered, and synthetic aggregation systematically flatters, because a clean sum of
-metered sources has no switching events, no false zeros, and no unmetered load — so a score from
-synthetic aggregation should be reported as performance under idealised aggregation rather than as
+**The five are not five attempts at the same measurement.** The hold-out is biased towards the sites that happen to be metered. Synthetic aggregation systematically flatters, because a clean sum of
+metered sources has no switching events, no false zeros, and no unmetered load. A score from synthetic aggregation should therefore be reported as performance under idealised aggregation rather than as
 real-world skill. The remaining three each answer a narrower question than they appear to: the
 independent-tool comparison says only whether we agree with an existing method; the physics checks
 find wrongness but never confirm rightness; and the downstream test measures whether the estimate is
@@ -2187,7 +2182,7 @@ the substitute behind that number.
 **The effective capacity of a metered generator has no ground truth either, and most of the six
 substitutes above cannot be applied to a single generator's meter.** A generator's own meter is the
 input a capacity estimator works from rather than a label to score the estimator against, so there
-is nothing to hold out and nothing to aggregate synthetically; of the physical checks above, only
+is nothing to hold out and nothing to aggregate synthetically. Of the physical checks above, only
 the night-zero and clear-sky bounds carry over to a single generator's output, because the rest test
 a substation's net flow. The same multiple-test logic therefore produces a different basket for
 challenge 3: a head-to-head contest between candidate estimators in which downstream forecast skill
@@ -2216,8 +2211,7 @@ labelled photovoltaic power and irradiance streams, score a detection as correct
 gradual shift is not knowable, and a tolerance that has to be stated, because the score means
 nothing without it. [Martín et al. (2018)](https://doi.org/10.3390/s18113947) set their detection
 threshold from instrument physics rather than from the data: transformers contribute up to ±1% error
-and the measurement equipment ±0.5% to ±1%, so ±2% is the inherent floor, and they set the threshold
-at ±4% "to avoid detection of false gain and offset errors".
+and the measurement equipment ±0.5% to ±1%, so ±2% is the inherent floor. They set the threshold at ±4% "to avoid detection of false gain and offset errors".
 
 **None of the three GB projects offers a number to compare a detector against, which we checked
 rather than assumed.** Across Electricity North West's ATLAS — both its 2016 methodology and its
@@ -2234,7 +2228,7 @@ series. For example, solar farms, wind farms, batteries, and the demand at prima
 get their own leaderboard. The leaderboards are public to view and reproducible, but we are not
 inviting other teams to submit entries. Anyone who wants to benchmark against us can rerun the setup
 for themselves. Not inviting outside entries means the literature's lessons about attracting
-entrants, prize pots, and qualifying rounds do not apply to us, while the lessons about protocol —
+entrants, prize pots, and qualifying rounds do not apply to us. The lessons about protocol —
 what makes a comparison trustworthy — apply with more force, because rival entrants give a
 competition some of its integrity by wanting to catch each other out.
 
@@ -2259,7 +2253,7 @@ leaderboard is still open.
 
 **We found no example of a standing leaderboard for substation forecasting** — a leaderboard that
 keeps accepting entries after its competition closes. Two of the three competitions NGED funded sat
-at exactly the levels NGED forecasts, which is why the gap is scoped to forecasting rather than to
+at exactly the levels NGED forecasts. That is why the gap is scoped to forecasting rather than to
 the voltage level. [McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541)
 draw the same conclusion this review does, writing that "many solutions are only tested on private
 data using a single method only compared (if at all) to simple, non-competitive benchmarks", which
@@ -2272,16 +2266,14 @@ gap, though we would be glad to be pointed at a counter-example.
 **WindAI is the closest of these competitions to challenge 3's problem of a generator whose capacity
 keeps changing, because robustness to that change was a scored criterion rather than an
 afterthought.** Statnett, Norway's transmission system operator, asked entrants for the hourly wind
-power of each of four Norwegian bidding zones two days ahead, and [Authen et al.
+power of each of four Norwegian bidding zones two days ahead. [Authen et al.
 (2026)](https://doi.org/10.5617/nmi.13106) report a weighted assessment giving 65% to accuracy, 20%
 to trustworthiness and explainability, 10% to implementation and presentation, and 5% to "robustness
 to changes in installed wind power capacity, evolving weather patterns, long-term climate
 variability". The two highest-placed teams both predicted capacity factor rather than absolute
-production, which Authen et al. record as a way "to account for maintenance events and future
-capacity expansions", and one team given an honourable mention fitted a physical power curve for
+production, which Authen et al. record as a way "to account for maintenance events and future capacity expansions". One team given an honourable mention fitted a physical power curve for
 each wind park under sequential Bayesian updating to absorb "capacity changes or the commissioning
-of new wind parks". Two further results transfer. The top three entries all used gradient-boosted
-decision trees, and Authen et al. conclude that the more complex deep-learning architectures'
+of new wind parks". Two further results transfer. The top three entries all used gradient-boosted decision trees. Authen et al. conclude that the more complex deep-learning architectures'
 "additional complexity did not translate into superior performance". And the placings did not follow
 the accuracy order — WindSight recorded a lower average root mean square error than Knowit, 216.22
 MW against 217.57 MW, and Knowit still took second place — which is what the other 35% of the
@@ -2299,8 +2291,7 @@ to 10 days ahead for Belgian solar generation and day-ahead for the German wind 
 50Hertz runs. The [platform documentation](https://predico-elia.inesctec.pt/docs/) scores the median
 submission by root mean square error and the 10th-to-90th percentile pair by the mean Winkler
 interval, and ranks forecasters monthly. Predico forecasts the national generation totals of two
-transmission networks rather than anything on a distribution network, and Elia Group describes the
-platform as a proof of concept in which participants cannot yet create their own markets, so what
+transmission networks rather than anything on a distribution network. Elia Group describes the platform as a proof of concept in which participants cannot yet create their own markets, so what
 Predico offers Flexpectation is a worked example of a standing, publicly ranked board rather than a
 precedent at NGED's aggregation level.
 
@@ -2309,10 +2300,8 @@ precedent at NGED's aggregation level.
 before the outturn it will be scored against physically exists, which "makes test-set contamination
 impossible by design". HEFTCom made the same argument from experience: because the competition ran
 on the real, unknown future, "data leakage, accidental or deliberate, was impossible". A half-hourly
-forecasting service meets that condition easily: every day supplies 48 fresh evaluation points that
-can never be reused, and the condition that the answer did not exist when the model was frozen holds
-automatically. The corollary is uncomfortable for anyone relying on a fixed hold-out set, and
-TS-Arena states it plainly: "leveraging any fixed dataset that is not evolving over time and
+forecasting service meets that condition easily: every day supplies 48 fresh evaluation points that can never be reused. The condition that the answer did not exist when the model was frozen holds
+automatically. The corollary is uncomfortable for anyone relying on a fixed hold-out set. TS-Arena states it plainly: "leveraging any fixed dataset that is not evolving over time and
 directed into the future — regardless of how carefully curated — can eventually lead to information
 leakage". [Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979) name the same failure
 from the other end, that "some datasets have been studied so well that the researchers may use some
@@ -2323,7 +2312,7 @@ enough to Flexpectation's position that its self-imposed rules transfer.** TS-Ar
 outside entries, where Flexpectation's leaderboards do not, but its reference models "act as neutral
 participants, autonomously requesting context from the API Portal and submitting forecasts to it",
 so that those models "operate under the exact same constraints (e.g., submission windows, data
-access) as other (external) participants", and each foundation model is run from its authors' own
+access) as other (external) participants". Each foundation model is run from its authors' own
 repository at its authors' recommended defaults, with no domain-specific tuning. All three of those
 rules are available to a single team, and Flexpectation intends to adopt them: our own models go
 through the same evaluation interface as any baseline, and a baseline is run as its authors
@@ -2337,21 +2326,18 @@ methodological advantages". [Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2
 more bluntly, that "sometimes the parameters are manipulated, so that the competing models are being
 dominated by the proposed ones", alongside two related habits — picking the error measure that
 favours the proposed method, and skipping comparison with naive models altogether. A team that runs
-every entry on its own leaderboard is exposed to all three by construction, which is why the
-authors'-code-and-authors'-defaults rule above matters more for Flexpectation than it does for a
+every entry on its own leaderboard is exposed to all three by construction. That is why the authors'-code-and-authors'-defaults rule above matters more for Flexpectation than it does for a
 competition. This is a large part of the reason why, in Flexpectation version 1, we are putting
 effort into *optimising* our XGBoost forecasts before trying more novel approaches.
 
 **The submission deadline, not a rule about which features are allowed, is what defines a fair
 information set.** [Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705) give a worked
 example of the trap: several published papers use the day-ahead wind and solar forecasts that the
-European Network of Transmission System Operators for Electricity publishes as inputs to day-ahead
-price models, but those forecasts are "released only after 18:00 on the day before delivery, whereas
+European Network of Transmission System Operators for Electricity publishes as inputs to day-ahead price models. But those forecasts are "released only after 18:00 on the day before delivery, whereas
 the day-ahead market already closes at 12:00 on that day", so the feature did not exist when the
 forecast had to be made. Their fix is structural rather than procedural, in that each competition
 "implicitly defines an operational information set through the submission deadline". Flexpectation
-has the same hazard in the delay between an ECMWF run and its arrival, and the same fix is
-available: score against the data that had actually landed at the forecast's issue time.
+has the same hazard in the delay between an ECMWF run and its arrival. The same fix is available: score against the data that had actually landed at the forecast's issue time.
 
 **Carry two baselines, a lower baseline below the achievable skill and an upper baseline at the
 achievable skill, rather than a single baseline.** [Doubleday et al.
@@ -2366,10 +2352,8 @@ the yardstick a new model has to reach.
 
 **Flexpectation's leaderboard today reuses one fold for both model selection and the published
 result, so the winner's reported skill is optimistically biased.** The fold that Flexpectation
-currently reports serves as both the model-selection set and the reported result, so every
-hyperparameter choice and feature ablation is adjudicated on the same 12 months the leaderboard
-publishes. With hundreds of experiments planned, that bias will grow. A leaderboard wears out
-through repeated use, and [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015), who
+currently reports serves as both the model-selection set and the reported result. Every hyperparameter choice and feature ablation is therefore adjudicated on the same 12 months the leaderboard
+publishes. With hundreds of experiments planned, that bias will grow. A leaderboard wears out through repeated use. [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015), who
 has co-organised a forecasting competition, expects it: "over-study of a single benchmark data set
 means that methods will eventually over-fit the published test data. I suspect this has happened
 with the M3 data over the past 20 years, and it is likely to happen with the M4 data, despite its
@@ -2384,8 +2368,7 @@ the number of experiments run against a fold is itself a statistic worth publish
 fold's results.
 
 **Rankings travel better than absolute numbers do.** Where a benchmark has enough data behind it,
-the ordering of models survives a change of test set even when the accuracy level does not, and the
-survival of the ordering decides what a leaderboard should report as its headline. [Recht et al.
+the ordering of models survives a change of test set even when the accuracy level does not. The survival of the ordering decides what a leaderboard should report as its headline. [Recht et al.
 (2019)](https://arxiv.org/abs/1902.10811) found the ordering of models preserved on a freshly
 collected test set while the accuracy level moved by "approximately five years of progress in a
 highly active period of machine learning research". [Fildes
@@ -2402,8 +2385,7 @@ measured on.
 **A finite evaluation window can rank the wrong model first, and several months is not obviously
 enough.** [Messner et al. (2020)](https://doi.org/10.1002/we.2497) demonstrate this rather than
 asserting it: they fit three forecasting models with three different loss functions, so that each
-model is optimal for one metric by construction, then score all three on the first 200 time steps —
-and the model built for the quadratic loss wins all three metrics, while the two built to win on
+model is optimal for one metric by construction, then score all three on the first 200 time steps. The model built for the quadratic loss wins all three metrics, while the two built to win on
 mean absolute error and on the quantile score both lose on their own metric. Their conclusion is the
 sharpest warning we found about reading a leaderboard: "evaluation results based on a finite data
 set are always subject to some degree of uncertainty and the best ranked forecast does not
@@ -2411,9 +2393,8 @@ necessarily have to be the truly best one. Depending on the actual setup, e.g., 
 exercise to hire a forecaster, it should be remembered that even periods of several months may still
 yield uncertainty in terms of who the best forecaster truly is." HEFTCom's own competition period
 was 3 months. The practical response, which TS-Arena adopts, is to publish an interval on the
-ranking rather than the ranking alone, so that a new entry near the top is visibly provisional:
-TS-Arena's interval comes from replaying the round order in random permutations, so it widens for
-models with few rounds rather than measuring sampling error over a finite window, and [Meyer et al.
+ranking rather than the ranking alone, so that a new entry near the top is visibly provisional. TS-Arena's interval comes from replaying the round order in random permutations, so it widens for
+models with few rounds rather than measuring sampling error over a finite window. [Meyer et al.
 (2026)](https://arxiv.org/abs/2512.20761) warn against "treating short-term success as proven
 superiority", noting that the confidence intervals of their own top models overlap.
 
@@ -2443,8 +2424,7 @@ M-competition's conclusions about whole classes of method — that statistically
 do not typically forecast more accurately than simpler methods, which the M3 competition did not go
 on to support, and that a combination of several methods forecasts more accurately, on average, than
 the individual methods going into the combination ([Hyndman
-(2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) — describe what many independent people
-chose to try, and no single team's leaderboard can support a conclusion about a whole class of
+(2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) — describe what many independent people chose to try. No single team's leaderboard can support a conclusion about a whole class of
 method.
 
 **What our leaderboard can do is narrower and still worth having:** show which approaches beat a
@@ -2456,7 +2436,7 @@ by declaring its own gaps, and Flexpectation's gap is known in advance:** the le
 the 32 trial-area series while the service is meant to reach the whole of NGED's distribution
 network, so we should expect our published numbers to flatter what happens at scale, and should say
 so each time we publish them. A benchmark of 32 series is also small enough that the constraint on
-what can be learned from it is likely to be its size, which is an argument for extending the
+what can be learned from it is likely to be its size. That is an argument for extending the
 leaderboard to the wider distribution network as soon as the data allows rather than for running
 more experiments against the trial area.
 
@@ -2477,8 +2457,7 @@ a whole.
 
 - **Every ratio comes with its reference forecast, the population it was scored on, and the number
 of ensemble members that produced it.** [Weigel et al. (2007)](https://doi.org/10.1175/MWR3280.1)
-show that a ranked probability skill score is biased downwards by an amount that depends on ensemble
-size, so a score from our 51 ensemble members is not comparable with a score from a study using 10 ensemble members until their
+show that a ranked probability skill score is biased downwards by an amount that depends on ensemble size. A score from our 51 ensemble members is therefore not comparable with a score from a study using 10 ensemble members until their
 correction is applied. We apply it.
 - **Accuracy is reported separately for each class of asset** — grid supply points, bulk supply
 points, primary substations, and metered generators — each against its own stated naive baseline,
@@ -2486,7 +2465,7 @@ because a single project-wide accuracy target would set a different level of dif
 class of asset.
 - **The fraction of series that beat their naive baseline is published alongside the average
 error**, never the average alone. An average error across a population can improve while the model
-gets worse at a substantial minority of series, and that minority is what an operator notices.
+gets worse at a substantial minority of series. That minority is what an operator notices.
 - **The battery, the gas generator, and the biofuel plant are reported separately** from the wind
 and solar sites, because those three assets are dispatched on market signals that no weather forecast
 contains.
@@ -2507,12 +2486,10 @@ threshold-weighted score, because an unweighted score "would place substantial e
 the predictive distribution where the two models are identical".
 - **Coverage — how often reality fell inside the range the forecast claimed — is broken down by
 season, by forecast lead time, and by how heavily loaded the substation was.** A coverage figure
-averaged over a year can read as a healthy 90% while being 99% in the quiet months and 70% at the
-winter peaks, and the winter peaks are the only periods NGED buys flexibility for. Conformal
+averaged over a year can read as a healthy 90% while being 99% in the quiet months and 70% at the winter peaks. The winter peaks are the only periods NGED buys flexibility for. Conformal
 prediction does not remove the need for the breakdown: [Foygel Barber et al.
 (2020)](https://doi.org/10.1093/imaiai/iaaa017) prove that a distribution-free guarantee holds only
-on average across all conditions, never separately for the conditions that matter, so a conformal
-forecast can promise 90% coverage overall while failing at the peaks.
+on average across all conditions, never separately for the conditions that matter. A conformal forecast can therefore promise 90% coverage overall while failing at the peaks.
 - **Each metered generator's series is normalised by its estimated effective capacity** before
 training — unless the comparison described under challenge 3 above shows the normalisation is not
 needed — and that estimate is tracked as it changes.
