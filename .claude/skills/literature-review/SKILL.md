@@ -29,7 +29,9 @@ than what is always true, and name the thing instead of writing "it".
    review the literature against those problems. A review organised around the questions is
    useful to the funder; a review organised around the papers is a reading list.
 2. **Assemble the library** — full texts on local disk, not abstracts.
-3. **Draft**, one problem at a time, with the sources open rather than a summary of them.
+3. **Draft**, one problem at a time, with the sources open rather than a summary of them. Load
+   `long-form-prose` first — a review is exactly the long connected argument that skill plans for,
+   and the outline it produces is what "one problem at a time" should follow.
 4. **Fact-check new prose before you commit it**, not after. A section that lands and is then
    corrected twenty times leaves a history that is honest but avoidable, and every uncorrected
    hour is an hour the wrong claim could have been read.
