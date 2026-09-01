@@ -1519,12 +1519,12 @@ Distribution network operators (DNOs) do not know exactly how much capacity is i
 December 2025 [consultation on asset
 visibility](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
 estimates that distribution network operators "are aware of less than half" of the consumer and
-distributed energy resources on their distribution networks, a figure Ofgem attributes to the
+distributed energy resources on their distribution networks. Ofgem attributes that figure to the
 Department for Energy Security and Net Zero's engagement with the operators rather than to a
-measurement, and which that department's own footnote traces to estimates the operators derived from
-other datasets, from sales volumes, and from grants processed. Each DNO's **Embedded Capacity
+measurement, and that department's own footnote traces the figure to estimates the operators derived
+from other datasets, from sales volumes, and from grants processed. Each DNO's **Embedded Capacity
 Register** records generation of 50 kW and above and names the primary substation each site sits
-behind, but the capacity recorded is the export limit "permitted as per the connection agreement"
+behind. But the capacity recorded is the export limit "permitted as per the connection agreement"
 rather than what a site can generate. Below 50 kW the register is silent, and that is where most of
 the panels are: of the 22,560 MW of solar photovoltaic capacity installed in GB by the end of July
 2026, 8,503 MW — 38% of the total — sits in arrays smaller than 50 kW, spread across 2,058,822 of
@@ -1545,12 +1545,10 @@ alternating-current rating.
 in the GB projects that have published a result the generation was either metered or its capacity
 read from a register, rather than inferred from the net flow.** Northern Powergrid's
 [Artificial Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) models gross
-demand and customer export independently at primary substations, but that customer export is
-metered, and the baseline Artificial Forecasting measures its customer-export models against is an
+demand and customer export independently at primary substations, but that customer export is metered. The baseline Artificial Forecasting measures its customer-export models against is an
 extrapolation from Northern Powergrid's own Distribution Future Energy Scenarios, not a capacity
 inferred from the net flow. [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/) split net
-load into demand and generation, forecast the two separately, and recombined them; TRANSITION's
-rooftop solar is not metered, but TRANSITION read each installation's capacity from a list of
+load into demand and generation, forecast the two separately, and recombined them. TRANSITION's rooftop solar is not metered, but TRANSITION read each installation's capacity from a list of
 Feed-In Tariff installations. Flexpectation has no register that would carry it as far, for the
 reasons set out under "The challenge" above.
 
@@ -1569,8 +1567,7 @@ says the register collects data on assets "when they are first registered into a
 flexibility market" — the market of a distribution system operator, or of the National Energy System
 Operator — so a rooftop array that never trades flexibility never enters the register, and the
 arrays this challenge has to find are the arrays nobody has registered anywhere. Where an asset does
-enter a flexibility market that NGED itself runs, NGED is the counterparty and already holds the
-data; what Flexibility Market Asset Registration adds there is one standardised record across
+enter a flexibility market that NGED itself runs, NGED is the counterparty and already holds the data. What Flexibility Market Asset Registration adds there is one standardised record across
 markets rather than a generator NGED could not previously see.
 
 **The published benchmarks we found of inferring capacity from the net flow work on individually
@@ -1584,12 +1581,10 @@ substations. [Kanchana et al. (2026)](https://doi.org/10.1016/j.epsr.2026.113279
 photovoltaic generation, and energy storage from one aggregated net-load series, and report doing so
 "without requiring capital-intensive customer-level metering", which is NGED's position exactly. We
 hold the publisher's landing page for Kanchana et al. rather than the full text, and that page names
-no customer count, no country, no time resolution, and no comparison method, so how far the reported
-errors of 8.14% for load, 5.12% for photovoltaic generation, and 11.51% for storage would carry to a
+no customer count, no country, no time resolution, and no comparison method. So how far the reported errors of 8.14% for load, 5.12% for photovoltaic generation, and 11.51% for storage would carry to a
 GB primary substation cannot be judged from what we have read. The same page says a generative
 adversarial network fills gaps in the load measurements while a variational autoencoder generates
-synthetic photovoltaic profiles, and that "observed net-load profiles are assembled to create
-validation scenarios", so whether the mixture being separated is a mixture a meter recorded is a
+synthetic photovoltaic profiles, and that "observed net-load profiles are assembled to create validation scenarios". So whether the mixture being separated is a mixture a meter recorded is a
 question the page leaves open.
 
 **The one result we found that separated solar from demand at a real distribution substation,
@@ -1597,7 +1592,7 @@ without being told the installed capacity, used that substation's own reactive p
 (2018)](https://doi.org/10.1016/j.segan.2017.11.001) estimate the solar generation downstream of a
 substation in Riverside, California, from the substation's active and reactive power, and report a
 root-mean-square error of 6% of installed capacity across all sky conditions. The estimator is given
-neither the installed capacity nor the panel geometry, but it does need one input NGED would
+neither the installed capacity nor the panel geometry. But it does need one input NGED would
 struggle to supply at most substations: the metered output of a second photovoltaic plant, four
 miles away on a different feeder and low-pass filtered, standing in for irradiance. Regressing the
 load's active power on the measured reactive power is what makes the separation work: the simpler
@@ -1605,11 +1600,10 @@ alternative, assuming the power factor measured at night holds through the day, 
 solar plant's own reactive power consumption, which the preprint version of Kara et al. found
 responsible for about 25% of the overestimation at its peak. Two features of the setup limit how far
 Kara et al.'s result carries to Flexpectation. The generation behind that substation is a single 7.5
-MW solar site, "the only generation asset located at this substation", rather than a fleet of
-differently-oriented rooftops, and the ground truth comes from a second measurement device at that
+MW solar site, "the only generation asset located at this substation", rather than a fleet of differently-oriented rooftops. The ground truth comes from a second measurement device at that
 site's own point of interconnection. Kara et al. also had to detect and compensate capacitor-bank
 switching before the reactive power was usable, and their accuracy was still improving as the
-sampling rate rose to one sample every 5 minutes, which puts NGED's half-hourly data below the rate
+sampling rate rose to one sample every 5 minutes. That puts NGED's half-hourly data below the rate
 at which the errors settled. Kara et al. name the amount of photovoltaic capacity behind the
 substation, its volatility, and its spatial spread as factors whose effect on their method they had
 not studied — the three respects in which a GB primary substation differs most from their test case.
@@ -1635,7 +1629,7 @@ project, run with Open Climate Fix under the Network Innovation Allowance, repor
 it produced "was 2.8 times better than our previous Photo Voltaic (PV) forecast (for forecasts up to
 two hours ahead)", and that the first fully operational service reached NESO's control room in
 December 2022. That operational service runs PVNet, Open Climate Fix's model, at 0 to 6 hours ahead
-and blends it with other models beyond 6 hours; Open Climate Fix now supplies the same forecast as
+and blends it with other models beyond 6 hours. Open Climate Fix now supplies the same forecast as
 its Quartz Solar product, which NESO uses in its control room. The project's [own record on the
 Smarter Networks Portal](https://smarter.energynetworks.org/projects/nia2_ngeso002/) reports
 "Accuracy improvement over the previous model by approximately 30% for the GSP and National
@@ -1650,8 +1644,7 @@ Fix](https://www.openclimatefix.org/insights/neso) states that the same forecast
 300,000 tonnes of carbon dioxide a year. Both figures describe one system and one forecast — Great
 Britain's national electricity system, and the Quartz Solar forecast Open Climate Fix supplies and
 NESO runs in its control room — and both are annual rates resting on the same halving of NESO's
-solar forecast error. Neither has an independent audit published, and neither is a substation-level
-result, so both belong here as an indication of the scale of the prize rather than as a measurement
+solar forecast error. Neither has an independent audit published, and neither is a substation-level result. So both belong here as an indication of the scale of the prize rather than as a measurement
 Flexpectation can build on.
  So
 the combination this challenge says is missing — unmetered generation, forecast probabilistically,
@@ -1664,8 +1657,7 @@ forecast, and the published series does not name the model behind it.
 and its limits are what keep Flexpectation's challenge open.**
 [PVNet](https://github.com/openclimatefix/PVNet) is released under the MIT licence and described by
 its authors as "a multi-modal late-fusion model for predicting renewable energy generation from
-weather data", combining numerical weather prediction with satellite imagery, recent generation, and
-the sun's position; the accompanying paper, [Fulton et al.
+weather data", combining numerical weather prediction with satellite imagery, recent generation, and the sun's position. The accompanying paper, [Fulton et al.
 (2024)](https://www.climatechange.ai/papers/iclr2024/46), makes "0-8 hour lead time forecasts for
 grid regions across Great Britain" and limits the model's inputs "to be reflective of those
 available in a live production system". That is a workshop paper rather than a peer-reviewed paper,
@@ -1684,13 +1676,11 @@ holding — until the generation pattern is unlike any pattern in the training d
 behind-the-meter solar at substations, and pose the problem as one of *partial labels*: for some
 aggregate measurements the operator knows which load types are present, but never their individual
 values. Yi and Wang's Bayesian dictionary-learning estimator reaches a total error rate of 8.97%,
-against 20.61% and 37.12% for two methods that need fully labelled training data, and its error
-weighted so that the estimates the method is unsure about count less — 0.13 to 0.16 — comes out far
+against 20.61% and 37.12% for two methods that need fully labelled training data. Its error weighted so that the estimates the method is unsure about count less — 0.13 to 0.16 — comes out far
 below its unweighted root-mean-square error of 5.19 to 6.20, which Yi and Wang read as showing that
 the estimates carrying the largest errors are also the estimates carrying the largest uncertainty.
 Where the test period's solar pattern is unlike any pattern in the training data, however, Yi and
-Wang report that the true load may fall outside the 99.7% confidence interval — the failure mode
-that matters most to Flexpectation, whose substations will carry generation mixes that no training
+Wang report that the true load may fall outside the 99.7% confidence interval. That is the failure mode that matters most to Flexpectation, whose substations will carry generation mixes that no training
 substation had. The validation runs on 360 generated training samples covering two industrial loads
 and one solar generation, not on measurements from a real substation, and carries no forecast
 horizon.
@@ -1709,16 +1699,14 @@ levels, at a level Erdener et al.'s table does not cover.
 literature, but the smart-meter work sits at individual premises rather than at a substation, and
 leans on a neighbouring-customer comparison NGED cannot make.**
 [Cheung et al. (2023)](https://doi.org/10.1109/TSUSC.2022.3192456) use the consumption patterns of
-neighbouring customers known to have no panels, which NGED cannot observe, and Cheung et al. are the
-one study we found that varies the aggregation count on measured household data: across 5, 10, and
+neighbouring customers known to have no panels, which NGED cannot observe. Cheung et al. are also the one study we found that varies the aggregation count on measured household data: across 5, 10, and
 20 Australian customers per aggregated series, their own method's solar mean absolute scaled error
 stays between 1.02 and 1.28 — around the average change between consecutive readings — with solar
-mean absolute percentage error of 21 to 25%, and Cheung et al. report that both measures stayed
+mean absolute percentage error of 21 to 25%. Cheung et al. report that both measures stayed
 "almost the same as aggregation level varied". The Kara-derived baseline they re-implemented for
 comparison degraded instead, from a mean absolute scaled error of 1.47 at 5 customers to 2.20 at 20,
 and from 28% to 43% mean absolute percentage error. Results reported elsewhere at an aggregate level
-are usually sums of individually metered households rather than a measurement taken at a real
-aggregation point, so the smart-meter literature stops far below the thousands of customers behind a
+are usually sums of individually metered households rather than a measurement taken at a real aggregation point. The smart-meter literature therefore stops far below the thousands of customers behind a
 GB primary substation.
 
 **Whether more customers behind a substation makes the estimate easier or harder is unsettled, and
@@ -1730,7 +1718,7 @@ households increases". The rising root-mean-square error is weaker evidence than
 appears: the error is in kilowatts against a total capacity that itself rises with the household
 count, the percentage error moves the other way, and the trend reverses sharply between 70 and 80
 households. The load and the household count are real, but the solar is simulated at three azimuths,
-45°, 0°, and −45°, all of them southerly, so the study has none of the north- and east-west-facing
+45°, 0°, and −45°, all of them southerly. So the study has none of the north- and east-west-facing
 roofs a real street would carry.
 
 #### What this means for Flexpectation
@@ -1740,8 +1728,7 @@ project works on the same kind of GB data, and Open Climate Fix is a partner in 
 [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/)
 (2024 to 2026, £0.4 million) infers the capacity of unmetered solar sitting behind each primary
 substation from half-hourly substation load and weather, then forecasts that generation. Open
-Climate Fix is a partner in both Power Flow to Solar Capacity and Flexpectation, so what Power Flow
-to Solar Capacity found about inferring solar capacity from GB primary-substation data reaches
+Climate Fix is a partner in both Power Flow to Solar Capacity and Flexpectation. So what Power Flow to Solar Capacity found about inferring solar capacity from GB primary-substation data reaches
 Flexpectation directly rather than only through what has been published.
 
 **The nearest published method we found splits unmetered wind and solar out of substation
@@ -1773,8 +1760,7 @@ percentage error in two others.** The data-driven estimators matched the model-b
 clean data, and beat the model-based estimators clearly on noisy data — the condition NGED's
 telemetry is in. And models trained on a Belgian dataset, then applied unseen to American and
 Australian datasets with only approximate irradiance, stayed under 5% mean absolute percentage error
-once the linear models were regularised. What Gouveia et al.'s estimators produce is a capacity
-figure rather than a forecast, so what Flexpectation adds is putting the capacity estimate inside a
+once the linear models were regularised. What Gouveia et al.'s estimators produce is a capacity figure rather than a forecast. What Flexpectation adds is therefore putting the capacity estimate inside a
 probabilistic multi-day forecast, and disaggregating the full shape of the unmetered generation.
 
 **GB already has an operational forecast of unmetered generation, but only at national scale and
@@ -1791,8 +1777,7 @@ separation**. [Hensley and Bull (2018)](https://doi.org/10.3847/1538-4357/aaa489
 the *nuisance* component too simple a model biases the component of interest, and that the fit does
 not announce the bias: "models that are strongly biased but still yield low χ² values are the most
 dangerous". Two consequences follow for Flexpectation. Effort spent making the demand model richer
-is justified on separation grounds even where it does not improve the fit to the substation's net
-flow, and the diagnostic to watch is the joint distribution over the components rather than the
+is justified on separation grounds even where it does not improve the fit to the substation's net flow. And the diagnostic to watch is the joint distribution over the components rather than the
 residual. Working in systems biology, [Wieland et al.
 (2021)](https://doi.org/10.1016/j.coisb.2021.03.005) add the matching warning about uncertainty:
 confidence intervals read off the curvature at the optimum, which a differentiable model gives with
@@ -1804,8 +1789,7 @@ geophysics, and that field reports that the order in which the fit admits fine d
 whether the fit converges at all.** Full-waveform inversion recovers the properties of the rock
 beneath a seismic survey — chiefly the speed at which sound travels through each point of the
 subsurface — by simulating the seismograms those properties would produce and adjusting the
-properties until the simulation matches the recording, which is the procedure Flexpectation version
-2 applies to a substation's net flow. [Virieux and Operto (2009)](https://doi.org/10.1190/1.3238367)
+properties until the simulation matches the recording. That is the procedure Flexpectation version 2 applies to a substation's net flow. [Virieux and Operto (2009)](https://doi.org/10.1190/1.3238367)
 report a failure mode the field calls cycle skipping: because a seismogram oscillates, a starting
 model that mis-predicts an arrival by more than half a period leads the optimiser to match the wrong
 cycle, and "the so-called cycle-skipping artifacts will lead to convergence toward a local minimum".
@@ -1813,8 +1797,7 @@ The remedy Virieux and Operto report as standard practice is a multi-scale sched
 low frequencies first, "because low frequencies are less sensitive to cycle-skipping artifacts",
 then admits successively higher frequencies, each stage starting from the model the previous stage
 produced. The arithmetic relating frequency to recovered detail belongs to wavefields and does not
-carry to a half-hourly power series, but the local-minimum mechanism does: a substation's net flow
-is periodic on a daily cycle, so fitting the slowest-varying structure of each component before
+carry to a half-hourly power series, but the local-minimum mechanism does. A substation's net flow is periodic on a daily cycle, so fitting the slowest-varying structure of each component before
 admitting half-hourly detail is the transferable precaution.
 
 **Whether two simultaneously fitted components can be told apart is a property of the measurements
@@ -1836,7 +1819,7 @@ of sound with the absorption jointly second, "because the reliability of the att
 reconstruction strongly depends on the accuracy of the starting VP model". One limit rides along: a
 seismic survey chooses where to put its sources and its receivers, and the long offsets and wide
 apertures that break the coupling are a design choice, whereas Flexpectation takes the telemetry
-NGED already collects, so what transfers is the test for coupling and the fitting order rather than
+NGED already collects. What transfers is therefore the test for coupling and the fitting order rather than
 the survey design.
 
 **Hyperspectral unmixing leans for identifiability on each component being observed alone somewhere,
@@ -1849,7 +1832,7 @@ show what happens when neither holds — on a highly mixed data set with no obse
 extremes, the fitted simplex comes out smaller than the true simplex, so the recovered components
 are biased rather than merely uncertain. Flexpectation's pure observations are the half-hours when
 nature switches one component off — night for solar, calm hours for wind, and the substations
-carrying no embedded generation at all — so whether a given substation has those half-hours is a
+carrying no embedded generation at all. Whether a given substation has those half-hours is a
 question the telemetry can answer on its own.
 
 ### 9. Disaggregating other distributed energy resources: heat pumps, electric-vehicle chargers, and batteries
@@ -1894,9 +1877,9 @@ from September 2023 rather than reporting a stock. The DESNZ series carries no p
 Scaling the GB figures to NGED is only approximate. NESO's [regional breakdown of the 2024
 scenarios](https://www.neso.energy/data-portal/regional-breakdown-fes-data-electricity) allocates
 36% of GB's sub-1 MW battery capacity to the four grid supply point groups NGED serves, and holds
-that 36% constant across every forecast year, so the regional number is an allocation of the GB
-total rather than a forecast of NGED's own area. The 2024 regional breakdown's own GB totals are
-lower than the figures in the table above, at 138 MW for 2024 and 863 MW for 2030, so the 49 MW and
+that 36% constant across every forecast year. The regional number is therefore an allocation of the
+GB total rather than a forecast of NGED's own area. The 2024 regional breakdown's own GB totals are
+lower than the figures in the table above, at 138 MW for 2024 and 863 MW for 2030. So the 49 MW and
 the 308 MW are 36% of those totals rather than of the 191 MW and the 975 MW. NGED serves nearly 8
 million customers, a little over a quarter of the GB total.
 
@@ -1915,7 +1898,7 @@ some models beat it, and at the sites with 3, 4, and 14 charge points none did. 
 discussing whether domestic batteries responding to a common price signal average out as more are
 added. On the topic of heat pumps, we found no measurement of heat-pump diversity in cold weather.
 The volume of work on these three resources is easy to demonstrate, and our searches were framed
-around substation and generation forecasting rather than around electrification: of the 305 papers
+around substation and generation forecasting rather than around electrification. Of the 305 papers
 accepted for the Brussels workshop of June 2026 held by the International Conference on Electricity
 Distribution (CIRED), 28 have a title naming electric vehicles, chargers, heat pumps, or batteries —
 more than the 23 whose titles name forecasting or prediction at all.
@@ -1924,8 +1907,7 @@ more than the 23 whose titles name forecasting or prediction at all.
 NGED's own.** The [Electric Nation
 trial](https://eatechnology.com/media/girhcnsc/electric-nation-customer-trial-report.pdf), run by
 NGED under its former name with 673 participants and over 130,000 charging events, fits the demand
-of a group of chargers as `Group Demand = N·P + Q√N`, where P is the mean demand per charger and Q
-the deviation: the mean scales with the number of chargers and the deviation only with its square
+of a group of chargers as `Group Demand = N·P + Q√N`, where P is the mean demand per charger and Q the deviation. The mean scales with the number of chargers and the deviation only with its square
 root, so relative uncertainty falls as more chargers are added. [Bollerslev et al.
 (2022)](https://doi.org/10.1109/TTE.2021.3088275) simulate Danish driving and plug-in behaviour on
 synthetic feeders and fit the exponent at between 0.42 and 0.51 across battery sizes and plug-in
@@ -1944,8 +1926,7 @@ that actually matters is untested.** [Love et al.
 (2017)](https://doi.org/10.1016/j.apenergy.2017.07.026) measured around 700 domestic heat pumps in
 GB and found demand per heat pump falling from 4.0 kW for a single unit to 1.7 kW once 275 are
 aggregated, with the spread between samples falling from 1.5 kW to 0.1 kW. But a heat pump sized
-small relative to a house's heat demand runs flat out for hours in cold weather, and Northern
-Powergrid's [code of practice for the economic development of the low-voltage
+small relative to a house's heat demand runs flat out for hours in cold weather. Northern Powergrid's [code of practice for the economic development of the low-voltage
 system](https://www.northernpowergrid.com/sites/default/files/assets/IMP001911_0.pdf) notes in a
 footnote that "further research is required to examine whether the increase in duty cycle (and hence
 average demand) with lower than average winter ambient temperatures is material when designing a LV
@@ -1964,8 +1945,7 @@ aggregations far smaller than a GB primary substation.**
 controlled loads — air conditioners, heating and ventilation units, and furnaces — from an
 aggregated residential load by contrastive sequence-to-point learning, and generalise the same model
 to photovoltaic generation and electric-vehicle charging. The 8.78% Gao et al. report is a mean
-absolute percentage error between the estimated thermostatically controlled load and the metered
-thermostatically controlled load, so the denominator is the appliance load being recovered rather
+absolute percentage error between the estimated thermostatically controlled load and the metered thermostatically controlled load. The denominator is therefore the appliance load being recovered rather
 than the aggregate the load was pulled out of. Gao et al. give 8.78% as a best case for the
 bi-directional model structure and 11.26% as a best case for the unidirectional structure, and name
 no baseline either structure is measured against. Gao et al.'s aggregate is the sum of the Pecan
@@ -1984,14 +1964,13 @@ photovoltaic generation and battery charging jointly by contextually supervised 
 the method family Kara et al. extended for solar under challenge 8, which suggests the battery
 problem and the solar problem are the same problem with another component added. Of the Gao et al.
 and Wang et al. papers we hold Gao et al.'s abstract, introduction, and dataset description from the
-publisher's landing page, and Wang et al.'s abstract, so the Wang et al. citation carries no more
-weight than the existence of the work. Both full texts are closed.
+publisher's landing page, and Wang et al.'s abstract. The Wang et al. citation therefore carries no more weight than the existence of the work. Both full texts are closed.
 
 **The two heat-pump disaggregation papers we obtained separate a heat pump from the total load of
 the single premises the heat pump sits in, and the widest aggregate either paper reports is five
 households.** [Brudermueller et al. (2023)](https://doi.org/10.1145/3600100.3623731) estimated the
 heat pump's own 15-minute energy in 363 Swiss single-family houses, each fitted with a second meter
-on the heat pump and none fitted with photovoltaics, explaining 83% of the variance in that second
+on the heat pump and none fitted with photovoltaics. Brudermueller et al. explained 83% of the variance in that second
 meter's readings across households held out of training, against 63% for the better of the two
 published baseline algorithms in the comparison.
 [Gisiger et al. (2026)](https://doi.org/10.1016/j.egyai.2026.100691) ran the same task over 7,021
@@ -2001,16 +1980,14 @@ sharing one transformer, to within 6% of the metered total over an evening peak 
 Gisiger et al.'s error, normalised by the mean metered heat-pump load, rose from 0.69 on the Swiss
 data the model was trained on to 0.78 on Brudermueller et al.'s separate Swiss dataset, and to 1.24
 on a German dataset of single-family houses with heat pumps, which Gisiger et al. attribute to
-differences in heat pump types, building stock, occupancy patterns, and data collection methods —
-measured evidence that a heat-pump model does not survive a change of dataset unaltered, with a
+differences in heat pump types, building stock, occupancy patterns, and data collection methods. That is measured evidence that a heat-pump model does not survive a change of dataset unaltered, with a
 change of country degrading it further still.
 
 #### What this means for Flexpectation
 
 **For Flexpectation version 1: heat pumps, chargers, and batteries stay inside net demand rather
 than being forecast separately.** In the one measurement we found, the only site size that clearly
-beat a naive benchmark 24 hours ahead was 145 charge points. Forecast uncertainty grows with lead
-time, so over the 14 days NGED needs, a site would probably have to be larger than 145 charge points
+beat a naive benchmark 24 hours ahead was 145 charge points. Forecast uncertainty grows with lead time. So over the 14 days NGED needs, a site would probably have to be larger than 145 charge points
 before a separate charger forecast was worth making.
 
 **Compared to the literature we found, Flexpectation version 2 plans to invert which half of the
@@ -2023,7 +2000,7 @@ pump, and Gisiger et al. on 7,021 Swiss premises with heat pumps, while Ebrahimi
 charging power and stored energy of 19 vehicles metered live. Exogenous inputs already appear in
 that work — Ebrahimi et al. take the hourly energy price and the ambient temperature, and Gisiger et
 al. find detection easier in colder weeks — but each paper uses those inputs as features feeding a
-mapping learned from metered examples, so what the model knows about a heat pump is what heat pumps
+mapping learned from metered examples. So what the model knows about a heat pump is what heat pumps
 looked like in the training set. A differentiable physical model states the relationship between
 outdoor temperature and heat-pump electrical demand as an equation instead, and fits the building's
 parameters. The measured argument for that inversion sits in this challenge's own literature:
@@ -2036,8 +2013,7 @@ outdoor temperature moves the heat pumps, irradiance and panel orientation move 
 moves the batteries. Whether a given substation's mixture is separable in practice is a property of
 the measurements rather than of the optimiser, which is the test challenge 8 borrows from
 exploration geophysics and from hyperspectral unmixing. Two limits ride along: the thermal physics
-of the thousands of premises behind a primary substation is not one building's physics repeated, and
-a differentiable physical model removes the need for submetered training examples at every
+of the thousands of premises behind a primary substation is not one building's physics repeated. And a differentiable physical model removes the need for submetered training examples at every
 substation without removing the need for submetered ground truth to check the answer against.
 
 **The spiky, synchronised charging that makes electric-vehicle load hard to *forecast* is what makes
@@ -2045,8 +2021,7 @@ that load easy to *detect* in aggregate, while heat pumps are hard to detect at 
 Powergrid's [smart-meter detection
 trial](https://smarter.energynetworks.org/projects/npg_nia_-49/), on 1,500 monitored premises,
 found that "EV [electric vehicle] identification at premises level was found to be relatively
-straightforward", though "a lack of ground truth, such as registered charging points, precluded
-formal validation", and that "aggregation does mask some signals, although EV usage is still clearly
+straightforward", though "a lack of ground truth, such as registered charging points, precluded formal validation". The trial also found that "aggregation does mask some signals, although EV usage is still clearly
 identifiable at feeder and substation level". The same trial found that "the detection of ASHP
 [air-source heat pumps] is frustrated by the low levels of adoption (<1% of premises) and
 differences in operation (low-slow vs high-fast)". [Gisiger et al.
@@ -2054,8 +2029,7 @@ differences in operation (low-slow vs high-fast)". [Gisiger et al.
 one week of 15-minute readings with a precision of 0.896 by a rule counting sharp rises in power and
 0.953 by a convolutional neural network, and found detection easier in colder weeks, when heat pumps
 run more. Gisiger et al. assembled that evaluation set around premises known to have heat pumps
-without reporting how many premises without a heat pump the set held, so the precision does not
-carry to the fewer than one premises in a hundred Northern Powergrid was searching.
+without reporting how many premises without a heat pump the set held. The precision therefore does not carry to the fewer than one premises in a hundred Northern Powergrid was searching.
 
 ## Evaluating the performance of power forecasts
 
