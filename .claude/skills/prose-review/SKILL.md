@@ -192,13 +192,13 @@ Highest yield first, so that the expensive passes run while attention is freshes
 8. Serial commas
 9. Acronyms expanded on first use
 10. Sentences readable two ways, and noun-piles
-11. Long sentences an "and" or a "but" would split into two
+11. Long sentences carrying two claims, which a full stop would split
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
 
 **Rule 4 has a cheap way in: find the sentences carrying two or more numerals.** A count chain is where the fault lives, and a methods sentence reporting a screening funnel is where a count chain lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and most will be fine; the ones that are not hand the reader a different unit at each number and define none of them.
 
-**Rule 11 has a cheap way in too: find the long sentences carrying a mid-sentence "and" or "but".** `grep -oE '[^.]{160,}\.'` over a whitespace-normalised copy returns the sentences worth reading, and the finding is only real where both halves could stand alone as sentences. A conjunction joining two verbs that share one subject is not a finding, and neither is a split that would leave a fragment.
+**Rule 11 has a cheap way in too: find the long sentences.** `grep -oE '[^.]{160,}\.'` over a whitespace-normalised copy returns the sentences worth reading, and the finding is real where the sentence carries two claims that read better apart. The joins to look for are "and" and "but", a semicolon, an em dash, a "so", a "which", and a trailing participle — the last three are the ones a sweep briefed on conjunctions alone will miss. A conjunction joining two verbs that share one subject is not a finding, and neither is a split that would leave a fragment.
 
 ## What is deliberately not a finding
 

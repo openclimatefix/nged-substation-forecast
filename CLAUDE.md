@@ -253,14 +253,15 @@ closing paragraph that repeats the opening. Delete those outright, and leave the
 sentences intact — buying brevity by clipping words out of a sentence that needs them is the
 mistake the next rule forbids.
 
-**Prefer short sentences. Where an "and" or a "but" joins two clauses that could each stand alone,
-replace the conjunction with a full stop.** A joined sentence makes the reader hold the first
-clause in mind while parsing the second, and the second clause is usually the one carrying the
-conclusion. So "The register gives a registered capacity. The register carries no panel tilt and no
-panel azimuth." beats the same two clauses joined by "and". Two limits keep the rule from doing
-harm. The split must leave two full sentences rather than a fragment, which is the rule below. And
-a conjunction joining two verbs that share one subject is not joining two clauses: "the forecast
-reuses yesterday's NWP run and widens the uncertainty bands" is one sentence and stays one.
+**Prefer short sentences. Where a sentence carries two claims, split it into two sentences.** A
+joined sentence makes the reader hold the first claim in mind while parsing the second, and the
+second claim usually carries the conclusion. The joins worth checking are "and" and "but", a
+semicolon, an em dash, a "so", a "which", and a trailing participle. None of those joins is wrong
+by itself. The test is whether splitting makes the passage easier to read, never whether a joining
+word is present. Two limits keep the rule from doing harm. A split must leave full sentences rather
+than a fragment, which is the rule below. And a conjunction joining two verbs that share one
+subject joins no second claim: "the forecast reuses yesterday's NWP run and widens the uncertainty
+bands" is one sentence and stays one.
 
 **Write full sentences; don't drop the subject.** Don't clip words for terseness
 if it leaves a sentence without a clear subject/verb. Prefer "We split storage across two
