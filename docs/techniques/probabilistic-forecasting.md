@@ -110,11 +110,12 @@ uncertainty out to 14 days.** The [energy-forecasting
 review](../background/energy-forecasting-review.md#horizon-ensembles-and-tails) found two papers
 asking for it and none delivering it. The nearest built system is [Ludwig et al.
 (2023)](https://doi.org/10.1080/01605682.2022.2115411), who drive a multi-step probabilistic load
-forecast from the same 51-member ECMWF ensemble 1 to 6 days ahead, but for the whole of Great
-Britain rather than for a substation. The horizon itself sits near a measured limit: [Buizza and
-Leutbecher (2015)](https://doi.org/10.1002/qj.2619) found that a weather ensemble stops beating a
-climatological distribution 16 to 23 days out, measured on upper-air variables rather than on the
-near-surface temperature and irradiance that drive substation load.
+forecast from the same 51-member ECMWF ensemble 1 to 6 days ahead. That system covers the whole
+of Great Britain, though, rather than a substation. The horizon itself sits near a measured
+limit: [Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) found that a weather
+ensemble stops beating a climatological distribution 16 to 23 days out. That figure was measured
+on upper-air variables rather than on the near-surface temperature and irradiance that drive
+substation load.
 
 ## The fix, formally: a mixture of conditional distributions
 
@@ -171,8 +172,8 @@ substation-scale tails explicitly, report that "below 1% and above 99% the forec
 quantile regression only are not calibrated at any GSP [grid supply point] Group. Therefore, these
 quantiles are not suitable for use in decision-making." Outside those percentiles Browell and
 Fasiolo switch to a fitted parametric tail at each end. The recipe above reads p1 and p99 straight
-off each member's quantile-regression output before mixing, so the mixture's own p1 and p99 may need
-the same parametric-tail treatment before they can be trusted.
+off each member's quantile-regression output before mixing. The mixture's own p1 and p99 may
+therefore need the same parametric-tail treatment before they can be trusted.
 
 ## The tempting shortcut that doesn't work: averaging the quantiles
 

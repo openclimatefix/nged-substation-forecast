@@ -47,7 +47,7 @@ losers do not disappear: they stay on the leaderboard as permanent baselines and
 **No published method already solves this across a mixed fleet, which is why the contest starts from
 a head-to-head rather than adopting one paper's method.** The [energy-forecasting
 review](../background/energy-forecasting-review.md#3-estimating-the-effective-capacity-of-metered-generators)
-found a method for each generation technology separately, but none running across a mixed fleet of
+found a method for each generation technology separately. But none run across a mixed fleet of
 individually metered generators at a distribution network operator — which is NGED's position, with
 solar, wind, a battery, a gas generator, and a biofuel plant behind one set of primaries.
 
@@ -140,14 +140,14 @@ $\ell_1$ penalty on successive differences). This lets capacity track genuine, p
 favour fitting over ratcheting.** The [energy-forecasting
 review](../background/energy-forecasting-review.md#3-estimating-the-effective-capacity-of-metered-generators)
 records that [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) estimate a wind farm's
-available capacity as a running maximum of its own metered production, a ratchet that can only rise,
-while [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) fit a piecewise capacity series by
-quadratic optimisation and publish both a monotonic and a non-monotonic variant. On hourly,
-region-aggregated Swedish data the non-monotonic variant gave the lowest day-ahead forecast error,
-2.0% below the running-maximum normalisation on mean absolute error, but neither method improved
-clearly on Viotti et al.'s own de-rating test, which suppressed production for 30 days to simulate a
-fault. A ratchet cannot follow capacity down at all, which is why both candidates here are built to
-fall as well as rise.
+available capacity as a running maximum of its own metered production, a ratchet that can only rise.
+[Viotti et al. (2026), by contrast,](https://doi.org/10.1002/we.70136) fit a piecewise capacity
+series by quadratic optimisation and publish both a monotonic and a non-monotonic variant. On
+hourly, region-aggregated Swedish data the non-monotonic variant gave the lowest day-ahead forecast
+error, 2.0% below the running-maximum normalisation on mean absolute error. But neither method
+improved clearly on Viotti et al.'s own de-rating test, which suppressed production for 30 days to
+simulate a fault. A ratchet cannot follow capacity down at all, which is why both candidates here
+are built to fall as well as rise.
 
 The prior is shared; how exactly each candidate realises it is part of the contest. A proximal
 convex solver produces **exactly zero** change on most days — so the nonzero steps *are* a
@@ -416,15 +416,15 @@ launders one of the largest error sources in the system into numbers that look e
 measure it rather than assume it.** [Pierrot and Pinson
 (2024)](https://doi.org/10.1080/00401706.2024.2350421), the direct precedent for Candidate B's
 native posteriors, improved continuous ranked probability score by 34.2% over probabilistic
-persistence, but their one clean test isolating a varying capacity bound from every other change in
+persistence. But their one clean test isolating a varying capacity bound from every other change in
 their method gained 2.43%, which they call no significant improvement. [de Vilmarest et al.
 (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) removed embedded wind and solar capacity from
-an adaptive model of GB regional net load and found error *fell* by 0.4%, against a rise of more
+an adaptive model of GB regional net load. They found error *fell* by 0.4%, against a rise of more
 than 10% for the same model fitted offline — evidence that an adaptive model can absorb a missing
 capacity signal rather than needing it, at the regional scale that result was measured on. Neither
 is a like-for-like test of a metered generator's effective capacity, as the [energy-forecasting
 review](../background/energy-forecasting-review.md#3-estimating-the-effective-capacity-of-metered-generators)
-sets out, but both are reasons the hypothesis above stays a hypothesis.
+sets out. But both are reasons the hypothesis above stays a hypothesis.
 
 The hypothesis is cheap to test, and the contest should: perturb the capacity series by its
 plausible error band, run the perturbed series through the two-pass normalisation, and measure

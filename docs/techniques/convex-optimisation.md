@@ -198,7 +198,7 @@ review](../background/energy-forecasting-review.md#3-estimating-the-effective-ca
 records that [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) fit a wind farm's capacity
 time series by quadratic optimisation against a capacity factor simulated from reanalysis weather,
 beating a running-maximum ratchet by 2.0% on the mean absolute error of the resulting day-ahead
-forecast — though only on hourly, region-aggregated data, and their own de-rating test, the case
+forecast — though only on hourly, region-aggregated data. Their own de-rating test, the case
 closest to the one Flexpectation needs, showed no comparable improvement over the ratchet.
 
 The coefficients in all four cases want the same *priors*, and each prior is convex:
@@ -268,8 +268,8 @@ records that recovering a demand the meter never saw is mature practice wherever
 one-sidedly censored: airline revenue management calls it unconstraining, and
 electric-vehicle-charging work calls it censored-demand recovery, as in [Hüttel et al.
 (2023)](https://arxiv.org/abs/2301.06418). Estimating what a curtailed wind farm would have
-produced is the closest analogue the review found inside the energy sector, and it is the same
-one-sided bound this section's censoring split relies on.
+produced is the closest analogue the review found inside the energy sector. Curtailment is also
+the same one-sided bound this section's censoring split relies on.
 
 ## Fitting an envelope with the quantile (pinball) loss
 

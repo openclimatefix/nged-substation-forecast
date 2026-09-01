@@ -34,7 +34,7 @@ them:
 * Track the **effective capacity** of metered generators over time (turbine failures, inverter
   faults, PV panel degradation), ignoring NGED-imposed Active Network Management curtailment —
   including detecting misbehaving generators. Curtailment is excluded here because a curtailed
-  generator is being held down rather than broken, and the point of a better forecast is to
+  generator is being held down rather than broken. The point of a better forecast is to
   curtail it less often.
 * Detect and compensate for **switching events** — where power is diverted from one substation
   to another due to maintenance, changing the local demand signature. (Whether this ships as a
@@ -59,31 +59,31 @@ their demand when a substation risks running beyond its capability. The second i
 curtailment**: holding embedded generation down through Active Network Management when export
 risks running beyond a limit. That limit is usually not the substation's own: a generation
 constraint typically binds above the primary, driven by the aggregated flow across several
-substations rather than by any single meter in isolation, so the forecasts that matter for
-curtailment are the ones that net and sum correctly up the hierarchy — which is why
+substations rather than by any single meter in isolation. The forecasts that matter for
+curtailment are therefore the ones that net and sum correctly up the hierarchy — which is why
 [curtailment scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at
 one primary before summing up the substation hierarchy. The money is counted differently too —
-curtailment today is priced as a whole-system cost rather than as NGED's own spend — but NGED
+curtailment today is priced as a whole-system cost rather than as NGED's own spend. But NGED
 rate the saving as highly, so the forecast requirement is unchanged. So the question users ask
 of a forecast is rarely "what is the most likely load?" and usually "**how likely is net
 demand to cross this limit?**" — NGED's [incumbent forecasting
 tool](nged-incumbent-forecast.md#the-operators-view) literally plots demand as headroom below
 a constraint line.
 
-The project's value therefore concentrates in **both tails** of each forecast distribution: a
+The project's value therefore concentrates in **both tails** of each forecast distribution: A
 model that is excellent on typical half-hours but unreliable in the handful of near-limit
-hours has failed at the job, and the near-limit hours sit at both ends. Flexibility
-procurement turns on the upper tail, where demand rises towards firm capacity, and bites in
-winter. Curtailment turns on the lower tail, where export rises towards whichever limit binds because
+hours has failed at the job. The near-limit hours sit at both ends. Flexibility procurement
+turns on the upper tail, where demand rises towards firm capacity, and bites in winter.
+Curtailment turns on the lower tail, where export rises towards whichever limit binds because
 embedded generation is high and demand is low, and bites in summer. The 13
 `DELIVERY_QUANTILES` are deliberately tail-heavy at both ends and symmetric about the median —
-p1, p2 and p5 matching p95, p98 and p99 — so the delivery shape already serves both decisions.
-This is why evaluation includes
-[tail & exceedance metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
+p1, p2 and p5 matching p95, p98 and p99. The delivery shape therefore already serves both
+decisions. This is why evaluation includes [tail & exceedance
+metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
 alongside average-error metrics. (One honest complication: a substation's real limit is not a
 single number — it varies with ambient temperature and with how long an overload lasts — so
-the evaluation metrics use documented static proxies; see
-[the threshold-choice discussion](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived).)
+the evaluation metrics use documented static proxies; see [the threshold-choice
+discussion](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived).)
 
 ## Stretch Goals
 

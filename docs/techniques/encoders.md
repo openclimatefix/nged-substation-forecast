@@ -14,9 +14,9 @@ review](../background/energy-forecasting-review.md#pre-trained-encoders) found. 
 (2025)](https://arxiv.org/abs/2507.22291) each show a single frozen encoder serving many downstream
 tasks, which is the arrangement this page plans. Neither result promises that a pre-trained encoder
 beats hand-designed features: Brown et al. report that learned featurisations "don't always
-outperform designed featurization methods in scarce data regimes", so the gradient-boosted tree on
-hand-designed features is the bar these encoders have to clear rather than a floor they can be
-assumed to sit above.
+outperform designed featurization methods in scarce data regimes". The gradient-boosted tree on
+hand-designed features is therefore the bar these encoders have to clear, rather than a floor they
+can be assumed to sit above.
 
 ## Why encoders are a natural fit with differentiable physics
 
@@ -60,8 +60,8 @@ Lerch (2018)](https://arxiv.org/abs/1805.09091) post-process a 50-member ECMWF e
 calibrated probabilistic 2-metre temperature at 537 German weather stations 48 hours ahead, cutting
 mean continuous ranked probability score from 1.16 for the raw ensemble to 0.78. [Mitra and
 Ramavajjala (2023)](https://arxiv.org/abs/2312.00290) freeze a weather autoencoder and train small
-models on the frozen representation alone, at accuracy comparable to purpose-built models — though
-their targets are further weather variables rather than power on an electricity network. The
+models on the frozen representation alone, at accuracy comparable to purpose-built models. Their
+targets are further weather variables rather than power on an electricity network, though. The
 [energy-forecasting review](../background/energy-forecasting-review.md#pre-trained-encoders) sets
 out both.
 

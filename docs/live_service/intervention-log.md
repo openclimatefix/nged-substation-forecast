@@ -163,9 +163,9 @@ in [the log](#the-log).
 
 v0.2 forecasts 31 time series, three more than v0.1, under the promoted model `xgboost_cv_0003`.
 From the 00:00 UTC slot on 14 August 2026 to the 06:00 UTC slot on 28 August 2026 the schedule
-called for 58 consecutive 6-hourly slots, and **every one of them produced a forecast for all 31
-time series**. No NWP run was missed: every slot in the window forecast from NWP between 12 and 30
-hours old, the healthy band for a once-daily ECMWF run.
+called for 58 consecutive 6-hourly slots. **Every one of those slots produced a forecast for all
+31 time series.** No NWP run was missed: every slot in the window forecast from NWP between 12 and
+30 hours old, the healthy band for a once-daily ECMWF run.
 
 *Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` and
 `experiment_name = "xgboost_cv_0003"` — v0.2's promoted model — in the `power_forecasts` Delta table

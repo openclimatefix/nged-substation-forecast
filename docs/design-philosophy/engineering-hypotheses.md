@@ -151,13 +151,13 @@ controlled measurement.
 **Nobody has measured what any of this delivers, which is why H2 is written as a falsifiable claim
 rather than a citation.** [Woźniak et al. (2025)](https://doi.org/10.1109/ACCESS.2025.3534990)
 screened 2,615 search results down to 41 publications looking for metrics that measure whether
-machine-learning-operations practice works, and reported that none of the reviewed articles
+machine-learning-operations practice works. They reported that none of the reviewed articles
 presented any — an absence they call unexpected. [Gundersen and Kjensmo
 (2018)](https://doi.org/10.1609/aaai.v32i1.11503) found that 400 artificial-intelligence papers
 documented between 20% and 30% of the variables needed to judge how an experiment was run, with no
 paper documenting all of them. A field that records so little about how its experiments were run
-cannot easily measure whether a change to how they are run helped, so H2 and T2.1 exist to supply
-this project's own measurement rather than to add a fifth testimonial to the pile.
+cannot easily measure whether a change to how they are run helped. H2 and T2.1 therefore exist to
+supply this project's own measurement rather than to add a fifth testimonial to the pile.
 
 **T2.1 — Experiment throughput.** Registered leaderboard experiments per person per month, taken
 from MLflow run timestamps. Two framing choices are deliberate.

@@ -92,15 +92,15 @@ training run.** Multiple seasonal-trend decomposition (MSTL) splits each substat
 trend, one seasonal component per period — daily and weekly, plus annual where the history is long
 enough — and a remainder. The remainder plays the same role as the model residual above: a switching
 event appears in it as a sustained level shift. MSTL has no features to engineer and no fitting run
-to wait for, so it is the cheapest way to answer the question that decides whether the rest is worth
-building — are the level shifts visible above the noise at all? Two limits keep MSTL a first look
-rather than the baseline. MSTL carries no weather covariate, so a cold snap or a still week lands in
-the remainder alongside the switching events. And MSTL estimates the trend and the seasonal
-components from the series' own history, so a months-long event can be partly absorbed into the
-trend it ought to be standing out against — a milder form of the lagged-power contamination
-described above. Both limits are why the XGBoost baseline follows. A published detector, [Kim
-(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) under stage 1 below, is built on a robust
-seasonal-trend decomposition used in exactly this role.
+to wait for. It is therefore the cheapest way to answer the question that decides whether the rest
+is worth building — are the level shifts visible above the noise at all? Two limits keep MSTL a
+first look rather than the baseline. MSTL carries no weather covariate, so a cold snap or a still
+week lands in the remainder alongside the switching events. And MSTL also estimates the trend and
+the seasonal components from the series' own history, so a months-long event can be partly absorbed
+into the trend it ought to be standing out against. That is a milder form of the lagged-power
+contamination described above. Both limits are why the XGBoost baseline follows. A published
+detector, [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) under stage 1 below, is built
+on a robust seasonal-trend decomposition used in exactly this role.
 
 **Baseline implementation: reuse the existing XGBoost forecaster with no lag features.** The
 production forecaster already consumes most of the covariates the baseline needs — NWP weather,
@@ -456,7 +456,7 @@ The detector adds three stages on top of the shared baseline: it detects level s
 
 Detect **sustained level shifts** in the baseline's normalised residual — the switching-event signature is a step, not a spike or a slope — with a standard mean-shift changepoint method (PELT or binary segmentation with an L2 cost, or CUSUM). The **output** is candidate step times and magnitudes per substation. But baseline residuals violate the assumptions those detectors make, so the residual must be prepared first.
 
-**A published detector already runs close to this whole chain, on distribution load alone.** [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) removes seasonal and trend components with a robust seasonal-trend decomposition, transforms the residual with a Haar stationary wavelet transform, finds candidate changepoints with Pruned Exact Linear Time, computes 15 statistical features per candidate — load variation, residual statistics, slope, ratio, and time location — and classifies the candidates with an isolation forest, reporting that "accurate detection is possible using load data alone, without external sensors or prior labels". Two differences matter here. Kim scores each distribution line on its own, with no balance check across neighbours, which is the redundancy stage 2 exists to exploit. And the paper reports no sensitivity floor in transferred magnitude × duration, so it does not answer the question this stage is built to answer. The paper is open access from the society's own journal portal, though its digital object identifier resolves to a paywalled aggregator. It reports an average detection rate of 78%, finding 7 of 9 logged transfers on the Kimhwa distribution feeder, and gives no false-alarm rate. Three earlier papers from the same author score against those same nine transfers. [Kim et al. (2020)](https://doi.org/10.3390/en13174358) detect a transfer where measured load departs from a neural network's prediction for the same feeder, finding 7 of the 9. [Kim et al. (2022)](https://doi.org/10.3390/en15041441) do it from polynomial and standard-pattern preprocessing, finding 7 of 9 on that feeder and 7 of 7 on another. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) simply thresholds the residual of a seasonal-trend decomposition on a moving average and a moving standard deviation, finding 8 of the 9 — the best score in the series. That the simplest method scores best on this benchmark is a reason to implement the moving-average threshold first, as the baseline stage 1 has to beat. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) is also the only paper in the series that comes near a sensitivity floor: its table gives the megawatt step and the percentage load change of each of the nine transfers, every transfer above the feeder's mean load-change rate of 37.5% was detected, and the one it missed moved 22.7%.
+**A published detector already runs close to this whole chain, on distribution load alone.** [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) removes seasonal and trend components with a robust seasonal-trend decomposition, transforms the residual with a Haar stationary wavelet transform, finds candidate changepoints with Pruned Exact Linear Time, computes 15 statistical features per candidate — load variation, residual statistics, slope, ratio, and time location — and classifies the candidates with an isolation forest, reporting that "accurate detection is possible using load data alone, without external sensors or prior labels". Two differences matter here. Kim scores each distribution line on its own, with no balance check across neighbours, which is the redundancy stage 2 exists to exploit. And the paper reports no sensitivity floor in transferred magnitude × duration, so it does not answer the question this stage is built to answer. The paper is open access from the society's own journal portal, though its digital object identifier resolves to a paywalled aggregator. It reports an average detection rate of 78%, finding 7 of 9 logged transfers on the Kimhwa distribution feeder, and gives no false-alarm rate. Three earlier papers from the same author score against those same nine transfers. [Kim et al. (2020)](https://doi.org/10.3390/en13174358) detect a transfer where measured load departs from a neural network's prediction for the same feeder, finding 7 of the 9. [Kim et al. (2022)](https://doi.org/10.3390/en15041441) do it from polynomial and standard-pattern preprocessing, finding 7 of 9 on that feeder and 7 of 7 on another. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) simply thresholds the residual of a seasonal-trend decomposition on a moving average and a moving standard deviation, finding 8 of the 9 — the best score in the series. That the simplest method scores best on this benchmark is a reason to implement the moving-average threshold first, as the baseline stage 1 has to beat. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) is also the only paper in the series that comes near a sensitivity floor: its table gives the megawatt step and the percentage load change of each of the nine transfers. Every transfer above the feeder's mean load-change rate of 37.5% was detected, and the one it missed moved 22.7%.
 
 **Changepoint detection must respect the residual's real statistics.** Textbook mean-shift
 detectors (PELT/BinSeg with an L2 cost, CUSUM) assume roughly independent noise with constant
@@ -509,13 +509,13 @@ residuals around time t (observed - expected), one row per substation:
 review](../background/energy-forecasting-review.md#4-detecting-switching-events) searched 40
 title-and-abstract queries and 10 full-text queries across OpenAlex, Semantic Scholar, Crossref,
 and arXiv, the works citing [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164), and every
-project title on the Energy Networks Association's Smarter Networks Portal, and found every
-switching detector in the literature scoring one substation against its own history alone. The
-one paper that search turned up whose title suggests it couples substations, [Willis et al.
+project title on the Energy Networks Association's Smarter Networks Portal. The review found
+every switching detector in the literature scoring one substation against its own history alone.
+The one paper that search turned up whose title suggests it couples substations, [Willis et al.
 (1984)](https://doi.org/10.1109/TPAS.1984.318713), corrects annual peak-load curve fits rather
-than detecting an event at a point in time, and the review could not obtain the full text to
-confirm whether the "load transfer coupling" regression that title names couples the substations
-that exchange load.
+than detecting an event at a point in time. The review could not obtain the full text to confirm
+whether the "load transfer coupling" regression that title names couples the substations that
+exchange load.
 
 **The neighbourhood-sum test (cheap, powerful corroboration).** Conservation offers a second,
 sharper statistic than "the rises sum to the drop": over the candidate set {source + donors}, the
@@ -567,8 +567,8 @@ changes in 5 years of half-hourly demand from over 70 bulk supply points and 380
 into "unreasonably zero or negative demand" and "switching operations and network reconfigurations",
 using power alone and no bottom-up reference series, as the [energy-forecasting
 review](../background/energy-forecasting-review.md#4-detecting-switching-events) records. ATLAS
-published no precision or recall for either rule, so it does not settle how well the distinction can
-be drawn — only that GB substations have been sorted this way before.
+published no precision or recall for either rule. It therefore does not settle how well the
+distinction can be drawn — only that GB substations have been sorted this way before.
 
 ##### Stage 3 — composition corroboration
 
@@ -603,7 +603,7 @@ Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 **Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**. The floor is not a single MW number: it is a frontier in **transferred magnitude × event duration**, reported per series relative to that series' residual noise. The duration axis exists because changepoint segmentation has a minimum detectable event length at half-hourly sampling (an event lasting minutes to a few hours appears as a spike or one odd interval, not a step), just as residual noise sets a minimum magnitude. Pair the frontier with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.* One caveat to carry into the scoring: measured **precision is a lower bound** — if the control-room logs are incomplete (worth asking NGED how complete they believe them to be), some "false positives" will be real, unlogged events.
 
-**Report an F1 score per event-duration band, so the detector can be set beside the only published measurement.** F1 is the harmonic mean of precision and recall, weighting the two equally, and runs from 0 for a useless detector to 1 for a perfect one. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) — the only published measurement of switching detection at a real network operator — score four duration bands (15 minutes to 6 hours, 6 hours to 3 days, 3 to 42 days, and 42 days or longer), and their best detectors reach about 0.2 on the two shortest bands and nearly 0.5 on the longest. Their headline metric is F1.5 rather than F1: the F-beta family lets recall be weighted more heavily than precision, and they set beta to 1.5 because "the potential impact of a false negative is higher than that of a false positive in power grid expansion planning". The same is true here, so report **both** — F1 as the headline number, F1.5 alongside it wherever the head-to-head with Bouman et al. is the point — and band the scores by duration the way they do, because a single fleet-wide score hides the fact that short events are the hard ones.
+**Report an F1 score per event-duration band, so the detector can be set beside the only published measurement.** F1 is the harmonic mean of precision and recall, weighting the two equally, and runs from 0 for a useless detector to 1 for a perfect one. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) — the only published measurement of switching detection at a real network operator — score four duration bands (15 minutes to 6 hours, 6 hours to 3 days, 3 to 42 days, and 42 days or longer). Their best detectors reach about 0.2 on the two shortest bands and nearly 0.5 on the longest. Their headline metric is F1.5 rather than F1: the F-beta family lets recall be weighted more heavily than precision. They set beta to 1.5 because "the potential impact of a false negative is higher than that of a false positive in power grid expansion planning". The same is true here, so report **both** — F1 as the headline number, F1.5 alongside it wherever the head-to-head with Bouman et al. is the point. Band the scores by duration the way they do, too, because a single fleet-wide score hides the fact that short events are the hard ones.
 
 **Synthetic event injection (the workhorse of tuning and validation).** The logs contain only however many events the trial period happens to contain, which caps the statistical power of any sensitivity estimate. Injection removes that cap: take periods believed clean, move a synthetic slice between real neighbours (subtract a scaled, plausibly-shaped signal from one series and add it across 1–3 others), and measure detection and attribution over a controlled **magnitude × duration grid**. This maps the full sensitivity frontier with arbitrary precision, tunes every threshold and penalty in stages 1–2 *without touching the gold-standard logs*, and works at any scale — including, later, on unlabelled full-fleet data. The real logs then play their proper role: confirming that the synthetic frontier transfers to reality, rather than carrying the whole measurement burden alone.
 

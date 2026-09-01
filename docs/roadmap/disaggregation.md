@@ -78,7 +78,7 @@ found that under a time-of-use tariff the share of charging events starting in t
 from 5.8% to 24.7%, and to 37.6% among participants using the smart-charging app: a population that
 had diversified re-synchronising around the cheap-rate window, which is the failure mode the caveat
 above covers. For heat pumps, the one measurement the review found showed demand per heat pump
-falling as more are aggregated, but in an average winter; whether that diversity survives the cold
+falling as more are aggregated, but in an average winter. Whether that diversity survives the cold
 snaps when a substation is under most strain is untested.
 
 ## The forward model
@@ -163,11 +163,11 @@ evidence.** The [energy-forecasting
 review](../background/energy-forecasting-review.md#model-families-for-flexpectation-version-2)
 found differentiable physics established for a generator's own output — [Gijón et al.
 (2025)](https://arxiv.org/abs/2502.07344) fit a turbine model to a wind farm's metered production —
-which is the precedent the photovoltaic and wind nodes below build on. For the gross-demand node the
-review found no comparable precedent: a search for differentiable physics applied to substation
-demand forecasting produced no strong result, and the review found nobody aggregating building
-thermal physics up to a substation and putting it inside a probabilistic forecast, though the
-ingredients exist separately.
+which is the precedent the photovoltaic and wind nodes below build on. For the gross-demand node
+the review found no comparable precedent: a search for differentiable physics applied to
+substation demand forecasting produced no strong result. The review also found nobody aggregating
+building thermal physics up to a substation and putting it inside a probabilistic forecast,
+though the ingredients exist separately.
 
 ### Node definitions
 
@@ -320,7 +320,7 @@ $$\text{MVA}_{\text{measured}} \approx \bigl|\,\text{Net substation flow}\,\bigr
 Two implementation cautions:
 
 - **The magnitude loss needs smoothing.** $|x|$ is non-differentiable at zero and its gradient flips sign there — exactly where the bounce lives. Compare against a smoothed magnitude, e.g. $\sqrt{x^2 + \epsilon}$, and add a temporal-continuity prior on the *sign* of the reconstructed flow: flow direction persists for hours, it does not flicker half-hour to half-hour.
-- **The near-unity power-factor assumption is weakest precisely at the bounce.** As real power passes through zero, reactive power dominates the measured magnitude, so the MVA trace has a soft *floor* above zero rather than a clean reflection. Expect the reconstruction to under-fit the bottom of the bounce, and do not let the optimiser explain the floor with phantom demand. The [energy-forecasting review](../background/energy-forecasting-review.md#7-recovering-signed-power-from-apparent-power-meters) confirms both cautions: a magnitude-only reading leaves more than one state of the network consistent with it, a result power-system state estimation has worked with since the 1990s, and apparent power is the magnitude of real power only near unity power factor, so the approximation is weakest exactly at the bounce. [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/), the closest published attempt to NGED's position, resolves the ambiguity using the meter's own history together with a model of the generation behind the meter, rather than a second independent measurement.
+- **The near-unity power-factor assumption is weakest precisely at the bounce.** As real power passes through zero, reactive power dominates the measured magnitude, so the MVA trace has a soft *floor* above zero rather than a clean reflection. Expect the reconstruction to under-fit the bottom of the bounce, and do not let the optimiser explain the floor with phantom demand. The [energy-forecasting review](../background/energy-forecasting-review.md#7-recovering-signed-power-from-apparent-power-meters) confirms both cautions: a magnitude-only reading leaves more than one state of the network consistent with it, a result power-system state estimation has worked with since the 1990s. And apparent power is the magnitude of real power only near unity power factor, so the approximation is weakest exactly at the bounce. [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/), the closest published attempt to NGED's position, resolves the ambiguity using the meter's own history together with a model of the generation behind the meter, rather than a second independent measurement.
 
 ## Handling abnormal running arrangements
 
@@ -404,13 +404,13 @@ The novelty lies in the **combination and problem framing**, not in any single c
 **1. Switching events as the primary disaggregation target, not an afterthought.** Existing
 disaggregation literature treats the network topology as fixed and known. The ARA problem — where the
 topology itself is a latent variable that flips over timescales of minutes to months — has not been
-addressed in the disaggregation literature. This is not a minor extension; it changes the structure of the inference problem fundamentally. The
-[energy-forecasting
+addressed in the disaggregation literature. This is not a minor extension; it changes the
+structure of the inference problem fundamentally. The [energy-forecasting
 review](../background/energy-forecasting-review.md#why-we-think-this-ambitious-plan-can-be-done)
 reports the nearest precedent it found as [Liu et al.
 (2019)](https://doi.org/10.1109/ACCESS.2019.2951422), who condition a forecast on an
-operating-state label, but for switching between transformers inside one substation, where the
-substation total stays metered throughout.
+operating-state label. But that precedent is for switching between transformers inside one
+substation, where the substation total stays metered throughout.
 
 **2. Power conservation as the cross-node inference signal.** Prior spatial-disaggregation work uses
 spatial correlation as a soft prior. Here the graph edges carry a hard physical constraint: rerouted

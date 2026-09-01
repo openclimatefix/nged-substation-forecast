@@ -181,13 +181,13 @@ infinity in any metric raises rather than silently poisoning the leaderboard agg
 
 **A published instance shows why an accuracy score is never reported alone.** [Kaas et al.
 (2026)](https://arxiv.org/abs/2607.01966) scored models on 200 German low-voltage feeders with an
-overload-decision metric; the two models that came first and second on that metric for consumer
+overload-decision metric. The two models that came first and second on that metric for consumer
 peaks had 90% prediction intervals that captured the true value only 62% and 58% of the time across
 the series as a whole, and 43% and 49% of the time at the peaks themselves. The [energy-forecasting
 review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
-draws the general point: a model that understates its uncertainty raises fewer false alarms, so it
-scores well on a threshold-crossing test while being exactly the model an operator should not trust
-near a capacity limit.
+draws the general point: a model that understates its uncertainty raises fewer false alarms. That
+model therefore scores well on a threshold-crossing test while being exactly the model an operator
+should not trust near a capacity limit.
 
 ### Pinball loss
 
@@ -324,15 +324,16 @@ the 95th percentile sits far below any limit. Getting the p95 right *everywhere*
 same skill as getting the forecast right *near the limit*. The metrics in this section target
 the second skill directly.
 
-**Mean absolute error's blindness to peaks is documented outside NGED.** The [energy-forecasting
+**Mean absolute error's blindness to peaks is documented outside NGED.** The
+[energy-forecasting
 review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
-records that meteorologists name the failure the "double penalty" — a peak predicted an hour late is
-penalised twice, once for the peak that did not happen and once for the peak that did — and that two
-projects reached the same conclusion for power independently. [Pinheiro et al.
-(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) adopted a peak-aware error measure for
-exactly this reason, and Northern Powergrid's [Artificial
-Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) project built a metric
-over the top 10% of demand values and made it the primary measure for comparing models.
+records that meteorologists name the failure the "double penalty" — a peak predicted an hour
+late is penalised twice, once for the peak that did not happen and once for the peak that did.
+The review also records that two projects reached the same conclusion for power independently.
+[Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493) adopted a peak-aware
+error measure for exactly this reason. Northern Powergrid's [Artificial
+Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) project built a
+metric over the top 10% of demand values and made it the primary measure for comparing models.
 
 ### The trap: scoring only the hours when the worst case actually happened
 

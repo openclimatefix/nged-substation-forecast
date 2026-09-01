@@ -43,11 +43,11 @@ winners into `conf/model/xgboost.yaml` one at a time to keep attribution clean.
 
 **How much the choice of baseline moves the answer has been measured.** [Nguyen and Müsgens
 (2026)](https://doi.org/10.1063/5.0300682) include the reference model as a regressor across 4,687
-skill scores and find that scoring against plain persistence reports a skill score 10.7 percentage
+skill scores. They find that scoring against plain persistence reports a skill score 10.7 percentage
 points higher at horizons beyond 6 hours than scoring the same forecast against a convex combination
 of smart persistence and climatology, with smart persistence alone 9.0 points higher. They recommend
 the combination as the more demanding benchmark. We already plan persistence and climatology as
-separate rows; their result is the argument for reading a win against either single bookend as the
+separate rows. Their result is the argument for reading a win against either single bookend as the
 optimistic end of the range.
 
 **A limit worth knowing before you rely on NaN handling.** XGBoost's NaN routing only covers the
@@ -1081,13 +1081,13 @@ hazard that dictates the ingest's scope, and the COVID covariate are on
 **The largest meta-analysis of solar forecasting puts the peak almost exactly where 5.5 years
 lands.** [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) pool 4,687 skill scores from
 188 solar forecasting papers and find that each extra day of training data raises skill score at
-horizons beyond 6 hours by 0.004 percentage points, but that the gain turns over at around 2,000
-days — roughly 5.5 years — which they attribute to over-fitting. That is a reason to expect the ERA5
-extension to reach the top of the curve rather than fall short of it, and a reason to argue any
-*further* extension on regime coverage or fold count rather than on volume alone. Two caveats before
-leaning on the number: their sample is deterministic solar forecasting at the plant or irradiance
-level, not substation net demand, and their beyond-6-hours band covers this page's 3-to-10-day focus
-in a single category.
+horizons beyond 6 hours by 0.004 percentage points. But they also find that the gain turns over at
+around 2,000 days — roughly 5.5 years — which they attribute to over-fitting. That is a reason to
+expect the ERA5 extension to reach the top of the curve rather than fall short of it, and a reason
+to argue any *further* extension on regime coverage or fold count rather than on volume alone. Two
+caveats before leaning on the number: their sample is deterministic solar forecasting at the plant
+or irradiance level, not substation net demand, and their beyond-6-hours band covers this page's
+3-to-10-day focus in a single category.
 
 Two sequencing notes. The [lead-time feature](#feed-the-model-the-forecast-lead-time-review-discovery-one-line)
 is a prerequisite, because the cheapest reconciliation arm leans on it to discount reanalysis

@@ -105,19 +105,23 @@ absorb level drift for the same reason.
   problem. Google's COVID-19 Community Mobility Reports are the richer alternative, because
   workplace and residential mobility sits closer to the causal driver of substation demand than the
   legal state does, and it captures both the voluntary March-2020 withdrawal and the slow return
-  through 2021–22. Both series ended in 2022, so check they are still downloadable — but note that a lockdown scalar is 0 for every future forecast, so a dead source is a back-fill problem, not a serving problem.
+  through 2021–22. Both series ended in 2022, so check they are still downloadable. But a lockdown
+  scalar is 0 for every future forecast, so a dead source is a back-fill problem, not a serving
+  problem.
 
 - **The measured evidence favours mobility over stringency, though it is thin.** [Chen et al.
   (2020)](https://arxiv.org/abs/2006.08826) feed Apple Mobility Trends driving data and Google
   Community Mobility Reports transit data straight into a day-ahead neural network across 12
-  regions. On UK national demand they take mean absolute percentage error from 10.11% for a pre-pandemic model to 8.74% with mobility, and to 4.46% with mobility plus multi-task learning
-  across similar-sized regions — while retraining on pandemic data *without* mobility made the UK figure worse, at 13.78%. Two caveats before leaning on those figures: the test window is 1 to 15 May 2020, two
-  weeks, and the paper is an arXiv preprint. The Oxford stringency index turned up in our search
-  only in explanatory econometrics, never as a forecasting input — and there ([Berezvai et al.
-  (2022)](https://doi.org/10.1016/j.segan.2022.100930), 23 European Union member states) a
-  *quadratic* specification was needed, with "the partial effect of an increase in the stringency
-  index depend[ing] on the type of day (weekday or weekend), hour of the day, and initial stringency
-  level", which one linear scalar cannot express.
+  regions. On UK national demand they take mean absolute percentage error from 10.11% for a
+  pre-pandemic model to 8.74% with mobility, and to 4.46% with mobility plus multi-task learning
+  across similar-sized regions. Retraining on pandemic data *without* mobility, though, made the UK
+  figure worse, at 13.78%. Two caveats before leaning on those figures: the test window is 1 to 15
+  May 2020, two weeks, and the paper is an arXiv preprint. The Oxford stringency index turned up in
+  our search only in explanatory econometrics, never as a forecasting input. There, though
+  ([Berezvai et al. (2022)](https://doi.org/10.1016/j.segan.2022.100930), 23 European Union member
+  states), a *quadratic* specification was needed, with "the partial effect of an increase in the
+  stringency index depend[ing] on the type of day (weekday or weekend), hour of the day, and
+  initial stringency level", which one linear scalar cannot express.
 
 - **Check whether simply adapting faster does the same job, before building the covariate.** [de
   Vilmarest and Goude (2021)](https://arxiv.org/abs/2110.00334) compare, on one dataset and horizon,
@@ -126,7 +130,7 @@ absorb level drift for the same reason.
   error 11.2 against 13.6 MW for a linear model, 12.4 against 14.3 for a generalised additive model,
   and 14.3 against 16.2 for an autoregressive model, losing only on a neural network at 12.4 against
   12.3. Learning the variances rather than fixing them matched the no-break version. The recency
-  sample weights above are the same idea, so run that arm first: the covariate has to beat faster
+  sample weights above are the same idea. Run that arm first: the covariate has to beat faster
   adaptation, not merely beat doing nothing.
 
 - **The pre-lockdown regime may never come back, and a scalar that returns to 0 says it does.**
@@ -134,25 +138,26 @@ absorb level drift for the same reason.
   Melbourne, report "significant shifts in distributions during the lockdown, which do not fully
   revert to their pre-lockdown state even after restrictions are lifted". If GB substation demand
   behaved the same way — and permanent home-working makes that plausible — then the post-lockdown
-  era is a third regime rather than a return to the first, and a lockdown scalar cannot say so: it
-  reads 0 both before 2020 and after 2021, for two different worlds. Recency sample weights can
-  express that difference, which is a second reason to run them as the control arm.
+  era is a third regime rather than a return to the first. A lockdown scalar cannot say so,
+  though: it reads 0 both before 2020 and after 2021, for two different worlds. Recency sample
+  weights can express that difference, which is a second reason to run them as the control arm.
 
 - **One published result supports the plan above: treat the lockdown as a labelled example rather
   than as data to discard.** [Abélès et al. (2024)](https://arxiv.org/abs/2402.14684) calibrate two
   process-noise variances — a slow one on pre-COVID data (2012 to 2019) and a fast one on 2020 —
   then let a Markov switch choose between them at run time. Tested on French national half-hourly
   demand over 2021 and 2022, *after* the lockdowns, the switching version beat both fixed-variance
-  filters. Note what that buys: the lockdown pays for itself by calibrating the fast regime, and
-  nothing about a stringency or mobility series is needed at inference.
+  filters. Note what that buys: the lockdown pays for itself by calibrating the fast regime.
+  Nothing about a stringency or mobility series is needed at inference.
 
 - **All of this evidence is national or building-level, none of it a distribution substation.** The
-  de Vilmarest, Abélès, and Berezvai results are national transmission demand; the only UK-level figure anywhere in this set is Chen et al.'s national mean absolute percentage error. A primary
-  substation serves a few thousand customers with a strongly non-average mix, so its lockdown
-  response could be far larger or far smaller than the national one depending on whether it feeds a
-  city centre or a dormitory estate. A search of OpenAlex for COVID-19 load forecasting at
-  distribution substations returned nothing, so this is a per-substation question we will have to
-  answer from NGED's own history.
+  de Vilmarest, Abélès, and Berezvai results are national transmission demand. The only UK-level
+  figure anywhere in this set is Chen et al.'s national mean absolute percentage error. A primary
+  substation serves a few thousand customers with a strongly non-average mix. Its lockdown response
+  could therefore be far larger or far smaller than the national one, depending on whether it feeds
+  a city centre or a dormitory estate. A search of OpenAlex for COVID-19 load forecasting at
+  distribution substations returned nothing. This is therefore a per-substation question we will
+  have to answer from NGED's own history.
 
 - **Keep exclusion as an ablation arm.** Dropping 2020-03 to 2021-07 costs roughly 1.3 of about
   5.5 winters. Probably the wrong trade — lockdown distorts the occupancy and calendar response far

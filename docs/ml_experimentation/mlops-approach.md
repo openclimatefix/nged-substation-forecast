@@ -8,10 +8,10 @@ Modern MLOps (as used in this project) changes throughput and closes the transla
 
 1. **Throughput.** The grunt work of an experiment — assembling features, training,
    cross-validating, recording results — is automated, so a small team can run hundreds of
-   experiments per month instead of one or two. Humans still decide what to try;
-   the infrastructure runs those experiments. (See [Running an ML experiment
+   experiments per month instead of one or two. Humans still decide what to try; the
+   infrastructure runs those experiments. (See [Running an ML experiment
    end-to-end](dagster-workflow.md).) That the throughput produces a better forecast is a bet
-   this project is making rather than a result the literature has settled: the
+   this project is making rather than a result the literature has settled. The
    energy-forecasting review found [no study measuring what adopting
    machine-learning-operations practice
    delivers](../background/energy-forecasting-review.md#mlops-research-describes-good-practice-but-does-not-measure-what-the-practice-improves),
@@ -49,7 +49,7 @@ re-implementation of it. Promotion to production takes minutes, and that speed i
 candidate has already been trained, cross-validated (see [Cross-validation
 folds](cross-validation-folds.md)), and evaluated on the same pipeline, under the same
 standardised protocol, as every model before it. Holding that protocol fixed is what makes two
-experiments comparable at all, which is the reason [Karpathy's
+experiments comparable at all. That is the reason [Karpathy's
 autoresearch](https://github.com/karpathy/autoresearch) fixes every training run to the same
 5-minute budget: a fixed budget "makes experiments directly comparable regardless of what the
 agent changes".

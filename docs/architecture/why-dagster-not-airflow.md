@@ -14,20 +14,20 @@ Both candidates here are tools OCF already runs, which is what keeps this questi
 wider machine-learning operations (MLOps) literature would have pointed somewhere else
 entirely: the 13 platforms that literature catalogues include Kubeflow, ZenML, ClearML,
 Polyaxon, Metaflow, Domino, Databricks, SageMaker, and Vertex AI ([Zhao et al.
-(2026)](https://doi.org/10.3390/info17040328)), and OCF runs none of those nine. Adopting any
-of those platforms would have introduced a tool genuinely alien to the team; choosing between
+(2026)](https://doi.org/10.3390/info17040328)). OCF runs none of those nine. Adopting any of
+those platforms would have introduced a tool genuinely alien to the team; choosing between
 Dagster and Airflow does not. Zhao et al. also report that no energy-specific mature MLOps
-platform was identified in the sources they screened, so adapting a general-purpose
-orchestrator to energy forecasting is the field's normal condition rather than a quirk of this
+platform was identified in the sources they screened. Adapting a general-purpose orchestrator
+to energy forecasting is therefore the field's normal condition rather than a quirk of this
 project.
 
 **Dagster does appear in that literature, though never as a comparison against Airflow.**
 [Pelekis et al. (2024)](https://doi.org/10.1016/j.softx.2024.101758) build DeepTSF, an
 open-source machine-learning-operations platform for time-series load forecasting, on Dagster
 assets and jobs, and demonstrate DeepTSF on a day-ahead forecast of Italy's national
-electricity load. DeepTSF makes no comparison with Airflow and benchmarks no orchestrator, so
-DeepTSF shows Dagster to be a workable foundation for an energy-forecasting pipeline rather
-than the better of the two tools.
+electricity load. DeepTSF makes no comparison with Airflow and benchmarks no orchestrator.
+DeepTSF therefore shows Dagster to be a workable foundation for an energy-forecasting
+pipeline rather than the better of the two tools.
 
 The page answers three questions in turn:
 
@@ -57,10 +57,10 @@ standardised leaderboard. Orchestrator ergonomics for experimentation are not a 
 here; they are load-bearing for the project's core output.
 
 **That premise is a bet this project is making rather than a result the literature has
-settled.** The energy-forecasting review found no measurement behind it: the
-energy-forecasting review found [no study measuring what adopting MLOps practice
-delivers](../background/energy-forecasting-review.md#mlops-research-describes-good-practice-but-does-not-measure-what-the-practice-improves),
-and [the case for fast, comparable
+settled.** The energy-forecasting review found [no study measuring what adopting MLOps
+practice
+delivers](../background/energy-forecasting-review.md#mlops-research-describes-good-practice-but-does-not-measure-what-the-practice-improves).
+The review also found that [the case for fast, comparable
 iteration](../background/energy-forecasting-review.md#fast-comparable-iteration-is-argued-for-not-measured)
 rests on a structural argument and on practitioner testimony instead. Naming the bet matters
 here, because the orchestrator choice is staked on that bet.

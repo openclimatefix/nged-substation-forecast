@@ -15,11 +15,11 @@ business case, and not quotable as either. Its one job is to rank forecasts on t
 about, turning "this model has a lower threshold-weighted continuous ranked probability score" into
 "this model would have spent less to keep the network within limits". We use pounds rather than a
 unitless score because the parameters genuinely are prices, and because pounds are what the
-decisions these forecasts feed are actually made in. Forecast developers do not usually tune on money:
-[Gürses-Tran and Monti (2022)](https://doi.org/10.3390/forecast4020028) observe that forecast
-developers "predominantly assess residuals and error statistics when tuning the targeted model's
-quality", so that "eventual cost or rewards of the underlying business application are typically not
-considered in the model development phase".
+decisions these forecasts feed are actually made in. Forecast developers do not usually tune on
+money: [Gürses-Tran and Monti (2022)](https://doi.org/10.3390/forecast4020028) observe that
+forecast developers "predominantly assess residuals and error statistics when tuning the targeted
+model's quality". As a result, "eventual cost or rewards of the underlying business application are
+typically not considered in the model development phase".
 
 ## Two savings, measured separately
 
@@ -62,8 +62,9 @@ operator in congestion management: 3,102 euros a year using standard load profil
 using a smart-meter-informed forecast. Two features of that study leave the question open for a real
 network: the modelled network is a modified IEEE 33-node test system rather than a real one, and
 what Bernecker et al. compare is two *information levels* rather than two forecasting models. The
-[energy-forecasting review](../background/energy-forecasting-review.md) found no case of a money metric ranking one forecast against another at a real substation, and the published work that does
-run on a real distribution network denominates the comparison in energy volumes or in spare capacity
+[energy-forecasting review](../background/energy-forecasting-review.md) found no case of a money
+metric ranking one forecast against another at a real substation. The published work that does run
+on a real distribution network denominates the comparison in energy volumes or in spare capacity
 rather than in money: [Angus et al. (2027)](https://doi.org/10.1016/j.epsr.2026.113545) win 10 to
 12% more capacity from 644 low-voltage transformers at a risk of overheating set wherever they ask
 for it, and [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) fix a risk appetite and
@@ -210,7 +211,7 @@ Out of scope for Flexpectation, including v2. This is documented as the eventual
 modelling reactive power, voltage drop and N-1 contingencies explicitly — but it is gated on
 power-flow integration work that sits outside this project.
 
-Tier 3 is also where a **real curtailment case study** becomes possible. Tiers 1 and 2 can each be computed and can rank models without Tier 3; what they cannot yet do is be validated against a real curtailment event, because no existing site maps a curtailment case to a specific series or a single hierarchy node — see [case studies](#case-studies) below.
+Tier 3 is also where a **real curtailment case study** becomes possible. Tiers 1 and 2 can each be computed and can rank models without Tier 3. What they cannot yet do is be validated against a real curtailment event, because no existing site maps a curtailment case to a specific series or a single hierarchy node — see [case studies](#case-studies) below.
 
 ### Curtailment price basis
 
@@ -313,7 +314,7 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
   resource (excluding any CMZ with "LV" in its name) and [short-term contracts](https://connecteddata.nationalgrid.co.uk/dataset/flexibility-trades-data-and-results/resource/b04ce2c2-8798-486a-8591-48bfdd05d979)
   resource, across all zones, feed the volume-weighted average prices in [what the volumes cost](#what-the-volumes-cost).
 
-- **The curtailment *case study* is blocked, not the curtailment metric.** Tiers 1 and 2 need nothing that does not already exist, so each can rank models as soon as it is implemented, and Tier 2 does not wait on Tier 3. What is blocked is validating either tier against a real curtailment event: mapping such an event to a specific series or hierarchy node needs Tier 3 power-flow modelling — see [Tier 3](#tier-3-full-power-flow-modelling). The trial area has two nominal flexibility zones with an export-side constraint, but neither has enough dispatch history to stand in as a case study.
+- **The curtailment *case study* is blocked, not the curtailment metric.** Tiers 1 and 2 need nothing that does not already exist, so each can rank models as soon as it is implemented. Tier 2 does not wait on Tier 3. What is blocked is validating either tier against a real curtailment event: mapping such an event to a specific series or hierarchy node needs Tier 3 power-flow modelling — see [Tier 3](#tier-3-full-power-flow-modelling). The trial area has two nominal flexibility zones with an export-side constraint, but neither has enough dispatch history to stand in as a case study.
 
 ## What these numbers do not capture
 
