@@ -179,34 +179,57 @@ expanded nowhere outside a table and the reference list.
 
 ### The order to sweep in
 
-Highest yield first, so that the expensive passes run while attention is freshest:
+The first position is fixed by a dependency; the rest run highest yield first, so that the
+expensive passes get the freshest attention:
 
-1. Pronouns and demonstratives, including "one", "ones", and "such a"
-2. Unenumerated singletons and superlatives
-3. Umbrella nouns — "thing", "something", "anything", "metadata"
-4. Counting nouns that never say what was counted — "records", "sources", "items",
+1. Long sentences carrying two claims, which a full stop would split
+2. Pronouns and demonstratives, including "one", "ones", and "such a"
+3. Unenumerated singletons and superlatives
+4. Umbrella nouns — "thing", "something", "anything", "metadata"
+5. Counting nouns that never say what was counted — "records", "sources", "items",
    "entries", "studies", "results"
-5. Money metaphors for performance
-6. Ambiguous "network"
-7. Numerals
-8. Serial commas
-9. Acronyms expanded on first use
-10. Sentences readable two ways, and noun-piles
-11. Long sentences carrying two claims, which a full stop would split
+6. Money metaphors for performance
+7. Ambiguous "network"
+8. Numerals
+9. Serial commas
+10. Acronyms expanded on first use
+11. Sentences readable two ways, and noun-piles
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
 
-**Rule 4 has a cheap way in: find the sentences carrying two or more numerals.** A count chain is where the fault lives, and a methods sentence reporting a screening funnel is where a count chain lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and most will be fine. The ones that are not hand the reader a different unit at each number and define none of them.
+**The split pass goes first because splitting a sentence manufactures work for the passes behind
+it.** A split leaves the second claim needing a subject, and the obvious subject is a pronoun
+standing for whatever the first half named: "it plays on substation load the role the combined
+reference plays on irradiance, and it is the bar that decides whether the project is worth its
+money" splits into a second sentence opening "It is also the bar", whose referent is now three
+nouns back. Seven of 94 splits in one pass did this. Running the pronoun pass next turns every one
+of those stranded pronouns into an ordinary pronoun finding, and the numeral pass later catches a
+split that leaves a sentence opening with a numeral. Sweep in the old order and each of those
+faults has to be hunted afterwards by hand, on text that no pass is looking at any more.
 
-**Rule 11 has a cheap way in too: find the long sentences.** `grep -oE '[^.]{160,}\.'` over a whitespace-normalised copy returns the sentences worth reading, and the finding is real where the sentence carries two claims that read better apart. The joins to look for are "and" and "but", a semicolon, an em dash, a "so", a "which", and a trailing participle — the last three are the ones a sweep briefed on conjunctions alone will miss. A conjunction joining two verbs that share one subject is not a finding, and neither is a split that would leave a fragment.
+**Where naming the stranded noun reads as pure repetition, the split was the wrong call.** Two
+verbs sharing one subject carry one claim between them, so the sentence was never a finding and
+the pronoun pass is telling you so. Rejoin it rather than inventing a subject for the second half.
 
-**Rule 11 creates rule 1 violations, so re-sweep for pronoun openers after applying it.** A split
-leaves the second claim needing a subject, and the obvious subject is a pronoun standing for
-whatever the first half named: "it plays on substation load the role the combined reference plays
-on irradiance, and it is the bar that decides whether the project is worth its money" splits into a
-second sentence opening "It is also the bar", whose referent is now three nouns back. Seven of 94
-splits in one pass did this. Name the noun, and where naming it reads as pure repetition, the split
-was the wrong call: two verbs sharing one subject carry one claim and stay in one sentence.
+**The reorder costs the split pass its cheapest way in.** Naming a noun, naming what a count
+counted, and expanding an acronym all make sentences longer, so a sweep that ran those passes
+first would hand the split pass a longer and more conspicuous corpus. Going first means the length
+grep below sees every sentence at its shortest. Set the threshold lower than the 160 characters
+that worked when splitting ran last, and treat the grep as a way in rather than as the pass: the
+finding is two claims, not a character count.
+
+**Rule 1 has a cheap way in: find the long sentences.** `grep -oE '[^.]{130,}\.'` over a
+whitespace-normalised copy returns the sentences worth reading, and the finding is real where the
+sentence carries two claims that read better apart. The joins to look for are "and" and "but", a
+semicolon, an em dash, a "so", a "which", and a trailing participle — the last three are the ones a
+sweep briefed on conjunctions alone will miss. A conjunction joining two verbs that share one
+subject is not a finding, and neither is a split that would leave a fragment.
+
+**Rule 5 has a cheap way in too: find the sentences carrying two or more numerals.** A count chain
+is where the fault lives, and a methods sentence reporting a screening funnel is where a count
+chain lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds
+them, and most will be fine. The ones that are not hand the reader a different unit at each number
+and define none of them.
 
 ## What is deliberately not a finding
 
@@ -261,15 +284,26 @@ wording cannot be triaged and is worth nothing.
   browser tools.** Concurrent agents editing one file collide, and a finding that lands before
   triage cannot be rejected.
 - **Ask for absolute line numbers in the file**, not offsets into an extracted chunk.
+- **Ask for the findings as JSON** — a list of objects carrying `file`, `quote` and `replacement` —
+  so `scripts/apply_findings.py` can apply the whole batch without anything being retyped. Tell the
+  agent to quote the sentence as the page reads; the script matches whether or not the agent kept
+  the markdown, and rejects a quote that occurs twice rather than guessing which one was meant.
 - **Do not edit a file while a sweep of it is in flight.** Every line number in every report still
   running is measured against the file as the agents found it.
 
 **Where the sweep covers pages a branch only partly wrote, gate each finding on the merge-base.**
 Tell the agent to skip prose that predates the branch, then check it mechanically too, because the
-instruction leaks: about one finding in nine came back on text already on `main`. Normalise
-whitespace, project the markup away, and test the quoted sentence against `git show
-<merge-base>:<path>` before applying. A finding that is already there belongs to whatever issue
-owns the unswept rest of the docs, not to the branch in hand.
+instruction leaks. A finding that is already on `main` belongs to whatever issue owns the unswept
+rest of the docs, not to the branch in hand. `scripts/apply_findings.py --merge-base <ref>` runs
+the check: it normalises the whitespace, projects the markup away, and tests the quoted sentence
+against `git show <ref>:<path>` before applying anything.
+
+**The leak is small, and an earlier estimate of it here was wrong.** Of 171 findings gated this
+way, the gate caught one. The figure this skill carried before — about one in nine — came from
+sampling sentence fragments picked by hand rather than the quotes the agents actually filed, and
+overstated the leak by more than an order of magnitude. Measure a yield on the findings that were
+really filed, or quote no yield at all. The gate stays worth running at one in 171, because it
+costs one flag and the finding it catches is prose the branch has no business touching.
 
 ## Which model to give the review to
 
@@ -334,50 +368,79 @@ and what it remembers is sometimes not what the line says.
 
 ## Applying and checking the edits
 
-**Edit through a wrap-tolerant substitution that asserts its match count** — the `rsub` helper in
-the `literature-review` skill — rather than by pasting text as it appears on screen, because a
-literal string match fails whenever the target spans a line break.
-
-**Reflow only the paragraphs whose text actually changed.** Re-wrapping the whole file buries the
-edit: one 8-edit batch produced a 412-line diff before the reflow was narrowed to changed
-paragraphs. `scripts/reflow_paragraphs.py` in the `literature-review` skill does this, and note it
-hardcodes a width of 100. **The wrap width is not uniform across this repo**, and applying the
-wrong width reflows every paragraph it touches. Detect the width per file: the file's width is the
-one that leaves the most existing paragraphs unchanged when re-wrapped.
-
-**An insertion anchored on a sentence can land inside a bolded lead**, between the lead's opening
-`**` and its closing `**`, leaving both markers unbalanced. `pymarkdown scan` passes,
-`mkdocs build --strict` passes, and the rendered page turns bold on and leaves it on for the rest of
-the section. Count the markers per paragraph after every batch, and expect zero:
+**Apply a batch with `scripts/apply_findings.py`, which refuses the edits that would corrupt the
+page.** Write the findings to a JSON file — one object per finding, carrying `file`, `quote` and
+`replacement` — then dry-run the script, read what it refused, and re-run it with `--apply`:
 
 ```bash
-python3 -c "t=open('FILE').read(); print(sum(1 for p in t.split(chr(10)*2) if p.count('**')%2))"
+uv run python .claude/skills/prose-review/scripts/apply_findings.py findings.json --merge-base REF
+uv run python .claude/skills/prose-review/scripts/apply_findings.py findings.json --apply --merge-base REF
 ```
 
-Then:
+The paragraphs below say what the script is defending against. Read them before hand-editing
+anything the script refused, because what the refusal was for decides how the edit has to be made
+instead. Every defect named below was written by an earlier apply script and then passed
+`pymarkdown scan`, `mkdocs build --strict` and `check_information_loss.py` unnoticed.
+
+**A sub-agent quotes the sentence with the markdown stripped, so a wrap-tolerant substitution still
+misses it.** `[Gijon et al. (2025)](https://doi.org/…) write` comes back as `Gijon et al. (2025)
+write`, and 57 of 98 findings failed to match on that alone. The script matches against a
+markup-stripped projection of the file that keeps an offset map back to the raw text, then splices
+the replacement in run by run, copying raw characters wherever the wording is unchanged so the
+links and bold markers the agent dropped survive. The replacement is written without markup too,
+so splicing it in whole would delete every link in the sentence.
+
+**A quote that stops short of a trailing clause matches nothing at all.** A sub-agent routinely
+ends its quote before a parenthetical the file actually carries, while every change it proposes
+sits in the head of the sentence. Trimming the words the quote and the replacement share at the end
+makes the truncated quote match, which the script does before searching.
+
+**A split whose full stop lands on a closing marker deletes that marker.** Splitting is the pass
+that does this, because the join it breaks is often the comma right after a bolded phrase or a code
+span. `**the same information**, and they are harder to spot` wants to become `**the same
+information.** They are harder to spot`, and a substitution written without the markers produces
+`**the same information. They are harder to spot` instead, with the bold left open. A link is
+worse, because the split drops the whole `](url)` half and the citation stops being a citation. The
+script counts `**`, backticks and links in the paragraph either side of the splice and refuses any
+edit that changes a count.
+
+**An insertion anchored on a sentence can land inside a bolded lead**, between the lead's opening
+`**` and its closing `**`, leaving both markers unbalanced. The rendered page then turns bold on
+and leaves it on for the rest of the section. The same marker count catches this case, and the
+per-paragraph check below catches one that reaches the file by another route.
+
+**A replacement spanning a different number of lines from the text it replaced invalidates every
+line index taken before the splice.** A three-line span rewritten as one line moves every following
+line up by two, so a re-wrap driven by the old indices reflows the wrong lines: one such re-wrap
+merged two numbered list items into `…instead. 2. **No translation gap.**`, and another swallowed
+the closing `---` of a skill file's YAML frontmatter into the description above it. Recompute the
+unit boundaries on the spliced text, never on the text as it was before, and leave the YAML
+frontmatter out of the re-wrap altogether — its indented lines read as list markers.
+
+**Reflow only the unit the change landed in, and solve that unit's width rather than assuming
+one.** Re-wrapping a whole file buries the edit: one 8-edit batch produced a 412-line diff before
+the reflow was narrowed. A unit is finer than a paragraph, because a bullet list written without
+blank lines between its items is a single paragraph, and re-wrapping the whole of one reflows every
+sibling bullet. The width is not uniform across this repo either — the pages this skill has swept
+are wrapped anywhere between 94 and 100 characters — so the script solves each unit's width by
+finding the width that reproduces the unit exactly, and falls back to the width most of the file's
+other units solve to.
+
+**Then check that the batch changed the words and nothing else**, before running the repo's own
+gates:
 
 ```bash
+uv run python .claude/skills/prose-review/scripts/check_structure.py HEAD
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 uv run mkdocs build --strict
 ```
 
-**A split whose full stop lands on a closing marker deletes that marker.** Rule 11 is the pass that
-does this, because the join it breaks is often the comma right after a bolded phrase or a code
-span. `**the same information**, and they are harder to spot` wants to become `**the same
-information.** They are harder to spot`, and a substitution written without the markers produces
-`**the same information. They are harder to spot` instead, with the bold left open. A link is
-worse, because the split drops the whole `](url)` half and the citation stops being a citation.
-Count `**`, backticks and links per paragraph before and after every batch, and refuse any edit
-that changes a count.
-
-**A sub-agent quotes the sentence with the markdown stripped, so a wrap-tolerant substitution still
-misses it.** `[Gijon et al. (2025)](https://doi.org/…) write` comes back as `Gijon et al. (2025)
-write`, and 57 of 98 findings failed to match on that alone. Match against a markup-stripped
-projection of the file that keeps an offset map back to the raw text, then splice the replacement
-in block by block, copying raw characters wherever the wording is unchanged so the links and bold
-markers survive. Trim the words the quote and the replacement share at the end before matching,
-too: a sub-agent routinely stops its quote before a trailing parenthetical the file actually
-carries, and every edit sits in the head.
+`check_structure.py` compares each changed file against a git ref and fails when a link, a bold or
+code span, a list item, a heading, a table row or a blank line has been *lost*, when a paragraph
+gains an unpaired `**` or backtick, when the trailing newline goes, or when a YAML frontmatter
+block stops closing. A count that *rises* is reported and not gated, because naming the noun a
+pronoun stood for legitimately adds a code span — writing `file` or `prose-review` where the
+sentence said "it" — while no sweep can legitimately lose one.
 
 **Neither command checks an anchor inside an absolute URL.** `mkdocs build --strict` validates
 relative links only, so a link to
