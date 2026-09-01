@@ -164,7 +164,12 @@ behind it, and the specific noun carries information the placeholder throws away
 contaminants that must be filtered out", not "the two things"; "Two caveats temper both figures",
 not "Two things temper"; "the closest work already published", not "the closest thing already
 published". A bolded lead opening "Two things follow" wastes the one sentence a skim-reader is
-guaranteed to read.
+guaranteed to read. **"Something" and "anything" throw away the same information**, and
+they are harder to spot because they read like ordinary English: "a decision to agree with NGED",
+not "something to agree with NGED"; "any occasion a human had to intervene in the running service",
+not "had to do something to it"; "when the ingest fails", not "when something breaks". Where the
+sentence genuinely means an unknown of unknown kind — a placeholder in a rule about future cases —
+say what kind of unknown: "an input we have not anticipated", not "something unexpected".
 
 **"Metadata" hides the fields that carry the information; list them.** The fault is the same as
 "thing": a reader told that a model was given "the site's metadata" learns nothing, because the
