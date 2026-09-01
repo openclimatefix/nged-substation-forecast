@@ -10,12 +10,16 @@
 ## Read this first: these pounds rank models, they do not cost anything
 
 These metrics put a **£** figure against every model we train. That figure rests on an invented
-network limit and a couple of average prices, so it is a **rough proxy**: not a cost analysis, not
-a business case, and not quotable as either. Its one job is to rank forecasts on the axis NGED
-care about, turning "this model has a lower threshold-weighted continuous ranked probability score"
-into "this model would have spent less to keep the network within limits". We use pounds rather
-than a unitless score because the parameters genuinely are prices, and because pounds are what the
-decisions these forecasts feed are actually made in.
+network limit and a couple of average prices, so it is a **rough proxy**: not a cost analysis, not a
+business case, and not quotable as either. Its one job is to rank forecasts on the axis NGED care
+about, turning "this model has a lower threshold-weighted continuous ranked probability score" into
+"this model would have spent less to keep the network within limits". We use pounds rather than a
+unitless score because the parameters genuinely are prices, and because pounds are what the
+decisions these forecasts feed are actually made in. That is not how forecasts are usually tuned:
+[Gürses-Tran and Monti (2022)](https://doi.org/10.3390/forecast4020028) observe that forecast
+developers "predominantly assess residuals and error statistics when tuning the targeted model's
+quality", so that "eventual cost or rewards of the underlying business application are typically not
+considered in the model development phase".
 
 ## Two savings, measured separately
 
@@ -39,14 +43,32 @@ engineer-hours.
 ## The shared idea: same risk, then compare the spend
 
 The textbook way to price a forecast charges it for what goes wrong: £X per action taken, £Y per
-limit breach nobody saw coming. We cannot do that, because £Y — the cost of a breach — is not a
-figure NGED hold in a form we can use.
+limit breach nobody saw coming. Meteorology has priced forecasts that way for decades: [Richardson
+(2000)](https://doi.org/10.1002/qj.49712656313) computes the relative economic value of the ECMWF
+ensemble across the whole range of ratios between the cost of acting on a forecast and the loss
+avoided by acting. We cannot follow that route, because £Y — the cost of a breach — is not a figure
+NGED hold in a form we can use.
 
 So we invert the question. **Models are aimed at equal safety, and we compare what each one spends
 to get there.** Each model may be as conservative as it likes, and we tune that conservatism until
 it leaves the same small amount of risk unaddressed. Then the only thing left to compare is cost.
 This matches the framing the design is built on: the risk to manage is unnecessary spend, not an
 unaddressed breach.
+
+**Holding risk constant and comparing the spend has been published at distribution level once, on a
+synthetic network.** [Bernecker et al. (2025)](https://doi.org/10.1016/j.ijepes.2025.110713) fix at
+95% the confidence level at which a network operator acts, then compare what two forecasts cost that
+operator in congestion management: 3,102 euros a year using standard load profiles against 86 euros
+using a smart-meter-informed forecast. Two features of that study leave the question open for a real
+network: the modelled network is a modified IEEE 33-node test system rather than a real one, and
+what Bernecker et al. compare is two *information levels* rather than two forecasting models. The
+[energy-forecasting review](../background/energy-forecasting-review.md) found no case of such a
+metric ranking one forecast against another at a real substation, and the published work that does
+run on a real distribution network denominates the comparison in energy volumes or in spare capacity
+rather than in money: [Angus et al. (2027)](https://doi.org/10.1016/j.epsr.2026.113545) win 10 to
+12% more capacity from 644 low-voltage transformers at a risk of overheating set wherever they ask
+for it, and [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) fix a risk appetite and
+compare the reserve volume each forecast has to hold.
 
 The knob is the **procurement quantile** $\tau$ — how far up its own forecast distribution a model
 looks when deciding to act. A timid model uses a high $\tau$, buys a lot, and is rarely caught out.
