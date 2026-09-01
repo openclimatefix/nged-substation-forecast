@@ -168,7 +168,7 @@ sweep of the same text, by the same model, found **30** — 26 pronouns, 2 unsco
 umbrella nouns, and a money metaphor. Extended across the whole review, 6 sub-agents working one
 rule per pass returned 469 findings on a file that had already passed several reviews.
 
-**Say "one pass per rule" explicitly in the brief.** A brief that lists nine rules together gets a
+**Say "one pass per rule" explicitly in the brief.** A brief that lists all eleven rules together gets a
 sweep that honours none of them, because listing the rules is not the same instruction as
 sequencing them.
 
@@ -192,10 +192,13 @@ Highest yield first, so that the expensive passes run while attention is freshes
 8. Serial commas
 9. Acronyms expanded on first use
 10. Sentences readable two ways, and noun-piles
+11. Long sentences an "and" or a "but" would split into two
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
 
 **Rule 4 has a cheap way in: find the sentences carrying two or more numerals.** A count chain is where the fault lives, and a methods sentence reporting a screening funnel is where a count chain lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and most will be fine; the ones that are not hand the reader a different unit at each number and define none of them.
+
+**Rule 11 has a cheap way in too: find the long sentences carrying a mid-sentence "and" or "but".** `grep -oE '[^.]{160,}\.'` over a whitespace-normalised copy returns the sentences worth reading, and the finding is only real where both halves could stand alone as sentences. A conjunction joining two verbs that share one subject is not a finding, and neither is a split that would leave a fragment.
 
 ## What is deliberately not a finding
 
