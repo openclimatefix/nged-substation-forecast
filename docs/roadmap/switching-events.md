@@ -507,14 +507,15 @@ residuals around time t (observed - expected), one row per substation:
 **Checking both sides of a transfer has no published precedent we could find.** The
 [energy-forecasting
 review](../background/energy-forecasting-review.md#4-detecting-switching-events) searched 40
-title-and-abstract queries and 10 full-text queries across OpenAlex, Semantic Scholar, Crossref, and
-arXiv, the works citing [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164), and every project
-title on the Energy Networks Association's Smarter Networks Portal, and found every switching
-detector in the literature scoring one substation against its own history alone. The one paper that
-search turned up which couples substations, [Willis et al.
-(1984)](https://doi.org/10.1109/TPAS.1984.318713), corrects annual peak-load curve fits rather than
-detecting an event at a point in time, and the review could not obtain the full text to confirm
-whether its "load transfer coupling" regression couples the substations that exchange load.
+title-and-abstract queries and 10 full-text queries across OpenAlex, Semantic Scholar, Crossref,
+and arXiv, the works citing [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164), and every
+project title on the Energy Networks Association's Smarter Networks Portal, and found every
+switching detector in the literature scoring one substation against its own history alone. The
+one paper that search turned up whose title suggests it couples substations, [Willis et al.
+(1984)](https://doi.org/10.1109/TPAS.1984.318713), corrects annual peak-load curve fits rather
+than detecting an event at a point in time, and the review could not obtain the full text to
+confirm whether the "load transfer coupling" regression that title names couples the substations
+that exchange load.
 
 **The neighbourhood-sum test (cheap, powerful corroboration).** Conservation offers a second,
 sharper statistic than "the rises sum to the drop": over the candidate set {source + donors}, the

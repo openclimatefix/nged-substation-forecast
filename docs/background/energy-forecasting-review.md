@@ -2062,9 +2062,9 @@ forecast has settled practice Flexpectation can adopt. Checking an estimate of a
 not meter — the effective capacity of a metered generator, the half-hourly output of unmetered
 solar, and the direction of flow behind an apparent-power meter — has no ground truth to score
 against, and each quantity needs its own basket of substitutes. Disaggregating unmetered solar has
-six possible substitutes, of which the papers we read use four. Scoring the detection of a rare
-event, such as a switching event or a metering fault, has good academic practice, and none of the GB
-projects we checked published a number to compare against.
+six possible substitutes, of which the disaggregation papers we read use three. Scoring the
+detection of a rare event, such as a switching event or a metering fault, has good academic
+practice, and none of the GB projects we checked published a number to compare against.
 
 **Mean absolute error rewards a flat forecast that would be of little use for either flexibility
 procurement or curtailment decisions, so a peak-aware score belongs alongside a proper score rather
@@ -2140,18 +2140,19 @@ in the used configuration". Flexpectation will treat the leakage as an open meth
 rather than a solved question, and will report what it did about the leakage rather than leave it
 implicit.
 
-**We have no ground truth for the unmetered solar and wind behind a substation's meter.** The papers
-we read use four substitutes for truth, each of which fails differently. Two further substitutes
-appear in none of the papers. The four in use are to hold out a generator that is metered, treating
-the generator as if it were unmetered, recovering it from a real substation's net flow and comparing
-against the meter; to sum individually metered generators into a synthetic substation and score the
-disaggregation against the components that went into the sum; to compare against an independent tool
-rather than against truth; and to measure whether the estimate improves the forecast it was built to
-improve. The two that appear in none of them are to check an estimate against a physical model, and
-to use a substation where every feeder and every embedded generator is metered, purely as
-validation. The physical checks are concrete and require little effort: disaggregated components
-must sum to the measured net flow; disaggregated solar must be zero at night and must sit under the
-clear-sky envelope; disaggregated wind must track wind speed rather than irradiance; and an inferred
+**We have no ground truth for the unmetered solar and wind behind a substation's meter.** The
+disaggregation papers we read use three substitutes for truth, each of which fails differently.
+Three further substitutes appear in none of those papers. The three in use are to hold out a
+generator that is metered, treating the generator as if it were unmetered, recovering it from a real
+substation's net flow and comparing against the meter; to sum individually metered generators into a
+synthetic substation and score the disaggregation against the components that went into the sum; and
+to compare against an independent tool rather than against truth. The three that appear in none of
+them are to measure whether the estimate improves the forecast it was built to improve, which the
+capacity-estimation literature does use; to check an estimate against a physical model; and to use a
+substation where every feeder and every embedded generator is metered, purely as validation. The
+physical checks are concrete and require little effort: disaggregated components must sum to the
+measured net flow; disaggregated solar must be zero at night and must sit under the clear-sky
+envelope; disaggregated wind must track wind speed rather than irradiance; and an inferred
 rooftop-solar capacity must be plausible for the area a substation serves. None of those checks
 needs a label, and a violation is a detectable error whatever the truth turns out to be. Using
 physical consistency to *score* an estimate, rather than to *shape* it, is close to absent from the
@@ -2608,16 +2609,15 @@ figure and no measurement of the engineering effort the pipeline saved. [Pelekis
 example with DeepTSF, an open-source platform that orchestrates its pipeline with Dagster and tracks
 experiments with MLflow: Pelekis et al. tune a neural basis expansion analysis (N-BEATS) model over
 100 hyperparameter trials on a day-ahead forecast of Italy's national electricity load, then
-backtest the winner on a held-out year, which makes DeepTSF the only platform description in this
-section to publish an accuracy figure at all. No comparison accompanies that figure: DeepTSF is
-measured against no baseline platform and no second orchestrator, and Pelekis et al. report that
-deployments in the I-NERGY project have "already proven DeepTSF's efficacy in DL-based load
-forecasting" without attaching a number to that claim. The one paper we found that argues for
-machine-learning operations from inside power-systems forecasting, [Gürses-Tran and Monti
-(2022)](https://doi.org/10.3390/forecast4020028), makes a different point altogether: forecast
-developers "predominantly assess residuals and error statistics when tuning the targeted model's
-quality", so that "eventual cost or rewards of the underlying business application are typically not
-considered in the model development phase".
+backtest the winner on a held-out year. What no platform description in this section supplies is a
+comparison between platforms: DeepTSF is measured against no baseline platform and no second
+orchestrator, and Pelekis et al. report that deployments in the I-NERGY project have "already proven
+DeepTSF's efficacy in DL-based load forecasting" without attaching a number to that claim. The one
+paper we found that argues for machine-learning operations from inside power-systems forecasting,
+[Gürses-Tran and Monti (2022)](https://doi.org/10.3390/forecast4020028), makes a different point
+altogether: forecast developers "predominantly assess residuals and error statistics when tuning the
+targeted model's quality", so that "eventual cost or rewards of the underlying business application
+are typically not considered in the model development phase".
 
 **Forecast error at Europe's transmission operators grew measurably over 5 years, yet no paper we
 read gives a retraining cadence for an energy forecast in production.** [Kazmi and Tao

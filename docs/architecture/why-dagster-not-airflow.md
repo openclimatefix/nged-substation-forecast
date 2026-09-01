@@ -12,10 +12,10 @@ spirit as the
 
 Both candidates here are tools OCF already runs, which is what keeps this question narrow. The
 wider machine-learning operations (MLOps) literature would have pointed somewhere else
-entirely: the platforms it catalogues are Kubeflow, ZenML, ClearML, Polyaxon, Metaflow, Domino,
-Databricks, SageMaker, and Vertex AI ([Zhao et al.
-(2026)](https://doi.org/10.3390/info17040328)), and OCF runs none of them. Adopting any of
-those platforms would have introduced a tool genuinely alien to the team; choosing between
+entirely: the 13 platforms that literature catalogues include Kubeflow, ZenML, ClearML,
+Polyaxon, Metaflow, Domino, Databricks, SageMaker, and Vertex AI ([Zhao et al.
+(2026)](https://doi.org/10.3390/info17040328)), and OCF runs none of those nine. Adopting any
+of those platforms would have introduced a tool genuinely alien to the team; choosing between
 Dagster and Airflow does not. Zhao et al. also report that no energy-specific mature MLOps
 platform was identified in the sources they screened, so adapting a general-purpose
 orchestrator to energy forecasting is the field's normal condition rather than a quirk of this

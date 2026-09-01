@@ -98,12 +98,15 @@ Nearly every objective above is an open research question — improving NRA fore
 detecting switching events, estimating effective capacity, flagging faulty meters,
 disaggregating DERs — and we hold far more ideas than we can try at once. That turns
 experimentation throughput into an infrastructure requirement in its own right: we need to run
-**on the order of hundreds of ML experiments per month**, and the workflow must make each one
-as frictionless as possible. The pre-registered version of that requirement — deliberately relaxed
-to a peak-month, per-person claim, so that months spent hardening the service are not spurious
-falsifications — is
-[H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month); the
-promotion half below is [H3](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
+**on the order of hundreds of ML experiments per month**, and the workflow must make each
+experiment as frictionless as possible. That the throughput produces a better forecast is a
+bet this project is making rather than a result the literature has settled, for the reasons
+set out in [Our Approach to MLOps](../ml_experimentation/mlops-approach.md). The
+pre-registered version of that requirement — deliberately relaxed to a peak-month, per-person
+claim, so that months spent hardening the service are not spurious falsifications — is
+[H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month);
+the promotion half below is
+[H3](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 
 Three properties matter as much as raw throughput:
 

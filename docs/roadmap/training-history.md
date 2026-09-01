@@ -110,10 +110,8 @@ absorb level drift for the same reason.
 - **The measured evidence favours mobility over stringency, though it is thin.** [Chen et al.
   (2020)](https://arxiv.org/abs/2006.08826) feed Apple Mobility Trends driving data and Google
   Community Mobility Reports transit data straight into a day-ahead neural network across 12
-  regions. On GB national demand they take mean absolute percentage error from 10.11% for a
-  pre-pandemic model to 8.74% with mobility, and to 4.46% with mobility plus multi-task learning
-  across similar-sized regions — while retraining on pandemic data *without* mobility made GB worse,
-  at 13.78%. Two caveats before leaning on those figures: the test window is 1 to 15 May 2020, two
+  regions. On UK national demand they take mean absolute percentage error from 10.11% for a pre-pandemic model to 8.74% with mobility, and to 4.46% with mobility plus multi-task learning
+  across similar-sized regions — while retraining on pandemic data *without* mobility made the UK figure worse, at 13.78%. Two caveats before leaning on those figures: the test window is 1 to 15 May 2020, two
   weeks, and the paper is an arXiv preprint. The Oxford stringency index turned up in our search
   only in explanatory econometrics, never as a forecasting input — and there ([Berezvai et al.
   (2022)](https://doi.org/10.1016/j.segan.2022.100930), 23 European Union member states) a
@@ -149,8 +147,7 @@ absorb level drift for the same reason.
   nothing about a stringency or mobility series is needed at inference.
 
 - **All of this evidence is national or building-level, none of it a distribution substation.** The
-  de Vilmarest, Abélès, and Berezvai results are national transmission demand; the only GB figure
-  anywhere in this set is Chen et al.'s national mean absolute percentage error. A primary
+  de Vilmarest, Abélès, and Berezvai results are national transmission demand; the only UK-level figure anywhere in this set is Chen et al.'s national mean absolute percentage error. A primary
   substation serves a few thousand customers with a strongly non-average mix, so its lockdown
   response could be far larger or far smaller than the national one depending on whether it feeds a
   city centre or a dormitory estate. A search of OpenAlex for COVID-19 load forecasting at
