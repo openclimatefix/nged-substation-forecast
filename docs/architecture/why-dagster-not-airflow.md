@@ -45,15 +45,16 @@ Airflow claims on this page were verified against Airflow 3.3.0 (released 6 July
 
 ## Why we chose Dagster (August 2025)
 
-This project is ML-R&D-heavy by design. Beyond improving demand-forecast skill, the
+This project is heavy on machine-learning research and development by design. Beyond improving
+demand-forecast skill, the
 [requirements](../background/requirements.md#ml-experimentation-at-scale) span
-switching-event detection, effective-capacity estimation, faulty-meter detection, and DER
-disaggregation — and we hold far more ideas than we can try at once. The infrastructure
-therefore has to support running **on the order of hundreds of ML experiments per month**,
-make each run — and, crucially, each *re-run*, when an inevitable bug fix invalidates earlier
-results — as frictionless as possible, and land every result on a standardised leaderboard.
-Orchestrator ergonomics for experimentation are not a nice-to-have here; they are load-bearing
-for the project's core output.
+switching-event detection, effective-capacity estimation, faulty-meter detection, and the
+disaggregation of distributed energy resources (DERs) — and we hold far more ideas than we can
+try at once. The infrastructure therefore has to support running **on the order of hundreds of
+ML experiments per month**, make each run — and, crucially, each *re-run*, when an inevitable
+bug fix invalidates earlier results — as frictionless as possible, and land every result on a
+standardised leaderboard. Orchestrator ergonomics for experimentation are not a nice-to-have
+here; they are load-bearing for the project's core output.
 
 **That premise is a bet this project is making rather than a result the literature has
 settled.** The energy-forecasting review found no measurement behind it: the
@@ -69,7 +70,7 @@ production as easily and as safely as possible, which is why R&D and production 
 unified codebase — promotion is an [audited
 materialisation](production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script),
 not a rewrite — and why anything that splits the R&D and production worlds apart carries an
-ongoing cost (a tension Option B below has to price in).
+ongoing burden (a tension Option B below has to weigh).
 
 Concretely, the workflow we designed for this is: mint an
 `{experiment_name}__{fold_id}` partition key per cross-validation cell at runtime, and get
@@ -82,7 +83,7 @@ When the system was designed in August 2025, the current Airflow release was 3.0
 8 August 2025; Airflow 3.1.0 did not arrive until 25 September 2025). At that point in time:
 
 - **Airflow had no asset partitioning of any kind.** Partitions were the time axis of a DAG,
-  full stop. [AIP-76 (Asset Partitions)](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=311626969)
+  full stop. [AIP-76, an Airflow Improvement Proposal, on Asset Partitions](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=311626969)
   was an unshipped proposal; it did not begin landing until Airflow 3.2.0 in April 2026. The
   experiment×fold dynamic-partition design simply had no Airflow analogue.
 - **The fallback pattern was compromised in the then-current release.** The natural Airflow
@@ -90,7 +91,7 @@ When the system was designed in August 2025, the current Airflow release was 3.0
   undermined by a live regression in the 3.0.x series
   ([#54779](https://github.com/apache/airflow/issues/54779)): clearing a single mapped
   instance restarted *all* of its siblings, so one failed fold could not be retried alone. The
-  fix shipped in 3.1.4, and the REST API could not target a single map index at all until
+  fix shipped in 3.1.4, and the representational-state-transfer (REST) application programming interface could not target a single map index at all until
   October 2025 ([#43635](https://github.com/apache/airflow/issues/43635)).
 - **Backfill run-config was fresh out of a bug.** Backfills silently failing to pass their
   `conf` to runs ([#51439](https://github.com/apache/airflow/issues/51439)) had been fixed
@@ -105,10 +106,10 @@ When the system was designed in August 2025, the current Airflow release was 3.0
 So the design-time claim is straightforward: in August 2025, Airflow could not deliver the
 per-cell experiment workflow this project was built around, and its nearest substitute had a
 broken per-fold retry story in the release we would have deployed. Choosing Dagster was not a
-matter of taste. Nor was it contrarian within OCF: we already ran Dagster for our on-prem data
-pipelines, and OCF's data-engineering view at the time favoured Dagster of the two
-orchestrators. (The later organisational shift towards possibly standardising on Airflow
-post-dates this design decision.)
+matter of taste. Nor was choosing Dagster contrarian within OCF: we already ran Dagster for
+our on-prem data pipelines, and OCF's data-engineering view at the time favoured Dagster of
+the two orchestrators. (The later organisational shift towards possibly standardising on
+Airflow post-dates this design decision.)
 
 ## Could we migrate today? (assessed July 2026)
 
@@ -124,7 +125,7 @@ Airflow 3.2.0 (April 2026) and 3.3.0 (July 2026) closed several of the gaps abov
   `DynamicPartitionsDefinition`. An `{experiment}__{fold}` key scheme is directly expressible.
 - **The backfill-conf bug class is fixed.** [#59043](https://github.com/apache/airflow/issues/59043)
   (conf silently not applied to runs with existing logical dates) was fixed in Airflow 3.2.2,
-  released 29 May 2026. No open issues in that class remain. One live caveat: AWS MWAA's
+  released 29 May 2026. No open issues in that class remain. One live caveat: Amazon Web Services' Managed Workflows for Apache Airflow (MWAA)
   newest supported version is 3.2.1, which predates the fix.
 - **Retry policies became pluggable** (AIP-105, in 3.3.0) — "retry only on
   `NwpRunNotYetAvailable` and `NwpVariableWhollyMissing`, fail fast on genuine bugs" is now
@@ -136,13 +137,13 @@ Airflow 3.2.0 (April 2026) and 3.3.0 (July 2026) closed several of the gaps abov
 A fair assessment has to judge Airflow's *native* redesign, not a mechanical translation of
 our Dagster code. That redesign is well established in the Airflow world: one triggered DAG
 run per experiment, carrying the experiment config as `conf` (with a meaningful `run_id` — the
-trigger UI, CLI, and `TriggerDagRunOperator` all support custom run IDs), and one dynamically
-mapped task instance per fold (`.expand()` over a fold list computed from `conf`). Astronomer's
-[MLOps guidance](https://www.astronomer.io/docs/learn/airflow-mlops) documents exactly this
-pattern, with MLflow as the system of record for experiment results.
+trigger UI, command-line interface, and `TriggerDagRunOperator` all support custom run IDs),
+and one dynamically mapped task instance per fold (`.expand()` over a fold list computed from
+`conf`). Astronomer's [MLOps guidance](https://www.astronomer.io/docs/learn/airflow-mlops)
+documents exactly this pattern, with MLflow as the system of record for experiment results.
 
-This gets further than one might expect — in particular, **per-fold observability and retry
-are not lost**:
+The native redesign gets further than one might expect — in particular, **per-fold
+observability and retry are not lost**:
 
 - Each mapped instance has its own state, logs, and XCom, visible in the Grid view one click
   below the task row; a failed fold auto-retries alone.
@@ -230,15 +231,15 @@ around the Dagster UI and would need rewriting.
 | Per-partition backfills with run config | `live_forecasts` replay | Backfills take `--dag-run-conf`; conf-dropped bug fixed in 3.2.2 | Good on ≥3.2.2; MWAA (3.2.1) still affected |
 | `add_output_metadata` tables, asset catalog, lineage | every asset | Asset-event `extra` JSON (2.10+) in the events list | Partial — raw JSON, no rendered tables or history plots |
 | Asset checks — non-blocking WARN, attached to an asset, dedicated Checks view (`power_data_is_fresh`, `nwp_has_no_unexpected_nulls`, `live_forecasts_are_healthy`) | power ingest, `ecmwf_ens`, `live_forecasts` | Data-quality as ordinary tasks (`common.sql` check operators; Great Expectations / Soda / dbt-test); no first-class check primitive or Checks UI, blocking by default (as of 3.3.0) | Partial — the capability exists as tasks; the non-blocking severity and check-status surface do not |
-| `EcsRunLauncher` (laptop = subprocess, cloud = Fargate, switched by `dagster.yaml`) | control plane | ECS executor (Amazon provider, Fargate launch type) | Exists; per-*task* rather than per-run granularity |
+| `EcsRunLauncher` (laptop = subprocess, cloud = Fargate, switched by `dagster.yaml`) | control plane | Elastic Container Service executor (Amazon provider, Fargate launch type) | Exists; per-*task* rather than per-run granularity |
 | Data-arrival sensors (planned, [#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)) | ingest jobs | Asset-triggered DAGs, event-driven scheduling | Parity |
 
-The asset-checks row is worth one extra sentence, because the gap there is architectural rather
-than cosmetic: non-blocking WARN checks are the *mechanism* by which this service stays
-fail-operational while still telling the truth about degraded inputs (see
-[Inherent Stability](../design-philosophy/inherent-stability.md)), so an orchestrator whose data-quality checks are
-ordinary, blocking-by-default tasks makes the house pattern something we would have to rebuild by
-hand rather than something we would inherit.
+The asset-checks row is worth one extra sentence, because the gap there is architectural
+rather than cosmetic: non-blocking WARN checks are the *mechanism* by which this service stays
+fail-operational while still telling the truth about degraded inputs (see [Inherent
+Stability](../design-philosophy/inherent-stability.md)), so an orchestrator whose
+data-quality checks are ordinary, blocking-by-default tasks makes the house pattern one we
+would have to rebuild by hand rather than inherit.
 
 ### The three trickiest parts of a full port
 
@@ -299,7 +300,7 @@ The assessment cuts both ways — Airflow would bring some genuine improvements:
 - **Organisational alignment and managed hosting.** OCF runs Airflow for its existing
   production services (alongside Dagster for the on-prem data pipelines), and has been
   discussing standardising on Airflow since around August 2025. If that lands as a platform
-  decision, a port buys alignment with the OCF standard: shared operational knowledge, shared
+  decision, a port gains alignment with the OCF standard: shared operational knowledge, shared
   tooling, and a hiring pool.
   AWS offers managed Airflow (MWAA, supporting Airflow 3.2.1 as of May 2026) — though MWAA
   pins Python 3.12, so this project's 3.14-only packages could not be imported by MWAA workers
@@ -311,13 +312,13 @@ The assessment cuts both ways — Airflow would bring some genuine improvements:
 
 #### Option A: full port — possible, but the hardest path
 
-Everything above applies. The translation itself is not the cost — assets are thin shells with
-their intended behaviour documented, so rewriting them as DAGs is days of work. The cost is
-the redesign of the CV layer around the missing partition-status surface, the verification of
-orchestration behaviour (schedules ticking, backfills replaying without lookahead leakage, ECS
-dispatch — inherently wall-clock-bound), the docs rewrite, and the deployment cutover.
-Realistically several weeks end-to-end, landing on an experimentation workflow with fewer of
-the affordances we rely on today.
+Everything above applies. The translation itself is not the hard part — assets are thin shells
+with their intended behaviour documented, so rewriting them as DAGs is days of work. The hard
+part is the redesign of the CV layer around the missing partition-status surface, the
+verification of orchestration behaviour (schedules ticking, backfills replaying without
+lookahead leakage, ECS dispatch — inherently wall-clock-bound), the docs rewrite, and the
+deployment cutover. Realistically several weeks end-to-end, landing on an experimentation
+workflow with fewer of the affordances we rely on today.
 
 #### Option B: port only the live service — promising, with a real two-orchestrator cost
 
@@ -363,9 +364,9 @@ Against (the cost of a second orchestrator, which is ongoing rather than one-off
 - There is an asymmetry worth noting: NGED would get a Dagster-free world, but OCF researchers
   would still live in both tools. The boundary is clean for the operator and leakier for the
   developer.
-- **It moves the fail-open half onto the orchestrator that lacks a fail-open primitive.** Option B
+- **Option B moves the fail-open half onto the orchestrator that lacks a fail-open primitive.** Option B
   ports precisely the half where the non-blocking check matters most: `power_data_is_fresh`,
-  `nwp_has_no_unexpected_nulls` and `live_forecasts_are_healthy` are all production-side, and the
+  `nwp_has_no_unexpected_nulls`, and `live_forecasts_are_healthy` are all production-side, and the
   warning channel to NGED originates there. Meanwhile the R&D half — which wants fail-fast and
   would be perfectly content with blocking data-quality tasks — is the half that stays on Dagster.
   That is backwards with respect to the
@@ -381,8 +382,8 @@ Against (the cost of a second orchestrator, which is ongoing rather than one-off
 We have not yet found a technical problem in this project that a port would solve, and either
 port lands somewhere between "equivalent" and "a little worse" for the people using the
 workflow daily. Our suggestion is therefore to stay put for now, and to treat this page as the
-documented seam: it records what would move, what it would cost, and what would justify paying
-that cost — so the option stays genuinely open rather than theoretical.
+documented seam: it records what would move, what the move would take, and what would justify
+accepting that effort — so the option stays genuinely open rather than theoretical.
 
 ## What would change this assessment
 
@@ -400,8 +401,7 @@ We would happily revisit this page if any of the following happens:
   on Airflow's roadmap, so this trigger is plausible rather than theoretical.
 - **MWAA catching up** to Airflow ≥3.2.2 (the backfill-conf fix) and ideally 3.3+, which
   would remove the last correctness caveat on the managed-hosting path.
-- **Dagster itself becoming harder to sustain** (maintenance burden, licensing or
-  project-direction concerns).
+- **Dagster itself becoming harder to sustain** (maintenance burden, licensing, or project-direction concerns).
 
 ## See also
 

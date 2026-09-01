@@ -1,14 +1,14 @@
 # Our Approach to MLOps
 
-A short explainer about this project's approach to MLOps tooling: what this project's
-experiment automation changes, and why it makes the path to production safer rather than
-riskier.
+A short explainer about this project's approach to machine-learning-operations (MLOps)
+tooling: what this project's experiment automation changes, and why that automation makes the
+path to production safer rather than riskier.
 
-Modern MLOps (as used in this project) changes two things:
+Modern MLOps (as used in this project) changes throughput and closes the translation gap:
 
 1. **Throughput.** The grunt work of an experiment — assembling features, training,
    cross-validating, recording results — is automated, so a small team can run hundreds of
-   experiments per month instead of one or two. Humans are still the ones deciding what to try;
+   experiments per month instead of one or two. Humans still decide what to try;
    the infrastructure runs those experiments. (See [Running an ML experiment
    end-to-end](dagster-workflow.md).) That the throughput produces a better forecast is a bet
    this project is making rather than a result the literature has settled: the
@@ -34,12 +34,12 @@ Modern MLOps (as used in this project) changes two things:
 
 ## An analogy
 
-Traditional ML R&D is a chef inventing dishes in their home kitchen: every winning recipe has
-to be laboriously re-created on the restaurant's equipment before it can go on the menu, and
-much is lost (or silently changed) in translation. We are building the restaurant where R&D
-happens on the service line itself: hundreds of tastings a month, every dish judged by the
-same tasting panel, and the winning dish on the menu the same night — because nothing about it
-needs translating.
+Traditional machine-learning research and development is a chef inventing dishes in their home
+kitchen: every winning recipe has to be laboriously re-created on the restaurant's equipment
+before it can go on the menu, and much is lost (or silently changed) in translation. We are
+building the restaurant where R&D happens on the service line itself: hundreds of tastings a
+month, every dish judged by the same tasting panel, and the winning dish on the menu the same
+night — because nothing about it needs translating.
 
 ## Nothing gets rewritten on the way to production
 
@@ -54,12 +54,10 @@ autoresearch](https://github.com/karpathy/autoresearch) fixes every training run
 5-minute budget: a fixed budget "makes experiments directly comparable regardless of what the
 agent changes".
 
-That is what makes a one-command promotion *safe* to press rather than merely quick. The
-largest risk in a conventional setup — that the artifact measured and the artifact deployed are
+Holding the protocol fixed is what makes a one-command promotion *safe* to press rather than merely quick. One risk in a conventional setup — that the artifact measured and the artifact deployed are
 two different pieces of code — does not exist here; the comparison that picked the winner was
 made against every other candidate on identical folds; and the way back to the previous
-champion is a single command too. A fast promotion route that nobody trusts enough to use is
-worth no more than a slow one. The speed comes from the protocol rather than from haste, a
+champion is a single command too. A fast promotion route that nobody trusts enough to use is worth no more than a slow route. The speed comes from the protocol rather than from haste, a
 distinction [Karpathy (2019)](https://karpathy.github.io/2019/04/25/recipe/) puts bluntly: "a
 'fast and furious' approach to training neural networks does not work and only leads to
 suffering".
