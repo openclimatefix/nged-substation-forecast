@@ -24,7 +24,7 @@ day 7–10 the control member is an increasingly unrepresentative sample of the 
 
 Be careful with that middle point: the step change at 144 h is **not** only a loss of resolution.
 For the period-ending variables — the two radiation fluxes and precipitation — it also introduces a
-*phase* error, because a value that averages the preceding six hours is currently interpolated as
+*phase* error, because a value that averages the preceding 6 hours is currently interpolated as
 though it described its own timestamp. Beyond day 6 the modelled solar day is shifted about three
 hours late and its peak cut by a quarter. That, and two other defects in how the pipeline reads the
 `nwp` table, are [fixed before anything else on this
@@ -93,13 +93,12 @@ Adding a `circular_var_names` ClassVar to `Nwp` — alongside the existing `cate
 the same mistake recurring, because the generic paths then cannot silently swallow a variable class
 they do not handle.
 
-That matters beyond this item, because three later items on this page iterate over variable classes
-in exactly the same way, and each is wrong for a circular variable:
-[neighbouring-cell mean and gradient](#neighbouring-h3-cell-weather-context),
-[per-variable ensemble
+That matters beyond this item, because three later items on this page iterate over variable
+classes in exactly the same way. Each is wrong for a circular variable: [neighbouring-cell mean
+and gradient](#neighbouring-h3-cell-weather-context), [per-variable ensemble
 quantiles](#ensemble-statistics-as-features-instead-of-member-by-member-rows), and [climatology
-z-scores](#weather-abnormality-climatology-z-score-features). A gradient or a standardised anomaly
-of a wrapped angle is meaningless, and a p90 of one has no correct definition at all.
+z-scores](#weather-abnormality-climatology-z-score-features). A gradient or a standardised
+anomaly of a wrapped angle is meaningless, and a p90 of one has no correct definition at all.
 
 **`continuous_var_names()` has three dependents beyond the resample, and narrowing it changes all
 three.** `delta_store.nwp.write_nwp` uses it to choose which columns get rounded to 13 significand
@@ -122,16 +121,16 @@ effect.
 
 **(b) Radiation and precipitation are interpolated as though they were instantaneous.** They are
 period-ending means over the preceding step, so interpolating between `valid_time` stamps treats a
-backward-looking average as a reading at the end of its window. That shifts the modelled solar day
-late and cuts its peak, worst of all the numeric variables
+backward-looking average as a reading at the end of its window. That mismatch shifts the modelled
+solar day late and cuts its peak, worst of all the numeric variables
 ([measured](../architecture/nwp-variable-conventions.md#period-ending-variables-are-interpolated-as-though-they-were-instantaneous)).
 
 The fix is the clear-sky-index resample, and it has **four requirements**. Getting the first wrong
 makes the result worse than doing nothing: normalising by the instantaneous clear-sky value at
 `valid_time`, the most natural reading, produces a physically impossible **1221 W m⁻²** peak on a
-clear day. Requirements 1, 3 and 4 were each verified on a reconstructed clear-sky day; requirement
-2 was not, because a clear-sky day has a constant clear-sky index, which no anchoring choice can
-disturb. Verify it on a partly-cloudy day when implementing.
+clear day. Requirements 1, 3, and 4 were each verified on a reconstructed clear-sky day;
+requirement 2 was not, because a clear-sky day has a constant clear-sky index, which no anchoring
+choice can disturb. Verify it on a partly-cloudy day when implementing.
 
 1. Normalise against the clear-sky **mean over the same window**, not the instantaneous clear-sky
    value at `valid_time`.
@@ -155,12 +154,13 @@ maximum falls between the 12:00 and 18:00 samples
 This one has no exact fix, since the asymmetric
 afternoon peak needs the second harmonic and four samples a day is at the Nyquist limit for it. A
 shape-preserving cubic or a diurnal-harmonic fit should recover part of the amplitude; how much has
-not been measured. It feeds the effective-temperature, degree-day and `windchill` features. Treat it
-as a bounded experiment rather than a correctness fix, and expect a smaller win than (a) or (b).
+not been measured. Temperature feeds the effective-temperature, degree-day and `windchill`
+features. Treat it as a bounded experiment rather than a correctness fix, and expect a smaller
+win than (a) or (b).
 
-The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mean_sea_level` and
-`geopotential_height_500hpa` lose almost nothing at 6-hourly spacing
-([MAE/SD 0.02–0.09](../architecture/nwp-variable-conventions.md#every-variable-and-how-to-read-it)).
+The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mean_sea_level`, and
+`geopotential_height_500hpa` lose almost nothing at 6-hourly spacing ([MAE/SD
+0.02–0.09](../architecture/nwp-variable-conventions.md#every-variable-and-how-to-read-it)).
 
 ### Store wind as u/v components rather than speed and direction
 
@@ -254,12 +254,11 @@ coarse pattern of nullified lags. `nwp_lead_time_hours` is already computed and 
 ### UK holiday and calendar features
 
 Day-of-week and time-of-year features exist, but no holiday flags. GB demand on bank holidays
-looks like a Sunday, and the Christmas–New Year fortnight is its own regime; for
-demand-dominated series this is one of the highest-value features in the load-forecasting
-literature and costs a static lookup (the `holidays` package is pure-Python — no pandas).
-Add `is_bank_holiday`, `is_day_before_holiday`, `is_day_after_holiday`, and a
-Christmas-proximity feature. Fully forecastable at any horizon — squarely in the 3–10 day
-band, which is why it sits this high.
+looks like a Sunday, and the Christmas–New Year fortnight is its own regime. For demand-dominated
+series this is one of the highest-value features in the load-forecasting literature and costs a
+static lookup (the `holidays` package is pure-Python — no pandas). Add `is_bank_holiday`,
+`is_day_before_holiday`, `is_day_after_holiday`, and a Christmas-proximity feature. Fully
+forecastable at any horizon — squarely in the 3–10 day band, which is why it sits this high.
 
 This item also double-serves as the covariate set of the v0.6 switching detector's
 [stage-1 baseline](switching-events.md#the-baseline-shared-foundation),
@@ -554,8 +553,8 @@ the time stage (c) runs.
   independently, because this is a feature rather than a resampling step. Plotting the upper tail is
   a free check that it was built right: a few tens of percent above 1 is real cloud enhancement,
   while values near 2 mean the denominator is wrong.
-- **Simplified PV power proxy** (PVWatts-style). Cell temperature from the Ross/NOCT model,
-  then a linear temperature derate:
+- **Simplified PV power proxy** (PVWatts-style). Cell temperature from the Ross/NOCT
+  (Nominal Operating Cell Temperature) model, then a linear temperature derate:
 
     $$
     T_{\text{cell}} = T_{2\text{m}} + k \, \mathrm{GHI},
@@ -574,7 +573,7 @@ the time stage (c) runs.
 
     This expression combines a period-ending GHI with an instantaneous temperature. Once stage (b)
     has landed that is a quarter-hour offset and immaterial to a cell-temperature model; before it,
-    it is a three-hour offset beyond day 6. We state this so that nobody reintroduces the larger
+    it is a 3-hour offset beyond day 6. We state this so that nobody reintroduces the larger
     version by deriving the proxy from un-resampled inputs.
 
 - **Wind power curve**: 100 m wind speed through a generic *farm-level* power curve — either
@@ -621,7 +620,7 @@ normalisation does.
 ### Monotone constraints for the generation models
 
 XGBoost's `monotone_constraints`: PV power non-decreasing in irradiance, wind power monotone
-in speed below rated. Mostly buys sane extrapolation in weather regimes the training year
+in speed below rated. Mostly delivers sane extrapolation in weather regimes the training year
 never saw — precisely the failure mode of a single-fold training set. A config-field addition
 once the solar/wind physics features exist.
 
@@ -684,9 +683,9 @@ Five scheduling notes specific to this page:
   24 h before forecast time") — never null at any horizon, and carrying exactly the anomaly
   signal that the init-time-anchored features' raw anchors mix in with ordinary weather-driven level variation. The
   same anchoring extends to the threshold-free *event-age* accumulators from the full design
-  (residual EWMAs at a few half-lives, or a self-resetting CUSUM statistic): "how long has this
-  series been abnormal" with no hand-coded normality threshold, because trees learn their own
-  cutpoints from continuous accumulators.
+  (residual EWMAs at a few half-lives, or a self-resetting CUSUM (cumulative sum) statistic):
+  "how long has this series been abnormal" with no hand-coded normality threshold, because trees
+  learn their own cutpoints from continuous accumulators.
 - **Inspect every feature visually before it enters an experiment.** Residuals, event-age
   accumulators, and neighbour pools are easy to build subtly wrong (sign conventions,
   normalisation, availability cuts) in ways the leaderboard will not surface; plot each one
@@ -828,15 +827,14 @@ business case alone.
 **Where the signal plausibly is**, in roughly descending order of confidence:
 
 - **PV soiling** — the mechanism this project has already worked out in most detail, which is why
-  it leads. Dust, pollen and bird droppings accumulate on panel glass and a decent fall of rain
-  washes most of it off.
-  [Differentiable physics → Soiling](../techniques/differentiable-physics.md#soiling) makes the
-  central point for us: Britain's *long-run average* effect is small, but the loss tracks **time
-  since the last washing rainfall** rather than any climate mean, so a multi-month dry spell is
-  exactly the regime in which it stops being small — and that page says the correction is worth
-  adding for Great Britain, not only for dustier climates. The tabular feature is the state
-  variable of that model, `d_t`, taken directly: time since precipitation last exceeded a washing
-  threshold.
+  it leads. Dust, pollen, and bird droppings accumulate on panel glass and a decent fall of rain
+  washes most of it off. [Differentiable physics →
+  Soiling](../techniques/differentiable-physics.md#soiling) makes the central point for us:
+  Britain's *long-run average* effect is small, but the loss tracks **time since the last washing
+  rainfall** rather than any climate mean, so a multi-month dry spell is exactly the regime in
+  which it stops being small — and that page says the correction is worth adding for Great
+  Britain, not only for dustier climates. The tabular feature is the state variable of that
+  model, `d_t`, taken directly: time since precipitation last exceeded a washing threshold.
 
     **Two things follow for the feature itself: it needs no new data source, and no
     climatological normalisation.** `precipitation_surface` is already among the ECMWF ENS
@@ -858,7 +856,7 @@ business case alone.
   [effective temperature](#effective-smoothed-temperature-and-degree-day-features) smooths over
   roughly 1–3 days, which is building thermal inertia. A multi-week heat regime is a different
   thing: acclimatisation, cooling equipment bought partway through a hot summer and then kept, and
-  ground and building-fabric temperatures that a three-day EWM cannot represent.
+  ground and building-fabric temperatures that a 3-day EWM cannot represent.
 - **Agricultural irrigation pumping.** Drought raises it, and the trial area sits in the EMids
   licence area, which includes arable Lincolnshire. Treat that second clause as an assumption
   rather than a finding: nothing in the metadata carries a land-use or customer-mix field, so it
@@ -992,8 +990,8 @@ happening should be deliberate, bounded and visible"**:
   so a forecast built on a bridged gap is distinguishable after the fact.
 - **Measured.** With the flag in place, compare against today's silent behaviour, and against
   leaving interior nulls unfilled entirely. A null result is worth having: it turns the standing
-  position from an assertion into a measured one — and, either way, this replaces an accident with
-  a decision.
+  position from an assertion into a measured position — and, either way, this replaces an accident
+  with a decision.
 
 **Filling within a run is the only fill worth having, which is at least one thing today's accident
 gets right.** The obvious alternative is worse. Filling from the *previous* NWP run looks
@@ -1034,9 +1032,10 @@ would be for an instantaneous field — and the 6-hourly steps are exactly the 3
 act on. That convention, and what it costs, is set out in
 [the data-handling fixes](#fix-the-nwp-resample-to-honour-the-variable-conventions), which land
 first: this item bounds gap-filling in the *fixed* resample, so its radiation gaps are bridged in
-clear-sky-index space rather than in raw W m⁻². Second, whatever is decided must apply identically in training and at inference, or the
-change buys a train/serve skew — the failure mode the NaN-handling limit at the top of this page
-warns about — in exchange for the one it fixes. Read the horizon slices either way.
+clear-sky-index space rather than in raw W m⁻². Second, whatever is decided must apply
+identically in training and at inference, or the change introduces a train/serve skew — the
+failure mode the NaN-handling limit at the top of this page warns about — instead of the one it
+fixes. Read the horizon slices either way.
 
 ## Tier 4 — structural model changes (weeks)
 
@@ -1081,7 +1080,7 @@ Train and predict route rows by `nwp_lead_time_hours`; `save`/`load` gain a wind
 to evaluate** — its win is by construction horizon-sliced. Under the 3–10 day focus the
 interesting experiment is narrower than "many windows": does a dedicated ~3–10 day model beat
 the lead-time feature *in that band*? Compare against the lead-time feature first — if the lead-time feature
-captures most of the benefit, the extra model count may not pay.
+captures most of the benefit, the extra model count may not justify itself.
 
 ### Batched training via `xgb.DataIter` (enabler)
 
@@ -1188,14 +1187,14 @@ spread-as-a-feature or the resilience property.
   quantile row can describe a physically impossible joint state. A member row cannot. Mitigations
   exist (member-rank-based statistics, or quantiles of a derived physics proxy rather than of each
   raw variable), and testing one is part of the experiment.
-- **51× less training data.** The mirror image of the cost win, and in direct tension with
+- **A 51× cut in training data.** The mirror image of the cost win, and in direct tension with
   [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) above, whose whole
   argument is that member rows multiply the training set. The two items are alternatives at the
   same fork, so decide them together rather than in sequence.
-- **It moves the `AllFeatures` primary key**, and therefore touches cross-validation, metrics and
-  the leaderboard.
-  [Principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically)
-  means it must be scored against the existing board by a controlled comparison, not swapped in.
+- **It moves the `AllFeatures` primary key**, and therefore touches cross-validation, metrics,
+  and the leaderboard. [Principle
+  8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically) means it
+  must be scored against the existing board by a controlled comparison, not swapped in.
 
 **How to evaluate.** One registered experiment against the member-by-member champion on the same
 folds and population, with four arms: quantile features, representative-member subsampling,
@@ -1225,18 +1224,18 @@ capacity factor in $[0, 1]$, its
 [wind/PV physics proxy](#linearised-physics-features-for-solar-and-wind) can be put on that same
 scale — the [wind proxy](#linearised-physics-features-for-solar-and-wind) already runs 0→1 (the
 normalised cubic ramp), while the PV proxy is in irradiance units ($\mathrm{W/m^2}$) and needs one
-extra division by a reference irradiance (≈ 1000 $\mathrm{W/m^2}$ at STC) to become a capacity
-factor. On a matched scale a single-`time_series_type` generation booster can take the proxy as its
-`base_margin` and learn only the site-specific deviation — physics carrying the cross-site shape,
-trees the correction. This is the scale match the per-series net-demand
-models lack — there the capacity-free proxy is the wrong tool as a margin (the
-[physics-features section](#linearised-physics-features-for-solar-and-wind) explains why), and
-capacity-factor normalisation is what supplies it. It is also the same base-margin move the
-[two-stage forecaster](switching-events.md#approach-1-the-two-stage-forecaster) makes with its
-stage-1 draft; there, the correction target's low variance and cross-series stationarity are part
-of what makes a *global* corrector tractable at all — the same property that helps here. (Under a
-log-link generation objective the margin would be `log(proxy)`, which needs a floor to handle the
-PV proxy's exact zeros at night.)
+extra division by a reference irradiance (≈ 1000 $\mathrm{W/m^2}$ at STC (Standard Test
+Conditions)) to become a capacity factor. On a matched scale a single-`time_series_type`
+generation booster can take the proxy as its `base_margin` and learn only the site-specific
+deviation — physics carrying the cross-site shape, trees the correction. This is the scale match
+the per-series net-demand models lack — there the capacity-free proxy is the wrong tool as a
+margin (the [physics-features section](#linearised-physics-features-for-solar-and-wind) explains
+why), and capacity-factor normalisation is what supplies it. It is also the same base-margin move
+the [two-stage forecaster](switching-events.md#approach-1-the-two-stage-forecaster) makes with
+its stage-1 draft; there, the correction target's low variance and cross-series stationarity are
+part of what makes a *global* corrector tractable at all — the same property that helps here.
+(Under a log-link generation objective the margin would be `log(proxy)`, which needs a floor to
+handle the PV proxy's exact zeros at night.)
 
 ## Explicitly deferred (not quick, or not skill)
 

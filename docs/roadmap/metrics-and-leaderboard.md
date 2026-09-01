@@ -189,7 +189,7 @@ bar that decides whether the project is worth its money. Persistence and climato
 diagnostic bookends, read as the loose end of the range rather than as the benchmark a win should
 be claimed against.
 
-**Carrying a loose bookend and a tight one is what the published guidance recommends** — see
+**Carrying a loose bookend and a tight bookend is what the published guidance recommends** — see
 [Leaderboards of machine learning
 results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results) for
 [Doubleday et al. (2020)](https://doi.org/10.1016/j.solener.2020.05.051)'s case for carrying a
@@ -269,15 +269,15 @@ docs.** Three changes to the shared rails, none baseline-specific.
   power to `[window_start, window_end]`, and `_apply_power_lag` reads lags from that same frame — so
   any lag longer than the elapsed window is null. This is a real existing gap: XGBoost's 336 h lag is
   null for the first fortnight of every validation window, and the incumbent's 49–55-week lags would
-  be null for all but roughly the last three weeks of the fold (lag targets only re-enter the window
-  from `val_start + 49 weeks`). Fix: a `power_lookback: timedelta` parameter that widens **only the
-  power scan's** lower bound (`window_start − power_lookback`); callers derive it from the
-  experiment's `selected_features` via `ParsedFeatures` (max power-lag hours), so it is automatic
-  per-experiment (~2 weeks for XGBoost, ~55 weeks for the incumbent). Safe because the bulk-mode
-  spine is NWP-centric (`_join_nwp_bulk_mode` left-joins power *onto* NWP rows), so the extra early
-  power rows feed only the lag lookup and add no spine rows and no label rows (labels live on spine
-  rows, bounded by the NWP `valid_time` filter); and `_nullify_leaky_lags` (which nulls any lag with
-  `lead ≥ lag_hours`) still guards leakage, so a longer lookback cannot leak. Apply to both
+  be null for all but roughly the last 3 weeks of the fold (lag targets only re-enter the window from
+  `val_start + 49 weeks`). Fix: a `power_lookback: timedelta` parameter that widens **only the power
+  scan's** lower bound (`window_start − power_lookback`); callers derive it from the experiment's
+  `selected_features` via `ParsedFeatures` (max power-lag hours), so it is automatic per-experiment
+  (~2 weeks for XGBoost, ~55 weeks for the incumbent). Safe because the bulk-mode spine is
+  NWP-centric (`_join_nwp_bulk_mode` left-joins power *onto* NWP rows), so the extra early power rows
+  feed only the lag lookup and add no spine rows and no label rows (labels live on spine rows,
+  bounded by the NWP `valid_time` filter); and `_nullify_leaky_lags` (which nulls any lag with `lead
+  ≥ lag_hours`) still guards leakage, so a longer lookback cannot leak. Apply to both
   `trained_cv_model` and `cv_power_forecasts`. `LIVE_POWER_HISTORY` in `production_assets.py` is a
   hard-coded 15-day equivalent for the live path — leave it, but cross-reference it from the new
   parameter so a future long-lag live model is not silently starved. Add a comment where
@@ -407,7 +407,7 @@ only skill floor the NWP ensemble must clear at long horizons.
 [NGED's incumbent forecast](../background/nged-incumbent-forecast.md); the implementation spec:
 
 - **Weekly analogues:** the last **6** weeks, same weekday & time-of-day.
-- **Annual analogues:** the **seven** weeks spanning **49–55 weeks back**, same weekday & time.
+- **Annual analogues:** the **7** weeks spanning **49–55 weeks back**, same weekday & time.
 - **Deterministic value:** NGED's own operating point is the **95th percentile** of all 13 analogue
   values ("more of a vibe") — reported alongside the metric-matched **median** headline (PR 1).
 - **No further processing:** no weighting, no holiday handling, no anomaly rejection, no
@@ -480,7 +480,7 @@ al. set out above. That is the same minimum the [cross-validation
 protocol](../ml_experimentation/cross-validation-folds.md#why-expanding-window-cross-validation)
 already builds the single fold around.
 
-**The `mid_2025_to_mid_2026` fold, at its full twelve validation months, is therefore what decides
+**The `mid_2025_to_mid_2026` fold, at its full 12 validation months, is therefore what decides
 promotion.** It is the same fixed historical fold every experiment above is adjudicated on, read
 through the Ladder guard and the caveats already stated in this section — not a separate, untouched
 final-test set.
@@ -510,9 +510,9 @@ final-test window early.
 `docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above.
 
 **2. Reserve a final-test window once a second, independent year of data exists — not by shrinking
-the fold that decides promotion.** The `mid_2025_to_mid_2026` fold stays at its full twelve
-validation months (above). This reservation therefore waits for Dynamical.org's backfill to make a
-second year of ECMWF data available, disjoint from that fold. At that point, found a new epoch in
+the fold that decides promotion.** The `mid_2025_to_mid_2026` fold stays at its full 12 validation
+months (above). This reservation therefore waits for Dynamical.org's backfill to make a second
+year of ECMWF data available, disjoint from that fold. At that point, found a new epoch in
 `conf/cv/default.yaml` (the epoch mechanism exists for exactly this):
 
 - Add a `final_test` fold covering that disjoint year, with a new per-fold flag `final_test: true`
@@ -871,13 +871,13 @@ design document.
 
 **A canonical failure-scenario suite.** A named, versioned set of degradation transforms over an
 `AllFeatures` frame — NWP {fresh, *n* runs missed, absent} × telemetry {present, partial, absent} ×
-metadata — on the order of ten to twenty realistic regimes rather than a combinatorial explosion.
-Only the *episodic* class needs enumerating; the chronic nulls the de-accumulated ECMWF variables
-carry are present in every run we ingest and so are already in-distribution
-(see
-[Inherent Stability → Missingness in learned models](../design-philosophy/inherent-stability.md#missingness-in-learned-models)).
-The vocabulary is a **contract**: it is stamped onto every metrics row, so changing it later
-invalidates historical comparisons.
+metadata — on the order of 10 to 20 realistic regimes rather than a combinatorial explosion. Only
+the *episodic* class needs enumerating; the chronic nulls the de-accumulated ECMWF variables carry
+are present in every run we ingest and so are already in-distribution (see [Inherent Stability →
+Missingness in learned
+models](../design-philosophy/inherent-stability.md#missingness-in-learned-models)). The vocabulary
+is a **contract**: it is stamped onto every metrics row, so changing it later invalidates historical
+comparisons.
 
 **How it is scored.** Train once, then predict once per scenario — the cost is N× *predict* plus
 N× metrics, not N× train. The scenario becomes a dimension on the metrics rows (and on the
@@ -915,7 +915,7 @@ and the standing
 
 ### The perfect-weather ceiling — what it gates
 
-Train *and* score on near-perfect weather, and the resulting skill bounds what we could buy by
+Train *and* score on near-perfect weather, and the resulting skill bounds what we could gain by
 removing **forecast error** from the weather input — the channel that more ensemble members, better
 ensemble post-processing and sharper interpolation all work through. If that ceiling sits close to
 today's ENS-scored skill, most of our error is not the weather forecast's fault and the effort
@@ -928,10 +928,10 @@ Two rungs, in increasing order of "cheating":
   perfect. Free once the [ingest](training-history.md) lands.
 
 - **Observations.** Closer to truth at the site, and worth the second rung precisely because ERA5's
-  remaining error is not small. The UK Met Office's MIDAS Open (via CEDA) supplies hourly
-  land-surface temperature, wind and pressure from GB stations — spatially sparse, so
-  nearest-station matched. [CM SAF](data-sources.md#weather-data) SARAH-3 is the equivalent rung for
-  solar, at 0.05°, and is already planned for v0.7.
+  remaining error is not small. The UK Met Office's MIDAS Open (via CEDA, the Centre for
+  Environmental Data Analysis) supplies hourly land-surface temperature, wind, and pressure from GB
+  stations — spatially sparse, so nearest-station matched. [CM SAF](data-sources.md#weather-data)
+  SARAH-3 is the equivalent rung for solar, at 0.05°, and is already planned for v0.7.
 
 Three conditions on reading the result.
 
@@ -1018,11 +1018,11 @@ Shipped. `compute_metrics` now scores every metric per `HORIZON_SLICES` band (de
 ### Phase B — probabilistic metrics from the existing ensemble ✅
 
 Shipped. `compute_metrics` now computes fair CRPS, the Fortin-corrected spread-skill ratio,
-pinball loss at the thirteen NGED delivery quantiles (plus their mean), and PICP and interval
-width for the six symmetric delivery bands — all member-aware, computed before the
-ensemble-mean collapse, per horizon slice. Definitions, equations, and the design decisions
-(fair CRPS divisor, RMS spread, delivery quantiles, MLflow allowlist) live in the
-[evaluation-metrics reference](../techniques/evaluation-metrics.md).
+pinball loss at the 13 NGED delivery quantiles (plus their mean), and PICP and interval width
+for the six symmetric delivery bands — all member-aware, computed before the ensemble-mean
+collapse, per horizon slice. Definitions, equations, and the design decisions (fair CRPS
+divisor, RMS spread, delivery quantiles, MLflow allowlist) live in the [evaluation-metrics
+reference](../techniques/evaluation-metrics.md).
 
 ### Phase C — cheap calibration (after B proves the diagnosis)
 
