@@ -909,10 +909,13 @@ modelling would not improve accuracy without wider access to embedded generators
 
 We call the amount of generation actually available at a metered site its *effective capacity*: the
 power output a generator could produce right now if the weather allowed, as opposed to its nameplate
-rating. Turbines go out for repair, inverters degrade, and sites are curtailed — told by the network
-operator to generate less than they could. A 20 MW wind farm that has been limited to 14 MW for a
-month is, for forecasting purposes, a different wind farm, and a model trained on its nameplate
-rating cannot see the difference.
+rating. The meter on a metered generator records that generator's output alone — not a substation's
+load, and not a second generator. That single-generator scope is what separates challenge 3 from
+challenge 8, where unmetered generation has to be recovered from a substation's net flow. Turbines
+go out for repair, inverters degrade, and sites are curtailed — told by the network operator to
+generate less than they could. A 20 MW wind farm that has been limited to 14 MW for a month is, for
+forecasting purposes, a different wind farm, and a model trained on its nameplate rating cannot see
+the difference.
 
 #### What the literature says
 
@@ -2057,10 +2060,11 @@ estimate of a quantity NGED does not meter, and scoring the detection of a rare 
 literature is far stronger on scoring forecasts than on the other two kinds of evaluation. Scoring a
 forecast has settled practice Flexpectation can adopt. Checking an estimate of a quantity NGED does
 not meter — the effective capacity of a metered generator, the half-hourly output of unmetered
-solar, and the direction of flow behind an apparent-power meter — has six possible substitutes for
-ground truth, of which the papers we read use four. Scoring the detection of a rare event, such as a
-switching event or a metering fault, has good academic practice, and none of the GB projects we
-checked published a number to compare against.
+solar, and the direction of flow behind an apparent-power meter — has no ground truth to score
+against, and each quantity needs its own basket of substitutes. Disaggregating unmetered solar has
+six possible substitutes, of which the papers we read use four. Scoring the detection of a rare
+event, such as a switching event or a metering fault, has good academic practice, and none of the GB
+projects we checked published a number to compare against.
 
 **Mean absolute error rewards a flat forecast that would be of little use for either flexibility
 procurement or curtailment decisions, so a peak-aware score belongs alongside a proper score rather
@@ -2136,38 +2140,49 @@ in the used configuration". Flexpectation will treat the leakage as an open meth
 rather than a solved question, and will report what it did about the leakage rather than leave it
 implicit.
 
-**We have no ground truth for the effective capacity of a metered generator, or an unmetered solar
-output.** The papers we read use four substitutes for truth, each of which fails differently. Two
-further substitutes appear in none of the papers. The four in use are to hold out sites that are
-metered; to inject a change into real data and see whether the method recovers it; to compare
-against an independent tool rather than against truth; and to measure whether the estimate improves
-the forecast it was built to improve. The two that appear in none of them are to check an estimate
-against a physical model, and to use a substation where every feeder and every embedded generator is
-metered, purely as validation. The physical checks are concrete and require little effort:
-disaggregated components must sum to the measured net flow; disaggregated solar must be zero at
-night and must sit under the clear-sky envelope; disaggregated wind must track wind speed rather
-than irradiance; and an inferred rooftop-solar capacity must be plausible for the area a substation
-serves. None of those checks needs a label, and a violation is a detectable error whatever the truth
-turns out to be. Using physical consistency to *score* an estimate, rather than to *shape* it, is
-close to absent from the papers we read, and physical-consistency scoring is the least effort of any
-evaluation on the list. The sixth substitute stays out of reach, because a fully metered substation
-is a field deployment rather than an analysis. No one substitute for ground truth is trustworthy
-alone, so the best approach may be to run *multiple* proxy tests and report where they disagree.
-Each test fails in a different way, so an estimate that survives multiple tests is better supported
-than an estimate from the single best substitute. The five are not five attempts at the same
-measurement. The hold-out is biased towards the sites that happen to be metered, and synthetic
-aggregation systematically flatters, because a clean sum of metered sources has no switching events,
-no false zeros, and no unmetered load — so a score from synthetic aggregation should be reported as
-performance under idealised aggregation rather than as real-world skill. The remaining three each
-answer a narrower question than they appear to: the independent-tool comparison says only whether we
-agree with an existing method; the physics checks find wrongness but never confirm rightness; and
-the downstream test measures whether the estimate is *useful*, which is not the same as whether the
-estimate is *right*, because an estimate that is wrong in a way the forecast does not care about
-will score well. For the metered generators of challenge 3 the same logic produces a head-to-head
-contest between candidate estimators in which downstream forecast skill decides, supported by
-synthetic fault injection, the precision and recall of the fitted change dates against NGED's
-maintenance records, robustness to unlogged curtailment, and the calibration of each estimator's
-stated uncertainty. Every number we publish will say which substitute produced it.
+**We have no ground truth for the unmetered solar and wind behind a substation's meter.** The papers
+we read use four substitutes for truth, each of which fails differently. Two further substitutes
+appear in none of the papers. The four in use are to hold out a generator that is metered, treating
+the generator as if it were unmetered, recovering it from a real substation's net flow and comparing
+against the meter; to sum individually metered generators into a synthetic substation and score the
+disaggregation against the components that went into the sum; to compare against an independent tool
+rather than against truth; and to measure whether the estimate improves the forecast it was built to
+improve. The two that appear in none of them are to check an estimate against a physical model, and
+to use a substation where every feeder and every embedded generator is metered, purely as
+validation. The physical checks are concrete and require little effort: disaggregated components
+must sum to the measured net flow; disaggregated solar must be zero at night and must sit under the
+clear-sky envelope; disaggregated wind must track wind speed rather than irradiance; and an inferred
+rooftop-solar capacity must be plausible for the area a substation serves. None of those checks
+needs a label, and a violation is a detectable error whatever the truth turns out to be. Using
+physical consistency to *score* an estimate, rather than to *shape* it, is close to absent from the
+papers we read, and physical-consistency scoring is the least effort of any evaluation on the list.
+The sixth substitute stays out of reach, because a fully metered substation is a field deployment
+rather than an analysis. No one substitute for ground truth is trustworthy alone, so the best
+approach may be to run *multiple* proxy tests and report where they disagree. Each test fails in a
+different way, so an estimate that survives multiple tests is better supported than an estimate from
+the single best substitute. The five are not five attempts at the same measurement. The hold-out is
+biased towards the sites that happen to be metered, and synthetic aggregation systematically
+flatters, because a clean sum of metered sources has no switching events, no false zeros, and no
+unmetered load — so a score from synthetic aggregation should be reported as performance under
+idealised aggregation rather than as real-world skill. The remaining three each answer a narrower
+question than they appear to: the independent-tool comparison says only whether we agree with an
+existing method; the physics checks find wrongness but never confirm rightness; and the downstream
+test measures whether the estimate is *useful*, which is not the same as whether the estimate is
+*right*, because an estimate that is wrong in a way the forecast does not care about will score
+well. Every number we publish will name the substitute behind that number.
+
+**The effective capacity of a metered generator has no ground truth either, and most of the six
+substitutes above cannot be applied to a single generator's meter.** A generator's own meter is the
+input a capacity estimator works from rather than a label to score the estimator against, so there
+is nothing to hold out and nothing to aggregate synthetically; of the physical checks above, only
+the night-zero and clear-sky bounds carry over to a single generator's output, because the rest test
+a substation's net flow. The same multiple-test logic therefore produces a different basket for
+challenge 3: a head-to-head contest between candidate estimators in which downstream forecast skill
+decides, supported by synthetic fault injection — scaling a known period of a healthy generator's
+output down by a known factor, then asking whether the estimator finds the change, at the right date
+and the right size — together with the precision and recall of the fitted change dates against
+NGED's maintenance records, robustness to unlogged curtailment, and the calibration of each
+estimator's stated uncertainty.
 
 **Scoring a rare-event detector is a class-imbalance problem before it is anything else, and the
 best-worked example in this review chose its answer deliberately.** Score by timestamp and the long
@@ -2579,19 +2594,30 @@ and the prior literature claim, not effects John et al. measured.
 a body of findings that agree or disagree with each other.** [Zhao et al.
 (2026)](https://doi.org/10.3390/info17040328) screened 256 records to 31 sources and mapped 13
 general-purpose platforms against an energy-forecasting lifecycle, scoring each capability as
-native, partial, or not clear from the platforms' own documentation. Zhao et al.'s first finding is the shape of the field rather than a ranking: "No energy-specific mature MLOps platforms were identified
-within the screened sources", so energy forecasting adapts general-purpose platforms to the domain.
-Zhao et al. are explicit that their mapping "does not perform hands-on deployments, runtime
-benchmarking, cost comparisons, or empirical evaluation of forecasting accuracy", and Zhao et al. close by naming the study that does not yet exist: "A natural next step is a hands-on empirical benchmark
-that evaluates the actual implementation complexity and operational performance of platforms."
-[Subramanya et al. (2022)](https://doi.org/10.3390/app12199851) go furthest of the three towards a worked example,
-building and running a pipeline for day-ahead price forecasting in the Finnish reserve market, but
-report no accuracy figure and no measurement of the engineering effort the pipeline saved. The one
-paper we found that argues for machine-learning operations from inside power-systems forecasting,
-[Gürses-Tran and Monti (2022)](https://doi.org/10.3390/forecast4020028), makes a different point
-altogether: forecast developers "predominantly assess residuals and error statistics when tuning the
-targeted model's quality", so that "eventual cost or rewards of the underlying business application
-are typically not considered in the model development phase".
+native, partial, or not clear from the platforms' own documentation. Zhao et al.'s first finding is
+the shape of the field rather than a ranking: "No energy-specific mature MLOps platforms were
+identified within the screened sources", so energy forecasting adapts general-purpose platforms to
+the domain. Zhao et al. are explicit that their mapping "does not perform hands-on deployments,
+runtime benchmarking, cost comparisons, or empirical evaluation of forecasting accuracy", and Zhao
+et al. close by naming the study that does not yet exist: "A natural next step is a hands-on
+empirical benchmark that evaluates the actual implementation complexity and operational performance
+of platforms." [Subramanya et al. (2022)](https://doi.org/10.3390/app12199851) build and run a
+pipeline for day-ahead price forecasting in the Finnish reserve market, but report no accuracy
+figure and no measurement of the engineering effort the pipeline saved. [Pelekis et al.
+(2024)](https://doi.org/10.1016/j.softx.2024.101758) go furthest of the four towards a worked
+example with DeepTSF, an open-source platform that orchestrates its pipeline with Dagster and tracks
+experiments with MLflow: Pelekis et al. tune a neural basis expansion analysis (N-BEATS) model over
+100 hyperparameter trials on a day-ahead forecast of Italy's national electricity load, then
+backtest the winner on a held-out year, which makes DeepTSF the only platform description in this
+section to publish an accuracy figure at all. No comparison accompanies that figure: DeepTSF is
+measured against no baseline platform and no second orchestrator, and Pelekis et al. report that
+deployments in the I-NERGY project have "already proven DeepTSF's efficacy in DL-based load
+forecasting" without attaching a number to that claim. The one paper we found that argues for
+machine-learning operations from inside power-systems forecasting, [Gürses-Tran and Monti
+(2022)](https://doi.org/10.3390/forecast4020028), makes a different point altogether: forecast
+developers "predominantly assess residuals and error statistics when tuning the targeted model's
+quality", so that "eventual cost or rewards of the underlying business application are typically not
+considered in the model development phase".
 
 **Forecast error at Europe's transmission operators grew measurably over 5 years, yet no paper we
 read gives a retraining cadence for an energy forecast in production.** [Kazmi and Tao
@@ -2602,11 +2628,24 @@ autocorrelated", meaning structure remains that a better model could exploit. [H
 (2022)](https://doi.org/10.1145/3538637.3539759) tackle the resulting problem by cutting the effort
 retraining takes, observing that "Most methods for coping with such concept drifts rely on
 computationally expensive retraining", and updating a lightweight profile instead of retraining the
-whole model. What none of these papers supplies is a number a network operator could act on. The retraining triggers the papers state are qualitative — Subramanya et al. update their pipelines "if the
-performance has gone down", and Gürses-Tran and Monti say of their own ProLoaF model that training
-"is performed once and does not require re-training, as long as the used training dataset is still
-representative of the system under study" — so how often a substation forecast must be retrained is
-a question Flexpectation will have to answer from its own data.
+whole model. What none of these papers supplies is a number a network operator could act on. The
+retraining triggers the papers state are qualitative — Subramanya et al. update their pipelines "if
+the performance has gone down", and Gürses-Tran and Monti say of their own ProLoaF model that
+training "is performed once and does not require re-training, as long as the used training dataset
+is still representative of the system under study" — so how often a substation forecast must be
+retrained is a question Flexpectation will have to answer from its own data.
+
+**The literature settles which orchestrator an energy-forecasting platform should run on no better
+than it settles the retraining cadence.** The platforms Zhao et al. map are general-purpose
+machine-learning platforms rather than orchestrators — Kubeflow, ZenML, ClearML, Polyaxon, Metaflow,
+Domino, Databricks, SageMaker, and Vertex AI among the 13 — and Airflow enters that mapping only as
+a tool Metaflow integrates with. Dagster is named in none of the five machine-learning-operations
+reviews cited above (Kreuzberger et al., Lima et al., Eken et al., Woźniak et al., and Zhao et al.),
+and DeepTSF, the one energy-forecasting platform we found that is built on Dagster, benchmarks no
+orchestrator at all. The published evidence therefore shows Dagster to be a workable foundation for
+an energy-forecasting pipeline, and says nothing about whether Dagster is the better of the two
+tools Flexpectation weighed; the reasoning behind that choice is set out in [Why Dagster, not
+Airflow](https://openclimatefix.github.io/nged-substation-forecast/architecture/why-dagster-not-airflow/).
 
 ### Operational meteorology is the better-documented precedent
 
@@ -3377,6 +3416,10 @@ procurement](https://doi.org/10.1186/s42162-024-00319-1). *Energy Informatics*.
 - Paredes, G. and Vargas, L. (2017). [Adjustment of discrete load changes in feeder databases for
 improving medium‐term demand forecasting](https://doi.org/10.1049/iet-gtd.2017.0129). *IET
 Generation, Transmission & Distribution*.
+- Pelekis, S., Pountridis, T., Kormpakis, G., Lampropoulos, G., Karakolis, E., Mouzakitis, S.
+and Askounis, D. (2024). [DeepTSF: Codeless machine learning operations for time series
+forecasting](https://doi.org/10.1016/j.softx.2024.101758). *SoftwareX*. Read as the arXiv
+preprint.
 - Perry, K. and Muller, M. (2022). [Automated Shift Detection in Sensor-Based PV Power and
 Irradiance Time Series](https://doi.org/10.1109/PVSC48317.2022.9938675). *2022 IEEE 49th
 Photovoltaics Specialists Conference (PVSC)*.

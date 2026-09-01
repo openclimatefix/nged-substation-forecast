@@ -20,11 +20,12 @@ Dagster and Airflow does not. Zhao et al. also report that no energy-specific ma
 platform was identified in the sources they screened, so adapting a general-purpose
 orchestrator to energy forecasting is the field's normal condition rather than a quirk of this
 project. Dagster does appear in that literature: [Pelekis et al.
-(2024)](https://doi.org/10.1016/j.softx.2024.101758) build DeepTSF, an MLOps framework for
-time-series load forecasting deployed on smart-meter data, on Dagster assets and jobs. DeepTSF
-makes no comparison with Airflow and benchmarks no orchestrator, so DeepTSF shows Dagster to be
-a workable foundation for an energy-forecasting pipeline rather than the better of the two
-tools.
+(2024)](https://doi.org/10.1016/j.softx.2024.101758) build DeepTSF, an open-source
+machine-learning-operations platform for time-series load forecasting, on Dagster assets and
+jobs, and demonstrate DeepTSF on a day-ahead forecast of Italy's national electricity load.
+DeepTSF makes no comparison with Airflow and benchmarks no orchestrator, so DeepTSF shows
+Dagster to be a workable foundation for an energy-forecasting pipeline rather than the better
+of the two tools.
 
 The page answers three questions in turn:
 
