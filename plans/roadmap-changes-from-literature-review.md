@@ -1,67 +1,32 @@
-# Roadmap changes the literature review surfaced
+# Decisions the literature review left for you
 
-Working note, started 2026-08-22 and extended on 2026-08-23 and 2026-08-24, to be deleted with
-the rest of `plans/` before this branch merges. It exists because the relevance review of
-[`docs/background/energy-forecasting-review.md`](../docs/background/energy-forecasting-review.md)
-turned up work on the roadmap side that we are deliberately not doing yet: the next step is a
-manual read of the review itself.
+Working note, started 2026-08-22, to be deleted with the rest of `plans/` before this branch
+merges. The stage-3 job it was written to track — linking the rest of `docs/` to
+[`docs/background/energy-forecasting-review.md`](../docs/background/energy-forecasting-review.md) —
+is done, and those items have been removed. What is left is the set of decisions that commit the
+project to something, which is not Claude's call.
 
-Nothing here is a decision. Each item says what was found, where, and what was verified.
+Two design additions surfaced in that work and are not made, for the same reason. Blum and Hardt's
+Ladder — publish a new best only when it beats the standing best by more than a margin, and report
+it rounded to that margin — is a cheap guard for a leaderboard one team queries repeatedly, and it
+is stronger than the submission-rate caps that ImageNet and the M5 competition used. It is not in
+the review, so it would arrive on the roadmap page as a new mechanism rather than as a citation.
+CAMEO freezes its baseline pipelines while their underlying databases keep updating, so that data
+growth cannot be mistaken for method improvement; the analogue here is rerunning frozen persistence
+and climatology baselines on every evaluation window.
 
-## Not yet done
+One tension is recorded but not written into the roadmap. `metrics-and-leaderboard.md` plans a
+final-test window, a fixed hold-out reused once per champion candidate. TS-Arena avoids reusing any
+fixed evaluation window at all, scoring every submission against outturn that did not exist when
+the model was frozen. The page's own mitigations are real — the window is read only immediately
+before promotion, never to choose between candidates — but saying *why* we accept the narrower
+trade would be writing a rationale the project has not agreed.
 
-**`docs/roadmap/cost-savings-metrics.md` cites nothing at all.** Verified: zero DOIs or links to
-published work in the whole file. The review says the literature has priced forecast decisions in
-energy volumes or spare capacity but never in money on a real distribution network, and this page
-is our attempt at exactly that — so it is the page where the gap should be named and the two
-relevant papers cited: Bernecker et al. (2025) and Richardson (2000)'s relative-economic-value
-curve. This is the clearest single instance of the wider step-2 job below.
-
-**Problem 3 has no owner for the fully-metered validation site.** The review lists six substitutes
-for ground truth when estimating something nobody measures, one of which is a substation where
-every feeder and embedded generator is metered for a period, used only as validation.
-`docs/techniques/disaggregation-evaluation.md` carries it for problems 7 and 8. Verified:
-`docs/roadmap/capacity-estimation.md` does not carry it for problem 3. Worth deciding whether such
-a site exists anywhere in NGED's data, or whether it is something to ask NGED for.
-
-**The two halves of the differentiable-physics strand are in opposite evidential positions, and the
-roadmap does not distinguish them.** The review now says the demand-side half — aggregating the
-thermal response of a few thousand buildings up to a substation, inside a probabilistic forecast —
-has no published precedent we could find, while the generation-side half has several. Both
-`capacity-estimation.md` (Candidate B) and `disaggregation.md` (the v2 engine) lean on the strand
-without saying which half they are relying on. The generation side is the well-supported one, so
-this is mostly a matter of saying so.
-
-**Fold overlap, if we ever run more than one fold.** `cross-validation-folds.md` reasons about
-non-overlapping walk-forward *between* folds; the section added this session covers the overlap
-between reissued forecasts *within* a fold. Nobody has checked whether the two interact.
-
-**`docs/roadmap/metrics-and-leaderboard.md` asserts an unsourced skill horizon that pulls against
-the review's.** The baselines section says that "at day 8–14 seasonal climatology often beats
-everything", with nothing behind it. Both reviews now cite [Buizza and Leutbecher
-(2015)](https://doi.org/10.1002/qj.2619), who put at 16 to 23 days the lead time beyond which a
-weather ensemble stops beating a climatological distribution — so on their measurement, day 8 to 14
-sits comfortably inside the range where the weather ensemble still carries skill. Both claims can
-hold at once, because they compare different things: Buizza and Leutbecher pit a weather ensemble
-against a weather climatology on upper-air variables, whereas the roadmap sentence pits a load model
-against a load climatology. But the roadmap states the day-8 figure as fact and cannot say where it
-came from, so either find the source or reword the sentence as the question the climatology baseline
-exists to answer.
-
-**Step 2 proper.** Every `docs/roadmap/` page making a claim the literature bears on should cite it
-and point at the review. Note the direction: **inbound only.** The review links to nothing of ours
-and must stay that way until the Milestone 2 report has gone to NGED, so the work happens entirely
-on the roadmap side.
-
-## Already done, so it does not need doing again
-
-- `docs/roadmap/data-sources.md` gained an AIFS-ENS research row. The review said whether a
-  machine-learned ensemble forecasts substation load better is something we can measure, and no
-  roadmap page recorded that question.
-- `docs/techniques/evaluation-metrics.md` named only ambient temperature and season as what moves a
-  thermal rating; it now names wind and thermal mass too.
-- `docs/ml_experimentation/cross-validation-folds.md` and
-  `docs/techniques/disaggregation-evaluation.md` already link to the review.
+Two gaps are reported rather than filled. `capacity-estimation.md` has no counterpart to the
+fully-metered validation site that `disaggregation-evaluation.md` carries for challenges 7 and 8;
+adding one would commit the project to finding or building such a site. And
+`docs/ml_experimentation/mlops-approach.md` is titled "MLops" where the review writes "MLOps"
+throughout.
 
 ## Decisions the review round of 2026-08-23 left for you
 
@@ -112,47 +77,6 @@ into "What we read", since searching 3,600 papers in full is the review's strong
 claim and is currently filed under housekeeping. Both are pure reordering, no words lost. Left for
 your manual read because a section move is the kind of change you would want to see before it
 happens.
-
-## From the leaderboard section, added 2026-08-23
-
-**Incoming: the full text of McSweeney, Haben and Young (2023).** Requested directly from Stephen
-Haben, so a legitimate author-shared copy rather than anything the paywall blocks. When it arrives,
-three things follow. The review currently cites it from its abstract and says so, and that caveat
-comes out. The abstract does not say what network level the three challenges sat at, so the
-leaderboard section's remaining absence claim — that we found no *standing* leaderboard at
-distribution-substation level — can be checked properly and narrowed again if one of the three was
-at substation level. And if the challenges left public data or a public leaderboard behind, that
-belongs in the section as the nearest GB precedent, ahead of GEFCom2017's delivery-point meters.
-Save the PDF to `literature/papers/mcsweeney-2023-data-science-challenges.pdf`.
-
-**Partly resolved: GB distribution-network data science competitions do exist.** The search that
-produced the leaderboard section's absence claim missed McSweeney, Haben and Young (2023), "Data
-Science Challenges; A Whole Systems Lens for Energy Network Solutions" (IEEE ISGT Europe), which
-reports three distribution-network-focused competitions and reaches the same diagnosis this review
-does about private data and non-competitive benchmarks. The paper is paywalled with no open copy, so
-the review cites it from its abstract and says so. What the abstract does not settle is what network
-level those three problems sat at, or whether any of them left a standing leaderboard — so the
-review's claim is now narrowed to the absence of a *standing* leaderboard at distribution-substation
-level. **Worth asking NGED directly**, since they are the partner and this is their own network's
-innovation history: were any of those three challenges at substation level, and is there a public
-record of the challenge itself rather than the write-up? If so the claim narrows again.
-
-**`docs/roadmap/metrics-and-leaderboard.md` now has literature behind it, and cites none of it.**
-The new review section draws on TS-Arena's pre-registration protocol, Energy-Arena's
-deadline-defines-the-information-set rule, Doubleday et al.'s two-benchmark bracket, Blum and
-Hardt's Ladder, and Messner et al.'s demonstration that a several-month window can rank the wrong
-model first. The roadmap page independently arrived at several of the same positions — most
-strikingly it already names "classic leaderboard overfitting" and tracks a final-test window under
-issue #226 — so this is a matter of citing the support rather than changing the design. Inbound
-only, as with the rest of step 2.
-
-**Two mechanisms in the literature that the roadmap does not currently have.** Blum and Hardt's
-Ladder — publish a new best only when it beats the standing best by more than a margin, and report
-it rounded to that margin — is a cheap, implementable guard for a leaderboard one team queries
-repeatedly, and it is stronger than the submission-rate caps that ImageNet and the M5 competition
-used. And CAMEO freezes its baseline pipelines while their underlying databases keep updating, so
-that data growth cannot be mistaken for method improvement; the analogue here is rerunning frozen
-persistence and climatology baselines on every evaluation window.
 
 ## Open questions for the manual read of the review
 
