@@ -445,35 +445,87 @@ fold is small in effective sample size rather than in row count, because consecu
 strongly correlated. The epoch mechanism handles *data* changes but not *adaptive selection* on a
 fixed fold.
 
+**We adopt the Ladder, so a new best is published only when it beats the standing best by more than
+a margin, and the published score is reported rounded to that margin.** [Blum and Hardt
+(2015)](https://arxiv.org/abs/1502.04585) designed the Ladder for machine-learning competitions
+that publish a leaderboard and accept repeated submissions — the same shape of risk hundreds of
+experiments create when every one of them is adjudicated on one fold. Every query against a
+held-out set leaks a little information about it back to the experimenter, and the
+margin-plus-rounding rule is what caps how much a single query can leak.
+
+**The persistence and climatology baselines are rerun, unchanged, on every leaderboard epoch's
+evaluation window, so growth in the data is never mistaken for improvement in the method.** A new
+epoch can widen the leaderboard's telemetry archive or its NWP archive, and that widening moves
+every metric on the leaderboard, including the baselines' own; rerunning the same frozen baseline
+code on the same epoch's window is what lets a widening gap between a model and a baseline be read
+as a project result rather than as the dataset simply growing. The precedent is CAMEO, a
+structure-prediction benchmark that keeps its baseline pipelines frozen while the protein-structure
+databases behind them keep updating ([Robin et al. (2021)](https://doi.org/10.1002/prot.26213)); we
+adopt the same discipline here.
+
 Until the structural fix lands: leaderboard metrics are selection metrics; differences smaller
 than fold-level noise should not drive decisions; and the number of experiments per epoch is
 itself a relevant statistic (visible as the MLflow experiment count).
 
+**A promotion decision has to be judged against historical data, because it has to be made in
+minutes, not months — there is no time to wait for fresh production data to accumulate.**
+
+**Judging that decision on less than a year of data is dangerous, because a shorter window cannot
+show whether a model handles both ends of the annual cycle.** [Pinheiro et al.
+(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) held out the whole of 2019 and note that
+"one year is the minimum acceptable to test a forecasting model whose target value shows annual
+seasonality" — the same minimum the [cross-validation
+protocol](../ml_experimentation/cross-validation-folds.md#why-expanding-window-cross-validation)
+already builds the single fold around.
+
+**The `mid_2025_to_mid_2026` fold, at its full twelve validation months, is therefore what decides
+promotion.** It is the same fixed historical fold every experiment above is adjudicated on, read
+through the Ladder guard and the caveats already stated in this section — not a separate, untouched
+final-test set.
+
+**Measuring a promoted model's performance on live data is a separate question from deciding which
+model to promote, and this page keeps the two apart.** Every model running in production is also
+scored against live data as it runs ([production
+monitoring](live-service.md#production-monitoring)), which answers "is the promoted model still
+performing", continuously, after the fact. The fold above answers a different question, "which
+candidate should we promote", once, ahead of the fact, and the two answers must not be blurred into
+one.
+
+**This page therefore holds two different attitudes to a fixed evaluation window, and the
+difference is deliberate, not an oversight.** TS-Arena avoids reusing any fixed evaluation window
+at all ([Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)). Flexpectation's promotion
+decision cannot work that way, because it has to be made in minutes, not months, so it has to be
+judged against a window of history that already exists rather than one still arriving — the fold
+above is that window. The live-monitoring check above is where Flexpectation's practice matches the
+TS-Arena pattern instead, because the question it answers — is the promoted model still performing
+— is a live, ongoing question rather than a promotion decision. The implementation details below
+are updated accordingly: the fold that decides promotion is not shrunk to buy a final-test window
+early.
+
 #### Implementation details — final-test window (deleted when it ships)
 
 **1. Document the caveat (immediately).** A short "Selection bias" subsection in
-`docs/ml_experimentation/cross-validation-folds.md` restating the paragraph above.
+`docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above.
 
-**2. Reserve a final-test window (next leaderboard epoch).** Found a new epoch in
+**2. Reserve a final-test window once a second, independent year of data exists — not by shrinking
+the fold that decides promotion.** The `mid_2025_to_mid_2026` fold stays at its full twelve
+validation months (above), so this waits for Dynamical.org's backfill to make a second year of
+ECMWF data available, disjoint from that fold. At that point, found a new epoch in
 `conf/cv/default.yaml` (the epoch mechanism exists for exactly this):
 
-- Shrink the leaderboard fold's validation window to `2025-07-01 → 2026-03-31`.
-- Add a `final_test` fold `2026-04-01 → 2026-06-30` with a new per-fold flag
-  `final_test: true` (extend `CvConfig` / the fold schema in
-  `packages/contracts/src/contracts/config_schemas.py`; it is neither a leaderboard fold nor a
-  dev fold — `_fold_ids_for_run_mode` in `defs/jobs.py` must *not* include it in any
-  run mode, so no experiment trains or scores on it in the normal flow).
-- Scoring against the final-test window is a deliberate, rare act — only for champion
-  candidates immediately before promotion — via the `metrics` asset with
-  `evaluation_scope="ad_hoc"` and the window's `valid_time` bounds in the existing
-  `PopulationFilter`. No new asset needed; the discipline is procedural. Note: the model
-  trained for the leaderboard fold is reused as-is (train window unchanged), so final-test
-  scoring needs a `cv_power_forecasts` run over the reserved window — check whether the
-  existing asset can forecast a window disjoint from the fold's `val_start/val_end`, and add a
-  window override to its config if not.
-- Rule, documented alongside: final-test results are never used to *choose between*
-  candidates (that re-creates the problem); they exist to report honest skill for the chosen
-  champion and to detect gross overfitting (final-test NMAE ≫ validation NMAE).
+- Add a `final_test` fold covering that disjoint year, with a new per-fold flag `final_test: true`
+  (extend `CvConfig` / the fold schema in `packages/contracts/src/contracts/config_schemas.py`; it
+  is neither a leaderboard fold nor a dev fold — `_fold_ids_for_run_mode` in `defs/jobs.py` must
+  *not* include it in any run mode, so no experiment trains or scores on it in the normal flow).
+- Scoring against the final-test window is a deliberate, rare act — only for champion candidates
+  immediately before promotion — via the `metrics` asset with `evaluation_scope="ad_hoc"` and the
+  window's `valid_time` bounds in the existing `PopulationFilter`. No new asset needed; the
+  discipline is procedural. Whether the leaderboard-fold model can be reused as-is, or needs its
+  own training run, depends on where the disjoint year sits relative to `mid_2025_to_mid_2026` —
+  decide once the backfill fixes that.
+- Rule, documented alongside: final-test results are never used to *choose between* candidates
+  (that re-creates the problem); they exist to report honest skill for the chosen champion and to
+  detect gross overfitting (final-test NMAE ≫ validation NMAE).
 
 **A multi-fold gotcha to handle when folds proliferate.** The parent-MLflow-run aggregation in
 the `metrics` asset averages each metric key over *only the folds in which that key appears*
@@ -487,19 +539,17 @@ folds (the multi-fold epoch below, or the `final_test` fold), either guarantee e
 leaderboard fold emits an identical key set, or make the parent-run aggregation record its
 per-key denominator.
 
-**3. Trade-off (decide at implementation time).** This costs 3 of the 12 validation months, on
-a dataset that is already short. The alternative — accepting documented bias until
-Dynamical.org backfills enable multiple yearly folds — is defensible; if the backfill is
-expected within a couple of months, do part 1 now and fold part 2 into the multi-fold epoch
-instead of spending a separate epoch on it. Decide based on the backfill outlook.
+**3. When the backfill lands.** Dynamical.org's backfill is what turns the single fold above into a
+genuine multi-fold epoch — enough independent years of ECMWF data to add both further leaderboard
+folds and the disjoint `final_test` fold in the same epoch, rather than spending a separate epoch
+on the `final_test` fold alone. Until then, the Ladder guard and the caveats above are the
+mitigation, and the fold that decides promotion is not shrunk to buy a final-test window early.
 
-**Verification.** (1) `register_experiment_job` in all three run modes never creates a
-partition for the `final_test` fold (extend `tests/test_register_experiment_job.py`).
-(2) Eligibility for the leaderboard fold is unchanged by the shrunk validation window (the
-eligibility rule keys off `val_start`/`val_end` — re-materialise `eligible_time_series` and
-diff). (3) End-to-end: score one existing experiment against the reserved window via the
-`ad_hoc` metrics path and confirm rows land in `forecast_metrics.delta` with the window label,
-and nothing is logged to the leaderboard MLflow runs.
+**Verification.** (1) `register_experiment_job` in all three run modes never creates a partition
+for the `final_test` fold (extend `tests/test_register_experiment_job.py`). (2) Once the disjoint
+year lands: end-to-end, score one existing experiment against the reserved window via the `ad_hoc`
+metrics path and confirm rows land in `forecast_metrics.delta` with the window label, and nothing
+is logged to the leaderboard MLflow runs.
 
 ---
 
