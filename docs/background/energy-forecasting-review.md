@@ -2557,37 +2557,47 @@ measurement, and the naming is the contribution.** [Sculley et al.
 (2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems) are
 explicit about the standing of their own paper, which "does not offer novel ML algorithms, but
 instead seeks to increase the community's awareness of the difficult tradeoffs that must be
-considered in practice over the long term", and which rests on what the paper's acknowledgements call
-"accumulated folk wisdom" from running machine learning at Google. The paper reports no experiment
-and no number. What the paper contributes is a vocabulary the rest of the field now uses:
-entanglement, where mixing signals together makes any one improvement impossible to isolate, and the
-principle Sculley et al. abbreviate to CACE, "Changing Anything Changes Everything" — no input to a
-model is ever really independent of the others, so changing one feature shifts the weight the model
-puts on the rest, and the same principle holds for a hyperparameter or a sampling method — along with
-correction cascades, where a model learned on top of another model's output makes the model underneath hard to improve, undeclared consumers, unstable and underutilised data dependencies,
-direct and hidden feedback loops, glue code, pipeline jungles, dead experimental codepaths,
-configuration debt, reproducibility debt, and process management debt. One widely used term is not Sculley et al.'s: "training-serving skew" is later vocabulary, and the words "skew" and "serving" appear
-nowhere in the paper.
+considered in practice over the long term", and which rests on what the paper's acknowledgements
+call "accumulated folk wisdom" from running machine learning at Google. The paper reports no
+experiment and no number.
 
-**Four further reviews agree that the field is largely conceptual, and the one review we found
-that went looking for a measure of effectiveness reported finding none.** [Woźniak et al.
+**What the paper contributes is a vocabulary the rest of the field now uses.** That vocabulary
+covers entanglement, where mixing signals together makes any one improvement impossible to isolate,
+and the principle Sculley et al. abbreviate to CACE, "Changing Anything Changes Everything" — no
+input to a model is ever really independent of the others, so changing one feature shifts the weight
+the model puts on the rest, and the same principle holds for a hyperparameter or a sampling method —
+along with correction cascades, where a model learned on top of another model's output makes the
+model underneath hard to improve, undeclared consumers, unstable and underutilised data
+dependencies, direct and hidden feedback loops, glue code, pipeline jungles, dead experimental
+codepaths, configuration debt, reproducibility debt, and process management debt. One widely used
+term is not Sculley et al.'s: "training-serving skew" is later vocabulary, and the words "skew" and
+"serving" appear nowhere in the paper.
+
+**Four further reviews agree that the field is largely conceptual, and the one review we found that
+went looking for a measure of effectiveness reported finding none.** [Woźniak et al.
 (2025)](https://doi.org/10.1109/ACCESS.2025.3534990) screened 2,615 search results to 135 and then
 to 41 publications, and asked as one of their four research questions what metrics measure the
-effectiveness of a machine-learning-operations implementation. Woźniak et al. answer that "None of the reviewed articles presented metrics that could measure the effectiveness of MLOps implementation in
-an organization", an absence Woźniak et al. call "unexpected" and attribute to the immaturity of the area.
-[Eken et al. (2025)](https://doi.org/10.1145/3747346) cast the widest net of the five reviews read for this section, a multivocal review
-analysing "a corpus of 150 peer-reviewed and 48 grey literature" precisely because so much of what
-the field knows sits outside the journals, and Eken et al. reach the same place from the other direction:
-an "impact analysis framework needs to be created" so that practitioners can "assess benefits and
-drawbacks using quantifiable metrics", which Eken et al. list as future work rather than as a metric the literature already offers. [Lima et al. (2022)](https://doi.org/10.5220/0010997300003179) screened
-1,905 articles to 30 and concluded that machine-learning operations "is still in its initial stage",
-and [Rajashekarappa et al. (2026)](https://doi.org/10.1080/21693277.2026.2658878), reviewing 186
-records down to 12 studies in manufacturing specifically, report that "fully automated MLOps
-frameworks remain underdeveloped". The largest empirical study we found does not break the pattern:
-[John et al. (2025)](https://doi.org/10.1016/j.infsof.2025.107725) interviewed practitioners at 14
-companies and built a framework, a maturity model, and a taxonomy from what those practitioners
-described, but measured no outcome — the benefits John et al.'s paper lists are benefits the interviewees
-and the prior literature claim, not effects John et al. measured.
+effectiveness of a machine-learning-operations implementation. Woźniak et al. answer that "None of
+the reviewed articles presented metrics that could measure the effectiveness of MLOps implementation
+in an organization", an absence Woźniak et al. call "unexpected" and attribute to the immaturity of
+the area. [Eken et al. (2025)](https://doi.org/10.1145/3747346) cast the widest net of the five
+reviews read for this section, a multivocal review analysing "a corpus of 150 peer-reviewed and 48
+grey literature" precisely because so much of what the field knows sits outside the journals, and
+Eken et al. reach the same place from the other direction: an "impact analysis framework needs to be
+created" so that practitioners can "assess benefits and drawbacks using quantifiable metrics", which
+Eken et al. list as future work rather than as a metric the literature already offers.
+
+**The other two reviews reach the same verdict from different corners of the field.** [Lima et al.
+(2022)](https://doi.org/10.5220/0010997300003179) screened 1,905 articles to 30 and concluded that
+machine-learning operations "is still in its initial stage", and [Rajashekarappa et al.
+(2026)](https://doi.org/10.1080/21693277.2026.2658878), reviewing 186 records down to 12 studies in
+manufacturing specifically, report that "fully automated MLOps frameworks remain underdeveloped".
+
+**The largest empirical study we found does not break the pattern.** [John et al.
+(2025)](https://doi.org/10.1016/j.infsof.2025.107725) interviewed practitioners at 14 companies and
+built a framework, a maturity model, and a taxonomy from what those practitioners described, but
+measured no outcome — the benefits John et al.'s paper lists are benefits the interviewees and the
+prior literature claim, not effects John et al. measured.
 
 ### Energy forecasting has platform descriptions and no retraining cadence
 
@@ -2602,22 +2612,27 @@ the domain. Zhao et al. are explicit that their mapping "does not perform hands-
 runtime benchmarking, cost comparisons, or empirical evaluation of forecasting accuracy", and Zhao
 et al. close by naming the study that does not yet exist: "A natural next step is a hands-on
 empirical benchmark that evaluates the actual implementation complexity and operational performance
-of platforms." [Subramanya et al. (2022)](https://doi.org/10.3390/app12199851) build and run a
-pipeline for day-ahead price forecasting in the Finnish reserve market, but report no accuracy
-figure and no measurement of the engineering effort the pipeline saved. [Pelekis et al.
+of platforms."
+
+**The individual platform descriptions supply worked examples and no comparison between platforms.**
+[Subramanya et al. (2022)](https://doi.org/10.3390/app12199851) build and run a pipeline for
+day-ahead price forecasting in the Finnish reserve market, but report no accuracy figure and no
+measurement of the engineering effort the pipeline saved. [Pelekis et al.
 (2024)](https://doi.org/10.1016/j.softx.2024.101758) go furthest of the four towards a worked
 example with DeepTSF, an open-source platform that orchestrates its pipeline with Dagster and tracks
-experiments with MLflow: Pelekis et al. tune a neural basis expansion analysis (N-BEATS) model over
-100 hyperparameter trials on a day-ahead forecast of Italy's national electricity load, then
-backtest the winner on a held-out year. What no platform description in this section supplies is a
-comparison between platforms: DeepTSF is measured against no baseline platform and no second
-orchestrator, and Pelekis et al. report that deployments in the I-NERGY project have "already proven
-DeepTSF's efficacy in DL-based load forecasting" without attaching a number to that claim. The one
-paper we found that argues for machine-learning operations from inside power-systems forecasting,
-[Gürses-Tran and Monti (2022)](https://doi.org/10.3390/forecast4020028), makes a different point
-altogether: forecast developers "predominantly assess residuals and error statistics when tuning the
-targeted model's quality", so that "eventual cost or rewards of the underlying business application
-are typically not considered in the model development phase".
+experiments with MLflow: Pelekis et al. tune a deep-learning model, neural basis expansion analysis
+(N-BEATS), over 100 hyperparameter trials on a day-ahead forecast of Italy's national electricity
+load, then backtest the winner on a held-out year. What no platform description in this section
+supplies is a comparison between platforms: DeepTSF is measured against no baseline platform and no
+second orchestrator, and Pelekis et al. report that deployments in the I-NERGY project have "already
+proven DeepTSF's efficacy in DL-based load forecasting" without attaching a number to that claim.
+
+**The one paper we found that argues for machine-learning operations from inside power-systems
+forecasting makes a different point altogether.** [Gürses-Tran and Monti
+(2022)](https://doi.org/10.3390/forecast4020028) find that forecast developers "predominantly
+assess residuals and error statistics when tuning the targeted model's quality", so that "eventual
+cost or rewards of the underlying business application are typically not considered in the model
+development phase".
 
 **Forecast error at Europe's transmission operators grew measurably over 5 years, yet no paper we
 read gives a retraining cadence for an energy forecast in production.** [Kazmi and Tao
@@ -2628,12 +2643,14 @@ autocorrelated", meaning structure remains that a better model could exploit. [H
 (2022)](https://doi.org/10.1145/3538637.3539759) tackle the resulting problem by cutting the effort
 retraining takes, observing that "Most methods for coping with such concept drifts rely on
 computationally expensive retraining", and updating a lightweight profile instead of retraining the
-whole model. What none of these papers supplies is a number a network operator could act on. The
-retraining triggers the papers state are qualitative — Subramanya et al. update their pipelines "if
-the performance has gone down", and Gürses-Tran and Monti say of their own ProLoaF model that
-training "is performed once and does not require re-training, as long as the used training dataset
-is still representative of the system under study" — so how often a substation forecast must be
-retrained is a question Flexpectation will have to answer from its own data.
+whole model.
+
+**What none of these papers supplies is a number a network operator could act on.** The retraining
+triggers the papers state are qualitative — Subramanya et al. update their pipelines "if the
+performance has gone down", and Gürses-Tran and Monti say of their own ProLoaF model that training
+"is performed once and does not require re-training, as long as the used training dataset is still
+representative of the system under study" — so how often a substation forecast must be retrained is
+a question Flexpectation will have to answer from its own data.
 
 **The literature settles which orchestrator an energy-forecasting platform should run on no better
 than it settles the retraining cadence.** The platforms Zhao et al. map are general-purpose
@@ -2690,10 +2707,14 @@ evaluate algorithms, and therefore iterate faster". [Godbole et al.
 shorter experiments and reserving the longest 'production length' runs for the models we hope to
 launch". Andrej Karpathy's [autoresearch](https://github.com/karpathy/autoresearch) fixes each
 training run at 5 minutes so that "you can expect approx 12 experiments/hour and approx 100
-experiments while you sleep", and states the reason for the fixed budget plainly: the fixed budget "makes experiments directly comparable regardless of what the agent changes". Karpathy warns against reading the case for fast iteration as licence to hurry, writing that "a 'fast and furious' approach
-to training neural networks does not work and only leads to suffering" ([Karpathy
-(2019)](https://karpathy.github.io/2019/04/25/recipe/)). Every one of these accounts describes fast
-iteration under a fixed and comparable protocol, which is a different claim from going fast.
+experiments while you sleep", and states the reason for the fixed budget plainly: the fixed budget
+"makes experiments directly comparable regardless of what the agent changes".
+
+**Every one of those accounts describes fast iteration under a fixed and comparable protocol, which
+is a different claim from going fast.** Karpathy warns against reading the case for fast iteration
+as licence to hurry, writing that "a 'fast and furious' approach to training neural networks does
+not work and only leads to suffering" ([Karpathy
+(2019)](https://karpathy.github.io/2019/04/25/recipe/)).
 
 **Two limits on that testimony bound what Flexpectation can claim for its own experiment
 framework.** The first limit is that the accounts above, though the accounts come from senior practitioners across several organisations whose results can be checked independently, are testimony rather than

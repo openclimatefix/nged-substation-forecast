@@ -19,13 +19,15 @@ of those platforms would have introduced a tool genuinely alien to the team; cho
 Dagster and Airflow does not. Zhao et al. also report that no energy-specific mature MLOps
 platform was identified in the sources they screened, so adapting a general-purpose
 orchestrator to energy forecasting is the field's normal condition rather than a quirk of this
-project. Dagster does appear in that literature: [Pelekis et al.
-(2024)](https://doi.org/10.1016/j.softx.2024.101758) build DeepTSF, an open-source
-machine-learning-operations platform for time-series load forecasting, on Dagster assets and
-jobs, and demonstrate DeepTSF on a day-ahead forecast of Italy's national electricity load.
-DeepTSF makes no comparison with Airflow and benchmarks no orchestrator, so DeepTSF shows
-Dagster to be a workable foundation for an energy-forecasting pipeline rather than the better
-of the two tools.
+project.
+
+**Dagster does appear in that literature, though never as a comparison against Airflow.**
+[Pelekis et al. (2024)](https://doi.org/10.1016/j.softx.2024.101758) build DeepTSF, an
+open-source machine-learning-operations platform for time-series load forecasting, on Dagster
+assets and jobs, and demonstrate DeepTSF on a day-ahead forecast of Italy's national
+electricity load. DeepTSF makes no comparison with Airflow and benchmarks no orchestrator, so
+DeepTSF shows Dagster to be a workable foundation for an energy-forecasting pipeline rather
+than the better of the two tools.
 
 The page answers three questions in turn:
 
@@ -44,24 +46,27 @@ Airflow claims on this page were verified against Airflow 3.3.0 (released 6 July
 ## Why we chose Dagster (August 2025)
 
 This project is ML-R&D-heavy by design. Beyond improving demand-forecast skill, the
-[requirements](../background/requirements.md#ml-experimentation-at-scale) span switching-event
-detection, effective-capacity estimation, faulty-meter detection, and DER disaggregation — and
-we hold far more ideas than we can try at once. The infrastructure therefore has to support
-running **on the order of hundreds of ML experiments per month**, make each run — and,
-crucially, each *re-run*, when an inevitable bug fix invalidates earlier results — as
-frictionless as possible, and land every result on a standardised leaderboard. Orchestrator
-ergonomics for experimentation are not a nice-to-have here; they are load-bearing for the
-project's core output. That premise is a bet this project is making rather than a result the
-literature has settled: the energy-forecasting review found [no study measuring what adopting
-MLOps practice
+[requirements](../background/requirements.md#ml-experimentation-at-scale) span
+switching-event detection, effective-capacity estimation, faulty-meter detection, and DER
+disaggregation — and we hold far more ideas than we can try at once. The infrastructure
+therefore has to support running **on the order of hundreds of ML experiments per month**,
+make each run — and, crucially, each *re-run*, when an inevitable bug fix invalidates earlier
+results — as frictionless as possible, and land every result on a standardised leaderboard.
+Orchestrator ergonomics for experimentation are not a nice-to-have here; they are load-bearing
+for the project's core output.
+
+**That premise is a bet this project is making rather than a result the literature has
+settled.** The energy-forecasting review found no measurement behind it: the
+energy-forecasting review found [no study measuring what adopting MLOps practice
 delivers](../background/energy-forecasting-review.md#the-field-describes-good-practice-but-does-not-measure-whether-the-practice-works),
 and [the case for fast, comparable
 iteration](../background/energy-forecasting-review.md#the-case-for-fast-comparable-iteration-is-argument-and-testimony)
 rests on a structural argument and on practitioner testimony instead. Naming the bet matters
-here, because the orchestrator choice is staked on that bet. And conducting experiments is only
-half the loop: a winning experiment must then move into production as easily and as safely as
-possible, which is why R&D and production share a single unified codebase — promotion is an
-[audited
+here, because the orchestrator choice is staked on that bet.
+
+**Conducting experiments is only half the loop.** a winning experiment must then move into
+production as easily and as safely as possible, which is why R&D and production share a single
+unified codebase — promotion is an [audited
 materialisation](production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script),
 not a rewrite — and why anything that splits the R&D and production worlds apart carries an
 ongoing cost (a tension Option B below has to price in).

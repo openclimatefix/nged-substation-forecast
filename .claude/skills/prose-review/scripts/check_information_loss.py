@@ -28,9 +28,11 @@ from typing import Final
 
 NUMBER: Final[str] = r"(?<![\w.])\d[\d,]*(?:\.\d+)?%?(?![\w.])"
 LINK_URL: Final[str] = r"\]\((https?://[^)\s]+)\)"
-# The two quote families are matched separately: allowing a curly opener to close on a straight
-# quote pairs marks belonging to different sentences and swallows the prose between them.
-QUOTATIONS: Final[tuple[str, ...]] = (r"“([^“”]{25,}?)”", r"\"([^\"]{25,}?)\"")
+# Curly marks say which end they are, so a regex pairs them safely. Straight marks do not, so they
+# must be paired positionally: a regex with a length floor silently skips a short quotation and
+# then pairs every later mark with the wrong partner, capturing the prose between two quotations.
+CURLY_QUOTE: Final[str] = r"“([^“”]{25,}?)”"
+MIN_QUOTE_LEN: Final[int] = 25
 BOLD_TERM: Final[str] = r"\*\*([^*]{3,80})\*\*"
 SHINGLE_LEN: Final[int] = 9
 MAX_LISTED: Final[int] = 40
@@ -54,13 +56,16 @@ def extract(text: str, pattern: str) -> set[str]:
 
 def quotations(text: str) -> set[str]:
     """Direct quotations only: a span between matching quote marks that reads as prose."""
+    candidates = list(extract(text, CURLY_QUOTE))
+    # Straight marks alternate open/close, so every other split segment sits inside a quotation.
+    candidates += text.split('"')[1::2]
     out: set[str] = set()
-    for pattern in QUOTATIONS:
-        for candidate in extract(text, pattern):
-            # A link or a reference-list dash means the marks belong to different sentences.
-            if "](" in candidate or ". - " in candidate:
-                continue
-            out.add(candidate)
+    for candidate in candidates:
+        stripped = candidate.strip()
+        # A link or a reference-list dash means the marks belong to different sentences.
+        if len(stripped) < MIN_QUOTE_LEN or "](" in stripped or ". - " in stripped:
+            continue
+        out.add(stripped)
     return out
 
 
