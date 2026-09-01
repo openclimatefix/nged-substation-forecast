@@ -1094,16 +1094,16 @@ second feeder as well.
 | [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) | A moving average and a moving standard deviation, thresholding the residual of a seasonal-trend decomposition | **8 of 9** |
 | [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) | Robust seasonal-trend decomposition, a Haar wavelet transform of the residual, then Pruned Exact Linear Time changepoints, then an isolation forest over each candidate | 7 of 9 |
 
-Every count is the share of logged events found, and no paper in the series reports a false-alarm
-rate. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) states that the method flagged
-more transfers than the 9 that were logged, and attributes the surplus to unplanned operational
-switching the log does not record rather than counting the surplus as false positives. [Kim
+Every count is the share of logged events found. No paper in the series reports a false-alarm rate.
+[Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) states that the method flagged more
+transfers than the 9 that were logged, and attributes the surplus to unplanned operational switching
+the log does not record rather than counting the surplus as false positives. [Kim
 (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) reports that the isolation forest's
 probability score separated true positives from false positives, which concedes that false positives
 existed but puts no number on them. Both papers explain their misses the same way, that the
 transfers they did not catch moved too little load to show up, and both argue that a transfer
 carrying no material load change matters less. The scores do not track how elaborate the method is:
-the simplest of the four, a threshold on a decomposition residual, found the most events, and [Kim
+the simplest of the four, a threshold on a decomposition residual, found the most events. [Kim
 (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757)'s pipeline — the closest of the four to what
 Flexpectation plans — found 7 of the 9, an average detection rate of 78%.
 
@@ -1129,7 +1129,7 @@ forecast.** Bouman et al., working with the Dutch distribution network operator 
 primary substations at 15-minute resolution over roughly a year, detecting events that run from a
 few minutes to several months. Alliander's purpose is capacity planning: a switch pushes the maximum
 and minimum load a substation records to the wrong value, and those two extremes decide whether the
-substation needs a bigger transformer, so the detected periods are cut out of the history before the
+substation needs a bigger transformer. The detected periods are therefore cut out of the history before the
 extremes are read off. In contrast, Flexpectation needs a forecast that keeps running through a
 switching event.
 
@@ -1141,11 +1141,9 @@ recall — the share of switched points the detector flagged — weighting recal
 the two, "to give a higher importance to the recall term, as the potential impact of a false
 negative is higher than that of a false positive in power grid expansion planning". An F1.5 score of
 1 is a perfect detector and 0 is a useless score, so higher is better. Those two scores come from
-different detectors, because no single method they tried wins across the range: Bouman et al. report
-the score separately for four event lengths — 15 minutes to 6 hours, 6 hours to 3 days, 3 to 42
-days, and 42 days or longer — and on the two shortest bands the best detectors, statistical process
-control and an isolation forest, reach about 0.2, where binary segmentation scores near what random
-guessing would give, while on the longest band binary segmentation reaches nearly 0.5. Combining the
+different detectors, because no single method they tried wins across the range. Bouman et al. report the score separately for four event lengths — 15 minutes to 6 hours, 6 hours to 3 days, 3 to 42
+days, and 42 days or longer. On the two shortest bands the best detectors, statistical process
+control and an isolation forest, reach about 0.2, where binary segmentation scores near what random guessing would give. On the longest band, binary segmentation reaches nearly 0.5. Combining the
 detectors, by flagging a point if any of them fired, raised recall but added enough false positives
 that on the two shortest bands the combination scored only marginally better than binary
 segmentation alone. Both figures were achieved on a Dutch distribution network, with the help of a
@@ -1156,8 +1154,7 @@ bottom-up estimate gives [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164
 on what each substation's power should have been. Bouman et al. fit and rescale that bottom-up
 estimate to the measured series, then hunt for step changes in the *difference* between the estimate
 and the measurement, so that normal daily and seasonal variation largely cancels and leaves a much
-cleaner signal. NGED has no bottom-up estimate of substation load, and building that estimate is out
-of Flexpectation's scope, because the project uses no telemetry from below primary substation level.
+cleaner signal. NGED has no bottom-up estimate of substation load. Building that estimate is out of Flexpectation's scope, because the project uses no telemetry from below primary substation level.
 Flexpectation plans to produce that second opinion from the substation's own meter plus weather and
 the calendar. The first attempt is classical: a multiple seasonal-trend decomposition of each series
 into a trend and daily, weekly, and annual cycles, leaving a remainder in which a switch shows up as
@@ -1168,14 +1165,12 @@ estimate. Neither route needs metering from below the substation.
 **Flexpectation also plans to investigate using a signal that Bouman et al.'s
 one-substation-at-a-time method cannot see: the power has to go *somewhere*.**
 [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) score each substation against its own
-history — "the current analysis considers one year of measurements for one station at a time" — so
-nothing in their method asks whether the power that left one substation turned up at another. When
+history — "the current analysis considers one year of measurements for one station at a time". So nothing in their method asks whether the power that left one substation turned up at another. When
 one substation's metered power drops, the substations that picked the load up should rise at the
 same moment, and their rises should sum to the drop. A step whose rise and drop fail to balance is
 more likely a meter fault or a one-off than a switch. That mismatch is where a per-substation
 detector spends its false positives. The catch is that an NGED transfer usually fans out across two
-or three neighbours, so the search runs over subsets of neighbours rather than over pairs, and the
-balance holds only approximately.
+or three neighbours, so the search runs over subsets of neighbours rather than over pairs. The balance holds only approximately.
 
 **We looked for a method that checks both sides and found none, and the closest published precedent
 is a 1984 regression written for long-range planning.** The search ran to 40 title-and-abstract
@@ -1184,10 +1179,9 @@ citing [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) under both its j
 identifier, 4 citing works, all read at abstract level; and the titles of all 3,160 projects on the
 Energy Networks Association's Smarter Networks Portal, which publishes no abstracts to search.
 [Willis et al. (1984)](https://doi.org/10.1109/TPAS.1984.318713) correct annual peak-load curve fits
-rather than detecting an event at a point in time, and their regression needs neither the size nor
+rather than detecting an event at a point in time. Their regression needs neither the size nor
 the direction of a transfer as an input. The title names a "load transfer coupling" regression,
-which suggests the fit couples the substations that exchange load — the feature that would make it
-the closest precedent — but we could not obtain the full text to check, and the abstract does not
+which suggests the fit couples the substations that exchange load — the feature that would make it the closest precedent. But we could not obtain the full text to check, and the abstract does not
 say.
 
 **NGED's switches are usually partial and fan out to two or three substations, so we should expect
@@ -1207,8 +1201,7 @@ is worse has no general answer — the answer depends on the size of the event.
 
 **The literature reaches for that defence without measuring it, with one exception.** All four of
 the Korean papers above explain their misses by saying the transfers they did not catch moved too
-little load to show up, and argue that a transfer carrying no material load change matters less —
-but only [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) publishes the megawatt step and
+little load to show up, and argue that a transfer carrying no material load change matters less. But only [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) publishes the megawatt step and
 the percentage load change of each of the 9 logged transfers. On that feeder every transfer above
 the mean load-change rate of 37.5% was detected, and the single transfer the method missed moved
 22.7%. That is the closest thing to a measured detection floor we found in this literature.
@@ -1260,7 +1253,7 @@ deviations from the switching status".
 **Ruhhütl et al. also clean "major deviations of the normal switching status" out of the training
 data before fitting, which removes those periods from the training set rather than correcting them
 to what the normal arrangement would have carried.** Neither the size of the accuracy sacrifice nor
-the size of the switching failure is quantified, so the paper shows that an operator traded accuracy
+the size of the switching failure is quantified. The paper therefore shows that an operator traded accuracy
 for switching robustness without saying how much accuracy the trade gave up. We found one substation
 study that conditions its forecast on an operating-state label —
 [Liu et al. (2019)](https://doi.org/10.1109/ACCESS.2019.2951422), for switching that moves load
@@ -1269,7 +1262,7 @@ between transformers inside a single substation.
 #### What this means for Flexpectation
 
 **Every published solution we found throws information away.** Leaving the level shifts in the data
-hurts performance, rewriting history erases the level shifts, and adapting to the new level forgets
+hurts performance. Rewriting history erases the level shifts. Adapting to the new level forgets
 that a switch happened. Adapting is disqualifying here, because the quantity NGED needs is what the
 substation *would* have carried under its normal arrangement. Flexpectation version 1 will therefore
 detect the abnormal periods automatically, flag the lagged power inputs that fall inside an abnormal
@@ -1282,16 +1275,14 @@ Vargas (2017)](https://doi.org/10.1049/iet-gtd.2017.0129) rewrite the history to
 have had if the switch had never happened, across 169 real feeders, and report better medium-term
 forecasts for it. Northern Powergrid's Artificial Forecasting project rewrites its history too, in
 step 6 of the data-preparation pipeline set out in its [Alpha
-deliverable](https://smarter.energynetworks.org/projects/npg_sif_006-1/) *WP2-D2 Results Scope Item
-2*, which rescales a block of older readings to align its median with the median of the most recent
+deliverable](https://smarter.energynetworks.org/projects/npg_sif_006-1/) *WP2-D2 Results Scope Item 2*. That pipeline rescales a block of older readings to align its median with the median of the most recent
 block whenever the older block's median falls outside the 10th-to-90th-percentile range of the most
 recent block. Northern Powergrid hold no readily accessible record of their own distribution
-network's configuration changes, so that pipeline hypothesises the timestamps from the load itself
+network's configuration changes. So that pipeline hypothesises the timestamps from the load itself
 and confirms them with the control room — the position NGED is in outside the trial area.
 
 **The fix is a level shift applied to the *older* half of each series.** Paredes and Vargas measure
-how far average demand moved across the step and add that difference to every reading before it, and
-the variant they recommend uses a separate difference for each hour of the day and each day of the
+how far average demand moved across the step and add that difference to every reading before it. The variant they recommend uses a separate difference for each hour of the day and each day of the
 week rather than one number for the whole series. Paredes and Vargas take the event times from
 expert identification rather than from a detector, since detection was not their subject. Adaptive
 models are the live alternative — they track a new level once it arrives, including a level that
@@ -1299,7 +1290,7 @@ arrives abruptly. [de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.202
 Kalman filter track the drift on the 14-region GB dataset of [Browell and Fasiolo
 (2021)](https://arxiv.org/abs/2103.10335) instead of correcting the history, cutting error by about
 4% in 2019, 7% in 2020, and 8% in 2021 against the same model refitted every day. But a switching
-event is a step rather than a drift, and a model that simply adapts to a new load level never
+event is a step rather than a drift. A model that simply adapts to a new load level never
 records that a switch happened, so it cannot report what the substation would have carried under its
 normal arrangement, which is the quantity NGED needs.
 
@@ -1313,7 +1304,7 @@ arrangement. An alternative worth testing early is to skip the flag and give the
 reference time series alongside the lagged power, leaving the model to notice for itself where a
 lagged reading departs from what the reference series expected. That reference-series difference
 plays the same role as the residual [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) detect
-on, but is built the other way round: Bouman et al.'s residual is metered load minus a
+on, but is built the other way round. Bouman et al.'s residual is metered load minus a
 topology-informed reconstruction, which goes stale the moment the distribution network is switched,
 whereas Flexpectation's residual would be metered load minus a model that never sees topology at
 all.
@@ -1326,16 +1317,14 @@ half, [Salinas et al. (2020)](https://doi.org/10.1016/j.ijforecast.2019.07.001) 
 for a probabilistic forecaster, motivated by retail stock-outs, and say they omitted the experiments
 for it. Searching OpenAlex, Crossref, and arXiv for sample masking, zero sample weights, gappy
 targets, and the exclusion of anomalous periods, we found no load-forecasting study reporting what
-dropping contaminated periods from the training target is worth, so Flexpectation will have to
-measure that itself.
+dropping contaminated periods from the training target is worth. So Flexpectation will have to measure that itself.
 
 **Flexpectation version 2 plans to go further and treat the normal-arrangement demand as a latent
 variable to be inferred for every metered substation, rather than a series to be repaired first**,
 through a differentiable-physics model of each substation with separate photovoltaic, wind, and
 demand components. Recovering a demand the meter never saw is mature where demand is censored —
 airline revenue management calls it unconstraining, and retail and electric-vehicle-charging work
-calls it censored-demand recovery, as in [Hüttel et al. (2023)](https://arxiv.org/abs/2301.06418) —
-and estimating what a curtailed wind farm would have produced is the closest analogue we found
+calls it censored-demand recovery, as in [Hüttel et al. (2023)](https://arxiv.org/abs/2301.06418). Estimating what a curtailed wind farm would have produced is the closest analogue we found
 inside the energy sector. But censoring is one-sided, so the observed value bounds the latent demand
 from below, whereas an abnormal running arrangement substitutes a different set of customers and can
 read either side of the normal-arrangement demand. Searching the same three indexes for
@@ -1349,7 +1338,7 @@ recovers a latent normal-running-arrangement demand for a distribution substatio
 
 NGED's telemetry carries stuck values that repeat unchanged for hours or days, zeros that mean "no
 reading" rather than "no load", physically impossible values, and gaps running from a single
-half-hour to several months. A model trained on uncleaned data learns the fault, and a forecast that
+half-hour to several months. A model trained on uncleaned data learns the fault. A forecast that
 fails silently because the series' recent history was stuck is worse than a forecast that reports
 itself degraded.
 
@@ -1370,8 +1359,7 @@ dataset, because the paper does not report it.
 **The literature offers two shapes of detector — test a reading against a redundant measurement of
 the same power, or against a forecast of what that reading should have been — and NGED's
 primary-substation telemetry rarely carries the redundant measurement, which leaves the forecast
-route.** One family tests a measurement against a physical relationship the measurement has to
-satisfy: UK Power Networks' Distribution Network Visibility checked 377 remote terminal units
+route.** One family tests a measurement against a physical relationship the measurement has to satisfy. UK Power Networks' Distribution Network Visibility checked 377 remote terminal units
 against the physics their readings have to obey rather than against a forecast, and found 95% of
 those units obeyed the expected logic within 15 kVA.
 [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) do the same with a second estimate of a
@@ -1386,8 +1374,7 @@ as one challenge, and merging the two faults is exactly what stops the Dutch lab
 faulty metering from switching.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) treat
 measurement errors and switch events as the two contaminants that must be filtered out before
 substation measurements can be used, and detect both on the same residual. Detecting both on one
-residual is also what merges the two classes in the Dutch labels, so the Dutch dataset can train a
-detector but cannot settle whether a flag is a stuck meter or a distribution network reconfiguration
+residual is also what merges the two classes in the Dutch labels. The Dutch dataset can therefore train a detector but cannot settle whether a flag is a stuck meter or a distribution network reconfiguration
 — the separation challenges 4 and 6 exist to make.
 
 **The faults that dominate NGED's telemetry are not the faults the model-based detectors were built
@@ -1410,15 +1397,12 @@ Visibility](https://www.ofgem.gov.uk/sites/default/files/docs/2014/03/dnv_cdr_ve
 and NGED's own [Time Series Data Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/)
 all tackled faulty metering substantively. None of the three published a figure for how often a
 flagged reading really was faulty, nor a label set to measure that against. Distribution Network
-Visibility's 95% is the share of units whose readings obeyed the expected logic, not a detection
-accuracy, so the GB record tells us what to look for rather than how well the approaches worked.
+Visibility's 95% is the share of units whose readings obeyed the expected logic, not a detection accuracy. The GB record therefore tells us what to look for rather than how well the approaches worked.
 What Distribution Network Visibility did publish is the shape of the output: a daily health report
 ranking units for maintenance. A GB labelled set with a taxonomy separating metering faults from
-switching stays unpublished, and Flexpectation is not producing a labelled set either, so
-Flexpectation's cleaning rules are judged by whether excluding the periods they flag improves
+switching stays unpublished, and Flexpectation is not producing a labelled set either. So Flexpectation's cleaning rules are judged by whether excluding the periods they flag improves
 forecast accuracy on held-out data rather than by a precision and a recall. A run of implausible
-values is a fault to a forecaster and a real event to a control engineer, and only the purpose of
-the analysis settles which.
+values is a fault to a forecaster and a real event to a control engineer. Only the purpose of the analysis settles which.
 
 ### 7. Recovering signed power from apparent-power meters
 
@@ -1427,10 +1411,10 @@ the analysis settles which.
 Of the trial area's 16 primary substations, 8 are metered in apparent power (MVA) rather than real
 power (MW), as are two of the three wind farms. An apparent-power meter reports a magnitude with no
 direction, so when a solar farm behind the substation exports more than the substation's customers
-are drawing, the substation's reading rises instead of going negative: the trace "bounces" off zero,
-and a midday export reads as a midday peak. NGED report that one of those 10 apparent-power sites
-has shown the bounce on sunny days, with two more suspected. The meter is not faulty; the difficulty
-is that the quantity NGED needs forecast is signed net demand, while an apparent-power meter reports
+are drawing, the substation's reading rises instead of going negative: the trace "bounces" off zero.
+A midday export reads as a midday peak. NGED report that one of those 10 apparent-power sites has
+shown the bounce on sunny days, with two more suspected. The meter is not faulty. The difficulty is
+that the quantity NGED needs forecast is signed net demand, while an apparent-power meter reports
 the absolute value of signed net demand — and reports even the absolute value only approximately.
 
 #### What the literature says
@@ -1438,16 +1422,14 @@ the absolute value of signed net demand — and reports even the absolute value 
 **A magnitude-only measurement leaves more than one state of the electricity network consistent with
 the reading, a result power-system state estimation has worked with since the 1990s.**
 [Abur and Expósito (1997)](https://doi.org/10.1109/59.575721) showed that a measurement set
-containing current magnitudes can admit multiple solutions, and
-[Ju et al. (2018)](https://doi.org/10.1109/TSG.2017.2709463) carry the result into distribution
+containing current magnitudes can admit multiple solutions. [Ju et al. (2018)](https://doi.org/10.1109/TSG.2017.2709463) carry the result into distribution
 networks with the remedy: where branch current-magnitude measurements "are the only ones to make the
 branch observable" the solution "is not unique", so a current-magnitude measurement can only sharpen
 an estimate that other measurements have already pinned down.
 
 **Two of the three published attempts we found rest on a second measurement of the same power.**
 [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164)'s Dutch substations carry the same
-limitation as NGED's MVA-metered substations, measuring only the absolute current, and Bouman et al.
-recover the sign from a bottom-up load estimate built from smart meters, wherever the substation
+limitation as NGED's MVA-metered substations, measuring only the absolute current. Bouman et al. recover the sign from a bottom-up load estimate built from smart meters, wherever the substation
 meter reads non-negative throughout while the bottom-up estimate goes negative. Western Power
 Distribution, NGED's predecessor, set out in the 2017 [Time Series Data
 Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/) NIA project to "first detect then
@@ -1482,27 +1464,24 @@ substation's import capacity or export approaching the substation's export capac
 **Flexpectation version 2 puts the meter's behaviour inside the model rather than repairing the
 series first.** The differentiable-physics forward model reconstructs a substation's signed net flow
 from gross demand, metered generation, and unmetered generation, and compares the *magnitude* of the
-reconstruction against the apparent-power reading, so the bounce is predicted rather than removed.
+reconstruction against the apparent-power reading. The bounce is therefore predicted rather than removed.
 Recovering a signal from the magnitude of a transform of that signal is the phase-retrieval problem,
 which [Dong et al. (2023)](https://doi.org/10.1109/MSP.2022.3219240) describe as non-convex because
 a signal satisfying the magnitude equation is always one of a family of solutions. An apparent-power
-meter takes the magnitude half-hour by half-hour, so nothing in the measurement couples one
-half-hour's sign to the next, and the family holds one member for every assignment of signs across
+meter takes the magnitude half-hour by half-hour, so nothing in the measurement couples one half-hour's sign to the next. The family holds one member for every assignment of signs across
 the window rather than two. Dong et al.'s uniqueness results do not rescue the problem either: those
-results turn on how far the number of measurements exceeds the number of unknowns, and an
-apparent-power meter gives exactly one reading per unknown — the ratio at which Dong et al. call
+results turn on how far the number of measurements exceeds the number of unknowns. An apparent-power meter gives exactly one reading per unknown — the ratio at which Dong et al. call
 Fourier phase retrieval "fundamentally ill-posed as we only know amplitudes". Dong et al.'s own
 prescription for that regime is the prescription Flexpectation is following, to "leverage a priori
-information on the object", so what Flexpectation adds is not the formulation but the information
+information on the object". So what Flexpectation adds is not the formulation but the information
 that breaks the ambiguity — and that information carries the whole weight. The reconstruction's
-solar module has to track irradiance, and a prior holds the direction of flow to persist for hours
+solar module has to track irradiance. A prior holds the direction of flow to persist for hours
 rather than flickering from one half-hour to the next.
 
 **Apparent power is the magnitude of real power only near unity power factor, and the approximation
 is weakest exactly at the bounce the reconstruction is trying to explain.** As real power passes
-through zero, reactive power dominates the measured magnitude, so the apparent-power trace has a
-soft floor above zero rather than a clean reflection of the signed flow. The reconstruction will
-therefore under-fit the bottom of the bounce, and the failure mode to design against is an optimiser
+through zero, reactive power dominates the measured magnitude. The apparent-power trace therefore has a soft floor above zero rather than a clean reflection of the signed flow. The reconstruction will
+therefore under-fit the bottom of the bounce. The failure mode to design against is an optimiser
 that explains the soft floor with demand that was never there.
 
 ### 8. Disaggregating unmetered solar and wind from a substation's net flow
