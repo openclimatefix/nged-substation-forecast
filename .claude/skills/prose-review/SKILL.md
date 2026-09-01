@@ -104,13 +104,36 @@ wording cannot be triaged and is worth nothing.
 
 ## Which model to give the sweep to
 
-**Use Sonnet 5. Do not use Haiku 4.5.** Both were given a byte-identical brief over an identical
-433-line range. Sonnet returned 116 findings; Haiku returned 8, and Haiku's 6 pronoun findings were
-a strict subset of Sonnet's 108 — Haiku found nothing Sonnet missed. Haiku also underperformed on
-the mechanical rules it was being trialled for, returning 1 numeral finding against 3 and no
-acronym findings against 2, and reported a clean acronym pass that was demonstrably wrong. Neither
-model invented a quote, and both honoured the one-pass-per-rule structure, so the failure is recall
-and self-verification rather than discipline.
+**Use Opus 5 for anything an outside reader will see, Sonnet 5 for routine internal sweeps, and
+never Haiku 4.5.** All three were given a byte-identical brief over an identical 433-line range.
+
+| | Haiku 4.5 | Sonnet 5 | Opus 5 |
+|---|---|---|---|
+| Total findings | 8 | 116 | 100 |
+| Pronouns | 6 | 108 | 73 |
+| Unenumerated singletons and superlatives | 1, misfiled | 0 | 8 |
+| Acronyms | 0, with a false all-clear | 2 | 3 |
+| Sentences readable two ways | 0 | 1 | 8 |
+| Sub-agent tokens | 93,000 | 174,000 | 100,000 |
+
+**Opus returned fewer findings than Sonnet and better ones.** Opus applied the author-possessive
+carve-out above without being told, and listed every candidate it had rejected with a line number,
+so the restraint is auditable rather than assumed. Sonnet reported that whole category as findings.
+
+**The gap that matters most is the singleton-and-superlative rule.** Sonnet reported no findings
+there, with confident reasoning. Opus found eight, one of which contradicted another passage of the
+same file 370 lines earlier. On a document a funder publishes, an unscoped absence claim is the
+costliest fault in the rule list, so a confident empty pass on that rule is the wrong kind of wrong.
+
+**Opus also found a defect outside the rule list**, in a passage that had survived several earlier
+review rounds: an enumeration of six items that could not be reconciled with the later discussion of
+five of them. A sweep is worth reading for what it notices as well as for what it was asked to find.
+
+**Haiku's failure was recall and self-verification, not discipline.** Haiku honoured the
+one-pass-per-rule structure and invented no quotes, and its six pronoun findings were a strict
+subset of Sonnet's. It reported a clean acronym pass over a range containing two acronyms that are
+expanded nowhere outside a table and a reference list, which is worse than a low count: a false
+all-clear is indistinguishable from a real one.
 
 ## Triage before applying anything
 

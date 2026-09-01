@@ -10,6 +10,22 @@ decision). This page records the assessment so the reasoning stays auditable, in
 spirit as the
 [rejected designs in Production Deployment](production-deployment.md#considered-but-rejected-designs).
 
+Both candidates here are tools OCF already runs, which is what keeps this question narrow. The
+wider machine-learning operations (MLOps) literature would have pointed somewhere else
+entirely: the platforms it catalogues are Kubeflow, ZenML, ClearML, Polyaxon, Metaflow, Domino,
+Databricks, SageMaker, and Vertex AI ([Zhao et al.
+(2026)](https://doi.org/10.3390/info17040328)), and OCF runs none of them. Adopting any of
+those platforms would have introduced a tool genuinely alien to the team; choosing between
+Dagster and Airflow does not. Zhao et al. also report that no energy-specific mature MLOps
+platform was identified in the sources they screened, so adapting a general-purpose
+orchestrator to energy forecasting is the field's normal condition rather than a quirk of this
+project. Dagster does appear in that literature: [Pelekis et al.
+(2024)](https://doi.org/10.1016/j.softx.2024.101758) build DeepTSF, an MLOps framework for
+time-series load forecasting deployed on smart-meter data, on Dagster assets and jobs. DeepTSF
+makes no comparison with Airflow and benchmarks no orchestrator, so DeepTSF shows Dagster to be
+a workable foundation for an energy-forecasting pipeline rather than the better of the two
+tools.
+
 The page answers three questions in turn:
 
 1. **Why did we choose Dagster when we designed the system (August 2025)?** At the time the
@@ -34,10 +50,18 @@ running **on the order of hundreds of ML experiments per month**, make each run 
 crucially, each *re-run*, when an inevitable bug fix invalidates earlier results — as
 frictionless as possible, and land every result on a standardised leaderboard. Orchestrator
 ergonomics for experimentation are not a nice-to-have here; they are load-bearing for the
-project's core output. And conducting experiments is only half the loop: a winning experiment
-must then move into production as easily and as safely as possible, which is why R&D and
-production share a single unified codebase — promotion is an
-[audited materialisation](production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script),
+project's core output. That premise is a bet this project is making rather than a result the
+literature has settled: the energy-forecasting review found [no study measuring what adopting
+MLOps practice
+delivers](../background/energy-forecasting-review.md#the-field-describes-good-practice-but-does-not-measure-whether-the-practice-works),
+and [the case for fast, comparable
+iteration](../background/energy-forecasting-review.md#the-case-for-fast-comparable-iteration-is-argument-and-testimony)
+rests on a structural argument and on practitioner testimony instead. Naming the bet matters
+here, because the orchestrator choice is staked on that bet. And conducting experiments is only
+half the loop: a winning experiment must then move into production as easily and as safely as
+possible, which is why R&D and production share a single unified codebase — promotion is an
+[audited
+materialisation](production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script),
 not a rewrite — and why anything that splits the R&D and production worlds apart carries an
 ongoing cost (a tension Option B below has to price in).
 
