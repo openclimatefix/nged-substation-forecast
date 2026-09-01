@@ -1516,8 +1516,8 @@ task from estimating how much of a *metered* generator's capacity is available t
 challenge 3.
 
 Distribution network operators (DNOs) do not know exactly how much capacity is installed. Ofgem's
-December 2025
-[consultation on asset visibility](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
+December 2025 [consultation on asset
+visibility](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
 estimates that distribution network operators "are aware of less than half" of the consumer and
 distributed energy resources on their distribution networks, a figure Ofgem attributes to the
 Department for Energy Security and Net Zero's engagement with the operators rather than to a
@@ -1528,9 +1528,10 @@ behind, but the capacity recorded is the export limit "permitted as per the conn
 rather than what a site can generate. Below 50 kW the register is silent, and that is where most of
 the panels are: of the 22,560 MW of solar photovoltaic capacity installed in GB by the end of July
 2026, 8,503 MW — 38% of the total — sits in arrays smaller than 50 kW, spread across 2,058,822 of
-the 2,068,186 installations, according to the Department for Energy Security and Net Zero's
-[solar deployment statistics](https://www.gov.uk/government/statistics/solar-photovoltaics-deployment).
-Other registers exist, but none provides a complete picture. The **Renewable Energy Planning
+the 2,068,186 installations, according to the Department for Energy Security and Net Zero's [solar
+deployment statistics](https://www.gov.uk/government/statistics/solar-photovoltaics-deployment).
+
+**None of the other registers fills the Embedded Capacity Register's gap either.** Other registers exist, but none provides a complete picture. The **Renewable Energy Planning
 Database** tracks projects through the planning system and starts at 150 kW, a threshold lowered
 from 1 MW only in 2021, so smaller projects that cleared planning before 2021 may be absent. The
 **Feed-In Tariff** register closed to new applicants on 1 April 2019. And a domestic array reaches
@@ -1559,7 +1560,10 @@ complement of the arrays this challenge has to find.** Ofgem [appointed Elexon i
 2025](https://www.ofgem.gov.uk/decision/decision-flexibility-market-asset-registration) to deliver
 Flexibility Market Asset Registration, digital infrastructure due by the third quarter of 2027 that
 will collect, store, and share data on assets participating in flexibility markets, aimed first at
-assets under 1 MW. Ofgem's [asset visibility
+assets under 1 MW.
+
+**The Department for Energy Security and Net Zero's own battery-installation figures cannot be
+reconciled with the Future Energy Scenarios numbers above.** Ofgem's [asset visibility
 consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf)
 says the register collects data on assets "when they are first registered into a DSO or NESO
 flexibility market" — the market of a distribution system operator, or of the National Energy System
@@ -2124,8 +2128,11 @@ covering 14 days is reissued every 6 hours, every target half-hour is covered by
 forecasts. The literature describes two traps: If we were to count the 56 forecasts as independent,
 then a significance test will report a confidence the data does not support. If we were to let a
 target half-hour fall on both sides of a train-test boundary, then the test set is contaminated
-outright. We searched every paper in this review that reissues a forecast more often than its
-horizon is long — looking for a gap or buffer between training and test, a block bootstrap, or a
+outright.
+
+**Only one paper in this review even partly addresses the leakage, and a second avoids the leakage
+only by accident.** We searched every paper in this review that reissues a forecast more often than
+its horizon is long — looking for a gap or buffer between training and test, a block bootstrap, or a
 correction to the number of independent observations — and found one partial treatment. [Hertel et
 al. (2026)](https://arxiv.org/abs/2607.15705) compare models with Diebold-Mariano tests implemented
 after the R `forecast` package, whose variance estimator corrects for serial correlation in the loss
@@ -2149,28 +2156,33 @@ synthetic substation and score the disaggregation against the components that we
 to compare against an independent tool rather than against truth. The three that appear in none of
 them are to measure whether the estimate improves the forecast it was built to improve, which the
 capacity-estimation literature does use; to check an estimate against a physical model; and to use a
-substation where every feeder and every embedded generator is metered, purely as validation. The
-physical checks are concrete and require little effort: disaggregated components must sum to the
-measured net flow; disaggregated solar must be zero at night and must sit under the clear-sky
+substation where every feeder and every embedded generator is metered, purely as validation.
+
+**The physical checks are concrete and require little effort:** disaggregated components must sum to
+the measured net flow; disaggregated solar must be zero at night and must sit under the clear-sky
 envelope; disaggregated wind must track wind speed rather than irradiance; and an inferred
 rooftop-solar capacity must be plausible for the area a substation serves. None of those checks
 needs a label, and a violation is a detectable error whatever the truth turns out to be. Using
 physical consistency to *score* an estimate, rather than to *shape* it, is close to absent from the
 papers we read, and physical-consistency scoring is the least effort of any evaluation on the list.
 The sixth substitute stays out of reach, because a fully metered substation is a field deployment
-rather than an analysis. No one substitute for ground truth is trustworthy alone, so the best
-approach may be to run *multiple* proxy tests and report where they disagree. Each test fails in a
-different way, so an estimate that survives multiple tests is better supported than an estimate from
-the single best substitute. The five are not five attempts at the same measurement. The hold-out is
-biased towards the sites that happen to be metered, and synthetic aggregation systematically
-flatters, because a clean sum of metered sources has no switching events, no false zeros, and no
-unmetered load — so a score from synthetic aggregation should be reported as performance under
-idealised aggregation rather than as real-world skill. The remaining three each answer a narrower
-question than they appear to: the independent-tool comparison says only whether we agree with an
-existing method; the physics checks find wrongness but never confirm rightness; and the downstream
-test measures whether the estimate is *useful*, which is not the same as whether the estimate is
-*right*, because an estimate that is wrong in a way the forecast does not care about will score
-well. Every number we publish will name the substitute behind that number.
+rather than an analysis.
+
+**No one substitute for ground truth is trustworthy alone, so the best approach may be to run
+*multiple* proxy tests and report where they disagree.** Each test fails in a different way, so an
+estimate that survives multiple tests is better supported than an estimate from the single best
+substitute.
+
+**The five are not five attempts at the same measurement.** The hold-out is biased towards the sites
+that happen to be metered, and synthetic aggregation systematically flatters, because a clean sum of
+metered sources has no switching events, no false zeros, and no unmetered load — so a score from
+synthetic aggregation should be reported as performance under idealised aggregation rather than as
+real-world skill. The remaining three each answer a narrower question than they appear to: the
+independent-tool comparison says only whether we agree with an existing method; the physics checks
+find wrongness but never confirm rightness; and the downstream test measures whether the estimate is
+*useful*, which is not the same as whether the estimate is *right*, because an estimate that is
+wrong in a way the forecast does not care about will score well. Every number we publish will name
+the substitute behind that number.
 
 **The effective capacity of a metered generator has no ground truth either, and most of the six
 substitutes above cannot be applied to a single generator's meter.** A generator's own meter is the
@@ -2424,24 +2436,29 @@ was developed against neither, but against a temporal hold-out of its own: [Jump
 after our training data cut-off", which is what a live forecasting service gets for free. The blind
 competition was the audit; the temporal hold-out was a check the team could run for itself, on data
 no rival had to supply. That is the same division of labour Flexpectation is proposing, and it is
-the reason a leaderboard without entrants is a coherent design. The first M-competition's
-conclusions about whole classes of method — that statistically sophisticated methods do not
-typically forecast more accurately than simpler methods, which the M3 competition did not go on to
-support, and that a combination of several methods forecasts more accurately, on average, than the
-individual methods going into the combination ([Hyndman
+the reason a leaderboard without entrants is a coherent design.
+
+**The same limit applies to a claim about a whole class of forecasting method.** The first
+M-competition's conclusions about whole classes of method — that statistically sophisticated methods
+do not typically forecast more accurately than simpler methods, which the M3 competition did not go
+on to support, and that a combination of several methods forecasts more accurately, on average, than
+the individual methods going into the combination ([Hyndman
 (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) — describe what many independent people
 chose to try, and no single team's leaderboard can support a conclusion about a whole class of
-method. What our leaderboard can do is narrower and still worth having: show which approaches beat a
+method.
+
+**What our leaderboard can do is narrower and still worth having:** show which approaches beat a
 stated baseline on NGED's own data, under one protocol, with the forecasts, the metric definitions,
-and the code published so that anyone can check the arithmetic or rerun the comparison themselves. A
-single-team leaderboard cannot take its credibility from rivals, so it has to earn credibility by
-declaring its own gaps, and Flexpectation's is known in advance: the leaderboard runs on the 32
-trial-area series while the service is meant to reach the whole of NGED's distribution network, so
-we should expect our published numbers to flatter what happens at scale, and should say so each time
-we publish them. A benchmark of 32 series is also small enough that the constraint on what can be
-learned from it is likely to be its size, which is an argument for extending the leaderboard to the
-wider distribution network as soon as the data allows rather than for running more experiments
-against the trial area.
+and the code published so that anyone can check the arithmetic or rerun the comparison themselves.
+
+**A single-team leaderboard cannot take its credibility from rivals, so it has to earn credibility
+by declaring its own gaps, and Flexpectation's gap is known in advance:** the leaderboard runs on
+the 32 trial-area series while the service is meant to reach the whole of NGED's distribution
+network, so we should expect our published numbers to flatter what happens at scale, and should say
+so each time we publish them. A benchmark of 32 series is also small enough that the constraint on
+what can be learned from it is likely to be its size, which is an argument for extending the
+leaderboard to the wider distribution network as soon as the data allows rather than for running
+more experiments against the trial area.
 
 ## Publishing results that others can compare against
 
@@ -2546,11 +2563,14 @@ al. established.
 
 **[Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138) give the definition most
 of the field now uses.** The definition rests on a structured review that narrowed 1,864 retrieved
-articles to 27, a review of the available tools, and eight interviews with practitioners. Kreuzberger et al. define machine-learning operations as "a paradigm, including aspects like best practices, sets of
-concepts, as well as a development culture when it comes to the end-to-end conceptualization,
-implementation, monitoring, deployment, and scalability of machine learning products", drawing on
-machine learning, software engineering, and data engineering together, and from that evidence Kreuzberger et al. derive nine principles. What Kreuzberger et al. do not do, and do not claim to do, is measure what
-adopting the nine principles changes.
+articles to the 194 read in detail and then to 27 peer-reviewed articles, a review of the available
+tools, and eight interviews with practitioners. Kreuzberger et al. define machine-learning
+operations as "a paradigm, including aspects like best practices, sets of concepts, as well as a
+development culture when it comes to the end-to-end conceptualization, implementation, monitoring,
+deployment, and scalability of machine learning products", drawing on machine learning, software
+engineering, and data engineering together, and from that evidence Kreuzberger et al. derive nine
+principles. What Kreuzberger et al. do not do, and do not claim to do, is measure what adopting the
+nine principles changes.
 
 **The failure modes the practice exists to prevent were named from experience rather than from
 measurement, and the naming is the contribution.** [Sculley et al.
@@ -2575,23 +2595,25 @@ term is not Sculley et al.'s: "training-serving skew" is later vocabulary, and t
 
 **Four further reviews agree that the field is largely conceptual, and the one review we found that
 went looking for a measure of effectiveness reported finding none.** [Woźniak et al.
-(2025)](https://doi.org/10.1109/ACCESS.2025.3534990) screened 2,615 search results to 135 and then
-to 41 publications, and asked as one of their four research questions what metrics measure the
-effectiveness of a machine-learning-operations implementation. Woźniak et al. answer that "None of
-the reviewed articles presented metrics that could measure the effectiveness of MLOps implementation
-in an organization", an absence Woźniak et al. call "unexpected" and attribute to the immaturity of
-the area. [Eken et al. (2025)](https://doi.org/10.1145/3747346) cast the widest net of the five
-reviews read for this section, a multivocal review analysing "a corpus of 150 peer-reviewed and 48
-grey literature" precisely because so much of what the field knows sits outside the journals, and
-Eken et al. reach the same place from the other direction: an "impact analysis framework needs to be
+(2025)](https://doi.org/10.1109/ACCESS.2025.3534990) screened 2,615 search results down to the 135
+publications that passed a title-and-abstract screen and then to the 41 kept after a full-text read,
+and asked as one of their four research questions what metrics measure the effectiveness of a
+machine-learning-operations implementation. Woźniak et al. answer that "None of the reviewed
+articles presented metrics that could measure the effectiveness of MLOps implementation in an
+organization", an absence Woźniak et al. call "unexpected" and attribute to the immaturity of the
+area. [Eken et al. (2025)](https://doi.org/10.1145/3747346) cast the widest net of the five reviews
+read for this section, a multivocal review analysing "a corpus of 150 peer-reviewed and 48 grey
+literature" precisely because so much of what the field knows sits outside the journals, and Eken et
+al. reach the same place from the other direction: an "impact analysis framework needs to be
 created" so that practitioners can "assess benefits and drawbacks using quantifiable metrics", which
 Eken et al. list as future work rather than as a metric the literature already offers.
 
 **The other two reviews reach the same verdict from different corners of the field.** [Lima et al.
-(2022)](https://doi.org/10.5220/0010997300003179) screened 1,905 articles to 30 and concluded that
-machine-learning operations "is still in its initial stage", and [Rajashekarappa et al.
-(2026)](https://doi.org/10.1080/21693277.2026.2658878), reviewing 186 records down to 12 studies in
-manufacturing specifically, report that "fully automated MLOps frameworks remain underdeveloped".
+(2022)](https://doi.org/10.5220/0010997300003179) screened 1,905 articles down to 30 papers and
+concluded that machine-learning operations "is still in its initial stage", and [Rajashekarappa et
+al. (2026)](https://doi.org/10.1080/21693277.2026.2658878), reviewing 186 database records down to
+12 studies in manufacturing specifically, report that "fully automated MLOps frameworks remain
+underdeveloped".
 
 **The largest empirical study we found does not break the pattern.** [John et al.
 (2025)](https://doi.org/10.1016/j.infsof.2025.107725) interviewed practitioners at 14 companies and
@@ -2603,16 +2625,17 @@ prior literature claim, not effects John et al. measured.
 
 **What exists for energy forecasting specifically is a handful of platform descriptions rather than
 a body of findings that agree or disagree with each other.** [Zhao et al.
-(2026)](https://doi.org/10.3390/info17040328) screened 256 records to 31 sources and mapped 13
-general-purpose platforms against an energy-forecasting lifecycle, scoring each capability as
-native, partial, or not clear from the platforms' own documentation. Zhao et al.'s first finding is
-the shape of the field rather than a ranking: "No energy-specific mature MLOps platforms were
-identified within the screened sources", so energy forecasting adapts general-purpose platforms to
-the domain. Zhao et al. are explicit that their mapping "does not perform hands-on deployments,
-runtime benchmarking, cost comparisons, or empirical evaluation of forecasting accuracy", and Zhao
-et al. close by naming the study that does not yet exist: "A natural next step is a hands-on
-empirical benchmark that evaluates the actual implementation complexity and operational performance
-of platforms."
+(2026)](https://doi.org/10.3390/info17040328) screened 256 candidate documents — vendor
+documentation, open-source repositories, and academic papers — down to the 31 they kept, and mapped
+the 13 general-purpose machine-learning-operations platforms those 31 documents describe against an
+energy-forecasting lifecycle, scoring each platform capability as native, partial, or not clear from
+the platforms' own documentation. Zhao et al.'s first finding is the shape of the field rather than
+a ranking: "No energy-specific mature MLOps platforms were identified within the screened sources",
+so energy forecasting adapts general-purpose platforms to the domain. Zhao et al. are explicit that
+their mapping "does not perform hands-on deployments, runtime benchmarking, cost comparisons, or
+empirical evaluation of forecasting accuracy", and Zhao et al. close by naming the study that does
+not yet exist: "A natural next step is a hands-on empirical benchmark that evaluates the actual
+implementation complexity and operational performance of platforms."
 
 **The individual platform descriptions supply worked examples and no comparison between platforms.**
 [Subramanya et al. (2022)](https://doi.org/10.3390/app12199851) build and run a pipeline for

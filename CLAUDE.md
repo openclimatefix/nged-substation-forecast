@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this
+repository.
 
 ## Commands
 
@@ -179,6 +180,17 @@ describing each low-voltage feeder — among them how many housing units it serv
 covariates". Where the fields are not worth listing in full, name the fields that matter and say
 how many there are. The same goes for every other umbrella noun that stands in for a list the
 reader wants: "parameters", "attributes", "characteristics", "data quality issues".
+
+**A noun that carries a count has to say what was counted.** A sentence chaining counts — "screened
+256 records to 31 sources and mapped 13 general-purpose platforms" — hands the reader three units
+and defines none of them, so the reader cannot tell whether a record, a source and a platform are
+one kind of object counted at three stages or three different kinds. Name each unit where it first
+appears, which usually takes two or three words: "screened 256 candidate documents — vendor
+documentation, open-source repositories, and academic papers — down to the 31 they kept, and mapped
+the 13 machine-learning-operations platforms those documents describe". The offenders are the nouns
+a methods section reaches for: records, sources, items, entries, results, studies, works, cases,
+instances, observations, points, and units. This is the counting cousin of the "metadata" rule
+above: there an umbrella noun hides a list of fields, here it hides what is being tallied.
 
 **Say which kind of network you mean, every time.** This project forecasts an electricity network
 using neural networks, so a bare "network" makes the reader stop and work out which one is meant.
@@ -367,7 +379,8 @@ already show, and the process then delays the change instead of protecting it.
 
 ## Architecture
 
-This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is the Dagster application; all reusable logic lives in `packages/`.
+This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is the Dagster
+application; all reusable logic lives in `packages/`.
 
 **A short list of design principles** governs architectural decisions:
 [`docs/design-philosophy/design-principles.md`](docs/design-philosophy/design-principles.md).
@@ -441,7 +454,11 @@ All tabular data flowing through the system is validated with **Patito** models.
 
 `_engineer_features()` (in `tabular_feature_engineer.py`) is the central tabular pipeline function: given a `set[str]` of requested feature names, it joins power observations with NWP and metadata, then applies features. Feature names are parsed by `ParsedFeatures.from_strings()` (in `_parsed_features.py`) into typed `LagFeature`, `RollingFeature`, `StaticFeature`, `TimeFeature`, or `WeatherFeature` objects. Callers reach this via `FeatureEngineer.engineer()` — see the ML Model Interface section below.
 
-**Critical design invariant — no lookahead bias:** `power_fcst_init_time` (when we make the forecast) is distinct from `nwp_init_time` (when the NWP model ran). Power lag features are nullified via `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time. Weather lags use a dual-strategy join: same NWP run for future target times, freshest NWP run for past target times.
+**Critical design invariant — no lookahead bias:** `power_fcst_init_time` (when we make the
+forecast) is distinct from `nwp_init_time` (when the NWP model ran). Power lag features are
+nullified via `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead
+time. Weather lags use a dual-strategy join: same NWP run for future target times, freshest NWP run
+for past target times.
 
 Two operating modes:
 
@@ -450,11 +467,28 @@ Two operating modes:
 
 ### ML Model Interface (`packages/ml_core/src/ml_core/base_forecaster.py`)
 
-All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatures)`, `predict(AllFeatures) -> PowerForecast`, `save(Path)`, and `load(Path) -> Self`. Each subclass owns its own persistence format; `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a `meta.json` with the full `XGBoostConfig`.
+All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatures)`,
+`predict(AllFeatures) -> PowerForecast`, `save(Path)`, and `load(Path) -> Self`. Each subclass owns
+its own persistence format; `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a
+`meta.json` with the full `XGBoostConfig`.
 
-Identity is split across two levels. **Model-family identity** — `MODEL_NAME` and `MODEL_VERSION` — are class-level constants on each `BaseForecaster` subclass (properties of the implementation; bumping `MODEL_VERSION` is a deliberate code change). **Experiment identity** — `experiment_name` and `ml_flow_experiment_id` — lives in `BaseForecasterConfig` so it travels with the saved model. Both levels are stamped onto every `PowerForecast` row at predict time: `power_fcst_model_name`/`power_fcst_model_version` from the class, and the dedicated `experiment_name`/`ml_flow_experiment_id` columns from the config. Do not collapse experiment identity into `power_fcst_model_name`.
+Identity is split across two levels. **Model-family identity** — `MODEL_NAME` and `MODEL_VERSION` —
+are class-level constants on each `BaseForecaster` subclass (properties of the implementation;
+bumping `MODEL_VERSION` is a deliberate code change). **Experiment identity** — `experiment_name`
+and `ml_flow_experiment_id` — lives in `BaseForecasterConfig` so it travels with the saved model.
+Both levels are stamped onto every `PowerForecast` row at predict time:
+`power_fcst_model_name`/`power_fcst_model_version` from the class, and the dedicated
+`experiment_name`/`ml_flow_experiment_id` columns from the config. Do not collapse experiment
+identity into `power_fcst_model_name`.
 
-Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer]` — a strategy object (composition, not inheritance) that owns the full data-preparation pipeline from raw inputs to an `AllFeatures` frame, including the NWP spatial join. The default `TabularFeatureEngineer` maps each gridded NWP H3 cell to the nearest time series then runs the tabular `_engineer_features` pipeline. A future model needing a different view of the data (e.g. a CNN wanting a spatial NWP crop) overrides `feature_engineer` with a different `FeatureEngineer` subclass — it does not change `_engineer_features` or `BaseForecaster`. Both classes live in `packages/ml_core/src/ml_core/features/`.
+Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer]` — a strategy
+object (composition, not inheritance) that owns the full data-preparation pipeline from raw inputs
+to an `AllFeatures` frame, including the NWP spatial join. The default `TabularFeatureEngineer`
+maps each gridded NWP H3 cell to the nearest time series then runs the tabular `_engineer_features`
+pipeline. A future model needing a different view of the data (e.g. a CNN wanting a spatial NWP
+crop) overrides `feature_engineer` with a different `FeatureEngineer` subclass — it does not change
+`_engineer_features` or `BaseForecaster`. Both classes live in
+`packages/ml_core/src/ml_core/features/`.
 
 ## Code Style
 

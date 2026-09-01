@@ -159,14 +159,18 @@ Highest yield first, so that the expensive passes run while attention is freshes
 1. Pronouns and demonstratives, including "one", "ones", and "such a"
 2. Unenumerated singletons and superlatives
 3. Umbrella nouns — "thing", "something", "anything", "metadata"
-4. Money metaphors for performance
-5. Ambiguous "network"
-6. Numerals
-7. Serial commas
-8. Acronyms expanded on first use
-9. Sentences readable two ways, and noun-piles
+4. Counting nouns that never say what was counted — "records", "sources", "items",
+   "entries", "studies", "results"
+5. Money metaphors for performance
+6. Ambiguous "network"
+7. Numerals
+8. Serial commas
+9. Acronyms expanded on first use
+10. Sentences readable two ways, and noun-piles
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
+
+**Rule 4 has a cheap way in: find the sentences carrying two or more numerals.** A count chain is where the fault lives, and a methods sentence reporting a screening funnel is where a count chain lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and most will be fine; the ones that are not hand the reader a different unit at each number and define none of them.
 
 ## What is deliberately not a finding
 
