@@ -239,6 +239,17 @@ to describe the new behaviour rather than appending a note about what changed. T
 "comments and docs must reflect current state only" rule in
 [`docs/architecture/code-style.md`](docs/architecture/code-style.md), applied to prose.
 
+**Every citation is a hyperlink to the work cited.** Writing "Sculley et al. (2015)" as plain text
+makes the reader go and find the paper; the link costs a few characters and a digital object
+identifier is a stable address. Wrap the author-and-year label itself —
+`[Sculley et al. (2015)](https://doi.org/...)` — and prefer a DOI to a publisher's landing page. This
+holds everywhere we write, not only in the literature review: a GitHub issue or a pull-request body
+quoting a paper links it too, because the reader there has even less context than a docs reader.
+The exception is repetition. Once a work is linked, later mentions of the same work in the same
+passage drop both the year and the link and name the authors alone — "Sculley et al. report" — so a
+paragraph does not carry the same link four times. `check_citations.py` in the `literature-review`
+skill enforces the linking half of this rule on the review, and nothing enforces it anywhere else.
+
 **Say what the source found, not what is always true.** When prose rests on a paper, a measurement
 or a trial, state the finding with its scope attached: "in the studies we read, a gradient-boosted
 model beat a same-time-yesterday rule by 10 to 20%", not "sophisticated models beat naive ones".
