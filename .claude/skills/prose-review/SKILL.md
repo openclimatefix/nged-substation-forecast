@@ -129,6 +129,15 @@ is. Often only one phrase is failing, and replacing that phrase keeps the conclu
 became "MLOps research" because a bare "the field" is the referent fault Rule 1 already forbids.
 The rewritten phrase lands in the one sentence a skim-reader is guaranteed to read.
 
+**The two tests apply to a navigation entry with more force than to a heading.** A published site's
+navigation is where a reader arrives, so a section or page name that only makes sense once the page
+is open sends every reader down the wrong branch. Read the navigation on its own, the way Pass A
+reads the bolded leads: `mkdocs.yml`'s `nav` block is the whole list, and any name a first-time
+reader cannot place is a finding. Keep the capitalisation consistent across the list too — a
+navigation list mixing title case with sentence case reads as two lists stapled together — and
+where two entries in different sections name the same subject, that duplication is a Pass F
+finding, not a naming one.
+
 **Renaming a heading changes its anchor slug, so grep for inbound links to the old slug first** —
 across `docs/`, the skills, and any absolute link to the published site — and update every one in the
 same commit. That cost is real: of three headings renamed in this repo, two carried three and two
