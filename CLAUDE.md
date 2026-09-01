@@ -144,8 +144,15 @@ then explain it.
 
 **Name the thing; don't write "it".** Wherever a pronoun or a demonstrative makes the reader look
 backwards to work out what it refers to, repeat the noun instead. "It", "this", "that", "these",
-"those", "they", "such", "the former" and "the latter" are the usual offenders, and a paragraph that
-*opens* with one is the worst case, because a skim-reader landing there has nothing to look back at.
+"those", "they", "such", "one", "ones", "the former" and "the latter" are the usual offenders,
+and a paragraph that *opens* with a pronoun is the worst case, because a skim-reader landing there
+has nothing to look back at. **"One" and "such a" are the two that slip past a careless sweep**,
+because both read smoothly: write "an energy-forecasting lifecycle rather than a generic
+lifecycle", never "rather than a generic one"; write "the only paper of the three", never "the only
+one of the three"; write "a measure of effectiveness", never "such a metric" where a metric was
+named a clause earlier. Repeating the noun is always available and always correct. "One" is fine as
+a determiner in front of the noun it counts — "the one review we found" both scopes a claim and
+names its noun — and wrong only when it stands in place of the noun.
 Prefer "the NWP download" over "it", "the threshold-weighted score" over "this". A little repetition
 beats an ambiguous sentence every time: never make the reader refer backwards to decode a sentence,
 and never buy elegance with a referent the reader has to hunt for. The same rule covers version

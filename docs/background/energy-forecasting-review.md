@@ -2488,8 +2488,8 @@ establish about the practice matters to this project.
 **The field is a large body of description and almost no measurement.** It has a settled definition,
 a vocabulary for the failure modes the practice exists to prevent, surveys of the available tools,
 and maturity models — but across the five reviews of the field read for this section, nobody has
-published a metric showing what adopting the practice delivers, and the one review we found that
-went looking for such a metric reported finding none. Energy forecasting has no separate body of
+published a metric showing what adopting the practice delivers, and the one review we found that went looking for a measure of effectiveness reported finding
+none. Energy forecasting has no separate body of
 findings to fall back on: what exists is a handful of platform descriptions, no energy-specific
 platform among those screened, and no paper giving a retraining cadence a network operator could act
 on — even though forecast error at Europe's transmission operators has been measured roughly
@@ -2498,8 +2498,8 @@ doubling over 5 years.
 **That absence sets the terms for what Flexpectation can claim for its own experiment framework.**
 The practice this project is betting on is fast, comparable iteration, and the case for it rests on
 a structural argument about how fields make progress together with testimony from senior
-practitioners, rather than on a controlled measurement — and the documentation needed to run such a
-measurement is itself largely missing from published work. The better-documented precedent lies
+practitioners, rather than on a controlled measurement — and the documentation needed to run a controlled measurement is itself largely missing from
+published work. The better-documented precedent lies
 outside machine learning: operational meteorology has tied production model changes to measured
 changes in forecast skill for decades. One finding cuts against this project directly, and the
 section below sets it out rather than quoting around it: the same structural argument predicts that
@@ -2510,8 +2510,7 @@ substation telemetry cannot be published.
 
 **[Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138) give the definition most
 of the field now uses.** The definition rests on a structured review that narrowed 1,864 retrieved
-articles to 27, a review of the available tools, and eight interviews with practitioners. They
-define machine-learning operations as "a paradigm, including aspects like best practices, sets of
+articles to 27, a review of the available tools, and eight interviews with practitioners. Kreuzberger et al. define machine-learning operations as "a paradigm, including aspects like best practices, sets of
 concepts, as well as a development culture when it comes to the end-to-end conceptualization,
 implementation, monitoring, deployment, and scalability of machine learning products", drawing on
 machine learning, software engineering, and data engineering together, and from that evidence they
@@ -2682,9 +2681,7 @@ derives the nine principles, and draws the architecture and the roles that go wi
 et al. (2025)](https://doi.org/10.1145/3747346) next, the broadest synthesis among the reviews
 above, which reads grey literature alongside journals, so that Eken et al. capture the
 practice practitioners write down outside the academic record. Then read [Zhao et al.
-(2026)](https://doi.org/10.3390/info17040328), the only one of the three written for energy
-forecasting, which maps platform capabilities against an energy-forecasting lifecycle rather than a
-generic one. [Sculley et al.
+(2026)](https://doi.org/10.3390/info17040328), the only paper of the three written for energy forecasting, which maps platform capabilities against an energy-forecasting lifecycle rather than a generic lifecycle. [Sculley et al.
 (2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems) is
 worth adding for the terms alone, since the rest of the field argues in the vocabulary Sculley
 et al. established.

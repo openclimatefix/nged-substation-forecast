@@ -7,7 +7,7 @@ roadmap.
 
 ## Documents
 
-- [Our approach to MLops](mlops-approach.md) — why we automate experiments, and why the model
+- [Our approach to MLOps](mlops-approach.md) — why we automate experiments, and why the model
   that wins the evaluation is deployed bit-for-bit, with nothing rewritten on the way to
   production.
 - [Running an ML experiment end-to-end](dagster-workflow.md) — step-by-step recipe for going

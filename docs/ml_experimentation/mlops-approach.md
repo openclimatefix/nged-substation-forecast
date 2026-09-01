@@ -1,10 +1,10 @@
-# Our Approach to MLops
+# Our Approach to MLOps
 
-A short explainer about this project's approach to MLops tooling: what this project's
+A short explainer about this project's approach to MLOps tooling: what this project's
 experiment automation changes, and why it makes the path to production safer rather than
 riskier.
 
-Modern MLops (as used in this project) changes two things:
+Modern MLOps (as used in this project) changes two things:
 
 1. **Throughput.** The grunt work of an experiment — assembling features, training,
    cross-validating, recording results — is automated, so a small team can run hundreds of

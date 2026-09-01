@@ -15,7 +15,7 @@ business case, and not quotable as either. Its one job is to rank forecasts on t
 about, turning "this model has a lower threshold-weighted continuous ranked probability score" into
 "this model would have spent less to keep the network within limits". We use pounds rather than a
 unitless score because the parameters genuinely are prices, and because pounds are what the
-decisions these forecasts feed are actually made in. That is not how forecasts are usually tuned:
+decisions these forecasts feed are actually made in. Forecast developers do not usually tune on money:
 [Gürses-Tran and Monti (2022)](https://doi.org/10.3390/forecast4020028) observe that forecast
 developers "predominantly assess residuals and error statistics when tuning the targeted model's
 quality", so that "eventual cost or rewards of the underlying business application are typically not
@@ -62,8 +62,7 @@ operator in congestion management: 3,102 euros a year using standard load profil
 using a smart-meter-informed forecast. Two features of that study leave the question open for a real
 network: the modelled network is a modified IEEE 33-node test system rather than a real one, and
 what Bernecker et al. compare is two *information levels* rather than two forecasting models. The
-[energy-forecasting review](../background/energy-forecasting-review.md) found no case of such a
-metric ranking one forecast against another at a real substation, and the published work that does
+[energy-forecasting review](../background/energy-forecasting-review.md) found no case of a money metric ranking one forecast against another at a real substation, and the published work that does
 run on a real distribution network denominates the comparison in energy volumes or in spare capacity
 rather than in money: [Angus et al. (2027)](https://doi.org/10.1016/j.epsr.2026.113545) win 10 to
 12% more capacity from 644 low-voltage transformers at a risk of overheating set wherever they ask
@@ -378,6 +377,24 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
    from, and what reliability does NGED target — how much genuinely-needed flexibility may go
    unbought? This was not settled by the prior round of answers and needs a direct follow-up
    question.
+
+## Cost-benefit analysis in the final work package
+
+**NGED will run their own cost-benefit analysis in the project's final work package, and the
+choice of method is theirs.** The final work package is tracked as
+[WP7](https://github.com/openclimatefix/nged-substation-forecast/issues/684), due February 2028.
+
+**One method worth recommending to NGED is a relative-economic-value curve in the shape of
+[Richardson (2000)](https://doi.org/10.1002/qj.49712656313), computed per substation, across the
+range of ratios between the cost of acting on a forecast and the loss avoided by acting.** [The
+shared idea](#the-shared-idea-same-risk-then-compare-the-spend) above explains why this page took
+a different route: £Y, the loss avoided by a breach, is not a figure NGED hold in a form the
+leaderboard metrics can use. NGED's own final work package is better placed to supply that figure,
+because pricing a breach is a judgement about NGED's business, not a property of a forecast.
+
+**NGED's cost-benefit analysis is not expected to start until late 2027, close to WP7's February
+2028 deadline.** This page records the recommendation now, well ahead of that date, so that the
+recommendation is not forgotten in the meantime.
 
 ## Implementation details (deleted when this ships)
 
