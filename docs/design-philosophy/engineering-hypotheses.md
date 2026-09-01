@@ -144,7 +144,7 @@ number of shorter experiments" rather than a few long ones. Andrej Karpathy's
 [autoresearch](https://github.com/karpathy/autoresearch) fixes each training run to the same time
 budget, because a fixed budget "makes experiments directly comparable regardless of what the agent
 changes". The [energy-forecasting
-review](../background/energy-forecasting-review.md#the-case-for-fast-comparable-iteration-is-argument-and-testimony)
+review](../background/energy-forecasting-review.md#fast-comparable-iteration-is-argued-for-not-measured)
 collects all four and is explicit that they are testimony and structural argument rather than a
 controlled measurement.
 

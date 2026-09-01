@@ -59,9 +59,9 @@ here; they are load-bearing for the project's core output.
 **That premise is a bet this project is making rather than a result the literature has
 settled.** The energy-forecasting review found no measurement behind it: the
 energy-forecasting review found [no study measuring what adopting MLOps practice
-delivers](../background/energy-forecasting-review.md#the-field-describes-good-practice-but-does-not-measure-whether-the-practice-works),
+delivers](../background/energy-forecasting-review.md#mlops-research-describes-good-practice-but-does-not-measure-what-the-practice-improves),
 and [the case for fast, comparable
-iteration](../background/energy-forecasting-review.md#the-case-for-fast-comparable-iteration-is-argument-and-testimony)
+iteration](../background/energy-forecasting-review.md#fast-comparable-iteration-is-argued-for-not-measured)
 rests on a structural argument and on practitioner testimony instead. Naming the bet matters
 here, because the orchestrator choice is staked on that bet.
 

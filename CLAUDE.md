@@ -131,6 +131,21 @@ skim-reading pattern is why we prefer sub-headings and short paragraphs over bul
 flattens the argument into items of equal weight, whereas a bolded lead says which claim matters
 and the sentences under it say why.
 
+**Prefer a heading that states the section's conclusion, but fall back to a plain descriptor the
+moment that conclusion needs explaining.** A heading is read cold, by someone who has not read the
+section and is deciding whether to, so it has no room to define its own terms. Two tests: can a
+first-time reader parse every word, and can that reader tell why the claim would matter to them?
+"More detailed weather data has not always improved the forecast" passes both tests — every word is
+ordinary, and a reader knows at once whether that finding is their problem. "Energy forecasting has
+platform descriptions and no retraining cadence" fails both tests, because "platform" and
+"retraining cadence" only acquire their meaning inside the section. Where the conclusion cannot be
+stated without a term the section itself has to introduce, name the subject instead — "MLOps in
+energy forecasting" — and leave the conclusion to the bolded lead, which has a whole sentence in
+which to land it. Helping a reader find the section they want is the heading's job; summarising the
+section is what a heading earns when every word survives being read cold. Renaming a heading
+changes its anchor slug, so grep for inbound links to the old slug first and update every one in
+the same commit.
+
 **Be concrete and plain; write for a skim-reader.** Assume the reader is skimming and wants the
 meaning to jump off the page, not to spend effort decoding a clever, abstract or metaphorical
 phrase. Name the actual thing — the asset, the column, the number, the failure — rather than

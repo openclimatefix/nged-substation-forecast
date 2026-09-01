@@ -698,7 +698,7 @@ exploits a weather forecast better than a classical model does, and most of the 
 comes from models carrying no weather forecast at all.** Their regression carries no interaction
 between model class and input, so it cannot detect whether a machine-learning model exploits a
 weather forecast better than an autoregressive model does. That question matters for Flexpectation.
-And only 19% of the 4,687 observations in [Nguyen and Müsgens
+And only 19% of the 4,687 skill scores in [Nguyen and Müsgens
 (2026)](https://doi.org/10.1063/5.0300682) use numerical weather prediction as an input at all,
 against 91% that use lagged power, so most of the evidence separating the model classes comes from
 models with no weather forecast in them.
@@ -796,7 +796,7 @@ below, which sets out the published methods in detail.
 
 **NGED's Embedded Capacity Register (ECR) gives a registered capacity for generation of 50 kW and
 above, but provides no other engineering parameters.** NGED's August 2026 ECR lists 5,598 connected
-generators totalling 11,456 MW, of which 4,202 sites and 5,958 MW are solar. But a registered
+generators totalling 11,456 MW, of which 4,202 generators and 5,958 MW are solar. But a registered
 capacity is *contractual* rather than operational — the export limit is the limit "permitted as per
 the connection agreement" — and the register carries no panel tilt, panel azimuth, or ratio of
 direct-current to alternating-current rating. Hence Flexpectation plans to infer those engineering
@@ -2559,7 +2559,7 @@ generic lifecycle. [Sculley et al.
 worth adding for the terms alone, since the rest of the field argues in the vocabulary Sculley et
 al. established.
 
-### The field describes good practice but does not measure whether the practice works
+### MLOps research describes good practice but does not measure what the practice improves
 
 **[Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138) give the definition most
 of the field now uses.** The definition rests on a structured review that narrowed 1,864 retrieved
@@ -2621,7 +2621,7 @@ built a framework, a maturity model, and a taxonomy from what those practitioner
 measured no outcome — the benefits John et al.'s paper lists are benefits the interviewees and the
 prior literature claim, not effects John et al. measured.
 
-### Energy forecasting has platform descriptions and no retraining cadence
+### MLOps in energy forecasting
 
 **What exists for energy forecasting specifically is a handful of platform descriptions rather than
 a body of findings that agree or disagree with each other.** [Zhao et al.
@@ -2641,8 +2641,7 @@ implementation complexity and operational performance of platforms."
 [Subramanya et al. (2022)](https://doi.org/10.3390/app12199851) build and run a pipeline for
 day-ahead price forecasting in the Finnish reserve market, but report no accuracy figure and no
 measurement of the engineering effort the pipeline saved. [Pelekis et al.
-(2024)](https://doi.org/10.1016/j.softx.2024.101758) go furthest of the four towards a worked
-example with DeepTSF, an open-source platform that orchestrates its pipeline with Dagster and tracks
+(2024)](https://doi.org/10.1016/j.softx.2024.101758) go further than Subramanya et al. towards a worked example with DeepTSF, an open-source platform that orchestrates its pipeline with Dagster and tracks
 experiments with MLflow: Pelekis et al. tune a deep-learning model, neural basis expansion analysis
 (N-BEATS), over 100 hyperparameter trials on a day-ahead forecast of Italy's national electricity
 load, then backtest the winner on a held-out year. What no platform description in this section
@@ -2698,7 +2697,7 @@ verification/evaluation has been a subject of research and also applied to opera
 more than a century" and reporting a user community of "more than 3,700 researchers and operational
 users from 124 countries". [Hoffman et al. (2018)](https://doi.org/10.1175/WAF-D-18-0117.1) show what continuous verification delivers: tracking the skill of three operational forecasting centres continuously, Hoffman et al. attribute a "7.37% increase in the probability of improved skill" to a single, named model upgrade made in 2016. Tying a specific production change to a measured change in skill is what the machine-learning-operations literature we read does not do, and meteorology has been tying production changes to measured skill routinely.
 
-### The case for fast, comparable iteration is argument and testimony
+### Fast, comparable iteration is argued for, not measured
 
 **Fast, comparable iteration is the practice within machine-learning operations that Flexpectation
 is betting on, and the case for that practice rests on a structural argument and on practitioner

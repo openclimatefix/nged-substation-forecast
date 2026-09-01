@@ -14,9 +14,9 @@ Modern MLOps (as used in this project) changes throughput and closes the transla
    this project is making rather than a result the literature has settled: the
    energy-forecasting review found [no study measuring what adopting
    machine-learning-operations practice
-   delivers](../background/energy-forecasting-review.md#the-field-describes-good-practice-but-does-not-measure-whether-the-practice-works),
+   delivers](../background/energy-forecasting-review.md#mlops-research-describes-good-practice-but-does-not-measure-what-the-practice-improves),
    and the case for [fast, comparable
-   iteration](../background/energy-forecasting-review.md#the-case-for-fast-comparable-iteration-is-argument-and-testimony)
+   iteration](../background/energy-forecasting-review.md#fast-comparable-iteration-is-argued-for-not-measured)
    rests on a structural argument and on practitioner testimony instead.
 2. **No translation gap.** The artifact we experimented on *is* the artifact we deploy.
    There is no "now rewrite the research code for production" step, because every experiment

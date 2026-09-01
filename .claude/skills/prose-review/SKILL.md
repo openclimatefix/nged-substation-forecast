@@ -30,7 +30,7 @@ every pass over everything:
 |---|---|
 | A docstring, a comment, a pull-request body, one or two paragraphs | The sentence sweep only |
 | Several paragraphs under one heading | Pass B, then the sentence sweep |
-| A whole page, or anything with headings | Passes A, B and D, then the sentence sweep |
+| A whole page, or anything with headings | Passes A, B, D and E, then the sentence sweep |
 | A page nobody has audited, or beyond roughly 5,000 words | Every pass, chunked across sub-agents |
 
 **Structure is settled before the sentence sweep runs, never after.** Reordering and splitting move
@@ -107,6 +107,31 @@ For every "the four in use", "three further", "six spokes", "the five are not", 
 
 **When prose restates a list another document owns, diff it item by item against the source list**
 rather than transcribing it from memory.
+
+## Pass E: do the headings work read cold?
+
+**Read the table of contents alone, as a reader who has not read the page.** Pass A reads the bolded
+leads to test the argument's order; this pass reads the headings to test whether a reader can
+navigate. The failure is invisible to the author, who cannot un-know what each section says.
+
+Two tests per heading, per CLAUDE.md's heading rule:
+
+- **Can a first-time reader parse every word?** A term the section itself defines has no meaning yet
+  in the heading above it.
+- **Can that reader tell why the claim would matter to them?** A heading whose significance is only
+  visible from inside the section sends the reader on a detour that returns nothing.
+
+A heading failing either test is rewritten as a plain descriptor of its subject, and the conclusion
+moves into the section's bolded lead. A heading passing both tests is left alone, however long it
+is. Often only one phrase is failing, and replacing that phrase keeps the conclusion: "the field"
+became "MLOps research" because a bare "the field" is the referent fault Rule 1 already forbids,
+landing in the one sentence a skim-reader is guaranteed to read.
+
+**Renaming a heading changes its anchor slug, so grep for inbound links to the old slug first** —
+across `docs/`, the skills, and any absolute link to the published site — and update every one in the
+same commit. That cost is real: of three headings renamed in this repo, two carried three and two
+inbound links respectively, and the link text is usually a fragment of the sentence around it rather
+than the heading itself, so only the anchor needs changing.
 
 ## Pass C: the first-stumble reader
 
@@ -193,8 +218,9 @@ never have been reported.
 - **Reference-list entries and author strings**, which follow the citation convention rather than
   the serial-comma rule.
 - **Code blocks and the code inside them**, including comments.
-- **Headings**, unless renaming is genuinely needed — a heading rename changes the anchor slug and
-  breaks inbound links from elsewhere in the docs, including absolute links from other pages.
+- **Headings**, which Pass E owns. The sentence sweep leaves them alone, because a heading rename
+  changes the anchor slug and breaks inbound links from elsewhere in the docs, including absolute
+  links from other pages, so it is worth doing deliberately rather than as a by-product.
 
 Findings worth keeping are the mirror image: "one"/"ones"/"theirs"/"ours" standing in place of a
 noun, a pronoun or demonstrative *opening* a sentence, a referent with two or more plausible
