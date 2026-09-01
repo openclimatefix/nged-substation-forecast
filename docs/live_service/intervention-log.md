@@ -1,11 +1,13 @@
 # Intervention log
 
 An append-only record of every occasion on which a human had to intervene in the running service.
-This is the artefact that
-[T1.1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) is
-scored from.
+This is the artefact that the
+[T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
+is scored from.
 
-It exists because T1.1 is the only test on the
+It exists because the
+[T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
+is the only test on the
 [engineering hypotheses](../design-philosophy/engineering-hypotheses.md) page that **cannot be
 measured retrospectively**. Every other test can be reconstructed later — from the scenario suite,
 from MLflow timestamps, from the runbooks, or from billing history. "How many times did a human
@@ -19,7 +21,7 @@ unlogged:
 
 | Column | What goes in it |
 |---|---|
-| **Date** | `YYYY-MM-DD HH:MM` UTC of the intervention, not of the underlying fault. The time of day matters: T1.1 scores out-of-hours interventions separately, and a date alone cannot be scored for that |
+| **Date** | `YYYY-MM-DD HH:MM` UTC of the intervention, not of the underlying fault. The time of day matters: the [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) scores out-of-hours interventions separately, and a date alone cannot be scored for that |
 | **Trigger** | What alerted us — a Sentry alarm, a missed check-in, an NGED email, a routine glance at the Dagster UI |
 | **Cause** | One of the [cause categories](#cause-taxonomy) below |
 | **Minutes** | Human-minutes spent, start to finish, rounded to the nearest 5 |
@@ -35,15 +37,16 @@ A run that failed and then recovered on its own retry is *not* an intervention, 
 with `Minutes = 0` and `Cause = self-recovered`. Self-recovery is evidence for the design rather
 than against it, and it is only evidence if somebody wrote it down.
 
-"Runbook?" is not bookkeeping. A gap in [operations.md](operations.md) is itself a finding: T1.1
+"Runbook?" is not bookkeeping. A gap in [operations.md](operations.md) is itself a finding: the
+[T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
 claims a non-expert can run this service from the runbooks alone, and every `no` is a point against
 that claim.
 
 ## Cause taxonomy
 
-The taxonomy is the substance of the test.
-[T1.1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts
-that **at least 90% of entries fall into `upstream-contract`** — that essentially the only thing
+The taxonomy is the substance of the test. The
+[T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
+predicts that **at least 90% of entries fall into `upstream-contract`** — that essentially the only thing
 that should ever need a human is an upstream provider changing the shape of what they publish.
 Every entry in another category counts against that 90%, which is exactly why the categories are
 recorded separately rather than lumped together. The threshold is deliberately not 100%, so a
@@ -51,7 +54,7 @@ single fluke cannot falsify the claim on its own.
 
 | Category | Meaning |
 |---|---|
-| `upstream-contract` | An upstream provider changed a format, schema, column, unit or file layout. **The one category T1.1 predicts.** |
+| `upstream-contract` | An upstream provider changed a format, schema, column, unit or file layout. **The one category the [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts.** |
 | `upstream-outage` | Upstream data absent or stuck for long enough that a human had to act, without the contract itself changing |
 | `infrastructure` | The host, container, scheduler, network or cloud account — anything below our own code |
 | `our-bug` | A defect in this codebase |
@@ -65,7 +68,9 @@ measures nothing.
 
 ## The scoring window opens at v1.0
 
-Log everything from day one, but **score T1.1 only from v1.0 onward**.
+Log everything from day one, but **score the [T1.1 operability
+test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) only from
+v1.0 onward**.
 
 While the system is being actively rebuilt through v0.2–v0.9, a good deal of what looks like an
 intervention is really development churn, and counting it would spuriously falsify the ≥90%
@@ -73,7 +78,8 @@ threshold. The pre-v1.0 entries are still worth having: they are what the cause 
 from, and they are the honest record of what the service actually demanded of us on the way up.
 
 The reverse also holds, and matters more. A *quiet* pre-v1.0 stretch does not score in favour of
-H1 either. Counting the good weeks of an excluded window while discounting the bad ones would be
+[H1, a service that mostly runs itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
+either. Counting the good weeks of an excluded window while discounting the bad ones would be
 the plainest possible case of the selective reading these hypotheses exist to prevent.
 
 ## The log
@@ -87,7 +93,7 @@ the plainest possible case of the selective reading these hypotheses exist to pr
 Recording the periods, and not only the entries, is what makes an empty table mean something. An
 empty log with no stated period is indistinguishable from a log nobody kept.
 
-| Period | Version | Scope | Interventions | Scores T1.1? |
+| Period | Version | Scope | Interventions | Scores [T1.1, operability](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)? |
 |---|---|---|---|---|
 | 2026-07-15 18:00 UTC → 2026-08-14 00:00 UTC | v0.1 | 28 time series, 6-hourly `live_forecasts` on AWS | 1 | No — pre-v1.0 |
 | 2026-08-14 00:00 UTC → ongoing | v0.2 | 31 time series, 6-hourly `live_forecasts` on AWS, with `live_forecasts_are_healthy` reporting on each slot | 0 | No — pre-v1.0 |
@@ -145,13 +151,17 @@ Three caveats, without which the window would be worth more than it is:
   `nwp_init_time` travels on every forecast row: the degradation was recoverable from the data, but
   nothing in the deployment announced it.
 - **A month is short, and this is the easy case.** v0.1 is 28 time series and one ECMWF run
-  per day. The dominant cause T1.1 predicts — an upstream contract change — did not happen in a
-  window this short; a partial publication is a milder fault than a changed schema.
+  per day. The dominant cause predicted by the
+  [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
+  — an upstream contract change — did not happen in a window this short; a partial publication is a
+  milder fault than a changed schema.
 - **It does not score.** The window opens at v1.0, [as above](#the-scoring-window-opens-at-v10).
 
-So what this is, stated plainly: **weak, non-scoring evidence for H1, drawn from a window the
-scoring rule excludes.** The deployed stack served all 117 scheduled slots over 29 days, absorbed
-one lost NWP run by degrading rather than stopping, and cost a human about a minute. That is worth
+So what this is, stated plainly: **weak, non-scoring evidence for
+[H1, a service that mostly runs itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
+drawn from a window the scoring rule excludes.** The deployed stack served all 117 scheduled slots
+over 29 days, absorbed one lost NWP run by degrading rather than stopping, and cost a human about a
+minute. That is worth
 recording, and it is not worth more than that.
 
 ### v0.2 on AWS, from 2026-08-14
@@ -189,8 +199,10 @@ service healthy regardless, so a degraded run looks like a good one from outside
 
 ## See also
 
-- [Engineering Hypotheses → H1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-  — the hypothesis this log scores, and the other three tests that sit alongside T1.1.
+- [Engineering Hypotheses → H1, a service that mostly runs
+  itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — the
+  hypothesis this log scores, and the other three tests that sit alongside the
+  [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 - [Operating the live service](operations.md) — the runbooks whose coverage the `Runbook?` column
   measures.
 - [Inherent Stability](../design-philosophy/inherent-stability.md) — the design that is meant to

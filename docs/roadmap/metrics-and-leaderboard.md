@@ -916,8 +916,9 @@ consumes no NWP and is indifferent to recent telemetry staleness, so it barely d
 makes it the honest bar to clear, and a far better failure criterion than any arbitrary staleness
 threshold. Concretely: at rungs 0–2 of the degradation ladder, every time series should still emit
 a forecast, and that forecast should still beat `nged_incumbent`. That is
-[T1.2](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself); the interval-calibration
-counterpart, PICP within tolerance in every regime, is T1.3.
+[T1.2, graceful degradation](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself);
+the interval-calibration counterpart, PICP within tolerance in every regime, is
+[T1.3, faithful uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 This suite is shared machinery: the same transforms drive the CI degradation smoke-tests in
 [Engineering Health](engineering-health.md) and, later, the outage-shaped training augmentation that

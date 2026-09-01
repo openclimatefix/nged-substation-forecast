@@ -43,50 +43,51 @@ plugins:
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started.md
-  - Documentation Guide: documentation-guide.md
-  - Design Philosophy:
-      - Overview: design-philosophy/index.md
-      - Design Principles: design-philosophy/design-principles.md
-      - Engineering Hypotheses: design-philosophy/engineering-hypotheses.md
-      - Inherent Stability: design-philosophy/inherent-stability.md
-      - Common Incident Classes: design-philosophy/common-incident-classes.md
-  - Background & Challenges:
-      - NGED Network: background/network.md
+  - Getting started: getting-started.md
+  - Documentation guide: documentation-guide.md
+  - Background:
+      - Overview: background/index.md
+      - NGED's network: background/network.md
       - Requirements: background/requirements.md
-      - NGED's Incumbent Forecast: background/nged-incumbent-forecast.md
-      - Data Quality: background/data-quality.md
-      - Switching Events: background/switching-events.md
-      - "Energy Forecasting: State of the Art": background/energy-forecasting-review.md
+      - NGED's incumbent forecast: background/nged-incumbent-forecast.md
+      - Data quality: background/data-quality.md
+      - Switching events: background/switching-events.md
+      - The state of the art in energy forecasting: background/energy-forecasting-review.md
+  - Design philosophy:
+      - Overview: design-philosophy/index.md
+      - Design principles: design-philosophy/design-principles.md
+      - Engineering hypotheses: design-philosophy/engineering-hypotheses.md
+      - Inherent stability: design-philosophy/inherent-stability.md
+      - Common incident classes: design-philosophy/common-incident-classes.md
   - Techniques:
       - Overview: techniques/index.md
-      - Convex Optimisation: techniques/convex-optimisation.md
-      - Differentiable Physics: techniques/differentiable-physics.md
-      - Disaggregation Evaluation: techniques/disaggregation-evaluation.md
-      - Encoders: techniques/encoders.md
-      - Evaluation Metrics: techniques/evaluation-metrics.md
-      - Probabilistic Forecasting: techniques/probabilistic-forecasting.md
+      - Convex optimisation: techniques/convex-optimisation.md
+      - Differentiable physics: techniques/differentiable-physics.md
+      - Evaluating disaggregation: techniques/disaggregation-evaluation.md
+      - Learned encoders: techniques/encoders.md
+      - Evaluation metrics: techniques/evaluation-metrics.md
+      - Probabilistic forecasting: techniques/probabilistic-forecasting.md
   - Architecture:
       - Overview: architecture/overview.md
-      - Performance and Scale: architecture/performance.md
-      - Forecast Delivery: architecture/forecast-delivery.md
-      - NWP Variable Conventions: architecture/nwp-variable-conventions.md
-      - Known ECMWF ENS Data-Quality Issues: architecture/ecmwf-ens-known-issues.md
-      - ML Orchestration Design: architecture/ml-orchestration.md
-      - Production Deployment Design: architecture/production-deployment.md
-      - AWS Running Costs: architecture/aws-costs.md
+      - Performance and scale: architecture/performance.md
+      - Forecast delivery: architecture/forecast-delivery.md
+      - NWP variable conventions: architecture/nwp-variable-conventions.md
+      - Known ECMWF ENS data-quality issues: architecture/ecmwf-ens-known-issues.md
+      - ML orchestration design: architecture/ml-orchestration.md
+      - Production deployment design: architecture/production-deployment.md
+      - AWS running costs: architecture/aws-costs.md
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
       - "Could this codebase forecast another country? (not planned)": architecture/adapting-to-another-geography.md
-      - Code Style: architecture/code-style.md
+      - Code style: architecture/code-style.md
       - Testing: architecture/testing.md
-  - ML Experimentation:
+  - ML experimentation:
       - Overview: ml_experimentation/index.md
       - Our approach to MLOps: ml_experimentation/mlops-approach.md
       - Model configuration: ml_experimentation/model-configuration.md
-      - Running an experiment end-to-end: ml_experimentation/dagster-workflow.md
+      - Running an ML experiment end-to-end: ml_experimentation/dagster-workflow.md
       - Cross-validation folds: ml_experimentation/cross-validation-folds.md
-      - Evaluating new data sources: ml_experimentation/evaluating-new-data-sources.md
-  - Live Service:
+      - Evaluating data sources with limited history: ml_experimentation/evaluating-new-data-sources.md
+  - Live service:
       - Overview: live_service/index.md
       - Running the whole stack locally: live_service/local.md
       - Setting up the live service on AWS: live_service/aws.md
@@ -97,25 +98,25 @@ nav:
       - Configuration reference: live_service/setup.md
   - Roadmap:
       - Overview: roadmap/index.md
-      - Capacity Estimation: roadmap/capacity-estimation.md
-      - Cost-Savings Metrics: roadmap/cost-savings-metrics.md
-      - Data Sources: roadmap/data-sources.md
-      - Delivery Tables: roadmap/delivery-tables.md
-      - Engineering Health: roadmap/engineering-health.md
-      - Forecast Building Blocks: roadmap/forecast-building-blocks.md
+      - Effective-capacity estimation: roadmap/capacity-estimation.md
+      - Cost-savings metrics: roadmap/cost-savings-metrics.md
+      - Data sources: roadmap/data-sources.md
+      - Delivery tables: roadmap/delivery-tables.md
+      - Engineering health: roadmap/engineering-health.md
+      - How NGED assembles forecasts: roadmap/forecast-building-blocks.md
       - Handover to NGED: roadmap/handover.md
-      - Live Service: roadmap/live-service.md
-      - Metrics & Leaderboard: roadmap/metrics-and-leaderboard.md
-      - Net-Demand Disaggregation: roadmap/disaggregation.md
-      - Switching Events: roadmap/switching-events.md
-      - Training History (ERA5): roadmap/training-history.md
-      - XGBoost Improvements: roadmap/xgboost-improvements.md
-  - API Reference:
+      - "Live service: what's left to build": roadmap/live-service.md
+      - Metrics and leaderboard: roadmap/metrics-and-leaderboard.md
+      - Net-demand disaggregation: roadmap/disaggregation.md
+      - Estimating latent demand under switching events: roadmap/switching-events.md
+      - Extending training history with ERA5: roadmap/training-history.md
+      - XGBoost improvements: roadmap/xgboost-improvements.md
+  - API reference:
       - Overview: api/index.md
       - Contracts: api/contracts/index.md
-      - Delta Store: api/delta_store/index.md
-      - Dynamical Data: api/dynamical_data/index.md
+      - Delta store: api/delta_store/index.md
+      - Dynamical data: api/dynamical_data/index.md
       - Geo: api/geo/index.md
-      - ML Core: api/ml_core/index.md
-      - NGED Data: api/nged_data/index.md
-      - XGBoost Forecaster: api/xgboost_forecaster/index.md
+      - ML core: api/ml_core/index.md
+      - NGED data: api/nged_data/index.md
+      - XGBoost forecaster: api/xgboost_forecaster/index.md

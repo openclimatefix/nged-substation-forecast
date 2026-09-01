@@ -36,7 +36,8 @@ data engineering has existed: *inherent stability* comes from vehicle dynamics, 
 from avionics autoland (the flight-deck technology that fully automates the landing phase) and
 ISO 26262, *blast radius* from site reliability engineering, and mobile telecoms supplies the case
 that a heavily-corrupted channel can still run genuinely unattended — see
-[H1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). Borrowing across disciplines
+[H1, a service that mostly runs
+itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). Borrowing across disciplines
 is the point, not a flourish: some of them have been shipping safety-critical systems for fifty
 years.
 
@@ -531,7 +532,8 @@ for a stated reason recorded at the time.
 *Serves:*
 [Hypothesis 4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money),
 [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-— specifically T1.4, operability by a non-expert.
+— specifically
+[T1.4, operability by a non-expert](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 *Detail:*
 [An established industry pattern](../architecture/forecast-delivery.md#an-established-industry-pattern),
@@ -573,9 +575,9 @@ that edge become a gate in production.
 
 *Without it:* in a chained design, one failed 06:00 ingest suppresses the 06:00 forecast and the
 slots behind it, and someone has to replay the chain in order, out of hours, to catch up — the
-precise out-of-hours intervention that
-[T1.1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts will never be
-needed.
+precise out-of-hours intervention that the
+[T1.1 operability test](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts
+will never be needed.
 
 *Decided:* the three production jobs run on three independent schedules with no run-status
 coupling between them, and the `:55` offset on the telemetry pull is an optimisation for
@@ -658,9 +660,10 @@ absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-a
 the routing rules and the mechanisms that keep those tags trustworthy.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
-itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — specifically T1.4,
-operability by a non-expert, and T1.1's cause taxonomy, which is only as good as what the telemetry
-says caused the failure.
+itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — specifically
+[T1.4, operability by a non-expert](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
+and [T1.1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)'s cause taxonomy, which is
+only as good as what the telemetry says caused the failure.
 
 *Detail:* [Send telemetry to Sentry, and alarm on
 absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence),

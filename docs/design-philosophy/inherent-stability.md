@@ -11,10 +11,10 @@
 
 This page argues in full the first and largest of the project's
 [design principles](design-principles.md): how Flexpectation behaves when its inputs degrade. It is
-the *how* behind [H1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — the
-hypothesis that the service mostly runs itself. [The rules](#the-rules) below are the
-fine-grained form of the never-stop, complexity-offline and strict-contracts principles in that
-list.
+the *how* behind
+[H1, the hypothesis that the service mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+[The rules](#the-rules) below are the fine-grained form of the never-stop, complexity-offline and
+strict-contracts principles in that list.
 
 **The model does the work, not a fallback path.** A central mechanism behind everything below is
 that the ML model itself is built to keep producing a sensible forecast when some of its inputs are
@@ -278,9 +278,10 @@ Two qualifiers keep it honest.
 
 It does not license unbounded training complexity, either: a training harness nobody can run is also
 a production risk, because
-[H2](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month) and
-[H3](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) depend on retraining
-staying cheap and promotion staying one command.
+[H2, a hundred experiments per person in a peak month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)
+and
+[H3, one-click promotion and one-click rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback)
+depend on retraining staying cheap and promotion staying one command.
 
 ## Mechanisms
 

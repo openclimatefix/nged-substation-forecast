@@ -84,7 +84,7 @@ regime**, which works with today's XGBoost and needs no retraining
 ([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)); the principle is
 [Inherent Stability → Widening bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal),
 and whether it worked is measured by
-[T1.3](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+[T1.3, faithful uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 ### Fields common to all three representations
 

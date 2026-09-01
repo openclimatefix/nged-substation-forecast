@@ -2951,11 +2951,11 @@ scopes the work rather than promising an output. How many of the strands survive
 data is exactly what the project has to find out.
 
 **Only the heavily-tuned gradient-boosting model, the first of the four strands, is in scope for
-Flexpectation version 1.** The other three strands belong to the scale-up across NGED's whole distribution network from 2027,
-as does the disaggregation of unmetered generation. That scale-up is itself a falsifiable claim the
-project has written down,
-[H5](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h5-scale-without-redesign):
-the architecture goes from 32 to about 2,500 time series without structural change.
+Flexpectation version 1.** The other three strands belong to the scale-up across NGED's whole
+distribution network from 2027, as does the disaggregation of unmetered generation. That scale-up
+is itself a falsifiable claim the project has written down: the architecture goes from 32 to about
+2,500 time series without structural change
+([H5](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h5-scale-without-redesign)).
 
 **The main reason for attempting all nine challenges at once is that the nine may be one challenge
 rather than nine.** A switching event, a turbine out for repair, and a stuck meter all surface in
@@ -2986,11 +2986,11 @@ estimated jointly by construction.
 **The first reason for confidence is that one more experiment takes compute time rather than staff
 time.** The core forecast already exists and runs today, on an experiment framework that makes one
 more experiment take compute time rather than staff time. That low marginal effort is what makes it
-realistic to run on the order of hundreds of machine-learning experiments a month. The introduction to this review makes the same argument. The project states the claim as a falsifiable
-hypothesis,
-[H2](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h2-a-hundred-experiments-per-person-in-a-peak-month):
+realistic to run on the order of hundreds of machine-learning experiments a month. The introduction
+to this review makes the same argument. The project states the claim as a falsifiable hypothesis:
 when experimentation is the active workstream, one person can register at least 100 leaderboard
-experiments in a month.
+experiments in a month
+([H2](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h2-a-hundred-experiments-per-person-in-a-peak-month)).
 
 **Expecting several of the four model families to fail is what makes those model families research
 directions rather than engineering tasks, and both NGED and this project count a negative result as

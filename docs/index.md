@@ -53,7 +53,7 @@ industries we borrow practice from and what we declined.
 > model.
 
 - [Design Philosophy](design-philosophy/index.md) — the portable *why*: the design principles, the falsifiable engineering hypotheses that score them, and the inherent-stability argument in full
-- [Background & Challenges](background/network.md) — NGED's network, project requirements, and data quality challenges
+- [Background](background/index.md) — NGED's network, project requirements, and data quality challenges
 - [Techniques](techniques/index.md) — durable explainers of the solution methods: differentiable physics, convex optimisation, encoders, probabilistic forecasting, and evaluation metrics
 - [Architecture Overview](architecture/overview.md) — what is actually built: technical components and data flow
 - [Performance and Scale](architecture/performance.md) — the measured performance engineering: storage formats, lazy evaluation, memory bounds, and Polars' row-index ceiling

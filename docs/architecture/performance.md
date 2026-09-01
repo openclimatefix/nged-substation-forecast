@@ -10,8 +10,10 @@ and [*measure; do not
 assume*](../design-philosophy/design-principles.md#12-measure-do-not-assume). Everything here exists so that the full
 pipeline — training and a complete 51-member backtest — runs on an ordinary laptop, which is what
 keeps experimentation fast
-([H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)) and the
-running service cheap ([H4](../design-philosophy/engineering-hypotheses.md#h4-it-runs-for-pocket-money)).
+([H2, a hundred experiments per person in a peak
+month](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month))
+and the running service cheap
+([H4, it runs for pocket money](../design-philosophy/engineering-hypotheses.md#h4-it-runs-for-pocket-money)).
 
 ## Storage formats: measured, not assumed
 

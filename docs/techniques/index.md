@@ -2,7 +2,7 @@
 
 This section holds durable explainers of the **solution methods** we bring to the forecasting
 problem — what each technique is, how it works, and why it fits. It complements the other
-sections: [background](../background/network.md) describes the *problem*, the
+sections: [background](../background/index.md) describes the *problem*, the
 [roadmap](../roadmap/index.md) says *what* we plan to build and in what order, and
 [architecture](../architecture/overview.md) documents what is *already built*. Unlike roadmap
 pages, techniques pages are permanent: they stay put (and stay linkable — including from code

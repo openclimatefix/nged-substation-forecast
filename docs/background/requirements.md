@@ -104,9 +104,9 @@ bet this project is making rather than a result the literature has settled, for 
 set out in [Our Approach to MLOps](../ml_experimentation/mlops-approach.md). The
 pre-registered version of that requirement — deliberately relaxed to a peak-month, per-person
 claim, so that months spent hardening the service are not spurious falsifications — is
-[H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month);
+[H2, a hundred experiments per person in a peak month](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month);
 the promotion half below is
-[H3](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
+[H3, one-click promotion and one-click rollback](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 
 Three properties matter as much as raw throughput:
 
@@ -194,7 +194,8 @@ degradation ladder sets out what the service should produce at each stage of inp
 
 This section is the *defensive* half of the argument — an outage does not cost much. The
 corresponding *positive* claim, that interventions will be rare in the first place, is stated and
-tested as [H1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+tested as
+[H1, a service that mostly runs itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 Missed forecasts are also not lost for evaluation purposes: once the service is back, missed
 slots are backfilled in replay mode, reconstructing what would have been forecast at the time —

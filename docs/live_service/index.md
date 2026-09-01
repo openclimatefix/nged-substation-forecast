@@ -45,9 +45,9 @@ driving is identical in both environments, so it lives on one shared page:
   champion model, let the 6-hourly `live_forecasts` schedule run (or materialise a slot by
   hand), inspect a forecast, and backfill a missed slot in replay mode.
 - [Intervention log](intervention-log.md) — the append-only record of every occasion a human had to
-  intervene in the running service, and the artefact
-  [T1.1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) is
-  scored from.
+  intervene in the running service, and the artefact the
+  [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
+  is scored from.
 - [Setting up Sentry telemetry](sentry.md) — point error reporting and the missed-check-in alarm
   at a Sentry project: get a DSN, test it from your laptop, and turn it on in production.
 - [Configuration reference](setup.md) — what the storage roots, the derive-from-root
