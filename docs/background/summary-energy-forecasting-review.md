@@ -189,10 +189,11 @@ them runs in live production at national scale.** Each entry gives what was fore
 scale, the horizon, the result and the baseline the result was measured against, and the weather
 input.
 
-- **[Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) — net load at 200 low-voltage feeders in
-Germany, 4 days ahead.** A general-purpose foundation timeseries model (Chronos-2) that was not
-trained on the authors' data beat every purpose-trained model on mean absolute error, 3.8 kW against
-4.2 kW. Weather: 1–3 h forecasts, so effectively after the fact at the 4-day horizon.
+- **[Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) — net load at 200 low-voltage feeders —
+the lines running from a substation out to clusters of customers — in Germany, 4 days ahead.** A
+general-purpose foundation timeseries model (Chronos-2) that was not trained on the authors' data
+beat every purpose-trained model on mean absolute error, 3.8 kW against 4.2 kW. Weather: 1–3 h
+forecasts, so effectively after the fact at the 4-day horizon.
 - **[Hertel et al. (2026)](https://arxiv.org/abs/2607.15705) — load in Germany and Portugal, at
 transmission level, 200 low-voltage feeders, and 287 individual customers, 4 days ahead.** Their
 best model beat a day-type persistence forecast by 59.6% at transmission level, 42.3% at low-voltage
@@ -230,9 +231,10 @@ primary substations with export data, 171 of them modelled, and active power at 
 substations; day-ahead to week-ahead at primary, evaluated to 11 days, and week- to month-ahead at
 secondary.** The published results give **about 8% lower mean absolute error** of utilisation rate
 than Northern Powergrid's existing method. Artificial Forecasting also captured 83% of the top 10%
-of demand values inside its 5th-to-95th-percentile band, and beat its comparison benchmarks at all 8
-of the near-capacity substations it was evaluated on. Weather: real forecasts at primary; none in
-the published secondary results.
+of demand values inside its 5th-to-95th-percentile band — short of the 90% that band nominally
+claims, so the forecast was under-covered at exactly the peaks a network operator acts on — and beat
+its comparison benchmarks at all 8 of the near-capacity substations it was evaluated on. Weather:
+real forecasts at primary; none in the published secondary results.
 - **[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) — load and generation at Austrian
 primary substations, count not stated, day-ahead.** The paper reports **3–8% mean absolute
 percentage error** for load, against no baseline the paper states, so not a target; varying with how
@@ -469,7 +471,8 @@ root-mean-square error at the upper levels of the hierarchy, and under 1% at the
 constraint carries no information about which substation neighbours which, and it stops holding the
 moment the distribution network is switched into an abnormal running arrangement (challenge 4
 above), which is why a summation constraint is not enough for Flexpectation. The nearest exception
-we found feeds which busbar connects to which into a graph neural network: [Jung et al.
+we found feeds which busbar connects to which — a busbar being the conductor inside a substation
+where several circuits meet — into a graph neural network: [Jung et al.
 (2026)](https://doi.org/10.1109/ACCESS.2026.3678038) build one node per bus and one edge per
 physical line, taken from a real feeder in Gyeonggi-do, South Korea, and forecast voltage magnitude
 and phase angle directly rather than load, beating the conventional pipeline — a long short-term
