@@ -1628,7 +1628,21 @@ and blends it with other models beyond 6 hours; Open Climate Fix now supplies th
 its Quartz Solar product, which NESO uses in its control room. The project's [own record on the
 Smarter Networks Portal](https://smarter.energynetworks.org/projects/nia2_ngeso002/) reports
 "Accuracy improvement over the previous model by approximately 30% for the GSP and National
-forecasts (4-8 hours)" and lists "Probabilistic forecasts for all horizons" among its outcomes. So
+forecasts (4-8 hours)" and lists "Probabilistic forecasts for all horizons" among its outcomes.
+
+**Two figures are quoted for what that national solar forecast is worth, and both are rough
+approximations rather than audited results.**
+[National Energy System
+Operator](https://www.neso.energy/news/how-solar-providing-secure-clean-and-affordable-energy-great-britain) states that a better solar forecast avoids around £30 million a year in imbalance cost, rising to as
+much as £150 million a year by 2035 at the government's solar target, and [Open Climate
+Fix](https://www.openclimatefix.org/insights/neso) states that the same forecast avoids around
+300,000 tonnes of carbon dioxide a year. Both figures describe one system and one forecast — Great
+Britain's national electricity system, and the Quartz Solar forecast Open Climate Fix supplies and
+NESO runs in its control room — and both are annual rates resting on the same halving of NESO's
+solar forecast error. Neither has an independent audit published, and neither is a substation-level
+result, so both belong here as an indication of the scale of the prize rather than as a measurement
+Flexpectation can build on.
+ So
 the combination this challenge says is missing — unmetered generation, forecast probabilistically,
 at a spatial level below the country — has been built once in GB, at grid supply point level rather
 than at primary substations, and for solar rather than for net demand. How NESO builds the embedded
@@ -2471,6 +2485,27 @@ Machine-learning operations — building, testing, deploying, and monitoring mac
 production software — is a core aim of Flexpectation, so what the literature does and does not
 establish about the practice matters to this project.
 
+**The field is a large body of description and almost no measurement.** It has a settled definition,
+a vocabulary for the failure modes the practice exists to prevent, surveys of the available tools,
+and maturity models — but across the five reviews of the field read for this section, nobody has
+published a metric showing what adopting the practice delivers, and the one review we found that
+went looking for such a metric reported finding none. Energy forecasting has no separate body of
+findings to fall back on: what exists is a handful of platform descriptions, no energy-specific
+platform among those screened, and no paper giving a retraining cadence a network operator could act
+on — even though forecast error at Europe's transmission operators has been measured roughly
+doubling over 5 years.
+
+**That absence sets the terms for what Flexpectation can claim for its own experiment framework.**
+The practice this project is betting on is fast, comparable iteration, and the case for it rests on
+a structural argument about how fields make progress together with testimony from senior
+practitioners, rather than on a controlled measurement — and the documentation needed to run such a
+measurement is itself largely missing from published work. The better-documented precedent lies
+outside machine learning: operational meteorology has tied production model changes to measured
+changes in forecast skill for decades. One finding cuts against this project directly, and the
+section below sets it out rather than quoting around it: the same structural argument predicts that
+fields which cannot share their data will fall behind in their rate of progress, and most of NGED's
+substation telemetry cannot be published.
+
 ### The field describes good practice but does not measure whether it works
 
 **[Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138) give the definition most
@@ -2492,7 +2527,9 @@ considered in practice over the long term", and which rests on what its acknowle
 "accumulated folk wisdom" from running machine learning at Google. The paper reports no experiment
 and no number. What the paper contributes is a vocabulary the rest of the field now uses:
 entanglement, where mixing signals together makes any one improvement impossible to isolate, and the
-principle Sculley et al. abbreviate to CACE, "Changing Anything Changes Everything", along with
+principle Sculley et al. abbreviate to CACE, "Changing Anything Changes Everything" — no input to a
+model is ever really independent of the others, so changing one feature shifts the weight the model
+puts on the rest, and the same holds for a hyperparameter or a sampling method — along with
 correction cascades, where a model learned on top of another model's output makes the model
 underneath expensive to improve, undeclared consumers, unstable and underutilised data dependencies,
 direct and hidden feedback loops, glue code, pipeline jungles, dead experimental codepaths,
@@ -2639,16 +2676,18 @@ is that the arrangement recovers part of the benefit of an open challenge rather
 
 ### Three papers to read first
 
-**Three of these papers are the place to start on machine-learning operations itself.** [Kreuzberger
-et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138) is the best single starting point,
-because it defines the term, derives the nine principles, and draws the architecture and the roles
-that go with them. [Eken et al. (2025)](https://doi.org/10.1145/3747346) is the broadest synthesis
-of the papers above, and because it reads grey literature alongside journals, it captures the
-practice that practitioners write down outside the academic record. [Zhao et al.
-(2026)](https://doi.org/10.3390/info17040328) is the one written for this domain, mapping platform
-capabilities against an energy-forecasting lifecycle rather than a generic one. [Sculley et al.
+**Three of these papers are the place to start on machine-learning operations itself.** Start with
+[Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138), which defines the term,
+derives the nine principles, and draws the architecture and the roles that go with them. Read [Eken
+et al. (2025)](https://doi.org/10.1145/3747346) next, the broadest synthesis among the reviews
+above, which reads grey literature alongside journals, so that Eken et al. capture the
+practice practitioners write down outside the academic record. Then read [Zhao et al.
+(2026)](https://doi.org/10.3390/info17040328), the only one of the three written for energy
+forecasting, which maps platform capabilities against an energy-forecasting lifecycle rather than a
+generic one. [Sculley et al.
 (2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems) is
-worth adding for the vocabulary alone, since the rest of the field argues in its terms.
+worth adding for the terms alone, since the rest of the field argues in the vocabulary Sculley
+et al. established.
 
 ## Three published results that point against this project's plan
 
@@ -2748,6 +2787,16 @@ of that size could have arisen by chance. And the margin rests on the weather co
 on the pre-training, because the same paper's ablation, which strips the covariates from the
 foundation models but not from the purpose-trained ones, puts Chronos-2 at 4.813 kW — behind the
 purpose-trained model that keeps them.
+
+**If the result does hold on NGED's substations, Flexpectation still delivers, and the finding is
+worth having in its own right.** A forecast is one component of what this project builds: the
+ingest, the contracts, the degradation ladder, the leaderboard, the delivery tables, and the live
+service all stand whichever model wins, and a pre-trained model that beat a purpose-trained one
+would simply be the model the leaderboard promoted. Establishing which of the two is better on a
+distribution network, measured against a common protocol on a real operator's telemetry, is a
+research result nobody has published, and a network operator deciding whether to train its own
+models would want it. Flexpectation is an innovation project, and a well-measured negative result is
+one of the outcomes it exists to produce.
 
 ## What network operators have already built
 
@@ -3287,6 +3336,8 @@ pre-trained weather embedding](https://arxiv.org/abs/2312.00290).
 - Moriano, J., Rodríguez, F., Martín, P., Jiménez, J. and Vuksanovic, B. (2016). [A New Approach to Detection of Systematic Errors in Secondary Substation Monitoring Equipment Based on Short Term Load Forecasting](https://doi.org/10.3390/s16010085). *Sensors*.
 - National Energy System Operator. [Embedded wind and solar
 forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts).
+- National Energy System Operator. [How solar is providing secure, clean and affordable energy to
+Great Britain](https://www.neso.energy/news/how-solar-providing-secure-clean-and-affordable-energy-great-britain).
 - National Energy System Operator (2025). [Future Energy Scenarios 2025](https://www.neso.energy/publications/future-energy-scenarios-fes).
 - National Energy System Operator (2025). [Regional breakdown of FES data (electricity)](https://www.neso.energy/data-portal/regional-breakdown-fes-data-electricity).
 - National Energy System Operator (2024). [Solar NowCasting innovation project improves solar
@@ -3315,6 +3366,7 @@ System, version
 - Ofgem (2025). [Decision: flexibility market asset registration](https://www.ofgem.gov.uk/decision/decision-flexibility-market-asset-registration).
 - Ofgem (2025). [Enhancing asset visibility: Distribution Network Operator options
 consultation](https://www.ofgem.gov.uk/sites/default/files/2025-12/Enhancing%20asset%20visibility%20-%20Distribution%20Network%20Operator%20Options%20consultation.pdf).
+- Open Climate Fix. [NESO Case Study: Halving Solar Forecast Errors with AI](https://www.openclimatefix.org/insights/neso).
 - Open Climate Fix. [PVNet](https://github.com/openclimatefix/PVNet).
 - Ostermann, A. and Haug, T. (2024). [Probabilistic forecast of electric vehicle charging demand:
 analysis of different aggregation levels and energy
