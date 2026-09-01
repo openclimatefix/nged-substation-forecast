@@ -110,6 +110,18 @@ which is exactly the knowledge a first-time reader doesn't have. Load `long-form
 drafting new prose longer than a few paragraphs, and `restructure-prose` before reordering or
 simplifying prose that already exists.
 
+**When auditing prose against these rules, do one pass per rule.** A reviewer asked to check
+everything at once finds the loudest fault in each paragraph and moves on, so the quieter ones
+survive: a single sweep of one section of the literature review reported nothing, and a later
+pass found six violations in one four-sentence paragraph of it — an unscoped superlative, a bare
+"the one" claiming a set has a single member, and four pronouns standing where the noun should be
+repeated. Sweep pronouns first, then unenumerated singletons and superlatives, then umbrella
+nouns, then money metaphors, then the mechanical rules (numerals, serial commas, acronym
+expansion). Report every instance rather than a representative sample, and give the replacement
+wording for each — a finding without concrete wording cannot be triaged. The same applies to a
+sub-agent brief: one rule per pass, and say so explicitly, because a brief listing nine rules
+together gets a sweep that honours none of them.
+
 **This is technical writing, not poetry: precision first, concision second, elegance last.** Every
 page here is a reference document, read by someone who is about to act on it, so a sentence that can
 be read two ways will eventually be read the wrong way and built on. Precision wins every contest it
