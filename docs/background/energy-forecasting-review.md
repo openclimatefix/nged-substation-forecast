@@ -2467,17 +2467,21 @@ data matches our own, and whether sustained experimentation stops yielding impro
 
 ## What the literature says about machine-learning operations (MLOps)
 
-**Machine-learning operations — building, testing, deploying, and monitoring machine learning as
-production software — is a core aim of Flexpectation. The field describes what good practice looks
-like, but does not measure whether that practice works.** [Kreuzberger et al.
-(2023)](https://doi.org/10.1109/ACCESS.2023.3262138) give the definition most of the field now uses,
-drawn from a structured review that narrowed 1,864 retrieved articles to 27, a review of the
-available tools, and eight interviews with practitioners. They define machine-learning operations as
-"a paradigm, including aspects like best practices, sets of concepts, as well as a development
-culture when it comes to the end-to-end conceptualization, implementation, monitoring, deployment,
-and scalability of machine learning products", drawing on machine learning, software engineering,
-and data engineering together, and from that evidence they derive nine principles. What Kreuzberger
-et al. do not do, and do not claim to do, is measure what adopting the nine principles changes.
+Machine-learning operations — building, testing, deploying, and monitoring machine learning as
+production software — is a core aim of Flexpectation, so what the literature does and does not
+establish about the practice matters to this project.
+
+### The field describes good practice but does not measure whether it works
+
+**[Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138) give the definition most
+of the field now uses.** The definition rests on a structured review that narrowed 1,864 retrieved
+articles to 27, a review of the available tools, and eight interviews with practitioners. They
+define machine-learning operations as "a paradigm, including aspects like best practices, sets of
+concepts, as well as a development culture when it comes to the end-to-end conceptualization,
+implementation, monitoring, deployment, and scalability of machine learning products", drawing on
+machine learning, software engineering, and data engineering together, and from that evidence they
+derive nine principles. What Kreuzberger et al. do not do, and do not claim to do, is measure what
+adopting the nine principles changes.
 
 **The failure modes the practice exists to prevent were named from experience rather than from
 measurement, and the naming is the contribution.** [Sculley et al.
@@ -2518,6 +2522,8 @@ companies and built a framework, a maturity model, and a taxonomy from what thos
 described, but measured no outcome — the benefits their paper lists are benefits the interviewees
 and the prior literature claim, not effects John et al. measured.
 
+### Energy forecasting has platform descriptions and no retraining cadence
+
 **What exists for energy forecasting specifically is a handful of platform descriptions rather than
 a body of findings that agree or disagree with each other.** [Zhao et al.
 (2026)](https://doi.org/10.3390/info17040328) screened 256 records to 31 sources and mapped 13
@@ -2554,6 +2560,8 @@ performance has gone down", and Gürses-Tran and Monti say of their own ProLoaF 
 representative of the system under study" — so how often a substation forecast must be retrained is
 a question Flexpectation will have to answer from its own data.
 
+### Operational meteorology is the better-documented precedent
+
 **Operational meteorology has been running continuous verification of production forecasts for
 decades, and has documented that practice far more thoroughly than the machine-learning-operations
 literature has documented its own.** [Brown et al. (2021)](https://doi.org/10.1175/BAMS-D-19-0093.1)
@@ -2562,6 +2570,8 @@ by the United States National Weather Service and others, noting that "Forecast
 verification/evaluation has been a subject of research and also applied to operational forecasts for
 more than a century" and reporting a user community of "more than 3,700 researchers and operational
 users from 124 countries". [Hoffman et al. (2018)](https://doi.org/10.1175/WAF-D-18-0117.1) show what continuous verification delivers: tracking the skill of three operational forecasting centres continuously, they attribute a "7.37% increase in the probability of improved skill" to a single, named model upgrade made in 2016. Tying a specific production change to a measured change in skill is what the machine-learning-operations literature we read does not do, and meteorology has been tying production changes to measured skill routinely.
+
+### The case for fast, comparable iteration is argument and testimony
 
 **Fast, comparable iteration is the practice within machine-learning operations that Flexpectation
 is betting on, and the case for that practice rests on a structural argument and on practitioner
@@ -2612,6 +2622,8 @@ grouped into three factors, and found that "between 20% and 30% of the variables
 documented", with no paper documenting all of them. A field that records so little about how its
 experiments were run cannot easily measure whether a change to how they are run helped.
 
+### Donoho's prediction for fields that cannot share their data
+
 **Donoho's account of fields that cannot share their data describes Flexpectation's position, and
 that account is the part of his argument this project has to answer rather than quote selectively.**
 Donoho predicts that fields with "inhibitions against data sharing, for example, because of
@@ -2624,6 +2636,8 @@ researchers ever get to see", as happens in clinical research. The leaderboard s
 "Leaderboards of machine learning results" above sits in that category — public to view and
 reproducible in method, with the underlying telemetry restricted — and the honest reading of Donoho
 is that the arrangement recovers part of the benefit of an open challenge rather than all of it.
+
+### Three papers to read first
 
 **Three of these papers are the place to start on machine-learning operations itself.** [Kreuzberger
 et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138) is the best single starting point,
@@ -2656,13 +2670,12 @@ Browell and Fasiolo added on top was the *spread* of the weather across those ce
 standard deviation, minimum, and maximum of the gridded fields. Measured by the Diebold-Mariano test
 against the same model without the spread features, adding the spread improved the pinball score
 significantly in 2 of the 14 regions, worsened the pinball score significantly in 3, and made no
-significant difference in the remaining
-9. Browell and Fasiolo report that cross-validation had suggested a small gain which "is not
-consistently reproduced on test data and therefore inconclusive", and conclude that gridded
-numerical weather prediction "does not appear to add significant value to deterministic and
-probabilistic net-load forecasts in the present framework" — while allowing that "it is possible
-that other forecasting methods would be able to extract value from this data by constructing
-different features".
+significant difference in the remaining 9. Browell and Fasiolo report that cross-validation had
+suggested a small gain which "is not consistently reproduced on test data and therefore
+inconclusive", and conclude that gridded numerical weather prediction "does not appear to add
+significant value to deterministic and probabilistic net-load forecasts in the present framework" —
+while allowing that "it is possible that other forecasting methods would be able to extract value
+from this data by constructing different features".
 
 **The question this result puts to Flexpectation is not whether weather matters, but whether the
 *spread* of the weather across a region does.** Weather itself mattered a great deal to Browell and
