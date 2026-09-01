@@ -1611,20 +1611,24 @@ al. (2022)](https://doi.org/10.1016/j.rser.2022.112224), judged that "the litera
 focused on uncertainty quantification within BTM [behind-the-meter] systems is immature", and
 recommended probabilistic approaches as the way to represent that uncertainty.
 
-**A second GB service forecasts the same unmetered generation at grid supply point level and only
-hours ahead, and Open Climate Fix built the model behind it, so we have an interest to declare.**
-NESO's [Solar
+**A second GB forecast of the same unmetered generation runs inside NESO's control room, and Open
+Climate Fix built the model covering its first 6 hours, so we have an interest to declare.** NESO's
+[Solar
 NowCasting](https://www.neso.energy/news/solar-nowcasting-innovation-project-improves-solar-forecasting)
 project, run with Open Climate Fix under the Network Innovation Allowance, reports that the forecast
 it produced "was 2.8 times better than our previous Photo Voltaic (PV) forecast (for forecasts up to
 two hours ahead)", and that the first fully operational service reached NESO's control room in
-December 2022. The project's [own record on the Smarter Networks
-Portal](https://smarter.energynetworks.org/projects/nia2_ngeso002/) reports "Accuracy improvement
-over the previous model by approximately 30% for the GSP and National forecasts (4-8 hours)" and
-lists "Probabilistic forecasts for all horizons" among its outcomes. So the combination this
-challenge says is missing — unmetered generation, forecast probabilistically, at a spatial level
-below the country — has been built once in GB, at grid supply point level rather than at primary
-substations, and for solar rather than for net demand.
+December 2022. That operational service runs PVNet, Open Climate Fix's model, at 0 to 6 hours ahead
+and blends it with other models beyond 6 hours; Open Climate Fix now supplies the same forecast as
+its Quartz Solar product, which NESO uses in its control room. The project's [own record on the
+Smarter Networks Portal](https://smarter.energynetworks.org/projects/nia2_ngeso002/) reports
+"Accuracy improvement over the previous model by approximately 30% for the GSP and National
+forecasts (4-8 hours)" and lists "Probabilistic forecasts for all horizons" among its outcomes. So
+the combination this challenge says is missing — unmetered generation, forecast probabilistically,
+at a spatial level below the country — has been built once in GB, at grid supply point level rather
+than at primary substations, and for solar rather than for net demand. How NESO builds the embedded
+solar forecast it *publishes* is a separate question we cannot answer: NESO runs more than one solar
+forecast, and the published series does not name the model behind it.
 
 **The model behind that service is published and open source, which is unusual in this literature,
 and its limits are what keep Flexpectation's challenge open.**
@@ -2372,15 +2376,16 @@ gathering every two years proteins "for which the experimental structure is abou
 solved but still not public" and giving the sequences to entrants, so each target is single-use once
 the structure is published. The standing benchmark in that field is a different one, CAMEO, which
 takes the weekly pre-release of forthcoming structures as its targets. AlphaFold2 was developed
-against neither, but against a temporal hold-out of its own: the model was trained to a fixed
-cut-off and scored on structures released after that cut-off, which is what a live forecasting
-service gets for free. The blind competition was the audit; the temporal hold-out was a check the
-team could run for itself, on data no rival had to supply. That is the same division of labour
-Flexpectation is proposing, and it is the reason a leaderboard without entrants is a coherent
-design. The first M-competition's conclusions about whole classes of method — that statistically
-sophisticated methods do not typically forecast more accurately than simpler ones, which the M3
-competition did not go on to support, and that a combination of several methods forecasts more
-accurately, on average, than the individual methods going into the combination ([Hyndman
+against neither, but against a temporal hold-out of its own: [Jumper et al.
+(2021)](https://doi.org/10.1038/s41586-021-03819-2) score it on structures "deposited in the PDB
+after our training data cut-off", which is what a live forecasting service gets for free. The blind
+competition was the audit; the temporal hold-out was a check the team could run for itself, on data
+no rival had to supply. That is the same division of labour Flexpectation is proposing, and it is
+the reason a leaderboard without entrants is a coherent design. The first M-competition's
+conclusions about whole classes of method — that statistically sophisticated methods do not
+typically forecast more accurately than simpler ones, which the M3 competition did not go on to
+support, and that a combination of several methods forecasts more accurately, on average, than the
+individual methods going into the combination ([Hyndman
 (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)) — describe what many independent people
 chose to try, and no single team's leaderboard can support a conclusion about a whole class of
 method. What our leaderboard can do is narrower and still worth having: show which approaches beat a
@@ -2949,6 +2954,8 @@ Forecasting*.
 - Ju, Y., Wu, W., Ge, F., Ma, K., Lin, Y. and Ye, L. (2018). [Fast Decoupled State Estimation for
 Distribution Networks Considering Branch Ampere
 Measurements](https://doi.org/10.1109/TSG.2017.2709463). *IEEE Transactions on Smart Grid*.
+- Jumper, J. et al. (2021). [Highly accurate protein structure prediction with
+AlphaFold](https://doi.org/10.1038/s41586-021-03819-2). *Nature*.
 - Jumper, J. (2024). [Nobel Week interview](https://youtu.be/nNM1QdmFwIs?t=852). Nobel Prize YouTube
 channel, 6 December 2024.
 - Jung, B.-W., Lee, D.-S. and Son, S.-Y. (2026). [Distribution System Nodal Voltage Forecasting
