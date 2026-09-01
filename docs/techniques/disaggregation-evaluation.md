@@ -55,7 +55,10 @@ irradiance; estimated unmetered-PV capacity is physically plausible given the su
 geographic footprint.
 
 Violations are detectable errors without any ground truth — a rigorous "wrongness floor" that
-discriminates between methods. This spoke is underused in the disaggregation literature.
+discriminates between methods. This spoke is underused in the disaggregation literature: the
+[energy-forecasting review](../background/energy-forecasting-review.md) found that using physical
+consistency to *score* an estimate, rather than to *shape* the method that produces it, is close to
+absent from the papers it read.
 
 ---
 
@@ -88,8 +91,7 @@ for NGED, because their goal is better forecasts for flexibility procurement.
 ## Spoke 6: Recovery on a fully-instrumented holdout (strongest)
 
 A single substation, even briefly, where every feeder and embedded generator is individually
-metered, used purely as validation. One such site anchors the whole evaluation. Worth asking NGED
-and UKPN whether one exists or could be temporarily instrumented during a maintenance window.
+metered, used purely as validation. One such site anchors the whole evaluation. Worth asking NGED and UKPN whether a fully metered substation already exists.
 
 ---
 

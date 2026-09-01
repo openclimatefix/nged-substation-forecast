@@ -105,6 +105,18 @@ model learn *how much* to attenuate its weather sensitivity per horizon — narr
 input is trustworthy, wide when it isn't — instead of the one horizon-averaged compromise it is
 forced into today.
 
+**No published result tests this combination — a weather ensemble driving substation-level
+uncertainty out to 14 days.** The [energy-forecasting
+review](../background/energy-forecasting-review.md#horizon-ensembles-and-tails) found two papers
+asking for it and none delivering it. The nearest built system is [Ludwig et al.
+(2023)](https://doi.org/10.1080/01605682.2022.2115411), who drive a multi-step probabilistic load
+forecast from the same 51-member ECMWF ensemble 1 to 6 days ahead. That system covers the whole
+of Great Britain, though, rather than a substation. The horizon itself sits near a measured
+limit: [Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) found that a weather
+ensemble stops beating a climatological distribution 16 to 23 days out. That figure was measured
+on upper-air variables rather than on the near-surface temperature and irradiance that drive
+substation load.
+
 ## The fix, formally: a mixture of conditional distributions
 
 Ask the model for a full conditional distribution per member — "the distribution of power
@@ -151,6 +163,17 @@ One practical note on step 2: the recipe is exact when the K levels are equally 
 delivery levels are deliberately tail-heavy (p1, p2, p5, …, p98, p99), so either have the model
 emit a denser equally-spaced set internally and reduce to the delivery levels at the end, or
 weight the pseudo-samples by the probability gap each one represents.
+
+**The extreme ends of that set need a caveat, because the literature found the quantile-regression
+forecast uncalibrated exactly there.** [Browell and Fasiolo
+(2021)](https://arxiv.org/abs/2103.10335), the only study the [energy-forecasting
+review](../background/energy-forecasting-review.md#horizon-ensembles-and-tails) found that models
+substation-scale tails explicitly, report that "below 1% and above 99% the forecasts based on
+quantile regression only are not calibrated at any GSP [grid supply point] Group. Therefore, these
+quantiles are not suitable for use in decision-making." Outside those percentiles Browell and
+Fasiolo switch to a fitted parametric tail at each end. The recipe above reads p1 and p99 straight
+off each member's quantile-regression output before mixing. The mixture's own p1 and p99 may
+therefore need the same parametric-tail treatment before they can be trusted.
 
 ## The tempting shortcut that doesn't work: averaging the quantiles
 

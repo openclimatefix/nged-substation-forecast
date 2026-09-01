@@ -32,8 +32,10 @@ phenomena *implicitly*. That said, explicit estimates are genuinely wanted where
 them:
 
 * Track the **effective capacity** of metered generators over time (turbine failures, inverter
-  faults, PV panel degradation), ignoring NGED-imposed ANM curtailment — including detecting
-  misbehaving generators.
+  faults, PV panel degradation), ignoring NGED-imposed Active Network Management curtailment —
+  including detecting misbehaving generators. Curtailment is excluded here because a curtailed
+  generator is being held down rather than broken. The point of a better forecast is to
+  curtail it less often.
 * Detect and compensate for **switching events** — where power is diverted from one substation
   to another due to maintenance, changing the local demand signature. (Whether this ships as a
   discrete event table or as continuous switching-state signals is an open question — see
@@ -51,20 +53,37 @@ decide unilaterally.
 
 ### The worst case matters most: forecasting threshold exceedance
 
-NGED's need for these forecasts is driven by **flexibility procurement**: deciding, days
-ahead, whether to pay flexible customers to reduce their demand when a substation risks
-running beyond its capability. So the question users ask of a forecast is rarely "what is the
-most likely load?" and usually "**how likely is load to cross this limit?**" — NGED's
-[incumbent forecasting tool](nged-incumbent-forecast.md#the-operators-view) literally plots
-demand as headroom below a constraint line. The project's value therefore concentrates in the
-**upper tail** of each forecast distribution: a model that is excellent on typical half-hours
-but unreliable in the handful of near-limit hours has failed at the job. This is why the
-delivery quantiles are deliberately tail-heavy, and why evaluation includes
-[tail & exceedance metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
+NGED put two costs on these forecasts and rate them at least equally. The first is
+**flexibility procurement**: deciding, days ahead, whether to pay flexible customers to reduce
+their demand when a substation risks running beyond its capability. The second is **generator
+curtailment**: holding embedded generation down through Active Network Management when export
+risks running beyond a limit. That limit is usually not the substation's own: a generation
+constraint typically binds above the primary, driven by the aggregated flow across several
+substations rather than by any single meter in isolation. The forecasts that matter for
+curtailment are therefore the ones that net and sum correctly up the hierarchy — which is why
+[curtailment scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at
+one primary before summing up the substation hierarchy. The money is counted differently too —
+curtailment today is priced as a whole-system cost rather than as NGED's own spend. But NGED
+rate the saving as highly, so the forecast requirement is unchanged. So the question users ask
+of a forecast is rarely "what is the most likely load?" and usually "**how likely is net
+demand to cross this limit?**" — NGED's [incumbent forecasting
+tool](nged-incumbent-forecast.md#the-operators-view) literally plots demand as headroom below
+a constraint line.
+
+The project's value therefore concentrates in **both tails** of each forecast distribution: A
+model that is excellent on typical half-hours but unreliable in the handful of near-limit
+hours has failed at the job. The near-limit hours sit at both ends. Flexibility procurement
+turns on the upper tail, where demand rises towards firm capacity, and bites in winter.
+Curtailment turns on the lower tail, where export rises towards whichever limit binds because
+embedded generation is high and demand is low, and bites in summer. The 13
+`DELIVERY_QUANTILES` are deliberately tail-heavy at both ends and symmetric about the median —
+p1, p2 and p5 matching p95, p98 and p99. The delivery shape therefore already serves both
+decisions. This is why evaluation includes [tail & exceedance
+metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
 alongside average-error metrics. (One honest complication: a substation's real limit is not a
 single number — it varies with ambient temperature and with how long an overload lasts — so
-the evaluation metrics use documented static proxies; see
-[the threshold-choice discussion](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived).)
+the evaluation metrics use documented static proxies; see [the threshold-choice
+discussion](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived).)
 
 ## Stretch Goals
 
@@ -79,12 +98,15 @@ Nearly every objective above is an open research question — improving NRA fore
 detecting switching events, estimating effective capacity, flagging faulty meters,
 disaggregating DERs — and we hold far more ideas than we can try at once. That turns
 experimentation throughput into an infrastructure requirement in its own right: we need to run
-**on the order of hundreds of ML experiments per month**, and the workflow must make each one
-as frictionless as possible. The pre-registered version of that requirement — deliberately relaxed
-to a peak-month, per-person claim, so that months spent hardening the service are not spurious
-falsifications — is
-[H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month); the
-promotion half below is [H3](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
+**on the order of hundreds of ML experiments per month**, and the workflow must make each
+experiment as frictionless as possible. That the throughput produces a better forecast is a
+bet this project is making rather than a result the literature has settled, for the reasons
+set out in [Our Approach to MLOps](../ml_experimentation/mlops-approach.md). The
+pre-registered version of that requirement — deliberately relaxed to a peak-month, per-person
+claim, so that months spent hardening the service are not spurious falsifications — is
+[H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month);
+the promotion half below is
+[H3](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 
 Three properties matter as much as raw throughput:
 

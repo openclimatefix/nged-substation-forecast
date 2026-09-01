@@ -10,12 +10,16 @@
 ## Read this first: these pounds rank models, they do not cost anything
 
 These metrics put a **£** figure against every model we train. That figure rests on an invented
-network limit and a couple of average prices, so it is a **rough proxy**: not a cost analysis, not
-a business case, and not quotable as either. Its one job is to rank forecasts on the axis NGED
-care about, turning "this model has a lower threshold-weighted continuous ranked probability score"
-into "this model would have spent less to keep the network within limits". We use pounds rather
-than a unitless score because the parameters genuinely are prices, and because pounds are what the
-decisions these forecasts feed are actually made in.
+network limit and a couple of average prices, so it is a **rough proxy**: not a cost analysis, not a
+business case, and not quotable as either. Its one job is to rank forecasts on the axis NGED care
+about, turning "this model has a lower threshold-weighted continuous ranked probability score" into
+"this model would have spent less to keep the network within limits". We use pounds rather than a
+unitless score because the parameters genuinely are prices, and because pounds are what the
+decisions these forecasts feed are actually made in. Forecast developers do not usually tune on
+money: [Gürses-Tran and Monti (2022)](https://doi.org/10.3390/forecast4020028) observe that
+forecast developers "predominantly assess residuals and error statistics when tuning the targeted
+model's quality". As a result, "eventual cost or rewards of the underlying business application are
+typically not considered in the model development phase".
 
 ## Two savings, measured separately
 
@@ -39,14 +43,32 @@ engineer-hours.
 ## The shared idea: same risk, then compare the spend
 
 The textbook way to price a forecast charges it for what goes wrong: £X per action taken, £Y per
-limit breach nobody saw coming. We cannot do that, because £Y — the cost of a breach — is not a
-figure NGED hold in a form we can use.
+limit breach nobody saw coming. Meteorology has priced forecasts that way for decades: [Richardson
+(2000)](https://doi.org/10.1002/qj.49712656313) computes the relative economic value of the ECMWF
+ensemble across the whole range of ratios between the cost of acting on a forecast and the loss
+avoided by acting. We cannot follow that route, because £Y — the cost of a breach — is not a figure
+NGED hold in a form we can use.
 
 So we invert the question. **Models are aimed at equal safety, and we compare what each one spends
 to get there.** Each model may be as conservative as it likes, and we tune that conservatism until
 it leaves the same small amount of risk unaddressed. Then the only thing left to compare is cost.
 This matches the framing the design is built on: the risk to manage is unnecessary spend, not an
 unaddressed breach.
+
+**Holding risk constant and comparing the spend has been published at distribution level once, on a
+synthetic network.** [Bernecker et al. (2025)](https://doi.org/10.1016/j.ijepes.2025.110713) fix at
+95% the confidence level at which a network operator acts, then compare what two forecasts cost that
+operator in congestion management: 3,102 euros a year using standard load profiles against 86 euros
+using a smart-meter-informed forecast. Two features of that study leave the question open for a real
+network: the modelled network is a modified IEEE 33-node test system rather than a real one, and
+what Bernecker et al. compare is two *information levels* rather than two forecasting models. The
+[energy-forecasting review](../background/energy-forecasting-review.md) found no case of a money
+metric ranking one forecast against another at a real substation. The published work that does run
+on a real distribution network denominates the comparison in energy volumes or in spare capacity
+rather than in money: [Angus et al. (2027)](https://doi.org/10.1016/j.epsr.2026.113545) win 10 to
+12% more capacity from 644 low-voltage transformers at a risk of overheating set wherever they ask
+for it, and [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) fix a risk appetite and
+compare the reserve volume each forecast has to hold.
 
 The knob is the **procurement quantile** $\tau$ — how far up its own forecast distribution a model
 looks when deciding to act. A timid model uses a high $\tau$, buys a lot, and is rarely caught out.
@@ -189,10 +211,7 @@ Out of scope for Flexpectation, including v2. This is documented as the eventual
 modelling reactive power, voltage drop and N-1 contingencies explicitly — but it is gated on
 power-flow integration work that sits outside this project.
 
-Tier 3 is also where a **real curtailment case study** becomes possible. Tiers 1 and 2 cannot
-currently be validated against a real curtailment event, because no existing site maps a curtailment
-case to a specific series or a single hierarchy node — see [case
-studies](#case-studies) below.
+Tier 3 is also where a **real curtailment case study** becomes possible. Tiers 1 and 2 can each be computed and can rank models without Tier 3. What they cannot yet do is be validated against a real curtailment event, because no existing site maps a curtailment case to a specific series or a single hierarchy node — see [case studies](#case-studies) below.
 
 ### Curtailment price basis
 
@@ -295,11 +314,7 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
   resource (excluding any CMZ with "LV" in its name) and [short-term contracts](https://connecteddata.nationalgrid.co.uk/dataset/flexibility-trades-data-and-results/resource/b04ce2c2-8798-486a-8591-48bfdd05d979)
   resource, across all zones, feed the volume-weighted average prices in [what the volumes cost](#what-the-volumes-cost).
 
-- **Curtailment (Metric 2) is currently blocked, not merely unscheduled.** Validating it against a
-  real curtailment event needs Tier 3 power-flow modelling to map the event to a specific location —
-  see [Tier 3](#tier-3-full-power-flow-modelling). The trial area has two nominal flexibility zones
-  with an export-side constraint, but neither has enough dispatch history to validate a curtailment
-  metric, even as a stopgap.
+- **The curtailment *case study* is blocked, not the curtailment metric.** Tiers 1 and 2 need nothing that does not already exist, so each can rank models as soon as it is implemented. Tier 2 does not wait on Tier 3. What is blocked is validating either tier against a real curtailment event: mapping such an event to a specific series or hierarchy node needs Tier 3 power-flow modelling — see [Tier 3](#tier-3-full-power-flow-modelling). The trial area has two nominal flexibility zones with an export-side constraint, but neither has enough dispatch history to stand in as a case study.
 
 ## What these numbers do not capture
 
@@ -363,6 +378,24 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
    from, and what reliability does NGED target — how much genuinely-needed flexibility may go
    unbought? This was not settled by the prior round of answers and needs a direct follow-up
    question.
+
+## Cost-benefit analysis in the final work package
+
+**NGED will run their own cost-benefit analysis in the project's final work package, and the
+choice of method is theirs.** The final work package is tracked as
+[WP7](https://github.com/openclimatefix/nged-substation-forecast/issues/684), due February 2028.
+
+**One method worth recommending to NGED is a relative-economic-value curve in the shape of
+[Richardson (2000)](https://doi.org/10.1002/qj.49712656313), computed per substation, across the
+range of ratios between the cost of acting on a forecast and the loss avoided by acting.** [The
+shared idea](#the-shared-idea-same-risk-then-compare-the-spend) above explains why this page took
+a different route: £Y, the loss avoided by a breach, is not a figure NGED hold in a form the
+leaderboard metrics can use. NGED's own final work package is better placed to supply that figure,
+because pricing a breach is a judgement about NGED's business, not a property of a forecast.
+
+**NGED's cost-benefit analysis is not expected to start until late 2027, close to WP7's February
+2028 deadline.** This page records the recommendation now, well ahead of that date, so that the
+recommendation is not forgotten in the meantime.
 
 ## Implementation details (deleted when this ships)
 

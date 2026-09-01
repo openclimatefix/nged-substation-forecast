@@ -7,6 +7,17 @@ grid values, timestamps, substation location — into useful representations. Ra
 transformations independently inside each node type, **shared encoder modules** learn a single
 compact embedding that every node can use.
 
+**The case for a pre-trained encoder rests on results from computer vision and Earth observation
+rather than from energy forecasting**, the [energy-forecasting
+review](../background/energy-forecasting-review.md#pre-trained-encoders) found. [Siméoni et al.
+(2025)](https://arxiv.org/abs/2508.10104) and [Brown et al.
+(2025)](https://arxiv.org/abs/2507.22291) each show a single frozen encoder serving many downstream
+tasks, which is the arrangement this page plans. Neither result promises that a pre-trained encoder
+beats hand-designed features: Brown et al. report that learned featurisations "don't always
+outperform designed featurization methods in scarce data regimes". The gradient-boosted tree on
+hand-designed features is therefore the bar these encoders have to clear, rather than a floor they
+can be assumed to sit above.
+
 ## Why encoders are a natural fit with differentiable physics
 
 This is the key insight: the differentiable physics layer handles DER-specific physical relationships
@@ -20,6 +31,17 @@ The practical payoff: a single shared weather encoder can be trained jointly acr
 all substations, benefiting from the full dataset. The encoder learns weather; the physics handles
 DER specifics.
 
+**The [energy-forecasting review](../background/energy-forecasting-review.md#pre-trained-encoders)
+found nobody pre-training a weather encoder against observations and then reading a substation's
+probabilistic load forecast off it, nor anybody using a differentiable model of a solar or wind farm
+to strip out the variance the engineering explains so that the weather encoder trains on a clean
+weather signal.** Both are what this page describes. The nearest precedent the review found for
+joining a pre-trained weather representation to a downstream forecast is one entrant in HEFTCom, a
+competition to forecast a GB wind-and-solar portfolio day-ahead: [Browell et al.
+(2026)](https://doi.org/10.1016/j.ijforecast.2025.10.005) report that team Rnt fed embeddings from
+their own AI weather models into downstream neural networks and finished third of the ranked
+entrants.
+
 ## Encoder types
 
 ### WeatherEncoder
@@ -32,6 +54,16 @@ meaning than a transient one) and spatial context across nearby NWP grid cells.
 
 Training signal: the reconstruction error from the full forward model — if the weather embedding is
 poor, the DP modules cannot reconstruct observed substation power correctly.
+
+**Each half of this design has already been built separately, by different authors.** [Rasp and
+Lerch (2018)](https://arxiv.org/abs/1805.09091) post-process a 50-member ECMWF ensemble into
+calibrated probabilistic 2-metre temperature at 537 German weather stations 48 hours ahead, cutting
+mean continuous ranked probability score from 1.16 for the raw ensemble to 0.78. [Mitra and
+Ramavajjala (2023)](https://arxiv.org/abs/2312.00290) freeze a weather autoencoder and train small
+models on the frozen representation alone, at accuracy comparable to purpose-built models. Their
+targets are further weather variables rather than power on an electricity network, though. The
+[energy-forecasting review](../background/energy-forecasting-review.md#pre-trained-encoders) sets
+out both.
 
 ### TimeEncoder
 

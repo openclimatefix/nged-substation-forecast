@@ -41,6 +41,15 @@ champion on the leaderboard fold; headline metric NMAE, sliced by horizon and
 interact (e.g. init-time-anchored features overlap short lags at short horizons), so land
 winners into `conf/model/xgboost.yaml` one at a time to keep attribution clean.
 
+**How much the choice of baseline moves the answer has been measured.** [Nguyen and Müsgens
+(2026)](https://doi.org/10.1063/5.0300682) include the reference model as a regressor across 4,687
+skill scores. They find that scoring against plain persistence reports a skill score 10.7 percentage
+points higher at horizons beyond 6 hours than scoring the same forecast against a convex combination
+of smart persistence and climatology, with smart persistence alone 9.0 points higher. They recommend
+the combination as the more demanding benchmark. We already plan persistence and climatology as
+separate rows. Their result is the argument for reading a win against either single bookend as the
+optimistic end of the range.
+
 **A limit worth knowing before you rely on NaN handling.** XGBoost's NaN routing only covers the
 missingness patterns present in the training data. Two consequences for the wins below: a model
 trained with NWP features does **not** behave like a weather-blind model when NWP vanishes (beating
@@ -868,11 +877,11 @@ business case alone.
   `time_series_type` in the contract, but the [32-series trial area](../index.md#scope) contains no
   hydro series. Nor does v2 rescue it. NGED's own
   [Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register)
-  (May 2026) lists **41 connected hydro sites totalling 25.7 MW** across all four licence areas —
-  South Wales 13.7 MW over 10 sites, South West 6.2 MW over 18, East Midlands 5.3 MW over 8, West
-  Midlands 0.5 MW over 5. For scale, the same register shows **5,669 MW of connected solar** and
-  1,416 MW of wind on that network, so hydro is under half a percent of the embedded solar
-  capacity.
+  (August 2026) lists **41 connected hydro sites totalling 25.7 MW** across all four licence areas —
+  South Wales 13.7 MW over 10 sites, South West 6.2 MW over 18 sites, East Midlands 5.3 MW over 8
+  sites, West Midlands 0.5 MW over 5 sites. For scale, the same register shows **5,958 MW of
+  connected solar** and 1,456 MW of wind on that network, so hydro is under half a percent of the
+  embedded solar capacity.
 
     Two details from the register matter more than the headline total. First, it confirms the
     physics is the *right* physics: 39 of the 44 hydro entries are `Hydro - Run of river` and 29
@@ -1068,6 +1077,17 @@ and secondarily the holiday, monotone-constraint and global-model items, whose v
 seasonal or regime coverage the current window does not have. The design, the era-confounding
 hazard that dictates the ingest's scope, and the COVID covariate are on
 [Extending the training history](training-history.md).
+
+**The largest meta-analysis of solar forecasting puts the peak almost exactly where 5.5 years
+lands.** [Nguyen and Müsgens (2026)](https://doi.org/10.1063/5.0300682) pool 4,687 skill scores from
+188 solar forecasting papers and find that each extra day of training data raises skill score at
+horizons beyond 6 hours by 0.004 percentage points. But they also find that the gain turns over at
+around 2,000 days — roughly 5.5 years — which they attribute to over-fitting. That is a reason to
+expect the ERA5 extension to reach the top of the curve rather than fall short of it, and a reason
+to argue any *further* extension on regime coverage or fold count rather than on volume alone. Two
+caveats before leaning on the number: their sample is deterministic solar forecasting at the plant
+or irradiance level, not substation net demand, and their beyond-6-hours band covers this page's
+3-to-10-day focus in a single category.
 
 Two sequencing notes. The [lead-time feature](#feed-the-model-the-forecast-lead-time-review-discovery-one-line)
 is a prerequisite, because the cheapest reconciliation arm leans on it to discount reanalysis

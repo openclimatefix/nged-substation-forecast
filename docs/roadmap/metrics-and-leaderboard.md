@@ -31,11 +31,37 @@ Each leaderboard will have tens (maybe hundreds) of rows. Each row is one **ML e
 particular model, trained with a particular set of features, processed a particular way. Entrants
 must be compared apples-to-apples — same test dataset, same metrics, same assumptions.
 
+**Running every entry ourselves is itself a threat to that comparison, and the failure is running a
+baseline badly rather than fabricating a result.** [Kleinebrahm et al.
+(2026)](https://arxiv.org/abs/2604.24705) describe the general problem with published comparisons,
+that competing methods "are not always implemented or optimized with equal care". Reported
+differences, they note, therefore "may reflect differences in implementation quality rather than
+inherent methodological advantages". [Hong et al.
+(2020)](https://doi.org/10.1109/OAJPE.2020.3029979) add two related habits: picking the error
+measure that favours the proposed method, and skipping the comparison with naive models altogether.
+A team that runs every entry on its own leaderboard is exposed to all three by construction. That is
+why every baseline here is run from its authors' own repository at its authors' recommended
+defaults, with no domain-specific tuning — the rule [Meyer et al.
+(2026)](https://arxiv.org/abs/2512.20761) apply on TS-Arena, set out under [Leaderboards of machine
+learning
+results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results).
+
 Per-experiment configuration, trained weights, and metrics are stored in the project's **MLflow**
 database. The leaderboard will be displayed as an interactive table showing multiple metrics at a
 glance, inspired by the [WeirdML leaderboard](https://htihle.github.io/weirdml.html):
 
 ![WeirdML leaderboard](assets/WeirdML_leaderboard.png)
+
+**The leaderboard is published with the material needed to check it, not just its rows.** We publish
+the telemetry, the evaluation protocol, the metric definitions, and the code that computes them.
+That lets someone outside the project reproduce a row rather than take it on trust. The reasoning
+behind this commitment, and behind the other reporting commitments spread through the rest of this
+page, is in [Publishing results that others can compare
+against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
+
+**Negative results get a leaderboard row too**, including whether an off-the-shelf model given none
+of our data matches our own, and whether sustained experimentation stops yielding improvements. A
+leaderboard carrying only the approaches that worked hides how much of the search space was tried.
 
 ---
 
@@ -47,6 +73,11 @@ No naive baseline exists anywhere in the codebase (only docstring mentions, e.g.
 `contracts/power_schemas.py:242`). Until the leaderboard carries naive rows, XGBoost's NMAE
 numbers aren't interpretable — and, more to the point, we can't answer the question this project
 exists to answer: **do we beat what NGED does today?**
+
+**Every comparison against a baseline is published as the fraction of series that beat the baseline
+alongside the average error, never the average alone.** An average error across a population can
+improve while the model gets worse at a substantial minority of series. That minority is what an
+operator notices.
 
 ### The headline baseline — `nged_incumbent`
 
@@ -118,12 +149,48 @@ what NGED already do, not from heavy ML**:
 
 The incumbent is really a *hybrid* — its weekly group is persistence-like recency, its annual
 group is climatology-like seasonality — so the two pure forms are still worth having: they isolate
-short-horizon vs long-horizon naive skill (at 0–6 h persistence is famously hard to beat; at day
-8–14 seasonal climatology often beats everything). A model could "win" the leaderboard while
-adding no skill over either, and without these rows nobody would know.
+short-horizon from long-horizon naive skill. Persistence is famously hard to beat at 0 to 6 hours.
+The climatology row asks the same question at the far end of the horizon: once the weather ensemble
+has run out of lead time to be informative, does the forecast still beat a plain seasonal average?
+We have found no published figure for where that cross-over falls for substation load. [Buizza and
+Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put the lead time beyond which a weather
+ensemble stops beating a climatological distribution at 16 to 23 days. But that figure was measured
+on upper-air variables rather than on a load forecast against a load climatology (see [Horizon,
+ensembles, and tails](../background/energy-forecasting-review.md#horizon-ensembles-and-tails)). The
+climatology row is therefore how we measure the cross-over, not a number we can already assert. A
+model could "win" the leaderboard while adding no skill over either bookend, and without these rows
+nobody would know.
 
 Side benefit: several more `BaseForecaster` implementations pressure-test the abstraction (the
 docs promise the interface is model-agnostic; today only `XGBoostForecaster` exercises it).
+
+**How much the choice of reference moves the answer has been measured, and it argues for reading a
+win over either bookend as the optimistic end of the range.** [Nguyen and Müsgens
+(2026)](https://doi.org/10.1063/5.0300682) include the reference model as a regressor across 4,687
+skill scores drawn from 188 solar forecasting papers. They find that a forecast scored against plain
+persistence reports a skill score 10.7 percentage points higher at horizons beyond 6 hours than the
+same forecast scored against a convex combination of smart persistence and climatology, with smart
+persistence alone 9.0 points higher. They recommend the combination as the more demanding benchmark.
+Two differences before carrying the number across: their smart persistence is persistence corrected
+by the clearness index and their climatology is a constant equal to the sample mean, both narrower
+than the rows described here, and their sample is deterministic solar forecasting rather than
+probabilistic substation net demand. The direction survives both — a margin over persistence alone,
+or over climatology alone, flatters a forecast that a combined reference would judge more harshly.
+
+**That is an argument for keeping `nged_incumbent` as the headline bar, not for building a fourth
+baseline.** The incumbent already blends recency with seasonality — the last 6 weeks of
+same-weekday, same-time-of-day analogues alongside the 49-to-55-weeks-back group — so it plays on
+substation load the role the combined reference plays on irradiance. The incumbent is also the
+bar that decides whether the project is worth its money. Persistence and climatology stay as
+diagnostic bookends, read as the loose end of the range rather than as the benchmark a win should
+be claimed against.
+
+**Carrying a loose bookend and a tight one is what the published guidance recommends.** [Doubleday
+et al. (2020)](https://doi.org/10.1016/j.solener.2020.05.051) distinguish the two jobs a benchmark
+does — a yardstick, which need not be a good forecast, and a point on the yardstick, which "should
+be close to the state of the art". They recommend carrying both, so that a new method is positioned
+between the two rather than declared better than a single baseline. Persistence and climatology are
+the yardstick here; `nged_incumbent` is the point on it.
 
 ### Implementation details — baselines (deleted when they ship)
 
@@ -369,40 +436,98 @@ Issue: [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/
 The single leaderboard fold (`mid_2025_to_mid_2026` in `conf/cv/default.yaml`: train 2024-04 →
 2025-06, validate 2025-07 → 2026-06) serves as **both** the model-selection set and the
 reported skill number. Every hyperparameter choice, feature ablation, and model comparison is
-adjudicated on the same 12 months that the leaderboard reports. With hundreds of planned
-experiments (the roadmap mentions LLM-driven auto-experimentation in v0.5), the winner's
-reported skill will be optimistically biased — classic leaderboard overfitting. The epoch
-mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
+adjudicated on the same 12 months that the leaderboard reports. With hundreds of planned experiments
+(the roadmap mentions LLM-driven auto-experimentation in v0.5), the winner's reported skill will be
+optimistically biased — classic leaderboard overfitting. [Hyndman
+(2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015), who has co-organised a forecasting
+competition, expects it: "over-study of a single benchmark data set means that methods will
+eventually over-fit the published test data. I suspect this has happened with the M3 data over the
+past 20 years, and it is likely to happen with the M4 data, despite its much larger size." Our own
+fold is small in effective sample size rather than in row count, because consecutive half-hours are
+strongly correlated. The epoch mechanism handles *data* changes but not *adaptive selection* on a
+fixed fold.
+
+**We adopt the Ladder, so a new best is published only when it beats the standing best by more than
+a margin, and the published score is reported rounded to that margin.** [Blum and Hardt
+(2015)](https://arxiv.org/abs/1502.04585) designed the Ladder for machine-learning competitions
+that publish a leaderboard and accept repeated submissions — the same shape of risk hundreds of
+experiments create when every one of them is adjudicated on one fold. Every query against a
+held-out set leaks a little information about it back to the experimenter. The margin-plus-rounding
+rule is what caps how much a single query can leak.
+
+**The persistence and climatology baselines are rerun, unchanged, on every leaderboard epoch's
+evaluation window, so growth in the data is never mistaken for improvement in the method.** A new
+epoch can widen the leaderboard's telemetry archive or its NWP archive, and that widening moves
+every metric on the leaderboard, including the baselines' own. Rerunning the same frozen baseline
+code on the same epoch's window is what lets a widening gap between a model and a baseline be read
+as a project result rather than as the dataset simply growing. The precedent is CAMEO, a
+structure-prediction benchmark that keeps its baseline pipelines frozen while the protein-structure
+databases behind them keep updating ([Robin et al. (2021)](https://doi.org/10.1002/prot.26213)). We
+adopt the same discipline here.
 
 Until the structural fix lands: leaderboard metrics are selection metrics; differences smaller
 than fold-level noise should not drive decisions; and the number of experiments per epoch is
 itself a relevant statistic (visible as the MLflow experiment count).
 
+**A promotion decision has to be judged against historical data, because it has to be made in
+minutes, not months — there is no time to wait for fresh production data to accumulate.**
+
+**Judging that decision on less than a year of data is dangerous, because a shorter window cannot
+show whether a model handles both ends of the annual cycle.** [Pinheiro et al.
+(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) held out the whole of 2019 and note that
+"one year is the minimum acceptable to test a forecasting model whose target value shows annual
+seasonality". That is the same minimum the [cross-validation
+protocol](../ml_experimentation/cross-validation-folds.md#why-expanding-window-cross-validation)
+already builds the single fold around.
+
+**The `mid_2025_to_mid_2026` fold, at its full twelve validation months, is therefore what decides
+promotion.** It is the same fixed historical fold every experiment above is adjudicated on, read
+through the Ladder guard and the caveats already stated in this section — not a separate, untouched
+final-test set.
+
+**Measuring a promoted model's performance on live data is a separate question from deciding which
+model to promote, and this page keeps the two apart.** Every model running in production is also
+scored against live data as it runs ([production
+monitoring](live-service.md#production-monitoring)), which answers "is the promoted model still
+performing", continuously, after the fact. The fold above answers a different question, "which
+candidate should we promote", once, ahead of the fact, and the two answers must not be blurred into
+one.
+
+**This page therefore holds two different attitudes to a fixed evaluation window, and the
+difference is deliberate, not an oversight.** TS-Arena avoids reusing any fixed evaluation window
+at all ([Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)). Flexpectation's promotion
+decision cannot work that way, because it has to be made in minutes, not months. It therefore has
+to be judged against a window of history that already exists rather than one still arriving — the
+fold above is that window. The live-monitoring check above is where Flexpectation's practice
+matches the TS-Arena pattern instead, because the question it answers — is the promoted model still
+performing — is a live, ongoing question rather than a promotion decision. The implementation
+details below are updated accordingly: the fold that decides promotion is not shrunk to buy a
+final-test window early.
+
 #### Implementation details — final-test window (deleted when it ships)
 
 **1. Document the caveat (immediately).** A short "Selection bias" subsection in
-`docs/ml_experimentation/cross-validation-folds.md` restating the paragraph above.
+`docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above.
 
-**2. Reserve a final-test window (next leaderboard epoch).** Found a new epoch in
+**2. Reserve a final-test window once a second, independent year of data exists — not by shrinking
+the fold that decides promotion.** The `mid_2025_to_mid_2026` fold stays at its full twelve
+validation months (above). This reservation therefore waits for Dynamical.org's backfill to make a
+second year of ECMWF data available, disjoint from that fold. At that point, found a new epoch in
 `conf/cv/default.yaml` (the epoch mechanism exists for exactly this):
 
-- Shrink the leaderboard fold's validation window to `2025-07-01 → 2026-03-31`.
-- Add a `final_test` fold `2026-04-01 → 2026-06-30` with a new per-fold flag
-  `final_test: true` (extend `CvConfig` / the fold schema in
-  `packages/contracts/src/contracts/config_schemas.py`; it is neither a leaderboard fold nor a
-  dev fold — `_fold_ids_for_run_mode` in `defs/jobs.py` must *not* include it in any
-  run mode, so no experiment trains or scores on it in the normal flow).
-- Scoring against the final-test window is a deliberate, rare act — only for champion
-  candidates immediately before promotion — via the `metrics` asset with
-  `evaluation_scope="ad_hoc"` and the window's `valid_time` bounds in the existing
-  `PopulationFilter`. No new asset needed; the discipline is procedural. Note: the model
-  trained for the leaderboard fold is reused as-is (train window unchanged), so final-test
-  scoring needs a `cv_power_forecasts` run over the reserved window — check whether the
-  existing asset can forecast a window disjoint from the fold's `val_start/val_end`, and add a
-  window override to its config if not.
-- Rule, documented alongside: final-test results are never used to *choose between*
-  candidates (that re-creates the problem); they exist to report honest skill for the chosen
-  champion and to detect gross overfitting (final-test NMAE ≫ validation NMAE).
+- Add a `final_test` fold covering that disjoint year, with a new per-fold flag `final_test: true`
+  (extend `CvConfig` / the fold schema in `packages/contracts/src/contracts/config_schemas.py`; it
+  is neither a leaderboard fold nor a dev fold — `_fold_ids_for_run_mode` in `defs/jobs.py` must
+  *not* include it in any run mode, so no experiment trains or scores on it in the normal flow).
+- Scoring against the final-test window is a deliberate, rare act — only for champion candidates
+  immediately before promotion — via the `metrics` asset with `evaluation_scope="ad_hoc"` and the
+  window's `valid_time` bounds in the existing `PopulationFilter`. No new asset needed; the
+  discipline is procedural. Whether the leaderboard-fold model can be reused as-is, or needs its
+  own training run, depends on where the disjoint year sits relative to `mid_2025_to_mid_2026` —
+  decide once the backfill fixes that.
+- Rule, documented alongside: final-test results are never used to *choose between* candidates
+  (that re-creates the problem); they exist to report honest skill for the chosen champion and to
+  detect gross overfitting (final-test NMAE ≫ validation NMAE).
 
 **A multi-fold gotcha to handle when folds proliferate.** The parent-MLflow-run aggregation in
 the `metrics` asset averages each metric key over *only the folds in which that key appears*
@@ -416,19 +541,17 @@ folds (the multi-fold epoch below, or the `final_test` fold), either guarantee e
 leaderboard fold emits an identical key set, or make the parent-run aggregation record its
 per-key denominator.
 
-**3. Trade-off (decide at implementation time).** This costs 3 of the 12 validation months, on
-a dataset that is already short. The alternative — accepting documented bias until
-Dynamical.org backfills enable multiple yearly folds — is defensible; if the backfill is
-expected within a couple of months, do part 1 now and fold part 2 into the multi-fold epoch
-instead of spending a separate epoch on it. Decide based on the backfill outlook.
+**3. When the backfill lands.** Dynamical.org's backfill is what turns the single fold above into a
+genuine multi-fold epoch — enough independent years of ECMWF data to add both further leaderboard
+folds and the disjoint `final_test` fold in the same epoch, rather than spending a separate epoch
+on the `final_test` fold alone. Until then, the Ladder guard and the caveats above are the
+mitigation. The fold that decides promotion is not shrunk to buy a final-test window early.
 
-**Verification.** (1) `register_experiment_job` in all three run modes never creates a
-partition for the `final_test` fold (extend `tests/test_register_experiment_job.py`).
-(2) Eligibility for the leaderboard fold is unchanged by the shrunk validation window (the
-eligibility rule keys off `val_start`/`val_end` — re-materialise `eligible_time_series` and
-diff). (3) End-to-end: score one existing experiment against the reserved window via the
-`ad_hoc` metrics path and confirm rows land in `forecast_metrics.delta` with the window label,
-and nothing is logged to the leaderboard MLflow runs.
+**Verification.** (1) `register_experiment_job` in all three run modes never creates a partition
+for the `final_test` fold (extend `tests/test_register_experiment_job.py`). (2) Once the disjoint
+year lands: end-to-end, score one existing experiment against the reserved window via the `ad_hoc`
+metrics path and confirm rows land in `forecast_metrics.delta` with the window label, and nothing
+is logged to the leaderboard MLflow runs.
 
 ---
 
@@ -470,6 +593,15 @@ reward a model that simply over-forecasts (the
 the **peak-events slice** (the top 5% highest *observed* demand) and NGED's hand-picked **hard
 examples**. Both are described under
 [Tail & exceedance metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
+
+**Every ratio between a model and a reference is published with its reference forecast, the
+population it was scored on, and the number of ensemble members that produced it.** [Weigel et al.
+(2007)](https://doi.org/10.1175/MWR3280.1) show that a ranked probability skill score is biased
+downwards by an amount that depends on ensemble size. A score from our 51 members is therefore not
+comparable with one from a study using 10 until the correction is applied. The fair,
+finite-ensemble-unbiased CRPS in the table above is the form that carries this correction. PICP is
+judged against the finite-ensemble calibrated reference rather than the nominal rate for the same
+reason.
 
 ### Which ensemble collapse defines the deterministic point forecast? 🚧
 
@@ -595,6 +727,11 @@ validation windows lie inside the observed history), but live-forecast scoring
 ([production monitoring](live-service.md#production-monitoring)) must
 choose which reference time's capacity to apply rather than expecting a row at a future `valid_time`.
 
+**Each metered generator's series is also normalised by its estimated effective capacity before
+training** — unless the comparison described under [effective-capacity
+estimation](capacity-estimation.md) shows the normalisation is not needed — and that estimate is
+tracked as it changes.
+
 One related distinction to keep straight: the *metric denominator* may use the full-history
 **smoothed** capacity estimate, but any capacity used to normalise model inputs at forecast init
 time (the two-pass training scheme) must be the **causal** estimate available at that init time, or
@@ -621,15 +758,24 @@ actually happened.** Scoring models only on the top-N% highest *observed* half-h
 models that simply bias every forecast upward — the "forecaster's dilemma", explained in
 plain language in the [evaluation-metrics
 reference](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
-Ranking-grade tail emphasis instead comes from proper scores re-weighted toward the tail and
+[Lerch et al. (2017)](https://doi.org/10.1214/16-STS588) show that choosing which periods to score
+on the basis of what happened rewards a forecaster who over-predicts extremes, and can rank a
+deliberately biased forecast above an honest one. Ranking-grade tail emphasis instead comes from
+proper scores re-weighted toward the tail and
 computed over **all** hours. Concretely, three metrics — definitions, equations, and intuitive
 explanations in the [evaluation-metrics
 reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
 
 - **Threshold-weighted CRPS
   ([twCRPS](../techniques/evaluation-metrics.md#threshold-weighted-crps-twcrps))** — CRPS
-  confined to behaviour above a per-series threshold; the headline *ranking* metric for tail
-  skill. Implementation is nearly free: replace members and observation by `max(value,
+  confined to behaviour above a per-series threshold, which is [Gneiting and Ranjan
+  (2011)](https://doi.org/10.1198/jbes.2010.08110)'s way of putting the emphasis inside the score
+  while it stays a proper scoring rule; the headline *ranking* metric for tail skill. A GB
+  distribution network has already been scored this way: [Maia et al.
+  (2026)](https://arxiv.org/abs/2603.01653) compare fault-count forecasts for SP Energy Networks
+  against a quantile-regression baseline on the threshold-weighted score, because an unweighted one
+  "would place substantial emphasis on parts of the predictive distribution where the two models are
+  identical". Implementation is nearly free: replace members and observation by `max(value,
   threshold)` and reuse the existing fair-CRPS aggregation unchanged, inheriting its
   comparability across ensemble sizes.
 
@@ -866,6 +1012,15 @@ with lead time:
 | Day 2–7 | Short/Medium Range | Synoptic weather. Skill driven by mapping large weather fronts to power; ensemble spread starts to matter. |
 | Day 8–14 | Extended Range | Ensemble probabilities. Deterministic weather is essentially noise; skill comes from processing ensemble uncertainty. |
 
+**Coverage — how often reality fell inside the range the forecast claimed — is broken down by season
+and by how heavily loaded the substation was, as well as by the lead-time slices above.** A coverage
+figure averaged over a year can read as a healthy 90% while being 99% in the quiet months and 70% at
+the winter peaks. The winter peaks are the only periods NGED buys flexibility for. Conformal
+prediction does not remove the need for the breakdown: [Foygel Barber et al.
+(2020)](https://doi.org/10.1093/imaiai/iaaa017) prove that a distribution-free guarantee holds only
+on average across all conditions, never separately for the conditions that matter. A conformal
+forecast can therefore promise 90% coverage overall while failing at the peaks.
+
 ### Measuring performance during switching events 🚧
 
 We will flag each timestep for whether it contains a switching event, and compute metrics separately
@@ -988,6 +1143,16 @@ NWP?"). Example tags:
 | `generator_capacity_estimation` | none, simple_p99, convex_envelope, differentiable_physics |
 | `switching_event_detection` | none, simple_statistical |
 | `pre_training` | none, ERA5 |
+
+**Accuracy is published separately for each class of asset** — grid supply points, bulk supply
+points, primary substations, and metered generators — each against its own stated naive baseline. A
+single project-wide accuracy target would mean different things at different levels. The unweighted
+`mae__all` aggregate is dominated by the grid supply points for exactly that reason. The
+`time_series_type` tag above is what carries the split.
+
+**The battery, the gas generator, and the biofuel plant are reported separately** from the wind and
+solar sites, because those three are dispatched on market signals that no weather forecast contains,
+so pooling them with weather-driven generators hides how well either group is forecast.
 
 > Every leaderboard row also carries two **cost savings (£)** figures — one for flexibility
 > procurement, one for curtailment — designed in

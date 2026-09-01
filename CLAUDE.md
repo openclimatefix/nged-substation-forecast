@@ -1,6 +1,7 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this
+repository.
 
 ## Commands
 
@@ -64,6 +65,9 @@ needed one, the mistake is already written.
 | `implement-issue` | writing code for an approved plan: worktree, verify set, PR, up to two adversarial reviews, stop |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh pr merge`, or ship-time triage |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
+| `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
+| `prose-review` | reviewing, reordering or simplifying prose that already exists — structure first, then one pass per rule |
+| `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
 
 ## Docs
 
@@ -96,8 +100,51 @@ by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised expor
 
 ### Prose style
 
-These five rules apply to everything we write in prose: `docs/` pages, READMEs, `SKILL.md` files,
-docstrings, code comments, and GitHub issue and PR bodies.
+These rules apply to everything we write in prose: `docs/` pages, READMEs, `SKILL.md` files,
+docstrings, code comments, GitHub issue and PR bodies, and anything we write for an outside reader.
+
+**The prose rules in this section govern words and sentences; getting a whole document's order
+right needs a planning step of its own.** A badly ordered document reads fine sentence by sentence,
+so the rules below won't catch it and neither will a reviewer holding the whole document in
+context. That reviewer already knows what a later section says while reading an earlier one —
+exactly the knowledge a first-time reader doesn't have. Load `long-form-prose` before drafting new
+prose longer than a few paragraphs.
+
+**When reviewing prose against these rules, load `prose-review` before starting.** A reviewer asked
+to check everything at once finds the loudest fault in each paragraph and moves on, so the quieter
+faults survive. A combined sweep of one section of the literature review reported nothing, and a
+one-rule-at-a-time sweep of the same text found thirty. The `prose-review` skill owns the procedure
+— the order to sweep in, what is deliberately not a finding, how to chunk a long file across
+sub-agents, which model to use, and how to triage findings before applying any of them.
+
+**This is technical writing, not poetry: precision first, concision second, elegance last.** Every
+page here is a reference document, read by someone who is about to act on it. A sentence that can
+be read two ways will eventually be read the wrong way and built on. Precision wins every contest
+it enters: repeat the noun, restate the qualifier, name the units, and accept a sentence flatter
+than a writer would like. Concision comes next, and comes from cutting whole sentences rather than
+from clipping words out of a sentence that needs them. Most of the rules below are that order of
+priorities applied to one recurring case.
+
+**Lead each paragraph with a bolded sentence that states its conclusion.** The reader should get
+the argument from the bolded leads alone, then read on only where they want the reasoning. That
+skim-reading pattern is why we prefer sub-headings and short paragraphs over bullet lists. A list
+flattens the argument into items of equal weight; a bolded lead says which claim matters, and the
+sentences under it say why.
+
+**Prefer a heading that states the section's conclusion, but fall back to a plain descriptor the
+moment that conclusion needs explaining.** A heading is read cold, by someone who has not read the
+section and is deciding whether to, so it has no room to define its own terms. Two tests: can a
+first-time reader parse every word, and can that reader tell why the claim would matter to them?
+"More detailed weather data has not always improved the forecast" passes both tests. Every word is
+ordinary, and a reader knows at once whether that finding is their problem. "Energy forecasting has
+platform descriptions and no retraining cadence" fails both tests, because "platform" and
+"retraining cadence" only acquire their meaning inside the section. Where the conclusion cannot be
+stated without a term the section itself has to introduce, name the subject instead — "MLOps in
+energy forecasting". Leave the conclusion to the bolded lead, which has a whole sentence in which
+to land it. Helping a reader find the section they want is the heading's job; summarising the
+section is what a heading earns when every word survives being read cold. Renaming a heading
+changes its anchor slug, so grep for inbound links to the old slug first and update every one in
+the same commit.
 
 **Be concrete and plain; write for a skim-reader.** Assume the reader is skimming and wants the
 meaning to jump off the page, not to spend effort decoding a clever, abstract or metaphorical
@@ -111,6 +158,92 @@ acronym expanded on first use — but without the two journalistic habits that w
 doc, so no punning or whimsical headings, and no scene-setting opening: state the conclusion first,
 then explain it.
 
+**Name the thing; don't write "it".** Wherever a pronoun or a demonstrative makes the reader look
+backwards to work out what it refers to, repeat the noun instead. "It", "this", "that", "these",
+"those", "they", "such", "one", "ones", "the former" and "the latter" are the usual offenders. A
+paragraph that *opens* with a pronoun is the worst case, because a skim-reader landing there has
+nothing to look back at. **"One" and "such a" are the two that slip past a careless sweep**,
+because both read smoothly: write "an energy-forecasting lifecycle rather than a generic
+lifecycle", never "rather than a generic one"; write "the only paper of the three", never "the only
+one of the three"; write "a measure of effectiveness", never "such a metric" where a metric was
+named a clause earlier. Repeating the noun is always available and always correct. "One" is fine as
+a determiner in front of the noun it counts — "the one review we found" both scopes a claim and
+names its noun — and wrong only when it stands in place of the noun. Prefer "the NWP download" over
+"it", "the threshold-weighted score" over "this". A little repetition beats an ambiguous sentence
+every time: never make the reader refer backwards to decode a sentence, and never buy elegance with
+a referent the reader has to hunt for. The same rule covers version numbers: write "Flexpectation
+v1" and "Flexpectation v2", never a bare "v1" or "v2", which could be a version of anything.
+
+**"Thing" is never the right noun.** Every use of "thing" or "things" has a specific noun waiting
+behind it, and the specific noun carries information the placeholder throws away: "the two
+contaminants that must be filtered out", not "the two things"; "Two caveats temper both figures",
+not "Two things temper"; "the closest work already published", not "the closest thing already
+published". A bolded lead opening "Two things follow" wastes the one sentence a skim-reader is
+guaranteed to read. **"Something" and "anything" throw away the same information.** They are harder
+to spot, because they read like ordinary English: "a decision to agree with NGED", not "something
+to agree with NGED"; "any occasion a human had to intervene in the running service", not "had to do
+something to it"; "when the ingest fails", not "when something breaks". Where the sentence
+genuinely means an unknown of unknown kind — a placeholder in a rule about future cases — say what
+kind of unknown: "an input we have not anticipated", not "something unexpected".
+
+**"Metadata" hides the fields that carry the information; list them.** The fault is the same as
+"thing": a reader told that a model was given "the site's metadata" learns nothing, because the
+fields are the information. Write "the panel tilt, the panel azimuth, and the ratio of
+direct-current to alternating-current rating", not "the site's metadata"; write "six columns
+describing each low-voltage feeder — among them how many housing units it serves", not "metadata
+covariates". Where the fields are not worth listing in full, name the fields that matter and say
+how many there are. The same goes for every other umbrella noun that stands in for a list the
+reader wants: "parameters", "attributes", "characteristics", "data quality issues".
+
+**A noun that carries a count has to say what was counted.** A sentence chaining counts — "screened
+256 records to 31 sources and mapped 13 general-purpose platforms" — hands the reader three units
+and defines none of them. The reader cannot tell whether a record, a source and a platform are one
+kind of object counted at three stages or three different kinds. Name each unit where it first
+appears, which usually takes two or three words: "screened 256 candidate documents — vendor
+documentation, open-source repositories, and academic papers — down to the 31 they kept, and mapped
+the 13 machine-learning-operations platforms those documents describe". The offenders are the nouns
+a methods section reaches for: records, sources, items, entries, results, studies, works, cases,
+instances, observations, points, and units. This is the counting cousin of the "metadata" rule
+above: there an umbrella noun hides a list of fields, here it hides what is being tallied.
+
+**Say which kind of network you mean, every time.** This project forecasts an electricity network
+using neural networks, so a bare "network" makes the reader stop and work out which one is meant.
+Qualify it on both sides: "electricity network", "distribution network", "network operator" for the
+wires, and "neural network", "graph neural network", "long short-term memory neural network" for
+the model. Where a sentence would otherwise pile up the qualifier, name the specific noun instead —
+"a model trained on the feeders' own history" beats "a model given a network's whole history". Any
+other word this project uses for two different meanings gets the same treatment.
+
+**Describe performance in performance terms, not in money metaphors.** A forecast does not "pay",
+an input does not "buy" accuracy, and a modelling choice does not "cost" anything unless real money
+changes hands. Write what actually moved: "the inputs that improve skill at short range", "adding
+the physics model made the forecast interpretable without making it less accurate", "rejected the
+gradient-boosted tree on the effort of tuning it". Keep "cost" and "price" for money: what NGED
+spends procuring flexibility is a cost. Calling a lost percentage point of skill a cost as well
+makes the page ambiguous exactly where it has to be exact.
+
+**Put the words in the order that cannot be misread.** "73 wind farms in GB" says what it means;
+"73 GB wind farms" makes the reader parse a noun-pile and can be read as a unit of measure. Where a
+qualifier can attach to more than one noun, move it or add the word that pins it down.
+
+**Use numerals when the number carries a unit, is 10 or more, or sits beside another numeral in the
+same phrase; use words otherwise.** So "5 years of half-hourly data", "50,000 substations" and "6
+solar farms, 3 wind farms", but "the eight challenges" and "nine ideas in ten". Reserving numerals
+for measured quantities makes the figures the reader cares about jump off the page on a skim, and
+stops one horizon appearing as "day four" in one paragraph and "day 4" in the next. Never open a
+sentence with a numeral: recast so the number falls inside the sentence ("Of the 32 series, 12 are
+metered generators"), or spell the number out. Counts of the document's own structure ("three model
+families") and idiomatic ratios ("nine ideas in ten") stay in words, because neither is a
+measurement.
+
+**Use the serial comma — the comma before the final "and" or "or" in a list of three or more
+items.** So "solar, wind, and dispatchable generators", never "solar, wind and dispatchable
+generators". The serial comma is the one deliberate departure from *The Economist*'s house style
+above. The serial comma also removes a real ambiguity: without the comma, the last two items can
+read as a pair belonging to the item before them. In a list of assets or of data sources, that
+reading changes the meaning. A list of two items takes no comma, and an author string in a
+reference list follows the citation convention rather than this rule.
+
 **Be concise by cutting whole sentences, not words.** Prose should be as short as it can be
 without losing readability, but the compressible material is rarely inside a sentence. It is whole
 sentences and paragraphs that carry no information: restating the heading, summarising what the
@@ -118,6 +251,16 @@ reader has just read, hedging ("it is worth noting that"), listing what we are *
 closing paragraph that repeats the opening. Delete those outright, and leave the surviving
 sentences intact — buying brevity by clipping words out of a sentence that needs them is the
 mistake the next rule forbids.
+
+**Prefer short sentences. Where a sentence carries two claims, split it into two sentences.** A
+joined sentence makes the reader hold the first claim in mind while parsing the second, and the
+second claim usually carries the conclusion. The joins worth checking are "and" and "but", a
+semicolon, an em dash, a "so", a "which", and a trailing participle. None of those joins is wrong
+by itself. The test is whether splitting makes the passage easier to read, never whether a joining
+word is present. Two limits keep the rule from doing harm. A split must leave full sentences rather
+than a fragment, which is the rule below. And a conjunction joining two verbs that share one
+subject joins no second claim: "the forecast reuses yesterday's NWP run and widens the uncertainty
+bands" is one sentence and stays one.
 
 **Write full sentences; don't drop the subject.** Don't clip words for terseness
 if it leaves a sentence without a clear subject/verb. Prefer "We split storage across two
@@ -131,6 +274,49 @@ changelog and makes the docs unreadable. When a change invalidates a passage, re
 to describe the new behaviour rather than appending a note about what changed. This is the
 "comments and docs must reflect current state only" rule in
 [`docs/architecture/code-style.md`](docs/architecture/code-style.md), applied to prose.
+
+**Every citation is a hyperlink to the work cited.** Writing "Sculley et al. (2015)" as plain text
+makes the reader go and find the paper. The link costs only a few characters, and a digital object
+identifier is a stable address. Wrap the author-and-year label itself — `[Sculley et al.
+(2015)](https://doi.org/...)` — and prefer a DOI to a publisher's landing page. This holds
+everywhere we write, not only in the literature review: a GitHub issue or a pull-request body
+quoting a paper links it too, because the reader there has even less context than a docs reader.
+The exception is repetition. Once a work is linked, later mentions of the same work in the same
+passage drop both the year and the link and name the authors alone — "Sculley et al. report" — so a
+paragraph does not carry the same link four times. `check_citations.py` in the `literature-review`
+skill enforces the linking half of this rule on the review, and nothing enforces it anywhere else.
+
+**Say what the source found, not what is always true.** When prose rests on a paper, a measurement
+or a trial, state the finding with its scope attached: "in the studies we read, a gradient-boosted
+model beat a same-time-yesterday rule by 10 to 20%", not "sophisticated models beat naive ones".
+A law-like sentence claims far more than the evidence supports, and the first reader who knows a
+counter-example stops trusting the rest of the page. The same applies to claims that something does
+*not* exist: an absence claim is only ever as good as the search behind it. Say what was searched
+and let the reader judge, rather than asserting that nobody has tried the approach.
+
+**Don't claim a set has exactly one member unless you have enumerated the set.** "The only study",
+"the one paper", "the first network to publish", "nobody has done this", "the closest precedent" —
+each asserts that a search was exhaustive. A search almost never is. Absence of evidence is not
+evidence of absence: we may only be aware of one instance, which is a different claim from there
+being only one. Say what was looked at and what turned up — "the one paper we found that measured
+properly", "the closest of the four", "labels that none of the GB projects we checked published".
+Superlatives need the same treatment, because "the most useful method" ranks a whole field on a
+survey nobody ran: scope the superlative to a set you have listed, or state the basis of the
+judgement instead, as in "the published method that fits NGED's telemetry most closely".
+
+**Don't commit the project to work it has not agreed to.** A page explaining what the literature
+found, what a technique does, or how a subsystem works is not a project plan. A sentence like
+"Flexpectation will therefore label the telemetry by hand" turns a description into a promise a
+funder can hold us to. Describe what is known and what the options are, and leave what we will do
+to the roadmap, the issue tracker, and the documents that own those commitments.
+
+**Don't introduce a name, a number, or an acronym before the reader has a use for it.** A fact that
+exists only to justify a claim belongs after the claim, not before it — a reader who meets the
+justification first has nothing yet to hang it on, and has to re-read once the claim finally
+arrives. Prefer "ECMWF ENS coarsens from a 3-hour to a 6-hour step width at day 6, so a forecast
+built on days 6 to 10 sits on the coarse half of the grid" over opening the paragraph with the step
+widths and only later saying why they matter. This is the document-level form of leading with the
+conclusion: state the claim, then supply the detail that backs it, never the reverse.
 
 **Don't name individuals.** Write the rule, not who asked for it: "get a contract change agreed
 before making it", never "ask so-and-so before changing a contract". One person maintains this repo
@@ -217,7 +403,8 @@ already show, and the process then delays the change instead of protecting it.
 
 ## Architecture
 
-This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is the Dagster application; all reusable logic lives in `packages/`.
+This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is the Dagster
+application; all reusable logic lives in `packages/`.
 
 **A short list of design principles** governs architectural decisions:
 [`docs/design-philosophy/design-principles.md`](docs/design-philosophy/design-principles.md).
@@ -291,7 +478,11 @@ All tabular data flowing through the system is validated with **Patito** models.
 
 `_engineer_features()` (in `tabular_feature_engineer.py`) is the central tabular pipeline function: given a `set[str]` of requested feature names, it joins power observations with NWP and metadata, then applies features. Feature names are parsed by `ParsedFeatures.from_strings()` (in `_parsed_features.py`) into typed `LagFeature`, `RollingFeature`, `StaticFeature`, `TimeFeature`, or `WeatherFeature` objects. Callers reach this via `FeatureEngineer.engineer()` — see the ML Model Interface section below.
 
-**Critical design invariant — no lookahead bias:** `power_fcst_init_time` (when we make the forecast) is distinct from `nwp_init_time` (when the NWP model ran). Power lag features are nullified via `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time. Weather lags use a dual-strategy join: same NWP run for future target times, freshest NWP run for past target times.
+**Critical design invariant — no lookahead bias:** `power_fcst_init_time` (when we make the
+forecast) is distinct from `nwp_init_time` (when the NWP model ran). Power lag features are
+nullified via `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead
+time. Weather lags use a dual-strategy join: same NWP run for future target times, freshest NWP run
+for past target times.
 
 Two operating modes:
 
@@ -300,11 +491,28 @@ Two operating modes:
 
 ### ML Model Interface (`packages/ml_core/src/ml_core/base_forecaster.py`)
 
-All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatures)`, `predict(AllFeatures) -> PowerForecast`, `save(Path)`, and `load(Path) -> Self`. Each subclass owns its own persistence format; `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a `meta.json` with the full `XGBoostConfig`.
+All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatures)`,
+`predict(AllFeatures) -> PowerForecast`, `save(Path)`, and `load(Path) -> Self`. Each subclass owns
+its own persistence format; `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a
+`meta.json` with the full `XGBoostConfig`.
 
-Identity is split across two levels. **Model-family identity** — `MODEL_NAME` and `MODEL_VERSION` — are class-level constants on each `BaseForecaster` subclass (properties of the implementation; bumping `MODEL_VERSION` is a deliberate code change). **Experiment identity** — `experiment_name` and `ml_flow_experiment_id` — lives in `BaseForecasterConfig` so it travels with the saved model. Both levels are stamped onto every `PowerForecast` row at predict time: `power_fcst_model_name`/`power_fcst_model_version` from the class, and the dedicated `experiment_name`/`ml_flow_experiment_id` columns from the config. Do not collapse experiment identity into `power_fcst_model_name`.
+Identity is split across two levels. **Model-family identity** — `MODEL_NAME` and `MODEL_VERSION` —
+are class-level constants on each `BaseForecaster` subclass (properties of the implementation;
+bumping `MODEL_VERSION` is a deliberate code change). **Experiment identity** — `experiment_name`
+and `ml_flow_experiment_id` — lives in `BaseForecasterConfig` so it travels with the saved model.
+Both levels are stamped onto every `PowerForecast` row at predict time:
+`power_fcst_model_name`/`power_fcst_model_version` from the class, and the dedicated
+`experiment_name`/`ml_flow_experiment_id` columns from the config. Do not collapse experiment
+identity into `power_fcst_model_name`.
 
-Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer]` — a strategy object (composition, not inheritance) that owns the full data-preparation pipeline from raw inputs to an `AllFeatures` frame, including the NWP spatial join. The default `TabularFeatureEngineer` maps each gridded NWP H3 cell to the nearest time series then runs the tabular `_engineer_features` pipeline. A future model needing a different view of the data (e.g. a CNN wanting a spatial NWP crop) overrides `feature_engineer` with a different `FeatureEngineer` subclass — it does not change `_engineer_features` or `BaseForecaster`. Both classes live in `packages/ml_core/src/ml_core/features/`.
+Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer]` — a strategy
+object (composition, not inheritance) that owns the full data-preparation pipeline from raw inputs
+to an `AllFeatures` frame, including the NWP spatial join. The default `TabularFeatureEngineer`
+maps each gridded NWP H3 cell to the nearest time series then runs the tabular `_engineer_features`
+pipeline. A future model needing a different view of the data (e.g. a CNN wanting a spatial NWP
+crop) overrides `feature_engineer` with a different `FeatureEngineer` subclass — it does not change
+`_engineer_features` or `BaseForecaster`. Both classes live in
+`packages/ml_core/src/ml_core/features/`.
 
 ## Code Style
 

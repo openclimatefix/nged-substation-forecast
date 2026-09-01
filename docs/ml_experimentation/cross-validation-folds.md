@@ -76,6 +76,40 @@ training-time technique, distinct from the validation folds described here; the 
 
 ---
 
+## Overlapping forecasts: what the fold boundary does and does not protect
+
+A 14-day forecast reissued every six hours covers each target half-hour 56 times, so it is
+worth saying precisely which problems that creates and which it does not.
+
+**It does not contaminate the test set.** `load_engineering_inputs` bounds both power and NWP by
+*target* time — power on `time` and NWP on `valid_time`, each within `[window_start, window_end]` —
+not by forecast origin. A training row whose `power_fcst_init_time` falls in June 2025 therefore
+cannot carry a target in the validation window, because the target itself is filtered out. The fold
+boundary is a boundary on observations, so no observation appears on both sides of it. Power lag
+features are separately protected by `_nullify_leaky_lags`, which nulls any lag shorter than the
+lead time.
+
+**It does inflate the apparent weight of evidence.** Within one horizon slice the same target
+half-hour is still scored many times: `extended_range` spans 168 h and beyond. With 6-hourly
+initialisations, roughly 28 forecasts therefore land in that band for a single target. Those are
+not 28 independent measurements of skill — they share the weather, the recent load and most of the
+model state. The leaderboard's per-slice counts therefore overstate how much independent evidence
+separates two experiments. A naive significance test on them would report more confidence than the
+data supports.
+
+We have not fixed this. The [energy-forecasting literature
+review](../background/energy-forecasting-review.md) found no paper offering a method to copy. The
+closest is [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335), who build the
+consistency intervals on their calibration diagrams "considering the temporal correlation of
+net-load, as the usual assumption of independence between samples does not hold" — the right
+instinct, applied to day-ahead forecasts that are not reissued. Until we do something better, the
+rule is the one already in force for [fold
+hygiene](../roadmap/metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window):
+differences smaller than fold-level noise must not drive decisions, and the per-slice point count
+is not a sample size.
+
+---
+
 ## Alternatives considered
 
 We weighed three other ways to slice the limited honest data — monthly expanding CV, quarterly

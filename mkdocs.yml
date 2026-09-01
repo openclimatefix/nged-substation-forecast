@@ -57,6 +57,7 @@ nav:
       - NGED's Incumbent Forecast: background/nged-incumbent-forecast.md
       - Data Quality: background/data-quality.md
       - Switching Events: background/switching-events.md
+      - "Energy Forecasting: State of the Art": background/energy-forecasting-review.md
   - Techniques:
       - Overview: techniques/index.md
       - Convex Optimisation: techniques/convex-optimisation.md
@@ -80,7 +81,7 @@ nav:
       - Testing: architecture/testing.md
   - ML Experimentation:
       - Overview: ml_experimentation/index.md
-      - Our approach to MLops: ml_experimentation/mlops-approach.md
+      - Our approach to MLOps: ml_experimentation/mlops-approach.md
       - Model configuration: ml_experimentation/model-configuration.md
       - Running an experiment end-to-end: ml_experimentation/dagster-workflow.md
       - Cross-validation folds: ml_experimentation/cross-validation-folds.md

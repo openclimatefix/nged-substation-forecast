@@ -150,11 +150,12 @@ running on AWS.*
 
 ---
 
-## v0.4 — Improved Automatic Data Cleaning
+## v0.4 — Automatic Data Cleaning
 
 *Epic: [#150](https://github.com/openclimatefix/nged-substation-forecast/issues/150)*
 
-- More sophisticated automatic cleaning of NGED's power data (building on the basic cleaning in v0.1)
+- Automatic cleaning of NGED's power data. Versions 0.1 to 0.3 do none: the models train on,
+  and the live service forecasts from, raw NGED telemetry
 - `power_forecast_warnings` **Phase 1** — `STALE NWP` and `STALE POWER`, with `warning_source`
   ([#439](https://github.com/openclimatefix/nged-substation-forecast/issues/439))
 - `power_forecast_warnings` **Phase 2** — the meter-error warning types, which are this milestone's
@@ -254,6 +255,7 @@ only for first month, then shared with NGED.*
 - Estimate the effective capacity of the *metered* wind and solar PV generators over time — it bumps up and down with maintenance, faults and build-out — by racing several candidate estimators head-to-head on the same data: a [convex (CVXPY)](../techniques/convex-optimisation.md) censored quantile-envelope estimator, a [differentiable-physics (PyTorch)](../techniques/differentiable-physics.md) variational estimator, and cheap baselines. The winner ships in v1; the judging criteria (including uncertainty quality and [robustness to missing inputs](capacity-estimation.md#robustness-to-missing-inputs), scored against the same failure-scenario vocabulary the forecasting leaderboard uses) are on the [capacity estimation](capacity-estimation.md) page. This is the first model family we must actively *build* for missingness — a differentiable-physics estimator [degrades most gracefully of all](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing), and that should count in the judging. A deliberate secondary goal of the contest is building hands-on CVXPY experience, to inform v2 tooling choices and our advice to NGED. The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is [v2 research](disaggregation.md).
 - Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
 - Ingest **CM SAF** (Satellite Application Facility on Climate Monitoring) — high-resolution satellite-derived irradiance, used to estimate solar PV capacity ([data sources](data-sources.md#weather-data)). Capacity estimation also needs ERA5, which [v0.5](#v05-xgboost-upgrades-quick-wins) already ingests to serve the pre-training experiments
+- Consider testing **CAMS** (the Copernicus Atmosphere Monitoring Service solar radiation time-series) alongside CM SAF ([data sources](data-sources.md#weather-data)). Both are **offline** sources — they feed historical capacity estimation, and the production serving path depends on neither — so CAMS's near-real-time freshness is not the reason to look at it. The reason is that CAMS offers steps down to 1 minute where SARAH-3 stops at 30, which is what the [dynamic thermal model](../techniques/differentiable-physics.md) would need. The cost of looking is small: CAMS serves one point per request rather than a grid, but the [v1 trial area](../index.md#scope) needs at most 32 requests, and 6 of those requests cover its solar farms, so a head-to-head against SARAH-3 on those sites settles whether sub-hourly irradiance improves the fitted plant model before anything larger is committed to
 - Populate the `effective_capacity` Delta table
 
 **Dynamic effective capacity estimation for substations**:
