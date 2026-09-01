@@ -200,6 +200,14 @@ Pronouns dominate every sweep run so far, by roughly an order of magnitude over 
 
 **Rule 11 has a cheap way in too: find the long sentences.** `grep -oE '[^.]{160,}\.'` over a whitespace-normalised copy returns the sentences worth reading, and the finding is real where the sentence carries two claims that read better apart. The joins to look for are "and" and "but", a semicolon, an em dash, a "so", a "which", and a trailing participle — the last three are the ones a sweep briefed on conjunctions alone will miss. A conjunction joining two verbs that share one subject is not a finding, and neither is a split that would leave a fragment.
 
+**Rule 11 creates rule 1 violations, so re-sweep for pronoun openers after applying it.** A split
+leaves the second claim needing a subject, and the obvious subject is a pronoun standing for
+whatever the first half named: "it plays on substation load the role the combined reference plays
+on irradiance, and it is the bar that decides whether the project is worth its money" splits into a
+second sentence opening "It is also the bar", whose referent is now three nouns back. Seven of 94
+splits in one pass did this. Name the noun, and where naming it reads as pure repetition, the split
+was the wrong call: two verbs sharing one subject carry one claim and stay in one sentence.
+
 ## What is deliberately not a finding
 
 **Most of the triage cost is one category, so put it in the brief rather than discovering it
@@ -255,6 +263,13 @@ wording cannot be triaged and is worth nothing.
 - **Ask for absolute line numbers in the file**, not offsets into an extracted chunk.
 - **Do not edit a file while a sweep of it is in flight.** Every line number in every report still
   running is measured against the file as the agents found it.
+
+**Where the sweep covers pages a branch only partly wrote, gate each finding on the merge-base.**
+Tell the agent to skip prose that predates the branch, then check it mechanically too, because the
+instruction leaks: about one finding in nine came back on text already on `main`. Normalise
+whitespace, project the markup away, and test the quoted sentence against `git show
+<merge-base>:<path>` before applying. A finding that is already there belongs to whatever issue
+owns the unswept rest of the docs, not to the branch in hand.
 
 ## Which model to give the review to
 
@@ -345,6 +360,24 @@ Then:
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 uv run mkdocs build --strict
 ```
+
+**A split whose full stop lands on a closing marker deletes that marker.** Rule 11 is the pass that
+does this, because the join it breaks is often the comma right after a bolded phrase or a code
+span. `**the same information**, and they are harder to spot` wants to become `**the same
+information.** They are harder to spot`, and a substitution written without the markers produces
+`**the same information. They are harder to spot` instead, with the bold left open. A link is
+worse, because the split drops the whole `](url)` half and the citation stops being a citation.
+Count `**`, backticks and links per paragraph before and after every batch, and refuse any edit
+that changes a count.
+
+**A sub-agent quotes the sentence with the markdown stripped, so a wrap-tolerant substitution still
+misses it.** `[Gijon et al. (2025)](https://doi.org/…) write` comes back as `Gijon et al. (2025)
+write`, and 57 of 98 findings failed to match on that alone. Match against a markup-stripped
+projection of the file that keeps an offset map back to the raw text, then splice the replacement
+in block by block, copying raw characters wherever the wording is unchanged so the links and bold
+markers survive. Trim the words the quote and the replacement share at the end before matching,
+too: a sub-agent routinely stops its quote before a trailing parenthetical the file actually
+carries, and every edit sits in the head.
 
 **Neither command checks an anchor inside an absolute URL.** `mkdocs build --strict` validates
 relative links only, so a link to
