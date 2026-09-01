@@ -2745,7 +2745,7 @@ reproducible in method, with the underlying telemetry restricted. The honest rea
 
 ## Three published results that point against this project's plan
 
-Three results in this literature point against Flexpectation's plan, and we intend to test all three
+Three results in this literature point against Flexpectation's plan. We intend to test all three
 rather than avoid them.
 
 ### More detailed weather data has not always improved the forecast
@@ -2765,7 +2765,7 @@ fields. Measured by the Diebold-Mariano test against the same model without the 
 adding the spread improved the pinball score significantly in 2 of the 14 regions, worsened the
 pinball score significantly in 3, and made no significant difference in the remaining 9. Browell and
 Fasiolo report that cross-validation had suggested a small gain which "is not consistently
-reproduced on test data and therefore inconclusive", and conclude that gridded numerical weather
+reproduced on test data and therefore inconclusive". Browell and Fasiolo conclude that gridded numerical weather
 prediction "does not appear to add significant value to deterministic and probabilistic net-load
 forecasts in the present framework" — while allowing that "it is possible that other forecasting
 methods would be able to extract value from this data by constructing different features".
@@ -2781,8 +2781,7 @@ if the spread of the weather across a region does.
 
 **Northern Powergrid's Artificial Forecasting project found the same pattern with finer weather
 data.** Artificial Forecasting obtained postcode-level weather forecasts for two wind-connected
-primary substations after the deliverable reported that the project's wind-connected models had
-performed poorly, and found that the postcode-level forecasts "did not notably improve model
+primary substations after the deliverable reported that the project's wind-connected models had performed poorly. Artificial Forecasting found that the postcode-level forecasts "did not notably improve model
 performance". The deliverable nonetheless names better weather data as a next step, without saying
 what would be better than postcode-level.
 
@@ -2794,15 +2793,13 @@ ECMWF ensemble, taken from the THORPEX Interactive Grand Global Ensemble (TIGGE)
 "only stores a limited set of atmospheric variables at 6-hour/0.5° resolution". The
 deterministic-driven model beat the ensemble-driven model "for all forecast horizons and case
 studies". Dantas and Browell then constrained the deterministic model to the ensemble's 6-hourly
-steps and single 10 m wind level, leaving the horizontal grid untouched, and the advantage held at
+steps and single 10 m wind level, leaving the horizontal grid untouched. The advantage held at
 the offshore farms and at only some of the onshore farms, which Dantas and Browell read as evidence
 that "all ENS-based methods presented here could be improved with access to the full-resolution
-model data". Two limits govern how far the result carries to Flexpectation. The comparison never
-matched the horizontal grids, so the comparison does not separate the ensemble from the resolution
+model data". Two limits govern how far the result carries to Flexpectation. The comparison never matched the horizontal grids. So the comparison does not separate the ensemble from the resolution
 as cleanly as the temporal constraint does. And once the ensemble was calibrated, the
 ensemble-driven method overtook the deterministic method "from around 4 days ahead" at onshore farms
-and "from 3 days ahead" offshore, with some offshore farms best served by the ensemble at every
-horizon, while Flexpectation forecasts 14 days out.
+and "from 3 days ahead" offshore, with some offshore farms best served by the ensemble at every horizon. Flexpectation forecasts 14 days out.
 
 ### Weather improved low-voltage forecasts less than expected in the past
 
@@ -2812,16 +2809,15 @@ of the tested methods worse.** [Haben et al.
 low-voltage feeders in Bracknell up to 4 days ahead at hourly resolution, and ran each of their
 methods twice, once without a temperature input and once with. Both the observed temperature and a
 temperature forecast were tried, taken from a weather station about 16 km away. Adding temperature
-had "minimal effect on the forecast accuracy", and for three of the methods adding temperature made
-the forecast worse; Haben et al. suggest that temperature is correlated with seasonality, so a model
+had "minimal effect on the forecast accuracy", and for three of the methods adding temperature made the forecast worse. Haben et al. suggest that temperature is correlated with seasonality, so a model
 can end up "erroneously training on the temperature as a surrogate for seasonality". The feeders
 carried an average of 45 households each, and the data were collected in 2014 and 2015. We expect
 how much weather matters at a substation to be changing quickly, because embedded solar generation
-and heat pumps make a substation considerably more weather-dependent, and there are far more of both
+and heat pumps make a substation considerably more weather-dependent. There are far more of both
 on the distribution network now, in 2026, than there were in 2015. That expectation is a prediction,
-though, not a measurement — and the Scottish primary-substation sensitivities of [Fox et al.
+though, not a measurement. And the Scottish primary-substation sensitivities of [Fox et al.
 (2018)](https://doi.org/10.34890/134), measured on the 10 years of weather and substation data
-before its publication say weather was already moving primary substation demand well before the
+before its publication, say weather was already moving primary substation demand well before the
 mid-2010s.
 
 ### A model trained on none of NGED's data may match a model trained on all of it
@@ -2846,10 +2842,10 @@ purpose-trained model that keeps the covariates.
 **If the result does hold on NGED's substations, Flexpectation still delivers, and the finding is
 worth having independently.** A forecast is one component of what this project builds: the ingest,
 the contracts, the degradation ladder, the leaderboard, the delivery tables, and the live service
-all stand whichever model wins, and a pre-trained model that beat a purpose-trained model would
+all stand whichever model wins. A pre-trained model that beat a purpose-trained model would
 simply be the model the leaderboard promoted. Establishing which of the two is better on a
 distribution network, measured against a common protocol on a real operator's telemetry, is a
-research result no study we read has published, and a network operator deciding whether to train its
+research result no study we read has published. A network operator deciding whether to train its
 own models would want the answer. Flexpectation is an innovation project, and a well-measured
 negative result is one of the outcomes Flexpectation exists to produce.
 
@@ -2883,18 +2879,15 @@ whatever generation behind that substation happened to produce — into demand a
 forecast demand and generation separately, then recombined the two forecasts. Flexpectation adds an
 ensemble that spans the whole 14-day horizon, and deployment across a whole distribution network;
 TRANSITION set out to build neither. TRANSITION's ensemble covered the first 4 days, so from day 4
-to day 10 a single deterministic forecast was all TRANSITION had, and Flexpectation's forecast
-horizon runs to 14 days. And TRANSITION was a 13-substation trial rather than a deployment across a
+to day 10 a single deterministic forecast was all TRANSITION had. Flexpectation's forecast horizon runs to 14 days. And TRANSITION was a 13-substation trial rather than a deployment across a
 whole distribution network. TRANSITION also used the distribution network's connectivity map — the
 record of which substation feeds which — throughout, and ranks "historical network connectivity data
-availability" as "just as important as historical net demand and generation measurements", which is
-a GB operator's own verdict on the connectivity-map input Flexpectation plans to use explicitly. The
+availability" as "just as important as historical net demand and generation measurements". That ranking is a GB operator's own verdict on the connectivity-map input Flexpectation plans to use explicitly. The
 rest of TRANSITION's published design matches what Flexpectation is building.
 
 **NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost, which
 the system's evaluation reported as the most accurate of the three methods tested and as easy to
-automate.** The project compared XGBoost against a long short-term memory (LSTM) neural network and
-against ARIMA, and the evaluation report says XGBoost "provided the best results of the three
+automate.** The project compared XGBoost against a long short-term memory (LSTM) neural network and against ARIMA. The evaluation report says XGBoost "provided the best results of the three
 methods tested, closely followed by LSTM", recommending XGBoost because XGBoost also allows
 simplified testing of features and can be easily automated. The report caveats that the LSTM could
 not be fully explored for want of graphics processing units, and expects that more testing would
@@ -2925,14 +2918,13 @@ GB precedent we found for putting gridded weather onto individual primary substa
 km resolution for 10 years, mapped that model onto each primary substation weighted by customer
 density, and used the model to separate the effect of weather on peak demand from the effect of
 everything else. Demand fell by between 1.4% and 4.8% for each degree Celsius of effective
-temperature, differing substation by substation with the mix of customers behind each substation,
-every one of the 13 sensitivities being negative. Fox et al.'s method corrects history for planning
+temperature, differing substation by substation with the mix of customers behind each substation. Every one of the 13 sensitivities was negative. Fox et al.'s method corrects history for planning
 rather than forecasting forward.
 
 **Two of the nine projects in the table are outside GB: OpenSTEF in the Netherlands and Enedis in
 France.** [OpenSTEF](https://lfenergy.org/projects/openstef/) is also the only operational
 forecasting system run by a network operator in this review whose code can be read rather than
-inferred from a deliverable, and OpenSTEF ships a component splitter that breaks a net-load forecast
+inferred from a deliverable. OpenSTEF ships a component splitter that breaks a net-load forecast
 into solar, wind, and residual parts — the operational relative of challenge 8.
 
 **Enedis has forecast all 2,300 of its high-voltage-to-medium-voltage substations since 2015, and is
@@ -2951,8 +2943,7 @@ transformers were more accurate under their own model. Cordier et al. chose both
 deliberately, as the cases where the fixed-coefficient method is "the most relevant and the most
 difficult to outperform". Cordier et al. do not say what their percentage error is normalised by,
 and report that the complete pipeline has not yet been evaluated end to end. Cordier et al.'s
-medium-to-low-voltage step was tested on about 100 substations using measured rather than forecast
-inputs, so the test measures the disaggregation rather than the forecast.
+medium-to-low-voltage step was tested on about 100 substations using measured rather than forecast inputs. So the test measures the disaggregation rather than the forecast.
 
 ### Northern Powergrid's Artificial Forecasting is already operational
 
@@ -2983,7 +2974,7 @@ Forecasting.** The net present value comes from a 3% reduction in spending on re
 building bigger transformers and cables — in the current price-control period, rising to 6% in the
 next, and from a 25% improvement in the cost-effectiveness of contracted flexibility. Curtailment is
 not included in Artificial Forecasting's four benefit categories. The forecast covers customer
-export at primary substations, but the one published value case in this review puts no money on
+export at primary substations. But the one published value case in this review puts no money on
 curtailment, which NGED values alongside the flexibility it procures. The Artificial Forecasting
 project pairs those figures with a direct caveat: Artificial Forecasting reports early Beta
 evidence, from one winter procurement cycle, supporting the performance assumptions behind the value
@@ -3001,8 +2992,7 @@ distribution network operators.
 describe.** The two projects overlap on forecasting net demand at primary substations and on
 forecasting metered generation. Artificial Forecasting's Beta registration also lists load
 disaggregation among the project's innovations, describing "a novel approach to forecasting HV
-[high-voltage] load, separately modelling gross demand and distributed generation"; the two series
-that approach separates are each already measured rather than inferred, which is a different task
+[high-voltage] load, separately modelling gross demand and distributed generation". The two series that approach separates are each already measured rather than inferred, which is a different task
 from the task Flexpectation takes on. The Beta annual progress report produces net demand "by
 independently modelling customer export data", the Alpha technical report covers "all 160
 substations where both gross demand and customer export data were available", and the Embedded
@@ -3013,8 +3003,7 @@ source separation. Two more of Flexpectation's challenges do have a counterpart 
 Forecasting's deliverables. The Artificial Forecasting Beta annual progress report describes
 automated health checks and dashboards that "highlight substations where input data is degraded
 (e.g. faulty sensors, frozen or anomalous values)" and an extract-transform-load (ETL) pipeline that
-"flags frozen/spiky SCADA [supervisory control and data acquisition] data before modelling", which
-is Flexpectation's challenge 6; and the Alpha user research treats planned and unplanned outages as
+"flags frozen/spiky SCADA [supervisory control and data acquisition] data before modelling", which is Flexpectation's challenge 6. The Alpha user research treats planned and unplanned outages as
 data worth bringing in and as a reason to widen the error margin, which is a different response to
 challenge 4's problem rather than no response.
 
@@ -3025,13 +3014,11 @@ dropping the periods when it was not; recovering signed net demand from an appar
 inferring unmetered solar and wind from a substation's net flow; and doing the same for heat pumps,
 chargers, and batteries. Across every Artificial Forecasting deliverable published on the Smarter
 Networks Portal — Discovery, Alpha, and Beta — searches for "abnormal", "unmetered", "apparent
-power", "non-directional", "blind source", and "source separation" return nothing at all; "capacity"
-appears 123 times but never as an effective or derated capacity; and the five occurrences of a
+power", "non-directional", "blind source", and "source separation" return nothing at all. "Capacity" appears 123 times but never as an effective or derated capacity. And the five occurrences of a
 "switch" stem are generators switching on or off, switchgear asset types, and switching over a data
 feed. Heat pumps and electric vehicles do appear, as drivers of demand growth and as model features
 rather than as quantities separated out of a net flow. Flexpectation also delivers 1st and 99th
-percentiles where Artificial Forecasting's published bands run from the 5th to the 95th, and the
-curtailment decisions NGED describes turn on those outer levels.
+percentiles where Artificial Forecasting's published bands run from the 5th to the 95th. The curtailment decisions NGED describes turn on those outer levels.
 
 ## Why we think this ambitious plan can be done
 
@@ -3039,15 +3026,14 @@ curtailment decisions NGED describes turn on those outer levels.
 literature in five ways at once.** The distance between Flexpectation's plan and the published
 literature says more about where our search fell short than about the quality of the work that fills
 the rest of the field. No study in this review drives a substation forecast from a weather ensemble
-across a 14-day horizon. No study we read models the tails explicitly at substation level; the one
-study that models the tails explicitly at all works on regions far larger than a substation. No
+across a 14-day horizon. No study we read models the tails explicitly at substation level. The one study that models the tails explicitly at all works on regions far larger than a substation. No
 study we read puts unmetered generation inside a probabilistic forecast at substation level over a
 multi-day horizon, though unmetered generation, probabilistic forecasting at substation level, and a
 multi-day horizon each exist independently. No study we read tracks the available capacity of a
 mixed fleet of solar, wind, and dispatchable generators at one distribution network, or measures
 whether doing so improves the forecast. No study we read turns switching-contaminated history at a
 substation into a useful input rather than deleting that history, rewriting that history, or
-absorbing the accuracy loss of leaving that history in; the nearest precedent we found, [Liu et al.
+absorbing the accuracy loss of leaving that history in. The nearest precedent we found, [Liu et al.
 (2019)](https://doi.org/10.1109/ACCESS.2019.2951422), conditions a forecast on an operating-state
 label, but for switching between transformers inside one substation, where the substation total
 stays metered throughout. Flexpectation attempts all nine challenges above, across four families of
@@ -3064,11 +3050,10 @@ model:
 
 **By the standard of scope in this literature, each of the four strands is a separate piece of
 work.** Almost every study reviewed above takes on one of the nine challenges, at one voltage level,
-with one family of model; the few that touch more than one challenge almost all solve those
+with one family of model. The few that touch more than one challenge almost all solve those
 challenges as a pipeline rather than together. Pre-training weather and time encoders and then
-reading a substation's probabilistic forecast off the encoders would be a full paper by that
-standard, and so would each of the other three strands. Sizing the four strands as separate papers
-scopes the work rather than promising an output — how many of the strands survive contact with the
+reading a substation's probabilistic forecast off the encoders would be a full paper by that standard. So would each of the other three strands. Sizing the four strands as separate papers
+scopes the work rather than promising an output. How many of the strands survive contact with the
 data is exactly what the project has to find out.
 
 **Only the heavily-tuned gradient-boosting model, the first of the four strands, is in scope for
@@ -3082,11 +3067,10 @@ the architecture goes from 32 to about 2,500 time series without structural chan
 rather than nine.** A switching event, a turbine out for repair, and a stuck meter all surface in
 the same place: as a discrepancy between what a substation metered and what the weather and the
 calendar say the substation should have metered. Almost every study reviewed above that touches more
-than one of the nine challenges solves those challenges as a pipeline, and the exception we found,
+than one of the nine challenges solves those challenges as a pipeline. The exception we found,
 [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421), fits one wind farm's
 time-varying capacity jointly with its probabilistic forecast rather than a substation's several
-challenges together. In the pipelines one stage's output is frozen before the next stage sees it, so
-an error made early cannot be corrected later and the forecast error never gets to tell the capacity
+challenges together. In the pipelines one stage's output is frozen before the next stage sees it. So an error made early cannot be corrected later, and the forecast error never gets to tell the capacity
 estimator that the estimate was wrong.
 
 **The question we want to answer is whether one model that estimates capacity, switching state, and
@@ -3095,11 +3079,9 @@ room for that combined approach, asking that capacity, switching state, and dema
 rather than that each be handled explicitly. The one published result we found that bears on the
 question points the joint way: [de Vilmarest et al.
 (2024)](https://doi.org/10.1109/TPWRS.2023.3310280), described under challenge 3, removed the
-embedded wind and solar capacities from their model of GB regional net load, and the adaptive
-version got 0.4% *better*, absorbing into its own coefficients what the explicit capacity figure had
+embedded wind and solar capacities from their model of GB regional net load. The adaptive version got 0.4% *better*, absorbing into its own coefficients what the explicit capacity figure had
 been supplying, while the offline, non-adaptive version got more than 10% worse. The de Vilmarest et
-al. finding is one result, on regions far larger than a substation, for one phenomenon out of
-several, and there are reasons to doubt the finding generalises: we expect a gradient-boosted tree
+al. finding is one result, on regions far larger than a substation, for one phenomenon out of several. There are reasons to doubt the finding generalises: we expect a gradient-boosted tree
 to do badly at the subtraction a two-stage residual hands the tree precomputed, and tens of
 thousands of training rows per series is a small sample in which to hope a model discovers an
 implicit baseline for itself. Neither expectation is measured here. We expect the answer to differ
@@ -3110,8 +3092,7 @@ estimated jointly by construction.
 **The first reason for confidence is that one more experiment takes compute time rather than staff
 time.** The core forecast already exists and runs today, on an experiment framework that makes one
 more experiment take compute time rather than staff time. That low marginal effort is what makes it
-realistic to run on the order of hundreds of machine-learning experiments a month, and the
-introduction to this review makes the same argument. The project states the claim as a falsifiable
+realistic to run on the order of hundreds of machine-learning experiments a month. The introduction to this review makes the same argument. The project states the claim as a falsifiable
 hypothesis,
 [H2](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h2-a-hundred-experiments-per-person-in-a-peak-month):
 when experimentation is the active workstream, one person can register at least 100 leaderboard
