@@ -878,10 +878,10 @@ business case alone.
   hydro series. Nor does v2 rescue it. NGED's own
   [Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register)
   (August 2026) lists **41 connected hydro sites totalling 25.7 MW** across all four licence areas —
-  South Wales 13.7 MW over 10 sites, South West 6.2 MW over 18, East Midlands 5.3 MW over 8, West
-  Midlands 0.5 MW over 5. For scale, the same register shows **5,958 MW of connected solar** and
-  1,456 MW of wind on that network, so hydro is under half a percent of the embedded solar
-  capacity.
+  South Wales 13.7 MW over 10 sites, South West 6.2 MW over 18 sites, East Midlands 5.3 MW over 8
+  sites, West Midlands 0.5 MW over 5 sites. For scale, the same register shows **5,958 MW of
+  connected solar** and 1,456 MW of wind on that network, so hydro is under half a percent of the
+  embedded solar capacity.
 
     Two details from the register matter more than the headline total. First, it confirms the
     physics is the *right* physics: 39 of the 44 hydro entries are `Hydro - Run of river` and 29
