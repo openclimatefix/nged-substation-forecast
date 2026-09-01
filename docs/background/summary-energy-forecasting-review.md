@@ -999,9 +999,11 @@ gives less stable results. [Meyers et al. (2020)](https://doi.org/10.1109/JPHOTO
 removed that requirement: their unsupervised signal-processing approach "only requires a measured
 power signal as an input — no irradiance data, temperature data, or system configuration
 information", and they validate the approach against RdTools on the same dataset, reporting greater
-robustness to data anomalies. Their approach is now the open-source Solar Data Tools, whose pipeline
-detects capacity changes and clipping and estimates degradation, with a Monte Carlo step that
-returns a distribution rather than a point estimate.
+robustness to data anomalies. That approach ships as the open-source StatisticalClearSky library,
+and Meyers et al. automated its data cleaning and preprocessing with a second open-source library,
+Solar Data Tools. Solar Data Tools now carries a pipeline of its own, which detects capacity changes
+and clipping, and estimates degradation with a Monte Carlo step that returns a distribution rather
+than a point estimate.
 
 **Estimating capacity jointly with the forecast, rather than in two stages, has also been published
 — and reading its headline figure carefully matters.** [Pierrot and Pinson
@@ -2200,7 +2202,7 @@ exists are the aggregation level and whether the leaderboard is still open.
 | HEFTCom ([Browell et al. (2026)](https://doi.org/10.1016/j.ijforecast.2025.10.005)) | The combined day-ahead output of one GB wind-and-solar portfolio | A single 3.6 GW portfolio: the 1.2 GW Hornsea 1 offshore wind farm plus a regional solar aggregate — the generation mix closest to NGED's, though at portfolio rather than substation level | Over 170 teams registered, 66 submitted, 24 completed | Closed; the competition period was 3 months |
 | Three competitions NGED funded with Energy Systems Catapult ([McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541)) | 1-minute peaks inside half-hourly averages; the daily peak a hidden population of electric-vehicle chargers added; and missing values. None was a load forecast | NGED's own grid supply point, bulk supply points, and primary-substation feeders | 37 teams, over 2,500 submissions | Closed, though the pages and data are still readable on CodaLab |
 | WindAI ([Authen et al. (2026)](https://doi.org/10.5617/nmi.13106)) | Hourly wind power for the whole of a target day two days ahead, submitted daily against an outturn that had not yet happened | Four bidding zones of a transmission network — regions far above a primary substation | 9 teams carry an average score in the competition summary | Closed; the live evaluation ran over 10 working days in autumn 2025 |
-| Energy-Arena ([Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705)) | The paper describes deterministic day-ahead tasks; the running platform today carries 24 challenges across prices, load, wind, and solar — 8 scored as point forecasts, 8 as quantiles, and 8 as ensembles | Not a distribution network | Not stated in what we read | Standing |
+| Energy-Arena ([Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705)) | The paper describes deterministic day-ahead tasks; the running platform carried 24 challenges across prices, load, wind, and solar in September 2026 — 8 scored as point forecasts, 8 as quantiles, and 8 as ensembles | Not a distribution network | Not stated in what we read | Standing |
 | TS-Arena ([Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)) | 186 live energy series | Not a distribution network | 13 foundation models and 3 statistical baselines run by the platform team, plus outside entries | Standing |
 | Predico ([Elia Group](https://innovation.eliagroup.eu/en/projects/predico-collaborative-forecasting-platform)) | Quarter-hourly probabilistic generation: Belgian solar out to 10 days ahead, and the German wind and solar markets 50Hertz runs day-ahead | National generation totals of two transmission networks | Forecasters join by application; the number taking part is not published | Standing |
 | **Flexpectation's leaderboards** | Net demand at substations, and output at metered generators | One board per class of time series | Public to view and reproducible; outside entries not invited | Standing |
@@ -2375,8 +2377,9 @@ design better than the loose one: CASP is a recurring competition rather than a 
 gathering every two years proteins "for which the experimental structure is about to be solved or is
 solved but still not public" and giving the sequences to entrants, so each target is single-use once
 the structure is published. The standing benchmark in that field is a different one, CAMEO, which
-takes the weekly pre-release of forthcoming structures as its targets. AlphaFold2 was developed
-against neither, but against a temporal hold-out of its own: [Jumper et al.
+[Robin et al. (2021)](https://doi.org/10.1002/prot.26213) describe as complementing CASP by running
+"fully automated blind evaluations" against the weekly pre-release of forthcoming structures.
+AlphaFold2 was developed against neither, but against a temporal hold-out of its own: [Jumper et al.
 (2021)](https://doi.org/10.1038/s41586-021-03819-2) score it on structures "deposited in the PDB
 after our training data cut-off", which is what a live forecasting service gets for free. The blind
 competition was the audit; the temporal hold-out was a check the team could run for itself, on data
@@ -2567,19 +2570,20 @@ so rather than being left blank.
 | [Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058) (Enedis, France) | Consumption and generation at the substation since 2015; the finer-grid method the paper describes covers consumption, not generation | All 2,300 high-voltage-to-medium-voltage substations, extending to 3,678 of the more than 5,000 transformers inside them, and towards 750,000 medium-to-low-voltage substations | Not stated in the paper; the forecasts run at 10- or 30-minute resolution | None stated in the paper |
 | **Flexpectation** | Net demand, with unmetered generation inferred | 32 series in the trial area; 52 grid supply points, 271 bulk supply points, and 1,161 primary substations across NGED's whole distribution network from 2027 | 14 days, updated every 6 hours | A 51-member ECMWF ensemble across the whole horizon |
 
-**[SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) (2018 - 2023; £12.6 million) is the
-closest precedent we found for Flexpectation's method.** TRANSITION split each substation's net load
-— demand minus whatever generation behind that substation happened to produce — into demand and
-generation, forecast the two separately, then recombined them. Flexpectation adds an ensemble that
-spans the whole 14-day horizon, and deployment across a whole distribution network; TRANSITION set
-out to build neither. TRANSITION's ensemble covered the first 4 days, so from day 4 to day 10 a
-single deterministic forecast was all TRANSITION had, and Flexpectation's forecast horizon runs to
-14 days. And TRANSITION was a 13-substation trial rather than a deployment across a whole
-distribution network. TRANSITION also used the distribution network's connectivity map — the record
-of which substation feeds which — throughout, and ranks "historical network connectivity data
-availability" as "just as important as historical net demand and generation measurements", which is
-a GB operator's own verdict on the connectivity-map input Flexpectation plans to use explicitly. The
-rest of TRANSITION's published design matches what Flexpectation is building.
+**[SSEN TRANSITION](https://ssen-innovation.co.uk/transition/) (2018 - 2023; £12.6 million in the
+project's close-down report, £14.5 million on SSEN's own project page) is the closest precedent we
+found for Flexpectation's method.** TRANSITION split each substation's net load — demand minus
+whatever generation behind that substation happened to produce — into demand and generation,
+forecast the two separately, then recombined them. Flexpectation adds an ensemble that spans the
+whole 14-day horizon, and deployment across a whole distribution network; TRANSITION set out to
+build neither. TRANSITION's ensemble covered the first 4 days, so from day 4 to day 10 a single
+deterministic forecast was all TRANSITION had, and Flexpectation's forecast horizon runs to 14 days.
+And TRANSITION was a 13-substation trial rather than a deployment across a whole distribution
+network. TRANSITION also used the distribution network's connectivity map — the record of which
+substation feeds which — throughout, and ranks "historical network connectivity data availability"
+as "just as important as historical net demand and generation measurements", which is a GB
+operator's own verdict on the connectivity-map input Flexpectation plans to use explicitly. The rest
+of TRANSITION's published design matches what Flexpectation is building.
 
 **NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost, which
 its evaluation reported as the most accurate of the three methods tested and as easy to automate.**
@@ -3078,6 +3082,9 @@ Machine Learning*.
 - Richardson, D. S. (2000). [Skill and relative economic value of the ECMWF ensemble prediction
 system](https://doi.org/10.1002/qj.49712656313). *Quarterly Journal of the Royal Meteorological
 Society*.
+- Robin, X. et al. (2021). [Continuous Automated Model EvaluatiOn (CAMEO)—Perspectives on the future
+of fully automated evaluation of structure prediction methods](https://doi.org/10.1002/prot.26213).
+*Proteins: Structure, Function, and Bioinformatics*.
 - Ruhhütl, M., Schmaranz, R. and Dietrichsteiner, T. (2023). [Load and generation forecast on
 substation level](https://doi.org/10.1049/icp.2023.0476). *CIRED 2023, Rome*, in *IET Conference
 Proceedings*.
