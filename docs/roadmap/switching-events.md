@@ -504,6 +504,18 @@ residuals around time t (observed - expected), one row per substation:
                 (pairwise matching would FAIL: neither j nor k alone equals 9)
 ```
 
+**Checking both sides of a transfer has no published precedent we could find.** The
+[energy-forecasting
+review](../background/energy-forecasting-review.md#4-detecting-switching-events) searched 40
+title-and-abstract queries and 10 full-text queries across OpenAlex, Semantic Scholar, Crossref, and
+arXiv, the works citing [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164), and every project
+title on the Energy Networks Association's Smarter Networks Portal, and found every switching
+detector in the literature scoring one substation against its own history alone. The one paper that
+search turned up which couples substations, [Willis et al.
+(1984)](https://doi.org/10.1109/TPAS.1984.318713), corrects annual peak-load curve fits rather than
+detecting an event at a point in time, and the review could not obtain the full text to confirm
+whether its "load transfer coupling" regression couples the substations that exchange load.
+
 **The neighbourhood-sum test (cheap, powerful corroboration).** Conservation offers a second,
 sharper statistic than "the rises sum to the drop": over the candidate set {source + donors}, the
 **summed residual should show no step at all** across the event, while every member shows one. So,
@@ -547,6 +559,15 @@ data-pipeline shifts on NGED's side produce coincident steps across *many* serie
 step time shared by a large fraction of the fleet is a data artifact, not a switching event, and
 must be excluded before the subset search runs — otherwise it manufactures spurious
 multi-substation "events".
+
+**A GB precedent already draws this distinction at fleet scale, on power alone.** Electricity North
+West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted step
+changes in 5 years of half-hourly demand from over 70 bulk supply points and 380 primary substations
+into "unreasonably zero or negative demand" and "switching operations and network reconfigurations",
+using power alone and no bottom-up reference series, as the [energy-forecasting
+review](../background/energy-forecasting-review.md#4-detecting-switching-events) records. ATLAS
+published no precision or recall for either rule, so it does not settle how well the distinction can
+be drawn — only that GB substations have been sorted this way before.
 
 ##### Stage 3 — composition corroboration
 

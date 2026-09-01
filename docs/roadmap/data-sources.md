@@ -75,6 +75,19 @@ As of May 2026, NGED's full network (the v2 target scope) consists of:
     - Power flow from metered generators connected to primaries is **already subtracted** from the
       primaries' power flow ("Disaggregated Demand").
 
+The **Embedded Capacity Register** behind these figures has limits worth naming, because both
+[capacity estimation](capacity-estimation.md) and [disaggregation](disaggregation.md) build on it.
+It records generation of 50 kW and above, and the capacity recorded is the export limit a site's
+connection agreement permits rather than what the site can actually generate, which is why both
+capacity candidates estimate *effective* capacity rather than reading nameplate capacity off the
+register. Below 50 kW the register is silent, and that is most of the panels: of the 22,560 MW of
+solar photovoltaic capacity installed in GB by the end of July 2026, 8,503 MW sits in arrays smaller
+than 50 kW, as the [energy-forecasting
+review](../background/energy-forecasting-review.md#8-disaggregating-unmetered-solar-and-wind-from-a-substations-net-flow)
+reports from the Department for Energy Security and Net Zero's [solar deployment
+statistics](https://www.gov.uk/government/statistics/solar-photovoltaics-deployment). That is the
+scale of what disaggregation has to recover with no register to check against.
+
 The **v1 trial area** is 32 of these time series — see the [roadmap index](index.md) for the
 breakdown.
 
