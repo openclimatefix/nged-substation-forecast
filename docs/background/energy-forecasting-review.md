@@ -450,12 +450,15 @@ substation power flow, which the pipelines of separate models in this literature
 
 **The evidence behind those three ML model families is uneven.**
 
-- **Pre-trained models** have the best support of the three, but the measured result is for a
-different kind of pre-training from the one Flexpectation plans — freezing one encoder and reusing
-it across several downstream tasks, rather than using a foundation model on its own: the
-general-purpose model [Kaas et al. (2026)](https://arxiv.org/abs/2607.01966) tested was pre-trained
-on time series, had never been trained on their data, and still beat every purpose-trained
-competitor across 200 German low-voltage feeders.
+- **Pre-trained models** have the best support of the three, but that support comes from computer
+vision and Earth observation rather than from energy forecasting — DINOv3 and AlphaEarth
+Foundations, each a single frozen encoder read by many downstream tasks, which is the arrangement
+Flexpectation plans and the one set out under "Pre-trained encoders" below. The one
+energy-forecasting result pointing the same way measures a different arrangement, a foundation model
+used on its own rather than an encoder reused across tasks: the general-purpose model [Kaas et al.
+(2026)](https://arxiv.org/abs/2607.01966) tested was pre-trained on time series, had never been
+trained on their data, and still beat every purpose-trained competitor across 200 German low-voltage
+feeders — by a single median margin that the same paper's covariate ablation reverses.
 - **Connectivity-map models** have been measured on NGED's own published data: [Campagne et al.
 (2025)](https://arxiv.org/abs/2507.03690) compare eight graph neural network architectures against
 feed-forward, persistence, and foundation-model baselines on French regional load and on the GB
@@ -2553,12 +2556,23 @@ model sophistication. But a model trained on the feeders' own history, beaten by
 none of that history, still tells us how much any programme of heavy engineering is likely to
 improve accuracy.
 
+**Two limits keep that one result from settling the question.** The margin is a single number: Kaas
+et al. report the median across their 200 feeders, 3.839 kW against 4.184 kW for the best
+purpose-trained model, with no confidence interval, no repeated runs, and no test of whether a gap
+of that size could have arisen by chance. And the margin rests on the weather covariates as much as
+on the pre-training, because the same paper's ablation, which strips the covariates from the
+foundation models but not from the purpose-trained ones, puts Chronos-2 at 4.813 kW — behind the
+purpose-trained model that keeps them.
+
 ## What network operators have already built
 
 **Nine projects run by electricity network operators have already built a forecasting capability
 that overlaps Flexpectation's.** The last row of the table below is Flexpectation itself, so the
 comparison is direct. Where a project's published deliverables do not answer a column, the cell says
-so rather than being left blank.
+so rather than being left blank. For scale against the project costs quoted after the table,
+Flexpectation's own [registration on the Smarter Networks
+Portal](https://smarter.energynetworks.org/projects/nged_nia_085/) records a budget of £841,733 and
+a January 2026 to March 2028 delivery window.
 
 | Project | What the project forecasts | Scale | Horizon | Uncertainty published |
 |---|---|---|---|---|
@@ -3052,6 +3066,8 @@ forecasts](https://www.neso.energy/data-portal/embedded-wind-and-solar-forecasts
 forecasting](https://www.neso.energy/news/solar-nowcasting-innovation-project-improves-solar-forecasting).
 - National Energy System Operator (2023). [Solar PV Nowcasting
 (NIA2_NGESO002)](https://smarter.energynetworks.org/projects/nia2_ngeso002/).
+- National Grid Electricity Distribution. [Flexpectation
+(NGED_NIA_085)](https://smarter.energynetworks.org/projects/nged_nia_085/).
 - Nespoli, L., Medici, V., Lopatichki, K. and Sossan, F. (2020). [Hierarchical Demand Forecasting
 Benchmark for the Distribution Grid](https://arxiv.org/abs/1910.03976). *Electric Power Systems
 Research*.
