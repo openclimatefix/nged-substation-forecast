@@ -63,11 +63,10 @@ needed one, the mistake is already written.
 | `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
 | `implement-issue` | writing code for an approved plan: worktree, verify set, PR, up to two adversarial reviews, stop |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh pr merge`, or ship-time triage |
-| `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
-| `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
-| `restructure-prose` | reordering or simplifying prose that already exists, especially a `docs/` page nobody has audited for structure since it was first drafted |
-| `prose-review` | auditing existing prose against the prose-style rules below, one rule per pass |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
+| `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
+| `prose-review` | reviewing, reordering or simplifying prose that already exists — structure first, then one pass per rule |
+| `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
 
 ## Docs
 
@@ -105,27 +104,31 @@ docstrings, code comments, GitHub issue and PR bodies, and anything we write for
 
 **The prose rules in this section govern words and sentences; getting a whole document's order
 right needs a planning step of its own.** A badly ordered document reads fine sentence by sentence,
-so the rules below won't catch it and neither will a reviewer holding the whole document in
-context — such a reviewer already knows what a later section says while reading an earlier one,
-which is exactly the knowledge a first-time reader doesn't have. Load `long-form-prose` before
-drafting new prose longer than a few paragraphs, and `restructure-prose` before reordering or
-simplifying prose that already exists.
+so the rules below won't catch it and neither will a reviewer holding the whole document in context
+— that reviewer already knows what a later section says while reading an earlier one, which is
+exactly the knowledge a first-time reader doesn't have. Load `long-form-prose` before drafting new
+prose longer than a few paragraphs.
 
-**When auditing prose against these rules, do one pass per rule, and load `prose-review`
-before starting.** A reviewer asked to check everything at once finds the loudest fault in each
-paragraph and moves on, so the quieter faults survive: a combined sweep of one section of the
-literature review reported nothing, and a one-rule-at-a-time sweep of the same text found thirty.
-The `prose-review` skill owns the procedure — the order to sweep in, what is deliberately not a
-finding, how to chunk a long file across sub-agents, which model to use, and how to triage findings
-before applying any of them.
+**When reviewing prose against these rules, load `prose-review` before starting.** A reviewer asked
+to check everything at once finds the loudest fault in each paragraph and moves on, so the quieter
+faults survive: a combined sweep of one section of the literature review reported nothing, and a
+one-rule-at-a-time sweep of the same text found thirty. The `prose-review` skill owns the procedure
+— the order to sweep in, what is deliberately not a finding, how to chunk a long file across
+sub-agents, which model to use, and how to triage findings before applying any of them.
 
 **This is technical writing, not poetry: precision first, concision second, elegance last.** Every
-page here is a reference document, read by someone who is about to act on it, so a sentence that can
-be read two ways will eventually be read the wrong way and built on. Precision wins every contest it
-enters: repeat the noun, restate the qualifier, name the units, and accept a sentence flatter than a
-writer would like. Concision comes next, and is bought by cutting whole sentences rather than by
-clipping words out of a sentence that needs them. Most of the rules below are that order of
-priorities applied to one recurring case.
+page here is a reference document, read by someone who is about to act on it, so a sentence that
+can be read two ways will eventually be read the wrong way and built on. Precision wins every
+contest it enters: repeat the noun, restate the qualifier, name the units, and accept a sentence
+flatter than a writer would like. Concision comes next, and comes from cutting whole sentences
+rather than from clipping words out of a sentence that needs them. Most of the rules below are that
+order of priorities applied to one recurring case.
+
+**Lead each paragraph with a bolded sentence that states its conclusion.** The reader should get
+the argument from the bolded leads alone, then read on only where they want the reasoning. That
+skim-reading pattern is why we prefer sub-headings and short paragraphs over bullet lists: a list
+flattens the argument into items of equal weight, whereas a bolded lead says which claim matters
+and the sentences under it say why.
 
 **Be concrete and plain; write for a skim-reader.** Assume the reader is skimming and wants the
 meaning to jump off the page, not to spend effort decoding a clever, abstract or metaphorical
@@ -173,17 +176,17 @@ say what kind of unknown: "an input we have not anticipated", not "something une
 fields are the information. Write "the panel tilt, the panel azimuth, and the ratio of
 direct-current to alternating-current rating", not "the site's metadata"; write "six columns
 describing each low-voltage feeder — among them how many housing units it serves", not "metadata
-covariates". Where the fields are not worth listing in full, name the ones that matter and say how
-many there are. The same goes for every other umbrella noun that stands in for a list the reader
-wants: "parameters", "attributes", "characteristics", "data quality issues".
+covariates". Where the fields are not worth listing in full, name the fields that matter and say
+how many there are. The same goes for every other umbrella noun that stands in for a list the
+reader wants: "parameters", "attributes", "characteristics", "data quality issues".
 
 **Say which kind of network you mean, every time.** This project forecasts an electricity network
 using neural networks, so a bare "network" makes the reader stop and work out which one is meant.
 Qualify it on both sides: "electricity network", "distribution network", "network operator" for the
-wires, and "neural network", "graph neural network", "long short-term memory neural network" for the
-model. Where a sentence would otherwise pile up the qualifier, name the thing instead — "a model
-trained on the feeders' own history" beats "a model given a network's whole history". Any other word
-this project uses for two different things gets the same treatment.
+wires, and "neural network", "graph neural network", "long short-term memory neural network" for
+the model. Where a sentence would otherwise pile up the qualifier, name the specific noun instead —
+"a model trained on the feeders' own history" beats "a model given a network's whole history". Any
+other word this project uses for two different meanings gets the same treatment.
 
 **Describe performance in performance terms, not in money metaphors.** A forecast does not "pay",
 an input does not "buy" accuracy, and a modelling choice does not "cost" anything unless real money
@@ -207,13 +210,13 @@ metered generators"), or spell the number out. Counts of the document's own stru
 families") and idiomatic ratios ("nine ideas in ten") stay in words, because neither is a
 measurement.
 
-**Use the serial comma — the one before the final "and" or "or" in a list of three or more items.**
-So "solar, wind, and dispatchable generators", never "solar, wind and dispatchable generators".
-The serial comma is the one deliberate departure from *The Economist*'s house style above, and it
-removes a real ambiguity: without the comma the last two items can read as a pair belonging to the
-item before them, which in a list of assets or of data sources changes the meaning. A list of two items takes no
-comma, and an author string in a reference list follows the citation convention rather than this
-rule.
+**Use the serial comma — the comma before the final "and" or "or" in a list of three or more
+items.** So "solar, wind, and dispatchable generators", never "solar, wind and dispatchable
+generators". The serial comma is the one deliberate departure from *The Economist*'s house style
+above, and it removes a real ambiguity: without the comma the last two items can read as a pair
+belonging to the item before them, which in a list of assets or of data sources changes the
+meaning. A list of two items takes no comma, and an author string in a reference list follows the
+citation convention rather than this rule.
 
 **Be concise by cutting whole sentences, not words.** Prose should be as short as it can be
 without losing readability, but the compressible material is rarely inside a sentence. It is whole
@@ -270,12 +273,6 @@ found, what a technique does, or how a subsystem works is not a project plan, an
 "Flexpectation will therefore label the telemetry by hand" turns a description into a promise a
 funder can hold us to. Describe what is known and what the options are, and leave what we will do
 to the roadmap, the issue tracker, and the documents that own those commitments.
-
-**Lead each paragraph with a bolded sentence that states its conclusion.** The reader should get the
-argument from the bolded leads alone, then read on only where they want the reasoning. This is why
-we prefer sub-headings and short paragraphs over bullet lists: a list flattens the argument into
-items of equal weight, whereas a bolded lead says which claim matters and the sentences under it
-say why.
 
 **Don't introduce a name, a number, or an acronym before the reader has a use for it.** A fact that
 exists only to justify a claim belongs after the claim, not before it — a reader who meets the

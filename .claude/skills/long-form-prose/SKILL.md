@@ -56,25 +56,11 @@ detail has stopped being a planning tool.
 - **Introduce a fact only in the section whose outline entry needs it.** If a section's draft wants
   a fact that belongs to a later section, that's a sign the outline order is wrong, not a fact to
   smuggle in early.
-- **Apply the CLAUDE.md prose-style rules one at a time, as separate passes over the drafted text**,
-  rather than trying to satisfy all of them while drafting. A single named-rule pass — for example,
-  a pronoun-only pass whose output is a line number and a proposed replacement — does better work
-  than a general "make this good" pass, and does much better work than trying to draft
-  rule-conforming prose from a blank page.
+- **Apply the CLAUDE.md prose-style rules one at a time, using `prose-review`'s one-rule-per-pass sweep, as separate passes over the drafted text** rather than trying to satisfy every rule while drafting. A single named-rule pass does better work than a general "make this good" pass, and much better work than trying to draft rule-conforming prose from a blank page.
 
 ## Check the draft against a reader, not a reviewer
 
-**Spawn a fresh sub-agent that can see only the draft, not this repository or this conversation.**
-Paste the draft into the prompt, or point the sub-agent at a single scratchpad file, and instruct it
-to read nothing else — left unconstrained, a sub-agent in this repo auto-loads `CLAUDE.md` and can
-read any file in it, which defeats the isolation. Give it a stated knowledge boundary too: a persona
-matched to the document's actual audience, such as "a distribution-network planner who has never
-trained a machine-learning model." Ask it to read from the top and stop at the first sentence it
-cannot follow, and to name the earlier sentence that would have had to exist for that sentence to
-work. Forbid it from rewriting anything — its job is to report where a reader stalls, not to fix the
-prose. Run it with two or three personas that cover the document's real readers; a stop point one
-persona reports and another doesn't is a gap specific to that persona's background, not a fault in
-the document as a whole.
+**Run `prose-review`'s first-stumble reader against the draft.** A fresh sub-agent, isolated from this repository and this conversation, reads from the top with a persona matched to the draft's real audience — such as "a distribution-network planner who has never trained a machine-learning model" — and stops at the first sentence it cannot follow. The isolation requirement, the multi-persona rule and the instruction not to rewrite anything are the same whether the text is a fresh draft or an existing page, and `prose-review` documents all three.
 
 **Fix every stop point at the outline level, then re-extract the conclusion list and check it
 again.** Move the missing prerequisite earlier, or move the stalling section later, rather than
@@ -83,9 +69,6 @@ outline's order wrong for the next reader who trips somewhere else.
 
 ## See also
 
-`restructure-prose` runs the same flat-list and first-stumble-reader checks over prose that already
-exists, for when there's a draft to fix rather than one to write. For a rewrite that adds whole new
-sections to an existing page, run `restructure-prose` on the existing text first, then outline the
-new sections here against the result — outlining new material against a page whose own structure
+`prose-review` runs the same flat-list and first-stumble-reader checks over prose that already exists, for when there's a draft to fix rather than one to write, and owns the one-rule-per-pass sweep this skill hands off to once a draft exists. For a rewrite that adds whole new sections to an existing page, run `prose-review` on the existing text first, then outline the new sections here against the result — outlining new material against a page whose own structure
 hasn't been checked risks building the new sections on prerequisites the existing page never
 actually establishes.

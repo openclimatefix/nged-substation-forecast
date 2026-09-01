@@ -158,7 +158,7 @@ load-bearing claim.
 than writing a brief from scratch. The template carries the constraints, the two kinds of route, and
 the reporting format that makes a negative checkable.
 
-## Reading the PDFs: five traps that silently corrupt what you quote
+## Reading the PDFs: six traps that silently corrupt what you quote
 
 Each of these produces plausible-looking text, so nothing warns you that the sentence you are
 about to quote is not the sentence in the paper.
@@ -244,10 +244,10 @@ the gap speak for itself.
 
 ## The four classes of claim that go wrong
 
-**Absence claims** — "nobody has", "no published work", "the first". These are only ever as good
-as the search behind them. State what was searched so the reader can judge, and prefer a narrower
-true claim to a wider one you cannot defend. Several such claims in this session's review survived
-three accuracy rounds and were refuted by a fourth with a wider net.
+**Absence claims** — "nobody has", "no published work", "the first". CLAUDE.md's rule applies
+(state what was searched, and prefer a narrower true claim to a wider claim you cannot defend);
+what this round adds is that such claims survive review longest. Several such claims in this
+session's review survived three accuracy rounds and were refuted by a fourth with a wider net.
 
 **Superlatives** — "the closest paper to our problem", "the largest study". Two of these in one
 document contradict each other, and a reader who notices stops trusting the rest. Scope every
@@ -456,3 +456,10 @@ uv run mkdocs build --strict
 
 **Reflow after editing**, so the wrapping stays consistent and the diff of the next edit stays
 readable.
+
+## See also
+
+`long-form-prose` plans the outline before any prose exists — load it before drafting a section of
+the review rather than after. `prose-review` owns the readability round referenced above, which is
+a separate pass from the accuracy round this skill owns, and it reuses the wrap-tolerant `rsub`
+substitution and the hard-wrapping warnings from this skill for editing the review itself.
