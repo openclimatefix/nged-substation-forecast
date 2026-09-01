@@ -89,8 +89,8 @@ share of research ideas that fail at around 90%, and treats that rate as an ordi
 feature of doing research rather than as evidence of doing it badly ([Nobel Week
 interview](https://youtu.be/nNM1QdmFwIs?t=852), 6 December 2024, from 14:12). So progress comes
 largely from being able to quickly test many ideas under identical conditions and carefully measure
-performance. We have built an MLOps framework that should allow us to test research ideas as
-efficiently as possible.
+performance. We have built a machine-learning operations (MLOps) framework that should allow us to
+test research ideas as efficiently as possible.
 
 **The fact that the industry doesn't yet know the state of the art is a huge opportunity for the
 Flexpectation project.** We are in a very privileged position where we can try hundreds of ideas,
@@ -446,7 +446,8 @@ body of data, then frozen and reused across several later tasks), connectivity-m
 differentiable physics (explicitly building the known behaviour of a solar panel, a wind turbine, or
 a building into the model, so the model has to learn only the physical parameters, not the
 equations) — are planned to *simultaneously* reason about multiple sources of variation in
-substation power flow, which the pipelines of separate models in this literature cannot do. The closing section of this review sets out the case for the work we plan in Flexpectation version 2.
+substation power flow, which the pipelines of separate models in this literature cannot do. The
+closing section of this review sets out the case for the work we plan in Flexpectation version 2.
 
 **The evidence behind those three ML model families is uneven.**
 
@@ -2464,6 +2465,178 @@ needed — and that estimate is tracked as it changes.
 - **Negative results are published too**, including whether an off-the-shelf model given none of our
 data matches our own, and whether sustained experimentation stops yielding improvements.
 
+## What the literature says about machine-learning operations
+
+**Machine-learning operations — building, testing, deploying, and monitoring machine learning as
+production software — is a core aim of Flexpectation, so the state of its literature is worth
+stating plainly: the field describes what good practice looks like, and does not measure whether
+that practice works.** [Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138)
+give the definition most of the field now uses, drawn from a structured review that narrowed 1,864
+retrieved articles to 27, a review of the available tools, and eight interviews with practitioners.
+They define machine learning operations as "a paradigm, including aspects like best practices, sets
+of concepts, as well as a development culture when it comes to the end-to-end conceptualization,
+implementation, monitoring, deployment, and scalability of machine learning products", drawing on
+machine learning, software engineering, and data engineering together, and from that evidence they
+derive nine principles. What Kreuzberger et al. do not do, and do not claim to do, is measure what
+adopting the nine principles changes.
+
+**The failure modes the practice exists to prevent were named from experience rather than from
+measurement, and the naming is the contribution.** [Sculley et al.
+(2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems) are
+explicit about the standing of their own paper, which "does not offer novel ML algorithms, but
+instead seeks to increase the community's awareness of the difficult tradeoffs that must be
+considered in practice over the long term", and which rests on what its acknowledgements call
+"accumulated folk wisdom" from running machine learning at Google. The paper reports no experiment
+and no number. What it contributes is a vocabulary the rest of the field now uses: entanglement and
+the principle Sculley et al. abbreviate to CACE, "Changing Anything Changes Everything", along with
+correction cascades, undeclared consumers, unstable and underutilised data dependencies, direct and
+hidden feedback loops, glue code, pipeline jungles, dead experimental codepaths, configuration debt,
+reproducibility debt, and process management debt. One widely used term is not theirs:
+"training-serving skew" is later vocabulary, and the words "skew" and "serving" appear nowhere in
+the paper.
+
+**Five systematic reviews agree that the field is largely conceptual, and the one that went looking
+for a measure of effectiveness reported finding none.** [Woźniak et al.
+(2025)](https://doi.org/10.1109/ACCESS.2025.3534990) screened 2,615 search results to 135 and then
+to 41 publications, and asked as one of their four research questions what metrics measure the
+effectiveness of a machine-learning-operations implementation. Their answer is that "None of the
+reviewed articles presented metrics that could measure the effectiveness of MLOps implementation in
+an organization", an absence they call "unexpected" and attribute to the immaturity of the area.
+[Eken et al. (2025)](https://doi.org/10.1145/3747346) cast the widest net, a multivocal review
+analysing "a corpus of 150 peer-reviewed and 48 grey literature" precisely because so much of what
+the field knows sits outside the journals, and they reach the same place from the other direction:
+an "impact analysis framework needs to be created" so that practitioners can "assess benefits and
+drawbacks using quantifiable metrics", which they list as future work rather than as something the
+literature already offers. [Lima et al. (2022)](https://doi.org/10.5220/0010997300003179) screened
+1,905 articles to 30 and concluded that machine-learning operations "is still in its initial stage",
+and [Rajashekarappa et al. (2026)](https://doi.org/10.1080/21693277.2026.2658878), reviewing 186
+records down to 12 studies in manufacturing specifically, report that "fully automated MLOps
+frameworks remain underdeveloped". The largest empirical study we found does not break the pattern:
+[John et al. (2025)](https://doi.org/10.1016/j.infsof.2025.107725) interviewed practitioners at 14
+companies and built a framework, a maturity model, and a taxonomy from what those practitioners
+described, but measured no outcome — the benefits their paper lists are benefits the interviewees
+and the prior literature claim, not effects John et al. measured.
+
+**What exists for energy forecasting specifically is a handful of platform descriptions rather than
+a body of findings that agree or disagree with each other.** [Zhao et al.
+(2026)](https://doi.org/10.3390/info17040328) screened 256 records to 31 sources and mapped 13
+general-purpose platforms against an energy-forecasting lifecycle, scoring each capability as
+native, partial, or not clear from the platforms' own documentation. Their first finding is the
+shape of the field rather than a ranking: "No energy-specific mature MLOps platforms were identified
+within the screened sources", so energy forecasting adapts general-purpose platforms to the domain.
+Zhao et al. are explicit that their mapping "does not perform hands-on deployments, runtime
+benchmarking, cost comparisons, or empirical evaluation of forecasting accuracy", and they close by
+naming the study that does not yet exist: "A natural next step is a hands-on empirical benchmark
+that evaluates the actual implementation complexity and operational performance of platforms."
+[Subramanya et al. (2022)](https://doi.org/10.3390/app12199851) go furthest towards a worked example,
+building and running a pipeline for day-ahead price forecasting in the Finnish reserve market, but
+report no accuracy figure and no measurement of the engineering effort the pipeline saved. The one
+paper we found that argues for machine-learning operations from inside power-systems forecasting,
+[Gürses-Tran and Monti (2022)](https://doi.org/10.3390/forecast4020028), makes a different point
+altogether: forecast developers "predominantly assess residuals and error statistics when tuning the
+targeted model's quality", so that "eventual cost or rewards of the underlying business application
+are typically not considered in the model development phase".
+
+**Operational forecast error grows measurably over time, yet no paper we read gives a retraining
+cadence for an energy forecast in production.** [Kazmi and Tao
+(2022)](https://doi.org/10.1016/j.apenergy.2022.119565) analysed 5 years of day-ahead forecasts
+published by 16 European transmission system operators and found that "the combined forecast error
+due to solar and wind has roughly doubled during just the last five years", with the errors "highly
+autocorrelated", meaning structure remains that a better model could exploit. [Heidrich et al.
+(2022)](https://doi.org/10.1145/3538637.3539759) attack the resulting problem from the cost side,
+observing that "Most methods for coping with such concept drifts rely on computationally expensive
+retraining", and updating a lightweight profile instead of retraining the whole model. What none of
+these papers supplies is a number a network operator could act on. The retraining triggers they
+state are qualitative — Subramanya et al. update their pipelines "if the performance has gone down",
+and Gürses-Tran and Monti say of their own ProLoaF model that training "is performed once and does
+not require re-training, as long as the used training dataset is still representative of the system
+under study" — so how often a substation forecast must be retrained is a question Flexpectation will
+have to answer from its own data.
+
+**Operational meteorology has been running continuous verification of production forecasts for
+decades, and has documented that practice far more thoroughly than the machine-learning-operations
+literature has documented its own.** [Brown et al. (2021)](https://doi.org/10.1175/BAMS-D-19-0093.1)
+describe the Model Evaluation Tools, verification software built since 2007 and used operationally
+by the United States National Weather Service and others, noting that "Forecast
+verification/evaluation has been a subject of research and also applied to operational forecasts for
+more than a century" and reporting a user community of "more than 3,700 researchers and operational
+users from 124 countries". [Hoffman et al. (2018)](https://doi.org/10.1175/WAF-D-18-0117.1) show
+what that machinery buys: tracking the skill of three operational forecasting centres continuously,
+they attribute a "7.37% increase in the probability of improved skill" to one named 2016 model
+upgrade. Tying a specific production change to a measured change in skill is what the
+machine-learning-operations literature does not do, and meteorology has been doing it routinely.
+
+**The case that fast, comparable iteration drives progress rests on a structural argument and on
+practitioner testimony, not on a controlled measurement.** [Donoho
+(2024)](https://doi.org/10.1162/99608f92.b91339ef) makes the structural argument. He identifies
+three practices, which he labels the frictionless-reproducibility triad — data sharing, the ability
+to re-execute another researcher's workflow exactly, and challenge problems with "a shared public
+dataset, a prescribed and quantified task performance metric, a set of enrolled competitors seeking
+to outperform each other on the task, and a public leaderboard" — and argues that fields adopting
+all three "commonly benefit from very high velocity of progress", because frictionless
+reproducibility "spontaneously spawns groups of inspired researchers to a tight loop of iterative
+experimental modification and improvement". Donoho hedges the claim in the same sentence: "Of
+course, not every field works this way." He offers historical case narrative rather than a
+measurement, so his paper is the strongest available argument for the mechanism and is not evidence
+of an effect size.
+
+**The practitioner testimony points the same way, and is careful to say that speed comes from the
+protocol rather than from haste.** John Jumper, whose estimate that around 90% of research ideas
+fail opens this review, elsewhere credits a prototype that "would give wrong answers at incredible
+speed", which "made it easy to start becoming very adventurous with the ideas you try" ([MIT
+Technology Review
+(2025)](https://www.technologyreview.com/2025/11/24/1128322/whats-next-for-alphafold-a-conversation-with-a-google-deepmind-nobel-laureate/),
+24 November 2025). [Ng (2018)](https://home-wordpress.deeplearning.ai/wp-content/uploads/2022/03/andrew-ng-machine-learning-yearning.pdf)
+writes that researchers "will usually try out many dozens of ideas before they discover something
+satisfactory", and that a development set with "a single-number evaluation metric helps you quickly
+evaluate algorithms, and therefore iterate faster". [Godbole et al.
+(2023)](https://github.com/google-research/tuning_playbook) recommend "running a larger number of
+shorter experiments and reserving the longest 'production length' runs for the models we hope to
+launch". Andrej Karpathy's [autoresearch](https://github.com/karpathy/autoresearch) fixes each
+training run at 5 minutes so that "you can expect approx 12 experiments/hour and approx 100
+experiments while you sleep", and states the reason for the fixed budget plainly: it "makes
+experiments directly comparable regardless of what the agent changes". The same author warns against
+reading any of this as licence to hurry, writing that "a 'fast and furious' approach to training
+neural networks does not work and only leads to suffering" ([Karpathy
+(2019)](https://karpathy.github.io/2019/04/25/recipe/)). Every one of these accounts describes fast
+iteration under a fixed and comparable protocol, which is a different claim from going fast.
+
+**Two limits on that testimony bound what Flexpectation can claim for its own machinery.** The
+accounts above come from senior practitioners across several organisations whose results can be
+checked independently, but they are testimony rather than measurement, and each describes a
+different quantity — a rate at which ideas fail, a count of experiments per hour, the turnaround
+time of a tuning trial — rather than one shared metric. The second limit is that the documentation
+needed to measure anything is itself largely missing: [Gundersen and Kjensmo
+(2018)](https://doi.org/10.1609/aaai.v32i1.11503) surveyed 400 papers drawn from four
+artificial-intelligence conferences, scored each against 16 documentation variables grouped into
+three factors, and found that "between 20% and 30% of the variables for each factor are documented",
+with no paper documenting all of them. A field that records so little about how its experiments were
+run cannot easily measure whether a change to how they are run helped.
+
+**Donoho's account of fields that cannot share their data describes Flexpectation's position, and it
+is the part of his argument this project has to answer rather than quote selectively.** Donoho
+predicts that fields with "inhibitions against data sharing, for example, because of confidentiality
+restrictions" will not make the transition he describes, "will be noticeably lagging behind in rate
+of progress", and "may soon enough be recognized as backwaters". Most of NGED's substation telemetry
+cannot be published, so that prediction is aimed squarely at this project. Donoho also names the
+arrangement such a field can still reach, which he calls a bring-your-own-data challenge: a shared
+task and shared code over data that "is private and only a few credentialed researchers ever get to
+see", as happens in clinical research. The leaderboard set out under "Leaderboards of machine
+learning results" above sits in that category — public to view and reproducible in method, with the
+underlying telemetry restricted — and the honest reading of Donoho is that the arrangement recovers
+part of the benefit of an open challenge rather than all of it.
+
+**Three of the papers above are the ones to read first.** [Kreuzberger et al.
+(2023)](https://doi.org/10.1109/ACCESS.2023.3262138) is the best single starting point, because it
+defines the term, derives the nine principles, and draws the architecture and the roles that go with
+them. [Eken et al. (2025)](https://doi.org/10.1145/3747346) is the broadest and most recent
+synthesis, and because it reads grey literature alongside journals it captures the practice that
+practitioners write down outside the academic record. [Zhao et al.
+(2026)](https://doi.org/10.3390/info17040328) is the one written for this domain, mapping platform
+capabilities against an energy-forecasting lifecycle rather than a generic one. [Sculley et al.
+(2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems) is
+worth adding for the vocabulary alone, since the rest of the field argues in its terms.
+
 ## Three published results that point against this project's plan
 
 Three results in this literature point against Flexpectation's plan, and we intend to test all three
@@ -2867,6 +3040,9 @@ Smart Grid*.
 - Browell, J., van der Meer, D., Kälvegren, H., Haglund, S., Simioni, E., Bessa, R. J. and Wang, Y.
 (2026). [The hybrid renewable energy forecasting and trading competition
 2024](https://doi.org/10.1016/j.ijforecast.2025.10.005). *International Journal of Forecasting*.
+- Brown, B. et al. (2021). [The Model Evaluation Tools (MET): More than a Decade of
+Community-Supported Forecast Verification](https://doi.org/10.1175/BAMS-D-19-0093.1). *Bulletin of
+the American Meteorological Society*.
 - Brown, C. F. et al. (2025). [AlphaEarth Foundations: An embedding field model for accurate and
 efficient global mapping from sparse label data](https://arxiv.org/abs/2507.22291).
 - Brudermueller, T., Breer, F. and Staake, T. (2023). [Disaggregation of Heat Pump Load Profiles
@@ -2899,6 +3075,10 @@ deployment](https://www.gov.uk/government/statistics/solar-photovoltaics-deploym
 - Dong, J., Valzania, L., Maillard, A., Pham, T., Gigan, S. and Unser, M. (2023). [Phase Retrieval:
 From Computational Imaging to Machine Learning: A Tutorial](https://doi.org/10.1109/MSP.2022.3219240).
 *IEEE Signal Processing Magazine*.
+- Donoho, D. (2024). [Data Science at the
+Singularity](https://doi.org/10.1162/99608f92.b91339ef). *Harvard Data Science Review*. Read as the
+preprint at [arXiv:2310.00865v1](https://arxiv.org/abs/2310.00865), the published version being
+behind a bot challenge.
 - Doubleday, K., Van Scyoc Hernandez, V. and Hodge, B. M. (2020). [Benchmark probabilistic solar
 forecasts: Characteristics and recommendations](https://doi.org/10.1016/j.solener.2020.05.051).
 *Solar Energy*.
@@ -2908,6 +3088,9 @@ Report](https://eatechnology.com/media/girhcnsc/electric-nation-customer-trial-r
 Feeder-Level Load Disaggregation and PEVs' Charging Behavior Characteristics
 Extraction](https://doi.org/10.1109/TII.2021.3118101). *IEEE Transactions on Industrial
 Informatics*. Read as the author-posted accepted manuscript.
+- Eken, B., Pallewatta, S., Tran, N. K., Tosun, A. and Babar, M. A. (2025). [A Multivocal Review of
+MLOps Practices, Challenges and Open Issues](https://doi.org/10.1145/3747346). *ACM Computing
+Surveys*.
 - Electricity North West (2018). [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/).
 - Elia Group (2026). [Predico: collaborative forecasting platform](https://innovation.eliagroup.eu/en/projects/predico-collaborative-forecasting-platform).
 - Erdener, B. C., Feng, C., Doubleday, K., Florita, A. and Hodge, B.-M. (2022). [A review of
@@ -2946,22 +3129,36 @@ networks](https://doi.org/10.1016/j.egyai.2026.100691). *Energy and AI*.
 - Gneiting, T. and Ranjan, R. (2011). [Comparing Density Forecasts Using Threshold- and
 Quantile-Weighted Scoring Rules](https://doi.org/10.1198/jbes.2010.08110). *Journal of Business &
 Economic Statistics*.
+- Godbole, V., Dahl, G. E., Gilmer, J., Shallue, C. J. and Nado, Z. (2023). [Deep Learning Tuning
+Playbook](https://github.com/google-research/tuning_playbook).
 - Gouveia, A. M. V., Hashmi, M. U., D’hulst, R. and Van Hertem, D. (2026). [Installed PV capacity
 detection on LV substations: Comparison of Data-Driven and Model-Based
 methods](https://doi.org/10.1016/j.ijepes.2026.111848). *International Journal of Electrical Power
 and Energy Systems*.
+- Gundersen, O. E. and Kjensmo, S. (2018). [State of the Art: Reproducibility in Artificial
+Intelligence](https://doi.org/10.1609/aaai.v32i1.11503). *Proceedings of the AAAI Conference on
+Artificial Intelligence*.
+- Gürses-Tran, G. and Monti, A. (2022). [Advances in Time Series Forecasting Development for Power
+Systems’ Operation with MLOps](https://doi.org/10.3390/forecast4020028). *Forecasting*.
 - Haben, S., Giasemidis, G., Ziel, F. and Arora, S. (2019). [Short term load forecasting and the
 effect of temperature at the low voltage level](https://doi.org/10.1016/j.ijforecast.2018.10.007).
 *International Journal of Forecasting*. Read as the arXiv preprint.
 - Haben, S., Arora, S., Giasemidis, G., Voss, M. and Greetham, D. V. (2021). [Review of Low Voltage
 Load Forecasting: Methods, Applications, and Recommendations](https://arxiv.org/abs/2106.00006).
 *Applied Energy*.
+- Heidrich, B., Ludwig, N., Turowski, M., Mikut, R. and Hagenmeyer, V. (2022). [Adaptively coping
+with concept drifts in energy time series forecasting using
+profiles](https://doi.org/10.1145/3538637.3539759). *Proceedings of the Thirteenth ACM
+International Conference on Future Energy Systems*.
 - Hensley, B. S. and Bull, P. (2018). [Mitigating Complex Dust Foregrounds in Future Cosmic
 Microwave Background Polarization Experiments](https://doi.org/10.3847/1538-4357/aaa489). *The
 Astrophysical Journal*.
 - Hertel, M., Pütz, S., Kolar, J., Schäfer, B., Mikut, R. and Hagenmeyer, V. (2026). [A Benchmark
 for Electrical Load Forecasting Across Grid Levels: Time-Series Transformers Outperform
 Established Methods](https://arxiv.org/abs/2607.15705).
+- Hoffman, R. N., Kumar, V. K., Boukabara, S.-A., Ide, K., Yang, F. and Atlas, R. (2018). [Progress
+in Forecast Skill at Three Leading Global Operational NWP Centers during 2015–17 as Seen in Summary
+Assessment Metrics (SAMs)](https://doi.org/10.1175/WAF-D-18-0117.1). *Weather and Forecasting*.
 - Hong, T., Pinson, P., Wang, Y., Weron, R., Yang, D. and Zareipour, H. (2020). [Energy Forecasting:
 A Review and Outlook](https://doi.org/10.1109/OAJPE.2020.3029979). *IEEE Open Access Journal of
 Power and Energy*.
@@ -2976,6 +3173,9 @@ feeders](https://doi.org/10.1016/j.apenergy.2019.114405). *Applied Energy*.
 competitions](https://doi.org/10.1016/j.ijforecast.2019.03.015). *International Journal of
 Forecasting*.
 - INESC TEC. [Predico documentation](https://predico-elia.inesctec.pt/docs/).
+- John, M. M., Olsson, H. H. and Bosch, J. (2025). [An empirical guide to MLOps adoption: Framework,
+maturity model and taxonomy](https://doi.org/10.1016/j.infsof.2025.107725). *Information and
+Software Technology*.
 - Ju, Y., Wu, W., Ge, F., Ma, K., Lin, Y. and Ye, L. (2018). [Fast Decoupled State Estimation for
 Distribution Networks Considering Branch Ampere
 Measurements](https://doi.org/10.1109/TSG.2017.2709463). *IEEE Transactions on Smart Grid*.
@@ -2999,6 +3199,12 @@ measurements](https://doi.org/10.1016/j.segan.2017.11.001). *Sustainable Energy,
 Networks*. Read as the accepted manuscript of the version of record, and as the preprint
 (arXiv:1607.02919, which carries a different title). The preprint's power-factor-based estimator,
 the source of the 25% figure cited above, does not appear in the published version.
+- Karpathy, A. (2019). [A recipe for training neural
+networks](https://karpathy.github.io/2019/04/25/recipe/).
+- Karpathy, A. [autoresearch](https://github.com/karpathy/autoresearch).
+- Kazmi, H. and Tao, Z. (2022). [How good are TSO load and renewable generation forecasts: Learning
+curves, challenges, and the road
+ahead](https://doi.org/10.1016/j.apenergy.2022.119565). *Applied Energy*.
 - Kim, J.-H., Lee, B.-S. and Kim, C.-H. (2020). [A Study on the Development of Machine-Learning
 Based Load Transfer Detection Algorithm for Distribution
 Planning](https://doi.org/10.3390/en13174358).
@@ -3015,6 +3221,8 @@ Transactions of The Korean Institute of Electrical Engineers*.
 - Kleinebrahm, M. et al. (2026). [Energy-Arena: A Dynamic Benchmark for Operational Energy
 Forecasting](https://arxiv.org/abs/2604.24705). *2026 International Conference on the European
 Energy Market*.
+- Kreuzberger, D., Kühl, N. and Hirschl, S. (2023). [Machine Learning Operations (MLOps): Overview,
+Definition, and Architecture](https://doi.org/10.1109/ACCESS.2023.3262138). *IEEE Access*.
 - Kryshtafovych, A., Schwede, T., Topf, M., Fidelis, K. and Moult, J. (2021). [Critical assessment
 of methods of protein structure prediction (CASP) — Round
 XIV](https://doi.org/10.1002/prot.26237). *Proteins: Structure, Function, and Bioinformatics*.
@@ -3022,6 +3230,9 @@ XIV](https://doi.org/10.1002/prot.26237). *Proteins: Structure, Function, and Bi
 Extreme Events and Forecast Evaluation](https://doi.org/10.1214/16-STS588). *Statistical Science*.
 - LF Energy. [OpenSTEF](https://lfenergy.org/projects/openstef/).
 - Liander. [Open data](https://www.liander.nl/over-ons/open-data).
+- Lima, A., Monteiro, L. and Furtado, A. (2022). [MLOps: Practices, Maturity Models, Roles, Tools,
+and Challenges – A Systematic Literature Review](https://doi.org/10.5220/0010997300003179).
+*Proceedings of the 24th International Conference on Enterprise Information Systems*.
 - Liu, H., Wang, Y., Wei, C., Li, J. and Lin, Y. (2019). [Two-Stage Short-Term Load Forecasting for
 Power Transformers Under Different Substation Operating
 Conditions](https://doi.org/10.1109/ACCESS.2019.2951422). *IEEE Access*.
@@ -3055,6 +3266,10 @@ ACM SIGKDD Conference on Knowledge Discovery and Data Mining*.
 - Meyers, B., Deceglie, M., Deline, C. and Jordan, D. (2020). [Signal Processing on PV Time-Series
 Data: Robust Degradation Analysis Without Physical
 Models](https://doi.org/10.1109/JPHOTOV.2019.2957646). *IEEE Journal of Photovoltaics*.
+- MIT Technology Review (2025). [What’s next for AlphaFold: A conversation with a Google DeepMind
+Nobel
+laureate](https://www.technologyreview.com/2025/11/24/1128322/whats-next-for-alphafold-a-conversation-with-a-google-deepmind-nobel-laureate/).
+24 November 2025.
 - Mitra, P. and Ramavajjala, V. (2023). [Learning to forecast diagnostic parameters using
 pre-trained weather embedding](https://arxiv.org/abs/2312.00290).
 - Moriano, J., Rodríguez, F., Martín, P., Jiménez, J. and Vuksanovic, B. (2016). [A New Approach to Detection of Systematic Errors in Secondary Substation Monitoring Equipment Based on Short Term Load Forecasting](https://doi.org/10.3390/s16010085). *Sensors*.
@@ -3071,6 +3286,9 @@ forecasting](https://www.neso.energy/news/solar-nowcasting-innovation-project-im
 - Nespoli, L., Medici, V., Lopatichki, K. and Sossan, F. (2020). [Hierarchical Demand Forecasting
 Benchmark for the Distribution Grid](https://arxiv.org/abs/1910.03976). *Electric Power Systems
 Research*.
+- Ng, A. (2018). [Machine Learning
+Yearning](https://home-wordpress.deeplearning.ai/wp-content/uploads/2022/03/andrew-ng-machine-learning-yearning.pdf).
+Draft.
 - Nguyen, T. N. and Müsgens, F. (2026). [A meta-analysis of solar forecasting based on skill
 score](https://doi.org/10.1063/5.0300682). *Journal of Renewable and Sustainable Energy*.
 - Northern Powergrid (2024). [Artificial Forecasting, Alpha
@@ -3100,6 +3318,9 @@ Series](https://doi.org/10.1080/00401706.2024.2350421). *Technometrics*.
 - Pinheiro, M. G., Madeira, S. C. and Francisco, A. P. (2023). [Short-term electricity load
 forecasting—A systematic approach from system level to secondary
 substations](https://doi.org/10.1016/j.apenergy.2022.120493). *Applied Energy*.
+- Rajashekarappa, M., Turanoglu Bekar, E., Karlsson, A., Bokrantz, J., Subramaniyan, M. and Skoogh,
+A. (2026). [Industrial MLOps: a systematic review of architectures and implementation
+challenges](https://doi.org/10.1080/21693277.2026.2658878). *Production & Manufacturing Research*.
 - Rasp, S. and Lerch, S. (2018). [Neural networks for post-processing ensemble weather
 forecasts](https://arxiv.org/abs/1805.09091). *Monthly Weather Review*.
 - Recht, B., Roelofs, R., Schmidt, L. and Shankar, V. (2019). [Do ImageNet Classifiers Generalize to
@@ -3125,6 +3346,9 @@ Forecasting*.
 [TRANSITION](https://ssen-innovation.co.uk/transition/).
 - Scottish and Southern Electricity Networks (2025). [FastTrack, Alpha Round
 4](https://smarter.energynetworks.org/projects/10166254/).
+- Sculley, D. et al. (2015). [Hidden Technical Debt in Machine Learning
+Systems](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems).
+*Advances in Neural Information Processing Systems 28*.
 - SGN and Northern Gas Networks (2026). [Forecaster for Embedded Generation (FEmGE),
 NIA2_SGN0081](https://portal.futureenergynetworks.org.uk/content/projects/NIA2_SGN0081).
 - Short, M., Crosbie, T., Dawood, M. and Dawood, N. (2017). [Load forecasting and dispatch
@@ -3135,6 +3359,8 @@ demand](https://doi.org/10.1049/stg2.12162). *IET Smart Grid*.
 - Siméoni, O. et al. (2025). [DINOv3](https://arxiv.org/abs/2508.10104).
 - SP Energy Networks (2023).
 [Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/).
+- Subramanya, R., Sierla, S. and Vyatkin, V. (2022). [From DevOps to MLOps: Overview and Application
+to Electricity Market Forecasting](https://doi.org/10.3390/app12199851). *Applied Sciences*.
 - Tang, L., Ashtine, M., Hua, W. and Wallom, D. C. H. (2024). [Sensitivity analysis of distributed
 photovoltaic system capacity estimation based on artificial neural
 network](https://doi.org/10.1016/j.segan.2024.101396). *Sustainable Energy, Grids and Networks*.
@@ -3167,6 +3393,9 @@ Quality](https://smarter.energynetworks.org/projects/nia_wpd_011/).
 and practical identifiability](https://doi.org/10.1016/j.coisb.2021.03.005). *Current Opinion in
 Systems Biology*.
 - Willis, H. L., Powell, R. D. and Wall, D. L. (1984). [Load Transfer Coupling Regression Curve Fitting for Distribution Load Forecasting](https://doi.org/10.1109/TPAS.1984.318713). *IEEE Transactions on Power Apparatus and Systems*.
+- Woźniak, A. P., Milczarek, M. and Woźniak, J. (2025). [MLOps Components, Tools, Process, and
+Metrics: A Systematic Literature Review](https://doi.org/10.1109/ACCESS.2025.3534990). *IEEE
+Access*.
 - Yi, M. and Wang, M. (2022). [Recent Results of Energy Disaggregation with Behind-the-Meter Solar
 Generation](https://arxiv.org/abs/2207.03490). *11th Bulk Power Systems Dynamics and Control
 Symposium (IREP), Banff*. The authors' own summary of their two *IEEE Transactions on Power Systems*
@@ -3175,3 +3404,6 @@ papers on the same work, both of which are closed.
 feeder-level probabilistic energy disaggregation considering roof-top solar
 energy](https://doi.org/10.1016/j.engappai.2022.104707). *Engineering Applications of Artificial
 Intelligence*.
+- Zhao, X., Ma, Z. G. and Jørgensen, B. N. (2026). [A Systematic Lifecycle-Referenced Capability
+Mapping of MLOps Platforms for Energy Forecasting](https://doi.org/10.3390/info17040328).
+*Information*.

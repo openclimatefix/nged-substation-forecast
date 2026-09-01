@@ -186,6 +186,17 @@ grepping for "forecasting" misses "fore-casting". Strip them before searching:
 pdftotext -layout paper.pdf - | sed 's/\xc2\xad//g' | tr '\014' '\n' > paper.txt
 ```
 
+**A minus sign can vanish, turning every loss into a gain.** Some PDFs draw the minus with a glyph
+that decodes to no Unicode codepoint at all, so `pdftotext` drops it silently rather than mangling
+it: a paper reporting a degradation rate of "−0.75%/year" extracts as "0.75%/year", and nothing in
+the text looks wrong. A whole table of losses can read as improvements. Wherever a number's *sign*
+carries the meaning — degradation, decline, bias, anomaly, temperature — check one value against the
+rendered page rather than trusting the extraction, and if the signs are missing say so in the cache:
+
+```bash
+pdftoppm -png -r 150 -f 3 -l 3 paper.pdf page   # render page 3 and read the number off it
+```
+
 **A running side-stamp lands in the middle of a sentence.** PubMed Central author manuscripts
 carry a vertical "Author Manuscript" stamp down the margin of every page, and `pdftotext` puts
 that stamp into the text in reading order — often mid-sentence. A CASP paper's definition of its
