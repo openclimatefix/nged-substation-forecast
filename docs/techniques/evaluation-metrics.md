@@ -179,6 +179,16 @@ RMSE = 0 (a perfect forecast over the scored group): with zero spread the ratio 
 uncertainty around an error-free mean) the computation refuses to emit a value — NaN or
 infinity in any metric raises rather than silently poisoning the leaderboard aggregates.
 
+**A published instance shows why an accuracy score is never reported alone.** [Kaas et al.
+(2026)](https://arxiv.org/abs/2607.01966) scored models on 200 German low-voltage feeders with an
+overload-decision metric; the two models that came first and second on that metric for consumer
+peaks had 90% prediction intervals that captured the true value only 62% and 58% of the time across
+the series as a whole, and 43% and 49% of the time at the peaks themselves. The [energy-forecasting
+review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
+draws the general point: a model that understates its uncertainty raises fewer false alarms, so it
+scores well on a threshold-crossing test while being exactly the model an operator should not trust
+near a capacity limit.
+
 ### Pinball loss
 
 **MW; smaller is better.** the score for a single quantile forecast, with a deliberately lopsided
@@ -314,11 +324,21 @@ the 95th percentile sits far below any limit. Getting the p95 right *everywhere*
 same skill as getting the forecast right *near the limit*. The metrics in this section target
 the second skill directly.
 
+**Mean absolute error's blindness to peaks is documented outside NGED.** The [energy-forecasting
+review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
+records that meteorologists name the failure the "double penalty" — a peak predicted an hour late is
+penalised twice, once for the peak that did not happen and once for the peak that did — and that two
+projects reached the same conclusion for power independently. [Pinheiro et al.
+(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) adopted a peak-aware error measure for
+exactly this reason, and Northern Powergrid's [Artificial
+Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) project built a metric
+over the top 10% of demand values and made it the primary measure for comparing models.
+
 ### The trap: scoring only the hours when the worst case actually happened
 
 The natural instinct — "NGED cares about peaks, so score the model only on the peak
-half-hours" — is a well-known statistical trap called the **forecaster's dilemma** (Lerch et
-al. 2017). The intuition: if you grade forecasters only on the occasions when something extreme
+half-hours" — is a well-known statistical trap called the **forecaster's dilemma** ([Lerch et
+al. 2017](https://doi.org/10.1214/16-STS588)). The intuition: if you grade forecasters only on the occasions when something extreme
 actually happened, you systematically reward the forecaster who *always* predicts extremes.
 Their alarmist forecasts happen to look right on the hours you kept, and the false alarms they
 raised on all the other hours were thrown away before grading. Formally, restricting even a
@@ -362,7 +382,8 @@ twCRPS reveals which one actually knows more about the near-limit hours.
 Computation is a one-line extension of the existing machinery: for the threshold $r$, replace
 every member and the observation by $v(z) = \max(z, r)$ and compute the
 [fair CRPS](#crps-continuous-ranked-probability-score) of the transformed values (this
-equivalence is standard — Gneiting & Ranjan 2011):
+equivalence is standard — [Gneiting and Ranjan
+(2011)](https://doi.org/10.1198/jbes.2010.08110)):
 
 $$
 \mathrm{twCRPS}_t(r) = \mathrm{CRPS}_t\!\left( \max(x_{t,1}, r), \dots, \max(x_{t,m}, r);\;
@@ -374,6 +395,12 @@ it is unbiased across ensemble sizes, so the 13-member `nged_incumbent` and the 
 models can be compared on it directly. It is computed against the [per-series
 threshold](#choosing-the-thresholds-static-per-series-quantile-derived), with `metric_param`
 carrying the threshold label.
+
+**A GB distribution network has already been scored this way.** [Maia et al.
+(2026)](https://arxiv.org/abs/2603.01653) compare fault-count forecasts for SP Energy Networks
+against a quantile-regression baseline on the threshold-weighted score, because an unweighted one
+"would place substantial emphasis on parts of the predictive distribution where the two models are
+identical" — the shoulders this metric exists to de-emphasise.
 
 ### Exceedance rate of the upper delivery quantiles
 
