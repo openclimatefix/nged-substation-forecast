@@ -2506,6 +2506,21 @@ section below sets it out rather than quoting around it: the same structural arg
 fields which cannot share their data will fall behind in their rate of progress, and most of NGED's
 substation telemetry cannot be published.
 
+### Recommended papers to read
+
+**Three of these papers are the place to start on machine-learning operations itself.** Start with
+[Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138), which defines the term
+"MLOps", derives nine principles, and draws the architecture and the roles that go with those
+principles. Read [Eken et al. (2025)](https://doi.org/10.1145/3747346) next, the broadest synthesis
+among the reviews we read, which reads grey literature alongside journals, so that Eken et al.
+capture the practice practitioners write down outside the academic record. Then read [Zhao et al.
+(2026)](https://doi.org/10.3390/info17040328), the only paper of the three written for energy
+forecasting, which maps platform capabilities against an energy-forecasting lifecycle rather than a
+generic lifecycle. [Sculley et al.
+(2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems) is
+worth adding for the terms alone, since the rest of the field argues in the vocabulary Sculley et
+al. established.
+
 ### The field describes good practice but does not measure whether it works
 
 **[Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138) give the definition most
@@ -2672,19 +2687,6 @@ researchers ever get to see", as happens in clinical research. The leaderboard s
 "Leaderboards of machine learning results" above sits in that category — public to view and
 reproducible in method, with the underlying telemetry restricted — and the honest reading of Donoho
 is that the arrangement recovers part of the benefit of an open challenge rather than all of it.
-
-### Three papers to read first
-
-**Three of these papers are the place to start on machine-learning operations itself.** Start with
-[Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138), which defines the term,
-derives the nine principles, and draws the architecture and the roles that go with them. Read [Eken
-et al. (2025)](https://doi.org/10.1145/3747346) next, the broadest synthesis among the reviews
-above, which reads grey literature alongside journals, so that Eken et al. capture the
-practice practitioners write down outside the academic record. Then read [Zhao et al.
-(2026)](https://doi.org/10.3390/info17040328), the only paper of the three written for energy forecasting, which maps platform capabilities against an energy-forecasting lifecycle rather than a generic lifecycle. [Sculley et al.
-(2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems) is
-worth adding for the terms alone, since the rest of the field argues in the vocabulary Sculley
-et al. established.
 
 ## Three published results that point against this project's plan
 
