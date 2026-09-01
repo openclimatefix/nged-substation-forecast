@@ -90,6 +90,16 @@ sub-headings and short paragraphs over bullet lists, because a list flattens an 
 of equal weight. A bulleted item carrying several sentences and a citation is a paragraph wearing a
 hyphen; a genuinely parallel set of short design notes is a list. Both directions are findings.
 
+**Prose that should be bullets is the harder direction to spot, and the rule that decides it is
+the complexity of the concept, not the length of the passage.** CLAUDE.md's bullets rule allows a
+list wherever the items really are of equal weight and each one is simple — the options a setting
+takes, what a table holds, a run of short design notes — and forbids one wherever the passage
+introduces a complex new concept, because the connective tissue between the sentences is what
+makes a new concept followable. So the finding is not "this paragraph is long". The finding is
+that a reader meeting this material for the first time would lose nothing if the sentences stopped
+joining up. Where a paragraph is building an argument towards a conclusion, leave it as prose
+however long it runs.
+
 ## Pass D: does every count close?
 
 **An enumeration that promises N items and delivers a different N is invisible to every other pass

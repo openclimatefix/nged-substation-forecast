@@ -234,8 +234,8 @@ abandon*"](#4-an-experiment-must-be-cheap-to-try-and-cheap-to-abandon)), and tha
 serve 32 time series or 2,500 without being rewritten. What makes this affordable rather than
 merely tidy is lazy evaluation: because each layer only ever describes work, the engine can fuse
 the layers' constraints at the end and pay nothing for their mutual ignorance — see [principle 11
-("*push the work down to the engine; materialise once, as late as
-possible*")](#11-push-the-work-down-to-the-engine-materialise-once-as-late-as-possible).
+("*push the work down to the query engine; materialise once, as late as
+possible*")](#11-push-the-work-down-to-the-query-engine-materialise-once-as-late-as-possible).
 
 *Without it:* the pipeline accumulates `if model_type == …` branches and local assumptions — a
 hard-coded timezone, an assumed half-hourly settlement period, a national voltage taxonomy — and
@@ -253,13 +253,10 @@ redesign](engineering-hypotheses.md#h5-scale-without-redesign), [Hypothesis 2: a
 experiments per person in a peak
 month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month).
 
-*Detail:* [The Universal Model Interface](../architecture/overview.md#the-universal-model-interface), [What
-is already
-geography-neutral](../architecture/adapting-to-another-geography.md#what-is-already-geography-neutral)
-— which also records, from an assessment made against a real brief, exactly where this principle
-is *not* yet honoured: the place-specific assumptions do sit in one thin layer (mostly the
-`contracts` package), but two hard-coded `"Europe/London"` defaults sit outside it — the
-dashboard's `DISPLAY_TIME_ZONE` and `ml_core`'s `DEFAULT_LOCAL_TIMEZONE` — which is precisely the
+*Detail:* [The Universal Model Interface](../architecture/overview.md#the-universal-model-interface).
+The principle is not yet fully honoured: the place-specific assumptions do sit in one thin layer
+(mostly the `contracts` package), but two hard-coded `"Europe/London"` defaults sit outside it —
+the dashboard's `DISPLAY_TIME_ZONE` and `ml_core`'s `DEFAULT_LOCAL_TIMEZONE` — which is precisely the
 leak the principle exists to prevent. `ml_core`'s default reaches `FeatureEngineer.engineer()` as
 an overridable parameter, but the value itself still lives in general-purpose `ml_core` code
 rather than in `contracts`, so it remains an instance of the leak.
@@ -300,16 +297,21 @@ thing. That cost has grown over the last few years rather than shrunk: a coding 
 close a loop it is able to run unaided, so a system that is fully exercisable on one machine is one
 an agent can be pointed at, while a system whose failures only reproduce in the cloud is not.
 
-*Decided:* the data-table roots default to **local paths** and take an `s3://` URI only by
-configuration, the MLflow tracking URI defaults to a local SQLite file and names a server only by
-configuration, and Sentry separates a laptop from the production box by an `environment` tag rather
-than by a different code path — *how* those values arrive differs by compute (a `.env` file on a
-laptop, container environment variables on AWS) but `Settings` reads them identically, and a laptop
-can even rehearse the full object-store path against a local MinIO server; a fresh clone reaches a
-trained model without any cloud resource; input pruning and `init_time` chunking were sized by what
-a laptop has (a full 51-member validation prediction, ~321M rows, peaks at ~9 GB) rather than by
-what an instance could be rented with; and the 13-bit significand rounding that makes the archive
-locally storable was adopted on measured, not assumed, compression.
+*Decided:* the project consistently defaults to what a laptop can run, and lets configuration —
+not a second code path — point at the cloud instead:
+
+- the data-table roots default to **local paths** and take an `s3://` URI only by configuration;
+- the MLflow tracking URI defaults to a local SQLite file and names a server only by configuration;
+- Sentry separates a laptop from the production box by an `environment` tag rather than by a
+  different code path — *how* those values arrive differs by compute (a `.env` file on a laptop,
+  container environment variables on AWS) but `Settings` reads them identically, and a laptop can
+  even rehearse the full object-store path against a local MinIO server;
+- a fresh clone reaches a trained model without any cloud resource;
+- input pruning and `init_time` chunking were sized by what a laptop has (a full 51-member
+  validation prediction, ~321M rows, peaks at ~9 GB) rather than by what an instance could be
+  rented with; and
+- the 13-bit significand rounding that makes the archive locally storable was adopted on measured,
+  not assumed, compression.
 
 *Serves:* [Hypothesis 2: a hundred experiments per person in a peak
 month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month),
@@ -455,7 +457,7 @@ partition directories and never touch each other.
 [Idempotent writes and concurrency](../architecture/ml-orchestration.md#idempotent-writes-and-concurrency),
 [Serve only the trained population](../architecture/production-deployment.md#serve-only-the-trained-population).
 
-### 11 — Push the work down to the engine; materialise once, as late as possible
+### 11 — Push the work down to the query engine; materialise once, as late as possible
 
 No code between storage and the model boundary may force the data into memory (in Polars, by
 calling `.collect()`), so the query engine sees the whole plan and prunes the scan before any data
@@ -768,7 +770,7 @@ degrading?" cheaply. It shares the open question raised under [input drift
 detection](#input-drift-detection) above: a summer like 2026's will legitimately worsen forecast
 error, and the chart must not read that as a model regression.
 
-### Naming poka-yoke
+### Naming poka-yoke (mistake-proofing)
 
 Mistake-proofing, from manufacturing: design names and interfaces so the
 wrong usage fails to parse rather than being merely discouraged. The codebase already practises

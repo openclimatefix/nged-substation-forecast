@@ -165,9 +165,11 @@ The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mea
 ### Store wind as u/v components rather than speed and direction
 
 The ingest computes speed and direction from ECMWF's native `u`/`v` components and discards the
-components. That conversion loses no information — the round trip costs at most 6.8 × 10⁻³ ° of
-direction once the components are rounded the way the table rounds everything else — but it hands
-every downstream stage a wrapped angle, which is the root of defect (a) above and of the three later
+components. That conversion loses no information — the round trip
+[costs at most 6.8 × 10⁻³ ° of
+direction](../architecture/nwp-variable-conventions.md#wind-is-stored-as-speed-and-direction-and-why)
+once the components are rounded the way the table rounds everything else — but it hands every
+downstream stage a wrapped angle, which is the root of defect (a) above and of the three later
 items named at the top of this section. Storing the components instead makes the whole class of
 defect structurally impossible rather than individually patched, which is what [principle
 15](../design-philosophy/design-principles.md#15-transform-data-in-feature-engineering-not-in-the-ingest-unless-it-saves-a-lot-of-storage)
@@ -265,13 +267,16 @@ which raises the bar on encoding: the detector consumes the baseline's residuals
 unmodelled behavioural day becomes a phantom event candidate. Prefer encodings that generalise
 across sparse examples — a days-to-nearest-holiday feature and a holiday-name categorical
 rather than a lone `is_bank_holiday` flag — and cover the days a day-of-year feature
-structurally cannot represent: Easter (which wanders across roughly five weeks of the
-calendar), regional school half-terms, and major broadcast events such as England playing in
-the later stages of a Football World Cup. Sporting fixtures carry a forecastability asymmetry
-the bank holidays do not: they are known perfectly in hindsight (fine for the detector's
-hindcast baseline), but at a 3–10 day horizon whether England will still be in the tournament
-may be unknown at forecast time, so the forward-forecast version needs either a
-"possible England match" encoding or an acceptance of that uncertainty.
+structurally cannot represent:
+[background on GB demand's calendar-driven quirks](../background/data-quality.md#behavioural-calendar-effects-on-demand)
+covers Easter, regional school half-terms, and major broadcast events such as England playing
+in the later stages of a Football World Cup.
+
+**Sporting fixtures carry a forecastability asymmetry the bank holidays do not.** They are known
+perfectly in hindsight (fine for the detector's hindcast baseline), but at a 3–10 day horizon
+whether England will still be in the tournament may be unknown at forecast time, so the
+forward-forecast version needs either a "possible England match" encoding or an acceptance of
+that uncertainty.
 
 ### Raw ordinal time features alongside sin/cos
 
@@ -706,9 +711,11 @@ Five scheduling notes specific to this page:
   cross-series feature engineering — entering as a fixed set of permutation-invariant pooled
   columns (the signed neighbourhood sum and the signed most-anomalous neighbour; see the full
   design), never one column per neighbour; the self-residual version needs neither and should
-  run first. Finally, adopting a winner is not free either: the live service must then run the
-  baseline model too — a second deployed model plus a hindcast-residual step in the predict
-  path.
+  run first.
+
+    **Adopting a winner is not free either: the live service must then run the baseline model
+    too.** That means a second deployed model, plus a hindcast-residual step in the predict path.
+
 - **A related variant reuses the same machinery to *correct a draft*, not only to supply residual
   lags.** The stage-1 baseline can be evaluated at the target time to make a first-draft forecast
   that stage 2 then corrects — supplied either as an ordinary feature or as an XGBoost
@@ -811,12 +818,10 @@ regime in which the two diverge sharply: a single 25 °C afternoon tells the mod
 whether the preceding quarter contained
 [the driest July England and Wales have recorded since their series began in 1836](../design-philosophy/design-principles.md#input-drift-detection).
 
-This is also the corner of the feature space where the GB brief and the
-[India assessment](../architecture/adapting-to-another-geography.md#the-two-pilot-discoms-delhi-and-jaipur)
-converge, which is worth knowing before deciding how much to invest here. Everything below is a
-mild refinement in a rainy maritime climate and a first-order effect in an arid one — Rajasthan
-sits on the margin of the Thar desert, where soiling between monsoons is severe *and* unusually
-observable, because a sharp washing signal is what identifies a reversible cleanliness factor at
+Everything below is a mild refinement in a rainy maritime climate, which is worth knowing before
+deciding how much to invest here. Soiling is a first-order effect in an arid climate and only a
+refinement in a wet one, and a sharp washing signal is what identifies a reversible cleanliness
+factor at
 all. Building these features for Great Britain is therefore cheaper than it looks on the GB
 business case alone.
 
@@ -831,22 +836,23 @@ business case alone.
   exactly the regime in which it stops being small — and that page says the correction is worth
   adding for Great Britain, not only for dustier climates. The tabular feature is the state
   variable of that model, `d_t`, taken directly: time since precipitation last exceeded a washing
-  threshold. Two things follow. It needs **no new data source** — `precipitation_surface` is
-  already among the ECMWF ENS variables we download, so the rainfall history sits in the archive
-  (though reconstructing a dry spell longer than one 15-day run still means stitching across
-  archived runs, and so inherits the availability-cut caveat below) — and it is the one member of
-  this family that needs no climatological normalisation at all, because "37 days since washing
-  rain" is already interpretable in absolute terms. The
-  [assessment of running this codebase over India](../architecture/adapting-to-another-geography.md#the-short-answer)
-  reaches the same conclusion from the opposite direction, and is worth reading alongside this
-  bullet: it argues that a reversible cleanliness factor is something "we should probably add for
-  Britain anyway", precisely because Britain's rainy *average* hides real dry-spell episodes, and
-  concludes that work done here would pay off in both countries. Note the division of labour with
-  capacity estimation, which absorbs the long-run
-  *average* soiling bias into the effective-capacity estimate
-  ([honest caveats of the convex route](capacity-estimation.md#honest-caveats-of-the-convex-route)):
-  that leaves precisely the time-varying part for a feature to explain, and this is the cheap
-  XGBoost-era stand-in for the differentiable-physics treatment.
+  threshold.
+
+    **Two things follow for the feature itself: it needs no new data source, and no
+    climatological normalisation.** `precipitation_surface` is already among the ECMWF ENS
+    variables we download, so the rainfall history sits in the archive (though reconstructing a
+    dry spell longer than one 15-day run still means stitching across archived runs, and so
+    inherits the availability-cut caveat below) — and it is the one member of this family that
+    needs no climatological normalisation at all, because "37 days since washing rain" is
+    already interpretable in absolute terms. A reversible cleanliness
+    factor is probably worth adding for Britain even so, precisely because Britain's rainy
+    *average* hides real dry-spell episodes. Note the
+    division of labour with capacity estimation, which absorbs the long-run *average* soiling
+    bias into the effective-capacity estimate
+    ([honest caveats of the convex route](capacity-estimation.md#honest-caveats-of-the-convex-route)):
+    that leaves precisely the time-varying part for a feature to explain, and this is the cheap
+    XGBoost-era stand-in for the differentiable-physics treatment.
+
 - **Sustained-heat demand** — the largest case by *magnitude* for the v1 population, because most
   of that population is demand. The Tier-2
   [effective temperature](#effective-smoothed-temperature-and-degree-day-features) smooths over
@@ -856,37 +862,20 @@ business case alone.
 - **Agricultural irrigation pumping.** Drought raises it, and the trial area sits in the EMids
   licence area, which includes arable Lincolnshire. Treat that second clause as an assumption
   rather than a finding: nothing in the metadata carries a land-use or customer-mix field, so it
-  needs confirming against NGED's own customer mix before anyone leans on it. Note how much easier
-  the same load is to model elsewhere: the
-  [India assessment](../architecture/adapting-to-another-geography.md#the-short-answer) calls
-  agricultural pumping "the happier case" there, because Indian agricultural feeders are largely
-  segregated and run to a published supply schedule, so a large unmetered load is partly known in
-  advance. GB offers no such segregation, which is exactly why this stays an inference from
-  weather rather than a measured quantity.
+  needs confirming against NGED's own customer mix before anyone leans on it. Agricultural pumping is easier to model
+  on an electricity network whose agricultural feeders are segregated and run to a published
+  supply schedule, because a large unmetered load is then partly known in advance. GB offers no
+  such segregation, which is exactly why this stays an inference from weather rather than a
+  measured quantity.
 - **Hydro** — physically the cleanest mechanism of the four, and the only one where a 90-day
   rainfall total approaches being a *primary* driver rather than a correction. It is listed last
   anyway, because NGED's network barely has any. It has **no v1 exposure**: `Hydro` is a valid
   `time_series_type` in the contract, but the [32-series trial area](../index.md#scope) contains no
-  hydro series. Nor does v2 rescue it. NGED's own
-  [Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register)
-  (August 2026) lists **41 connected hydro sites totalling 25.7 MW** across all four licence areas —
-  South Wales 13.7 MW over 10 sites, South West 6.2 MW over 18 sites, East Midlands 5.3 MW over 8
-  sites, West Midlands 0.5 MW over 5 sites. For scale, the same register shows **5,958 MW of
-  connected solar** and 1,456 MW of wind on that network, so hydro is under half a percent of the
-  embedded solar capacity.
-
-    Two details from the register matter more than the headline total. First, it confirms the
-    physics is the *right* physics: 39 of the 44 hydro entries are `Hydro - Run of river` and 29
-    of the 41 connected sites join at 0.4 kV, so this is overwhelmingly small run-of-river with no
-    storage — the most rainfall-sensitive kind there is, output tracking catchment flow almost
-    directly. Second, it kills the feature's usefulness for hydro *specifically*: those 41 sites
-    are spread across **32 distinct primary substations**, so no primary is hydro-dominated and
-    every one of these schemes arrives diluted into a much larger net-demand signal rather than as
-    its own series. The largest connected schemes are Llyn Brianne (5.45 MW, Dyfed), Elan Valley
-    (4.0 MW, Powys), Chatsworth (3.7 MW, Derbyshire), Mary Tavy (2.6 MW, Devon) and Ystradffin
-    (1.99 MW, Dyfed). One entry is much larger — a 58.5 MW Cwm Rheidol scheme accepted to connect
-    in the South Wales area — but its target energisation date is 2037, well beyond any horizon
-    this roadmap plans for.
+  hydro series. Nor does v2 rescue it: NGED's [embedded hydro
+  capacity](../background/network.md#embedded-generation-on-the-network) is under half a percent
+  of connected solar capacity, overwhelmingly small run-of-river, and spread across 32 distinct
+  primary substations, so no primary is hydro-dominated and every scheme arrives diluted into a
+  much larger net-demand signal rather than as its own series.
 
 **Why this sits behind the instantaneous z-scores, and what the leaderboard will actually tell
 you.** The obstacle is not the feature, it is the effective sample size *on the training side*. A
@@ -1024,7 +1013,7 @@ mixing NWP lead times either.
 Mechanics: the change lands in `_upsample_nwp_to_half_hourly`, which is where the interpolation
 already happens — not as a new pass elsewhere, which would leave two fills to reason about. It
 must stay lazy, per
-[principle 11](../design-philosophy/design-principles.md#11-push-the-work-down-to-the-engine-materialise-once-as-late-as-possible),
+[principle 11](../design-philosophy/design-principles.md#11-push-the-work-down-to-the-query-engine-materialise-once-as-late-as-possible),
 and it must stay out of the ingest: imputed values in the NWP Delta table would destroy the
 provenance
 [principle 9](../design-philosophy/design-principles.md#9-provenance-travels-with-the-forecast-data)

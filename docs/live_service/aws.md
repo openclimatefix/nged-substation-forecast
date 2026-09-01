@@ -27,7 +27,9 @@ bake the model in at build time, an always-on control plane rather than EventBri
 > [access-phasing plan](../roadmap/live-service.md#access-phasing), and infrastructure-as-code
 > ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) is scheduled
 > to start at Stage 2, when team access adds enough moving parts to justify it.
-> Sentry error telemetry and the missed-check-in alarm are wired (set the `SENTRY_*` vars in
+>
+> **Sentry telemetry is already wired; only per-task failure emails are still to come.** Sentry
+> error telemetry and the missed-check-in alarm are wired (set the `SENTRY_*` vars in
 > [Step 14](#step-14-configure-dagster-on-the-box)); only per-task failure emails (SNS) are still
 > to come — see [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
 

@@ -46,7 +46,8 @@ The textbook way to price a forecast charges it for what goes wrong: £X per act
 limit breach nobody saw coming. We cannot follow that route, because £Y — the cost of a breach — is
 not a figure NGED hold in a form we can use, and the literature that does price a forecast this way
 has never done so on a real distribution network at a money-denominated cost — the
-[energy-forecasting review](../background/energy-forecasting-review.md#horizon-ensembles-and-tails)
+[energy-forecasting
+review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
 reports [Richardson (2000)](https://doi.org/10.1002/qj.49712656313)'s cost-loss framing, [Bernecker
 et al. (2025)](https://doi.org/10.1016/j.ijepes.2025.110713)'s 97% synthetic-network saving, and
 [Angus et al. (2027)](https://doi.org/10.1016/j.epsr.2026.113545)'s and [Browell and Fasiolo

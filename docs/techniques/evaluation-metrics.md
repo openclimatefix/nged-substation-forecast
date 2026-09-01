@@ -72,8 +72,12 @@ $$
 their time near zero output, so normalising by *mean* power would inflate their NMAE relative
 to a demand substation of similar peak size. The denominator is the series' full-history
 effective capacity (P99 of |power|), computed over the full history so that it stays stable
-across CV folds — see
-[Normalising NMAE by effective_capacity](../roadmap/metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity).
+across CV folds.
+
+**Why NMAE, not the unweighted `mae__all` / `rmse__all`, is the headline cross-series metric:**
+those aggregates, logged to MLflow, are unweighted means across series whose scales span roughly
+two orders of magnitude, so the GSPs dominate them. They are useful for tracking a single model
+over time, not for comparing skill across the population.
 
 ### Root mean squared error (RMSE)
 
@@ -481,7 +485,7 @@ prediction:
   cross-series comparability. A full-history quantile threshold guarantees every series a
   scoreable event rate (~1% by construction), is identical in meaning across series, and is
   stable across CV folds for the same reason the
-  [effective-capacity denominator](../roadmap/metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
+  [effective-capacity denominator](#normalised-mae-nmae)
   is computed over the full history.
 
 - **NGED-supplied firm/flex ratings** for the trial area remain valuable — for ad-hoc case

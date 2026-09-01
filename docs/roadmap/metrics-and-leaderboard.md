@@ -132,9 +132,9 @@ worth stating plainly:
 
 ### A faithful replica and a "cheap upgrades" variant
 
-We implement two closely-related incumbent baselines, and the *pair* carries a message that is
-itself a valuable project outcome — **most of the benefit may come from a few simple upgrades to
-what NGED already do, not from heavy ML**:
+**Most of the benefit may come from a few simple upgrades to what NGED already do, not from heavy
+ML — the message the pair of baselines is built to test.** We implement two closely-related
+incumbent baselines:
 
 - `nged_incumbent` — the faithful replica above. No holiday handling; warts and all. Pure lag
   features.
@@ -151,9 +151,12 @@ what NGED already do, not from heavy ML**:
 The incumbent is really a *hybrid* — its weekly group is persistence-like recency, its annual
 group is climatology-like seasonality — so the two pure forms are still worth having: they isolate
 short-horizon from long-horizon naive skill. Persistence is famously hard to beat at 0 to 6 hours.
-The climatology row asks the same question at the far end of the horizon: once the weather ensemble
-has run out of lead time to be informative, does the forecast still beat a plain seasonal average?
-We have found no published figure for where that cross-over falls for substation load. [Buizza and
+
+**The climatology row measures where the weather ensemble stops adding skill over a plain seasonal
+average — a cross-over point with no published figure for substation load.** The climatology row
+asks the same question at the far end of the horizon: once the weather ensemble has run out of
+lead time to be informative, does the forecast still beat a plain seasonal average? We have found
+no published figure for where that cross-over falls for substation load. [Buizza and
 Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put the lead time beyond which a weather
 ensemble stops beating a climatological distribution at 16 to 23 days. But that figure was measured
 on upper-air variables rather than on a load forecast against a load climatology (see [Horizon,
@@ -557,7 +560,7 @@ is logged to the leaderboard MLflow runs.
 | Metric | Type | Status | Purpose |
 |---|---|---|---|
 | Mean absolute error (MAE) | Deterministic | ✅ | Typical error magnitude (MW). |
-| Normalised MAE (NMAE) | Deterministic | ✅ | MAE normalised by the series' [effective capacity](#normalising-nmae-by-effective_capacity) (full-history P99) — comparable across substations of different sizes. |
+| Normalised MAE (NMAE) | Deterministic | ✅ | MAE normalised by the series' [effective capacity](../techniques/evaluation-metrics.md#normalised-mae-nmae) (full-history P99) — comparable across substations of different sizes. |
 | Root mean squared error (RMSE) | Deterministic | ✅ | Heavily penalises large misses (one 100 MW error costs more than two 50 MW errors). |
 | Mean bias error (MBE) | Deterministic | ✅ | Systematic over/under-prediction. |
 | Histogram of errors | Deterministic | 🚧 | Visual check that errors are ~Normal. |
@@ -670,43 +673,14 @@ re-scores the whole leaderboard from a single `metrics` re-materialisation with 
 re-prediction — and doing it now, before the leaderboard adjudicates anything, is the cheapest moment
 to shift every existing deterministic number.
 
-### Normalising NMAE by `effective_capacity`
+### The v0.7 upgrade: effective capacity becomes time-varying 🚧
 
-NMAE is MAE divided by a per-series **effective capacity**, not by the mean or a per-fold P99. A
-capacity-like denominator is what makes NMAE comparable across asset types: intermittent generators
-(PV, wind) spend much of their time near zero output, so normalising by the *mean* would inflate
-their NMAE relative to a demand substation of similar peak size. Computing the denominator over each
-series' **full history** (rather than within the validation window) also keeps it stable across
-folds — an unusually calm year for a wind farm would otherwise give a low in-window P99 and an
-inflated NMAE.
-
-Normalisation is also why NMAE is the **headline cross-series metric**: the aggregate `mae__all` /
-`rmse__all` values logged to MLflow are unweighted means across series whose scales span roughly
-two orders of magnitude, so the GSPs dominate them. They are useful for tracking a single model
-over time, not for comparing skill across the population.
-
-The denominator comes from the [`effective_capacity`](delivery-tables.md#table-4-effective_capacity)
-Delta table (schema `contracts.power_schemas.EffectiveCapacity`), consumed by `compute_metrics`
-(`ml_core.metrics`).
-
-**v0.1 representation: one scalar row per series.** The `effective_capacity` asset writes one
-row per `time_series_id` — `effective_capacity_mw` = P99 of `|power|` over the whole observation
-history, `time` = the latest observed timestep. `compute_metrics` joins it onto the per-series
-metrics **on `time_series_id` alone** and divides.
-
-**Why v0.1 is a single row per series, not the value repeated at every half-hour.** The
-v0.7 upgrade below *will* store one row per `(time_series_id, time)` half-hour — but with a
-genuinely *time-varying* value. In v0.1 the value is a single constant per series, so repeating it
-across every half-hour would just be a denormalised encoding of one number: at V2 scale (~2,500
-series × ~4 years × 17,520 half-hours/yr ≈ 175M rows) that is hundreds of millions of rows to
-express ~2,500 scalars, for zero extra information. It would also *not* buy forward-compatibility,
-because the real v0.1→v0.7 interface change is not the data shape but **the join** (below). The
-`EffectiveCapacity` schema — `(time_series_id, time, effective_capacity_mw)` — already accommodates
-both the one-row-per-series v0.1 shape and the one-row-per-half-hour v0.7 shape; that is the
-forward-compatibility we want. (The v0.7 upgrade does widen the *columns* — the value becomes a
-mean + std pair,
-[#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247) — but the row shape
-and the join are unaffected by that.)
+NMAE's denominator is each series' full-history **effective capacity** — why a capacity-like
+denominator is used rather than the mean, and why NMAE rather than `mae__all` is the headline
+cross-series metric, is durable metric-design rationale that lives in [Normalised MAE
+(NMAE)](../techniques/evaluation-metrics.md#normalised-mae-nmae). The `effective_capacity` Delta
+table itself, and why v0.1 stores one scalar row per series, is described in
+[Table 4 — `effective_capacity`](delivery-tables.md#table-4-effective_capacity).
 
 **v0.7 upgrade: time-varying, and the join changes.** The
 [differentiable-physics](capacity-estimation.md) capacity model produces a value that changes over

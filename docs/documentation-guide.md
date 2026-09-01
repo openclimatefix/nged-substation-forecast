@@ -60,7 +60,7 @@ roadmap items that apply them.
 | Understand the principles the whole design answers to | [`docs/design-philosophy/`](design-philosophy/index.md) — the portable argument, readable without knowing the codebase |
 | Understand *why* something already built works the way it does | [`docs/architecture/`](architecture/overview.md) — the local rationale, recorded next to each component |
 | State — or check — a measurable claim about the engineering | [`docs/design-philosophy/engineering-hypotheses.md`](design-philosophy/engineering-hypotheses.md). Add a test with a threshold and a resolution point; never renumber an existing one |
-| Record an assessment of work we decided **not** to do | [`docs/architecture/`](architecture/overview.md), with a `Status:` banner saying so — e.g. [Why Dagster, not Airflow?](architecture/why-dagster-not-airflow.md), [Could this codebase forecast another country?](architecture/adapting-to-another-geography.md). Not `docs/roadmap/`, which implies intent to build and is deleted on ship. |
+| Record an assessment of work we decided **not** to do | [`docs/architecture/`](architecture/overview.md), with a `Status:` banner saying so — e.g. [Why Dagster, not Airflow?](architecture/why-dagster-not-airflow.md). Not `docs/roadmap/`, which implies intent to build and is deleted on ship. |
 | Learn *how* to run/operate something already built, step by step | [`docs/ml_experimentation/`](ml_experimentation/index.md), [`docs/live_service/`](live_service/index.md) |
 | File a quick tweak or a non-code task | A GitHub issue only — no markdown needed |
 | Plan how to implement an issue, before writing code | `plans/<branch-name>.md` on that issue's branch (one file per branch, deleted on merge) |

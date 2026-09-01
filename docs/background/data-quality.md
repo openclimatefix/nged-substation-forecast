@@ -28,6 +28,21 @@ Gaps range from a few half-hours to months. Solar farms frequently have no data 
 
 Some substations only have MVA meters, which report the *absolute value* of power flow — they cannot detect direction. When generation exceeds demand and power flows "backwards", the MVA reading increases rather than going negative. This "bouncing off zero" behaviour looks like a demand increase but is actually reverse power flow. NGED report that 10 sites in the trial area are non-directional, of which one (and potentially two others) has shown reverse power flow in the past, from studying sunny days. The following figure shows power flow for Stickney primary and Leverton Solar Park; note the absence of peaks at Stickney primary on May 3rd and 4th when Leverton experienced lower generation: ![Power flow for Stickney primary and Leverton Solar Park; note the absence of peaks at Stickney on May 3rd and 4th, when Leverton experienced lower generation](assets/MVA_metering_bounce_at_Stickney_primary.png)
 
+## Behavioural calendar effects on demand
+
+**GB electricity demand depends on human behaviour as well as on weather, and a plain
+day-of-year feature cannot represent the calendar's sharp cases.** Easter wanders across
+roughly five weeks of the calendar, from late March to late April, so its behavioural signature
+smears into "normal spring" unless an explicit holiday feature marks it. The bridge days around
+bank holidays and the Christmas–New Year "run of Sundays" are milder versions of the same
+problem, and school half-terms vary by county across NGED's licence areas. Demand on a bank
+holiday already looks like a Sunday, and the Christmas–New Year fortnight is its own regime.
+
+**Major broadcast events shift and synchronise demand too.** England playing in the later
+stages of a Football World Cup shifts and synchronises evening demand across the country,
+including the classic half-time TV-pickup surge. Unlike bank holidays, sporting fixtures of
+this kind are not knowable years ahead.
+
 ## Switching events
 
 Power is periodically diverted from one substation to another during maintenance or in response to faults ("abnormal running arrangement"). Each substation spends roughly 10% of its operating time in an abnormal arrangement. This severely biases lagged-power features (the single most informative feature for demand forecasting) if not detected and handled. Recovering the demand that *would* have been metered under the normal running arrangement is described in [Switching Events](switching-events.md); the staged solution plan is in the [roadmap](../roadmap/switching-events.md) (v0.6 detector → v2 mixture models).

@@ -131,6 +131,17 @@ skim-reading pattern is why we prefer sub-headings and short paragraphs over bul
 flattens the argument into items of equal weight; a bolded lead says which claim matters, and the
 sentences under it say why.
 
+**Bullets are right where the items really are of equal weight and each one is simple.** The
+preference for prose above is about an argument, not about every list: where a passage is a
+parallel set of simple, independent facts — the options a setting takes, what a table holds, a run
+of short design notes — flattening costs nothing and the bullets read faster than the prose would.
+The test is whether a reader meeting the material for the first time needs the connective tissue
+between the sentences. **Never condense a passage that introduces a complex new concept**, because
+the connective tissue is what makes a new concept followable, and a bulleted argument reads as a
+set of assertions nobody joined up. Judge it per passage rather than per page, in both directions:
+a bulleted item carrying several sentences and a citation is a paragraph wearing a hyphen, and a
+paragraph listing five simple settings is a list wearing prose.
+
 **Prefer a heading that states the section's conclusion, but fall back to a plain descriptor the
 moment that conclusion needs explaining.** A heading is read cold, by someone who has not read the
 section and is deciding whether to, so it has no room to define its own terms. Two tests: can a

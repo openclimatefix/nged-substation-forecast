@@ -56,6 +56,13 @@ detail has stopped being a planning tool.
 - **Introduce a fact only in the section whose outline entry needs it.** If a section's draft wants
   a fact that belongs to a later section, that's a sign the outline order is wrong, not a fact to
   smuggle in early.
+- **Decide prose or bullets per passage, on how complex the concept is rather than how long the
+  passage runs.** A parallel set of simple, independent facts — the options a setting takes, what a
+  table holds, a run of short design notes — is a list, and drafting it as prose only makes a
+  reader work harder for the same content. A passage introducing a complex new concept is prose,
+  because the connective tissue between the sentences is what makes a new concept followable. The
+  outline is where this is easiest to see: an entry whose content is a set of peers is a list, and
+  an entry whose content is an argument reaching a conclusion is not.
 - **Apply the CLAUDE.md prose-style rules one at a time, using `prose-review`'s one-rule-per-pass sweep, as separate passes over the drafted text** rather than trying to satisfy every rule while drafting. A single named-rule pass does better work than a general "make this good" pass, and much better work than trying to draft rule-conforming prose from a blank page.
 
 ## Check the draft against a reader, not a reviewer

@@ -82,13 +82,15 @@ per hourly evaluation, against about 8 KB at 50 rows. The cap matches the Sentry
 below (both 50) rather than the tighter 20 on the Sentry message body, so the same leading series
 appear in both and there is one less thing to reconcile. The counts beside it are uncapped, and an `n_late_listed`
 field records how many rows the table actually holds, so a truncated table can never make a large
-stall look small. Dagster's
-Checks view becomes the operator's at-a-glance "is the power data healthy?" status surface, showing
-a green tick when every series is current and a yellow warning when the feed has stalled — or when a
-series we had written off starts reporting again.
-The severity is a warning rather than a failure: a stalled feed is expected to self-heal once
-NGED recovers (the pipeline back-fills the gap automatically), so it must not block downstream
-assets.
+stall look small.
+
+**Dagster's Checks view becomes the operator's at-a-glance status for whether the power data is
+healthy, and the check stays a warning rather than a failure because a stalled feed is expected to
+self-heal.** It is the operator's at-a-glance "is the power data healthy?" status surface, showing
+a green tick when every series is current and a yellow warning when the feed has stalled — or when
+a series we had written off starts reporting again. The severity is a warning rather than a
+failure: a stalled feed is expected to self-heal once NGED recovers (the pipeline back-fills the
+gap automatically), so it must not block downstream assets.
 
 Nothing the check's **body** does can fail its own step. It runs as a step of the hooked
 `power_time_series_and_metadata_job`, and Dagster fails a run whose check step *errors* however
@@ -343,11 +345,13 @@ imperfection — throws away otherwise-good data; ignoring the distinction the o
 genuinely broken data land silently.
 
 The `ecmwf_ens` asset is the worked example. Its `nwp_has_no_unexpected_nulls` check surfaces the
-nulls that ECMWF ENS is known to carry (a WARN), and its `nwp_run_is_complete` check surfaces a
-run that arrived short of its full ensemble-member, forecast-step and grid-cell grid (also a WARN
-— the rows that did arrive are kept), while `Nwp.validate` still hard-fails a weather column that
-carries no data at all. The reasoning behind exactly where that fatal/tolerated line sits is
-documented in
+nulls that ECMWF ENS is known to carry (a WARN); its `nwp_instantaneous_variables_have_no_nulls`
+check surfaces a null in a variable that should never be null, such as temperature or wind (also
+a WARN, but one worth raising with Dynamical.org rather than re-running); and its
+`nwp_run_is_complete` check surfaces a run that arrived short of its full ensemble-member,
+forecast-step and grid-cell grid (also a WARN — the rows that did arrive are kept), while
+`Nwp.validate` still hard-fails a weather column that carries no data at all. The reasoning behind
+exactly where that fatal/tolerated line sits is documented in
 [Known ECMWF ENS data-quality issues](ecmwf-ens-known-issues.md). The `power_data_is_fresh` check
 above is the same shape of tool pointed at a different question — staleness rather than
 completeness — and is likewise a warning, never a failure.
@@ -706,14 +710,15 @@ serving through an MLflow outage would need to be designed (tracked in
 [issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472));
 `load_from_mlflow` does not supply one.
 
-### Infrastructure tier: alternatives to the EC2 control-plane box
+## Infrastructure tier: alternatives to the EC2 control-plane box
 
 **This decision settles which AWS infrastructure tier hosts the control plane, not how a run is
-dispatched once the control plane exists** — the designs above settle that question. The
+dispatched once the control plane exists** — the orchestration designs in
+[Considered but rejected designs](#considered-but-rejected-designs) settle that question. The
 infrastructure-tier decision is between a small EC2 box, nothing always-on, one big box running
 all compute, a serverless control plane backed by RDS, and a managed Dagster+ Solo plan.
 
-#### Accepted option: small EC2 control-plane box + `EcsRunLauncher` ~£25–35/month
+### Accepted option: small EC2 control-plane box + `EcsRunLauncher` ~£25–35/month
 
 A `t4g.medium` (2 vCPU / 4 GB; **£20.55/month on-demand, £12.95/month 1-yr no-upfront
 reserved**) runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker +
@@ -744,12 +749,12 @@ starts with `dagster`, so the run task definition must neutralise the image's
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
   £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
 
-#### Considered but rejected
+### Considered but rejected
 
 The four alternatives below were researched alongside the accepted option above and rejected in
 its favour. They're kept here as a durable record of the decision, not as live options.
 
-##### Option A — Level 1: nothing always-on ~£12–22/month
+#### Option A — Level 1: nothing always-on ~£12–22/month
 
 Hourly EventBridge Scheduler → one-shot Fargate task → `dagster job execute` against a
 throwaway local `DAGSTER_HOME` → exit. Freshness check is the first op (latest Dynamical init
@@ -764,7 +769,7 @@ Dynamical availability, never Dagster's records (they evaporate with the throwaw
   replay), backtests stay on the workstation, and the Marimo dashboard needs a separate
   always-on home (+£6/month Fargate service) anyway.
 
-##### Option C — one big box with everything on it ~£56–86/month
+#### Option C — one big box with everything on it ~£56–86/month
 
 Dagster + Postgres + Marimo + *all compute* (inference peaks ~9 GB → 16 GB box): EC2
 `t4g.xlarge` £82.20 on-demand / £51.90 reserved-1yr; Lightsail 16 GB £61.70 (4 vCPU, 40% CPU
@@ -776,7 +781,7 @@ OCF runs everything else (with Airflow).
 - **Cons:** priciest; backtests capped at 2–4 vCPU (slower than the workstation); Lightsail
   variants mean static AWS keys and burst-credit accounting; biggest pet.
 
-##### Option D — serverless control plane (no pets) ~£41–45/month
+#### Option D — serverless control plane (no pets) ~£41–45/month
 
 Daemon + webserver as one always-on 0.5 vCPU / 2 GB ARM Fargate service (£14.70), RDS
 `db.t4g.micro` Postgres (£10–12, approximate — the one unverified price), Marimo as its own
@@ -787,7 +792,7 @@ tiny Fargate service (approx £6.20), runs on ephemeral Fargate.
   ALB (+~£16.50/month) or a Tailscale-sidecar hack; the most Terraform. Cleaner on paper than
   in practice.
 
-##### Option E — Dagster+ Solo, Hybrid ~£37–45/month typical
+#### Option E — Dagster+ Solo, Hybrid ~£37–45/month typical
 
 £7.50/month base + £0.030/credit (1 credit = 1 materialisation or op execution; May 2026
 pricing). Live cadence ≈ 395 credits ≈ £12/month; backtests £0.15–0.52 each (a heavy
@@ -801,7 +806,7 @@ no serverless charge; sensor evaluations are free (an hourly freshness *op* woul
   metering shapes design decisions; vendor dependency. The 1-user cap is likely disqualifying
   for an OCF collaboration.
 
-#### Comparison
+### Comparison
 
 | | A: Level 1 | Accepted: small box + Fargate | C: one big box | D: serverless CP | E: Dagster+ Solo |
 |---|---|---|---|---|---|

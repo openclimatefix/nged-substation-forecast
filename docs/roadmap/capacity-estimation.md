@@ -24,7 +24,7 @@ series per metered generator**, feeding the
 this turns v0.1's single scalar-per-series capacity into a time-varying series, the metrics
 pipeline must also swap its `time_series_id`-only NMAE-denominator join for a temporal as-of
 join — see
-[Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity).
+[The v0.7 upgrade: effective capacity becomes time-varying](metrics-and-leaderboard.md#the-v07-upgrade-effective-capacity-becomes-time-varying).
 
 **How capacity feeds the forecast:** a **two-pass** approach. The first pass estimates effective
 capacity (this page); the second normalises each generator's time series by its effective

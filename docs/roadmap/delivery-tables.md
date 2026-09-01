@@ -245,10 +245,28 @@ not cover the forecast period.
 `|power|` over the full available observation history. This is a static scalar per series — a
 robust capacity proxy that is less sensitive to outlier spikes than the maximum, and more
 capacity-representative than the mean (which is dragged down by zero-output periods for PV/wind).
-It is also the denominator used to normalise NMAE in the `forecast_metrics` table — see
-[Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
-for why v0.1 stores one scalar row per series (rather than repeating the value at every half-hour)
-and how the metrics join evolves for the v0.7 upgrade.
+It is also the denominator used to normalise NMAE in the `forecast_metrics` table. The denominator
+comes from the `effective_capacity` Delta table (schema `contracts.power_schemas.EffectiveCapacity`),
+consumed by `compute_metrics` (`ml_core.metrics`).
+
+**v0.1 representation: one scalar row per series.** The `effective_capacity` asset writes one
+row per `time_series_id` — `effective_capacity_mw` = P99 of `|power|` over the whole observation
+history, `time` = the latest observed timestep. `compute_metrics` joins it onto the per-series
+metrics **on `time_series_id` alone** and divides.
+
+**Why v0.1 is a single row per series, not the value repeated at every half-hour.** The
+v0.7 upgrade below *will* store one row per `(time_series_id, time)` half-hour — but with a
+genuinely *time-varying* value. In v0.1 the value is a single constant per series, so repeating it
+across every half-hour would just be a denormalised encoding of one number: at V2 scale (~2,500
+series × ~4 years × 17,520 half-hours/yr ≈ 175M rows) that is hundreds of millions of rows to
+express ~2,500 scalars, for zero extra information. It would also *not* buy forward-compatibility,
+because the real v0.1→v0.7 interface change is not the data shape but **the join** (below). The
+`EffectiveCapacity` schema — `(time_series_id, time, effective_capacity_mw)` — already accommodates
+both the one-row-per-series v0.1 shape and the one-row-per-half-hour v0.7 shape; that is the
+forward-compatibility we want. (The v0.7 upgrade does widen the *columns* — the value becomes a
+mean + std pair,
+[#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247) — but the row shape
+and the join are unaffected by that.)
 
 **v0.7 upgrade:** replace the static P99 with a time-varying estimate from the winning
 [capacity estimator](capacity-estimation.md#several-estimators-one-winner). For generators, the
@@ -271,7 +289,7 @@ single `effective_capacity_mw` column is upgraded to a mean + std pair
 Normal-distribution convention); the asset body changes to emit one row per
 `(time_series_id, time)`, and the metrics pipeline swaps
 its `time_series_id`-only capacity join for a temporal as-of join (see
-[Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)).
+[The v0.7 upgrade: effective capacity becomes time-varying](metrics-and-leaderboard.md#the-v07-upgrade-effective-capacity-becomes-time-varying)).
 
 | Field | Data type | Notes |
 |---|---|---|

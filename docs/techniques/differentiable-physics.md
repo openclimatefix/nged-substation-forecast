@@ -335,8 +335,6 @@ where $d_t$ is time since the last washing rainfall and $r_t$ is the rainfall ra
 
 **The real cost is identifiability, not implementation.** Soiling and slower-than-assumed capacity growth both depress output, and they are separable only because soiling tracks rainfall history with a sawtooth shape whereas installations arrive as steps. Whether that separation actually holds at realistic noise levels needs demonstrating on synthetic data before the extra parameters are let anywhere near a real fit. In the aggregate-fleet case there is a second confound worth naming: real fleets are cleaned and rained on unevenly, so the fleet-level soiling ratio is a smeared average of many site-level sawtooths, which makes $\delta$ easier to identify than $r_{\text{wash}}$.
 
-This came out of an assessment of what it would take to run this method over India, where soiling between monsoons is a first-order effect rather than a refinement — see [Could this codebase forecast another country?](../architecture/adapting-to-another-geography.md#pv-disaggregation-without-capacity-priors).
-
 ---
 
 ## Scaling to aggregate fleets: `UniversalSolarFleetNode`

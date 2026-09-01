@@ -421,9 +421,6 @@ def _local_utc_offset_minutes(local_time: pl.Expr) -> pl.Expr:
 
     Returns:
         An ``Int16`` expression holding the offset from UTC in minutes.
-
-    See the portability review for the wider picture,
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/adapting-to-another-geography/>.
     """
     offset = local_time.dt.base_utc_offset() + local_time.dt.dst_offset()
     return offset.dt.total_minutes().cast(pl.Int16)
