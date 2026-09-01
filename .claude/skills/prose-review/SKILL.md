@@ -5,13 +5,14 @@ description: >-
   and word choice alike. Claude reads those rules as a general standard while drafting and does not
   enact them, so the violations are found only by a review that takes one rule at a time. A
   combined sweep of one section reported zero findings; a one-rule-at-a-time sweep of the same text
-  found 30. This skill sizes the review to the text, then runs the structural passes (bolded-lead
-  extraction, paragraph splitting, count closure, first-stumble reader) before the
-  word-and-sentence sweep. It also owns what is deliberately not a finding, how to chunk a long
-  file across sub-agents, which model to give the work to, how to triage findings before applying
-  any, and how to check that a restructure lost no information. Load whenever prose is to be
-  reviewed, reordered or simplified — a docs/ page, a README, a SKILL.md, a docstring, a literature
-  review — and whenever a reviewer asked to check prose has reported little or nothing.
+  found 30. This skill sizes the review to the text, then runs the structural passes (cross-page
+  redundancy, bolded-lead extraction, paragraph splitting, count closure, first-stumble reader)
+  before the word-and-sentence sweep. It also owns what is deliberately not a finding, how to chunk
+  a long file across sub-agents, which model to give the work to, how to triage findings before
+  applying any, and how to check that a restructure lost no information, and the scripts that apply
+  a batch of findings and prove the page kept its structure. Load whenever prose is to be reviewed,
+  reordered or simplified — a docs/ page, a README, a SKILL.md, a docstring, a literature review —
+  and whenever a reviewer asked to check prose has reported little or nothing.
 ---
 
 # Reviewing prose that already exists
@@ -32,6 +33,7 @@ every pass over everything:
 | Several paragraphs under one heading | Pass B, then the sentence sweep |
 | A whole page, or anything with headings | Passes A, B, D and E, then the sentence sweep |
 | A page nobody has audited, or beyond roughly 5,000 words | Every pass, chunked across sub-agents |
+| A whole section of the docs, or the docs as a whole | Pass F first, then the rest per page |
 
 **Structure is settled before the sentence sweep runs, never after.** Reordering and splitting move
 sentences, so a word-level sweep done first is partly wasted and its line numbers go stale.
@@ -127,6 +129,15 @@ is. Often only one phrase is failing, and replacing that phrase keeps the conclu
 became "MLOps research" because a bare "the field" is the referent fault Rule 1 already forbids.
 The rewritten phrase lands in the one sentence a skim-reader is guaranteed to read.
 
+**The two tests apply to a navigation entry with more force than to a heading.** A published site's
+navigation is where a reader arrives, so a section or page name that only makes sense once the page
+is open sends every reader down the wrong branch. Read the navigation on its own, the way Pass A
+reads the bolded leads: `mkdocs.yml`'s `nav` block is the whole list, and any name a first-time
+reader cannot place is a finding. Keep the capitalisation consistent across the list too — a
+navigation list mixing title case with sentence case reads as two lists stapled together — and
+where two entries in different sections name the same subject, that duplication is a Pass F
+finding, not a naming one.
+
 **Renaming a heading changes its anchor slug, so grep for inbound links to the old slug first** —
 across `docs/`, the skills, and any absolute link to the published site — and update every one in the
 same commit. That cost is real: of three headings renamed in this repo, two carried three and two
@@ -149,6 +160,50 @@ is a gap specific to that persona's background, not a fault in the document as a
 
 The output is a list of stop points: an ordering-bug report, not a style critique.
 
+## Pass F: what does another page already say?
+
+**When the unit under review is a set of pages rather than one page, the biggest cut is the idea
+explained on four pages instead of one.** Every other pass looks inside a page and cannot see this.
+Run Pass F before the per-page passes, because restructuring a page that is about to lose half its
+content wastes the restructuring.
+
+**Each idea belongs on the one page a reader would look for it on, and every other page links
+there.** Durable explanation belongs on a permanent page; a plan belongs with the plan; a
+step-by-step procedure belongs with the procedure. An idea that currently exists only inside a page
+scheduled for deletion has to be promoted to a permanent page before that page goes.
+
+**A cross-reference must carry a few words saying what is on the other end.** A bare `H2`, a bare
+"see the design principles", or a link whose visible text is only a label leaves the reader unable
+to tell whether they need to follow it, so they either break off and read the other page or skip a
+claim they should have checked. Write "the model must beat the incumbent forecast at day-ahead
+(H2)" with the link on the words, not "see H2". A label is an address, not a description, and a
+link whose text is only the address is as opaque as no link at all.
+
+**Find the candidates with `scripts/find_duplication.py`, then find the real duplication by
+reading.** The script counts the 8-word runs each pair of pages shares, which is a cheap way to
+choose what to read side by side:
+
+```bash
+uv run python .claude/skills/prose-review/scripts/find_duplication.py docs
+```
+
+**Verbatim overlap is the small half of the problem, so never treat that output as the work list.**
+Across this repo's docs, verbatim runs account for 3% to 15% of a page, while the redundancy that
+costs a reader is the same idea written out twice in different words. Give a sub-agent a pair of
+related pages and ask what each says that the other also says, in whatever words — not which
+sentences match.
+
+**Two pages named for the same subject are a redundancy and a navigation fault at once.** Where one
+subject has a short page in one section and a long page in another, decide which page a reader
+arrives at first and what that page owes them, rather than merging by default: an overview that
+genuinely routes a reader earns its length, and one that restates the page it links to does not.
+
+**Before deleting any passage, grep for inbound links to it, anchors included.** A heading that
+disappears takes its anchor slug with it, and `mkdocs build --strict` checks relative links only,
+so a link from outside the repo breaks silently. **And never cut a passage that limits a claim in
+the project's own favour** — material that makes the project look more modest is almost always
+there on purpose.
+
 ## Fix at the level the pass found the problem
 
 - A stop point traced to a missing prerequisite → move the missing fact earlier if it exists
@@ -157,6 +212,8 @@ The output is a list of stop points: an ordering-bug report, not a style critiqu
 - A lead (bolded, or summarised for Pass A) that doesn't fit the argument's order → move or cut the
   paragraph, not the sentence.
 - A paragraph reaching two conclusions → split it and write the second lead.
+- An idea explained on a second page → delete the weaker explanation and link to the stronger one,
+  with a few words saying what the link leads to.
 - Only once ordering is settled, run the sentence sweep below.
 
 ## The sentence sweep: one pass per rule, or it finds nothing
@@ -500,5 +557,7 @@ existing text first, then switch to `long-form-prose` to outline the new section
 result. Outlining new material against a page whose own structure hasn't been checked risks
 building the new sections on prerequisites the existing page never actually establishes.
 
-`literature-review` owns the accuracy round, which is a separate pass from this one, and owns the
-`rsub` substitution and the reflow script this skill points at.
+`literature-review` owns the accuracy round, which is a separate pass from this one. Reach for its
+`rsub` helper only for a single hand-edit; a batch of findings goes through
+`scripts/apply_findings.py` here, which `rsub` predates and which handles the markup, the wrap
+width and the merge-base gate that a bare substitution does not.
