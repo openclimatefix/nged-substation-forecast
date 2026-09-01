@@ -1,25 +1,16 @@
 # Design Philosophy
 
-**The one-minute description:** we are betting that these five claims can all hold at once:
+**The one-minute description:** we are betting that five claims can all hold at once, each stated as
+a falsifiable [engineering hypothesis](engineering-hypotheses.md) with a number and a deadline:
 
-- **A service that mostly runs itself** — manual attention needed only when an upstream data format
-  changes, with the forecast degrading gracefully rather than stopping when an input goes missing.
-  The mechanism matters as much as the outcome: we plan to get there by training an ML model that
-  can itself cope with missing inputs, rather than by wrapping fallback logic around a model that
-  assumes complete data. A consequence of that, if it holds, is a service an operator can run day
-  to day from the runbooks alone, without knowledge of the implementation details.
-- **A hundred experiments per person in a peak month** — most research ideas fail, so the number of
-  good ones a project finds is set by how many it can attempt.
-- **Safe one-click promotion, and one-click rollback** — one *command*, not one leap of faith. By
-  the time that command is available, the candidate has been scored against every other model on
-  identical folds, has run on the very same code that will serve it, and can be reverted just as
-  cheaply if it disappoints.
-- **It runs for pocket money** — under £50/month at v1 scale, under £200/month at v2.
-- **Scale without redesign** — 32 time series to ~2,500, with no structural change.
+- [H1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
+- [H2: a hundred experiments per person in a peak month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)
+- [H3: safe one-click promotion, and one-click rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback)
+- [H4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money)
+- [H5: scale without redesign](engineering-hypotheses.md#h5-scale-without-redesign)
 
-These are written down as [hypotheses with numbers and deadlines](engineering-hypotheses.md) rather
-than as aims: none of them is settled yet, and a threshold we miss gets published as a negative
-result rather than quietly revised.
+None of them is settled yet, and a threshold we miss gets published as a negative result rather than
+quietly revised.
 
 The rest of this section is the **portable "why"** of the project: it would survive a rewrite of
 every line of code, and it is what another team could adopt without adopting any of our stack. It is

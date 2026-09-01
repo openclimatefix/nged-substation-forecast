@@ -351,10 +351,11 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
 Target: **January 2027**
 
 - All features listed above (v0.1–v0.8), plus fixes discovered during live running
-- 32 time series in the NGED trial area: 16 primary substations, 6 solar PV farms, 3 wind farms, 2 GSPs, 2 BSPs, 1 biofuel generator, 1 BESS, 1 reciprocating gas generator
+- 32 time series in the NGED trial area ([scope](../index.md#scope))
 - Five Delta Lake output tables delivered to NGED every 6 hours:
     1. `power_forecast` — [−1, +1] ensemble power forecasts
-    2. `power_forecast_warnings` — per-`time_series_id` warnings (HEALTHY, MISSING VALUE, STUCK TIMESERIES, INVALID TIMESERIES VALUE, GENERATOR OR CIRCUIT FAULT, GENERATOR REDUCED CAPACITY, SUBSTATION ABNORMAL RUNNING ARRANGEMENT, STALE NWP, STALE POWER)
+    2. `power_forecast_warnings` — meter, generator and feed-health warnings per
+       `time_series_id` ([the nine warning types](delivery-tables.md#table-2-power_forecast_warnings))
     3. `asset_health_history` — complete historical record of each time series's health state
     4. `effective_capacity` — half-hourly probabilistic effective-capacity estimates (mean + std
        after the v0.7 upgrade,

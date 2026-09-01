@@ -20,9 +20,10 @@ Each forecast is:
 
 **Version 2** (future): Scale to approximately 2,500 time series covering all of NGED's primary substations and most customer meters.
 
-**After the NIA project**: NGED's stated preference (pending sign-off from their internal
-teams) is to run the service themselves, on NGED's own AWS infrastructure — so the service is
-being built to be operable day to day by a non-expert. See
+**After the NIA project**: NGED's stated preference, pending sign-off from their internal teams,
+is to run the service themselves on NGED's own AWS infrastructure — so the service is being built
+to be operable day to day by a non-expert.
+See
 [Requirements → Operating model & handover](background/requirements.md#operating-model-handover)
 and the [Handover to NGED](roadmap/handover.md) design page.
 
@@ -40,19 +41,10 @@ isn't reliably possible from power readings alone, that's a useful finding in it
 can use it as evidence to justify investing in extracting switching-event labels from their own
 operational systems, rather than us silently working around the gap.
 
-The same logic applies to the engineering, which is why our claims about it are written down as
-falsifiable [engineering hypotheses](design-philosophy/engineering-hypotheses.md) with thresholds attached: a
-pre-registered number we then miss is a transferable finding, whereas an aspiration we quietly fall
-short of is not.
-
-Flexpectation is a greenfield project, which is a rare chance to **research industry best practice,
-test-drive it against real data and a real production service, and report what we find**. The ideas
-worth borrowing are not all from energy forecasting: the
-[inherent stability](design-philosophy/inherent-stability.md) that shapes how the service behaves
-when its inputs degrade comes from vehicle dynamics, *fail-operational* from avionics autoland, and
-*blast radius* from site reliability engineering. The
-[design principles](design-philosophy/design-principles.md) page records what each principle
-actually decided, which practices we considered and declined, and which we have not yet absorbed.
+The same logic applies to the engineering: our claims about it are written down as falsifiable
+[engineering hypotheses](design-philosophy/engineering-hypotheses.md) with thresholds attached, and
+the [Design Philosophy](design-philosophy/index.md) section explains why — including which
+industries we borrow practice from and what we declined.
 
 ## Documentation
 

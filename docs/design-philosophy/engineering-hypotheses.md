@@ -132,32 +132,12 @@ statement of this is
 every objective in the brief is an open research question, and we hold far more ideas than we can
 try at once.
 
-**Four further accounts make the same case as Jumper's, and none of them is a measurement either.**
-[Donoho (2024)](https://doi.org/10.1162/99608f92.b91339ef) makes the structural argument, that
-frictionless reproducibility "spontaneously spawns groups of inspired researchers to a tight loop of
-iterative experimental modification and improvement". [Ng
-(2018)](https://home-wordpress.deeplearning.ai/wp-content/uploads/2022/03/andrew-ng-machine-learning-yearning.pdf)
-writes that researchers "will usually try out many dozens of ideas before they discover something
-satisfactory", and that a single-number evaluation metric is what lets them iterate faster. [Godbole
-et al. (2023)](https://github.com/google-research/tuning_playbook) recommend "running a larger
-number of shorter experiments" rather than a few long ones. Andrej Karpathy's
-[autoresearch](https://github.com/karpathy/autoresearch) fixes each training run to the same time
-budget, because a fixed budget "makes experiments directly comparable regardless of what the agent
-changes". The [energy-forecasting
-review](../background/energy-forecasting-review.md#fast-comparable-iteration-is-argued-for-not-measured)
-collects all four and is explicit that they are testimony and structural argument rather than a
-controlled measurement.
-
-**Nobody has measured what any of this delivers, which is why H2 is written as a falsifiable claim
-rather than a citation.** [Woźniak et al. (2025)](https://doi.org/10.1109/ACCESS.2025.3534990)
-screened 2,615 search results down to 41 publications looking for metrics that measure whether
-machine-learning-operations practice works. They reported that none of the reviewed articles
-presented any — an absence they call unexpected. [Gundersen and Kjensmo
-(2018)](https://doi.org/10.1609/aaai.v32i1.11503) found that 400 artificial-intelligence papers
-documented between 20% and 30% of the variables needed to judge how an experiment was run, with no
-paper documenting all of them. A field that records so little about how its experiments were run
-cannot easily measure whether a change to how they are run helped. H2 and T2.1 therefore exist to
-supply this project's own measurement rather than to add a fifth testimonial to the pile.
+**The same case has been made before, by senior practitioners across several organisations, and the
+absence of any measurement of what fast iteration delivers is a known gap in the
+machine-learning-operations literature** — see [Fast, comparable iteration is argued for, not
+measured](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/#fast-comparable-iteration-is-argued-for-not-measured)
+in the literature review. H2 and T2.1 exist to supply this project's own measurement rather than to
+add a fifth testimonial to the pile.
 
 **T2.1 — Experiment throughput.** Registered leaderboard experiments per person per month, taken
 from MLflow run timestamps. Two framing choices are deliberate.

@@ -32,4 +32,4 @@ All forecasting models subclass `BaseForecaster` (defined in `ml_core`), which p
 * _Input translation_: Transforms the canonical `AllFeatures` Polars LazyFrame into the required model shape.
 * _Output translation_: Converts native model outputs into the strict `PowerForecast` schema.
 * _Persistence_: Each subclass owns its own save/load format. `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a `meta.json` containing the full serialised `XGBoostConfig`. (This may change later. We may switch to saving models using native MLflow flavors (e.g., `mlflow.xgboost.log_model`), which serialize the raw model object directly.)
-* _Identity_: Model name, version, and optional MLflow experiment ID travel with the config, so every `PowerForecast` row is self-describing.
+* _Identity_: `MODEL_NAME` and `MODEL_VERSION` are class-level constants on each `BaseForecaster` subclass, separate from `BaseForecasterConfig`. `experiment_name` and `ml_flow_experiment_id` travel in the config instead. Both levels are stamped onto every `PowerForecast` row at predict time, so each row is self-describing.

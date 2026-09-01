@@ -1,9 +1,8 @@
 # ML Experimentation
 
-How we run and evaluate ML forecasting experiments. Unlike the [roadmap](../roadmap/index.md)
-(which holds forward-looking design for work not yet built), this area documents methodology that
-is **implemented** and in use — the durable home for ML experimentation docs once they leave the
-roadmap.
+How we run and evaluate ML forecasting experiments — the durable home for this methodology once it
+leaves the [roadmap](../roadmap/index.md), per the
+[Documentation Guide](../documentation-guide.md#how-planning-works).
 
 ## Documents
 

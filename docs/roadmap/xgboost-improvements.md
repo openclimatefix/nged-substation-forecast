@@ -85,12 +85,13 @@ The cost of that grows with every experiment added, and it is currently zero.
 ### Fix the NWP resample to honour the variable conventions
 
 `_upsample_nwp_to_half_hourly` linearly interpolates every column in `Nwp.continuous_var_names()`,
-which is defined as "every weather variable that is not categorical". That definition is the root
-cause: it silently classifies a period-ending rate and a wrapped angle as things that may be
-linearly interpolated between their `valid_time` stamps. Adding a `circular_var_names` ClassVar to
-`Nwp` — alongside the existing `categorical_var_names` and `deaccumulated_var_names` — and removing
-those columns from `continuous_var_names()` is what stops the same mistake recurring, because the
-generic paths then cannot silently swallow a variable class they do not handle.
+which silently classifies a period-ending rate and a wrapped angle as safe to interpolate — the root
+cause of all three defects below
+([NWP variable conventions](../architecture/nwp-variable-conventions.md#what-the-half-hourly-resample-does-today)).
+Adding a `circular_var_names` ClassVar to `Nwp` — alongside the existing `categorical_var_names` and
+`deaccumulated_var_names` — and removing those columns from `continuous_var_names()` is what stops
+the same mistake recurring, because the generic paths then cannot silently swallow a variable class
+they do not handle.
 
 That matters beyond this item, because three later items on this page iterate over variable classes
 in exactly the same way, and each is wrong for a circular variable:
@@ -112,9 +113,8 @@ test has to become a three-way partition assertion. Decide the first deliberatel
 is a separate "round these on write" set, since rounding a direction is correct even though
 interpolating one is not.
 
-**(a) Wind direction is interpolated across the 0°/360° wrap**, which affects 6.57% of interpolated
-`wind_direction_10m` rows with a mean circular error around 100°
-([measurements](../architecture/nwp-variable-conventions.md#wind-direction-is-interpolated-across-the-0360-wrap)).
+**(a) Wind direction is interpolated across the 0°/360° wrap**
+([measured](../architecture/nwp-variable-conventions.md#wind-direction-is-interpolated-across-the-0360-wrap)).
 Both direction columns are in `conf/model/xgboost.yaml`'s `selected_features` today. The fix is to
 interpolate the wind *vector* rather than the polar pair, which the [u/v storage
 change](#store-wind-as-uv-components-rather-than-speed-and-direction) below delivers as a side
@@ -123,11 +123,8 @@ effect.
 **(b) Radiation and precipitation are interpolated as though they were instantaneous.** They are
 period-ending means over the preceding step, so interpolating between `valid_time` stamps treats a
 backward-looking average as a reading at the end of its window. That shifts the modelled solar day
-late by half the step width — three hours beyond day 6 — and cuts its peak by a quarter, from
-816 W m⁻² to 590
-([measurements](../architecture/nwp-variable-conventions.md#period-ending-variables-are-interpolated-as-though-they-were-instantaneous)).
-Shortwave radiation is the worst-affected numeric variable, at half again the next-worst
-([MAE/SD 0.44 against 0.30](../architecture/nwp-variable-conventions.md#every-variable-and-how-to-read-it)).
+late and cuts its peak, worst of all the numeric variables
+([measured](../architecture/nwp-variable-conventions.md#period-ending-variables-are-interpolated-as-though-they-were-instantaneous)).
 
 The fix is the clear-sky-index resample, and it has **four requirements**. Getting the first wrong
 makes the result worse than doing nothing: normalising by the instantaneous clear-sky value at
@@ -153,9 +150,8 @@ convention but needs no clear-sky treatment: its accumulator features integrate 
 anyway, so only sub-window timing is lost.
 
 **(c) Instantaneous variables lose diurnal amplitude beyond day 6**, because the ~15:00 temperature
-maximum falls between the 12:00 and 18:00 samples: the mean daily temperature range falls from
-6.09 °C to 5.37 °C, an **11.9% compression**
-([measurements](../architecture/nwp-variable-conventions.md#instantaneous-variables-lose-diurnal-amplitude)).
+maximum falls between the 12:00 and 18:00 samples
+([measured](../architecture/nwp-variable-conventions.md#instantaneous-variables-lose-diurnal-amplitude)).
 This one has no exact fix, since the asymmetric
 afternoon peak needs the second harmonic and four samples a day is at the Nyquist limit for it. A
 shape-preserving cubic or a diurnal-harmonic fit should recover part of the amplitude; how much has
@@ -177,13 +173,9 @@ defect structurally impossible rather than individually patched, which is what [
 15](../design-philosophy/design-principles.md#15-transform-data-in-feature-engineering-not-in-the-ingest-unless-it-saves-a-lot-of-storage)
 argues for.
 
-It costs storage rather than saving it. Measured through the production write path on two full runs,
-storing components rather than the polar pair is **+5.7% to +6.3% of the whole `nwp` table**. That
-is so even though direction, averaged over the archive, is the most expensive weather column we
-store, because the significand rounding collapses the polar values into repeats that Parquet's
-dictionary encoding captures better than it captures `u`/`v`. The numbers are on
-[NWP variable
-conventions](../architecture/nwp-variable-conventions.md#wind-is-stored-as-speed-and-direction-and-why).
+Measured through the production write path, storing components instead of the polar pair costs
+storage rather than saves it
+([measured](../architecture/nwp-variable-conventions.md#wind-is-stored-as-speed-and-direction-and-why)).
 
 Two consequences to plan for. Wind speed becomes a **derived feature** — `sqrt(u² + v²)` computed at
 half-hourly resolution from the interpolated components, in the same `_parsed_features.py` slot as
@@ -982,15 +974,10 @@ distinguish from no effect.
 
 **Measured, that population is smaller still — which is the argument for de-prioritising this
 item.** The null count this item is sized against is mostly an artefact of the aggregation
-*estimator* rather than lost weather. Divide each cell by 1.0 instead of renormalising it over
-the grid points that arrived, and one corrupt grid point nulls its *entire* cell, because NaN
-propagates through a weighted sum — and a grid point feeds 4.92 cells on average, so a very
-small amount of upstream corruption looks like a great deal of missingness. On 2025-06-04 00Z,
-the worst run in the archive by this measure, 0.014% of `precipitation_surface` grid points give
-**4,394** null cells under that estimator; renormalising — what the ingest actually does — leaves
-**339**, none of them newly null. Across the whole archive — 862 runs, 6.24 billion rows, read from the
-Delta log's parquet statistics — only **12 runs carry any de-accumulated null beyond the lead-0
-floor at all**, totalling **6,550 cells**.
+*estimator* rather than lost weather: renormalising each cell over its contributing grid points
+(rather than dividing by 1.0) leaves 339 null cells on the worst run in the archive against 4,394
+under the naive estimator, and only 12 runs in the whole archive carry any de-accumulated null at all
+([measured](../architecture/ecmwf-ens-known-issues.md#spatial-aggregation-is-where-a-grid-points-null-is-resolved)).
 
 So roughly 92% of the null count this item is sized against is estimator artefact rather than
 missing weather, and what remains

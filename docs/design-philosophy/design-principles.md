@@ -65,9 +65,9 @@ principle behind it is a claim we are merely hoping comes true.
 
 ### 1 — The power forecast never stops
 
-If data inputs are disrupted, the forecast gets less certain instead of stopping. The forecast
-always does the best it can with whatever data it has, rather than blowing up. That covers errors
-in the **upstream data**, and only those. An error in **our own code** — an empty promoted model, a
+If data inputs are disrupted, the forecast gets less certain instead of stopping — the full
+argument, the degradation ladder and the failure-modes table are in [Inherent
+Stability](inherent-stability.md). An error in **our own code** — an empty promoted model, a
 contract violation, a join that has fanned out — gets the opposite posture: fail as early as
 possible, because degrading around our own bug would deliver a wrong forecast and bury its cause.
 How far such a failure then spreads is a different axis, and the business of
@@ -118,15 +118,16 @@ the complexity-offline and strict-contracts principles.
 ### 2 — Complexity belongs offline, not in the serving path
 
 When a capability could be built into the training loop *or* into the production service, build it
-into the training loop: training runs in front of a human who can read the traceback, whereas the
-production service runs unattended. Production forecasting systems commonly solve real problems
-*in* the serving path — a post-processing step that corrects for recent forecast errors, a switch
-to a separately-trained fallback model when an input feed is down, a blend of models specialised
-per horizon — and each of those is a reasonable answer to a real need. The bet this principle makes
-is that the same needs can be met by training a single model to handle whatever gets thrown at it,
-for example: recent-error correction learned from lagged-power features, missing-input tolerance
-trained in rather than switched to, one model spanning the whole horizon. Whether that bet actually
-pays, and what it costs, is exactly what the planned failure-scenario suite is meant to measure.
+into the training loop — training runs unattended, in front of nobody; see [Where complexity should
+live](inherent-stability.md#where-complexity-should-live) for why that asymmetry decides it.
+Production forecasting systems commonly solve real problems *in* the serving path — a post-processing
+step that corrects for recent forecast errors, a switch to a separately-trained fallback model when
+an input feed is down, a blend of models specialised per horizon — and each of those is a reasonable
+answer to a real need. The bet this principle makes is that the same needs can be met by training a
+single model to handle whatever gets thrown at it, for example: recent-error correction learned from
+lagged-power features, missing-input tolerance trained in rather than switched to, one model spanning
+the whole horizon. Whether that bet actually pays, and what it costs, is exactly what the planned
+failure-scenario suite is meant to measure.
 
 *Without it:* the serving path grows `if-then-else` branches — corrections, fallbacks, blends —
 that are easy to leave under-exercised: unless a team deliberately tests all these execution paths,
@@ -651,15 +652,10 @@ step's logs, and works out from a stack trace which time series, which weather r
 own assumptions actually broke — an hour per incident, and a cause recorded in the [intervention
 log](../live_service/intervention-log.md) that is a guess.
 
-*Decided:* every Sentry *event* sender carries a tag an alert rule can route on, including the
-failure hook's positive `fault_category:run_failed` marker rather than a rule phrased as "error
-level, and neither degradation tag is set", which would misclassify silently the day a fifth sender
-is added; an asset check that swallows its own exception still reports it through
-`report_check_degradation`, because log capture is off and the `ERROR` log alone would reach
-nobody; and the stale-power event names the worst late series and how late each is (`series 12:
-48.5h late`), caps that list so a whole-feed stall cannot attach thousands of rows, carries the true
-count in an `n_late` tag so the cap cannot make a large stall look small, and is fingerprinted per
-environment so an hourly-repeating stall stays one issue.
+*Decided:* every Sentry event sender carries a tag an alert rule can route on, and the stale-power
+event names the worst-affected series — see [Send telemetry to Sentry, and alarm on
+absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence) for
+the routing rules and the mechanisms that keep those tags trustworthy.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — specifically T1.4,

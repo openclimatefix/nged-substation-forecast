@@ -13,14 +13,9 @@ identical to the AWS deployment.
 
 Follow [Getting started on your laptop](../getting-started.md) for first-time setup (`uv`, `uv
 sync`, pre-commit hooks, and `cp .env.example .env`). This rehearsal ingests real telemetry, so
-`.env` needs the three NGED source-bucket credentials (see
-[Configuration reference](setup.md#the-env-file-and-nged-source-credentials)):
-
-```dotenv
-NGED_S3_BUCKET_URL=<nged source bucket url>
-NGED_S3_BUCKET_ACCESS_KEY=<key>
-NGED_S3_BUCKET_SECRET=<secret>
-```
+`.env` needs the three NGED source-bucket credentials from
+[Getting started → Step 2](../getting-started.md#step-2-create-your-env), also documented in the
+[Configuration reference](setup.md#the-env-file-and-nged-source-credentials).
 
 With nothing else set, every storage root resolves to `<repo>/data` and every table is a plain
 file on disk — see the [Configuration reference](setup.md#three-storage-roots) for the model.

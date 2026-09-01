@@ -1,10 +1,9 @@
 # Live Service
 
-How to operate the production forecasting service day to day. Unlike
-[the roadmap](../roadmap/index.md) (forward-looking design for work not yet built), this is the
-durable home for live-service **operational** docs — step-by-step recipes for running what's
-already built — once each piece ships. Design rationale (the *why*) lives in
-[`docs/architecture/`](../architecture/overview.md) instead; see that folder's
+How to operate the production forecasting service day to day — the durable home for live-service
+operational docs once each piece ships, per the
+[Documentation Guide](../documentation-guide.md#how-planning-works). Design rationale (the *why*)
+lives in [`docs/architecture/`](../architecture/overview.md) instead; see that folder's
 [Production Deployment — Design](../architecture/production-deployment.md) page for this area's
 counterpart.
 [The roadmap's Live Service page](../roadmap/live-service.md) sends readers here as its sections

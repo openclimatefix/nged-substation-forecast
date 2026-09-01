@@ -19,17 +19,12 @@ additional benefit.
   readable from Excel, Polars, pandas, DuckDB, Power BI, etc. The full rationale (including the
   comparison with a custom REST API) is on the durable
   [Forecast Delivery](../architecture/forecast-delivery.md) architecture page.
-- **Which bucket**: these five tables live in a dedicated `nged-forecast-delivery` S3 bucket,
-  physically separate from OCF's own working tables (NWP, raw power telemetry, forecast metrics,
-  …) in a second `nged-forecast-internal` bucket. NGED gets read access to both — there's no
-  reason to withhold the internal tables — but only the five below are a **stable contract**: the
-  internal bucket's tables may change shape at any time with no notice. See
-  [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it) for why, and
-  [Setting up the live service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-1-create-the-s3-buckets)
-  for the concrete bucket/IAM setup.
-- **Access**: both buckets hold data about NGED's customers, so neither is public — both are
-  protected with S3 authentication (mirroring how NGED protects their own time-series JSON
-  bucket).
+- **Which bucket, and how it's secured**: these five tables live in a dedicated
+  `nged-forecast-delivery` S3 bucket, separate from OCF's internal working tables. Neither bucket
+  is public — both need S3/IAM authentication — and only the five tables below are a stable
+  contract; the internal bucket's tables may change shape at any time. See [Forecast Delivery:
+  Securing it](../architecture/forecast-delivery.md#securing-it) for the full reasoning and the
+  concrete bucket/IAM setup.
 - **Update cadence**: every 6 hours, when a new forecast run is generated.
 - **Reading it** is a one-liner — `scan_delta` is lazy and only fetches the partitions a query
   touches, so a single forecast comes back in a fraction of a second even though the full dataset is
