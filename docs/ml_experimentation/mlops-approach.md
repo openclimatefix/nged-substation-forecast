@@ -14,7 +14,7 @@ Modern MLOps (as used in this project) changes two things:
    this project is making rather than a result the literature has settled: the
    energy-forecasting review found [no study measuring what adopting
    machine-learning-operations practice
-   delivers](../background/energy-forecasting-review.md#the-field-describes-good-practice-but-does-not-measure-whether-it-works),
+   delivers](../background/energy-forecasting-review.md#the-field-describes-good-practice-but-does-not-measure-whether-the-practice-works),
    and the case for [fast, comparable
    iteration](../background/energy-forecasting-review.md#the-case-for-fast-comparable-iteration-is-argument-and-testimony)
    rests on a structural argument and on practitioner testimony instead.
