@@ -106,16 +106,14 @@ input is trustworthy, wide when it isn't — instead of the one horizon-averaged
 forced into today.
 
 **No published result tests this combination — a weather ensemble driving substation-level
-uncertainty out to 14 days.** The [energy-forecasting
-review](../background/energy-forecasting-review.md#horizon-ensembles-and-tails) found two papers
-asking for it and none delivering it. The nearest built system is [Ludwig et al.
-(2023)](https://doi.org/10.1080/01605682.2022.2115411), who drive a multi-step probabilistic load
-forecast from the same 51-member ECMWF ensemble 1 to 6 days ahead. That system covers the whole
-of Great Britain, though, rather than a substation. The horizon itself sits near a measured
-limit: [Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) found that a weather
-ensemble stops beating a climatological distribution 16 to 23 days out. That figure was measured
-on upper-air variables rather than on the near-surface temperature and irradiance that drive
-substation load.
+uncertainty out to 14 days** — and the horizon sits near a measured limit, as the
+[energy-forecasting
+review](../background/energy-forecasting-review.md#horizon-ensembles-and-tails) sets out: the
+nearest built system, [Ludwig et al. (2023)](https://doi.org/10.1080/01605682.2022.2115411),
+covers the whole of Great Britain rather than a substation, and [Buizza and Leutbecher
+(2015)](https://doi.org/10.1002/qj.2619) found a weather ensemble stops beating a
+climatological distribution 16 to 23 days out — on upper-air variables, not the near-surface
+temperature and irradiance that drive substation load.
 
 ## The fix, formally: a mixture of conditional distributions
 

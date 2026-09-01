@@ -11,9 +11,10 @@
 
 ## What this changes (and what it doesn't)
 
-For the remainder of the NIA project, nothing about the milestone arc changes: OCF develops and
-runs Flexpectation on OCF's AWS account, exactly as [the roadmap](index.md#milestones) already
-plans. What changes is a **standing design constraint** on everything we build from now on:
+For the remainder of the NIA project, nothing about the milestone arc changes — see
+[the roadmap](index.md#milestones) for the v1/v2 plan and [Requirements → Operating model &
+handover](../background/requirements.md#operating-model-handover) for the phasing NGED agreed to.
+What changes is a **standing design constraint** on everything we build from now on:
 
 **The service must be operable day to day by a non-expert at NGED.** The operator's scarce
 skill is ops, not Python — if the service is designed well, the day-to-day maintainer should
@@ -209,16 +210,12 @@ work:
 
 ## Timing and decision gates
 
-- **Now → late NIA project**: OCF develops and runs the service on OCF's AWS account. The
-  operator-contract constraint applies to new design work from today; workstream 5
-  (landing-zone probing) starts early; the rest of the workstreams land alongside the v1/v2
+- **The phasing NGED agreed to is recorded in [Requirements → Operating model &
+  handover](../background/requirements.md#operating-model-handover)**: OCF running the service
+  through the NIA project, a scale gate at v2, progressive handover in the final months, and NGED
+  taking over post-NIA. Workstream 5 (probing NGED's landing zone) is the one workstream that
+  should start well before that final-months handoff; the rest land alongside the v1/v2
   milestones they depend on.
-- **Scale gate**: we will not know whether the service is truly hand-over-able until OCF has
-  run the full v2 service (~2,500 time series) for a few months. NGED has accepted this.
-- **Last few months of the NIA project**: progressively hand control to NGED, support them as
-  they get up to speed, run the game days. NGED then decides whether to run it themselves.
-- **Post-NIA**: OCF is no longer on call; NGED handles day-to-day operations. OCF may continue
-  developing the software and models (the hybrid model), possibly under a retainer — all TBD.
 - **The decision is reversible.** The NIA project's original plan was for OCF to deliver
   recommendations informing an RFP, through which NGED would procure a forecast service from a
   third party. That remains the fallback throughout: NGED can treat self-operation as an

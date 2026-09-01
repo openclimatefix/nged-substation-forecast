@@ -71,15 +71,11 @@ hardest case.
 
 **The literature backs both calls and adds a caveat for heat pumps**, as the [energy-forecasting
 review](../background/energy-forecasting-review.md#9-disaggregating-other-distributed-energy-resources-heat-pumps-electric-vehicle-chargers-and-batteries)
-sets out. For batteries, a Northern Powergrid code of practice fits diversity curves to demand, heat
-pumps, and chargers alike, then states that diversity "should not be applied when considering a BESS
-device" — a diversity factor of exactly one. For electric vehicles, NGED's own Electric Nation trial
-found that under a time-of-use tariff the share of charging events starting in the 22:00 hour rose
-from 5.8% to 24.7%, and to 37.6% among participants using the smart-charging app: a population that
-had diversified re-synchronising around the cheap-rate window, which is the failure mode the caveat
-above covers. For heat pumps, the one measurement the review found showed demand per heat pump
-falling as more are aggregated, but in an average winter. Whether that diversity survives the cold
-snaps when a substation is under most strain is untested.
+sets out: a Northern Powergrid code of practice puts batteries at a diversity factor of exactly
+one; NGED's own Electric Nation trial found a time-of-use tariff re-synchronising EV charging
+into the 22:00 hour, the failure mode the caveat above covers; and the one heat-pump diversity
+measurement the review found holds only in an average winter, untested in the cold snaps when a
+substation is under most strain.
 
 ## The forward model
 
@@ -359,19 +355,17 @@ by itself, a known approach. **Convex disaggregation** also has precedent: Wytoc
 contextually supervised source separation is the direct ancestor of
 [the dictionary baseline above](#the-convex-dictionary-baseline).
 
-**The nearest GB precedent is a sibling Open Climate Fix project on the same problem, which has not
-yet published a result.** [UK Power Networks' Power Flow to Solar
-Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) infers the capacity of
-unmetered solar behind each primary substation from half-hourly substation load and weather, then
-forecasts that generation, and Open Climate Fix is a partner in both that project and Flexpectation.
-The [energy-forecasting
-review](../background/energy-forecasting-review.md#8-disaggregating-unmetered-solar-and-wind-from-a-substations-net-flow)
-found no published benchmark of inferring capacity from the net flow at primary-substation
-aggregation. The nearest published method at a comparable scale, [Teng et al.
-(2023)](https://doi.org/10.1016/j.rser.2023.113662)'s DAZLS, splits unmetered wind and solar out of
-Dutch substation measurements but needs each site's installed capacity as an input — half of what
-this engine has to infer. The one result the review found that separated solar from demand at a real
-distribution substation without being told the installed capacity, [Kara et al.
+**The nearest GB precedent is a sibling Open Climate Fix project on the same problem, which has
+not yet published a result** — see the [energy-forecasting
+review](../background/energy-forecasting-review.md#8-disaggregating-unmetered-solar-and-wind-from-a-substations-net-flow)'s
+assessment of UK Power Networks' Power Flow to Solar Capacity, the project this engine's
+unmetered-PV work builds on. The review found no published benchmark of inferring capacity from
+the net flow at primary-substation aggregation. The nearest published method at a comparable
+scale, [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662)'s DAZLS, splits unmetered
+wind and solar out of Dutch substation measurements but needs each site's installed capacity as an
+input — half of what this engine has to infer. The one result the review found that separated
+solar from demand at a real distribution substation without being told the installed capacity,
+[Kara et al.
 (2018)](https://doi.org/10.1016/j.segan.2017.11.001), needed the substation's own reactive power
 and a nearby solar plant's output standing in for irradiance, neither of which NGED's primary
 substations routinely supply.

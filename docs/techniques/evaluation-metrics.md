@@ -179,15 +179,14 @@ RMSE = 0 (a perfect forecast over the scored group): with zero spread the ratio 
 uncertainty around an error-free mean) the computation refuses to emit a value — NaN or
 infinity in any metric raises rather than silently poisoning the leaderboard aggregates.
 
-**A published instance shows why an accuracy score is never reported alone.** [Kaas et al.
-(2026)](https://arxiv.org/abs/2607.01966) scored models on 200 German low-voltage feeders with an
-overload-decision metric. The two models that came first and second on that metric for consumer
-peaks had 90% prediction intervals that captured the true value only 62% and 58% of the time across
-the series as a whole, and 43% and 49% of the time at the peaks themselves. The [energy-forecasting
+**A published instance shows why an accuracy score is never reported alone.** The
+[energy-forecasting
 review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
-draws the general point: a model that understates its uncertainty raises fewer false alarms. That
-model therefore scores well on a threshold-crossing test while being exactly the model an operator
-should not trust near a capacity limit.
+records a case where the two best-ranked models on a threshold-crossing metric had 90% prediction
+intervals that captured the truth only 58–62% of the time overall, and under half the time at the
+peaks — exactly the fault a spread-skill ratio below 1.0 flags. A model that understates its
+uncertainty raises fewer false alarms, so it can score well on a threshold-crossing test while
+being exactly the model an operator should not trust near a capacity limit.
 
 ### Pinball loss
 

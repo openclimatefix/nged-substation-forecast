@@ -35,7 +35,12 @@ the computational graph, for three core reasons:
   explicit physical parameters like tilt, azimuth, or capacity. This lets engineers immediately
   audit the model's assumptions.
 
-**Adding a learned residual on top of a physical generator model is established practice.** [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) write a turbine's actuator-disc equation into a differentiable model, fit the aerodynamic power coefficient to a wind farm's metered production, and train a second neural network on the residual, cutting mean absolute percentage error by 37% over the physical model alone. A purely data-driven model given the same inputs, though, performed about as well as the hybrid, so adding the physics made the forecast interpretable without making it less accurate. Gijón et al. predict power from wind measured at the moment being predicted rather than from a weather forecast days ahead. The [energy-forecasting review](../background/energy-forecasting-review.md#differentiable-physics-for-generators) found nobody putting a differentiable model of a generator inside a distribution network's probabilistic net-demand forecast.
+**Adding a learned residual on top of a physical generator model is established practice, and
+adding the physics buys interpretability without costing accuracy** — the [energy-forecasting
+review](../background/energy-forecasting-review.md#differentiable-physics-for-generators) reports
+[Gijón et al. (2025)](https://arxiv.org/abs/2502.07344)'s turbine result and its limits: the gain
+is measured from wind at the moment predicted, not from a multi-day forecast, and nobody has put a
+differentiable generator model inside a distribution network's probabilistic net-demand forecast.
 
 ### Graceful degradation when an input is missing
 
@@ -101,11 +106,31 @@ We model each physical parameter as a learnable Normal distribution $\mathcal{N}
 
 Crucially, the training objective is an **ELBO**, not a bare reconstruction loss: a power-reconstruction term *plus* a KL term that pulls each posterior toward a fixed physical prior. The KL term is not optional. Minimising power error alone always rewards shrinking $\sigma \to 0$, so the parameter "uncertainty" we are trying to capture would simply collapse. The prior does double duty: it keeps the posterior spreads honest, and it injects weak domain knowledge (e.g. "panels point roughly south at a typical UK roof pitch") that regularises sites with little data.
 
-**The fitted parameters are *effective* parameters, not the plant's true ones, and the evaluation follows from that.** [Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024) fitted tilt and azimuth to a plant's own power history and found an azimuth 5° from the surveyed value simulated better than the surveyed value itself, because the fit balances the systematic error of the physical model. They concluded that the output "should be seen as a set of parameters that lead to the best simulation and not necessarily as the actual characteristics of the PV plant". Comparing a fitted tilt against a surveyed tilt is therefore a **diagnostic** — it catches a fit that has wandered somewhere physically absurd — and never the test. The test is the forecast score. The priors serve that same end: keeping the posterior spreads honest and regularising sites with little data, not pinning a posterior to a survey. That is why the priors below are weakly informative rather than tight. No published work has run that test: the [energy-forecasting review](../background/energy-forecasting-review.md#inferring-engineering-parameters) found no evidence for how much a photovoltaic power forecast improves from inferring tilt and azimuth rather than using a registered or nameplate value. The gain is therefore a hypothesis to test against the forecast score rather than a settled prize.
+**The fitted parameters are *effective* parameters, not the plant's true ones, and the evaluation
+follows from that.** The [energy-forecasting
+review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports
+[Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024) finding a fitted
+azimuth 5° off the surveyed value that simulated better than the surveyed value itself, because the
+fit absorbs the physical model's own systematic error. Comparing a fitted tilt against a surveyed
+tilt is therefore a **diagnostic** — it catches a fit that has wandered somewhere physically absurd
+— and never the test. The test is the forecast score. The priors serve that same end: keeping the
+posterior spreads honest and regularising sites with little data, not pinning a posterior to a
+survey. That is why the priors below are weakly informative rather than tight. No published work
+has run that test: the [energy-forecasting
+review](../background/energy-forecasting-review.md#inferring-engineering-parameters) found no
+evidence for how much a photovoltaic power forecast improves from inferring tilt and azimuth rather
+than using a registered or nameplate value. The gain is therefore a hypothesis to test against the
+forecast score rather than a settled prize.
 
 **Every fitted parameter is constrained by construction to a physically possible range, and that constraint does a different job from the prior.** A tilt cannot leave 0° to 90°, a capacity cannot go negative, and an efficiency cannot exceed unity, because each posterior is parameterised in an unconstrained space and squashed into its admissible range. That range comes from a sigmoid or an exponential rather than a clamp, so gradients keep flowing everywhere. The constraint rules out what the physics forbids; the prior shapes what is merely implausible inside the range the constraint leaves. Prior widths are therefore a hyperparameter rather than a fixed choice. Where the experiment budget allows, we sweep them and read the answer off the forecast score.
 
-**Fitting capacity itself as a distribution, the way `log_dc_capacity` and `log_ac_capacity` are posteriors here, has a published precedent for wind.** [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) treat a wind farm's available capacity as a time-varying bound fitted jointly with the forecast and tracked by gradient descent, improving continuous ranked probability score by 34.2% over probabilistic persistence at the Anholt offshore wind farm. Their one clean test of tracking the bound in isolation from the rest of the method gained 2.43%, which they call no significant improvement. The headline figure should therefore not be read as the value of a varying bound alone.
+**Fitting capacity itself as a distribution, the way `log_dc_capacity` and `log_ac_capacity` are
+posteriors here, has a published precedent for wind — with a caveat on the headline number.** The
+[energy-forecasting
+review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports
+[Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421)'s 34.2% CRPS gain from
+jointly fitting a time-varying capacity bound, and their own isolated test showing most of that
+gain comes from the joint fit rather than the bound alone.
 
 Two practical details the ELBO must get right — both classic failure modes of hand-rolled variational inference:
 
@@ -118,7 +143,11 @@ Three physics details the sketch gets right:
 - **DC and AC capacity.** The learnable `dc_capacity` is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. `ac_capacity` is a separate learnable parameter that clips the inverter output via `torch.minimum` — a single plant clips hard, unlike [the fleet soft clip](#scaling-to-aggregate-fleets-universalsolarfleetnode).
 - **Panel temperature derate.** Cell temperature sits above ambient in proportion to absorbed POA irradiance; efficiency then falls roughly linearly with temperature above 25 °C. The sketch adds a steady-state derate using two module-level constants; in the full variational model these become learnable posteriors — and the [subsection below](#panel-temperature) extends this to the broken-cloud effect.
 
-Getting the model chain right is not a rounding error. [Mayer and Gróf (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) scored all 32,400 combinations of irradiance-separation, transposition, reflection-loss, cell-temperature, module, shading, and inverter models against a year of 15-minute metered output from 16 plants in Hungary. They found the best chain 13% lower in mean absolute error than the worst — with irradiance separation and transposition the two whose model choice matters most, even with every plant's tilt and azimuth known exactly from its design documentation.
+Getting the model chain right is not a rounding error: the [energy-forecasting
+review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports [Mayer
+and Gróf (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) finding a 13% mean-absolute-error
+gap between the best and worst of 32,400 model-chain combinations, even with every plant's geometry
+known exactly from its design documentation.
 
 Angle convention: azimuth is measured from due south, with east negative and west positive (east = −90°, south = 0°, west = +90°). Beware that this differs from [pvlib](https://pvlib-python.readthedocs.io/)'s convention (north = 0°, clockwise, in degrees); `pvlib-pytorch` should adopt pvlib's own convention and convert at the boundary — mismatched angle conventions are the classic silent bug in PV modelling.
 

@@ -59,9 +59,10 @@ behind this commitment, and behind the other reporting commitments spread throug
 page, is in [Publishing results that others can compare
 against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
 
-**Negative results get a leaderboard row too**, including whether an off-the-shelf model given none
-of our data matches our own, and whether sustained experimentation stops yielding improvements. A
-leaderboard carrying only the approaches that worked hides how much of the search space was tried.
+**A leaderboard carrying only the approaches that worked hides how much of the search space was
+tried, so negative results get a row too** — for the reason given under [Publishing results that
+others can compare
+against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
 
 ---
 
@@ -74,10 +75,10 @@ No naive baseline exists anywhere in the codebase (only docstring mentions, e.g.
 numbers aren't interpretable — and, more to the point, we can't answer the question this project
 exists to answer: **do we beat what NGED does today?**
 
-**Every comparison against a baseline is published as the fraction of series that beat the baseline
-alongside the average error, never the average alone.** An average error across a population can
-improve while the model gets worse at a substantial minority of series. That minority is what an
-operator notices.
+**Every comparison against a baseline publishes the fraction of series that beat it alongside the
+average error, never the average alone** — see [Publishing results that others can compare
+against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
+for why an average can hide a model getting worse at a substantial minority of series.
 
 ### The headline baseline — `nged_incumbent`
 
@@ -185,12 +186,12 @@ bar that decides whether the project is worth its money. Persistence and climato
 diagnostic bookends, read as the loose end of the range rather than as the benchmark a win should
 be claimed against.
 
-**Carrying a loose bookend and a tight one is what the published guidance recommends.** [Doubleday
-et al. (2020)](https://doi.org/10.1016/j.solener.2020.05.051) distinguish the two jobs a benchmark
-does — a yardstick, which need not be a good forecast, and a point on the yardstick, which "should
-be close to the state of the art". They recommend carrying both, so that a new method is positioned
-between the two rather than declared better than a single baseline. Persistence and climatology are
-the yardstick here; `nged_incumbent` is the point on it.
+**Carrying a loose bookend and a tight one is what the published guidance recommends** — see
+[Leaderboards of machine learning
+results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results) for
+[Doubleday et al. (2020)](https://doi.org/10.1016/j.solener.2020.05.051)'s case for carrying a
+yardstick benchmark and a point on the yardstick together. Persistence and climatology are the
+yardstick here; `nged_incumbent` is the point on it.
 
 ### Implementation details — baselines (deleted when they ship)
 
@@ -433,19 +434,17 @@ alternatives we considered.
 
 Issue: [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226)
 
-The single leaderboard fold (`mid_2025_to_mid_2026` in `conf/cv/default.yaml`: train 2024-04 →
-2025-06, validate 2025-07 → 2026-06) serves as **both** the model-selection set and the
-reported skill number. Every hyperparameter choice, feature ablation, and model comparison is
-adjudicated on the same 12 months that the leaderboard reports. With hundreds of planned experiments
-(the roadmap mentions LLM-driven auto-experimentation in v0.5), the winner's reported skill will be
-optimistically biased — classic leaderboard overfitting. [Hyndman
-(2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015), who has co-organised a forecasting
-competition, expects it: "over-study of a single benchmark data set means that methods will
-eventually over-fit the published test data. I suspect this has happened with the M3 data over the
-past 20 years, and it is likely to happen with the M4 data, despite its much larger size." Our own
-fold is small in effective sample size rather than in row count, because consecutive half-hours are
-strongly correlated. The epoch mechanism handles *data* changes but not *adaptive selection* on a
-fixed fold.
+**The single leaderboard fold (`mid_2025_to_mid_2026` in `conf/cv/default.yaml`) serves as both
+the model-selection set and the reported skill number, which the review already names as a
+source of optimistic bias** — see [Leaderboards of machine learning
+results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results) for
+[Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 warning and [Pinheiro
+et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of which
+our own fold already meets in length but not in independence. With hundreds of planned experiments
+(the roadmap mentions LLM-driven auto-experimentation in v0.5), the winner's reported skill will
+grow more optimistically biased over time. Our own fold is small in effective sample size rather
+than in row count, because consecutive half-hours are strongly correlated. The epoch mechanism
+handles *data* changes but not *adaptive selection* on a fixed fold.
 
 **We adopt the Ladder, so a new best is published only when it beats the standing best by more than
 a margin, and the published score is reported rounded to that margin.** [Blum and Hardt
@@ -473,10 +472,8 @@ itself a relevant statistic (visible as the MLflow experiment count).
 minutes, not months — there is no time to wait for fresh production data to accumulate.**
 
 **Judging that decision on less than a year of data is dangerous, because a shorter window cannot
-show whether a model handles both ends of the annual cycle.** [Pinheiro et al.
-(2023)](https://doi.org/10.1016/j.apenergy.2022.120493) held out the whole of 2019 and note that
-"one year is the minimum acceptable to test a forecasting model whose target value shows annual
-seasonality". That is the same minimum the [cross-validation
+show whether a model handles both ends of the annual cycle** — the one-year minimum Pinheiro et
+al. set out above. That is the same minimum the [cross-validation
 protocol](../ml_experimentation/cross-validation-folds.md#why-expanding-window-cross-validation)
 already builds the single fold around.
 
@@ -594,14 +591,14 @@ the **peak-events slice** (the top 5% highest *observed* demand) and NGED's hand
 examples**. Both are described under
 [Tail & exceedance metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
 
-**Every ratio between a model and a reference is published with its reference forecast, the
-population it was scored on, and the number of ensemble members that produced it.** [Weigel et al.
-(2007)](https://doi.org/10.1175/MWR3280.1) show that a ranked probability skill score is biased
-downwards by an amount that depends on ensemble size. A score from our 51 members is therefore not
-comparable with one from a study using 10 until the correction is applied. The fair,
-finite-ensemble-unbiased CRPS in the table above is the form that carries this correction. PICP is
-judged against the finite-ensemble calibrated reference rather than the nominal rate for the same
-reason.
+**Every ratio between a model and a reference carries its reference forecast, population, and
+ensemble-member count, corrected for the ensemble-size bias [Weigel et al.
+(2007)](https://doi.org/10.1175/MWR3280.1) describe** — see [Publishing results that others can
+compare
+against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
+for the general commitment. The fair, finite-ensemble-unbiased CRPS in the table above is the form
+that carries this correction. PICP is judged against the finite-ensemble calibrated reference
+rather than the nominal rate for the same reason.
 
 ### Which ensemble collapse defines the deterministic point forecast? 🚧
 
@@ -742,29 +739,15 @@ backtests gain lookahead — see
 
 Issue: [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254)
 
-NGED's goal is **flexibility procurement**: paying flexible customers to reduce demand when a
-substation risks running beyond its capability. The question they ask of a forecast is therefore
-"**will load cross the limit?**" — their operator tool plots demand as headroom below a
-constraint line (see [NGED's incumbent
-forecast](../background/nged-incumbent-forecast.md#the-operators-view)), and the
-[requirements](../background/requirements.md#the-worst-case-matters-most-forecasting-threshold-exceedance)
-name threshold exceedance as the core concept. The existing metrics lean toward the tails (the
-mean pinball loss is deliberately tail-weighted; PICP covers the p1–p99 band) but they measure
-upper-quantile skill *at every hour equally* — including hours when nothing is anywhere near a
-limit. This section adds the metrics that measure skill *near the limit* itself.
-
-One design rule governs the whole section: **never rank models on a sample selected by what
-actually happened.** Scoring models only on the top-N% highest *observed* half-hours rewards
-models that simply bias every forecast upward — the "forecaster's dilemma", explained in
-plain language in the [evaluation-metrics
-reference](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
-[Lerch et al. (2017)](https://doi.org/10.1214/16-STS588) show that choosing which periods to score
-on the basis of what happened rewards a forecaster who over-predicts extremes, and can rank a
-deliberately biased forecast above an honest one. Ranking-grade tail emphasis instead comes from
-proper scores re-weighted toward the tail and
-computed over **all** hours. Concretely, three metrics — definitions, equations, and intuitive
-explanations in the [evaluation-metrics
-reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
+**This section is the delivery plan for the three ranking-grade metrics that answer NGED's actual
+question — "will load cross the limit?"** Why mean pinball loss and PICP under-serve that
+question, and why a model can only be ranked on hours selected by something other than the
+observed load, is durable reasoning that lives in [Why the tails need their own
+metrics](../techniques/evaluation-metrics.md#why-the-tails-need-their-own-metrics) and [The trap:
+scoring only the hours when the worst case actually
+happened](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
+Definitions, equations, and intuitive explanations for each metric are in the
+[evaluation-metrics reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
 
 - **Threshold-weighted CRPS
   ([twCRPS](../techniques/evaluation-metrics.md#threshold-weighted-crps-twcrps))** — CRPS
@@ -795,21 +778,15 @@ All three fit the existing `Metrics` shape — `metric_param` carries the thresh
 label — but they need a contract change to get there: `METRIC_NAMES` has no `twcrps` or `brier`
 entry, and `METRIC_PARAMS` no `historical_p99`, and both fields are `pl.Enum`.
 
-**Thresholds: static, per-series, quantile-derived.** A substation's true limit is not a
-single number (ratings vary with ambient temperature; transformers tolerate short overloads,
-so exceedance *duration* matters; switching changes what a feeder carries — NGED's own limit
-line is a time-varying "Flex Profile"). We deliberately do not model any of that for scoring.
-Each series gets one static threshold — the P99 of its full observation history, in the series
-type's constraint-side direction (high load for demand; reverse power flow for generation) —
-chosen because it guarantees every series a scoreable event rate, means the same thing across
-series, and stays stable across CV folds. NGED described setting capacity at the 99th percentile
-when we discussed this in July 2026; it is the same rung the
+**Thresholds: static, per-series, quantile-derived.** Each series gets one static threshold — the
+P99 of its full observation history, in the series type's constraint-side direction (high load for
+demand; reverse power flow for generation) — the same rung NGED described setting capacity at when
+we discussed this in July 2026, and the same rung the
 [cost-savings metrics](cost-savings-metrics.md#choosing-the-limit) use, so the leaderboard
 carries one threshold concept rather than several. Physical firm/flex ratings, where NGED
-supplies them, feed ad-hoc case studies and dashboard overlays instead: a rating that is never
-breached in the validation window yields zero events, and a warning system cannot be graded on
-events that never happen. The full rationale, and the explicit "this is a proxy" caveat, live
-in [the threshold-choice
+supplies them, feed ad-hoc case studies and dashboard overlays instead. The full rationale — why a
+full-history quantile threshold beats the physical rating for scoring — and the explicit "this is
+a proxy" caveat live in [the threshold-choice
 section](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived)
 of the reference.
 
@@ -1012,14 +989,11 @@ with lead time:
 | Day 2–7 | Short/Medium Range | Synoptic weather. Skill driven by mapping large weather fronts to power; ensemble spread starts to matter. |
 | Day 8–14 | Extended Range | Ensemble probabilities. Deterministic weather is essentially noise; skill comes from processing ensemble uncertainty. |
 
-**Coverage — how often reality fell inside the range the forecast claimed — is broken down by season
-and by how heavily loaded the substation was, as well as by the lead-time slices above.** A coverage
-figure averaged over a year can read as a healthy 90% while being 99% in the quiet months and 70% at
-the winter peaks. The winter peaks are the only periods NGED buys flexibility for. Conformal
-prediction does not remove the need for the breakdown: [Foygel Barber et al.
-(2020)](https://doi.org/10.1093/imaiai/iaaa017) prove that a distribution-free guarantee holds only
-on average across all conditions, never separately for the conditions that matter. A conformal
-forecast can therefore promise 90% coverage overall while failing at the peaks.
+**Coverage is broken down by season, by how heavily loaded the substation was, and by the lead-time
+slices above, not reported as one annual figure** — see [Publishing results that others can compare
+against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
+for why an averaged 90% can hide 70% coverage at the winter peaks, the only periods NGED buys
+flexibility for.
 
 ### Measuring performance during switching events 🚧
 
@@ -1145,14 +1119,16 @@ NWP?"). Example tags:
 | `pre_training` | none, ERA5 |
 
 **Accuracy is published separately for each class of asset** — grid supply points, bulk supply
-points, primary substations, and metered generators — each against its own stated naive baseline. A
-single project-wide accuracy target would mean different things at different levels. The unweighted
-`mae__all` aggregate is dominated by the grid supply points for exactly that reason. The
-`time_series_type` tag above is what carries the split.
+points, primary substations, and metered generators — each against its own stated naive baseline,
+for the reason given under [Publishing results that others can compare
+against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
+The unweighted `mae__all` aggregate is dominated by the grid supply points for exactly that reason.
+The `time_series_type` tag above is what carries the split.
 
 **The battery, the gas generator, and the biofuel plant are reported separately** from the wind and
-solar sites, because those three are dispatched on market signals that no weather forecast contains,
-so pooling them with weather-driven generators hides how well either group is forecast.
+solar sites, for the reason given under [Publishing results that others can compare
+against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
+— pooling them with weather-driven generators would hide how well either group is forecast.
 
 > Every leaderboard row also carries two **cost savings (£)** figures — one for flexibility
 > procurement, one for curtailment — designed in

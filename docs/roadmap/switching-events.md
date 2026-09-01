@@ -456,7 +456,16 @@ The detector adds three stages on top of the shared baseline: it detects level s
 
 Detect **sustained level shifts** in the baseline's normalised residual — the switching-event signature is a step, not a spike or a slope — with a standard mean-shift changepoint method (PELT or binary segmentation with an L2 cost, or CUSUM). The **output** is candidate step times and magnitudes per substation. But baseline residuals violate the assumptions those detectors make, so the residual must be prepared first.
 
-**A published detector already runs close to this whole chain, on distribution load alone.** [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) removes seasonal and trend components with a robust seasonal-trend decomposition, transforms the residual with a Haar stationary wavelet transform, finds candidate changepoints with Pruned Exact Linear Time, computes 15 statistical features per candidate — load variation, residual statistics, slope, ratio, and time location — and classifies the candidates with an isolation forest, reporting that "accurate detection is possible using load data alone, without external sensors or prior labels". Two differences matter here. Kim scores each distribution line on its own, with no balance check across neighbours, which is the redundancy stage 2 exists to exploit. And the paper reports no sensitivity floor in transferred magnitude × duration, so it does not answer the question this stage is built to answer. The paper is open access from the society's own journal portal, though its digital object identifier resolves to a paywalled aggregator. It reports an average detection rate of 78%, finding 7 of 9 logged transfers on the Kimhwa distribution feeder, and gives no false-alarm rate. Three earlier papers from the same author score against those same nine transfers. [Kim et al. (2020)](https://doi.org/10.3390/en13174358) detect a transfer where measured load departs from a neural network's prediction for the same feeder, finding 7 of the 9. [Kim et al. (2022)](https://doi.org/10.3390/en15041441) do it from polynomial and standard-pattern preprocessing, finding 7 of 9 on that feeder and 7 of 7 on another. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) simply thresholds the residual of a seasonal-trend decomposition on a moving average and a moving standard deviation, finding 8 of the 9 — the best score in the series. That the simplest method scores best on this benchmark is a reason to implement the moving-average threshold first, as the baseline stage 1 has to beat. [Kim (2024)](https://doi.org/10.5370/KIEE.2024.73.11.1873) is also the only paper in the series that comes near a sensitivity floor: its table gives the megawatt step and the percentage load change of each of the nine transfers. Every transfer above the feeder's mean load-change rate of 37.5% was detected, and the one it missed moved 22.7%.
+**A published detector already runs close to this whole chain, on distribution load alone, but
+never checks neighbours or reports a sensitivity floor.** The closest of a four-paper Korean
+series, [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), scores each distribution
+line on its own — the redundancy Stage 2 exists to exploit — and reports no sensitivity floor
+in transferred magnitude × duration, so it does not answer the question this stage is built to
+answer. The simplest of the four, a moving-average threshold on a decomposition residual,
+scores best on the shared nine-transfer benchmark, which is a reason to implement that route
+first, as Stage 1's baseline has to beat it. Full comparison and scores: [energy-forecasting
+review, §4 Detecting switching
+events](../background/energy-forecasting-review.md#4-detecting-switching-events).
 
 **Changepoint detection must respect the residual's real statistics.** Textbook mean-shift
 detectors (PELT/BinSeg with an L2 cost, CUSUM) assume roughly independent noise with constant
@@ -506,16 +515,10 @@ residuals around time t (observed - expected), one row per substation:
 
 **Checking both sides of a transfer has no published precedent we could find.** The
 [energy-forecasting
-review](../background/energy-forecasting-review.md#4-detecting-switching-events) searched 40
-title-and-abstract queries and 10 full-text queries across OpenAlex, Semantic Scholar, Crossref,
-and arXiv, the works citing [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164), and every
-project title on the Energy Networks Association's Smarter Networks Portal. The review found
-every switching detector in the literature scoring one substation against its own history alone.
-The one paper that search turned up whose title suggests it couples substations, [Willis et al.
-(1984)](https://doi.org/10.1109/TPAS.1984.318713), corrects annual peak-load curve fits rather
-than detecting an event at a point in time. The review could not obtain the full text to confirm
-whether the "load transfer coupling" regression that title names couples the substations that
-exchange load.
+review](../background/energy-forecasting-review.md#4-detecting-switching-events) ran an
+exhaustive literature search and found every switching detector in the literature scoring one
+substation against its own history alone; the closest candidate it turned up, a 1984 regression,
+could not be confirmed as coupling substations because the full text was unobtainable.
 
 **The neighbourhood-sum test (cheap, powerful corroboration).** Conservation offers a second,
 sharper statistic than "the rises sum to the drop": over the candidate set {source + donors}, the
@@ -538,13 +541,11 @@ estimate, by permutation (run the same subset search at randomly chosen event-fr
 often a balancing subset of a given quality arises by chance, and only accept attributions that
 clear that null. Without this, the event list gets padded with confident-looking coincidences.
 
-**Conservation is only approximate — set the tolerance band accordingly.** Reconfiguration
-changes feeding-path lengths, so $I^2R$ losses change; and load served at a slightly different
-voltage draws slightly different power (load is mildly voltage-dependent — the effect behind
-conservation voltage reduction). Expect the
-donor pickups to miss the source drop systematically by a few percent, in either direction. The
-balance and neighbourhood-sum tests need a tolerance band, not an equality — and the imbalance
-distribution observed on logged events is itself worth reporting.
+**Conservation is only approximate — set the tolerance band accordingly.** [Background: the two
+facts that make this hard](../background/switching-events.md#the-two-facts-that-make-this-hard)
+explains why: donor pickups miss the source drop by a few percent, in either direction. The
+balance and neighbourhood-sum tests both need that tolerance band, not an equality, and the
+imbalance distribution observed on the logged events is itself worth reporting.
 
 **Events are intervals, not onsets.** Everything downstream (the ARA mask, the delivered event
 table) needs `[start, end]`, so the reversion step must be detected and **paired** with its
@@ -561,14 +562,14 @@ step time shared by a large fraction of the fleet is a data artifact, not a swit
 must be excluded before the subset search runs — otherwise it manufactures spurious
 multi-substation "events".
 
-**A GB precedent already draws this distinction at fleet scale, on power alone.** Electricity North
-West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted step
-changes in 5 years of half-hourly demand from over 70 bulk supply points and 380 primary substations
-into "unreasonably zero or negative demand" and "switching operations and network reconfigurations",
-using power alone and no bottom-up reference series, as the [energy-forecasting
-review](../background/energy-forecasting-review.md#4-detecting-switching-events) records. ATLAS
-published no precision or recall for either rule. It therefore does not settle how well the
-distinction can be drawn — only that GB substations have been sorted this way before.
+**A GB precedent already draws this distinction at fleet scale, on power alone.** Electricity
+North West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted
+step changes into meter-fault and switching-event categories across a fleet more than ten times
+this project's trial area, using power alone — but published no precision or recall for either
+rule (full description: [energy-forecasting review,
+§4](../background/energy-forecasting-review.md#4-detecting-switching-events)). It therefore
+does not settle how well the distinction can be drawn — only that GB substations have been
+sorted this way before.
 
 ##### Stage 3 — composition corroboration
 
@@ -603,7 +604,14 @@ Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 **Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**. The floor is not a single MW number: it is a frontier in **transferred magnitude × event duration**, reported per series relative to that series' residual noise. The duration axis exists because changepoint segmentation has a minimum detectable event length at half-hourly sampling (an event lasting minutes to a few hours appears as a spike or one odd interval, not a step), just as residual noise sets a minimum magnitude. Pair the frontier with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.* One caveat to carry into the scoring: measured **precision is a lower bound** — if the control-room logs are incomplete (worth asking NGED how complete they believe them to be), some "false positives" will be real, unlogged events.
 
-**Report an F1 score per event-duration band, so the detector can be set beside the only published measurement.** F1 is the harmonic mean of precision and recall, weighting the two equally, and runs from 0 for a useless detector to 1 for a perfect one. [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) — the only published measurement of switching detection at a real network operator — score four duration bands (15 minutes to 6 hours, 6 hours to 3 days, 3 to 42 days, and 42 days or longer). Their best detectors reach about 0.2 on the two shortest bands and nearly 0.5 on the longest. Their headline metric is F1.5 rather than F1: the F-beta family lets recall be weighted more heavily than precision. They set beta to 1.5 because "the potential impact of a false negative is higher than that of a false positive in power grid expansion planning". The same is true here, so report **both** — F1 as the headline number, F1.5 alongside it wherever the head-to-head with Bouman et al. is the point. Band the scores by duration the way they do, too, because a single fleet-wide score hides the fact that short events are the hard ones.
+**Report an F1 score per event-duration band, so the detector can be set beside the only
+published measurement.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) is the only
+published measurement of switching detection scored on both precision and recall, and the
+[energy-forecasting
+review](../background/energy-forecasting-review.md#4-detecting-switching-events) explains their
+F1.5 scoring choice and reports their scores (≈0.2 on events under 3 days, ≈0.5 on events of 42
+days or more). Report **both**: F1 as the headline number, F1.5 alongside it wherever the
+head-to-head with Bouman et al. is the point, banded by duration the way they band theirs.
 
 **Synthetic event injection (the workhorse of tuning and validation).** The logs contain only however many events the trial period happens to contain, which caps the statistical power of any sensitivity estimate. Injection removes that cap: take periods believed clean, move a synthetic slice between real neighbours (subtract a scaled, plausibly-shaped signal from one series and add it across 1–3 others), and measure detection and attribution over a controlled **magnitude × duration grid**. This maps the full sensitivity frontier with arbitrary precision, tunes every threshold and penalty in stages 1–2 *without touching the gold-standard logs*, and works at any scale — including, later, on unlabelled full-fleet data. The real logs then play their proper role: confirming that the synthetic frontier transfers to reality, rather than carrying the whole measurement burden alone.
 
@@ -1265,7 +1273,11 @@ PyTorch, is in the mixture-model tooling note above.
 
 The obvious further stage models the **actual switchable physical units (feeders / load blocks)** explicitly — decomposing each substation into discrete blocks, each routed as a unit. **That stage is rejected, and is not on the plan**, for two independent and decisive reasons:
 
-1. **The unit does not exist.** NGED have been explicit that the network is meshed and run radially with movable cut points; load is a near-continuous distribution splittable almost anywhere. There is no stable, re-identifiable feeder with a persistent identity or composition to discover and route. The model would be trying to recover units that do not persist.
+1. **The unit does not exist.** [Background: the HV network is meshed but run
+   radially](../background/switching-events.md#the-hv-network-is-meshed-but-run-radially)
+   establishes that cut points move, so there is no stable, re-identifiable feeder with a
+   persistent identity or composition to discover and route. The model would be trying to
+   recover units that do not persist.
 2. **It lives in the unlabelled regime.** This stage is precisely what would run at full scale (~1,161 primary substations), where **no switching labels exist.** Any block model that needed supervision to identify blocks is doomed there twice over.
 
 **Possible deferred successor (a research bet, not a planned step).** If within-type shape error in the typed mixture ever proves to materially hurt the forecast, the conceptually correct (but much harder) direction is to model **load as distributed along network arcs with movable cut points**, inferring the cut location rather than assuming discrete blocks. This is a genuine spatial-inference research problem and should be explicitly *deferred*, not chased — and only entertained if the typed mixture's residuals demonstrate the need.
@@ -1276,21 +1288,32 @@ The obvious further stage models the **actual switchable physical units (feeders
 
 These apply at every stage and are the things most easily got wrong:
 
-- **Unsupervised at production scale; the labels are for using in v1.** The switching logs
-  exist for the 32-series trial only, so no fleet-scale production path may *require* them. But
-  v1 is an experiment, and within it the logs should be used freely: plot them against every
-  engineered feature, and run label-consuming training variants (label-excluded baselines and
-  the like) deliberately — the measured value of the labels is itself a deliverable,
-  quantifying for NGED what fleet-wide switching logs would be worth and thereby informing
-  their case for investing in extracting logs from their operational systems.
+- **Unsupervised at production scale; the labels are for using in v1.** [Background: the labels
+  asymmetry](../background/switching-events.md#the-labels-asymmetry) is why: the switching logs
+  exist for the 32-series trial only, so no fleet-scale production path may *require* them.
+  Within v1, though, use them freely — plot them against every engineered feature, and run
+  label-consuming training variants (label-excluded baselines and the like) deliberately. The
+  measured value of the labels is itself a deliverable, quantifying for NGED what fleet-wide
+  switching logs would be worth and informing their case for investing in extracting logs from
+  their operational systems.
 - **Do not fit pilot-only parameters and rely on them at scale.** Anything learned only on the 16 labelled primaries that cannot be set for the other ~1,145 is forbidden as a *production* dependency. The *method* generalises; a pilot lookup does not.
 - **Keep the detector's headline scores honest.** Any *unsupervised* detector's reported
   precision/recall must come from logged events that were not used to tune it — tuning belongs
   on the synthetic-injection harness. Free experimental use of the logs (the first bullet) and
   held-out final scoring coexist by keeping those two activities separate.
-- **Conservation is node-level flow balance, everywhere.** One source's lost power is absorbed by a *subset* of neighbours whose pickups sum to it. Never implement conservation as independent pairwise equal-and-opposite matches — confirmed 2–3-way fan-out makes that wrong.
-- **Composition is read from recipients, never the source.** Any per-leg composition estimate (v0.6 stage 3) must come from each recipient's individual step *after* attribution; the source's step blends all simultaneous outgoing legs.
-- **Partial transfer is the common case.** Expect arbitrary continuous transferred magnitudes down to the noise floor. Quantify the detection sensitivity floor (a magnitude × duration frontier, per series); do not assume a clean event/no-event separation.
+- **Conservation is node-level flow balance, everywhere** — see [Background: the two facts that
+  make this hard](../background/switching-events.md#the-two-facts-that-make-this-hard) and
+  [Stage 2](#stage-2-balance-attribution-across-neighbours). Never implement it as independent
+  pairwise equal-and-opposite matches.
+- **Composition is read from recipients, never the source** — see [Stage
+  3](#stage-3-composition-corroboration). Any per-leg composition estimate (v0.6 stage 3) must
+  come from each recipient's individual step after attribution, never from the source's step,
+  which blends every simultaneous outgoing leg.
+- **Partial transfer is the common case.** [Background: the two facts that make this
+  hard](../background/switching-events.md#the-two-facts-that-make-this-hard) covers why —
+  transferred magnitude is a free continuous variable with no minimum size. Quantify the
+  detection sensitivity floor (a magnitude × duration frontier, per series) rather than
+  assuming a clean event/no-event separation.
 - **Every detection statistic gets a null.** Changepoint penalties calibrated per series under the residual's real autocorrelation; attribution scores calibrated against chance-level subset balance by permutation. Uncalibrated thresholds are how phantom events happen.
 - **Synthetic event injection is the standard tuning instrument at every stage.** Thresholds, penalties, and sensitivity frontiers are tuned and measured on injected events; the logged events are reserved for final scoring, never for tuning.
 - **Routing/switching priors:** regularise toward the identity (NRA) and piecewise-constant in time; switching is rare and abrupt.

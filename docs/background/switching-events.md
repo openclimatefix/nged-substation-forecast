@@ -83,6 +83,8 @@ The diagram shows why "how much moved?" has no clean answer. The load `·` is sp
    It is continuous, unknown, and usually only a SLICE (not the whole substation).
 ```
 
+**Conservation is only approximate.** Reconfiguration changes feeding-path lengths, so $I^2R$ losses change, and load served at a slightly different voltage draws slightly different power (load is mildly voltage-dependent — the effect behind conservation voltage reduction). Expect the donor pickups to miss the source drop by a few percent, in either direction.
+
 ## The labels asymmetry
 
 We have **switching labels (control-room logs) only for the 32-series trial area** (16 primaries plus associated generation/GSP/BSP series). When the system expands to the full ~1,161 primary substations, **we will have no switching labels.**

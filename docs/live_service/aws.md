@@ -658,8 +658,8 @@ run dispatch), the Dagster webserver (the UI), the code-location server, and Pos
 which stay on ephemeral Fargate. (To read about why we're using an always-on box, and why this
 shape, see the [orchestration
 decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm);
-the sizing and cost are the roadmap's [accepted
-option](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month).)
+the sizing and cost are the [accepted
+option](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month).)
 
 First create its IAM role: **IAM** →
 [**Roles**](https://us-east-1.console.aws.amazon.com/iam/home?region=eu-west-2#/roles) → **Create
@@ -854,10 +854,9 @@ tailnet and you lose SSH and UI access until someone re-authenticates it. In the
 the box with a *tagged* auth key, e.g. `tag:nged-forecast`, which makes it org-owned and
 non-expiring in one step; disabling expiry on the user-owned node is the quick fix.)
 
-Because the tailnet is the *only* way in and the Dagster UI has no authentication of its own,
-anyone who can reach this box over the OCF tailnet gets its UI and — via `--ssh` — a shell as
-`ubuntu`, governed by the tailnet's ACLs. That is intended here (OCF-wide access is fine for this
-box); tighten it later with Tailscale ACLs or tags if that ever changes.
+Because the tailnet is the only way in, anyone who can reach this box over the tailnet gets its
+UI and a shell — see [Connecting to the AWS control plane](connecting.md) for why that is the
+deliberate access model at this stage, and how a laptop reaches the box.
 
 Now **delete the temporary inbound rule** (**Edit inbound rules** → **Delete** → **Save rules**),
 returning `nged-forecast-ctrl-sg` to zero inbound rules — Tailscale establishes its connections

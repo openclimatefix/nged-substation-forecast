@@ -63,7 +63,7 @@ existing control-plane box — nothing new billable beyond a DNS domain and host
 (pennies per month). The only material new billable resource across all three stages is the
 second Fargate task/service for Stage 3's public Marimo instance, roughly priced by the
 same-shaped workload in
-[Option D](../roadmap/live-service.md#option-d-serverless-control-plane-no-pets-4145month)
+[Option D](production-deployment.md#option-d-serverless-control-plane-no-pets-4145month)
 (~£6.20/month for Marimo as its own tiny Fargate service).
 
 ### Workload model

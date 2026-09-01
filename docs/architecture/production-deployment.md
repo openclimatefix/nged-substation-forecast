@@ -15,10 +15,10 @@ issuing the forecasts themselves (6-hourly). The box does none of that pipeline 
 own, though: it dispatches every run — those schedules and UI-launched backtests alike — to an
 ephemeral Fargate task via `EcsRunLauncher`. Even the light data-ingest runs go to Fargate;
 the reasoning is in
-[Running the data-ingest runs on the control-plane VM](#running-the-data-ingest-runs-on-the-control-plane-vm). This is the roadmap's
-[accepted architecture](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month);
+[Running the data-ingest runs on the control-plane VM](#running-the-data-ingest-runs-on-the-control-plane-vm). This is the
+[accepted infrastructure tier](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month);
 see [Live service: AWS architecture](../roadmap/live-service.md#aws-architecture) for the
-costed options, and [AWS Running Costs](aws-costs.md) for what the deployed service costs to
+roadmap's summary, and [AWS Running Costs](aws-costs.md) for what the deployed service costs to
 run — as built at v1, and projected at v2 scale.
 
 Because scheduling lives inside Dagster rather than in any cloud-specific service, the entire
@@ -705,6 +705,118 @@ dynamically once redeploys become frequent, at which point a production-resilien
 serving through an MLflow outage would need to be designed (tracked in
 [issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472));
 `load_from_mlflow` does not supply one.
+
+### Infrastructure tier: alternatives to the EC2 control-plane box
+
+**This decision settles which AWS infrastructure tier hosts the control plane, not how a run is
+dispatched once the control plane exists** — the designs above settle that question. The
+infrastructure-tier decision is between a small EC2 box, nothing always-on, one big box running
+all compute, a serverless control plane backed by RDS, and a managed Dagster+ Solo plan.
+
+#### Accepted option: small EC2 control-plane box + `EcsRunLauncher` ~£25–35/month
+
+A `t4g.medium` (2 vCPU / 4 GB; **£20.55/month on-demand, £12.95/month 1-yr no-upfront
+reserved**) runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker +
+**the Marimo dashboard**, behind Tailscale (no ALB). Every run — live schedules *and*
+UI-launched backtests — is dispatched by `EcsRunLauncher` to an ephemeral Fargate task sized
+to the job. Add ~£1.80 EBS, £5–7/month live Fargate, ~£0.65/backtest.
+
+**One image, four roles.** The daemon, webserver, and code-location server all run from the
+*same* [production image](../architecture/production-deployment.md) the ephemeral Fargate runs
+use (harmless — the baked-in champion model is dead weight for the first three, only a run's
+actual execution touches it) — a `docker-compose.yml` on the box just launches each as a
+separate service with a different command override. The compose file, and the entrypoint
+gotchas it has to navigate (`dagster-webserver`/`dagster-daemon` are separate console-script
+binaries, not `dagster` subcommands; and `EcsRunLauncher` generates a run command that itself
+starts with `dagster`, so the run task definition must neutralise the image's
+`ENTRYPOINT ["dagster"]`), are now written up in the runbook —
+[Setting up the live service on AWS: Steps 9 and 14](../live_service/aws.md#step-9-create-the-ecs-cluster-and-fargate-task-definition).
+
+- **Pros:** Dagster properly (history, UI backfills, sensors, concurrency pools enforced
+  centrally); backtests get big ephemeral compute; dashboard rides free; EC2 IAM instance
+  roles (no static keys); the textbook Dagster-OSS-on-AWS deployment.
+- **Cons:** one pet server (patching, disk, daemon liveness — mitigate with systemd restart
+  policies + the monitoring plan's "no fresh forecast" alarm); dagster.yaml/run-launcher
+  config work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans). The pet-server
+  risk grows once a non-expert operates the service — the full mitigation list (auto-recovery
+  alarms, disk hygiene, a tested rebuild-from-scratch script) is
+  [Handover workstream 3](../roadmap/handover.md#3-de-pet-the-control-plane-box).
+- Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
+  £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
+
+#### Considered but rejected
+
+The four alternatives below were researched alongside the accepted option above and rejected in
+its favour. They're kept here as a durable record of the decision, not as live options.
+
+##### Option A — Level 1: nothing always-on ~£12–22/month
+
+Hourly EventBridge Scheduler → one-shot Fargate task → `dagster job execute` against a
+throwaway local `DAGSTER_HOME` → exit. Freshness check is the first op (latest Dynamical init
+vs the NWP init behind the newest forecast in `power_forecasts` on S3); failure recovery is
+the cron (stale outputs → next tick re-runs); Delta commits provide the atomicity the
+freshness logic needs; "which partitions need materialising" derived from Delta contents vs
+Dynamical availability, never Dagster's records (they evaporate with the throwaway SQLite).
+
+- **Pros:** cheapest; zero servers; self-healing by construction; everything it builds is
+  needed by the accepted option (and C/D) anyway.
+- **Cons:** fails both new requirements — no run history, hand-rolled backfills (issue #208
+  replay), backtests stay on the workstation, and the Marimo dashboard needs a separate
+  always-on home (+£6/month Fargate service) anyway.
+
+##### Option C — one big box with everything on it ~£56–86/month
+
+Dagster + Postgres + Marimo + *all compute* (inference peaks ~9 GB → 16 GB box): EC2
+`t4g.xlarge` £82.20 on-demand / £51.90 reserved-1yr; Lightsail 16 GB £61.70 (4 vCPU, 40% CPU
+baseline); Lightsail memory-optimised 16 GB £54.40 (2 vCPU). This is #206's "Level 3" and how
+OCF runs everything else (with Airflow).
+
+- **Pros:** simplest architecture possible — no Fargate/ECR-per-run/EventBridge/run-launcher;
+  `docker compose` + `git pull`.
+- **Cons:** priciest; backtests capped at 2–4 vCPU (slower than the workstation); Lightsail
+  variants mean static AWS keys and burst-credit accounting; biggest pet.
+
+##### Option D — serverless control plane (no pets) ~£41–45/month
+
+Daemon + webserver as one always-on 0.5 vCPU / 2 GB ARM Fargate service (£14.70), RDS
+`db.t4g.micro` Postgres (£10–12, approximate — the one unverified price), Marimo as its own
+tiny Fargate service (approx £6.20), runs on ephemeral Fargate.
+
+- **Pros:** full Dagster with zero servers to patch; IAM-native throughout.
+- **Cons:** RDS is the tax (no local disk → no Postgres-in-Docker); webserver access needs an
+  ALB (+~£16.50/month) or a Tailscale-sidecar hack; the most Terraform. Cleaner on paper than
+  in practice.
+
+##### Option E — Dagster+ Solo, Hybrid ~£37–45/month typical
+
+£7.50/month base + £0.030/credit (1 credit = 1 materialisation or op execution; May 2026
+pricing). Live cadence ≈ 395 credits ≈ £12/month; backtests £0.15–0.52 each (a heavy
+50-experiment month adds £7.50–26). Plus a stateless Hybrid agent (~£6.75 tiny Fargate
+service) and Marimo hosting (~£3.75–6), and the same per-run Fargate compute. Hybrid incurs
+no serverless charge; sensor evaluations are free (an hourly freshness *op* would cost
++£22/month — on Dagster+ you use sensors, the better design anyway).
+
+- **Pros:** managed UI/daemon/alerting/backfills with nothing of ours to keep alive.
+- **Cons:** **Solo is 1 user** — collaborators can't log in (Starter is £75/month base);
+  metering shapes design decisions; vendor dependency. The 1-user cap is likely disqualifying
+  for an OCF collaboration.
+
+#### Comparison
+
+| | A: Level 1 | Accepted: small box + Fargate | C: one big box | D: serverless CP | E: Dagster+ Solo |
+|---|---|---|---|---|---|
+| £/month | 12–22 | **25–35** | 56–86 | ~41–45 (+ALB) | 37–45 |
+| Run history + UI backfills | ✗ | ✓ | ✓ | ✓ | ✓ |
+| Backtests in AWS | ✗ | ✓ big ephemeral compute | ✓ but 2–4 vCPU | ✓ | ✓ (credits) |
+| Marimo dashboard | +£6 add-on | ✓ free on box | ✓ free on box | +£6 service | +£3.75–6 |
+| Servers to patch | 0 | 1 | 1 | 0 | 0 |
+| No static AWS keys | ✓ | ✓ | ✓ EC2 / ✗ Lightsail | ✓ | ✓ |
+| Multi-user UI | n/a | ✓ (Tailscale) | ✓ | ✓ | ✗ (1 user) |
+
+**Recommendation (accepted): the small-box option** — the only shape giving full Dagster *and*
+workstation-beating backtest compute *and* a free dashboard home, for ~£13–15/month over Level 1.
+Option C is the fallback if operational simplicity trumps backtest speed and ~£30/month. D pays
+an RDS+ALB tax for purism; E's 1-user cap rules it out.
 
 ## See also
 

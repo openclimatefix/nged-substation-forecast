@@ -1,6 +1,6 @@
 # Live service (AWS deployment)
 
-> **Status: ✅ v0.1 shipped (July 2026, `v0.1.0`)** on the accepted architecture below; the same
+> **Status: ✅ v0.1 shipped (July 2026, `v0.1.0`)** on the accepted architecture; the same
 > architecture now runs **v0.2** (`v0.2.0`, deployed 13 August 2026) — the naive forecast is
 > deployed and running on AWS. Epic
 > [#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137)
@@ -19,10 +19,12 @@
 > infra-as-code ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)),
 > and the MLflow-server / dev-dashboard future work
 > ([#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235),
-> [#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)) — plus the
-> durable record of the costed [AWS-architecture decision](#aws-architecture) behind the
-> deployment (the running-cost estimate itself has moved to
-> [AWS Running Costs](../architecture/aws-costs.md)). It is retired in full once production
+> [#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)). The
+> [AWS-architecture decision](#aws-architecture) itself is built and running; its durable decision
+> record now lives in
+> [Production Deployment — Design](../architecture/production-deployment.md#infrastructure-tier-alternatives-to-the-ec2-control-plane-box),
+> and the running-cost estimate in
+> [AWS Running Costs](../architecture/aws-costs.md). It is retired in full once production
 > monitoring lands and its design is promoted,
 > per the ship-time triage tracked in
 > [Engineering health](engineering-health.md#scientific-rigor-tests-and-cleanup).
@@ -107,10 +109,10 @@ Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206) (done)
 
-> **Status: ✅ Built and running.** The accepted option below runs on AWS as v0.2 (`v0.2.0`) —
-> the same architecture v0.1 (`v0.1.0`) used, unchanged; the bring-up is documented in
-> [Setting up the live service on AWS](../live_service/aws.md). The costed comparison and the
-> rejected alternatives are kept below as the durable record of the decision. The
+> **Status: ✅ Built and running.** The accepted option — a small EC2 control-plane box +
+> `EcsRunLauncher` — runs on AWS as v0.2 (`v0.2.0`), the same architecture v0.1 (`v0.1.0`) used,
+> unchanged; the bring-up is documented in
+> [Setting up the live service on AWS](../live_service/aws.md). The
 > [access-phasing](#access-phasing) Stages 2–3 and the future-work items (MLflow server, dev
 > dashboard) remain post-v0.1.
 
@@ -126,11 +128,8 @@ filesystem). The two requirements Level 1 does not serve:
 2. **An always-on dev dashboard** (a simple Marimo web app showing the latest forecasts) —
    so *something* must be always-on regardless.
 
-**Decision: small EC2 control-plane box + `EcsRunLauncher`, decided 2026-07-11 — the
-[accepted option](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month) below.**
-The four alternatives considered and rejected are recorded further down so the decision has a
-durable record. The implementation workstreams are identical under every option except the
-infrastructure one.
+**Decision: small EC2 control-plane box + `EcsRunLauncher`, decided 2026-07-11.** The
+implementation workstreams are identical under every option except the infrastructure one.
 
 The decision was pressure-tested again in July 2026 against the fully serverless alternative —
 EventBridge Scheduler firing an ECS `RunTask` directly, with no always-on control plane — and
@@ -144,114 +143,17 @@ and the accepted trade-offs (mitigated by the external
 The running-cost estimate for the accepted option — the headline **~£25–35/month**, the
 workload model behind it, and the storage and data-transfer arithmetic — now lives at its
 durable home, [AWS Running Costs](../architecture/aws-costs.md), alongside a projected
-estimate for running at v2 scale (~2,500 time series). The per-option figures below stay on
-this page as part of the decision record: the rejected alternatives range from ~£12–22/month
-(Option A, which fails two requirements) to ~£56–86/month (Option C).
+estimate for running at v2 scale (~2,500 time series). The per-option figures sit in the
+decision record: the rejected alternatives range from ~£12–22/month (Option A, which fails two
+requirements) to ~£56–86/month (Option C).
 
-### Accepted option: small EC2 control-plane box + `EcsRunLauncher` ~£25–35/month
-
-A `t4g.medium` (2 vCPU / 4 GB; **£20.55/month on-demand, £12.95/month 1-yr no-upfront
-reserved**) runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker +
-**the Marimo dashboard**, behind Tailscale (no ALB). Every run — live schedules *and*
-UI-launched backtests — is dispatched by `EcsRunLauncher` to an ephemeral Fargate task sized
-to the job. Add ~£1.80 EBS, £5–7/month live Fargate, ~£0.65/backtest.
-
-**One image, four roles.** The daemon, webserver, and code-location server all run from the
-*same* [production image](../architecture/production-deployment.md) the ephemeral Fargate runs
-use (harmless — the baked-in champion model is dead weight for the first three, only a run's
-actual execution touches it) — a `docker-compose.yml` on the box just launches each as a
-separate service with a different command override. The compose file, and the entrypoint
-gotchas it has to navigate (`dagster-webserver`/`dagster-daemon` are separate console-script
-binaries, not `dagster` subcommands; and `EcsRunLauncher` generates a run command that itself
-starts with `dagster`, so the run task definition must neutralise the image's
-`ENTRYPOINT ["dagster"]`), are now written up in the runbook —
-[Setting up the live service on AWS: Steps 9 and 14](../live_service/aws.md#step-9-create-the-ecs-cluster-and-fargate-task-definition).
-
-- **Pros:** Dagster properly (history, UI backfills, sensors, concurrency pools enforced
-  centrally); backtests get big ephemeral compute; dashboard rides free; EC2 IAM instance
-  roles (no static keys); the textbook Dagster-OSS-on-AWS deployment.
-- **Cons:** one pet server (patching, disk, daemon liveness — mitigate with systemd restart
-  policies + the monitoring plan's "no fresh forecast" alarm); dagster.yaml/run-launcher
-  config work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans). The pet-server
-  risk grows once a non-expert operates the service — the full mitigation list (auto-recovery
-  alarms, disk hygiene, a tested rebuild-from-scratch script) is
-  [Handover workstream 3](handover.md#3-de-pet-the-control-plane-box).
-- Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
-  £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
-
-### Considered but rejected
-
-The four alternatives below were researched alongside the accepted option above and rejected in
-its favour. They're kept here as a durable record of the decision, not as live options.
-
-#### Option A — Level 1: nothing always-on ~£12–22/month
-
-Hourly EventBridge Scheduler → one-shot Fargate task → `dagster job execute` against a
-throwaway local `DAGSTER_HOME` → exit. Freshness check is the first op (latest Dynamical init
-vs the NWP init behind the newest forecast in `power_forecasts` on S3); failure recovery is
-the cron (stale outputs → next tick re-runs); Delta commits provide the atomicity the
-freshness logic needs; "which partitions need materialising" derived from Delta contents vs
-Dynamical availability, never Dagster's records (they evaporate with the throwaway SQLite).
-
-- **Pros:** cheapest; zero servers; self-healing by construction; everything it builds is
-  needed by the accepted option (and C/D) anyway.
-- **Cons:** fails both new requirements — no run history, hand-rolled backfills (issue #208
-  replay), backtests stay on the workstation, and the Marimo dashboard needs a separate
-  always-on home (+£6/month Fargate service) anyway.
-
-#### Option C — one big box with everything on it ~£56–86/month
-
-Dagster + Postgres + Marimo + *all compute* (inference peaks ~9 GB → 16 GB box): EC2
-`t4g.xlarge` £82.20 on-demand / £51.90 reserved-1yr; Lightsail 16 GB £61.70 (4 vCPU, 40% CPU
-baseline); Lightsail memory-optimised 16 GB £54.40 (2 vCPU). This is #206's "Level 3" and how
-OCF runs everything else (with Airflow).
-
-- **Pros:** simplest architecture possible — no Fargate/ECR-per-run/EventBridge/run-launcher;
-  `docker compose` + `git pull`.
-- **Cons:** priciest; backtests capped at 2–4 vCPU (slower than the workstation); Lightsail
-  variants mean static AWS keys and burst-credit accounting; biggest pet.
-
-#### Option D — serverless control plane (no pets) ~£41–45/month
-
-Daemon + webserver as one always-on 0.5 vCPU / 2 GB ARM Fargate service (£14.70), RDS
-`db.t4g.micro` Postgres (£10–12, approximate — the one unverified price), Marimo as its own
-tiny Fargate service (approx £6.20), runs on ephemeral Fargate.
-
-- **Pros:** full Dagster with zero servers to patch; IAM-native throughout.
-- **Cons:** RDS is the tax (no local disk → no Postgres-in-Docker); webserver access needs an
-  ALB (+~£16.50/month) or a Tailscale-sidecar hack; the most Terraform. Cleaner on paper than
-  in practice.
-
-#### Option E — Dagster+ Solo, Hybrid ~£37–45/month typical
-
-£7.50/month base + £0.030/credit (1 credit = 1 materialisation or op execution; May 2026
-pricing). Live cadence ≈ 395 credits ≈ £12/month; backtests £0.15–0.52 each (a heavy
-50-experiment month adds £7.50–26). Plus a stateless Hybrid agent (~£6.75 tiny Fargate
-service) and Marimo hosting (~£3.75–6), and the same per-run Fargate compute. Hybrid incurs
-no serverless charge; sensor evaluations are free (an hourly freshness *op* would cost
-+£22/month — on Dagster+ you use sensors, the better design anyway).
-
-- **Pros:** managed UI/daemon/alerting/backfills with nothing of ours to keep alive.
-- **Cons:** **Solo is 1 user** — collaborators can't log in (Starter is £75/month base);
-  metering shapes design decisions; vendor dependency. The 1-user cap is likely disqualifying
-  for an OCF collaboration.
-
-### Comparison
-
-| | A: Level 1 | Accepted: small box + Fargate | C: one big box | D: serverless CP | E: Dagster+ Solo |
-|---|---|---|---|---|---|
-| £/month | 12–22 | **25–35** | 56–86 | ~41–45 (+ALB) | 37–45 |
-| Run history + UI backfills | ✗ | ✓ | ✓ | ✓ | ✓ |
-| Backtests in AWS | ✗ | ✓ big ephemeral compute | ✓ but 2–4 vCPU | ✓ | ✓ (credits) |
-| Marimo dashboard | +£6 add-on | ✓ free on box | ✓ free on box | +£6 service | +£3.75–6 |
-| Servers to patch | 0 | 1 | 1 | 0 | 0 |
-| No static AWS keys | ✓ | ✓ | ✓ EC2 / ✗ Lightsail | ✓ | ✓ |
-| Multi-user UI | n/a | ✓ (Tailscale) | ✓ | ✓ | ✗ (1 user) |
-
-**Recommendation (accepted): the small-box option** — the only shape giving full Dagster *and*
-workstation-beating backtest compute *and* a free dashboard home, for ~£13–15/month over Level 1.
-Option C is the fallback if operational simplicity trumps backtest speed and ~£30/month. D pays
-an RDS+ALB tax for purism; E's 1-user cap rules it out.
+The accepted architecture — a small EC2 control-plane box running Dagster behind Tailscale,
+dispatching every run to an ephemeral Fargate task via `EcsRunLauncher` — is built and running
+in production. Its rationale, and the infrastructure-tier alternatives rejected in its favour (a
+fully serverless "nothing always-on" design, one big box running all compute, a serverless
+control plane with RDS, and Dagster+ Solo), are recorded as a decision history in [Production
+Deployment — Design: infrastructure tier alternatives to the EC2 control-plane
+box](../architecture/production-deployment.md#infrastructure-tier-alternatives-to-the-ec2-control-plane-box).
 
 **Future work (post-v0.1):** once an always-on control-plane box exists (the accepted option or
 later), it's also
@@ -275,10 +177,10 @@ pattern in Stage 2 are load-bearing security decisions, not tidiness.
 
 #### Stage 1 — solo, Tailscale only
 
-This is exactly what the
-[accepted option](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month) section
-above already describes; it's named explicitly as Stage 1 here only so Stage 2/3 below have
-something to say "additive on top of."
+This is exactly what the [accepted
+option](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month)
+already describes; it's named explicitly as Stage 1 here only so Stage 2/3 below have something
+to say "additive on top of."
 
 - Daemon, full-access Dagster webserver, and the Marimo dashboard all run on the `t4g.medium`
   control-plane box, alongside MLflow once its tracking server lands (the "Future work" item
@@ -410,9 +312,9 @@ A Dagster sensor that fires on each `power_time_series_and_metadata` materialisa
 `evaluation_scope="production_monitoring"` over `fold_id="live"` for both trailing windows.
 Sensor preferred over a schedule so it fires on the actual data update.
 
-Note this sensor needs a running Dagster daemon — the
-[accepted option](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month) provides
-one.
+Note this sensor needs a running Dagster daemon — the [accepted
+option](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month)
+provides one.
 
 ### Alert on absence: the missed-check-in alarm
 
@@ -432,8 +334,8 @@ when **no successful forecast has landed in N hours** (e.g. 8 hours — one miss
 plus margin), regardless of cause. An alert feeding a runbook — rather than paging or automatic
 failover — is a proportionate response because the project's
 [uptime requirements are lenient by design](../background/requirements.md#uptime-lenient-by-design).
-The accepted option's "daemon silently dead" staleness alarm (mentioned under
-[the architecture options](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month))
+The accepted option's "daemon silently dead" staleness alarm (described in [the architecture
+options](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month))
 is this alarm; recording it here makes it a first-class monitoring deliverable rather than a
 side note.
 
@@ -490,8 +392,9 @@ Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > do the whole job. Closing #208 took a several-day soak under `dg dev` with a persistent
 > `DAGSTER_HOME`, which confirmed 6-hourly forecasts landing with no duplicate rows and a missed
 > slot backfillable in replay mode. No hand-rolled freshness op is needed, and neither is the
-> one-shot `live_pipeline_job` that [Option A](#considered-but-rejected) would require (Option A has no
-> daemon to hold schedules) — Option A is rejected, so that job is not specified here.
+> one-shot `live_pipeline_job` that [Option
+> A](../architecture/production-deployment.md#considered-but-rejected) would require (Option A has
+> no daemon to hold schedules) — Option A is rejected, so that job is not specified here.
 
 ### Deployment workstream 3 — AWS infrastructure
 
@@ -501,24 +404,9 @@ Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > documented step-by-step in [Setting up the live service on AWS](../live_service/aws.md). The
 > items further down are what remains 🚧 after v0.1.
 
-Built for v0.1 (see the [runbook](../live_service/aws.md) for the exact console steps):
-
-- **ECR** repository; image pushed by hand (tag = model run-id + git SHA) — a CI container build
-  is a later, infra-as-code-era step.
-- **S3** data bucket mirroring the local `data/` layout (`nwp_data/`, `power_forecasts/`, …).
-  The NGED-delivery bucket/prefix is a later step (v0.1 is "forecast running", not "delivery
-  contract live").
-- **Two IAM roles**, not one — a task *execution* role
-  (`AmazonECSTaskExecutionRolePolicy`: ECR pull + CloudWatch Logs) and a task role carrying the
-  S3 read/write policy. No static AWS keys anywhere.
-- **Fargate task definition**: 4 vCPU / 16 GB ARM for live runs (measured inference peak ~9 GB).
-- **EC2 `t4g.medium` control-plane box** (IAM instance role; ~20 GB gp3 EBS) running the Dagster
-  daemon, webserver, code-location server, Postgres (run/event/schedule storage, `pg_dump` to S3
-  nightly), and the Marimo dashboard under Docker Compose, dispatching every run to Fargate via
-  `EcsRunLauncher` (`dagster.yaml` also carries the `pool="ECMWF"` concurrency limit, now
-  enforced centrally). The 6-hourly `live_forecasts` schedule and `ecmwf_ens` daily-partition
-  automation run on the daemon (freshness via `SkipReason`); `restart: always` +
-  unattended-upgrades keep the box up. Reached over Tailscale — no public ingress.
+Every piece of the AWS infrastructure above is built and running, documented step by step in
+[Setting up the live service on AWS](../live_service/aws.md); the orchestration design behind
+the deployment is in [Production Deployment — Design](../architecture/production-deployment.md).
 
 Still 🚧 after v0.1:
 

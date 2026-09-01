@@ -382,10 +382,10 @@ forecast uses the freshest run). Read it as follows.
 - **absent from the metadata** — the NWP table holds no run at or before this slot, so the count
   has no finite answer; the description says so. Expect `live_forecasts` itself to be failing too.
 
-One count deserves a caveat: the check demands the day's run by 14:00 UTC, late enough to clear the
-08:30 download plus its retry window, so a download that fails today first shows up at the 18:00
-slot rather than the 12:00 one. That six-hour lag is deliberate — the alternative is a false alarm
-on every morning the download merely ran slowly.
+One count deserves a caveat: the check demands the day's run by 14:00 UTC, so a download that
+fails today first shows up at the 18:00 slot rather than the 12:00 one — deliberately, for the
+reasoning in [Production Deployment — Design: the missed daily NWP run
+count](../architecture/production-deployment.md#read-the-live-forecast-back-off-disk-with-a-second-asset-check).
 
 **When `live_forecasts` fails outright.** Today, if no NWP run on disk is recent enough to cover
 the forecast horizon (roughly 15 days of staleness), the asset raises rather than producing a
