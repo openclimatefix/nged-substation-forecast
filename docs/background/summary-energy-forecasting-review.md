@@ -2443,7 +2443,11 @@ biased: [Lerch et al. (2017)](https://doi.org/10.1214/16-STS588) show that choos
 score on the basis of what happened rewards a forecaster who over-predicts extremes, and can rank a
 deliberately biased forecast above an honest one. [Gneiting and Ranjan
 (2011)](https://doi.org/10.1198/jbes.2010.08110)'s threshold-weighted score puts the emphasis inside
-the score instead, and stays a proper scoring rule while doing it.
+the score instead, and stays a proper scoring rule while doing it. A GB distribution network has
+already been scored this way: [Maia et al. (2026)](https://arxiv.org/abs/2603.01653) compare
+fault-count forecasts for SP Energy Networks against a quantile-regression baseline on the
+threshold-weighted score, because an unweighted one "would place substantial emphasis on parts of
+the predictive distribution where the two models are identical".
 - **Coverage — how often reality fell inside the range the forecast claimed — is broken down by
 season, by forecast lead time, and by how heavily loaded the substation was.** A coverage figure
 averaged over a year can read as a healthy 90% while being 99% in the quiet months and 70% at the
@@ -2564,7 +2568,7 @@ so rather than being left blank.
 | [SSEN FastTrack](https://smarter.energynetworks.org/projects/10166254/) | How the connections queue, around 180 GW, will load the distribution network | Primary substations up to the grid supply point | A planning horizon rather than an operational one | A probability that a queued connection becomes real load |
 | [NGED's EFFS](https://smarter.energynetworks.org/projects/wpden03/) | Grid supply points, bulk supply points, primary substation transformers, and generation sites | Across NGED's whole distribution network | 1 hour to 6 months | None |
 | [UK Power Networks' Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) | The capacity of unmetered solar behind each primary substation, then that solar's generation | Not stated in what we read | Not stated in what we read | Not stated in what we read |
-| [SP Energy Networks' Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/) | Electricity network faults, not load | Per district | Up to 7 days | A probability distribution driven by a weather ensemble |
+| [SP Energy Networks' Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/) | Electricity network faults, not load | Per district | Up to 4 days at 24-hour resolution in the project's published method paper; the project's registration document states up to 7 days | A probability distribution driven by a 50-member ECMWF ensemble |
 | [Fox et al. (2018)](https://doi.org/10.34890/134) (SP Energy Networks) | The effect of weather on past peak demand, not a forward forecast | 13 primary substations in the proof of concept, almost 400 in production | Backwards over 10 years | None |
 | [OpenSTEF](https://lfenergy.org/projects/openstef/) (Alliander, the Netherlands) | Net load, with a splitter into solar, wind, and residual parts | Thousands of grid connection points | To 48 hours | Yes; the framework is built for probabilistic forecasting |
 | [Cordier et al. (2024)](https://doi.org/10.1049/icp.2024.2058) (Enedis, France) | Consumption and generation at the substation since 2015; the finer-grid method the paper describes covers consumption, not generation | All 2,300 high-voltage-to-medium-voltage substations, extending to 3,678 of the more than 5,000 transformers inside them, and towards 750,000 medium-to-low-voltage substations | Not stated in the paper; the forecasts run at 10- or 30-minute resolution | None stated in the paper |
@@ -2604,9 +2608,13 @@ Predict4Resilience](https://smarter.energynetworks.org/projects/10061710/) are b
 but they aim at different questions.** FastTrack puts a probability on how much of the connections
 queue turns into real load and how that load behaves, which is a planning question rather than the
 operational one Flexpectation asks. Predict4Resilience drives a probability distribution of network
-faults per district from an ensemble weather forecast, in a tool built with control-room engineers
-that its Beta phase is taking into live trials — the GB precedent we found for putting
-ensemble-derived distributions in front of network operators.
+faults per district from an ensemble weather forecast, in a tool built with control-room engineers —
+the GB precedent we found for putting ensemble-derived distributions in front of network operators.
+[Maia et al. (2026)](https://arxiv.org/abs/2603.01653) publish the method: additive quantile
+regressions for ordinary fault counts, a discrete generalised Pareto distribution for the extremes,
+and a 50-member ECMWF ensemble carrying the weather uncertainty into both. Engineers at SP Energy
+Networks assessed the resulting forecasts in a trial running from October 2024 to March 2025, and
+found them "sufficiently reliable to inform decision-making".
 
 **SP Energy Networks has also published at Flexpectation's own voltage level, and it is the GB
 precedent for putting gridded weather onto individual primary substations.** [Fox et al.
@@ -3010,6 +3018,9 @@ demand: Evidence from a heat pump field trial](https://doi.org/10.1016/j.apenerg
 - Ludwig, N., Arora, S. and Taylor, J. W. (2023). [Probabilistic load forecasting using
 post-processed weather ensemble predictions](https://doi.org/10.1080/01605682.2022.2115411).
 *Journal of the Operational Research Society*.
+- Maia, M., Castro-Camilo, D. and Browell, J. (2026). [Probabilistic forecasting of weather-driven
+faults in electricity networks: a flexible approach for extreme and non-extreme
+events](https://arxiv.org/abs/2603.01653). *arXiv*.
 - Martín, P., Moreno, G., Rodríguez, F. J., Jiménez, J. A. and Fernández, I. (2018). [A Hybrid Approach to Short-Term Load Forecasting Aimed at Bad Data Detection in Secondary Substation Monitoring Equipment](https://doi.org/10.3390/s18113947). *Sensors*.
 - Mayer, M. J. and Gróf, G. (2021). [Extensive comparison of physical models for photovoltaic power
 forecasting](https://doi.org/10.1016/j.apenergy.2020.116239). *Applied Energy*.
