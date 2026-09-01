@@ -26,6 +26,22 @@ different defects, and a reviewer asked to check both at once does neither well.
 pass first: reordering paragraphs moves sentences around, and a fact-check done before the reorder
 gets redone once paragraphs move.
 
+## Run one pass per section, and one over the whole document
+
+**A per-section pass finds the defects inside a section; only a whole-document pass finds a
+paragraph sitting in the wrong section.** Splitting a long page into one scratchpad file per
+section and giving each file to its own agent works well: the agent holds its whole section at
+once, and the findings come back scoped to a stretch of text a human can review in one sitting.
+What the split cannot see is the join — an agent holding one section has no way to notice that its
+section repeats a paragraph from an earlier one, or that a fact it asks for arrives two sections
+later. Run the Test 1 extraction over the complete document as well, and treat that whole-document
+pass as the only one entitled to move a paragraph between sections.
+
+**Tell every agent that the file is hard-wrapped.** A sentence spans several lines at this repo's
+100-character prose width, so a plain grep for a phrase misses most of its matches and an agent
+that greps will report a passage as absent when it is present. Tell the agent to normalise
+whitespace before searching: `tr '\n' ' ' < FILE | tr -s ' ' | grep -o 'phrase'`.
+
 ## Test 1: the bolded-lead extraction
 
 Pull every bolded lead sentence (the ones CLAUDE.md's "lead each paragraph with a bolded sentence"
@@ -46,6 +62,15 @@ paragraph, blind to the document's overall argument as far as that's practical, 
 reports what the paragraph actually concludes rather than what the summariser already expects the
 page to say. Once a restructure lands, adding the bolded lead to each paragraph outright is worth
 doing — it makes this test free to re-run next time.
+
+**Check whether a missing bolded lead is a convention before proposing to add one.** A paragraph
+with no bolded lead usually wants one, but not always: a page can deliberately give a whole class of
+paragraph no lead — the short paragraph that states a problem ahead of the sections answering it,
+the sentence that exists only to introduce the table under it. Three separate reviewers in one run
+each proposed adding a lead to a paragraph of one such class, because each saw a single instance and
+none checked the rest of the page. Before recording the finding, count how many paragraphs of the
+same kind the document holds and how many of those carry a lead. Where none does, the absence is a
+convention and the finding is wrong.
 
 ## Test 2: the first-stumble reader
 
@@ -74,11 +99,50 @@ The output is a list of stop points: an ordering-bug report, not a style critiqu
   pass — a pronoun-only pass whose output is a line number and a proposed replacement beats a pass
   that tries to fix pronouns, numerals, and metaphor together.
 
+## Triage: assume roughly half the findings are wrong
+
+**Read the line a finding quotes before acting on the finding.** In one run of this skill the
+reviewers variously reported a cross-reference pointing the wrong way when the document already
+pointed the right way, proposed renaming a metric to a word other than the one the cited paper uses
+for it, and three times proposed the bolded lead the section above describes. An agent reading a
+3,000-line document reports what it remembers, and what it remembers is sometimes not what the line
+says.
+
+Two triage rules earn their keep on top of that:
+
+- **When two agents independently propose the same cut, that is evidence the passage reads badly,
+  not evidence the cut is right.** The third option is usually a rewrite.
+- **A cut that makes the document more self-serving is almost always wrong.** Material that limits
+  the author's own claim is usually there on purpose.
+
+## Moving a paragraph in a hard-wrapped file
+
+**An insertion or a move in a hard-wrapped file breaks in ways no linter catches, so check for the
+breakage explicitly.**
+
+- **A literal string match fails whenever the target spans a line break.** Edit through a
+  whitespace-insensitive substitution that asserts it matched exactly once — the
+  wrap-tolerant `rsub` in the `literature-review` skill — rather than by pasting the text as
+  it appears on screen.
+- **An insertion anchored on a sentence can land inside a bolded lead**, between the lead's opening
+  `**` and its closing `**`, which leaves both markers unbalanced. `pymarkdown scan` passes,
+  `mkdocs build --strict` passes, and the rendered page turns bold on and leaves it on for the rest
+  of the section. Count the markers per paragraph after every batch of edits, and expect zero:
+
+  ```bash
+  python3 -c "t=open('FILE').read(); print(sum(1 for p in t.split(chr(10)*2) if p.count('**')%2))"
+  ```
+
+- **Re-wrapping the whole file buries the edit.** Reflow only the paragraphs whose text actually
+  changed — compare each against the same paragraph in `git show HEAD:FILE` and leave the
+  identical ones alone — or the diff fills with rewrapped lines nobody can review, and the
+  real changes hide among them.
+
 ## Re-run after a restructure
 
 Moving paragraphs can break a bolded lead that referred to "the previous section," or introduce a
 fact before its new position's prerequisites are met. Re-run both tests after a restructure, not
-just once at the start.
+just once at the start, and re-run the balanced-bold count above with them.
 
 ## See also
 
