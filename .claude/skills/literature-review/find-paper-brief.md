@@ -1,6 +1,6 @@
 # Brief: find an open-access copy of one paper
 
-Fill in the bracketed fields and hand the whole file to a sub-agent. Delete nothing else — the
+Fill in the bracketed fields and hand the whole file to a sub-agent. Delete nothing else. The
 constraints and the reporting format are what make the answer usable, and a brief that drops them
 comes back as an unverifiable "I couldn't find it".
 
@@ -63,8 +63,8 @@ opening move, never as the search.**
 ## Traps that produce a confident, wrong negative
 
 - **The namesake.** An ORCID and Zenodo trail under the right surname belonged to a researcher in a
-  different field entirely, and that false trail is what made a wrong negative look convincing.
-  Confirm a profile belongs to the right person — by affiliation, by co-authors, by field — before
+  different field entirely. That false trail is what made a wrong negative look convincing. Confirm
+  a profile belongs to the right person — by affiliation, by co-authors, by field — before
   concluding anything from what it lists.
 - **A route that cannot answer.** A bare domain that does not resolve, a results page rendered in
   JavaScript, and a mistyped path all print exactly what a genuine absence prints. One venue
@@ -82,7 +82,7 @@ opening move, never as the search.**
   forbidden regardless of what you find or how convenient it would be.
 - **Never bypass a bot challenge or CAPTCHA.** A gated route is a closed route. Report the URL so a
   person can open the page themselves, and move on. Publisher portals, ResearchGate, LinkedIn, and
-  several university search interfaces all refuse a command-line client; a 403 from any of them says
+  several university search interfaces all refuse a command-line client. A 403 from any of them says
   nothing about whether the paper is open behind it.
 - **Do not spawn sub-agents.** A grandchild agent cannot report back once its parent has finished.
 - **Do not pay for anything**, and never enter credentials or personal details anywhere.

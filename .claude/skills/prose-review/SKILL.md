@@ -3,15 +3,15 @@ name: prose-review
 description: >-
   How to review prose that already exists against the "Prose style" rules in CLAUDE.md — structure
   and word choice alike. Claude reads those rules as a general standard while drafting and does not
-  enact them, so the violations are found only by a review that takes one rule at a time: a combined
-  sweep of one section reported zero findings and a one-rule-at-a-time sweep of the same text found
-  30. This skill sizes the review to the text, then runs the structural passes (bolded-lead
-  extraction, paragraph splitting, count closure, first-stumble reader) before the word-and-sentence
-  sweep. It also owns what is deliberately not a finding, how to chunk a long file across sub-agents,
-  which model to give the work to, how to triage findings before applying any, and how to check that
-  a restructure lost no information. Load whenever prose is to be reviewed, reordered or simplified —
-  a docs/ page, a README, a SKILL.md, a docstring, a literature review — and whenever a reviewer
-  asked to check prose has reported little or nothing.
+  enact them, so the violations are found only by a review that takes one rule at a time. A
+  combined sweep of one section reported zero findings; a one-rule-at-a-time sweep of the same text
+  found 30. This skill sizes the review to the text, then runs the structural passes (bolded-lead
+  extraction, paragraph splitting, count closure, first-stumble reader) before the
+  word-and-sentence sweep. It also owns what is deliberately not a finding, how to chunk a long
+  file across sub-agents, which model to give the work to, how to triage findings before applying
+  any, and how to check that a restructure lost no information. Load whenever prose is to be
+  reviewed, reordered or simplified — a docs/ page, a README, a SKILL.md, a docstring, a literature
+  review — and whenever a reviewer asked to check prose has reported little or nothing.
 ---
 
 # Reviewing prose that already exists
@@ -46,13 +46,13 @@ Pull every bolded lead sentence (the ones CLAUDE.md's "lead each paragraph with 
 rule asks for) out of the document into a flat list, in order, and read only that list. If the
 argument doesn't hold together read that way, the paragraphs are in the wrong order, or a paragraph
 doesn't belong where it sits — fix that before touching a single sentence inside any paragraph.
-Where bolded leads exist, extracting the list is mechanical rather than a judgement call, and it
-catches what a reviewer holding the whole document in context cannot see, because that reviewer
-already knows what a later section says while reading an earlier one.
+Where bolded leads exist, extracting the list is mechanical rather than a judgement call. The
+extraction also catches what a reviewer holding the whole document in context cannot see, because
+that reviewer already knows what a later section says while reading an earlier one.
 
 **Many pages have no bolded leads to extract — summarise each paragraph instead.** The bolded-lead
-rule is recent, so a page written before the rule can lack bolded leads entirely, and even a page
-that has some can have paragraphs without one. Where a paragraph has no bolded lead, write a
+rule is recent, so a page written before the rule can lack bolded leads entirely. Even a page that
+has some can have paragraphs without one. Where a paragraph has no bolded lead, write a
 one-sentence summary of its conclusion — not its topic — standing in for the lead it should have
 had, then build the same flat list from those summaries and read it the same way. Unlike the
 mechanical extraction above, summarising is a judgement call: do it paragraph by paragraph, blind
@@ -72,8 +72,8 @@ does, the absence is a convention and the finding is wrong.
 
 **A paragraph that makes two distinct claims can carry a bolded lead for only one of them, which
 makes an oversized paragraph a structural defect rather than a stylistic one.** Nothing else in
-this repo looks for it, and until this pass existed a 479-word paragraph, a 525-word paragraph and
-a 352-word paragraph all survived every review round the literature review had been given.
+this repo looks for it. Until this pass existed, a 479-word paragraph, a 525-word paragraph and a
+352-word paragraph all survived every review round the literature review had been given.
 
 Roughly 150 words or ten wrapped lines is the prompt to look, not the test. The test is whether the
 paragraph reaches more than one conclusion. A 180-word paragraph running one continuous argument to
@@ -92,16 +92,16 @@ hyphen; a genuinely parallel set of short design notes is a list. Both direction
 
 **An enumeration that promises N items and delivers a different N is invisible to every other pass
 and mechanically detectable by this one.** It reads perfectly well sentence by sentence, so the
-word-level sweep passes over it, and a reviewer holding the whole document already knows what the
-author meant.
+word-level sweep passes over it. A reviewer holding the whole document already knows what the
+author meant, too.
 
 For every "the four in use", "three further", "six spokes", "the five are not", "nine challenges":
 
 - Count the enumerated items and check the number matches.
 - Check the later discussion names the **same** members, not merely the same number. One paragraph
   enumerated six substitutes for ground truth and then discussed a technique it had never
-  introduced, having taken an item from a different document's list; two documents each owned a
-  six-item protocol and the counts hid the swap.
+  introduced, having taken an item from a different document's list. Two documents each owned a
+  six-item protocol, and the counts hid the swap.
 - Check any heading that states a count against the section under it. `literature-review`'s own
   heading promised five traps and listed six.
 
@@ -124,28 +124,28 @@ Two tests per heading, per CLAUDE.md's heading rule:
 A heading failing either test is rewritten as a plain descriptor of its subject, and the conclusion
 moves into the section's bolded lead. A heading passing both tests is left alone, however long it
 is. Often only one phrase is failing, and replacing that phrase keeps the conclusion: "the field"
-became "MLOps research" because a bare "the field" is the referent fault Rule 1 already forbids,
-landing in the one sentence a skim-reader is guaranteed to read.
+became "MLOps research" because a bare "the field" is the referent fault Rule 1 already forbids.
+The rewritten phrase lands in the one sentence a skim-reader is guaranteed to read.
 
 **Renaming a heading changes its anchor slug, so grep for inbound links to the old slug first** —
 across `docs/`, the skills, and any absolute link to the published site — and update every one in the
 same commit. That cost is real: of three headings renamed in this repo, two carried three and two
-inbound links respectively, and the link text is usually a fragment of the sentence around it rather
-than the heading itself, so only the anchor needs changing.
+inbound links respectively. The link text is usually a fragment of the sentence around it rather than
+the heading itself, so only the anchor needs changing.
 
 ## Pass C: the first-stumble reader
 
 **Spawn a fresh sub-agent that can see only the document, not this repository or this
 conversation.** Paste the document into the prompt, or point the sub-agent at a single scratchpad
-file, and instruct it to read nothing else — left unconstrained, a sub-agent in this repo
-auto-loads `CLAUDE.md` and can read any file in it, which defeats the isolation. Give it a stated
-knowledge boundary too: a persona matched to the document's actual audience, such as "an NGED
-engineer who has never trained a machine-learning model" or "a funder reading this for the first
-time." Ask it to read from the top and stop at the first sentence it cannot follow, and to name the
-earlier sentence that would have had to exist for that sentence to work. Forbid it from rewriting
-anything — its job is to report where a reader stalls, not to fix the prose. Run it with two or
-three personas that cover the page's real readers; a stop point one persona reports and another
-doesn't is a gap specific to that persona's background, not a fault in the document as a whole.
+file, and instruct it to read nothing else. Left unconstrained, a sub-agent in this repo auto-loads
+`CLAUDE.md` and can read any file in it, which defeats the isolation. Give it a stated knowledge
+boundary too: a persona matched to the document's actual audience, such as "an NGED engineer who
+has never trained a machine-learning model" or "a funder reading this for the first time." Ask it
+to read from the top and stop at the first sentence it cannot follow, and to name the earlier
+sentence that would have had to exist for that sentence to work. Forbid it from rewriting anything
+— its job is to report where a reader stalls, not to fix the prose. Run it with two or three
+personas that cover the page's real readers. A stop point one persona reports and another doesn't
+is a gap specific to that persona's background, not a fault in the document as a whole.
 
 The output is a list of stop points: an ordering-bug report, not a style critique.
 
@@ -173,7 +173,7 @@ sweep that honours none of them, because listing the rules is not the same instr
 sequencing them.
 
 **Require reasoning on the passes that return nothing.** A silent pass and a skipped pass look
-identical in a report. Asking for the reasoning makes the difference visible, and it catches a real
+identical in a report. Asking for the reasoning makes the difference visible, and catches a real
 failure mode: one model reported a clean acronym pass on a range containing two acronyms that are
 expanded nowhere outside a table and the reference list.
 
@@ -196,7 +196,7 @@ Highest yield first, so that the expensive passes run while attention is freshes
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
 
-**Rule 4 has a cheap way in: find the sentences carrying two or more numerals.** A count chain is where the fault lives, and a methods sentence reporting a screening funnel is where a count chain lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and most will be fine; the ones that are not hand the reader a different unit at each number and define none of them.
+**Rule 4 has a cheap way in: find the sentences carrying two or more numerals.** A count chain is where the fault lives, and a methods sentence reporting a screening funnel is where a count chain lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and most will be fine. The ones that are not hand the reader a different unit at each number and define none of them.
 
 **Rule 11 has a cheap way in too: find the long sentences.** `grep -oE '[^.]{160,}\.'` over a whitespace-normalised copy returns the sentences worth reading, and the finding is real where the sentence carries two claims that read better apart. The joins to look for are "and" and "but", a semicolon, an em dash, a "so", a "which", and a trailing participle — the last three are the ones a sweep briefed on conjunctions alone will miss. A conjunction joining two verbs that share one subject is not a finding, and neither is a split that would leave a fragment.
 
@@ -221,9 +221,9 @@ never have been reported.
 - **Reference-list entries and author strings**, which follow the citation convention rather than
   the serial-comma rule.
 - **Code blocks and the code inside them**, including comments.
-- **Headings**, which Pass E owns. The sentence sweep leaves them alone, because a heading rename
-  changes the anchor slug and breaks inbound links from elsewhere in the docs, including absolute
-  links from other pages, so it is worth doing deliberately rather than as a by-product.
+- **Headings**, which Pass E owns. The sentence sweep leaves them alone. A heading rename changes
+  the anchor slug and breaks inbound links from elsewhere in the docs, including absolute links
+  from other pages, so it is worth doing deliberately rather than as a by-product.
 
 Findings worth keeping are the mirror image: "one"/"ones"/"theirs"/"ours" standing in place of a
 noun, a pronoun or demonstrative *opening* a sentence, a referent with two or more plausible
@@ -238,12 +238,12 @@ wording cannot be triaged and is worth nothing.
 - **Chunk by section boundary, not by equal line count**, so no agent owns half an argument.
   Roughly 5,000 to 7,000 words per agent worked well; the reference list needs no sweep.
 - **A per-section pass finds the defects inside a section; only a whole-document pass finds a
-  paragraph sitting in the wrong section.** What a split cannot see is the join — an agent holding
+  paragraph sitting in the wrong section.** What a split cannot see is the join. An agent holding
   one section cannot notice that its section repeats a paragraph from an earlier one, or that a
   fact it asks for arrives two sections later. Run Pass A over the complete document as well, and
   treat that whole-document pass as the only one entitled to move a paragraph between sections.
 - **Warn about hard wrapping.** In a wrapped file a sentence spans several lines, so a plain grep
-  for a phrase misses most matches and an agent that greps will report a present passage as absent.
+  for a phrase misses most matches. An agent that greps will report a present passage as absent.
   Tell the agent to normalise first: `tr '\n' ' ' < FILE | tr -s ' ' | grep -o 'phrase'`.
 - **Warn that a diff overstates what changed, when the review is scoped to a diff.** Hard wrapping
   means an edit to one word reflows the whole paragraph, so `git diff` presents untouched sentences
@@ -272,13 +272,14 @@ never Haiku 4.5.** All three were given a byte-identical brief over an identical
 
 **Opus returned fewer findings than Sonnet, and better findings.** Opus applied the
 author-possessive carve-out above without being told, and listed every candidate it had rejected
-with a line number, so the restraint is auditable rather than assumed. Sonnet reported that whole
-category as findings.
+with a line number. Listing the rejections makes the restraint auditable rather than assumed.
+Sonnet reported that whole category as findings.
 
 **The gap that matters most is the singleton-and-superlative rule.** Sonnet reported no findings
 there, with confident reasoning. Opus found eight, one of which contradicted another passage of the
 same file 370 lines earlier. On a document a funder publishes, an unscoped absence claim is the
-costliest fault in the rule list, so a confident empty pass on that rule is the wrong kind of wrong.
+costliest fault in the rule list. A confident empty pass on that rule is therefore the wrong kind of
+wrong.
 
 **Opus also found a defect outside the rule list**, in a passage that had survived several earlier
 review rounds: the enumeration mismatch Pass D now looks for. A sweep is worth reading for what it
@@ -287,8 +288,8 @@ notices as well as for what it was asked to find.
 **Haiku's failure was recall and self-verification, not discipline.** Haiku honoured the
 one-pass-per-rule structure and invented no quotes, and its six pronoun findings were a strict
 subset of Sonnet's. Haiku reported a clean acronym pass over a range containing two acronyms that
-are expanded nowhere outside a table and a reference list, which is worse than a low count: a false
-all-clear is indistinguishable from a real all-clear.
+are expanded nowhere outside a table and a reference list. A false all-clear is worse than a low
+count, because it is indistinguishable from a real all-clear.
 
 ## Triage before applying anything
 
@@ -325,7 +326,7 @@ literal string match fails whenever the target spans a line break.
 **Reflow only the paragraphs whose text actually changed.** Re-wrapping the whole file buries the
 edit: one 8-edit batch produced a 412-line diff before the reflow was narrowed to changed
 paragraphs. `scripts/reflow_paragraphs.py` in the `literature-review` skill does this, and note it
-hardcodes a width of 100 — **the wrap width is not uniform across this repo**, and applying the
+hardcodes a width of 100. **The wrap width is not uniform across this repo**, and applying the
 wrong width reflows every paragraph it touches. Detect the width per file: the file's width is the
 one that leaves the most existing paragraphs unchanged when re-wrapped.
 
@@ -367,8 +368,8 @@ uv run python .claude/skills/prose-review/scripts/check_render_loss.py
 ## Did the restructure lose anything?
 
 **Run this after any large structural change, and skip it after a sentence-level sweep.** Splitting,
-merging, moving and cutting paragraphs moves text in bulk, and the loss is silent: nothing fails,
-the page still reads well, and the missing caveat is noticed only by the reader who needed it.
+merging, moving and cutting paragraphs moves text in bulk. The loss is silent: nothing fails, the
+page still reads well, and the missing caveat is noticed only by the reader who needed it.
 
 Three checks, cheapest first. The first two are mechanical and take seconds:
 
@@ -400,7 +401,7 @@ just once at the start, and re-run the balanced-bold count with them.
 `long-form-prose` runs the planning discipline before any prose exists, for drafting rather than
 reviewing. For a rewrite that adds whole new sections to an existing page, run this skill on the
 existing text first, then switch to `long-form-prose` to outline the new sections against the
-result — outlining new material against a page whose own structure hasn't been checked risks
+result. Outlining new material against a page whose own structure hasn't been checked risks
 building the new sections on prerequisites the existing page never actually establishes.
 
 `literature-review` owns the accuracy round, which is a separate pass from this one, and owns the

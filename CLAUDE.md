@@ -105,43 +105,43 @@ docstrings, code comments, GitHub issue and PR bodies, and anything we write for
 
 **The prose rules in this section govern words and sentences; getting a whole document's order
 right needs a planning step of its own.** A badly ordered document reads fine sentence by sentence,
-so the rules below won't catch it and neither will a reviewer holding the whole document in context
-— that reviewer already knows what a later section says while reading an earlier one, which is
+so the rules below won't catch it and neither will a reviewer holding the whole document in
+context. That reviewer already knows what a later section says while reading an earlier one —
 exactly the knowledge a first-time reader doesn't have. Load `long-form-prose` before drafting new
 prose longer than a few paragraphs.
 
 **When reviewing prose against these rules, load `prose-review` before starting.** A reviewer asked
 to check everything at once finds the loudest fault in each paragraph and moves on, so the quieter
-faults survive: a combined sweep of one section of the literature review reported nothing, and a
+faults survive. A combined sweep of one section of the literature review reported nothing, and a
 one-rule-at-a-time sweep of the same text found thirty. The `prose-review` skill owns the procedure
 — the order to sweep in, what is deliberately not a finding, how to chunk a long file across
 sub-agents, which model to use, and how to triage findings before applying any of them.
 
 **This is technical writing, not poetry: precision first, concision second, elegance last.** Every
-page here is a reference document, read by someone who is about to act on it, so a sentence that
-can be read two ways will eventually be read the wrong way and built on. Precision wins every
-contest it enters: repeat the noun, restate the qualifier, name the units, and accept a sentence
-flatter than a writer would like. Concision comes next, and comes from cutting whole sentences
-rather than from clipping words out of a sentence that needs them. Most of the rules below are that
-order of priorities applied to one recurring case.
+page here is a reference document, read by someone who is about to act on it. A sentence that can
+be read two ways will eventually be read the wrong way and built on. Precision wins every contest
+it enters: repeat the noun, restate the qualifier, name the units, and accept a sentence flatter
+than a writer would like. Concision comes next, and comes from cutting whole sentences rather than
+from clipping words out of a sentence that needs them. Most of the rules below are that order of
+priorities applied to one recurring case.
 
 **Lead each paragraph with a bolded sentence that states its conclusion.** The reader should get
 the argument from the bolded leads alone, then read on only where they want the reasoning. That
-skim-reading pattern is why we prefer sub-headings and short paragraphs over bullet lists: a list
-flattens the argument into items of equal weight, whereas a bolded lead says which claim matters
-and the sentences under it say why.
+skim-reading pattern is why we prefer sub-headings and short paragraphs over bullet lists. A list
+flattens the argument into items of equal weight; a bolded lead says which claim matters, and the
+sentences under it say why.
 
 **Prefer a heading that states the section's conclusion, but fall back to a plain descriptor the
 moment that conclusion needs explaining.** A heading is read cold, by someone who has not read the
 section and is deciding whether to, so it has no room to define its own terms. Two tests: can a
 first-time reader parse every word, and can that reader tell why the claim would matter to them?
-"More detailed weather data has not always improved the forecast" passes both tests — every word is
+"More detailed weather data has not always improved the forecast" passes both tests. Every word is
 ordinary, and a reader knows at once whether that finding is their problem. "Energy forecasting has
 platform descriptions and no retraining cadence" fails both tests, because "platform" and
 "retraining cadence" only acquire their meaning inside the section. Where the conclusion cannot be
 stated without a term the section itself has to introduce, name the subject instead — "MLOps in
-energy forecasting" — and leave the conclusion to the bolded lead, which has a whole sentence in
-which to land it. Helping a reader find the section they want is the heading's job; summarising the
+energy forecasting". Leave the conclusion to the bolded lead, which has a whole sentence in which
+to land it. Helping a reader find the section they want is the heading's job; summarising the
 section is what a heading earns when every word survives being read cold. Renaming a heading
 changes its anchor slug, so grep for inbound links to the old slug first and update every one in
 the same commit.
@@ -160,32 +160,31 @@ then explain it.
 
 **Name the thing; don't write "it".** Wherever a pronoun or a demonstrative makes the reader look
 backwards to work out what it refers to, repeat the noun instead. "It", "this", "that", "these",
-"those", "they", "such", "one", "ones", "the former" and "the latter" are the usual offenders,
-and a paragraph that *opens* with a pronoun is the worst case, because a skim-reader landing there
-has nothing to look back at. **"One" and "such a" are the two that slip past a careless sweep**,
+"those", "they", "such", "one", "ones", "the former" and "the latter" are the usual offenders. A
+paragraph that *opens* with a pronoun is the worst case, because a skim-reader landing there has
+nothing to look back at. **"One" and "such a" are the two that slip past a careless sweep**,
 because both read smoothly: write "an energy-forecasting lifecycle rather than a generic
 lifecycle", never "rather than a generic one"; write "the only paper of the three", never "the only
 one of the three"; write "a measure of effectiveness", never "such a metric" where a metric was
 named a clause earlier. Repeating the noun is always available and always correct. "One" is fine as
 a determiner in front of the noun it counts — "the one review we found" both scopes a claim and
-names its noun — and wrong only when it stands in place of the noun.
-Prefer "the NWP download" over "it", "the threshold-weighted score" over "this". A little repetition
-beats an ambiguous sentence every time: never make the reader refer backwards to decode a sentence,
-and never buy elegance with a referent the reader has to hunt for. The same rule covers version
-numbers: write "Flexpectation v1" and "Flexpectation v2", never a bare "v1" or "v2", which could be
-a version of anything.
+names its noun — and wrong only when it stands in place of the noun. Prefer "the NWP download" over
+"it", "the threshold-weighted score" over "this". A little repetition beats an ambiguous sentence
+every time: never make the reader refer backwards to decode a sentence, and never buy elegance with
+a referent the reader has to hunt for. The same rule covers version numbers: write "Flexpectation
+v1" and "Flexpectation v2", never a bare "v1" or "v2", which could be a version of anything.
 
 **"Thing" is never the right noun.** Every use of "thing" or "things" has a specific noun waiting
 behind it, and the specific noun carries information the placeholder throws away: "the two
 contaminants that must be filtered out", not "the two things"; "Two caveats temper both figures",
 not "Two things temper"; "the closest work already published", not "the closest thing already
 published". A bolded lead opening "Two things follow" wastes the one sentence a skim-reader is
-guaranteed to read. **"Something" and "anything" throw away the same information**, and
-they are harder to spot because they read like ordinary English: "a decision to agree with NGED",
-not "something to agree with NGED"; "any occasion a human had to intervene in the running service",
-not "had to do something to it"; "when the ingest fails", not "when something breaks". Where the
-sentence genuinely means an unknown of unknown kind — a placeholder in a rule about future cases —
-say what kind of unknown: "an input we have not anticipated", not "something unexpected".
+guaranteed to read. **"Something" and "anything" throw away the same information.** They are harder
+to spot, because they read like ordinary English: "a decision to agree with NGED", not "something
+to agree with NGED"; "any occasion a human had to intervene in the running service", not "had to do
+something to it"; "when the ingest fails", not "when something breaks". Where the sentence
+genuinely means an unknown of unknown kind — a placeholder in a rule about future cases — say what
+kind of unknown: "an input we have not anticipated", not "something unexpected".
 
 **"Metadata" hides the fields that carry the information; list them.** The fault is the same as
 "thing": a reader told that a model was given "the site's metadata" learns nothing, because the
@@ -198,8 +197,8 @@ reader wants: "parameters", "attributes", "characteristics", "data quality issue
 
 **A noun that carries a count has to say what was counted.** A sentence chaining counts — "screened
 256 records to 31 sources and mapped 13 general-purpose platforms" — hands the reader three units
-and defines none of them, so the reader cannot tell whether a record, a source and a platform are
-one kind of object counted at three stages or three different kinds. Name each unit where it first
+and defines none of them. The reader cannot tell whether a record, a source and a platform are one
+kind of object counted at three stages or three different kinds. Name each unit where it first
 appears, which usually takes two or three words: "screened 256 candidate documents — vendor
 documentation, open-source repositories, and academic papers — down to the 31 they kept, and mapped
 the 13 machine-learning-operations platforms those documents describe". The offenders are the nouns
@@ -219,8 +218,8 @@ other word this project uses for two different meanings gets the same treatment.
 an input does not "buy" accuracy, and a modelling choice does not "cost" anything unless real money
 changes hands. Write what actually moved: "the inputs that improve skill at short range", "adding
 the physics model made the forecast interpretable without making it less accurate", "rejected the
-gradient-boosted tree on the effort of tuning it". Keep "cost" and "price" for money — what NGED
-spends procuring flexibility is a cost, and calling a lost percentage point of skill a cost as well
+gradient-boosted tree on the effort of tuning it". Keep "cost" and "price" for money: what NGED
+spends procuring flexibility is a cost. Calling a lost percentage point of skill a cost as well
 makes the page ambiguous exactly where it has to be exact.
 
 **Put the words in the order that cannot be misread.** "73 wind farms in GB" says what it means;
@@ -240,10 +239,10 @@ measurement.
 **Use the serial comma — the comma before the final "and" or "or" in a list of three or more
 items.** So "solar, wind, and dispatchable generators", never "solar, wind and dispatchable
 generators". The serial comma is the one deliberate departure from *The Economist*'s house style
-above, and it removes a real ambiguity: without the comma the last two items can read as a pair
-belonging to the item before them, which in a list of assets or of data sources changes the
-meaning. A list of two items takes no comma, and an author string in a reference list follows the
-citation convention rather than this rule.
+above. The serial comma also removes a real ambiguity: without the comma, the last two items can
+read as a pair belonging to the item before them. In a list of assets or of data sources, that
+reading changes the meaning. A list of two items takes no comma, and an author string in a
+reference list follows the citation convention rather than this rule.
 
 **Be concise by cutting whole sentences, not words.** Prose should be as short as it can be
 without losing readability, but the compressible material is rarely inside a sentence. It is whole
@@ -277,10 +276,10 @@ to describe the new behaviour rather than appending a note about what changed. T
 [`docs/architecture/code-style.md`](docs/architecture/code-style.md), applied to prose.
 
 **Every citation is a hyperlink to the work cited.** Writing "Sculley et al. (2015)" as plain text
-makes the reader go and find the paper; the link costs a few characters and a digital object
-identifier is a stable address. Wrap the author-and-year label itself —
-`[Sculley et al. (2015)](https://doi.org/...)` — and prefer a DOI to a publisher's landing page. This
-holds everywhere we write, not only in the literature review: a GitHub issue or a pull-request body
+makes the reader go and find the paper. The link costs only a few characters, and a digital object
+identifier is a stable address. Wrap the author-and-year label itself — `[Sculley et al.
+(2015)](https://doi.org/...)` — and prefer a DOI to a publisher's landing page. This holds
+everywhere we write, not only in the literature review: a GitHub issue or a pull-request body
 quoting a paper links it too, because the reader there has even less context than a docs reader.
 The exception is repetition. Once a work is linked, later mentions of the same work in the same
 passage drop both the year and the link and name the authors alone — "Sculley et al. report" — so a
@@ -292,12 +291,12 @@ or a trial, state the finding with its scope attached: "in the studies we read, 
 model beat a same-time-yesterday rule by 10 to 20%", not "sophisticated models beat naive ones".
 A law-like sentence claims far more than the evidence supports, and the first reader who knows a
 counter-example stops trusting the rest of the page. The same applies to claims that something does
-*not* exist: an absence claim is only ever as good as the search behind it, so say what was searched
+*not* exist: an absence claim is only ever as good as the search behind it. Say what was searched
 and let the reader judge, rather than asserting that nobody has tried the approach.
 
 **Don't claim a set has exactly one member unless you have enumerated the set.** "The only study",
 "the one paper", "the first network to publish", "nobody has done this", "the closest precedent" —
-each asserts that a search was exhaustive, and a search almost never is. Absence of evidence is not
+each asserts that a search was exhaustive. A search almost never is. Absence of evidence is not
 evidence of absence: we may only be aware of one instance, which is a different claim from there
 being only one. Say what was looked at and what turned up — "the one paper we found that measured
 properly", "the closest of the four", "labels that none of the GB projects we checked published".
@@ -306,7 +305,7 @@ survey nobody ran: scope the superlative to a set you have listed, or state the 
 judgement instead, as in "the published method that fits NGED's telemetry most closely".
 
 **Don't commit the project to work it has not agreed to.** A page explaining what the literature
-found, what a technique does, or how a subsystem works is not a project plan, and a sentence like
+found, what a technique does, or how a subsystem works is not a project plan. A sentence like
 "Flexpectation will therefore label the telemetry by hand" turns a description into a promise a
 funder can hold us to. Describe what is known and what the options are, and leave what we will do
 to the roadmap, the issue tracker, and the documents that own those commitments.

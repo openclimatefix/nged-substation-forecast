@@ -30,10 +30,10 @@ than what is always true, and name the thing instead of writing "it".
    useful to the funder; a review organised around the papers is a reading list.
 2. **Assemble the library** — full texts on local disk, not abstracts.
 3. **Draft**, one problem at a time, with the sources open rather than a summary of them. Load
-   `long-form-prose` first — a review is exactly the long connected argument that skill plans for,
+   `long-form-prose` first. A review is exactly the long connected argument that skill plans for,
    and the outline it produces is what "one problem at a time" should follow.
 4. **Fact-check new prose before you commit it**, not after. A section that lands and is then
-   corrected twenty times leaves a history that is honest but avoidable, and every uncorrected
+   corrected twenty times leaves a history that is honest but avoidable. Every uncorrected
    hour is an hour the wrong claim could have been read.
 5. **Review in rounds**, each round asking a different question. Accuracy and readability are
    separate rounds, because they find different defects and a reviewer asked for both does
@@ -46,9 +46,9 @@ reasonable.
 ## Assembling the library
 
 **Get the full text. An abstract is not a source you can quote from.** An abstract states what was
-done and that it worked; it almost never carries the number, the baseline, the horizon or the
-caveat that makes a finding worth citing. Several of the worst errors caught in review came from
-drafting off an abstract and inferring the rest.
+done and that it worked. An abstract almost never carries the number, the baseline, the horizon or
+the caveat that makes a finding worth citing. Several of the worst errors caught in review came
+from drafting off an abstract and inferring the rest.
 
 **Draft from the source, not from a summary of the source.** A research agent's report — or your
 own notes, or a previous draft — is a map of where to look, never a substitute for looking. Writing
@@ -85,7 +85,7 @@ division matters far more than the order within either kind.
 about the paper.** Aggregators, repositories, and preprint servers all work by indexing, so a copy
 on somebody's own web page is invisible to every one of them by construction. Mesarcik et al. (2025)
 was recorded as unobtainable after Unpaywall, OpenAlex, Semantic Scholar, OpenAIRE, Crossref, arXiv,
-Zenodo, CORE, the CIRED repository, and two university repositories all came back empty; the paper
+Zenodo, CORE, the CIRED repository, and two university repositories all came back empty. The paper
 was on a co-author's personal website the whole time. The first sweep is the cheap opening move,
 never the search.
 
@@ -93,8 +93,8 @@ never the search.
 
 - **Each author's own web page.** Search every author's name separately, not only the first.
 - **The publisher's or the learned society's own portal.** Unpaywall and OpenAlex both reported two
-  Korean load-transfer papers `closed` while the Korean Institute of Electrical Engineers served
-  them free, under a Creative Commons licence, from its own journal portal.
+  Korean load-transfer papers `closed`. The Korean Institute of Electrical Engineers served them
+  free, under a Creative Commons licence, from its own journal portal.
 - **The employer's website, in the employer's own language,** when the authors work in industry
   rather than at a university. A utility posts conference papers under *Veröffentlichungen* or
   *Publikationen*, not under "publications".
@@ -110,7 +110,7 @@ A route that answers is worth far more than a route that stays silent, so prefer
 say no.
 
 **Watch for the namesake.** An ORCID and Zenodo trail under the right surname belonged to a radio
-astronomer rather than to the network-operator engineer being searched for, and that false trail is
+astronomer rather than to the network-operator engineer being searched for. That false trail is
 what made a wrong negative look convincing. Confirm a profile belongs to the right person — by
 affiliation, by co-authors, by field — before drawing any conclusion from what the profile does or
 does not list.
@@ -122,8 +122,7 @@ Models", where the published title drops "Structured".
 **Never bypass a bot challenge** to reach a document, and never let an agent do it. If a route is
 gated, the route is closed: record the URL so a person can open the page themselves, and move on.
 Publisher portals, ResearchGate, LinkedIn, and several university search interfaces all refuse a
-command-line client, and a 403 from any of them says nothing about whether the paper is open behind
-it.
+command-line client. A 403 from any of them says nothing about whether the paper is open behind it.
 
 **Prove the search ran before recording a negative.** A mistyped path, a wrong directory, a bare
 domain that does not resolve, or a results page rendered in JavaScript all print exactly what a
@@ -142,11 +141,11 @@ file, because the people who ran the study can say what baseline they used.
 the review ends up citing it.** In this repo that means `literature/papers/` for academic papers,
 named `<first-author-surname>-<year>-<short-title>.pdf`, with a `.txt` cache of the same stem
 beside it. A paper you read and set aside is still evidence about what was searched, and it is the
-answer to the next person who asks the same question — a library holding only the citations is a
+answer to the next person who asks the same question. A library holding only the citations is a
 record of the conclusions, not of the work. Never leave a download in the session scratchpad: the
-scratchpad is under `/tmp`, which is tmpfs here and is lost on reboot, and "I already checked that
-one" is worth nothing once the file is gone. Where you hold both a preprint and the version of
-record, keep both and suffix them `-arxiv`/`-preprint` and `-published`; suffix an author's
+scratchpad is under `/tmp`, which is tmpfs here and is lost on reboot. Once the file is gone, "I
+already checked that one" is worth nothing. Where you hold both a preprint and the version of
+record, keep both and suffix them `-arxiv`/`-preprint` and `-published`. Suffix an author's
 conference deck `-slides`.
 
 **When a paper cannot be obtained, say so in the review at the point of citation**, and record it in
@@ -160,7 +159,7 @@ the reporting format that makes a negative checkable.
 
 ## Reading the PDFs: six traps that silently corrupt what you quote
 
-Each of these produces plausible-looking text, so nothing warns you that the sentence you are
+Each of these produces plausible-looking text. Nothing warns you that the sentence you are
 about to quote is not the sentence in the paper.
 
 **Form-feed page breaks swallow records.** `pdftotext` separates pages with `\014`, and a line-based
@@ -188,22 +187,22 @@ pdftotext -layout paper.pdf - | sed 's/\xc2\xad//g' | tr '\014' '\n' > paper.txt
 
 **A minus sign can vanish, turning every loss into a gain.** Some PDFs draw the minus with a glyph
 that decodes to no Unicode codepoint at all, so `pdftotext` drops it silently rather than mangling
-it: a paper reporting a degradation rate of "−0.75%/year" extracts as "0.75%/year", and nothing in
-the text looks wrong. A whole table of losses can read as improvements. Wherever a number's *sign*
+it: a paper reporting a degradation rate of "−0.75%/year" extracts as "0.75%/year". Nothing in the
+text looks wrong. A whole table of losses can read as improvements. Wherever a number's *sign*
 carries the meaning — degradation, decline, bias, anomaly, temperature — check one value against the
-rendered page rather than trusting the extraction, and if the signs are missing say so in the cache:
+rendered page rather than trusting the extraction. If the signs are missing, say so in the cache:
 
 ```bash
 pdftoppm -png -r 150 -f 3 -l 3 paper.pdf page   # render page 3 and read the number off it
 ```
 
 **A running side-stamp lands in the middle of a sentence.** PubMed Central author manuscripts
-carry a vertical "Author Manuscript" stamp down the margin of every page, and `pdftotext` puts
-that stamp into the text in reading order — often mid-sentence. A CASP paper's definition of its
+carry a vertical "Author Manuscript" stamp down the margin of every page. `pdftotext` puts that
+stamp into the text in reading order — often mid-sentence. A CASP paper's definition of its
 targets extracted as "the experimental structure is about **Author Manuscript** to be solved",
-so a search for the whole phrase returned nothing even after whitespace normalisation, which is
-exactly what a misquotation would return. **Search on a short fragment either side of the gap
-before concluding a quotation is wrong**, and strip the stamp before quoting:
+so a search for the whole phrase returned nothing even after whitespace normalisation. An empty
+result is exactly what a misquotation would return. **Search on a short fragment either side of
+the gap before concluding a quotation is wrong**, and strip the stamp before quoting:
 
 ```bash
 sed 's/Author Manuscript//g' paper.txt
@@ -211,8 +210,8 @@ sed 's/Author Manuscript//g' paper.txt
 
 **`file` under-reports the page count, so a complete PDF looks truncated.** `file` guesses by
 counting `/Type /Page` in the raw stream, which misses every page whose entry sits in a
-compressed object stream: it called a 21-page paper 4 pages. A brief written on that number sent
-a sub-agent hunting for text it thought had been cut off. Use `pdfinfo`, which reads the
+compressed object stream. `file` called a 21-page paper 4 pages. A brief written on that number
+sent a sub-agent hunting for text it thought had been cut off. Use `pdfinfo`, which reads the
 catalogue, and check the page count against the version of record's page range before deciding a
 download is incomplete.
 
@@ -233,20 +232,20 @@ Where a paper's headline number fails this test, either say so at the point of c
 the number out.
 
 **Prefer errors normalised by something physical** — a rating, a capacity — over errors normalised
-by the load that happened to occur, and say which normalisation each quoted number used. Numbers
+by the load that happened to occur. Say which normalisation each quoted number used. Numbers
 normalised differently cannot be put in the same table without a note saying so.
 
 **Describe scope, not failure.** A paper that did not do X because X was not its question has not
 "failed to" do X, "only" done Y, or "stopped short". Loaded verbs and adverbs — only, merely, just,
-fails to, barely, quietly, does not even — turn a description of scope into a criticism, and the
-author will read it that way. Describe what the paper did and what question remains open, and let
-the gap speak for itself.
+fails to, barely, quietly, does not even — turn a description of scope into a criticism. The author
+will read it that way. Describe what the paper did and what question remains open, and let the gap
+speak for itself.
 
 ## The four classes of claim that go wrong
 
 **Absence claims** — "nobody has", "no published work", "the first". CLAUDE.md's rule applies
-(state what was searched, and prefer a narrower true claim to a wider claim you cannot defend);
-what this round adds is that such claims survive review longest. Several such claims in this
+(state what was searched, and prefer a narrower true claim to a wider claim you cannot defend).
+What this round adds is that such claims survive review longest. Several such claims in this
 session's review survived three accuracy rounds and were refuted by a fourth with a wider net.
 
 **Superlatives** — "the closest paper to our problem", "the largest study". Two of these in one
@@ -255,7 +254,7 @@ superlative to a set you have actually enumerated: "the closest paper among the 
 covers".
 
 **Numbers.** Check every number against the source text, not against your notes. Check whether the
-same fact appears twice in different units — a ratio in one place and the two figures behind it in
+same fact appears twice in different units. A ratio in one place and the two figures behind it in
 another is one fact stated twice, and the reader who divides them wonders which is wrong.
 
 **Attribution.** Which organisation did which part? A tool built by one group and deployed by
@@ -263,7 +262,7 @@ another, a method named after a project that did not invent it, a benchmark run 
 rather than by its host — these are easy to blur and embarrassing to get wrong in a document the
 parties will read. **When the claim is about software, check the tagged source, not the current
 release.** A review once said an open-source stack "carries no trace" of a method its own
-maintainers had published; the method shipped in every release across a whole major version, and
+maintainers had published. The method shipped in every release across a whole major version, and
 the current release still ships its simplified descendant pre-trained. Fetching three tags from the
 project's repository settled in a minute what the sentence had got backwards.
 
@@ -271,7 +270,7 @@ project's repository settled in a minute what the sentence had got backwards.
 
 **A review that states a commitment must match the document that owns that commitment.** The most
 valuable single finding in this session was that the review told the funder how a metric would be
-computed, and the project's own metrics page specified something different. Before publishing, list
+computed. The project's own metrics page specified something different. Before publishing, list
 every commitment the review makes about what the project will do or measure, find the internal
 document that owns each one, and reconcile them. When the two disagree, decide which is right — the
 review is sometimes the document that is correct, and then the internal one changes.
@@ -406,9 +405,9 @@ nobody can review.
 **A span anchored by its opening and closing words deletes the wrong thing when the closing words
 recur.** Deleting by line number goes stale after the first cut, so the natural fix is to anchor a
 span by the words it starts and ends with. That fix has its own failure: `opening + .*? + closing`
-finds the *next* occurrence of the closing words, and if those words appear again later, the
-deletion swallows everything in between and reports success. Twice in one session that removed
-whole sections — once about 250 words, once about 550 — with nothing in the output to show it. Two
+finds the *next* occurrence of the closing words. If those words appear again later, the deletion
+swallows everything in between and reports success. Twice in one session that removed whole
+sections — once about 250 words, once about 550 — with nothing in the output to show it. Two
 guards between them make the tool safe, and neither costs anything:
 
 - **Cap the match length** and refuse anything longer, because a legitimate sentence-level cut is
@@ -424,8 +423,8 @@ which is why an assertion on the match count is not optional.
 
 **Build the short version by lifting whole sentences out of the long one, not by writing a summary
 from memory.** Every sentence in the long review has already survived fact-checking; a freshly
-written paraphrase has not, and drafting from notes rather than from sources is what produced
-twenty errors in two thousand words the last time it was tried. Lifting also keeps the two documents
+written paraphrase has not. Drafting from notes rather than from sources is what produced twenty
+errors in two thousand words the last time it was tried. Lifting also keeps the two documents
 saying the same thing, which matters when a reader has both.
 
 **Write the extraction as a script, not as retyping.** A script that pulls each span out of the
@@ -435,9 +434,9 @@ version that has never been checked, and it is small enough to check by hand.
 
 **Audit the result with shingles.** Split the short version into overlapping nine-word runs and
 check each against the long review. Every run that is not found is either connective prose you
-wrote or a join between two lifted passages — and the joins are where the faults are: a stranded
-"the ones" whose referent was in the sentence you cut, a bare "0.07" whose result sentence went
-with it, a space left before a full stop. Read every miss.
+wrote or a join between two lifted passages. The joins are where the faults are: a stranded "the
+ones" whose referent was in the sentence you cut, a bare "0.07" whose result sentence went with
+it, a space left before a full stop. Read every miss.
 
 **Expect the cuts to strand referents.** A pronoun or a demonstrative that was clear in the long
 review points at nothing once the sentence naming its subject is gone. After each round of cutting,
@@ -461,5 +460,6 @@ readable.
 
 `long-form-prose` plans the outline before any prose exists — load it before drafting a section of
 the review rather than after. `prose-review` owns the readability round referenced above, which is
-a separate pass from the accuracy round this skill owns, and it reuses the wrap-tolerant `rsub`
-substitution and the hard-wrapping warnings from this skill for editing the review itself.
+a separate pass from the accuracy round this skill owns. `prose-review` also reuses the
+wrap-tolerant `rsub` substitution and the hard-wrapping warnings from this skill for editing the
+review itself.
