@@ -27,7 +27,7 @@ could disagree with every one of them while still adopting everything in this se
 Flexpectation is a greenfield project, and that is a rare opportunity to research the best practices
 of several industries, test-drive them against real data and a real production service, and report
 what we find. Those industries are not only energy forecasting: some of the most useful ideas here
-are borrowed from vehicle dynamics, avionics, manufacturing and site reliability engineering. The
+are borrowed from vehicle dynamics, avionics, manufacturing, and site reliability engineering. The
 intended output is a field report, not a rulebook: a list of principles that any energy-forecasting
 project might find useful *to consider*, together with honest results about which practices were
 worth their cost here, which we declined, which we have not yet absorbed — and, in time, which
@@ -38,7 +38,7 @@ Four pages, in reading order:
 
 - **[Design Principles](design-principles.md)** — the constraints we impose on our own decisions,
   each with the failure it prevents, a real decision it made, and the hypothesis it serves. Includes
-  the practices we considered and deliberately declined, and the ones we know we have not yet
+  the practices we considered and deliberately declined, and the practices we know we have not yet
   absorbed.
 - **[Engineering Hypotheses](engineering-hypotheses.md)** — the falsifiable claims the engineering
   is meant to deliver, each with a numeric threshold and the window in which it resolves. The

@@ -32,7 +32,7 @@ not moved by "it's fine when it breaks".
 
 Mobile telecoms is where that positive claim already holds, in an environment far noisier than any
 input this project depends on. A phone call crossing between cell towers rides a radio channel
-disrupted by multipath fading, interference and a lift shaft blocking the signal outright, and it
+disrupted by multipath fading, interference, and a lift shaft blocking the signal outright, and it
 degrades to a choppy few seconds rather than dropping — with nobody watching a dashboard per call.
 Forward error correction and packet-loss concealment absorb that corruption structurally, which is
 the same shape of claim H1 is making about the forecast: build the tolerance into the system so
@@ -60,10 +60,11 @@ of the [degradation ladder](inherent-stability.md#the-degradation-ladder). Block
 [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147), which builds the
 baseline to compare against.
 
-**T1.3 — Faithful uncertainty.** PICP and pinball loss computed per degradation regime, from the
-leaderboard's scenario dimension. This is the sharpest test we have, and it needs no new metric —
-only the scenario dimension, which is the same machinery T1.2 uses. The tolerance is pre-registered
-at ±5 percentage points (a nominal 90% interval must achieve 85–95% coverage in every regime);
+**T1.3 — Faithful uncertainty.** PICP (prediction interval coverage probability) and pinball loss
+computed per degradation regime, from the leaderboard's scenario dimension. This is the sharpest
+test we have, and it needs no new metric — only the scenario dimension, which is the same machinery
+T1.2 uses. The tolerance is pre-registered at ±5 percentage points (a nominal 90% interval must
+achieve 85–95% coverage in every regime);
 [#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443) may tighten it before
 the first scoring, but any change must be recorded here.
 
@@ -72,15 +73,16 @@ alone, is largely a consequence of the rest of H1 rather than a separate propert
 needs attention only when an upstream format changes is most of the way there already, because the
 set of situations the operator must ever handle is small enough to enumerate. That enumeration
 exists as the **operator contract** in
-[Handover to NGED](../roadmap/handover.md#1-the-operator-contract) — ten or fewer actions
-the operator is ever expected to take. What this test adds on top of T1.1 is that those few are
-*written down well enough to follow*, which is a documentation claim resting on an engineering one.
-The measurement: during the
-[game days](../roadmap/handover.md#6-game-days-and-in-person-training), the operator recovers from
-each scripted failure — NWP feed broken, disk full, daemon killed, credential expired, forecast
-slot missed — unaided, using only the runbooks. An exercise that needs OCF intervention is a
-falsification of T1.4 for that exercise, and a documentation bug to fix. Stating it as a test is
-what turns the game days into a measurement rather than purely a training exercise.
+[Handover to NGED](../roadmap/handover.md#1-the-operator-contract) — 10 or fewer actions the
+operator is ever expected to take. What this test adds on top of T1.1 is that those few are
+*written down well enough to follow*, which is a documentation claim resting on an engineering
+one. The measurement: during the [game
+days](../roadmap/handover.md#6-game-days-and-in-person-training), the operator recovers from each
+scripted failure — numerical weather prediction (NWP) feed broken, disk full, daemon killed,
+credential expired, forecast slot missed — unaided, using only the runbooks. An exercise that
+needs OCF intervention is a falsification of T1.4 for that exercise, and a documentation bug to
+fix. Stating it as a test is what turns the game days into a measurement rather than purely a
+training exercise.
 
 ## H2 — a hundred experiments per person in a peak month
 
@@ -88,26 +90,26 @@ what turns the game days into a measurement rather than purely a training exerci
 > experiments in a month.
 
 **Why a hundred, rather than "as many as we can manage"?** Because a low hit rate is the normal
-condition of ML research, and it makes throughput the denominator of everything else. John Jumper,
-who shared the 2024 Nobel Prize in Chemistry for his work on AlphaFold, puts the share of research
-ideas that fail at around 90%, and treats that rate as an ordinary and necessary feature of doing
-research rather than as evidence of doing it badly — his answer to *How important is failure in
-research?* in his [Nobel Week
+condition of machine-learning (ML) research, and it makes throughput the denominator of everything
+else. John Jumper, who shared the 2024 Nobel Prize in Chemistry for his work on AlphaFold, puts the
+share of research ideas that fail at around 90%, and treats that rate as an ordinary and necessary
+feature of doing research rather than as evidence of doing it badly — his answer to *How important
+is failure in research?* in his [Nobel Week
 interview](https://www.nobelprize.org/prizes/chemistry/2024/jumper/interview/) (recorded 6 December
 2024; that section starts at 14:12). If roughly one idea in ten survives contact with the data then
-ten attempts is simply the price of one result, and a team that can run five experiments a month is
-not doing research ten times more slowly than a team that can run fifty. It is answering a
-different, much smaller set of questions.
+ten attempts is simply the price of one result. A team that can run five experiments a month is not
+doing research ten times more slowly than a team that can run fifty. It is answering a different,
+much smaller set of questions.
 
 The sharper consequence is that throughput changes *which* ideas are worth attempting, not merely
 how quickly they are worked through. When an experiment is expensive, a speculative idea has to
-clear a far higher bar of prior plausibility than a safe one before it is worth the cost — so the
-wild ideas are the first to be cut, and they are exactly where the large wins live, because an idea
-everybody already expects to work is rarely worth much. Cheap failure is what makes a
-low-probability, high-payoff attempt rational. That is why the corresponding design principle is expressed as a
-*cost* rule — [an experiment must be cheap to try, and cheap to
-abandon](design-principles.md#4-an-experiment-must-be-cheap-to-try-and-cheap-to-abandon) —
-rather than as a speed one.
+clear a far higher bar of prior plausibility than a safe idea before it is worth the cost. The
+wild ideas are therefore the first to be cut, and they are exactly where the large wins live,
+because an idea everybody already expects to work is rarely worth much. Cheap failure is what
+makes a low-probability, high-payoff attempt rational. That is why the corresponding design
+principle is expressed as a *cost* rule — [an experiment must be cheap to try, and cheap to
+abandon](design-principles.md#4-an-experiment-must-be-cheap-to-try-and-cheap-to-abandon) — rather
+than as a speed one.
 
 **And an idea is not scored just once.** Because H1 claims graceful degradation, a serious
 candidate has to be evaluated not only on complete data but across a range of data outages — a dead meter, a
@@ -115,8 +117,8 @@ missed NWP run, a feed that has gone stale, several at once — which is exactly
 measure. One idea therefore costs a handful of evaluations rather than one, and the multiplier is
 unforgiving in the wrong direction: when a scenario sweep is expensive, it quietly shrinks to the
 one or two cases somebody had time for, and the failure modes that were too costly to test are
-precisely the ones the service will meet unattended at 3am. Throughput is what keeps the awkward
-scenarios in the evaluation rather than in the backlog.
+precisely the failure modes the service will meet unattended at 3am. Throughput is what keeps the
+awkward scenarios in the evaluation rather than in the backlog.
 
 **And the research here is broad as well as deep.** Flexpectation is an unusually research-heavy
 forecasting project: alongside forecast skill itself sit
@@ -142,11 +144,11 @@ add a fifth testimonial to the pile.
 **T2.1 — Experiment throughput.** Registered leaderboard experiments per person per month, taken
 from MLflow run timestamps. Two framing choices are deliberate.
 
-It is a **peak** claim. There will be months spent hardening the production service or writing
+T2.1 is a **peak** claim. There will be months spent hardening the production service or writing
 documentation, and a quiet month is not a falsification — the claim is about what the machinery
 allows when we lean on it.
 
-And it is **count-only**. A single N-configuration sweep can inflate the number, and we accept
+And T2.1 is **count-only**. A single N-configuration sweep can inflate the number, and we accept
 that, because a simple count that MLflow already records beats a "decision-grade experiments"
 qualifier that would need a human-effort log to measure. If the threshold is ever met only by
 config sweeps, that will be obvious from reading the runs, and the fix is to *append a T2.2* then —
@@ -170,7 +172,7 @@ becomes available to run:
   behind the same data contracts and the same test suite, so nothing is re-implemented between the
   measurement and the deployment — the *one execution path from research to production* principle.
   This removes the single largest source of promotion risk in a conventional setup, which is that
-  the thing measured and the thing deployed are two different pieces of code.
+  the model measured and the model deployed are two different pieces of code.
 - **It will have been measured against degradation, not only against clean history.** Once the
   failure-scenario suite exists (T1.2 and T1.3), a candidate is scored with inputs missing and
   stale as well as complete — the class of behaviour a backtest on tidy history cannot see. This is
@@ -180,7 +182,7 @@ becomes available to run:
   promotion is only as safe as its reversal is cheap.
 
 Speed, then, is a *consequence* of the rigour rather than a trade against it. A promotion gated
-behind a week of manual checking would not be safer — it would be the same evidence, gathered more
+behind a week of manual checking would not be safer. It would be the same evidence, gathered more
 slowly and less repeatably, with the added risk that a hand-run check is skipped under deadline
 pressure.
 
@@ -198,7 +200,7 @@ half of H3.
 
 > The whole running service costs under £50/month at v1 scale and under £200/month at v2 scale.
 
-This is probably the most transferable finding of the set, and it is an answer, independent of H1's,
+H4 is probably the most transferable finding of the set, and it is an answer, independent of H1's,
 to the worry that a service like this must carry heavy operational overhead. The estimates it is pinned to are in
 [AWS Running Costs](../architecture/aws-costs.md): ~£25–35/month at v1 and a projected ~£70–140/month
 at v2. The thresholds sit above those estimates deliberately, so that the hypothesis is a claim
@@ -212,15 +214,15 @@ backtest on AWS is bounded at well under £1 per run at v1 scale — all inside 
 
 > The architecture goes from 32 to ~2,500 time series without structural change.
 
-This is the central engineering bet of the project. It is what justifies building the v2
+H5 is the central engineering bet of the project. It is what justifies building the v2
 architecture during v1 rather than prototyping first and rewriting later, and it is only truly
 resolvable at v2 — which is an argument for writing it down now, while the prediction still costs
 something to make.
 
 **T5.1 — Scale without redesign.** The test passes if, at v2, no change has been forced by scale
-alone to the data contracts, the asset graph, or the storage layout. Changes to configuration, partition counts and
-machine sizes do not count against it; a new table, a changed schema, or a restructured asset graph
-does.
+alone to the data contracts, the asset graph, or the storage layout. Changes to configuration,
+partition counts, and machine sizes do not count against it; a new table, a changed schema, or a
+restructured asset graph does.
 
 ## The tests, at a glance
 
@@ -251,10 +253,10 @@ Six report issues ([#128](https://github.com/openclimatefix/nged-substation-fore
 [#156](https://github.com/openclimatefix/nged-substation-forecast/issues/156)) are the natural
 consumers.
 
-**It converts arguments into measurements.** Several of the claims above — particularly the ones
-about operational burden — are genuinely disputed, and a document that argues one side persuades
-nobody. A number that resolves itself is a better outcome, and pre-registering one signals
-confidence in a way that prose cannot.
+**It converts arguments into measurements.** Several of the claims above — particularly the
+claims about operational burden — are genuinely disputed, and a document that argues one side
+persuades nobody. A number that resolves itself is a better outcome, and pre-registering one
+signals confidence in a way that prose cannot.
 
 **It forces the measurement artefacts to exist in advance.** Most of these tests need something
 built before they can be scored: a baseline forecaster and a scenario suite, plus the
@@ -294,8 +296,8 @@ falls into "upstream format or contract change".
 
 If a test fails, the result is recorded here rather than quietly dropped: the threshold stays, and
 the hypothesis gains a short note saying what was measured, when, and what we think the cause was.
-A falsified engineering hypothesis is one of the more useful things this project can hand to the
-next DNO that tries it.
+A falsified engineering hypothesis is one of the more useful findings this project can hand to the
+next distribution network operator (DNO) that tries it.
 
-Five hypotheses is the sensible ceiling. Each one carries a measurement cost, and a page of thirty
+Five hypotheses is the sensible ceiling. Each one carries a measurement cost, and a page of 30
 claims nobody scores is worse than a handful that are actually resolved.
