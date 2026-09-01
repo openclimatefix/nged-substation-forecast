@@ -104,10 +104,10 @@ industry as a whole to better understand how multiple approaches perform.
 review is human; the research questions are human; the text was either written manually or drafted
 by Claude and heavily reviewed and edited manually.
 
-**Claude Code did the mechanical work of the review, and did it tirelessly.** We used Claude Code as
-a "research assistant": it searches the literature, downloads PDFs, creates tables summarising
-papers, traces citations forwards and backwards (to find updates on results published a few years
-ago), adversarially reviews its own text to check claims against the source PDFs, finds gaps in the
+**Claude Code did the mechanical work of the review.** We used Claude Code as a "research
+assistant": it searches the literature, downloads PDFs, creates tables summarising papers, traces
+citations forwards and backwards (to find updates on results published a few years ago),
+adversarially reviews its own text to check claims against the source PDFs, finds gaps in the
 literature, writes little Python scripts to download data published in the literature to confirm
 results, etc.
 
@@ -2465,20 +2465,19 @@ needed — and that estimate is tracked as it changes.
 - **Negative results are published too**, including whether an off-the-shelf model given none of our
 data matches our own, and whether sustained experimentation stops yielding improvements.
 
-## What the literature says about machine-learning operations
+## What the literature says about machine-learning operations (MLOps)
 
 **Machine-learning operations — building, testing, deploying, and monitoring machine learning as
-production software — is a core aim of Flexpectation, so the state of its literature is worth
-stating plainly: the field describes what good practice looks like, and does not measure whether
-that practice works.** [Kreuzberger et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138)
-give the definition most of the field now uses, drawn from a structured review that narrowed 1,864
-retrieved articles to 27, a review of the available tools, and eight interviews with practitioners.
-They define machine learning operations as "a paradigm, including aspects like best practices, sets
-of concepts, as well as a development culture when it comes to the end-to-end conceptualization,
-implementation, monitoring, deployment, and scalability of machine learning products", drawing on
-machine learning, software engineering, and data engineering together, and from that evidence they
-derive nine principles. What Kreuzberger et al. do not do, and do not claim to do, is measure what
-adopting the nine principles changes.
+production software — is a core aim of Flexpectation. The field describes what good practice looks
+like, but does not measure whether that practice works.** [Kreuzberger et al.
+(2023)](https://doi.org/10.1109/ACCESS.2023.3262138) give the definition most of the field now uses,
+drawn from a structured review that narrowed 1,864 retrieved articles to 27, a review of the
+available tools, and eight interviews with practitioners. They define machine-learning operations as
+"a paradigm, including aspects like best practices, sets of concepts, as well as a development
+culture when it comes to the end-to-end conceptualization, implementation, monitoring, deployment,
+and scalability of machine learning products", drawing on machine learning, software engineering,
+and data engineering together, and from that evidence they derive nine principles. What Kreuzberger
+et al. do not do, and do not claim to do, is measure what adopting the nine principles changes.
 
 **The failure modes the practice exists to prevent were named from experience rather than from
 measurement, and the naming is the contribution.** [Sculley et al.
@@ -2487,16 +2486,18 @@ explicit about the standing of their own paper, which "does not offer novel ML a
 instead seeks to increase the community's awareness of the difficult tradeoffs that must be
 considered in practice over the long term", and which rests on what its acknowledgements call
 "accumulated folk wisdom" from running machine learning at Google. The paper reports no experiment
-and no number. What it contributes is a vocabulary the rest of the field now uses: entanglement and
-the principle Sculley et al. abbreviate to CACE, "Changing Anything Changes Everything", along with
-correction cascades, undeclared consumers, unstable and underutilised data dependencies, direct and
-hidden feedback loops, glue code, pipeline jungles, dead experimental codepaths, configuration debt,
-reproducibility debt, and process management debt. One widely used term is not theirs:
-"training-serving skew" is later vocabulary, and the words "skew" and "serving" appear nowhere in
-the paper.
+and no number. What the paper contributes is a vocabulary the rest of the field now uses:
+entanglement, where mixing signals together makes any one improvement impossible to isolate, and the
+principle Sculley et al. abbreviate to CACE, "Changing Anything Changes Everything", along with
+correction cascades, where a model learned on top of another model's output makes the model
+underneath expensive to improve, undeclared consumers, unstable and underutilised data dependencies,
+direct and hidden feedback loops, glue code, pipeline jungles, dead experimental codepaths,
+configuration debt, reproducibility debt, and process management debt. One widely used term is not
+theirs: "training-serving skew" is later vocabulary, and the words "skew" and "serving" appear
+nowhere in the paper.
 
-**Five systematic reviews agree that the field is largely conceptual, and the one that went looking
-for a measure of effectiveness reported finding none.** [Woźniak et al.
+**Four further reviews agree that the field is largely conceptual, and the one review we found
+that went looking for a measure of effectiveness reported finding none.** [Woźniak et al.
 (2025)](https://doi.org/10.1109/ACCESS.2025.3534990) screened 2,615 search results to 135 and then
 to 41 publications, and asked as one of their four research questions what metrics measure the
 effectiveness of a machine-learning-operations implementation. Their answer is that "None of the
@@ -2528,7 +2529,7 @@ Zhao et al. are explicit that their mapping "does not perform hands-on deploymen
 benchmarking, cost comparisons, or empirical evaluation of forecasting accuracy", and they close by
 naming the study that does not yet exist: "A natural next step is a hands-on empirical benchmark
 that evaluates the actual implementation complexity and operational performance of platforms."
-[Subramanya et al. (2022)](https://doi.org/10.3390/app12199851) go furthest towards a worked example,
+[Subramanya et al. (2022)](https://doi.org/10.3390/app12199851) go furthest of the three towards a worked example,
 building and running a pipeline for day-ahead price forecasting in the Finnish reserve market, but
 report no accuracy figure and no measurement of the engineering effort the pipeline saved. The one
 paper we found that argues for machine-learning operations from inside power-systems forecasting,
@@ -2537,21 +2538,21 @@ altogether: forecast developers "predominantly assess residuals and error statis
 targeted model's quality", so that "eventual cost or rewards of the underlying business application
 are typically not considered in the model development phase".
 
-**Operational forecast error grows measurably over time, yet no paper we read gives a retraining
-cadence for an energy forecast in production.** [Kazmi and Tao
+**Forecast error at Europe's transmission operators grew measurably over 5 years, yet no paper we
+read gives a retraining cadence for an energy forecast in production.** [Kazmi and Tao
 (2022)](https://doi.org/10.1016/j.apenergy.2022.119565) analysed 5 years of day-ahead forecasts
 published by 16 European transmission system operators and found that "the combined forecast error
 due to solar and wind has roughly doubled during just the last five years", with the errors "highly
 autocorrelated", meaning structure remains that a better model could exploit. [Heidrich et al.
-(2022)](https://doi.org/10.1145/3538637.3539759) attack the resulting problem from the cost side,
-observing that "Most methods for coping with such concept drifts rely on computationally expensive
-retraining", and updating a lightweight profile instead of retraining the whole model. What none of
-these papers supplies is a number a network operator could act on. The retraining triggers they
-state are qualitative — Subramanya et al. update their pipelines "if the performance has gone down",
-and Gürses-Tran and Monti say of their own ProLoaF model that training "is performed once and does
-not require re-training, as long as the used training dataset is still representative of the system
-under study" — so how often a substation forecast must be retrained is a question Flexpectation will
-have to answer from its own data.
+(2022)](https://doi.org/10.1145/3538637.3539759) tackle the resulting problem by cutting the effort
+retraining takes, observing that "Most methods for coping with such concept drifts rely on
+computationally expensive retraining", and updating a lightweight profile instead of retraining the
+whole model. What none of these papers supplies is a number a network operator could act on. The
+retraining triggers they state are qualitative — Subramanya et al. update their pipelines "if the
+performance has gone down", and Gürses-Tran and Monti say of their own ProLoaF model that training
+"is performed once and does not require re-training, as long as the used training dataset is still
+representative of the system under study" — so how often a substation forecast must be retrained is
+a question Flexpectation will have to answer from its own data.
 
 **Operational meteorology has been running continuous verification of production forecasts for
 decades, and has documented that practice far more thoroughly than the machine-learning-operations
@@ -2560,14 +2561,11 @@ describe the Model Evaluation Tools, verification software built since 2007 and 
 by the United States National Weather Service and others, noting that "Forecast
 verification/evaluation has been a subject of research and also applied to operational forecasts for
 more than a century" and reporting a user community of "more than 3,700 researchers and operational
-users from 124 countries". [Hoffman et al. (2018)](https://doi.org/10.1175/WAF-D-18-0117.1) show
-what that machinery buys: tracking the skill of three operational forecasting centres continuously,
-they attribute a "7.37% increase in the probability of improved skill" to one named 2016 model
-upgrade. Tying a specific production change to a measured change in skill is what the
-machine-learning-operations literature does not do, and meteorology has been doing it routinely.
+users from 124 countries". [Hoffman et al. (2018)](https://doi.org/10.1175/WAF-D-18-0117.1) show what continuous verification delivers: tracking the skill of three operational forecasting centres continuously, they attribute a "7.37% increase in the probability of improved skill" to a single, named model upgrade made in 2016. Tying a specific production change to a measured change in skill is what the machine-learning-operations literature we read does not do, and meteorology has been tying production changes to measured skill routinely.
 
-**The case that fast, comparable iteration drives progress rests on a structural argument and on
-practitioner testimony, not on a controlled measurement.** [Donoho
+**Fast, comparable iteration is the practice within machine-learning operations that Flexpectation
+is betting on, and the case for that practice rests on a structural argument and on practitioner
+testimony rather than on a controlled measurement.** [Donoho
 (2024)](https://doi.org/10.1162/99608f92.b91339ef) makes the structural argument. He identifies
 three practices, which he labels the frictionless-reproducibility triad — data sharing, the ability
 to re-execute another researcher's workflow exactly, and challenge problems with "a shared public
@@ -2577,16 +2575,17 @@ all three "commonly benefit from very high velocity of progress", because fricti
 reproducibility "spontaneously spawns groups of inspired researchers to a tight loop of iterative
 experimental modification and improvement". Donoho hedges the claim in the same sentence: "Of
 course, not every field works this way." He offers historical case narrative rather than a
-measurement, so his paper is the strongest available argument for the mechanism and is not evidence
-of an effect size.
+measurement, so his paper is the strongest argument for the mechanism among the sources this review
+found, and is not evidence of an effect size.
 
-**The practitioner testimony points the same way, and is careful to say that speed comes from the
-protocol rather than from haste.** John Jumper, whose estimate that around 90% of research ideas
-fail opens this review, elsewhere credits a prototype that "would give wrong answers at incredible
-speed", which "made it easy to start becoming very adventurous with the ideas you try" ([MIT
-Technology Review
+**The practitioner testimony reaches the same conclusion as Donoho's structural argument, and is
+careful to say that speed comes from the protocol rather than from haste.** John Jumper, whose
+estimate that around 90% of research ideas fail opens this review, elsewhere credits a prototype
+that "would give wrong answers at incredible speed", which "made it easy to start becoming very
+adventurous with the ideas you try" ([MIT Technology Review
 (2025)](https://www.technologyreview.com/2025/11/24/1128322/whats-next-for-alphafold-a-conversation-with-a-google-deepmind-nobel-laureate/),
-24 November 2025). [Ng (2018)](https://home-wordpress.deeplearning.ai/wp-content/uploads/2022/03/andrew-ng-machine-learning-yearning.pdf)
+24 November 2025). [Ng
+(2018)](https://home-wordpress.deeplearning.ai/wp-content/uploads/2022/03/andrew-ng-machine-learning-yearning.pdf)
 writes that researchers "will usually try out many dozens of ideas before they discover something
 satisfactory", and that a development set with "a single-number evaluation metric helps you quickly
 evaluate algorithms, and therefore iterate faster". [Godbole et al.
@@ -2596,42 +2595,42 @@ launch". Andrej Karpathy's [autoresearch](https://github.com/karpathy/autoresear
 training run at 5 minutes so that "you can expect approx 12 experiments/hour and approx 100
 experiments while you sleep", and states the reason for the fixed budget plainly: it "makes
 experiments directly comparable regardless of what the agent changes". The same author warns against
-reading any of this as licence to hurry, writing that "a 'fast and furious' approach to training
-neural networks does not work and only leads to suffering" ([Karpathy
+reading the case for fast iteration as licence to hurry, writing that "a 'fast and furious' approach
+to training neural networks does not work and only leads to suffering" ([Karpathy
 (2019)](https://karpathy.github.io/2019/04/25/recipe/)). Every one of these accounts describes fast
 iteration under a fixed and comparable protocol, which is a different claim from going fast.
 
-**Two limits on that testimony bound what Flexpectation can claim for its own machinery.** The
-accounts above come from senior practitioners across several organisations whose results can be
-checked independently, but they are testimony rather than measurement, and each describes a
-different quantity — a rate at which ideas fail, a count of experiments per hour, the turnaround
-time of a tuning trial — rather than one shared metric. The second limit is that the documentation
-needed to measure anything is itself largely missing: [Gundersen and Kjensmo
-(2018)](https://doi.org/10.1609/aaai.v32i1.11503) surveyed 400 papers drawn from four
-artificial-intelligence conferences, scored each against 16 documentation variables grouped into
-three factors, and found that "between 20% and 30% of the variables for each factor are documented",
-with no paper documenting all of them. A field that records so little about how its experiments were
-run cannot easily measure whether a change to how they are run helped.
+**Two limits on that testimony bound what Flexpectation can claim for its own experiment
+framework.** The first limit is that the accounts above, though they come from senior practitioners
+across several organisations whose results can be checked independently, are testimony rather than
+measurement, and each describes a different quantity — a rate at which ideas fail, a count of
+experiments per hour, the turnaround time of a tuning trial — rather than one shared metric. The
+second limit is that the documentation needed to measure anything is itself largely missing:
+[Gundersen and Kjensmo (2018)](https://doi.org/10.1609/aaai.v32i1.11503) surveyed 400 papers drawn
+from four artificial-intelligence conferences, scored each against 16 documentation variables
+grouped into three factors, and found that "between 20% and 30% of the variables for each factor are
+documented", with no paper documenting all of them. A field that records so little about how its
+experiments were run cannot easily measure whether a change to how they are run helped.
 
-**Donoho's account of fields that cannot share their data describes Flexpectation's position, and it
-is the part of his argument this project has to answer rather than quote selectively.** Donoho
-predicts that fields with "inhibitions against data sharing, for example, because of confidentiality
-restrictions" will not make the transition he describes, "will be noticeably lagging behind in rate
-of progress", and "may soon enough be recognized as backwaters". Most of NGED's substation telemetry
-cannot be published, so that prediction is aimed squarely at this project. Donoho also names the
-arrangement such a field can still reach, which he calls a bring-your-own-data challenge: a shared
-task and shared code over data that "is private and only a few credentialed researchers ever get to
-see", as happens in clinical research. The leaderboard set out under "Leaderboards of machine
-learning results" above sits in that category — public to view and reproducible in method, with the
-underlying telemetry restricted — and the honest reading of Donoho is that the arrangement recovers
-part of the benefit of an open challenge rather than all of it.
+**Donoho's account of fields that cannot share their data describes Flexpectation's position, and
+that account is the part of his argument this project has to answer rather than quote selectively.**
+Donoho predicts that fields with "inhibitions against data sharing, for example, because of
+confidentiality restrictions" will not make the transition he describes, "will be noticeably lagging
+behind in rate of progress", and "may soon enough be recognized as backwaters". Most of NGED's
+substation telemetry cannot be published, so that prediction is aimed squarely at this project.
+Donoho also names the arrangement such a field can still reach, which he calls a bring-your-own-data
+challenge: a shared task and shared code over data that "is private and only a few credentialed
+researchers ever get to see", as happens in clinical research. The leaderboard set out under
+"Leaderboards of machine learning results" above sits in that category — public to view and
+reproducible in method, with the underlying telemetry restricted — and the honest reading of Donoho
+is that the arrangement recovers part of the benefit of an open challenge rather than all of it.
 
-**Three of the papers above are the ones to read first.** [Kreuzberger et al.
-(2023)](https://doi.org/10.1109/ACCESS.2023.3262138) is the best single starting point, because it
-defines the term, derives the nine principles, and draws the architecture and the roles that go with
-them. [Eken et al. (2025)](https://doi.org/10.1145/3747346) is the broadest and most recent
-synthesis, and because it reads grey literature alongside journals it captures the practice that
-practitioners write down outside the academic record. [Zhao et al.
+**Three of these papers are the place to start on machine-learning operations itself.** [Kreuzberger
+et al. (2023)](https://doi.org/10.1109/ACCESS.2023.3262138) is the best single starting point,
+because it defines the term, derives the nine principles, and draws the architecture and the roles
+that go with them. [Eken et al. (2025)](https://doi.org/10.1145/3747346) is the broadest synthesis
+of the papers above, and because it reads grey literature alongside journals, it captures the
+practice that practitioners write down outside the academic record. [Zhao et al.
 (2026)](https://doi.org/10.3390/info17040328) is the one written for this domain, mapping platform
 capabilities against an energy-forecasting lifecycle rather than a generic one. [Sculley et al.
 (2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems) is
