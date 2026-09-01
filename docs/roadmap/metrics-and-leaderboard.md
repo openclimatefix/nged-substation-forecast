@@ -31,6 +31,20 @@ Each leaderboard will have tens (maybe hundreds) of rows. Each row is one **ML e
 particular model, trained with a particular set of features, processed a particular way. Entrants
 must be compared apples-to-apples — same test dataset, same metrics, same assumptions.
 
+**Running every entry ourselves is itself a threat to that comparison, and the failure is running a
+baseline badly rather than fabricating a result.** [Kleinebrahm et al.
+(2026)](https://arxiv.org/abs/2604.24705) describe the general problem with published comparisons,
+that competing methods "are not always implemented or optimized with equal care", so reported
+differences "may reflect differences in implementation quality rather than inherent methodological
+advantages". [Hong et al. (2020)](https://doi.org/10.1109/OAJPE.2020.3029979) add two related
+habits: picking the error measure that favours the proposed method, and skipping the comparison with
+naive models altogether. A team that runs every entry on its own leaderboard is exposed to all three
+by construction, which is why every baseline here is run from its authors' own repository at its
+authors' recommended defaults, with no domain-specific tuning — the rule [Meyer et al.
+(2026)](https://arxiv.org/abs/2512.20761) apply on TS-Arena, set out under [Leaderboards of machine
+learning
+results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results).
+
 Per-experiment configuration, trained weights, and metrics are stored in the project's **MLflow**
 database. The leaderboard will be displayed as an interactive table showing multiple metrics at a
 glance, inspired by the [WeirdML leaderboard](https://htihle.github.io/weirdml.html):
@@ -134,9 +148,17 @@ what NGED already do, not from heavy ML**:
 
 The incumbent is really a *hybrid* — its weekly group is persistence-like recency, its annual
 group is climatology-like seasonality — so the two pure forms are still worth having: they isolate
-short-horizon vs long-horizon naive skill (at 0–6 h persistence is famously hard to beat; at day
-8–14 seasonal climatology often beats everything). A model could "win" the leaderboard while
-adding no skill over either, and without these rows nobody would know.
+short-horizon from long-horizon naive skill. Persistence is famously hard to beat at 0 to 6 hours.
+The climatology row asks the same question at the far end of the horizon: once the weather ensemble
+has run out of lead time to be informative, does the forecast still beat a plain seasonal average?
+We have found no published figure for where that cross-over falls for substation load. [Buizza and
+Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put the lead time beyond which a weather
+ensemble stops beating a climatological distribution at 16 to 23 days, but measured on upper-air
+variables rather than on a load forecast against a load climatology (see [Horizon, ensembles, and
+tails](../background/energy-forecasting-review.md#horizon-ensembles-and-tails)). The climatology
+row is therefore how we measure the cross-over, not a number we can already assert. A model could
+"win" the leaderboard while adding no skill over either bookend, and without these rows nobody would
+know.
 
 Side benefit: several more `BaseForecaster` implementations pressure-test the abstraction (the
 docs promise the interface is model-agnostic; today only `XGBoostForecaster` exercises it).
@@ -160,6 +182,13 @@ same-weekday, same-time-of-day analogues alongside the 49-to-55-weeks-back group
 substation load the role the combined reference plays on irradiance, and it is the bar that decides
 whether the project is worth its money. Persistence and climatology stay as diagnostic bookends,
 read as the loose end of the range rather than as the benchmark a win should be claimed against.
+
+**Carrying a loose bookend and a tight one is what the published guidance recommends.** [Doubleday
+et al. (2020)](https://doi.org/10.1016/j.solener.2020.05.051) distinguish the two jobs a benchmark
+does — a yardstick, which need not be a good forecast, and a point on the yardstick, which "should
+be close to the state of the art" — and recommend carrying both, so that a new method is positioned
+between the two rather than declared better than a single baseline. Persistence and climatology are
+the yardstick here; `nged_incumbent` is the point on it.
 
 ### Implementation details — baselines (deleted when they ship)
 
@@ -407,8 +436,14 @@ The single leaderboard fold (`mid_2025_to_mid_2026` in `conf/cv/default.yaml`: t
 reported skill number. Every hyperparameter choice, feature ablation, and model comparison is
 adjudicated on the same 12 months that the leaderboard reports. With hundreds of planned
 experiments (the roadmap mentions LLM-driven auto-experimentation in v0.5), the winner's
-reported skill will be optimistically biased — classic leaderboard overfitting. The epoch
-mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
+reported skill will be optimistically biased — classic leaderboard overfitting, and [Hyndman
+(2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015), who has co-organised a forecasting
+competition, expects it: "over-study of a single benchmark data set means that methods will
+eventually over-fit the published test data. I suspect this has happened with the M3 data over the
+past 20 years, and it is likely to happen with the M4 data, despite its much larger size." Our own
+fold is small in effective sample size rather than in row count, because consecutive half-hours are
+strongly correlated. The epoch mechanism handles *data* changes but not *adaptive selection* on a
+fixed fold.
 
 Until the structural fix lands: leaderboard metrics are selection metrics; differences smaller
 than fold-level noise should not drive decisions; and the number of experiments per epoch is
@@ -671,15 +706,24 @@ actually happened.** Scoring models only on the top-N% highest *observed* half-h
 models that simply bias every forecast upward — the "forecaster's dilemma", explained in
 plain language in the [evaluation-metrics
 reference](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
-Ranking-grade tail emphasis instead comes from proper scores re-weighted toward the tail and
+[Lerch et al. (2017)](https://doi.org/10.1214/16-STS588) show that choosing which periods to score
+on the basis of what happened rewards a forecaster who over-predicts extremes, and can rank a
+deliberately biased forecast above an honest one. Ranking-grade tail emphasis instead comes from
+proper scores re-weighted toward the tail and
 computed over **all** hours. Concretely, three metrics — definitions, equations, and intuitive
 explanations in the [evaluation-metrics
 reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
 
 - **Threshold-weighted CRPS
   ([twCRPS](../techniques/evaluation-metrics.md#threshold-weighted-crps-twcrps))** — CRPS
-  confined to behaviour above a per-series threshold; the headline *ranking* metric for tail
-  skill. Implementation is nearly free: replace members and observation by `max(value,
+  confined to behaviour above a per-series threshold, which is [Gneiting and Ranjan
+  (2011)](https://doi.org/10.1198/jbes.2010.08110)'s way of putting the emphasis inside the score
+  while it stays a proper scoring rule; the headline *ranking* metric for tail skill. A GB
+  distribution network has already been scored this way: [Maia et al.
+  (2026)](https://arxiv.org/abs/2603.01653) compare fault-count forecasts for SP Energy Networks
+  against a quantile-regression baseline on the threshold-weighted score, because an unweighted one
+  "would place substantial emphasis on parts of the predictive distribution where the two models are
+  identical". Implementation is nearly free: replace members and observation by `max(value,
   threshold)` and reuse the existing fair-CRPS aggregation unchanged, inheriting its
   comparability across ensemble sizes.
 
