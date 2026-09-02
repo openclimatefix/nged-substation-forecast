@@ -466,12 +466,13 @@ comma right after a bolded phrase or a code span. `**the same information**, and
 spot` becomes `**the same information.** They are harder to spot`, with the stop pulled inside the
 `**` that opens the block — through a blockquote's `>` and a list item's bullet alike. Every other
 span takes its punctuation outside: a serial comma after a code span, a link or a mid-sentence bold
-is written after the closing marker. The counts across `docs/` and the root markdown files are what
-set that rule. A lead at the start of a paragraph carries the stop inside its `**` 371 times
-against 6 that do not, a lead on a list item 344 times against none, and a lead in a blockquote 38
-times against 1, while 215 commas and 67 full stops sit after a closing `**` and none inside one.
-Single-asterisk emphasis was never counted, so a stop after one is left where the replacement put
-it. The script still counts `**`, backticks and links in the paragraph either side of the splice,
+is written after the closing marker. Counts over the 78 markdown files under `docs/`, in the
+repository root and in `.claude/skills/` are what set that rule. A lead opening a paragraph carries
+the stop inside its `**` 451 times against 6 that do not, a lead on a list item 404 times against
+1, and a lead in a blockquote 38 times against 1. A bold span in the middle of a sentence goes the
+other way, with 144 commas and 70 full stops after its closing `**` against no comma and 2 full
+stops inside one. Single-asterisk emphasis was never counted, so a stop after one is left where the
+replacement put it. The script still counts `**`, backticks and links in the paragraph either side of the splice,
 and refuses any edit that changes a count.
 
 **An insertion anchored on a sentence can land inside a bolded lead**, between the lead's opening

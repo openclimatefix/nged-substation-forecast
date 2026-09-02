@@ -435,6 +435,52 @@ def test_a_bolded_lead_on_a_list_item_keeps_its_stop_inside_the_markers(tmp_path
     assert updated.startswith("- **Name the fault.** The operator reads")
 
 
+def test_an_arrow_before_a_bold_span_is_not_read_as_a_list_marker(tmp_path: Path):
+    """An arrow `->` is not a bullet, so the span after it opens nothing and keeps its stop
+    outside its markers.
+    """
+    path = tmp_path / "page.md"
+    raw = _write(
+        path,
+        "-> **Retry the run**, and the queue backs off before the next attempt, so a run that has "
+        "failed on a transient network error is retried without an operator touching anything.",
+    )
+    updated, status = _apply(
+        path,
+        raw,
+        "Retry the run, and the queue backs off",
+        "Retry the run. The queue backs off",
+    )
+    assert status == "applied"
+    assert updated.startswith("-> **Retry the run**. The queue backs off")
+
+
+def test_an_inline_triple_backtick_span_does_not_open_a_fenced_block(tmp_path: Path):
+    """A hard wrap can push such a span to the start of a line, where it looks like a fence.
+
+    Read as one, it opens a region no later line closes, and every finding in the rest of the file
+    is refused. CommonMark forbids a backtick in a fence's info string, which tells the two apart.
+    """
+    page = (
+        "The retry header is spelled\n"
+        "```retry_after``` in the response, which the client reads before scheduling the next\n"
+        "attempt at the download.\n"
+        "\n"
+        "The engineer reads the alert and the run identifier before opening the logs at all,\n"
+        "because the alert already names the series and the asset that is at fault.\n"
+    )
+    path = tmp_path / "page.md"
+    path.write_text(page, encoding="utf-8")
+    assert apply_findings.fenced_regions(page) == ()
+    _, status = _apply(
+        path,
+        page,
+        "The engineer reads the alert and the run identifier before opening",
+        "The engineer reads the alert, and the run identifier, before opening",
+    )
+    assert status == "applied"
+
+
 def test_a_stop_after_single_asterisk_emphasis_is_left_where_the_replacement_put_it(
     tmp_path: Path,
 ):

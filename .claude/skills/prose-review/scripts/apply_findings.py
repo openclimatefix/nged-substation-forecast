@@ -92,14 +92,22 @@ FALLBACK_WIDTH: Final[int] = 99
 FRONTMATTER: Final[re.Pattern[str]] = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
 """A skill file's YAML block. Its indented lines read as list markers, so it is never re-flowed."""
 
-FENCE: Final[re.Pattern[str]] = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})")
+FENCE: Final[re.Pattern[str]] = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[^`\n]*$")
 """The line opening or closing a fenced code block, matched against one line at a time.
 
 The indent is unbounded rather than CommonMark's three characters, because a fence inside a list
 item is indented to that item's content column: every fenced block on the code-style page is, and
 two of the six on the getting-started page are. A line that deep which is not a fence is inside an
 indented code block anyway, where an edit is no more welcome.
+
+Nothing may follow the marker except an info string carrying no backtick, which is CommonMark's own
+rule and is what tells a fence from an inline ```code span``` that a hard wrap has pushed to the
+start of a line. Read as a fence, such a span opens a region no later line closes, and every
+finding in the rest of the file is then refused.
 """
+
+QUOTE_MARKERS: Final[re.Pattern[str]] = re.compile(r"(?:[ \t]*>)+[ \t]*")
+"""The blockquote markers a line may carry before its content, however deeply nested."""
 
 BOLD: Final[str] = "**"
 """The emphasis marker a bolded lead is written with, and the only one a stop is moved into."""
@@ -380,11 +388,12 @@ def _lead_marker(*, raw: str, at: int) -> str:
     """The emphasis run ending at `at` when it closes a span opening its own block, else `""`.
 
     A bolded lead's full stop belongs inside its markers and every other span's punctuation belongs
-    outside. Counted across `docs/` and the root markdown files: 371 leads at the start of a
-    paragraph carry the stop inside their `**` against 6 that do not, 344 leads on a list item
-    carry it inside and none outside, and 38 leads in a blockquote carry it inside against 1 that
-    does not. Meanwhile 215 commas and 67 full stops sit after a closing `**` and none inside one.
-    A lead is therefore recognised through a blockquote's `>` and a list item's bullet alike.
+    outside. Counted over the 78 markdown files under `docs/`, in the repository root and in
+    `.claude/skills/`: a lead opening a paragraph carries the stop inside its `**` 451 times
+    against 6 that do not, a lead on a list item 404 times against 1, and a lead in a blockquote 38
+    times against 1. A bold span in the middle of a sentence goes the other way — 144 commas and 70
+    full stops sit after its closing `**`, against no comma and 2 full stops inside one. A lead is
+    therefore recognised through a blockquote's `>` and a list item's bullet alike.
 
     Only `**` moves a stop. Single-asterisk emphasis was never counted, so the script leaves the
     stop where the reviewer's replacement put it.
@@ -395,9 +404,13 @@ def _lead_marker(*, raw: str, at: int) -> str:
     opener = raw.rfind(BOLD, block_start, at - len(BOLD))
     if opener == -1:
         return ""
-    # A blockquote's markers are not text, so neutralise them before asking what precedes the
-    # lead: what is left is either nothing or the one list marker `MARKER` describes.
-    before_opener = block[: opener - block_start].replace(">", " ")
+    # A blockquote's markers are not text, so drop the leading run of them before asking what
+    # precedes the lead: what is left is either nothing or the one list marker `MARKER` describes.
+    # Only the leading run — a `>` later in the prefix is an arrow or a comparison, and `-> ` read
+    # as a bullet would pull the stop inside a bold span that opens nothing.
+    before_opener = block[: opener - block_start]
+    quoted = QUOTE_MARKERS.match(before_opener)
+    before_opener = before_opener[quoted.end() :] if quoted else before_opener
     return BOLD if not before_opener.strip() or MARKER.fullmatch(before_opener) else ""
 
 
