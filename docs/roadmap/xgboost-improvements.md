@@ -346,7 +346,7 @@ the cheap way to start answering it.
   baseline model.
 - **End-to-end optimisation.** The booster extracts whatever notion of "anomaly" actually helps the forecast
   objective, rather than the notion a residual definition pre-commits to (median residual, a
-  particular normalisation).
+  particular normalisation); no stage-1 bias is frozen into a feature.
 
 **Cons — why we expect it to learn a much cruder "how normal is this lag" signal:**
 
