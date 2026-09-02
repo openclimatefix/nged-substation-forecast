@@ -6,11 +6,13 @@ underscores — a guessed `_` -> `-` rule produced 15 false failures the first t
 `test_underscore_anchor_resolves` is the regression for that.
 
 Each test builds a throwaway `mkdocs.yml` + `docs/` tree under `tmp_path` rather than depending on
-the real docs staying put, and calls `main()` directly with explicit file arguments so no test
-needs a real git repository.
+the real docs staying put. Most call `main()` with explicit file arguments;
+`test_whole_repo_scan_finds_a_bad_link` covers the no-argument path CI uses, which needs a real
+git repository to list.
 """
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -146,3 +148,40 @@ def test_mkdocstrings_page_skips_anchor_check(
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "SKIPPED" in out
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "Have you read {url}?",
+        "Go and read {url}!",
+        "**{url}**",
+        "*{url}*",
+        "_{url}_",
+        "| {url} |",
+        "|{url}|",
+        "**[tuning]({url})**",
+    ],
+)
+def test_link_resolves_through_surrounding_punctuation(docs_site: Path, template: str) -> None:
+    """Punctuation a regex sweep picks up must not be mistaken for part of the anchor.
+
+    Every case here is a false positive rather than a false negative: the link is good and a
+    sloppy stripper reports it broken. That is the failure that gets the hook deleted, because
+    the first person it fires on cannot commit and can see the link is fine.
+    """
+    url = f"{SITE_PREFIX}architecture/performance/#tuning"
+    consumer = _write_consumer(docs_site, template.format(url=url) + "\n")
+    assert check_docs_links.main([str(consumer)]) == 0
+
+
+def test_whole_repo_scan_finds_a_bad_link(
+    docs_site: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """With no arguments the checker scans every git-tracked file, which is how CI runs it."""
+    _write_consumer(docs_site, f"{SITE_PREFIX}no-such-page/\n")
+    for command in (["git", "init", "-q"], ["git", "add", "-A"]):
+        subprocess.run(command, cwd=docs_site, check=True)
+
+    assert check_docs_links.main([]) == 1
+    assert "BAD PAGE" in capsys.readouterr().out

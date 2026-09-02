@@ -232,7 +232,7 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
 
 - **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`:
   `ruff check`, `ruff format --check`, `ty check`, the `pymarkdown scan` command from CLAUDE.md,
-  `check_docs_links.py` (see below), and the offline test suite (plain `uv run pytest` — the
+  `mkdocs build --strict`, `check_docs_links.py` (see below), and the offline test suite (plain `uv run pytest` — the
   network gate above keeps CI off the network). The job installs with `uv sync --locked
   --all-packages`: `--all-packages` because
   `ty` type-checks the source of every workspace member, including leaf packages that a plain
@@ -251,15 +251,19 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
   block PRs: a red nightly run signals drift in the upstream catalog's conventions, not a
   defect in whatever PR happens to be open.
 
-**`scripts/check_docs_links.py` catches a link to the published docs site whose page or anchor no
-longer exists.** `mkdocs build --strict` validates links only *inside* `docs/`, so a link from a
-docstring, a comment, or a GitHub issue body to the rendered site — the form CLAUDE.md requires —
-passes silently even when a rename moved the page or a heading rewrite killed the anchor. It
-resolves each anchor by running the real `markdown.Markdown()` converter over the target page
-rather than guessing a slug, because Python-Markdown's `toc` extension preserves underscores. The
-one gap: it cannot check an anchor on a `docs/api/` page, because mkdocstrings generates those at
-build time, not the `toc` extension, so it only confirms the page exists there. Runs in `ci.yml`
-and as a pre-commit hook over changed markdown, Python, and YAML files.
+**Two steps validate links, because neither sees what the other does.** `mkdocs build --strict`
+fails on a broken link *within* `docs/`. `scripts/check_docs_links.py` fails on a link *into* the
+published site — the form CLAUDE.md requires from a docstring, a comment or a GitHub issue body —
+whose page a rename moved or whose anchor a heading rewrite killed.
+
+`check_docs_links.py` resolves each anchor by running the real `markdown.Markdown()` converter over
+the target page rather than guessing a slug, because Python-Markdown's `toc` extension preserves
+underscores. An extension it cannot load fails the run rather than being skipped: dropping
+`pymdownx.superfences` makes a `#` comment inside an indented fenced code block parse as a heading,
+which would invent anchors the real site does not have and pass links that are broken. The one gap
+is a `docs/api/` page, whose anchors mkdocstrings generates at build time, so only the page's
+existence is checked there. It runs in `ci.yml` and as a pre-commit hook, scanning the whole repo
+each time because a link can sit in any text file.
 
 ### Why a bespoke workflow rather than OCF's template
 
