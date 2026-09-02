@@ -263,6 +263,19 @@ closing paragraph that repeats the opening. Delete those outright, and leave the
 sentences intact — buying brevity by clipping words out of a sentence that needs them is the
 mistake the next rule forbids.
 
+**Delete a clause the sentence does not need.** This is the one case where cutting inside a
+sentence is right, because a clause the sentence does not need is not a clause that needs its
+words. The usual offenders are a contrast nobody asked for, a restatement of the first half in
+different words, and an aside naming what the passage is *not* about. Each tends to survive from
+whatever prompted the writing — a brief, a review comment, a question someone asked in a meeting —
+and answers a question the reader never had. `"Baseline" here means a fitted model of expected
+power whose residual every approach consumes, not a naive benchmark model` is a definition
+followed by a contrast the definition has already settled, and the sentence reads better ending at
+"consumes". The test is mechanical: delete the clause, re-read the sentence, and keep the deletion
+unless something the reader needed went with it. Keep the contrast only where a reader would
+otherwise land on the wrong meaning of a genuinely ambiguous term, and check that the wrong meaning
+is one the reader might reach rather than one the author happened to be thinking about.
+
 **Prefer short sentences. Where a sentence carries two claims, split it into two sentences.** A
 joined sentence makes the reader hold the first claim in mind while parsing the second, and the
 second claim usually carries the conclusion. The joins worth checking are "and" and "but", a

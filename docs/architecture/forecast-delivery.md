@@ -445,7 +445,7 @@ underlying USD prices):
 | Fargate ARM GB-hour | £0.00267/hr | £0.00307/hr | +14.9% |
 | S3 Standard storage (first 50 TB) | £0.0173/GB-mo | £0.0180/GB-mo | +4.3% |
 
-At v1 scale that premium is a rounding error — maybe £1–3/month on a ~£25–35/month bill (see
+At v1 scale that premium is a rounding error — maybe £1–3/month on a ~£27–40/month bill (see
 [AWS Running Costs](aws-costs.md)). It matters more at
 v2 scale: NGED's population grows from 32 to ~2,500 time series, and `power_forecasts` could
 reach on the order of a **trillion rows** (see [How big is Flexpectation's power forecast

@@ -94,8 +94,7 @@ then point the task definition at the new tag — see
 ## Step 3 — Let the schedule run, or materialise `live_forecasts` by hand
 
 Once a model is promoted, `live_forecasts` produces a new forecast automatically every 6 hours —
-at 00:00, 06:00, 12:00, and 18:00 UTC — via `live_forecasts_job_schedule`.
-`power_time_series_and_metadata`
+at 00:00, 06:00, 12:00, and 18:00 UTC — via `live_forecasts_schedule`. `power_time_series_and_metadata`
 (a separate, hourly-scheduled job `live_forecasts` depends on but is deliberately not ordered
 against) is itself scheduled 5 minutes *before* each hour so that hour's pull has landed by the
 time `live_forecasts` ticks. That offset is an optimisation for freshness, not a precondition: if

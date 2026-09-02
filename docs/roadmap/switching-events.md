@@ -22,7 +22,7 @@
 
 ## The approaches
 
-The work is organised as a set of **named approaches**, tried in the order set out just below. The three v0.6 approaches all build on one shared baseline. "Baseline" here means a fitted model of expected power whose residual every approach consumes. Its purpose is to remove seasonality to help make the switching events visible. A substation's metered power moves for ordinary reasons — a cold snap, a sunny afternoon, a Sunday — and a change in the electricity network's topology is buried under that variation. Subtract the power the weather and the clock explain, and — we hope — switching events surface in the residual as a sustained level shift. Work on v0.6 starts with a multiple seasonal-trend decomposition, which answers whether the events are visible above the noise before any of the rest is built.   Escalation from a simpler approach to a heavier approach must be justified by *measured residual structure the simpler approach leaves behind*.
+The work is organised as a set of **named approaches**, tried in the order set out just below. The three v0.6 approaches all build on one shared baseline. "Baseline" here means a fitted model of expected power whose residual every approach consumes. Its purpose is to remove seasonality to help make the switching events visible. A substation's metered power moves for ordinary reasons — a cold snap, a sunny afternoon, a Sunday — and a change in the electricity network's topology is buried under that variation. Subtract the power the weather and the clock explain, and — we hope — switching events surface in the residual as a sustained level shift. Work on v0.6 starts with a multiple seasonal-trend decomposition, which answers whether the events are visible above the noise before any of the rest is built. Escalation from a simpler approach to a heavier approach must be justified by *measured residual structure the simpler approach leaves behind*.
 
 ### Overview and ordering
 
@@ -115,7 +115,7 @@ past approach 1 we go.
 
 For each substation, form an expected-power baseline that is a function of **exogenous, switching-independent covariates only** — temperature, solar irradiance, recent weather, time-of-day, day-of-week, holidays — fitted across a long history (e.g. an XGBoost or generalised additive model (GAM) regression). Take the residual (observed − expected): a switching event shows up in it as a *sustained level shift* — not a spike, not a slope. This residual, normalised by each series' own spread, is the raw material both the two-stage forecaster and the staged detector consume.
 
-**Why the baseline must be weather/calendar-based and *not* a lagged-power baseline.** A tempting cheap baseline is "same half-hour last week." But, if last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the **sign reversed**, because the contamination is in the *reference*, not the observation. Stage 2's balance attribution would then hunt for donor rises coincident with a source drop that is a baseline artifact. The hunt manufactures phantom events and mis-attributes them. Worse, because switching events can persist for days to months, a lag can land *inside the same ongoing event*. There is then no step at all, and a real event is masked entirely. Weather and clock time are unaffected by the electricity network's topology, so a baseline built only from them cannot be contaminated by switching state. The residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.
+**Why the baseline must be weather/calendar-based and *not* a lagged-power baseline.** A tempting cheap baseline is "same half-hour last week." But, if last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the **sign reversed**, because the contamination is in the *reference*, not the observation. [Approach 2's balance-attribution stage](#stage-2-balance-attribution-across-neighbours) would then hunt for donor rises coincident with a source drop that is a baseline artifact. The hunt manufactures phantom events and mis-attributes them. Worse, because switching events can persist for days to months, a lag can land *inside the same ongoing event*. There is then no step at all, and a real event is masked entirely. Weather and clock time are unaffected by the electricity network's topology, so a baseline built only from them cannot be contaminated by switching state. The residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.
 
 **The first approach to try is a classical multiple seasonal-trend decomposition (MSTL).** MSTL
 splits each substation's series into a trend, one seasonal component per period — daily and weekly,
@@ -157,12 +157,15 @@ so the fiddly question "which days count as similar?" reduces to "is the calenda
 enough?" (see [background: GB demand's calendar-driven
 quirks](../background/network.md#behavioural-calendar-effects-on-demand)).
 
-An unmodelled calendar event surfaces as a coherent residual excursion that the changepoint detector
-may flag (erroneously) as a switching event. Two safeguards keep the phantom-event risk manageable.
+**A calendar event the baseline does not know about looks like a switching event, so the calendar
+features decide how many phantom events the detector reports.** An unmodelled calendar event
+surfaces as a coherent residual excursion that [approach 2's changepoint detector](#stage-1-changepoint-detection-on-the-baseline-residual)
+may flag, erroneously, as a switching event. Two safeguards keep the phantom-event risk manageable.
 First, the failure has a distinctive shape: a holiday miss hits many demand-driven series
 *simultaneously and with the same sign*, whereas a real switching event is localised and
-balance-conserving. Stage 2's neighbourhood-sum check therefore discriminates a holiday miss from a
-switching event. Second, the fix must come from the feature side — richer holiday encodings (the
+balance-conserving. [Approach 2's balance-attribution stage](#stage-2-balance-attribution-across-neighbours) therefore
+discriminates a holiday miss from a switching event, because its neighbourhood sum does not balance
+for a holiday miss. Second, the fix must come from the feature side — richer holiday encodings (the
 [planned quick win](xgboost-improvements.md#uk-holiday-and-calendar-features)) and, at V2 scale,
 cross-series pooling (a [global model](xgboost-improvements.md#global-model-per-time_series_type)
 sees dozens of Easters where a per-series model sees about three) — and **never** from trailing
@@ -171,19 +174,20 @@ would smuggle the lagged-power contamination above back in through the side door
 persistent switching event into "expected" within a few weeks and blinding the detector to exactly
 the events it exists to find.
 
-**Three residual-contamination routes to handle:**
+**Fitting the baseline has three traps, all of them caused by the switching events sitting in its
+own training history.**
 
-- *Training-set contamination.* If the baseline is fitted on history that itself contains
-  switching events, the fit is biased toward those contaminated periods. Fit **robustly**
-  (quantile or Huber loss), or iteratively: fit → flag large residuals as candidate events →
-  refit excluding them. Because events occupy only ~10% of the time, a robust fit recovers the
+- *Fit robustly, because the training history itself contains switching events.* Fitted
+  straight, the baseline is biased toward the contaminated periods. Fit with a **robust loss**
+  (quantile or Huber), or iteratively: fit → flag large residuals as candidate events → refit
+  excluding them. Because events occupy only ~10% of the time, a robust fit recovers the
   NRA relationship and the events fall out as residuals. This closes a virtuous loop with the
   detector itself — detected events feed back to clean the baseline's training data.
 
     **Use v1's logged events to measure, once, the contamination penalty the robust fit leaves
     behind.** In **v1 we also hold NGED's logged switching events**, which enables the cleanest
     of the three options: train the baseline with labelled event periods excluded. Labels will not exist
-    beyond the trial area, so v1 should run this as a small experiment family: the stage-1
+    beyond the trial area, so v1 should run this as a small experiment family: the shared
     baseline trained **with and without** labelled-event exclusion, plus a third arm that
     excludes the *same volume* of randomly chosen non-event periods. The random-exclusion
     control separates the effect of removing contamination from the effect of simply training on
@@ -194,13 +198,18 @@ the events it exists to find.
     that the robust fit fails to absorb, i.e. the accuracy the label-free V2 fleet will lose — cheap
     to measure now, impossible to measure later.
 
-- *Persistent events.* A months-long ARA appears as a residual level shift that *stays* shifted, not a transient. The changepoint detector handles a sustained shift (the detector catches the onset step). The baseline must **not** be allowed to slowly adapt and treat the new level as normal. Keep the baseline static (weather/calendar-driven only) over the detection window so a sustained ARA remains visible as a sustained residual offset.
-- *Seasonal-maintenance confounding.* Planned switching is not uniform through the year — outages
-  cluster in maintenance seasons. A flexible time-of-year covariate fitted on contaminated history
-  can therefore absorb systematic ARA effects into "seasonality". The robust loss does *not* fix
-  that absorption, because the contamination is locally dense within the season even though it is
-  only ~10% overall. Keep seasonal terms low-flexibility, prefer multiple years of history, and
-  make sure the fit → flag → refit loop removes flagged periods from the seasonal fit too.
+- *Keep the baseline static, so that a months-long event stays visible.* A months-long ARA
+  appears as a residual level shift that *stays* shifted, not as a transient. The changepoint
+  detector handles a sustained shift, because it catches the onset step. What breaks the detector
+  is a baseline that slowly adapts and comes to treat the new level as normal. Drive the baseline
+  from weather and calendar alone over the detection window, and a sustained ARA stays visible as
+  a sustained residual offset.
+- *Keep the seasonal terms low-flexibility, because outages cluster in maintenance seasons.*
+  Planned switching is not uniform through the year. A flexible time-of-year covariate fitted on
+  contaminated history can therefore absorb systematic ARA effects into "seasonality", and the
+  robust loss does *not* fix that absorption, because the contamination is locally dense within
+  the season even though it is only ~10% overall. So prefer multiple years of history, and make
+  sure the fit → flag → refit loop removes flagged periods from the seasonal fit too.
 
 #### Approach 1 — the two-stage forecaster
 

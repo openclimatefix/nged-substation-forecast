@@ -246,25 +246,36 @@ expanded nowhere outside a table and the reference list.
 
 ### The order to sweep in
 
-The first position is fixed by a dependency; the rest run highest yield first, so that the
+The first two positions are fixed by dependencies; the rest run highest yield first, so that the
 expensive passes get the freshest attention:
 
-1. Long sentences carrying two claims, which a full stop would split
-2. Pronouns and demonstratives, including "one", "ones", and "such a"
-3. Unenumerated singletons and superlatives
-4. Umbrella nouns — "thing", "something", "anything", "metadata"
-5. Counting nouns that never say what was counted — "records", "sources", "items",
+1. Clauses that can be deleted without the sentence losing anything
+2. Long sentences carrying two claims, which a full stop would split
+3. Pronouns and demonstratives, including "one", "ones", and "such a"
+4. Unenumerated singletons and superlatives
+5. Umbrella nouns — "thing", "something", "anything", "metadata"
+6. Counting nouns that never say what was counted — "records", "sources", "items",
    "entries", "studies", "results"
-6. Money metaphors for performance
-7. Ambiguous "network"
-8. Numerals
-9. Serial commas
-10. Acronyms expanded on first use
-11. Sentences readable two ways, and noun-piles
+7. Money metaphors for performance
+8. Ambiguous "network"
+9. Numerals
+10. Serial commas
+11. Acronyms expanded on first use
+12. Sentences readable two ways, and noun-piles
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
 
-**The split pass goes first because splitting a sentence manufactures work for the passes behind
+**The deletion pass goes first because a clause that is about to be deleted is not worth
+splitting, naming a noun in, or expanding an acronym in.** Every later pass costs less on text the
+deletion pass has already thinned, and a sentence that loses a dead clause often stops being a
+two-claim sentence at all, so the split pass has less to do. The deletion finding is a whole
+clause the sentence can lose: the contrast that restates what the definition already settled, the
+half-sentence saying what a passage is *not* about, the aside that repeats the subject. Delete it,
+re-read the sentence, and keep the deletion unless the reader lost something. Where the reviewer
+cannot tell whether the clause carries anything, it stays — this pass is for the clauses whose
+deletion is obviously safe, not for close calls.
+
+**The split pass goes second because splitting a sentence manufactures work for the passes behind
 it.** A split leaves the second claim needing a subject, and the obvious subject is a pronoun
 standing for whatever the first half named: "it plays on substation load the role the combined
 reference plays on irradiance, and it is the bar that decides whether the project is worth its

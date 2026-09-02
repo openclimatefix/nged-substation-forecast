@@ -58,7 +58,7 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
   and a handover requirement — see [the orchestration
   decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm).
 - AWS infrastructure with **no static AWS keys** (IAM roles throughout), basic alerting on task
-  failure (SNS → email), and cost-conscious operation (~£25–35/month target).
+  failure (SNS → email), and cost-conscious operation (~£27–40/month target).
 
 **Post-v0.1 (explicitly deferred):**
 
@@ -140,7 +140,7 @@ and the accepted trade-offs (mitigated by the external
 
 ### Cost summary
 
-The running-cost estimate for the accepted option — the headline **~£25–35/month**, the
+The running-cost estimate for the accepted option — the headline **~£27–40/month**, the
 workload model behind it, and the storage and data-transfer arithmetic — now lives at its
 durable home, [AWS Running Costs](../architecture/aws-costs.md), alongside a projected
 estimate for running at v2 scale (~2,500 time series). The per-option figures sit in the
@@ -178,7 +178,7 @@ pattern in Stage 2 are load-bearing security decisions, not tidiness.
 #### Stage 1 — solo, Tailscale only
 
 This is exactly what the [accepted
-option](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month)
+option](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher)
 already describes; it's named explicitly as Stage 1 here only so Stage 2/3 below have something
 to say "additive on top of."
 
@@ -313,7 +313,7 @@ A Dagster sensor that fires on each `power_time_series_and_metadata` materialisa
 Sensor preferred over a schedule so it fires on the actual data update.
 
 Note this sensor needs a running Dagster daemon — the [accepted
-option](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month)
+option](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher)
 provides one.
 
 ### Alert on absence: the missed-check-in alarm
@@ -335,7 +335,7 @@ plus margin), regardless of cause. An alert feeding a runbook — rather than pa
 failover — is a proportionate response because the project's [uptime requirements are lenient
 by design](../background/requirements.md#uptime-lenient-by-design). The accepted option's
 "daemon silently dead" staleness alarm (described in [the architecture
-options](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month))
+options](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher))
 is this alarm; recording it here makes it a first-class monitoring deliverable rather than a
 side note.
 
@@ -388,8 +388,7 @@ Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 > **Status: ✅ Done** (closed 2026-07-10). The native per-asset Dagster schedules that ship with
 > [The `live_forecasts` asset](#the-live_forecasts-asset)
-> (`power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`,
-> `live_forecasts_job_schedule`)
+> (`power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`, `live_forecasts_schedule`)
 > do the whole job. Closing #208 took a several-day soak under `dg dev` with a persistent
 > `DAGSTER_HOME`, which confirmed 6-hourly forecasts landing with no duplicate rows and a missed
 > slot backfillable in replay mode. No hand-rolled freshness op is needed, and neither is the

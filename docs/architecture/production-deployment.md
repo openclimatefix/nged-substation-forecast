@@ -16,7 +16,7 @@ own, though: it dispatches every run — those schedules and UI-launched backtes
 ephemeral Fargate task via `EcsRunLauncher`. Even the light data-ingest runs go to Fargate;
 the reasoning is in
 [Running the data-ingest runs on the control-plane VM](#running-the-data-ingest-runs-on-the-control-plane-vm). This is the
-[accepted infrastructure tier](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month);
+[accepted infrastructure tier](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher);
 see [Live service: AWS architecture](../roadmap/live-service.md#aws-architecture) for the
 roadmap's summary, and [AWS Running Costs](aws-costs.md) for what the deployed service costs to
 run — as built at v1, and projected at v2 scale.
@@ -723,14 +723,16 @@ dispatched once the control plane exists** — the orchestration designs in
 infrastructure-tier decision is between a small EC2 box, nothing always-on, one big box running
 all compute, a serverless control plane backed by RDS, and a managed Dagster+ Solo plan.
 
-### Accepted option: small EC2 control-plane box + `EcsRunLauncher` ~£25–35/month
+### Accepted option: small EC2 control-plane box + `EcsRunLauncher`
 
 A `t4g.medium` (2 vCPU / 4 GB; **£20.55/month on-demand, £12.95/month 1-yr no-upfront
 reserved**) runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker +
 **the Marimo dashboard**, behind Tailscale (no ALB — Application Load Balancer). Every run —
 live schedules *and* UI-launched backtests — is dispatched by `EcsRunLauncher` to an
 ephemeral Fargate task sized to the job. Add ~£1.80 EBS (Elastic Block Store, the VM's disk),
-£5–7/month live Fargate, ~£0.65/backtest.
+£9–13/month Fargate — live
+inference plus the hourly ingest and polling runs, priced in
+[AWS Running Costs](aws-costs.md#v1-32-time-series) — and ~£0.65/backtest.
 
 **One image, four roles.** The daemon, webserver, and code-location server all run from the
 *same* [production image](#bake-the-model-into-the-image-at-build-time) the ephemeral Fargate runs
@@ -816,13 +818,18 @@ no serverless charge; sensor evaluations are free (an hourly freshness *op* woul
 
 | | A: Level 1 | Accepted: small box + Fargate | C: one big box | D: serverless CP | E: Dagster+ Solo |
 |---|---|---|---|---|---|
-| £/month | 12–22 | **25–35** | 56–86 | ~41–45 (+ALB) | 37–45 |
+| £/month | 12–22 | **27–40** | 56–86 | ~41–45 (+ALB) | 37–45 |
 | Run history + UI backfills | ✗ | ✓ | ✓ | ✓ | ✓ |
 | Backtests in AWS | ✗ | ✓ big ephemeral compute | ✓ but 2–4 vCPU | ✓ | ✓ (credits) |
 | Marimo dashboard | +£6 add-on | ✓ free on box | ✓ free on box | +£6 service | +£3.75–6 |
 | Servers to patch | 0 | 1 | 1 | 0 | 0 |
 | No static AWS keys | ✓ | ✓ | ✓ EC2 / ✗ Lightsail | ✓ | ✓ |
 | Multi-user UI | n/a | ✓ (Tailscale) | ✓ | ✓ | ✗ (1 user) |
+
+Only the accepted option's £/month figure is re-derived from the full cost model in
+[AWS Running Costs](aws-costs.md#v1-32-time-series). Every option pays the same per-run
+Fargate compute — the hourly ingest and polling runs included — so that arithmetic moves
+all five columns together and leaves the gaps between them unchanged.
 
 **Recommendation (accepted): the small-box option** — the only shape giving full Dagster *and*
 workstation-beating backtest compute *and* a free dashboard home, for ~£13–15/month over Level 1.

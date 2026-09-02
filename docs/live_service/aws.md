@@ -636,7 +636,7 @@ which stay on ephemeral Fargate. (To read about why we're using an always-on box
 shape, see the [orchestration
 decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm);
 the sizing and cost are the [accepted
-option](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month).)
+option](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher).)
 
 First create its IAM role: **IAM** →
 [**Roles**](https://us-east-1.console.aws.amazon.com/iam/home?region=eu-west-2#/roles) → **Create
@@ -1211,8 +1211,8 @@ scheduler and run-monitoring daemons with green heartbeats.
 ## Step 16 — Turn on the schedules and verify end-to-end
 
 1. **UI → Automation**: switch on `power_time_series_and_metadata_schedule`,
-   `ecmwf_ens_schedule`, and `live_forecasts_job_schedule`. Schedule state lives in Postgres,
-   so this is a one-time action — it survives restarts and reboots.
+   `ecmwf_ens_schedule`, and `live_forecasts_schedule`. Schedule state lives in Postgres, so
+   this is a one-time action — it survives restarts and reboots.
 2. **First time only — materialise the upstream assets once so `live_forecasts` has something
    to read.** A Dagster `deps=[...]` declaration records lineage; it does *not* make
    materialising `live_forecasts` reach back and build its parents first. On a brand-new box the
@@ -1244,7 +1244,7 @@ scheduler and run-monitoring daemons with green heartbeats.
    history intact.
 5. **Leave it running for several days**: a forecast appears after every 6-hourly slot and a
    fresh NWP ingest after each daily 00Z publication; check Cost Explorer against the
-   [cost model](../architecture/aws-costs.md#v1-32-time-series-2535month).
+   [cost model](../architecture/aws-costs.md#v1-32-time-series).
 
 If a slot gets missed (box down, failed run), backfill it from the same UI —
 [Operating the live service: Backfilling a missed slot](operations.md#backfilling-a-missed-slot).

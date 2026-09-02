@@ -30,10 +30,9 @@ the weekly re-train is priced as an ephemeral EC2 GPU instance (start, train, pr
 model, terminate); the GPU rates are from the price-list API on 2026-07-23, converted at the
 same \$1 = £0.75.
 
-## v1 (32 time series): ~£25–35/month
+## v1 (32 time series)
 
-**Headline cost: ~£25–35/month** (nudging ~£40 only if the polling-and-ingest line lands at
-its pessimistic top). The headline covers everything needed to keep the deployed service
+**Headline cost: ~£27–40/month.** The headline covers everything needed to keep the deployed service
 running unattended: the always-on control plane, every scheduled Fargate run (inference,
 ingest, and polling), S3 storage and requests, data transfer, and the planned weekly
 re-train. It excludes ML experimentation — backtests are priced per run rather than per
@@ -43,7 +42,7 @@ account to read the delivery bucket. It is made up of:
 | Component | £/month |
 |---|---|
 | Always-on control plane (EC2 `t4g.medium` + 20 GB EBS) | 15–22 (1-yr reserved vs on-demand) |
-| Live Fargate inference (4 runs/day) + hourly polling & ingest | 5–12 |
+| Live Fargate inference (4 runs/day) + hourly polling & ingest | 9–13 |
 | S3 storage (~100 GB) + requests | 2–4 |
 | Data transfer (ingress + egress) | ≈0 |
 | Weekly re-training (planned; ephemeral GPU instance) | ~£1 |
@@ -216,7 +215,7 @@ experimentation.
 
 The weekly re-train scales the same way. We may also adopt somewhat heavier models at v2, so
 the ~10-minute v1 laptop train (~£1/month as an AWS GPU run — see the
-[v1 estimate](#v1-32-time-series-2535month)) grows on both axes at once. Bracketing 1 to 4
+[v1 estimate](#v1-32-time-series)) grows on both axes at once. Bracketing 1 to 4
 hours per weekly run on a single-GPU instance — `g4dn.xlarge` (1× T4, £0.46/hr) up to
 `g6.xlarge` (1× L4, \$1.02/hr → £0.77/hr) — gives ~£0.50–3/run, or **~£2–15/month**. That
 range is wide because both the model family and its training time are still open; like the

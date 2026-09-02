@@ -202,7 +202,7 @@ half of H3.
 
 H4 is probably the most transferable finding of the set, and it is an answer, independent of H1's,
 to the worry that a service like this must carry heavy operational overhead. The estimates it is pinned to are in
-[AWS Running Costs](../architecture/aws-costs.md): ~£25–35/month at v1 and a projected ~£70–140/month
+[AWS Running Costs](../architecture/aws-costs.md): ~£27–40/month at v1 and a projected ~£70–140/month
 at v2. The thresholds sit above those estimates deliberately, so that the hypothesis is a claim
 about the architecture rather than a restatement of the spreadsheet.
 
