@@ -92,8 +92,17 @@ FALLBACK_WIDTH: Final[int] = 99
 FRONTMATTER: Final[re.Pattern[str]] = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
 """A skill file's YAML block. Its indented lines read as list markers, so it is never re-flowed."""
 
-FENCE: Final[re.Pattern[str]] = re.compile(r"^ {0,3}(?P<fence>`{3,}|~{3,})")
-"""The line opening or closing a fenced code block, matched against one line at a time."""
+FENCE: Final[re.Pattern[str]] = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})")
+"""The line opening or closing a fenced code block, matched against one line at a time.
+
+The indent is unbounded rather than CommonMark's three characters, because a fence inside a list
+item is indented to that item's content column: every fenced block on the code-style page is, and
+two of the six on the getting-started page are. A line that deep which is not a fence is inside an
+indented code block anyway, where an edit is no more welcome.
+"""
+
+BOLD: Final[str] = "**"
+"""The emphasis marker a bolded lead is written with, and the only one a stop is moved into."""
 
 
 class Finding(TypedDict):
@@ -371,19 +380,25 @@ def _lead_marker(*, raw: str, at: int) -> str:
     """The emphasis run ending at `at` when it closes a span opening its own block, else `""`.
 
     A bolded lead's full stop belongs inside its markers and every other span's punctuation belongs
-    outside. Counted across `docs/` and the root markdown files: 371 leads carry the stop inside
-    their `**` against 6 that do not, while 215 commas and 67 full stops sit after a closing `**`
-    and none inside one.
+    outside. Counted across `docs/` and the root markdown files: 371 leads at the start of a
+    paragraph carry the stop inside their `**` against 6 that do not, 344 leads on a list item
+    carry it inside and none outside, and 38 leads in a blockquote carry it inside against 1 that
+    does not. Meanwhile 215 commas and 67 full stops sit after a closing `**` and none inside one.
+    A lead is therefore recognised through a blockquote's `>` and a list item's bullet alike.
+
+    Only `**` moves a stop. Single-asterisk emphasis was never counted, so the script leaves the
+    stop where the reviewer's replacement put it.
     """
-    marker = next((run for run in ("**", "*") if raw.endswith(run, 0, at)), "")
-    if not marker:
+    if not raw.endswith(BOLD, 0, at):
         return ""
     block_start, block = _block_at(raw, at)
-    opener = raw.rfind(marker, block_start, at - len(marker))
+    opener = raw.rfind(BOLD, block_start, at - len(BOLD))
     if opener == -1:
         return ""
-    before_opener = block[: opener - block_start]
-    return marker if not before_opener.strip() or MARKER.fullmatch(before_opener) else ""
+    # A blockquote's markers are not text, so neutralise them before asking what precedes the
+    # lead: what is left is either nothing or the one list marker `MARKER` describes.
+    before_opener = block[: opener - block_start].replace(">", " ")
+    return BOLD if not before_opener.strip() or MARKER.fullmatch(before_opener) else ""
 
 
 @functools.lru_cache(maxsize=64)

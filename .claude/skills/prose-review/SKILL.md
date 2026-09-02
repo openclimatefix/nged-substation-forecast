@@ -464,12 +464,15 @@ makes the truncated quote match, which the script does before searching.
 there.** Splitting is the pass that reaches this boundary, because the join it breaks is often the
 comma right after a bolded phrase or a code span. `**the same information**, and they are harder to
 spot` becomes `**the same information.** They are harder to spot`, with the stop pulled inside the
-`**` that opens the paragraph. Every other span takes its punctuation outside: a serial comma after
-a code span, a link or a mid-sentence bold is written after the closing marker. The counts across
-`docs/` and the root markdown files are what set that rule — 371 leads carry the stop inside their
-`**` against 6 that do not, while 215 commas and 67 full stops sit after a closing `**` and none
-inside one. The script still counts `**`, backticks and links in the paragraph either side of the
-splice, and refuses any edit that changes a count.
+`**` that opens the block — through a blockquote's `>` and a list item's bullet alike. Every other
+span takes its punctuation outside: a serial comma after a code span, a link or a mid-sentence bold
+is written after the closing marker. The counts across `docs/` and the root markdown files are what
+set that rule. A lead at the start of a paragraph carries the stop inside its `**` 371 times
+against 6 that do not, a lead on a list item 344 times against none, and a lead in a blockquote 38
+times against 1, while 215 commas and 67 full stops sit after a closing `**` and none inside one.
+Single-asterisk emphasis was never counted, so a stop after one is left where the replacement put
+it. The script still counts `**`, backticks and links in the paragraph either side of the splice,
+and refuses any edit that changes a count.
 
 **An insertion anchored on a sentence can land inside a bolded lead**, between the lead's opening
 `**` and its closing `**`, leaving both markers unbalanced. The rendered page then turns bold on
@@ -482,7 +485,9 @@ packages` inside a fenced block, and a serial-comma finding quoting those words 
 command. Nothing downstream notices: the page still lints, still builds, and `check_structure.py`
 sees no marker move. The script reports such a finding as `code block` and writes nothing, the way
 it already refuses one landing in a skill file's YAML frontmatter. Reword the finding to quote the
-prose it meant, or leave the block alone.
+prose it meant, or leave the block alone. A fence indented under a list item counts, because that
+is where most of this repo's fenced blocks sit — every one on the code-style page, and two of the
+six on the getting-started page.
 
 **A replacement spanning a different number of lines from the text it replaced invalidates every
 line index taken before the splice.** A three-line span rewritten as one line moves every following

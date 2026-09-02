@@ -378,6 +378,83 @@ def test_a_finding_in_the_prose_of_a_page_that_has_a_fenced_block_still_applies(
     assert "`src/`, and the assets appear" in updated
 
 
+def test_a_fence_indented_under_a_list_item_still_bounds_a_code_block(tmp_path: Path):
+    """Every fence on the code-style page is indented under a list item, and two of six here."""
+    page = (
+        "Install the workspace before running anything else:\n\n"
+        "1. Sync the environment, which creates the virtualenv:\n\n"
+        "    ```bash\n"
+        "    uv sync     # create the virtualenv and install all workspace packages\n"
+        "    ```\n\n"
+        "The definitions then load and the assets appear in the Dagster UI.\n"
+    )
+    path = tmp_path / "page.md"
+    path.write_text(page, encoding="utf-8")
+    updated, status = _apply(
+        path,
+        page,
+        "create the virtualenv and install all workspace packages",
+        "create the virtualenv, and install all workspace packages",
+    )
+    assert status == "code block"
+    assert updated == page
+
+
+def test_a_bolded_lead_in_a_blockquote_keeps_its_stop_inside_the_markers(tmp_path: Path):
+    path = tmp_path / "page.md"
+    raw = (
+        "> **Name the fault**, and the operator reads the alert rather than the logs when the\n"
+        "> overnight ingest degrades and the forecast falls back to yesterday's weather run.\n"
+    )
+    path.write_text(raw, encoding="utf-8")
+    updated, status = _apply(
+        path,
+        raw,
+        "Name the fault, and the operator reads the alert",
+        "Name the fault. The operator reads the alert",
+    )
+    assert status == "applied"
+    assert updated.startswith("> **Name the fault.** The operator reads")
+    assert _counts(updated) == _counts(raw)
+
+
+def test_a_bolded_lead_on_a_list_item_keeps_its_stop_inside_the_markers(tmp_path: Path):
+    path = tmp_path / "page.md"
+    raw = (
+        "- **Name the fault**, and the operator reads the alert rather than the logs when the\n"
+        "  overnight ingest degrades and the forecast falls back to yesterday's weather run.\n"
+    )
+    path.write_text(raw, encoding="utf-8")
+    updated, status = _apply(
+        path,
+        raw,
+        "Name the fault, and the operator reads the alert",
+        "Name the fault. The operator reads the alert",
+    )
+    assert status == "applied"
+    assert updated.startswith("- **Name the fault.** The operator reads")
+
+
+def test_a_stop_after_single_asterisk_emphasis_is_left_where_the_replacement_put_it(
+    tmp_path: Path,
+):
+    """Only `**` was counted, so only `**` takes a stop inside it."""
+    path = tmp_path / "page.md"
+    raw = _write(
+        path,
+        "*Freshest run wins*, and the join falls back to the same run for a future target time, "
+        "which is what keeps the lag features free of any lookahead into the forecast horizon.",
+    )
+    updated, status = _apply(
+        path,
+        raw,
+        "Freshest run wins, and the join falls back",
+        "Freshest run wins. The join falls back",
+    )
+    assert status == "applied"
+    assert updated.startswith("*Freshest run wins*. The join falls back")
+
+
 def test_a_tilde_fence_and_an_unclosed_fence_both_bound_a_code_block():
     tilde = "Prose here.\n\n~~~bash\nuv sync\n~~~\n\nMore prose.\n"
     ((low, high),) = apply_findings.fenced_regions(tilde)
