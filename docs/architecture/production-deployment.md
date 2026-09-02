@@ -68,6 +68,10 @@ maximum `time` per `time_series_id` — rather than the asset's materialisation 
 when any series has no data within a 24-hour staleness threshold. A native materialisation-freshness
 policy would miss this exact failure, because the materialisation keeps succeeding.
 
+The threshold is 24 hours because NGED publishes at irregular intervals several hours apart, and the
+pipeline back-fills the gaps by itself once the feed recovers. Twenty-four hours therefore sits
+comfortably past the normal jitter, while still catching a genuine multi-slot stall the same day.
+
 The check is attached to `power_time_series_and_metadata`, so the existing hourly schedule runs it
 every hour with no extra wiring. The check reports two kinds of lateness: a series that once
 reported but has now gone **stale**, and a roster series (present in the `TimeSeriesMetadata`
@@ -157,7 +161,9 @@ Two of those checks deserve a note. The **horizon** is checked because `live_for
 outside the selected NWP run's coverage, so a partly-ingested run delivers a much shorter forecast
 than NGED expect while every individual row stays perfectly well-formed — a fault nothing else would
 see. The floor is half the horizon we ask for, which is loose enough that a healthy slot (about
-13.75 of the 14 days, since the run it used is already 12–30 hours old) never trips it.
+13.75 of the 14 days, since the run it used is already 12–30 hours old) never trips it. A tighter
+floor would risk a false alarm, and would compete with the missed-run count for the same fault.
+Half the horizon catches only the case nothing else sees: NWP that is fresh but truncated.
 
 **The read is scoped to the promoted model's own `experiment_name`, because `write_power_forecasts`
 replaces one `(experiment_name, fold_id)` partition at a time.** Promoting a champion from a
@@ -176,7 +182,11 @@ deadline — how long after a run's `init_time` a healthy ingest should have lan
 from the publication time, because what matters is when the run reaches *our* disk. The deadline
 therefore has to clear `ecmwf_ens_schedule`'s 08:30 UTC start plus that asset's retry ladder — 8 retries
 at 30 minutes, plus a download on each attempt, for the failure mode that is only detectable
-after downloading — so it sits at 14 hours. The consequence is a one-run leniency at the 12:00 slot,
+after downloading — so it sits at 14 hours. The retry delays alone put the last healthy landing at
+about 12:30 UTC, and paying a download and convert on every attempt moves that to about 12:40 UTC,
+which leaves 81 minutes of margin spread over 9 attempts. The deadline is therefore breached only if
+download-and-convert *averages* about 10 minutes across all 9 attempts, not if one attempt is slow:
+a single 645-second download costs only about 10 of those 81 minutes. The consequence is a one-run leniency at the 12:00 slot,
 where today's run has landed but is not yet *demanded*: a download that fails today is reported from
 the 18:00 slot onwards rather than six hours earlier. That one-run leniency is the right way round
 to be wrong. A tighter deadline would recover those six hours but trigger a false alarm on every

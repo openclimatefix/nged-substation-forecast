@@ -1,9 +1,9 @@
 """Production Dagster assets: model promotion and 6-hourly live inference.
 
-New file (``defs/cv_assets.py`` is already ~900 lines): ``promoted_model`` (manually-triggered
-promotion of a champion model to local disk) and ``live_forecasts`` (the 6-hourly inference asset
-that reads it). Both stay thin shells over the pure/IO-light helpers in
-``ml_core.production_helpers``.
+``promoted_model`` promotes a champion model to local disk; ``live_forecasts`` is the 6-hourly
+inference asset that reads it. Both are thin shells over ``ml_core.production_helpers``. Design
+rationale is on [Production Deployment —
+Design](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/).
 """
 
 import json
@@ -67,16 +67,11 @@ live_forecast_partitions = TimeWindowPartitionsDefinition(
     fmt="%Y-%m-%d-%H:%M",
     timezone="UTC",
 )
-"""One partition per 6-hourly tick (00/06/12/18 UTC). ``start`` is a few days before this asset
-shipped — no need for a deep empty backlog on a brand-new live asset.
+"""One partition per 6-hourly tick (00/06/12/18 UTC).
 
-**Partition semantics**: a partition key names the *start* of its 6-hour window; the window runs
-until the *next* partition's key, 6 hours later. A partition's ``power_fcst_init_time`` (when its
-forecast is initialised) is that window's *end* — i.e. the next tick's timestamp, not the key's
-own timestamp (see ``live_forecasts``'s docstring for why). E.g. partition key
-``"2026-07-04-00:00"`` covers the window from 2026-07-04 00:00 UTC (the key itself) to
-2026-07-04 06:00 UTC (the next tick), so its ``power_fcst_init_time`` is 2026-07-04 06:00 UTC —
-six hours after the timestamp named in the key, not at the midnight the key names.
+**Partition semantics**: a partition key names the *start* of its 6-hour window, and
+``power_fcst_init_time`` is that window's *end*, six hours later — see ``live_forecasts``'s
+docstring for the full explanation and a worked example.
 """
 
 
@@ -84,11 +79,9 @@ six hours after the timestamp named in the key, not at the midnight the key name
 def promotable_model_runs(context: AssetExecutionContext) -> None:
     """List MLflow fold runs eligible for promotion via ``promoted_model``.
 
-    Purely informational: materialise this on demand (it has no dependents and writes nothing to
-    disk) to refresh the candidate list as a metadata table in the Dagster UI, then copy the
-    champion's ``run_id`` into ``promoted_model``'s launchpad. The champion is still picked by
-    eye off the MLflow leaderboard (metrics vary per experiment, so there is no single sort key to
-    automate the pick) — this just saves retyping/misremembering the run id.
+    Purely informational: writes nothing to disk and has no dependents. See [Operating the live
+    service → Step 1 — Pick a champion
+    model](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#step-1-pick-a-champion-model).
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -123,23 +116,19 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     """Promote a champion model from MLflow to local disk for zero-MLflow-at-runtime inference.
 
     Manually triggered from the Dagster UI launchpad with ``mlflow_run_id`` set to the champion
-    fold's run id — materialise ``promotable_model_runs`` first and copy the id from its output
-    metadata table if you don't have it to hand. Downloads that run's saved model artifacts to
+    fold's run id. Downloads that run's saved model artifacts to
     ``Settings.production_model_path`` (via ``ml_core.production_helpers.fetch_model_artifacts``,
     which replaces the directory atomically), then reads back ``meta.json`` to report provenance.
-    ``live_forecasts`` reads this directory with a plain disk load — never MLflow.
 
-    Promotion refuses a model whose saved config this code cannot rebuild — a feature name it
-    cannot parse, or a ``model_params`` key it no longer declares — and refuses it before the
-    directory is replaced, so the previous champion stays in place and keeps serving.
-
-    Every such refusal reaches the operator as a failed materialisation: this asset catches
-    nothing, unlike the rest of ``defs/``. The reasoning is in
-    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
-
-    Promotion as a Dagster materialisation gives an audit trail and lineage for free, rather than
-    a bare script (a script wrapper for the eventual Docker build (#222) stays trivial by calling
-    the same ``fetch_model_artifacts`` helper).
+    Refuses a model whose saved config this code cannot rebuild — a feature name it cannot parse,
+    or a ``model_params`` key it no longer declares — before the directory is replaced, so the
+    previous champion stays in place and keeps serving. This asset catches nothing, unlike the
+    rest of ``defs/``: every such refusal reaches the operator as a failed materialisation. See
+    [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules),
+    [Promote the champion via a Dagster asset, not a
+    script](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#promote-the-champion-via-a-dagster-asset-not-a-script),
+    and [Operating the live service → Step 2 — Materialise
+    promoted_model](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#step-2-materialise-promoted_model).
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -174,22 +163,17 @@ def _parse_utc_init_time(value: str) -> datetime:
 def _available_nwp_init_times(settings: Settings) -> list[datetime]:
     """Return the distinct ``init_time``s present in the ``nwp`` Delta table.
 
-    Reads only Delta partition metadata (``DeltaTable.partitions()``, no data scan) and parses
-    the ``init_time`` partition values into tz-aware UTC datetimes via ``_parse_utc_init_time``.
-    Uses ``datetime.fromisoformat`` rather than a fixed ``strptime`` pattern so a delta-rs
-    rendering that drops the fractional seconds (whole-second ``init_time``s have no fractional
-    part to keep) parses the same as one that keeps them — ``strptime``'s ``%f`` requires at
-    least one fractional digit and would raise on that rendering.
+    Reads only Delta partition metadata (``DeltaTable.partitions()``, no data scan) and parses the
+    ``init_time`` values via ``_parse_utc_init_time``. Uses ``datetime.fromisoformat`` rather than
+    a fixed ``strptime`` pattern, because a whole-second ``init_time`` has no fractional part for
+    ``strptime``'s ``%f`` to match, and it would raise.
 
-    Deliberately uncaught: a partition value that ``_parse_utc_init_time`` cannot parse means our
-    own write path (``delta_store.nwp.write_nwp``) corrupted its own metadata, not that some
-    outside system misbehaved, and the inherent-stability rule reserves raising for exactly that
-    case. It is also consistent with ``select_nwp_init_time``, which already raises when no
-    available run qualifies. Nothing here needs a fail-open path of its own: ``live_forecasts``
-    calls this directly and is meant to fail loudly, and the one caller that must stay
-    fail-open — ``live_forecasts_are_healthy`` — already wraps the whole evaluation in
-    ``except BaseException``, so a corrupt key degrades that check to a warning instead of turning
-    a warning into a hard failure.
+    Deliberately uncaught: an unparseable value means our own write path
+    (``delta_store.nwp.write_nwp``) corrupted its own metadata, and [rule
+    1](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
+    reserves raising for exactly that case. ``live_forecasts`` calls this directly and is meant to
+    fail loudly; ``live_forecasts_are_healthy``, the one caller that must stay fail-open, already
+    wraps the whole evaluation in ``except BaseException``.
     """
     delta_table = DeltaTable(
         settings.nwp_data_path, storage_options=typeddict_to_dict(settings.storage_options)
@@ -202,10 +186,12 @@ class LiveForecastsConfig(Config):
     """Run config for the ``live_forecasts`` asset."""
 
     availability_mode: AvailabilityModeType = "live"
-    """``"live"`` (the scheduled default) uses the freshest NWP run present as of
-    ``power_fcst_init_time``, no modelled delay. ``"replay"`` (manual backfills only)
-    reconstructs what was available ``nwp_publication_delay_hours`` before
-    ``power_fcst_init_time``. See ``select_nwp_init_time``."""
+    """``"live"`` (the scheduled default) uses the freshest NWP run present, no modelled delay.
+    ``"replay"`` (manual backfills only) reconstructs what was available
+    ``nwp_publication_delay_hours`` before ``power_fcst_init_time``. See ``select_nwp_init_time``
+    and [Resolve NWP availability
+    asymmetrically](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#resolve-nwp-availability-asymmetrically-live-vs-replay).
+    """
 
 
 @asset(
@@ -219,21 +205,19 @@ class LiveForecastsConfig(Config):
             # 6-hourly ticks, not ecmwf_ens_partitions' daily ones. So start_offset=-16 reaches
             # back 16 * 6h = 4 days, not 16 days. This is a lineage-only safety margin (it decides
             # what the Dagster UI graph and a `--with upstream` materialisation consider a parent,
-            # not what live_forecasts actually reads): comfortably more than the ~30h a healthy
-            # NWP run is ever stale — the 00Z run lands around 08:30 UTC (see
-            # schedules.ecmwf_ens_schedule), so the 06:00 slot still uses the previous day's run, a
-            # worst case of 30h — so it still covers several consecutive missed daily runs before
-            # live_forecasts_are_healthy's missed-run check would already have alarmed.
+            # not what live_forecasts actually reads): comfortably more than a healthy NWP run is
+            # ever stale, so it covers several missed daily runs before live_forecasts_are_healthy
+            # would already have alarmed. See the missed-NWP-run deadline at
+            # https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check
             partition_mapping=TimeWindowPartitionMapping(start_offset=-16, end_offset=0),
         ),
         "power_time_series_and_metadata",
-        # `promoted_model` is deliberately NOT a dep. The model reaches
-        # `Settings.production_model_path` out-of-band, by a different mechanism per environment:
-        # the `promoted_model` asset (an MLflow fetch) when running on a laptop, and the Docker
-        # image it was baked into when running on the production box. Either way it is a filesystem
-        # input, not a Dagster data-flow edge. Declaring the edge would render a permanently
-        # un-materialised `promoted_model` parent on the box, which has no MLflow and never runs
-        # promotion. The docstring below records the coupling instead.
+        # `promoted_model` is deliberately NOT a dep: the model reaches
+        # `Settings.production_model_path` out-of-band (an MLflow fetch on a laptop, or the Docker
+        # image on the production box) — a filesystem input, not a Dagster data-flow edge.
+        # Declaring the edge would leave a permanently un-materialised `promoted_model` parent on
+        # the box. See
+        # https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#bake-the-model-into-the-image-at-build-time
     ],
 )
 def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) -> None:
@@ -254,25 +238,26 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     key, not the midnight the key names.
 
     Loads the production model from a plain disk directory (``load_forecaster_from_dir`` against
-    ``Settings.production_model_path``, populated out-of-band by the ``promoted_model``
-    asset) — **no MLflow import or call anywhere in this asset**; live performance is tracked by
-    production monitoring, never logged here. A model whose saved config this code cannot rebuild
-    fails at that load rather than partway through feature engineering; promotion applies the same
-    check, so this only bites when the code changed after the champion was promoted. Forecasts
-    exactly ``forecaster.trained_time_series_ids`` (never today's eligibility set — the
-    train==predict population invariant) across every NWP ensemble member, using single-run feature
-    engineering stamped with this partition's ``power_fcst_init_time``.
+    ``Settings.production_model_path``, populated out-of-band by the ``promoted_model`` asset) —
+    no MLflow import or call anywhere in this asset. A model whose saved config this code cannot
+    rebuild fails at that load rather than partway through feature engineering; promotion applies
+    the same check, so this only bites when the code changed after the champion was promoted.
+
+    Forecasts exactly ``forecaster.trained_time_series_ids`` — never today's eligibility set, the
+    train==predict population invariant — across every NWP ensemble member, using single-run
+    feature engineering stamped with this partition's ``power_fcst_init_time``. See [Serve only the
+    trained
+    population](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#serve-only-the-trained-population)
+    and [Run live inference in single-run
+    mode](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#run-live-inference-in-single-run-mode-not-bulk).
 
     Each series' location comes from the model's own frozen metadata copy
     (``load_trained_metadata``), never from the ``TimeSeriesMetadata`` roster, so a roster that is
     unreadable or has lost rows can neither fail a slot nor silently drop a series from it. The H3
-    cells the NWP scan is pruned to are therefore the cells the model trained against rather than
-    whatever the roster says today.
+    cells the NWP scan is pruned to are therefore the cells the model trained against, not whatever
+    the roster says today.
 
-    NWP availability is resolved via ``config.availability_mode``: the scheduled tick always
-    uses ``"live"`` (freshest run actually present, no modelled delay); manual backfills of past
-    partitions pass ``"replay"`` (reconstructs what was available ``nwp_publication_delay_hours``
-    before ``power_fcst_init_time``). See ``select_nwp_init_time``.
+    NWP availability follows ``config.availability_mode`` — see ``LiveForecastsConfig``.
 
     Writes idempotently: overwrites exactly this partition's rows in ``power_forecasts``
     (``experiment_name``, ``fold_id="live"``, and this ``power_fcst_init_time``) via
@@ -356,9 +341,9 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         storage_options=settings.storage_options,
     )
 
-    # Heartbeat to Sentry's missed-check-in alarm — only after a genuinely successful live write,
-    # and never on a replay backfill (which reprocesses the past, not "the live service is alive
-    # now"). A no-op unless sentry_monitor_forecasts is set. See nged_substation_forecast._sentry.
+    # Heartbeat to Sentry's missed-check-in alarm, after a successful live write only — never on a
+    # replay backfill. See nged_substation_forecast._sentry and
+    # https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence
     if config.availability_mode == "live":
         send_forecast_checkin(settings)
 

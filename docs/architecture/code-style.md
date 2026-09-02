@@ -106,9 +106,11 @@ Three places where a positional argument is right:
 
 ## Comments, docstrings and links
 
-- **Do not remove existing comments** unless they are misleading or out of date. Only add new
-  comments if you're doing something that isn't obvious from the code. Write self-documenting
-  code, and assume the reader is fluent in Python.
+- **Do not remove existing comments** unless they are misleading, out of date, or a second copy of
+  an argument a `docs/` page already makes. Only add new comments if you're doing something that
+  isn't obvious from the code. Write self-documenting code, and assume the reader is fluent in
+  Python. The third ground is the "One home per argument" rule below, applied in the direction of
+  deletion: where the page carries the argument, the comment carries the link.
 - **Comments and docs must reflect current state only** — never reference previous iterations of
   the code or deleted files. This is the same rule as "Write about the present, not the past" in
   `CLAUDE.md`, applied to code.

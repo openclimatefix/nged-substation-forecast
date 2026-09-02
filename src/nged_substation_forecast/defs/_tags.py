@@ -2,7 +2,8 @@
 
 Splitting the asset graph this way lets whoever operates the live service filter the experiment
 assets out of the Dagster UI — see
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/#core-components>
+for which assets carry each value.
 """
 
 from typing import Final
@@ -25,9 +26,8 @@ Applied as ``@asset(tags=PRODUCTION_LAYER_TAGS)``.
 RESEARCH_LAYER_TAGS: Final[dict[str, str]] = {LAYER_TAG_KEY: "research"}
 """Tags for an asset the deployed service never needs: cross-validation, and model promotion.
 
-The tag says the live service does not need the asset, not where the asset runs. Today these all
-run on a researcher's laptop; some may well move to the cloud later, though not onto the VM that
-serves the forecasts.
+The tag says the live service does not need the asset, not where the asset runs (see the module
+docstring's link).
 
 ``research`` rather than ``rnd``, which reads as an abbreviation of "random", and rather than
 ``R&D``, which Dagster rejects as a tag value.

@@ -74,12 +74,11 @@ from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS
 _POWER_INGEST_MAX_RETRIES: Final[int] = 2
 """How many times to retry the NGED S3 read before letting the hourly ingest fail.
 
-Deliberately small. The retry exists only to stop a transient object-store error from reporting a
-fault that has already fixed itself; the data is never at risk, because this asset is unpartitioned,
-re-lists NGED's bucket from scratch on every attempt, and the next hourly run back-fills whatever
-this one missed. A longer budget would buy nothing the next hour does not already buy, and each
-retry re-runs the whole listing, download and parse — which at V2 scale costs far more than the
-delay does. A persistent outage still fails after the budget and still reports."""
+Deliberately small: nothing is lost by waiting, since this asset re-lists NGED's bucket from
+scratch on every attempt and the next hourly run back-fills whatever this one missed. See [Send
+telemetry to
+Sentry](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+for why this retry is in-band rather than a Dagster ``RetryPolicy``."""
 
 _POWER_INGEST_RETRY_DELAY_SECONDS: Final[int] = 2
 """How long to wait between retries of a transient NGED S3 failure."""
@@ -87,34 +86,23 @@ _POWER_INGEST_RETRY_DELAY_SECONDS: Final[int] = 2
 
 @asset(tags=PRODUCTION_LAYER_TAGS)
 def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
-    """Ingests raw telemetry and metadata from NGED S3 into our local storage.
+    """Ingest NGED telemetry and metadata from S3 into local storage.
 
-    This asset acts as the entry point for NGED data into our system. It fetches
-    the latest available data from the external S3 bucket and appends it to our
-    local Delta table for time series data, while upserting the latest metadata.
-    This raw data will later be consumed by downstream cleaning assets to prepare
-    it for forecasting models.
-
-    WHY UNPARTITIONED? Because NGED's JSON files land at irregular, several-hours-apart intervals
-    with no fixed schedule, so the start time changes every day. And because we don't want people
-    to have to spin up thousands of Dagster runs (one per partition) when first backfilling. It's
-    much more efficient to just check what's available on NGED's S3 bucket and append to our
-    local Delta table.
+    Unpartitioned: NGED's JSON files land at irregular, several-hours-apart intervals with no fixed
+    schedule, and partitioning would mean one Dagster run per file when backfilling. This asset
+    instead lists what is newly available on NGED's S3 bucket each run and appends it.
     """
     settings = Settings()
     delta_path = settings.power_time_series_data_path
     metadata_path = settings.metadata_path
     storage_options = settings.storage_options
 
-    # Fetch new data from S3, using the existing delta table to determine what's new.
-    # We are deliberately keeping the code simple for now, but may move the S3 store
-    # to a Dagster ConfigurableResource in the future.
+    # Fetch new data from S3, kept as a direct read rather than a Dagster ConfigurableResource for
+    # simplicity.
     #
-    # Everything that talks to NGED's bucket sits under one retry guard, so a transient object-store
-    # error costs a short wait instead of a Sentry event for a fault that has already fixed itself.
-    # The guard stops here rather than wrapping the whole body: a fault in the writes below is ours,
-    # and retrying it would let `select_new_rows` dedupe the second attempt to a no-op and turn a
-    # real failure into a green run.
+    # The retry guard below covers everything that talks to NGED's bucket and stops before the
+    # writes: retrying past them would let `select_new_rows` dedupe a real failure into a green
+    # run (see `_POWER_INGEST_MAX_RETRIES`).
     try:
         store = settings.get_nged_s3_store()
         list_of_all_json_files = list_timeseries_json_files(store)
@@ -123,7 +111,6 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
             list_of_large_json_files, delta_path, storage_options
         )
 
-        # Log statistics to be shown in Dagster's UI.
         context.add_output_metadata(
             _FileListingSummary.make_table(
                 "nged_s3_paths",
@@ -144,11 +131,8 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         )
         return
     except BaseException as exc:
-        # `BaseException` for the same reason as `checks.py::power_data_is_fresh`: obstore, delta-rs
-        # and polars each define their own exception classes and a Rust panic is not an `Exception`,
-        # so naming what must *propagate* is the only version that stays true as dependencies come
-        # and go. That makes this deliberately liberal — a bug in our own code in here is retried
-        # too, which costs the budget and then reports as it would have anyway.
+        # `BaseException`, not `Exception` — same reason as `checks.py::power_data_is_fresh`. See
+        # https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check.
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
             raise  # A cancelled run must cancel.
         context.log.warning(f"Could not read NGED's S3 bucket, requesting a retry: {exc!r}")
@@ -168,8 +152,8 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         {"n_implausible_power_rows_dropped": downloaded.n_implausible_power_rows_dropped}
     )
 
-    # Save TimeSeriesMetadata. A roster failure must not stop the power write below; what that costs
-    # is in https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
+    # A roster failure must not stop the power write below; what that costs is in
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/.
     try:
         upsert_metadata_stats = upsert_metadata(
             new_metadata=new_metadata, metadata_path=metadata_path, storage_options=storage_options
@@ -185,7 +169,6 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 
     context.add_output_metadata(upsert_metadata_stats)
 
-    # Save PowerTimeSeries:
     new_power_ts_deduped = select_new_rows(new_power_ts, delta_path, storage_options)
     if not new_power_ts_deduped.is_empty():
         if_local_path_then_make_parent_dir(delta_path)
@@ -196,7 +179,6 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
             delta_write_options={"partition_by": "time_series_id"},
         )
 
-    # Log statistics to be shown in Dagster's UI.
     context.add_output_metadata(
         _PowerTimeSeriesSummary.make_table(
             "PowerTimeSeries",
@@ -210,10 +192,9 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 
 @asset(tags=PRODUCTION_LAYER_TAGS)
 def h3_grid_weights(context: AssetExecutionContext) -> None:
-    """Computes H3 grid weights for the Great Britain boundary.
+    """Compute each H3 cell's fractional overlap with the Great Britain boundary.
 
-    This asset calculates the fractional overlap of H3 cells with the GB boundary
-    at various resolutions, which is used for spatial aggregation of weather data.
+    Used for NWP spatial aggregation.
     """
     settings = Settings()
     boundary = load_gb_boundary()
@@ -221,14 +202,12 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
         boundary, nwp_grid_size_degrees=0.25, h3_res=ECMWF_ENS_H3_RESOLUTION
     )
 
-    # Save to parquet
     h3_grid_weights_path = settings.h3_grid_weights_path
     if_local_path_then_make_parent_dir(h3_grid_weights_path)
     weights.write_parquet(
         h3_grid_weights_path, storage_options=typeddict_to_dict(settings.storage_options)
     )
 
-    # Add metadata to Dagster context
     context.add_output_metadata(
         {
             "n_rows": len(weights),
@@ -245,17 +224,11 @@ its 00Z run has actually landed, matching Dynamical's publication lag; shared wi
 ``ecmwf_ens_job``/``ecmwf_ens_schedule`` in ``defs/schedules.py``."""
 
 _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
-"""Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≥ 4h of coverage past the 08:30 UTC schedule
-(``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time — and past the
-3h25m a measured republication took. Applies to ``NwpRunNotYetAvailable`` and
-``NwpVariableWhollyMissing``, the two ways an upstream run says "not ready yet"; a genuine bug
-fails immediately instead of retrying for hours.
-
-"≥" rather than "≈" because only ``NwpRunNotYetAvailable`` is raised before the download.
-``NwpVariableWhollyMissing`` comes from validation *after* it, so each of those retries also pays
-for a full re-download (22.5s at best, minutes when the upstream fetch is slow) and re-takes the
-``ECMWF`` concurrency pool slot. That is the price of not discarding the partition, and the
-elapsed window is wider than the delays alone imply."""
+"""Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` gives at least 4h of coverage past the 08:30 UTC
+schedule. Applies to ``NwpRunNotYetAvailable`` and ``NwpVariableWhollyMissing`` — both mean the
+upstream run is not ready yet; anything else fails immediately. See [A wholly-missing variable is
+retried, not failed
+outright](https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright)."""
 
 _ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800
 """How long to wait between retries of a not-yet-published ECMWF run."""
@@ -263,11 +236,12 @@ _ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800
 _NWP_QUALITY_CHECK_NAME: Final[str] = "nwp_has_no_unexpected_nulls"
 """Name of the per-run NWP data-quality check emitted by ``ecmwf_ens`` (see ``assess_nwp_quality``).
 
-Computed in-asset from the frame already in memory rather than as a standalone ``@asset_check``
-scanning the Delta table: the quality of a run is a property of the specific ingest we are holding,
-so there is nothing to re-scan (and re-scanning the whole ~5.9B-row NWP table would hit Polars'
-2**32 row-count ceiling). This differs from ``power_data_is_fresh``, whose freshness genuinely
-drifts over time and so must re-read the table on a schedule."""
+Computed in-asset from the frame already in memory, not as a standalone ``@asset_check`` re-scanning
+the Delta table: a run's quality is a property of the ingest already held, and re-scanning the whole
+NWP table would cross Polars' [row-count
+ceiling](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#the-other-hard-ceiling-polars-32-bit-row-index).
+``power_data_is_fresh`` differs because its freshness genuinely drifts over time and must re-read
+the table on a schedule."""
 
 _NWP_QUALITY_CHECK_DESCRIPTION: Final[str] = (
     "Nulls in the de-accumulated NWP variables (precipitation and the two radiation fluxes) beyond "
@@ -290,16 +264,15 @@ _NWP_COMPLETENESS_CHECK_NAME: Final[str] = "nwp_run_is_complete"
 """Name of the per-run NWP completeness check emitted by ``ecmwf_ens`` (see
 ``assess_nwp_run_completeness``).
 
-Separate from ``nwp_has_no_unexpected_nulls`` because the two answer different questions with
-different remedies: that one asks whether the rows we got are usable, this one asks whether we got
-all the rows. Computed in-asset from the frame in memory, for the same reason."""
+Separate from ``nwp_has_no_unexpected_nulls``: that check asks whether the rows we got are usable,
+this one asks whether we got all the rows. Computed in-asset, for the same reason as that check."""
 
 _NWP_INSTANTANEOUS_CHECK_NAME: Final[str] = "nwp_instantaneous_variables_have_no_nulls"
 """Name of the per-run check on the instantaneous variables' raw-grid nulls.
 
-Separate from ``nwp_has_no_unexpected_nulls`` because the two count populations whose nulls mean
-opposite things, and so warrant opposite thresholds and different remedies: tolerated corruption to
-read as a trend, against an anomaly to raise with Dynamical.org today."""
+Separate from ``nwp_has_no_unexpected_nulls`` because the two populations' nulls mean opposite
+things. See [The instantaneous variables: scattered nulls, counted on the raw
+grid](https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#the-instantaneous-variables-scattered-nulls-counted-on-the-raw-grid)."""
 
 _NWP_INSTANTANEOUS_CHECK_DESCRIPTION: Final[str] = (
     "Nulls in the instantaneous NWP variables (temperature, dew point, the winds, the pressures, "
@@ -356,28 +329,23 @@ _UPSTREAM_PER_VARIABLE_SCHEMA: Final[TableSchema] = TableSchema(
         ),
         AssetCheckSpec(name=_NWP_COMPLETENESS_CHECK_NAME, asset="ecmwf_ens", blocking=False),
     ],
-    # `pool="ECMWF"` caps how many partitions of this asset run at once, in conjunction with
-    # the Dagster instance configuration: `concurrency: pools: default_limit` in `dagster.yaml`,
-    # or a per-pool limit set with `dagster instance concurrency set ECMWF <n>`. The deployed
-    # limit is 4. See:
-    # https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
+    # `pool="ECMWF"` caps concurrent partitions of this asset (deployed limit: 4), set via
+    # `dagster instance concurrency set ECMWF <n>` or `dagster.yaml`'s
+    # `concurrency.pools.default_limit`. See
+    # https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools.
     #
-    # What the cap protects is the download, not memory: the conversion holds one
-    # `(lead_time, ensemble_member)` slice at a time, and on AWS the `EcsRunLauncher` gives every
-    # run its own Fargate task, so concurrent partitions never share an address space. Each
-    # partition does run `download_ecmwf_ens_data`'s thread pool, though, so the fetches
-    # Dynamical.org sees at once are this limit multiplied by that pool's `max_workers`, and
-    # issue #276 measured 13 concurrent fetches self-contending into multi-minute stragglers.
-    # The two knobs move together: if per-partition download times grow a long tail, lower
-    # `max_workers` rather than treating the tail as an upstream problem.
+    # The cap protects the download, not memory — each partition runs in its own Fargate task, so
+    # partitions never share an address space. But each partition also runs
+    # `download_ecmwf_ens_data`'s own thread pool, so Dynamical.org sees this limit multiplied by
+    # that pool's `max_workers` at once (issue #276 measured 13 concurrent fetches self-contending
+    # into multi-minute stragglers). Lower `max_workers` if per-partition downloads grow a long
+    # tail, rather than raising this limit.
     pool="ECMWF",
 )
 def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
-    """Downloads and processes ECMWF ensemble NWP data for a specific day.
+    """Download and convert the 00Z ECMWF ENS run for the partition date.
 
-    This asset fetches the 00Z NWP run for the partition date, converts it to a
-    Polars DataFrame, and writes it to the Delta table through
-    ``delta_store.nwp.write_nwp`` (Float32, significand-rounded), which replaces that
+    Writes the result to the NWP Delta table via ``delta_store.nwp.write_nwp``, replacing that
     ``(nwp_model_id, init_time)`` partition.
 
     Its ``nwp_has_no_unexpected_nulls`` check reports null counts for both the raw NWP grid and the
@@ -390,20 +358,15 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     partition_date_str = context.partition_key
     nwp_init_time = datetime.strptime(partition_date_str, "%Y-%m-%d").replace(tzinfo=UTC)
 
-    # Load dependencies
     h3_grid = pt.DataFrame(
         pl.read_parquet(
             settings.h3_grid_weights_path, storage_options=typeddict_to_dict(storage_options)
         )
     ).set_model(H3GridWeights)
 
-    # Download and convert. Both retryable failures mean "the upstream run is not ready yet", they
-    # just say it at different points: the run is absent from the catalog, or it is present but a
-    # weather variable is still wholesale empty. Dynamical.org publishes each run as ~40 separate
-    # Icechunk commits, so an in-progress publication is genuinely readable and genuinely
-    # incomplete, and a defective one gets republished — the 2026-08-09 00Z run was repaired 3h25m
-    # after its first publication, inside this asset's four-hour retry budget. Every other error
-    # still fails immediately.
+    # Download and convert. `NwpRunNotYetAvailable` and `NwpVariableWhollyMissing` both mean the
+    # upstream run is not ready yet (see `_ECMWF_ENS_MAX_RETRIES`); every other error fails
+    # immediately.
     try:
         ds_lazy = open_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
         context.log.info("Lazily opened Icechunk store.")
@@ -419,14 +382,10 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         ) from exc
     context.log.info(f"Converted NWP data to Polars. Columns: {nwp.columns}")
 
-    # Three non-fatal per-run checks. The first surfaces the tolerated scattered nulls (known
-    # upstream ECMWF ENS corruption) that Nwp.validate deliberately let through. The second counts
-    # the same raw grid over the variables that are never legitimately null, where the aggregation
-    # absorbs scattered corruption so completely that nothing downstream of it can see any. The
-    # third asks whether the run is *whole*; a short run is the upstream provider misbehaving, so we
-    # keep the rows that did arrive and WARN rather than discarding the run. Computed before the
-    # write, not merely under a guard — rule 7 of
-    # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules
+    # Three non-fatal per-run checks — see
+    # https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#separate-is-this-run-usable-from-is-it-perfect
+    # for what each answers. Computed before the write, not merely under a guard — rule 7 of
+    # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules.
     try:
         quality = assess_nwp_quality(nwp)
         upstream = assess_upstream_grid_point_nulls(
@@ -520,9 +479,8 @@ def _nwp_completeness_check_result(report: NwpRunCompletenessReport) -> AssetChe
     """Wrap an :class:`NwpRunCompletenessReport` into a WARN-severity Dagster check result."""
     return AssetCheckResult(
         check_name=_NWP_COMPLETENESS_CHECK_NAME,
-        # WARN, never fail: an incomplete upstream run is absent input, not malformed input, and
-        # partial NWP still forecasts far better than yesterday's run would. See
-        # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/.
+        # WARN, never fail — absent input, not malformed. See
+        # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#why-it-warns-instead-of-failing-the-run.
         passed=report.is_complete,
         severity=AssetCheckSeverity.WARN,
         description=report.describe(),
@@ -545,9 +503,9 @@ def _nwp_quality_check_result(
 ) -> AssetCheckResult:
     """Wrap the two null reports for one run into a WARN-severity Dagster check result.
 
-    ``passed`` follows the H3 cells alone. The upstream rate is a trend across runs, not a verdict
-    on this one, and the archive has no threshold that separates a healthy feed from a degrading
-    one — so it is published and plotted rather than gated. Escalating a badly-degraded run is
+    ``passed`` follows the H3 cells alone. See [Two populations, counted
+    separately](https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#two-populations-counted-separately)
+    for why. Escalating a badly-degraded run is
     <https://github.com/openclimatefix/nged-substation-forecast/issues/501>.
     """
     return AssetCheckResult(
@@ -561,11 +519,10 @@ def _nwp_quality_check_result(
         metadata={
             "n_null_h3_cells": report.n_null_cells,
             "n_affected_h3_slices": report.n_affected_slices,
-            # The split of `n_affected_h3_slices`, broken out because the two halves mean different
-            # things and only one of them is measured well: a wholly-null slice reaches the cells
-            # intact however they are aggregated, whereas the scattered remainder is only whatever
-            # upstream corruption happened to take out every grid point of a cell. Both are
-            # emitted so the operations runbook can name either as a number to read off this check.
+            # Split out because only one half is measured well: a wholly-null slice reaches the
+            # cells intact however they are aggregated, but the scattered remainder is only whatever
+            # corruption happened to take out every grid point of a cell. Both are recorded so an
+            # operator can read either off this check.
             "n_whole_null_h3_slices": report.n_whole_null_slices,
             "n_scattered_h3_slices": report.n_scattered_slices,
             "affected_h3_variables": list(report.affected_variables),
@@ -583,10 +540,8 @@ def _nwp_quality_check_result(
 def _nwp_instantaneous_check_result(upstream: UpstreamNullRate) -> AssetCheckResult:
     """Wrap the instantaneous variables' raw-grid null count into a WARN Dagster check result.
 
-    ``passed`` is a zero threshold, unlike ``nwp_has_no_unexpected_nulls``'s: these variables are
-    never legitimately null, so one null grid point is worth an operator's attention. It still only
-    WARNs, because by the time this runs the aggregation has already absorbed whatever it counts —
-    the run is landed either way, and what is at stake is whether we ask Dynamical.org about it.
+    ``passed`` is a zero threshold, unlike ``nwp_has_no_unexpected_nulls``'s — see
+    :data:`_NWP_INSTANTANEOUS_CHECK_NAME` for why.
     """
     return AssetCheckResult(
         check_name=_NWP_INSTANTANEOUS_CHECK_NAME,
@@ -659,9 +614,8 @@ def _nwp_quality_description(report: NwpQualityReport, upstream: UpstreamNullRat
             f"partly-null and {report.n_whole_null_slices} wholly-null (member, valid_time) "
             "slice(s)"
         )
-    # Only claim corruption when some was found: this string is the operator's summary of the run,
-    # and a clean run described as tolerated corruption is the same false claim, inverted, that
-    # reporting the cells alone used to make.
+    # Only claim corruption when some was found: a clean run described as tolerated corruption would
+    # be the same false claim, inverted, as reporting only the cells.
     verdict = (
         ""
         if upstream.is_healthy and report.is_healthy
@@ -676,9 +630,9 @@ def _nwp_quality_description(report: NwpQualityReport, upstream: UpstreamNullRat
 def _upstream_null_metadata(upstream: UpstreamNullRate) -> dict[str, MetadataValue]:
     """The upstream corruption rate, for the materialisation timeline.
 
-    Published on every materialisation whose assessment succeeded, including the ones where the
-    check passes, because the provider question this answers — is the feed degrading? — is about
-    the trend across runs and is invisible in any single one.
+    Published on every materialisation whose assessment succeeded, so the trend across runs is
+    visible even where the check passes — see :func:`_nwp_quality_check_result` for why that
+    question needs the trend rather than one run.
     """
     return {
         "n_null_nwp_grid_points": MetadataValue.int(upstream.n_null_nwp_grid_points),
@@ -689,20 +643,18 @@ def _upstream_null_metadata(upstream: UpstreamNullRate) -> dict[str, MetadataVal
 _NWP_NULL_SLICES_TABLE_LIMIT: Final[int] = 100
 """Cap on rows rendered in the affected-slices metadata table.
 
-A broadly-corrupt upstream run could touch thousands of (variable, member, valid_time) slices;
-the exact totals live in the scalar metadata, so the table only needs the worst offenders to be
-useful — bounding it keeps the Dagster event log from bloating on a bad day."""
+A broadly-corrupt run could touch thousands of (variable, member, valid_time) slices; the exact
+totals live in the scalar metadata, so the table only needs the worst offenders, bounding it
+against the Dagster event log bloating on a bad day."""
 
 
 def _nwp_null_slices_metadata(affected: pl.DataFrame) -> TableMetadataValue:
     """Render the worst affected (variable, member, valid_time) slices as a Dagster metadata table.
 
     Capped at ``_NWP_NULL_SLICES_TABLE_LIMIT`` rows; the full counts are in the scalar metadata
-    alongside. Wholly-null slices sort first, then the most-null of the rest — that is the order an
-    operator wants, because a wholly-null slice names a field that arrived missing. Sorting on
-    ``n_null`` alone would not achieve it: slices need not have equal cell counts (a short run is
-    tolerated), so a wholly-null slice of few cells can carry fewer nulls than a partly-null slice
-    of many.
+    alongside. Wholly-null slices sort first, then the most-null of the rest, because a wholly-null
+    slice names a field that arrived missing — sorting on ``n_null`` alone would not achieve that,
+    since a wholly-null slice of few cells can carry fewer nulls than a partly-null slice of many.
     """
     top = (
         affected.with_columns(is_whole_null=pl.col("n_null") == pl.col("n_total"))

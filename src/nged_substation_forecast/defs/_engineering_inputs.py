@@ -39,31 +39,21 @@ def load_engineering_inputs(
 
     Called by ``trained_cv_model`` (training window + eligible population), ``cv_power_forecasts``
     (validation window + trained population) and ``live_forecasts`` (the live window + the promoted
-    model's population). Both are filtered to the inclusive ``[window_start, window_end]`` window
-    and to ``time_series_ids``.
+    model's population). Both returned frames are filtered to the inclusive
+    ``[window_start, window_end]`` window and to ``time_series_ids``.
 
-    **Memory: prune the NWP scan at the source.** The NWP Delta is large (tens of GB: every
-    ``init_time`` × every H3 cell × ~51 ensemble members × the 30-min forecast horizon). Every
-    filter below is applied directly to the ``Nwp.scan_delta`` scan, so only the surviving rows
-    are ever decoded into memory. This is the difference between a few GB and an OOM. See the
-    "NWP scan pruning" notes in
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>. The three
-    levers:
+    Every filter below is applied directly to the ``Nwp.scan_delta`` scan, so only the surviving
+    rows are ever decoded — the difference between a few GB and an OOM on the multi-tens-of-GB NWP
+    Delta. See [Bounding feature-engineering
+    memory](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
+    for why each predicate below prunes, and by how much. The returned NWP frame is filtered to:
 
-    - ``init_time``: the table is partitioned by ``init_time``, so bounding it to the runs that can
-      cover the window (``[window_start - MAX_NWP_LEAD, window_end]``) is a true *partition* prune
-      — Polars opens only those partition directories. Filtering ``valid_time`` alone does **not**
-      prune partitions.
-    - ``ensemble_member``: applied at the scan so we never decode the ~50 discarded members; the
-      member-early sort (``delta_store.nwp.NWP_SORT_COLS``) additionally lets Parquet row-group
-      stats skip most of each partition outright for this predicate, provided the predicate
-      reaches the Parquet scan unchanged — which requires ``Nwp``'s declared ``ensemble_member``
-      dtype to match what's physically on disk. See
-      <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
-    - ``h3_index``: restricted to the cells the requested series sit in. There is a *many-to-one*
-      relationship between ``time_series_id`` and ``h3_index`` (one NWP cell covers several series),
-      so this is a small set of cells; the per-cell weather is later replicated across the series in
-      that cell by the feature engineer's spatial join.
+    - ``init_time`` in ``[init_time_start, init_time_end]`` (default
+      ``[window_start - MAX_NWP_LEAD, window_end]``): the runs that can cover the window.
+    - ``ensemble_member`` in ``ensemble_members``, if given; every member otherwise.
+    - ``h3_index`` restricted to the cells the requested series sit in (one cell can cover several
+      series; the feature engineer's spatial join later replicates each cell's weather across
+      them).
 
     Args:
         settings: Application settings (data paths, credentials).
@@ -75,18 +65,17 @@ def load_engineering_inputs(
         window_end: Inclusive end of the time window for power observations and NWP
             ``valid_time``.
         ensemble_members: If provided, NWP is filtered to these ``ensemble_member`` indices. If
-            ``None`` (the default), every ensemble member is carried through. Training restricts to
-            the control member (``[0]``) to avoid fanning every forecast row out across all ~51
-            members against the same power target; prediction passes ``None`` because the
+            ``None`` (the default), every ensemble member is carried through. Training restricts
+            to the control member (``[0]``), which stops every training row fanning out across all
+            ~51 members against one power target; prediction passes ``None`` because the
             probabilistic leaderboard metrics need the full ensemble.
-        init_time_start: Optional explicit lower ``init_time`` partition bound. When ``None`` it
-            defaults to ``window_start - MAX_NWP_LEAD``, the earliest run that can cover the
-            window.
-        init_time_end: Optional explicit upper ``init_time`` partition bound. When ``None`` it
-            defaults to ``window_end``. Together with ``init_time_start`` this lets
-            ``cv_power_forecasts`` pass a narrower sub-range and process the validation window in
-            ``init_time`` chunks, so the full-ensemble forecast frame for one chunk stays in RAM
-            while the rest streams from the partition-pruned scan.
+        init_time_start: Optional explicit lower ``init_time`` partition bound. Defaults to
+            ``window_start - MAX_NWP_LEAD``, the earliest run that can cover the window.
+        init_time_end: Optional explicit upper ``init_time`` partition bound. Defaults to
+            ``window_end``. Together with ``init_time_start`` this lets ``cv_power_forecasts`` pass
+            a narrower sub-range and process the validation window in ``init_time`` chunks, so one
+            chunk's full-ensemble forecast frame stays in RAM while the rest streams from the
+            pruned scan.
 
     Returns:
         ``(power_time_series, nwp)`` — a lazy power frame and a lazy NWP frame, both filtered to

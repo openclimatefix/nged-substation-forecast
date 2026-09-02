@@ -1,57 +1,22 @@
 """Dagster asset checks: the operator's at-a-glance data-health status.
 
-``power_data_is_fresh`` warns when NGED's telemetry feed has stalled — no new
-``power_time_series`` data for over ``_POWER_DATA_STALENESS_THRESHOLD``. The hourly
-``power_time_series_and_metadata_job`` runs this check every time it materialises the asset, so
-Dagster's Checks view is the single "is the data up to date and healthy?" surface: a green tick
-when every series is current, a yellow **WARN** naming the late count when the feed has stalled.
-
-The check reads the Delta table's *actual* data recency, not the asset's materialisation
-timestamp — the job succeeds hourly even when NGED publishes nothing, so only the on-disk
-``time`` reveals whether fresh data really landed. A native materialisation-freshness policy
-would miss exactly the failure this check exists to catch.
-
-Series we already know are dead — ``_KNOWN_DEAD_TIME_SERIES_IDS`` — are dropped from the check's
-*inputs* rather than from its output, so every count describes the series we are still watching, and
-the Sentry warning inherits the silencing without knowing it exists. The check keeps naming the
-silenced ids every hour, green or yellow, and turns yellow on its own if one of them reports again.
-
-``evaluate_power_freshness`` is a pure function so it is unit-testable without Dagster or Delta,
-and it is the hand-off point for routing per-series staleness to Sentry: the same
-``PowerFreshnessResult`` is fed to ``report_power_freshness`` (in
-``nged_substation_forecast._sentry``) rather than recomputed. The two mechanisms stay
-complementary — the
-[Sentry missed-check-in alarm](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
-fires on total silence from outside the deployment, while this check (and its Sentry warning) report
-per-series staleness from inside Dagster while the daemon is alive.
-
-``live_forecasts_are_healthy`` does the same job for the one asset NGED actually consumes. It
-answers two questions the asset's own success status cannot: did this 6-hourly slot really land
-valid forecast rows on disk, and how many daily NWP runs were missing when the forecast was made?
-Both are read back from disk after the write, so a run that "succeeded" while writing nothing —
-or writing null/non-finite forecasts, hindcast rows, or a short population — still shows up.
-Missed NWP runs are *counted as runs*, never measured in hours of age — healthy NWP is 12–30 hours
-old depending on the slot, so any absolute age threshold would fire on two slots in four every day.
-The full argument is in
-[Inherent Stability → Three audiences, three channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
-
-Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and nothing either one's *body*
-does can fail its own step: each sits under a catch-all which logs the traceback, reports the
-exception to Sentry (the run no longer fails, so the failure hook no longer fires) and returns an
-unhealthy result. Catching ``BaseException`` is what makes that absolute — a Rust panic in any of
-the pyo3 extensions these bodies read through arrives as a ``PanicException``, which does not
-derive from ``Exception``. Only cancellation is re-raised, which is what we want: a cancelled run
-should cancel. What remains outside the guard is Dagster's own machinery: resource init, and
-serialising the returned ``AssetCheckResult`` into an event. A warning path that could fail would
-turn fail-open into fail-closed at exactly the wrong moment (rule 7 of
+Two checks, both ``AssetCheckSeverity.WARN`` and ``blocking=False``, with their whole body under a
+catch-all so a bug in the check cannot fail the run it is warning about (rule 7 of
 [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
 
-The two differ in how much they salvage short of that catch-all. In ``live_forecasts_are_healthy``
-an absent ``power_forecasts`` or NWP table reads as empty, and an absent *or unreadable*
-promoted-model ``meta.json`` degrades to "population unknown", so the rest of the report survives;
-a read *error* on either table still costs the whole report. ``power_data_is_fresh`` salvages
-nothing below the catch-all on purpose: its only per-read fallback would be "roster unknown", and a
-fresh power table would then render an unreadable roster as a green tick.
+``power_data_is_fresh`` (``evaluate_power_freshness``) reads the ``power_time_series`` Delta
+table's on-disk recency and warns when a watched series is stale or has never reported;
+``_KNOWN_DEAD_TIME_SERIES_IDS`` silences series already known dead.
+``live_forecasts_are_healthy`` (``evaluate_live_forecast_health``) reads a live slot's
+``power_forecasts`` rows back off disk and warns when they are missing, invalid, short of the
+requested horizon, short of the trained population, or built from a stale NWP feed.
+
+Design: [Warn on stale power
+data](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check)
+and [Read the live forecast back off
+disk](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check).
+Operator runbook: [Degraded input
+data](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled).
 """
 
 import json
@@ -101,21 +66,8 @@ _LATE_TABLE_SCHEMA: Final[TableSchema] = TableSchema(
 """Fixed schema for the late-series metadata table (required so an empty table still renders)."""
 
 _MAX_LATE_SERIES_IN_TABLE: Final[int] = 50
-"""Cap on how many late series the check's metadata table lists.
-
-Unlike the other capped listings this one lands in Dagster's event log, so it is written to durable
-storage every hour a stall lasts. Uncapped, a whole-feed stall at V2 scale (~2,500 series) would
-serialise to about 355 KB per hourly evaluation; at 50 rows it is about 8 KB.
-
-Matches ``_sentry.MAX_LATE_SERIES_IN_CONTEXT`` (50) rather than the tighter
-``_sentry.MAX_LATE_SERIES_IN_MESSAGE`` (20) that bounds the Sentry message body, because a browsable
-table and the Sentry event context serve the same drill-down purpose.
-
-The rows follow ``_LATE_STATUS_ORDER``, so the listing is the head of that order rather than the 50
-series in most trouble: when never-reported series outnumber the cap, no stale series is listed at
-all, however stale it is. ``n_stale`` and ``n_never_reported`` stay exact for the watched
-population throughout, and are what the operator should read first. Why the table is capped, and
-why at this number:
+"""Cap on how many late series the check's metadata table lists. Matches
+``_sentry.MAX_LATE_SERIES_IN_CONTEXT``. Why capped, and at this number:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>
 """
 
@@ -124,20 +76,14 @@ _LATE_STATUS_ORDER: Final[tuple[str, ...]] = ("never", "stale")
 row order in the late-series table (never-reported series listed before merely-stale ones)."""
 
 _POWER_DATA_STALENESS_THRESHOLD: Final[timedelta] = timedelta(hours=24)
-"""A ``time_series_id`` is 'late' if its most recent observation is older than this.
-
-NGED publishes at irregular, several-hours-apart intervals and our pipeline back-fills gaps
-automatically once the feed recovers, so 24 hours is comfortably past normal jitter while still
-catching a genuine multi-slot stall the same day."""
+"""A ``time_series_id`` is 'late' if its most recent observation is older than this."""
 
 _KNOWN_DEAD_TIME_SERIES_IDS: Final[tuple[int, ...]] = (33,)
 """Series ``power_data_is_fresh`` stops warning about, because we already know they are dead.
 
-33: the site monitor is broken (reported by James at NGED); no data since 2026-01-26.
+33: the site monitor is broken (reported by NGED); no data since 2026-01-26.
 
-Delete an entry to start warning about that series again. The check keeps naming every id listed
-here, so the silencing cannot be forgotten, and turns yellow by itself if one of them reports data
-again. How to edit the list, and what each description means:
+How to edit the list:
 <https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled>
 
 Why it is a source constant rather than operator-editable state:
@@ -337,7 +283,6 @@ def _describe_power_freshness(result: PowerFreshnessResult) -> str:
             f"{result.n_never} never reported."
         )
     sentences = [summary]
-    # Named on every run, healthy or not, so silencing something is never quietly forgotten.
     if result.silenced_ids:
         ids = ", ".join(str(i) for i in result.silenced_ids)
         sentences.append(f"Ignoring {len(result.silenced_ids)} known-dead time series: {ids}.")
@@ -355,10 +300,9 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
     # Truncate once, here, so the table and the count that describes it come from one slice.
     listed = result.late.head(_MAX_LATE_SERIES_IN_TABLE)
     return AssetCheckResult(
-        # A stalled feed is expected to self-heal via back-fill, so warn — never fail the run and
-        # block downstream assets. Absent data is not "healthy" either, hence the count guard.
-        # A resurrection is the one yellow nothing else can raise: the series is healthy, so
-        # `is_healthy` stays true, and only an edit to the dead list clears it.
+        # WARN, never blocking (design page linked from the module docstring). A resurrection is
+        # the one yellow nothing else can raise: the series is healthy, so `is_healthy` stays true,
+        # and only an edit to the dead list clears it.
         passed=result.is_healthy and result.n_series_total > 0 and not result.resurrected_ids,
         severity=AssetCheckSeverity.WARN,
         description=_describe_power_freshness(result),
@@ -393,9 +337,7 @@ def _check_power_data_freshness() -> AssetCheckResult:
         # Read at the call site, not defaulted into the signature, so a test can monkeypatch it.
         silenced_ids=_KNOWN_DEAD_TIME_SERIES_IDS,
     )
-    # Forward per-series staleness to Sentry (a no-op unless a DSN is set and some series is late).
-    # Best-effort: report_power_freshness never raises, so a telemetry hiccup costs no more than
-    # its own event — were it to raise, the caller's catch-all would discard this whole evaluation.
+    # report_power_freshness never raises (best-effort Sentry telemetry; see module docstring).
     report_power_freshness(settings, result)
     return _to_asset_check_result(result)
 
@@ -412,30 +354,21 @@ def _check_power_data_freshness() -> AssetCheckResult:
 def power_data_is_fresh() -> AssetCheckResult:
     """Report how many time series are late on the ``power_time_series`` Delta table.
 
-    Runs automatically alongside every ``power_time_series_and_metadata`` materialisation (hourly
-    via ``power_time_series_and_metadata_schedule``), so the check re-evaluates freshness each
-    hour regardless of whether new data landed.
-
-    Cannot fail its own step: the whole body is guarded, so an object-store error, a half-written
-    ``metadata.parquet`` or a bug in here degrades to an unhealthy result rather than failing the
-    hourly production run. (A merely *slow* object store makes a slow check, not a degraded one —
-    nothing here imposes a step-level timeout.)
+    Cannot fail its own step: the whole body is guarded, so a bug in here degrades to an unhealthy
+    result rather than failing the hourly production run. A merely *slow* object store makes a slow
+    check, not a degraded one — nothing here imposes a step-level timeout.
     """
     try:
         return _check_power_data_freshness()
     except BaseException as exc:
-        # `BaseException`, not `Exception`: a Rust panic surfaces as a pyo3 `PanicException`, which
-        # derives from `BaseException`, and each compiled extension this body reads through (polars,
-        # delta-rs, obstore) defines its own class — so there is no one name to catch. Naming what
-        # must propagate instead is the only version that stays true as dependencies come and go.
+        # BaseException, not Exception: a Rust panic (pyo3 PanicException) does not derive from
+        # Exception, and each compiled extension in the read path (polars, delta-rs, obstore)
+        # defines its own panic class — see the module docstring's design link for why no narrower
+        # catch stays complete.
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
             raise  # A cancelled run must cancel.
-        # The width has one cost worth knowing when writing tests: pytest's `fail` and `skip` raise
-        # from `BaseException` too, so they are swallowed here. Never use one as a "must not be
-        # called" sentinel inside this body; assert after the call instead.
-        # Rule 7: a non-blocking check that *errors* still fails its run, and this job carries the
-        # `sentry_capture_failure` hook, so a raise here would turn fail-open into fail-closed.
-        # Sentry is told explicitly because not failing the run means that hook no longer fires.
+        # pytest's `fail` and `skip` also raise from BaseException, so they are swallowed here too.
+        # Never use one as a "must not be called" sentinel inside this body; assert after the call.
         logger.exception("Could not evaluate power-data freshness")
         report_check_degradation(check_name="power_data_is_fresh", exc=exc)
         return AssetCheckResult(
@@ -462,23 +395,11 @@ _NWP_RUN_INTERVAL: Final[timedelta] = timedelta(days=1)
 _NWP_RUN_EXPECTED_ON_DISK_BY: Final[timedelta] = timedelta(hours=14)
 """How long after its ``init_time`` a daily NWP run must be on disk before it counts as missed.
 
-``ecmwf_ens_schedule`` fires at 08:30 UTC and ``ecmwf_ens`` retries an unusable run every 30
-minutes, up to 8 times. The delays alone put the last healthy landing at about 12:30 UTC, but one
-of the two retryable failures (``NwpVariableWhollyMissing``) is raised *after* the download, so
-the worst case pays a download and convert on every attempt too — about 12:40 UTC at the ~1
-min/run measured in
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/>. That leaves
-81 minutes of margin to
-14:00 UTC, spread over 9 attempts: the deadline is breached only if download-and-convert
-*averages* about 10 minutes across all of them, not if one attempt is slow. So the 645 s download
-recorded in ``dynamical_data.ecmwf_ens.download`` would cost only ~10 of those 81 minutes on its
-own; it takes a sustained slowdown, not a single bad fetch. The deadline
-is deliberately generous because the two errors cost very different amounts: too tight and the
-check cries wolf daily (exactly the failure mode of an absolute age threshold), too loose and a
-genuinely missed run is reported one 6-hourly slot later than it might have been. At 14 hours the
-00:00, 06:00 and 12:00 slots expect yesterday's run and the 18:00 slot expects today's, so every
-healthy slot reports zero missed runs and a failed download is reported from the 18:00 slot
-onwards."""
+Derived from ``ecmwf_ens_schedule``'s 08:30 UTC start plus its retry ladder, deliberately generous
+so the check does not cry wolf on a normal-length retry. Every healthy slot reports zero missed
+runs; a failed download is reported from the 18:00 slot onwards. Why 14 hours:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check>
+"""
 
 _LIVE_SLOT_INTERVAL: Final[timedelta] = timedelta(hours=6)
 """The live forecast cadence (00/06/12/18 UTC), mirroring ``live_forecast_partitions``.
@@ -498,14 +419,9 @@ _UNIX_EPOCH: Final[datetime] = datetime(1970, 1, 1, tzinfo=UTC)
 
 _MIN_HORIZON_FRACTION: Final[float] = 0.5
 """Fraction of ``LIVE_FORECAST_HORIZON`` a slot's rows must span before the horizon is called
-truncated.
-
-Half is deliberately loose. A *healthy* slot reaches almost the full 14 days — ECMWF ENS covers
-about 15 days from its ``init_time`` and the run is 12–30 hours old at forecast time, leaving
-roughly 13.75 days — so the only ways to fall below 7 days are a partially-ingested run or NWP
-about a week stale, and the latter is already reported as missed runs. A tighter floor would start
-competing with the missed-run count for the same fault while risking false alarms; this one catches
-the case nothing else sees, which is fresh-but-truncated NWP."""
+truncated. Loose enough that a healthy slot never trips it. Why half:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check>
+"""
 
 _MIN_HORIZON_HOURS: Final[float] = (
     LIVE_FORECAST_HORIZON.total_seconds() / 3600.0 * _MIN_HORIZON_FRACTION
@@ -589,22 +505,15 @@ class LiveForecastHealthResult:
 
     @property
     def horizon_is_truncated(self) -> bool:
-        """True when the slot's rows stop well short of the forecast horizon we asked for.
+        """True when the slot's rows stop well short of the forecast horizon asked for.
 
-        ``live_forecasts`` drops rows outside the selected NWP run's coverage, so a run that was
-        only partly ingested — or one so old that its remaining coverage is nearly used up —
-        silently delivers a much shorter forecast than NGED expect, with every row still perfectly
-        well-formed. That is structural, not a matter of skill, so it belongs here.
+        A fault nothing else here catches. See the design page linked from the module docstring.
         """
         return self.horizon_hours is not None and self.horizon_hours < _MIN_HORIZON_HOURS
 
     @property
     def is_healthy(self) -> bool:
-        """True when the slot is fully healthy.
-
-        That is, when it wrote usable rows, over the expected horizon, for the whole trained
-        population, against a complete NWP feed.
-        """
+        """True when the slot is fully healthy."""
         return (
             self.rows.n_rows > 0
             and self.rows.n_invalid == 0
@@ -628,10 +537,10 @@ def count_missed_nwp_runs(
 ) -> MissedNwpRuns:
     """Count the daily NWP runs missing between the freshest run on disk and the freshest expected.
 
-    Pure and deterministic — no Dagster, Delta or clock access. We count missed *runs* rather than
-    hours of age because we ingest one ECMWF run per day but forecast four times a day, so healthy
-    NWP is anywhere from 12 to 30 hours old. Counting runs reads zero in every healthy slot,
-    whichever slot it is; counting hours would not (see the module docstring).
+    Pure and deterministic — no Dagster, Delta or clock access. Counts *runs*, not hours of age
+    (rule 5 of
+    [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)),
+    so it reads zero in every healthy slot.
 
     Args:
         available_init_times: The ``init_time``s genuinely present in the NWP Delta table. Runs
@@ -649,9 +558,8 @@ def count_missed_nwp_runs(
     latest = max(usable, default=None)
     if latest is None:
         return MissedNwpRuns(None, expected_latest, None)
-    # Clamped at zero: NWP fresher than the deadline requires is not a fault. That is exactly the
-    # healthy 12:00 slot, where the day's run has already landed (08:30) but a deadline generous
-    # enough to survive the ingest retry window still only asks for yesterday's.
+    # Clamped at zero: NWP fresher than the deadline is not a fault (e.g. the healthy 12:00 slot,
+    # where today's run has already landed but the deadline still only demands yesterday's).
     n_missed = max(0, (expected_latest - latest) // run_interval)
     return MissedNwpRuns(latest, expected_latest, n_missed)
 
@@ -665,8 +573,7 @@ def evaluate_live_forecast_health(
 ) -> LiveForecastHealthResult:
     """Judge one live slot: did it write usable rows, and was the NWP feed whole when it ran?
 
-    Pure and deterministic, so it is unit-testable without Dagster or Delta. Deliberately says
-    nothing about forecast *skill* — whether the numbers are any good is production monitoring's
+    Pure and deterministic. Says nothing about forecast *skill* — that is production monitoring's
     job, not a data-health check's.
 
     Args:
@@ -734,21 +641,17 @@ def _read_live_forecast_rows(
 ) -> LiveForecastRows:
     """Summarise the ``power_forecasts`` rows one live slot wrote, without materialising them.
 
-    Returns the empty summary if the Delta table does not exist yet (a brand-new deployment), so
-    "no table" and "no rows for this slot" reach the evaluator as the same unhealthy state.
+    Returns the empty summary if the Delta table does not exist yet, so "no table" and "no rows
+    for this slot" reach the evaluator as the same unhealthy state.
 
-    ``experiment_name`` scopes the read to the promoted model's own rows. It matters because
-    ``write_power_forecasts`` replaces one ``(experiment_name, fold_id)`` partition at a time, so
-    promoting a champion from a *different* experiment leaves the outgoing experiment's rows for
-    the same slot in place: without this filter the check would aggregate live rows from two
-    experiments and report faults sourced entirely from dead ones. ``None`` — the promoted model's
-    ``meta.json`` is absent or unreadable, so there is no name to scope to — falls back to reading
-    every live experiment, which over-reports rather than under-reports.
+    ``experiment_name`` scopes the read to the promoted model's own rows — see [Read the live
+    forecast back off
+    disk](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check)
+    for why. ``None`` falls back to reading every live experiment, which over-reports rather than
+    under-reports.
 
-    The scan is pruned to the matching ``(experiment_name, fold_id="live")`` Delta partitions and
-    then to the one ``power_fcst_init_time``, and every column is reduced to a scalar inside
-    Polars, so only the aggregates cross back into Python. The ``pl.len()`` is safe from the
-    32-bit row-count wraparound documented in
+    Every column is reduced to a scalar inside Polars, so only the aggregates cross back into
+    Python. ``pl.len()`` is safe from the 32-bit row-count wraparound documented in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/#data-handling>:
     it counts one slot's rows (~1M at V1 scale, ~86M at V2), not the whole table.
     """
@@ -816,10 +719,11 @@ def _nwp_init_times_on_disk(settings: Settings) -> list[datetime]:
 def _read_promoted_model_facts(production_model_path: str) -> PromotedModelFacts:
     """Read the promoted model's experiment name and trained population from its ``meta.json``.
 
-    One read for both, because both come from the same file that ``BaseForecaster.save`` wrote.
-    Any absence or malformation degrades to ``_UNKNOWN_PROMOTED_MODEL`` rather than raising: the
-    model directory is populated out-of-band (by the ``promoted_model`` asset on a laptop, by the
-    image build on the box), so the check must cope with it being absent.
+    One read for both, since both come from the same file ``BaseForecaster.save`` wrote. Any
+    absence or malformation degrades to ``_UNKNOWN_PROMOTED_MODEL`` rather than raising: the model
+    directory is populated out-of-band — see [Bake the model into the image at build
+    time](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#bake-the-model-into-the-image-at-build-time)
+    — so the check must cope with it being absent.
     """
     meta_path = Path(production_model_path) / "meta.json"
     if not meta_path.exists():
@@ -936,9 +840,7 @@ def _live_forecast_check_metadata(result: LiveForecastHealthResult) -> dict[str,
 def _to_live_forecast_check_result(result: LiveForecastHealthResult) -> AssetCheckResult:
     """Turn a ``LiveForecastHealthResult`` into a WARN-severity Dagster check result."""
     return AssetCheckResult(
-        # WARN, never ERROR, and non-blocking: a degraded slot is still the best forecast we have,
-        # and blocking here would contradict the principle that a partition fails only when there
-        # is genuinely no useful data.
+        # WARN, never blocking (design page linked from the module docstring).
         passed=result.is_healthy,
         severity=AssetCheckSeverity.WARN,
         description=_describe_live_forecast_health(result),
@@ -993,16 +895,10 @@ def _evaluate_live_forecasts(context: AssetCheckExecutionContext) -> AssetCheckR
 def live_forecasts_are_healthy(context: AssetCheckExecutionContext) -> AssetCheckResult:
     """Report whether one live slot landed valid rows, and how many NWP runs it was missing.
 
-    Runs alongside every ``live_forecasts`` materialisation (6-hourly via
-    ``live_forecasts_schedule``), *after* the asset's Delta write, so it reads back what was
-    actually persisted rather than what was in memory. This is not a measure of forecast skill —
-    only of whether rows exist and hold usable data.
-
-    It covers the slots where the asset *succeeded*: a slot whose asset raised never reaches this
-    check (Dagster does not run a check whose asset op failed), and that case is already loud —
-    the run fails and ``live_forecasts_job``'s ``sentry_capture_failure`` hook reports it. The gap
-    this closes is the quiet one: a run that succeeded while writing nothing usable, or that
-    forecast from a days-old NWP run.
+    Runs *after* the asset's Delta write, so it reads back what was actually persisted rather than
+    what was in memory. Not a measure of forecast skill — only of whether rows exist and hold
+    usable data. Covers only slots where the asset succeeded; see the design page linked from the
+    module docstring for the rest.
     """
     try:
         return _evaluate_live_forecasts(context)

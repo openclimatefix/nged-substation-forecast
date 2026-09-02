@@ -4,6 +4,11 @@ These are jobs (not assets) because they manage MLflow state and the ``cv_experi
 dynamic partition set rather than producing a data artifact. Their ops use ``OpExecutionContext``
 (not ``AssetExecutionContext``) because they call ``context.instance.add_dynamic_partitions``,
 which needs the Dagster instance.
+
+How to launch a run and what ``register_experiment_job`` does is on [Step 6 — Launch
+register_experiment_job](https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/#step-6-launch-register_experiment_job).
+Config resolution and ``config_overrides`` are on [Tweaking a config for an
+experiment](https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/model-configuration/#tweaking-a-config-for-an-experiment).
 """
 
 import json
@@ -66,23 +71,20 @@ _UNOVERRIDABLE_MODEL_PARAMS: Final[dict[str, str]] = {
 }
 """The ``model_params`` keys a run's ``config_overrides`` may not set, mapped to why not.
 
-Both are ordinary keys as far as the override merge is concerned, and each needs rejecting for its
-own reason. ``experiment_name`` is a *declared* field, so ``BaseForecasterConfig``'s
-``extra="forbid"`` cannot see it: an override of it validates cleanly and is then overwritten by
-the assignment that stamps the job's own value, discarding it without a word. ``_target_`` would be
-caught by ``extra="forbid"`` unaided, and is listed here only for the message — pydantic would say
-just "extra inputs are not permitted", where this names the key and points at ``base_model_config``
-as the way to change the forecaster.
+``experiment_name`` is a *declared* field, so ``BaseForecasterConfig``'s ``extra="forbid"`` cannot
+catch an override of it: the override validates cleanly and is then silently overwritten by the
+job's own value. ``_target_`` would already be caught by ``extra="forbid"`` unaided; it is listed
+here only so the message names the key and points at ``base_model_config`` instead. See the module
+docstring for where the two are documented.
 """
 
 
 def _forecaster_target_and_params(raw: Any, config_path: Path) -> tuple[str, dict[str, Any]]:
     """Pull the ``_target_`` path and the ``model_params`` mapping out of a parsed model YAML.
 
-    ``base_model_config`` is free text on the launchpad, so a typo points this at the wrong file —
-    ``conf/cv/default.yaml``, say, or a file that does not parse to a mapping at all. Reading both
-    required pieces in one place means every such mistake reports the path and the whole expected
-    shape, instead of a bare ``KeyError``.
+    ``base_model_config`` is free text, so a typo can point this at the wrong file, or one that
+    does not parse to a mapping at all. Reading both keys here means every such mistake reports
+    the path and the expected shape, instead of a bare ``KeyError``.
 
     Args:
         raw: Whatever ``yaml.safe_load`` returned for the model YAML — ``Any``, because
@@ -128,19 +130,15 @@ def _resolve_forecaster_config(
 
     Loads the base model YAML, applies ``config_overrides`` to its ``model_params``, then
     constructs the forecaster's ``CONFIG_CLASS``, which is where pydantic validates the
-    hyper-parameters. Reaching the config class through the forecaster is what stops a registration
-    validating hyper-parameters against a different class from the one ``load`` will rebuild them
-    with.
+    hyperparameters — see [Config
+    files](https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/model-configuration/#config-files)
+    for why the config class is reached through the forecaster rather than named directly.
 
     Args:
         base_model_config: Path relative to ``PROJECT_ROOT`` of the base model YAML.
-        config_overrides: Overrides applied to ``model_params`` as **whole-value replacement**: an
-            override replaces the base value outright rather than merging into it. Lists are
-            replaced, not extended, and a value that is itself a mapping is replaced whole, so
-            an override must restate every key of that mapping it wants to keep. Every key must
-            name a field the config class declares, and the keys in
-            ``_UNOVERRIDABLE_MODEL_PARAMS`` are refused on top of that — they are the resolver's
-            own to set.
+        config_overrides: Whole-value replacement onto ``model_params`` (see the module
+            docstring). Every key must name a declared field; the keys in
+            ``_UNOVERRIDABLE_MODEL_PARAMS`` are refused on top of that.
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
@@ -149,9 +147,9 @@ def _resolve_forecaster_config(
     Raises:
         ValueError: ``config_overrides`` names an unoverridable key, or the YAML is not a usable
             model config.
-        ValidationError: An override names an undeclared key, or gives a declared one a value of
-            the wrong type. Raised by the config class before any fold is scheduled. A subclass of
-            ``ValueError``, so a caller that wants "the config is unusable" catches that alone.
+        ValidationError: An override names an undeclared key or a wrong-typed value, raised
+            before any fold is scheduled. A subclass of ``ValueError``, so a caller wanting "the
+            config is unusable" can catch that alone.
     """
     for key, reason in _UNOVERRIDABLE_MODEL_PARAMS.items():
         if key in config_overrides:
@@ -251,21 +249,21 @@ def _reject_changed_identity(
 ) -> None:
     """Raise if re-registering ``experiment_name`` would change its identity.
 
-    An experiment's identity **is** its config: every fold of an experiment must be trained and
-    scored under one config, or its leaderboard row silently mixes two different models. Folds
-    already materialised under the old config cannot be un-trained, and the assets read the config
-    back from the experiment tag (``load_experiment_forecaster``), so re-pointing that tag
-    mid-flight would poison every comparison built on the experiment. A changed config is therefore
-    a *new* experiment, and the only correct answer is to reject it — before anything has been
-    written.
+    An experiment's identity is its ``config`` and ``forecaster_target`` tags
+    (:data:`IDENTITY_TAGS`). Rejects a re-registration that would change either, before any
+    write, so MLflow is left exactly as it found it; the caller sees
+    :class:`ExperimentIdentityChangedError` naming each differing field. See [An experiment's
+    identity is its
+    config](https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/#an-experiments-identity-is-its-config)
+    for why a changed config must be registered as a new experiment.
 
-    Called with the experiment's stored tags before any write, so a rejection leaves MLflow exactly
-    as it found it. A tag absent from ``stored_tags`` is not a change: that is the untagged
-    experiment ``get_or_create_experiment`` creates as its self-healing fallback, which this
-    registration is entitled to complete.
+    This rejection is not a degradation path: these are R&D jobs, which fail fast rather than
+    degrade — see [R&D fails the other
+    way](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#rd-fails-the-other-way).
 
-    The decision to reject *is* the list of differences to report, so the error can never claim a
-    change it cannot then name.
+    A tag absent from ``stored_tags`` is not a change: that is the untagged experiment
+    ``get_or_create_experiment`` creates as a self-healing fallback, and this registration is
+    entitled to complete it.
 
     Args:
         experiment_name: The MLflow experiment name, for the error message.
@@ -311,12 +309,9 @@ def _fold_ids_for_run_mode(run_mode: str, cv_config: CvConfig) -> list[str]:
 def register_experiment(context: OpExecutionContext, config: RegisterExperimentConfig) -> None:
     """Create the MLflow experiment + parent run and add the experiment's CV partition keys.
 
-    Idempotent for the *same* config: re-running with the same ``experiment_name`` resolves the
-    existing experiment, parent run, and partition keys rather than duplicating them, and may
-    freely update the ``description`` and add the other run mode's folds. Re-running with a
-    **changed** config is rejected outright — see ``_reject_changed_identity``. Materialises no
-    assets — the user materialises ``trained_cv_model`` / ``cv_power_forecasts`` for the new
-    partitions afterwards.
+    Idempotent for the same config (see the module docstring); rejects a changed one outright —
+    see :func:`_reject_changed_identity`. Materialises no assets: the user materialises
+    ``trained_cv_model`` / ``cv_power_forecasts`` for the new partitions afterwards.
 
     Raises:
         ExperimentIdentityChangedError: If ``experiment_name`` is already registered under a
@@ -346,15 +341,10 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
         requested_tags=identity_tags,
     )
 
-    # Log the params before the experiment tags. MLflow params are write-once, so this is the one
-    # write the tracking store can reject; doing it first means a rejection can never leave the
-    # experiment tagged with a config that its params contradict. The check above should make such
-    # a rejection unreachable, but an experiment registered before that check existed may already
-    # carry params that disagree with its tag, and the ordering keeps even that case one-sided.
-    # log_params is not itself atomic — a batch containing one conflicting key still writes the
-    # batch's other keys before raising — so this bounds the damage to the params rather than
-    # eliminating it. Reaching that requires an experiment whose tags failed to write on an earlier
-    # registration, which is why the tags are the last thing written.
+    # Params before tags: MLflow params are write-once, so a rejected write can never leave the
+    # experiment tagged with a config its params contradict. log_params is not itself atomic — a
+    # batch carrying one conflicting key still writes the batch's other keys before raising — so
+    # the ordering bounds the damage to the params rather than eliminating it.
     parent_run_id = get_or_create_parent_run(experiment_id)
     with mlflow.start_run(run_id=parent_run_id):
         mlflow.log_params(flatten_config(forecaster_config))
@@ -368,9 +358,9 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
             }
         )
 
-    # The identity tags carry the resolved config as JSON plus the forecaster class the JSON itself
-    # cannot name, so assets can reconstruct the exact forecaster — and, through its CONFIG_CLASS,
-    # the exact config subclass — from MLflow alone. See load_experiment_forecaster.
+    # Carries the resolved config and forecaster class so trained_cv_model can reconstruct both
+    # from MLflow alone — see [Why trained_cv_model reads config from MLflow, not from
+    # YAML](https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/#why-trained_cv_model-reads-config-from-mlflow-not-from-yaml).
     for tag_name, tag_value in identity_tags.items():
         client.set_experiment_tag(experiment_id=experiment_id, key=tag_name, value=tag_value)
     client.set_experiment_tag(

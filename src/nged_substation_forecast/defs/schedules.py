@@ -28,17 +28,11 @@ power_time_series_and_metadata_schedule = ScheduleDefinition(
 has landed by the time ``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
 
 ``live_forecasts`` declares ``power_time_series_and_metadata`` as a dep, but the two run as
-separate jobs on separate schedules and nothing enforces the ordering at runtime. That is
-deliberate, not a gap: the offset is an optimisation for freshness, and if it is missed —
-because this pull failed, or ran long — ``live_forecasts`` still runs on time against whatever
-telemetry is already on disk. Making the ordering a precondition would convert one failed
-ingest into a missing forecast, which is the failure mode the whole design exists to avoid.
-
-(The NWP run used is stamped on every forecast row as ``nwp_init_time``, and
-``live_forecasts_are_healthy`` reports how many daily NWP runs were missing at forecast time;
-telemetry staleness is not yet recorded on the forecast row itself.) Rule: "never make one
-production job's run status a precondition for another's" —
-<https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>."""
+separate jobs on separate schedules and nothing enforces the ordering at runtime — deliberately:
+if this pull is missed or runs long, ``live_forecasts`` still fires on time against whatever
+telemetry is already on disk. See [rule
+11](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
+for why a production schedule must never gate on another's run status."""
 
 ecmwf_ens_job = define_asset_job(
     "ecmwf_ens_job",
@@ -53,13 +47,11 @@ def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
 
     08:30 UTC is a safety margin past the 00Z run's expected publication time (roughly 08:00
     UTC / 9am BST); ``ecmwf_ens_partitions``' ``end_offset=1`` means today's partition key
-    already exists by this point. If the run isn't usable yet — absent from the catalog, or
-    present with a weather variable still wholesale empty — ``ecmwf_ens`` retries every 30
-    minutes, up to 8 times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` →
-    ``RetryRequested`` in ``defs/assets.py``) rather than failing outright; any other error still
-    fails immediately.
-    Live inference (``live_forecasts``) always uses the freshest run genuinely present
-    regardless of this schedule's exact timing.
+    already exists by this point. A run that isn't usable yet retries rather than failing
+    outright — see [A wholly-missing variable is retried, not failed
+    outright](https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright)
+    for the retry ladder. Live inference (``live_forecasts``) always uses the freshest run
+    genuinely present, regardless of this schedule's exact timing.
     """
     return RunRequest(partition_key=context.scheduled_execution_time.strftime("%Y-%m-%d"))
 
