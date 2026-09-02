@@ -41,7 +41,7 @@ by origin, and so the production missed-check-in alert — scoped to `environmen
 fires for your machine.
 
 Do **not** set `SENTRY_MONITOR_FORECASTS` on a laptop. It gates the live heartbeat, and an
-intermittently-run laptop must never register a check-in on the production monitor: the monitor
+intermittently-run laptop must never register a check-in on the production monitor. The monitor
 would then expect a 6-hourly heartbeat your laptop won't keep sending, and would flag it as missed.
 The verification below sends its heartbeat to a throwaway monitor slug instead.
 
@@ -124,7 +124,7 @@ optionally resolve the two test issues). Neither affects the production wiring.
 
 ## What gets sent when you run Dagster locally
 
-With a `SENTRY_DSN` configured, `init_sentry` runs at import of the Dagster definitions module, so
+With a `SENTRY_DSN` configured, `init_sentry` runs at import of the Dagster definitions module. So
 every local Dagster process (the webserver and each run worker) has Sentry active and tags
 everything with your `SENTRY_ENVIRONMENT`. But the telemetry is deliberately narrow — running
 Dagster on your laptop does **not** forward everything to Sentry:

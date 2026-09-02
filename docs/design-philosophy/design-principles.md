@@ -15,68 +15,33 @@ be useful. Writing them all down is what makes them explicit and checkable: a de
 then be tested against the *whole* list, rather than against whichever two or three principles
 happen to be at the front of the reviewer's mind that day.
 
-That pays off twice over now that much of this repo is written with an AI coding agent, because an
-agent can check every new addition against the whole list on every change — precisely the job a
-human reviewer's attention is too scarce to do reliably. Principles that live only in an
-experienced engineer's head cannot be applied that way; written-down ones can.
+Checking proposals against the whole list this way pays off twice over now that much of this repo
+is written with an AI coding agent, because an agent can check every new addition against the whole
+list on every change — precisely the job a human reviewer's attention is too scarce to do reliably.
+Principles that live only in an experienced engineer's head cannot be applied that way; written-down
+principles can.
 
-These are **bets, not truths**: each one is scored by the [engineering
-hypotheses](engineering-hypotheses.md), and a principle that fails its test will be reported as a
-negative result, not rewritten out of the record. The defence against merely collecting
-fashionable engineering trends is the admission test described below.
-
-## Where these principles come from
-
-The framing — a greenfield chance to test-drive other industries' best practice and produce a field
-report rather than a rulebook — is stated on the [section overview](index.md).
-
-We deliberately researched best practices across multiple industries. Several of the ideas on these
-pages are borrowed from disciplines that have been solving the same shape of problem for longer than
-data engineering has existed: *inherent stability* comes from vehicle dynamics, *fail-operational*
-from avionics autoland (the flight-deck technology that fully automates the landing phase) and
-ISO 26262, *blast radius* from site reliability engineering, and mobile telecoms supplies the case
-that a heavily-corrupted channel can still run genuinely unattended — see
-[H1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). Borrowing across disciplines
-is the point, not a flourish: some of them have been shipping safety-critical systems for fifty
-years.
-
-Not every borrowed idea survives contact with reality, and we record those outcomes too — that is
-what makes this a field report rather than a manifesto. *Error budgets* were examined and declined
-([Deliberately absent](#deliberately-absent) below); [five practices we respect are not yet
-absorbed](#industry-best-practices-we-have-not-yet-absorbed); and Postel's law is named on the
-[Inherent
-Stability](inherent-stability.md#not-postels-law) page precisely so that nobody mistakes it for what
-we do.
-
-## How principles relate to hypotheses
-
-Principles are constraints on *decisions*; in contrast, hypotheses are claims about *outcomes*. A
-hypothesis can be falsified by a measurement. A principle cannot — it is a decision rule, not a
-factual claim — so it is retired by different routes: the hypothesis it serves is falsified, which
-discredits the bet behind it; or measurements override it in specific decisions often enough that
-the exceptions become the rule; or it turns out never to actually decide anything, and is deleted
-as decoration. The two are connected in one direction: the principles
-are the bets we are making in order to test the hypotheses. That gives us a test for admission to
-this list — **name the hypothesis it serves and a decision it actually decided**. A principle
-serving no hypothesis is either decoration or a sign of a missing hypothesis; a hypothesis with no
-principle behind it is a claim we are merely hoping comes true.
+The principles are **bets, not truths**: each one is scored by the [engineering
+hypotheses](engineering-hypotheses.md). A principle that fails its test will be reported as a
+negative result, not rewritten out of the record. The defence against merely collecting fashionable
+engineering trends is the admission test described below.
 
 ## The principles
 
 ### 1 — The power forecast never stops
 
-If data inputs are disrupted, the forecast gets less certain instead of stopping. The forecast
-always does the best it can with whatever data it has, rather than blowing up. That covers errors
-in the **upstream data**, and only those. An error in **our own code** — an empty promoted model, a
+If data inputs are disrupted, the forecast gets less certain instead of stopping — the full
+argument, the degradation ladder and the failure-modes table are in [Inherent
+Stability](inherent-stability.md). An error in **our own code** — an empty promoted model, a
 contract violation, a join that has fanned out — gets the opposite posture: fail as early as
 possible, because degrading around our own bug would deliver a wrong forecast and bury its cause.
 How far such a failure then spreads is a different axis, and the business of
 [principle 10 ("*every write is atomic and idempotent, and every failure is confined to one
 partition*")](#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition)
 rather than of this one. The plan is to deliver graceful degradation through the **model itself** —
-an ML model that can, at least partially, handle missing inputs — rather than through fallback
-logic wrapped around a model that assumes complete data. (Note that this decision to
-"never stop" will not be appropriate for energy-forecasting systems where an uncertain forecast
+a machine-learning (ML) model that can, at least partially, handle missing inputs — rather than
+through fallback logic wrapped around a model that assumes complete data. (Note that this decision
+to "never stop" will not be appropriate for energy-forecasting systems where an uncertain forecast
 might be more harmful than *no* forecast. But, in Flexpectation, there are strong arguments that
 our forecast will *always* be better than NGED's incumbent baseline, even when we have no live
 data.)
@@ -102,10 +67,10 @@ developer spends the morning re-running a pipeline whose only real problem was a
 `ERROR`-severity check anywhere. Non-blocking never means non-notifying: a check that detects
 degradation must still send a Sentry event, without failing the run it is warning about. On the
 other side of the line, `PowerForecast.validate` hard-fails a whole slot on a duplicated primary
-key, because only a bug of ours can duplicate a forecast row: every NWP write replaces its
-partition, so the duplication cannot come from the data at rest. One production raise is not yet on
-the right side of that line: a sustained NWP outage still fails `live_forecasts` rather than
-degrading to a weather-blind forecast
+key, because only a bug of ours can duplicate a forecast row: every numerical weather prediction
+(NWP) write replaces its partition, so the duplication cannot come from the data at rest. One
+production raise is not yet on the right side of that line: a sustained NWP outage still fails
+`live_forecasts` rather than degrading to a weather-blind forecast
 ([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)).
 
 *Serves:* [Hypothesis 1: a service that mostly runs
@@ -118,15 +83,16 @@ the complexity-offline and strict-contracts principles.
 ### 2 — Complexity belongs offline, not in the serving path
 
 When a capability could be built into the training loop *or* into the production service, build it
-into the training loop: training runs in front of a human who can read the traceback, whereas the
-production service runs unattended. Production forecasting systems commonly solve real problems
-*in* the serving path — a post-processing step that corrects for recent forecast errors, a switch
-to a separately-trained fallback model when an input feed is down, a blend of models specialised
-per horizon — and each of those is a reasonable answer to a real need. The bet this principle makes
-is that the same needs can be met by training a single model to handle whatever gets thrown at it,
-for example: recent-error correction learned from lagged-power features, missing-input tolerance
-trained in rather than switched to, one model spanning the whole horizon. Whether that bet actually
-pays, and what it costs, is exactly what the planned failure-scenario suite is meant to measure.
+into the training loop — training runs unattended, in front of nobody; see [Where complexity should
+live](inherent-stability.md#where-complexity-should-live) for why that asymmetry decides it.
+Production forecasting systems commonly solve real problems *in* the serving path — a post-processing
+step that corrects for recent forecast errors, a switch to a separately-trained fallback model when
+an input feed is down, a blend of models specialised per horizon — and each of those is a reasonable
+answer to a real need. The bet this principle makes is that the same needs can be met by training a
+single model to handle whatever gets thrown at it, for example: recent-error correction learned from
+lagged-power features, missing-input tolerance trained in rather than switched to, one model spanning
+the whole horizon. Whether that bet actually improves the forecast, and where it trades skill away,
+is exactly what the planned failure-scenario suite is meant to measure.
 
 *Without it:* the serving path grows `if-then-else` branches — corrections, fallbacks, blends —
 that are easy to leave under-exercised: unless a team deliberately tests all these execution paths,
@@ -150,7 +116,7 @@ The code that implements the best-performing model in R&D *is* the code we deplo
 direction of travel: this is emphatically **not** "push the research notebook to production" — it
 is the opposite. Research runs on the production pipeline, so research code is held to production
 standards from the first experiment onwards. Exploratory notebooks are still allowed, but an idea
-becomes an *experiment* — something that can enter the leaderboard, and therefore be promoted to
+becomes an *experiment* — a candidate that can enter the leaderboard, and therefore be promoted to
 production — only once it is implemented in the pipeline's own code, behind the same data contracts
 and tests as everything else. There is then no "now rewrite the research code for production" step,
 because there was never a second, scruffier implementation to rewrite (and this should *accelerate*
@@ -175,7 +141,7 @@ month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-m
 rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 
 *Detail:* [Nothing gets rewritten on the way to
-production](../ml_experimentation/mlops-approach.md#nothing-gets-rewritten-on-the-way-to-production),
+production](../ml_experimentation/index.md#nothing-gets-rewritten-on-the-way-to-production),
 [Why Dagster, not Airflow?](../architecture/why-dagster-not-airflow.md).
 
 ### 4 — An experiment must be cheap to try, and cheap to abandon
@@ -192,8 +158,8 @@ when that price starts to climb, the answer is to make the shared pipeline easie
 to quietly reopen a research-only shortcut.
 
 *Without it:* trying an unusual idea means editing code that every other experiment depends on, so
-a speculative idea has to clear a far higher bar than a safe one before it is worth attempting —
-and since the wilder ideas are the ones most likely to fail, the cost of failure is exactly what
+a speculative idea has to clear a far higher bar than a safe idea before it is worth attempting —
+and since the wilder ideas are also the likeliest to fail, the cost of failure is exactly what
 decides whether they are ever tried at all.
 
 *Decided:* a new model family is a
@@ -232,8 +198,8 @@ abandon*"](#4-an-experiment-must-be-cheap-to-try-and-cheap-to-abandon)), and tha
 serve 32 time series or 2,500 without being rewritten. What makes this affordable rather than
 merely tidy is lazy evaluation: because each layer only ever describes work, the engine can fuse
 the layers' constraints at the end and pay nothing for their mutual ignorance — see [principle 11
-("*push the work down to the engine; materialise once, as late as
-possible*")](#11-push-the-work-down-to-the-engine-materialise-once-as-late-as-possible).
+("*push the work down to the query engine; materialise once, as late as
+possible*")](#11-push-the-work-down-to-the-query-engine-materialise-once-as-late-as-possible).
 
 *Without it:* the pipeline accumulates `if model_type == …` branches and local assumptions — a
 hard-coded timezone, an assumed half-hourly settlement period, a national voltage taxonomy — and
@@ -251,13 +217,10 @@ redesign](engineering-hypotheses.md#h5-scale-without-redesign), [Hypothesis 2: a
 experiments per person in a peak
 month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month).
 
-*Detail:* [The Universal Model Interface](../architecture/overview.md#the-universal-model-interface), [What
-is already
-geography-neutral](../architecture/adapting-to-another-geography.md#what-is-already-geography-neutral)
-— which also records, from an assessment made against a real brief, exactly where this principle
-is *not* yet honoured: the place-specific assumptions do sit in one thin layer (mostly the
-`contracts` package), but two hard-coded `"Europe/London"` defaults sit outside it — the
-dashboard's `DISPLAY_TIME_ZONE` and `ml_core`'s `DEFAULT_LOCAL_TIMEZONE` — which is precisely the
+*Detail:* [The Universal Model Interface](../architecture/overview.md#the-universal-model-interface).
+The principle is not yet fully honoured: the place-specific assumptions do sit in one thin layer
+(mostly the `contracts` package), but two hard-coded `"Europe/London"` defaults sit outside it —
+the dashboard's `DISPLAY_TIME_ZONE` and `ml_core`'s `DEFAULT_LOCAL_TIMEZONE` — which is precisely the
 leak the principle exists to prevent. `ml_core`'s default reaches `FeatureEngineer.engineer()` as
 an overridable parameter, but the value itself still lives in general-purpose `ml_core` code
 rather than in `contracts`, so it remains an instance of the leak.
@@ -285,29 +248,35 @@ This principle's limit at v2 scale is worth stating plainly, and it is narrower 
 sound. Nothing here casts doubt on whether the architecture *serves* ~2,500 time series — that is
 [Hypothesis 5](engineering-hypotheses.md#h5-scale-without-redesign), and the production service
 runs on a rented machine sized for the job. What v2 scale tests is the stronger, additional claim
-that the *whole* thing still fits on one developer's laptop. Even there the likely pinch is
+that the *whole* system still fits on one developer's laptop. Even there the likely pinch is
 wall-clock rather than feasibility — a full v2-scale 51-member backtest may simply take too long to
 sit through — and the ordinary answer is to develop against a subset of time series, which costs
 nothing this principle cares about, since the loop still closes locally. If even that turns out not
 to hold, it is a result to report, not a rule to quietly drop.
 
 *Without it:* the debugging loop runs through somebody else's computer. Reproducing a failure needs
-credentials, a provisioned cluster and a wait, so the loop closes a handful of times a day instead
+credentials, a provisioned cluster, and a wait, so the loop closes a handful of times a day instead
 of continuously, and a newcomer's first day goes on access requests rather than on running the
-thing. That cost has grown over the last few years rather than shrunk: a coding agent can only
-close a loop it is able to run unaided, so a system that is fully exercisable on one machine is one
-an agent can be pointed at, while a system whose failures only reproduce in the cloud is not.
+system. That cost has grown over the last few years rather than shrunk: a coding agent can only
+close a loop it is able to run unaided. A system that is fully exercisable on one machine is
+therefore one an agent can be pointed at, while a system whose failures only reproduce in the cloud
+is not.
 
-*Decided:* the data-table roots default to **local paths** and take an `s3://` URI only by
-configuration, the MLflow tracking URI defaults to a local SQLite file and names a server only by
-configuration, and Sentry separates a laptop from the production box by an `environment` tag rather
-than by a different code path — *how* those values arrive differs by compute (a `.env` file on a
-laptop, container environment variables on AWS) but `Settings` reads them identically, and a laptop
-can even rehearse the full object-store path against a local MinIO server; a fresh clone reaches a
-trained model without any cloud resource; input pruning and `init_time` chunking were sized by what
-a laptop has (a full 51-member validation prediction, ~321M rows, peaks at ~9 GB) rather than by
-what an instance could be rented with; and the 13-bit significand rounding that makes the archive
-locally storable was adopted on measured, not assumed, compression.
+*Decided:* the project consistently defaults to what a laptop can run, and lets configuration —
+not a second code path — point at the cloud instead:
+
+- the data-table roots default to **local paths** and take an `s3://` URI only by configuration;
+- the MLflow tracking URI defaults to a local SQLite file and names a server only by configuration;
+- Sentry separates a laptop from the production box by an `environment` tag rather than by a
+  different code path — *how* those values arrive differs by compute (a `.env` file on a laptop,
+  container environment variables on AWS) but `Settings` reads them identically, and a laptop can
+  even rehearse the full object-store path against a local MinIO server;
+- a fresh clone reaches a trained model without any cloud resource;
+- input pruning and `init_time` chunking were sized by what a laptop has (a full 51-member
+  validation prediction, ~321M rows, peaks at ~9 GB) rather than by what an instance could be
+  rented with; and
+- the 13-bit significand rounding that makes the archive locally storable was adopted on measured,
+  not assumed, compression.
 
 *Serves:* [Hypothesis 2: a hundred experiments per person in a peak
 month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month),
@@ -320,9 +289,9 @@ laptop](../getting-started.md).
 
 ### 7 — Strict contracts at every boundary
 
-We are liberal about missing inputs and strict about malformed ones. Every tabular boundary is a
-Patito schema, validated rather than assumed. This is the deliberate *opposite* of Postel's law,
-and it is what stops [principle 1 ("*the power forecast never
+We are liberal about missing inputs and strict about malformed inputs. Every tabular boundary is
+a Patito schema, validated rather than assumed. This is the deliberate *opposite* of Postel's
+law, and it is what stops [principle 1 ("*the power forecast never
 stops*")](#1-the-power-forecast-never-stops) from decaying into "accept anything and hope".
 Strictness also has a granularity: reject structurally-broken data outright, but tolerate
 locally-corrupt values a model can absorb — throwing away an otherwise-good NWP run because a few
@@ -332,7 +301,7 @@ percent of its pixels are null would convert a tolerable problem into an outage.
 shifts forecasts until someone notices the units are wrong. The failure mode is silent corruption
 rather than a loud rejection at the boundary.
 
-*Decided:* `AllFeatures`, `PowerForecast` and the rest are validated schemas rather than
+*Decided:* `AllFeatures`, `PowerForecast`, and the rest are validated schemas rather than
 conventions, and every `PowerForecast` row is self-describing. `Nwp.validate` rejects a
 de-accumulated variable that is null in *every* slice beyond lead-0 — a column carrying no weather
 at all — but tolerates every smaller null pattern, from scattered per-pixel corruption up to a
@@ -354,19 +323,19 @@ exists to forbid.
 ### 8 — Every experiment is scored identically
 
 What varies is the model, never the measurement. A leaderboard is only worth having if two numbers
-on it are genuinely comparable, which requires the population, the folds, the metric definitions
+on it are genuinely comparable, which requires the population, the folds, the metric definitions,
 and the pipeline to be held constant *by construction rather than by discipline*. Note what this
-does **not** say: it does not say that an experiment may change only one thing at a time. The space
-of ideas worth trying is far larger than the compute budget, so a single experiment will often
-bundle several changes — two new features at once, or a feature together with a hyperparameter —
-and spending a scarce budget that way is usually the right call. The price of bundling is
-*attribution*: you learn that the bundle helped, not which part of it did, and buying that
-attribution back is what a controlled ablation is for. The price we never pay is comparability,
-because a score that cannot be set against the scores already on the board tells you nothing at
-all, however cheaply it was obtained.
+does **not** say: it does not say that an experiment may change only one variable at a time. The
+space of ideas worth trying is far larger than the compute budget, so a single experiment will
+often bundle several changes — two new features at once, or a feature together with a
+hyperparameter — and spending a scarce budget that way is usually the right call. The price of
+bundling is *attribution*: you learn that the bundle helped, not which part of it did, and buying
+that attribution back is what a controlled ablation is for. The price we never pay is
+comparability, because a score that cannot be set against the scores already on the board tells you
+nothing at all, however cheaply it was obtained.
 
 *Without it:* the leaderboard fills with numbers that cannot be compared — one model scored on easy
-folds, another on hard ones — and every "which idea won?" decision is built on sand.
+folds, another on hard folds — and every "which idea won?" decision is built on sand.
 
 *Decided:* fold eligibility is derived from data coverage alone and **never** from the model or
 config; a fold enters the leaderboard only once its validation window is complete; a new data
@@ -378,12 +347,13 @@ source is assessed by a controlled ablation before it may enter the leaderboard 
 *Detail:*
 [Eligibility](../ml_experimentation/cross-validation-folds.md#eligibility),
 [Complete validation windows only](../architecture/ml-orchestration.md#complete-validation-windows-only),
-[Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).
+[Evaluating a data source whose history is shorter than the
+folds](../ml_experimentation/cross-validation-folds.md#evaluating-a-data-source-whose-history-is-shorter-than-the-folds).
 
 ### 9 — Provenance travels with the forecast data
 
 Every forecast row carries enough to say where it came from, so a forecast can be explained,
-reproduced or invalidated without an external lookup.
+reproduced, or invalidated without an external lookup.
 
 *Without it:* "why was Tuesday's forecast odd?" becomes an afternoon of cross-referencing deploy
 logs and run timestamps — answerable, but slowly, and only by whoever still remembers how the
@@ -421,11 +391,11 @@ sees the state before it or the state after it, never a half-finished middle. *I
 re-running it is safe, so a retry cannot double-count. *Confined*: a failure cannot spread beyond
 the partition it happened in — a *blast-radius* property, how much fails, which is a different axis
 from [principle 1 ("*the power forecast never stops*")](#1-the-power-forecast-never-stops), which
-is about which *way* a thing fails.
+is about which *way* a failure occurs.
 
 Atomicity is the one that is easiest to lose without noticing, because several widely-used array
 and table formats are plain directories of files with no commit boundary. A reader of such a
-directory has no way to distinguish "the write finished" from "the write is halfway through", and a
+directory has no way to distinguish "the write finished" from "the write is halfway through". A
 producer and a consumer running as independent processes will overlap sooner or later. It is also
 the property that keeps principle 1 honest: with an atomic store, an interrupted write leaves the
 previous version in place, so a consumer sees *stale* data — a state the [degradation
@@ -453,25 +423,24 @@ partition directories and never touch each other.
 [Idempotent writes and concurrency](../architecture/ml-orchestration.md#idempotent-writes-and-concurrency),
 [Serve only the trained population](../architecture/production-deployment.md#serve-only-the-trained-population).
 
-### 11 — Push the work down to the engine; materialise once, as late as possible
+### 11 — Push the work down to the query engine; materialise once, as late as possible
 
 No code between storage and the model boundary may force the data into memory (in Polars, by
 calling `.collect()`), so the query engine sees the whole plan and prunes the scan before any data
 crosses the wire. At this data scale the alternative is not slow, it is impossible.
 
-The saving in memory is the obvious benefit, but the more valuable one is that laziness is what
+The saving in memory is the obvious benefit, but the more valuable benefit is that laziness is what
 makes [principle 5 ("*everything around the model is
 general-purpose*")](#5-everything-around-the-model-is-general-purpose) affordable. Each layer
-expresses only the constraint it actually knows about — the cross-validation code filters by
-date and population, knowing nothing about which features
-were selected; the feature engineer adds columns, knowing nothing about which fold it is serving;
-the model materialises at its own boundary — and none of them has to be told what the others did.
-At the point of materialisation the engine fuses the lot, pushing every filter and column selection
-from every
-layer down into the scan, so the result costs no more than if one omniscient function had written
-the whole query by hand. Without that, generality would be unaffordable: to avoid materialising a
-vast intermediate, the cross-validation code would have to know which columns the model wanted,
-which is exactly the model-awareness principle 5 exists to forbid.
+expresses only the constraint it actually knows about — the cross-validation code filters by date
+and population, knowing nothing about which features were selected; the feature engineer adds
+columns, knowing nothing about which fold it is serving; the model materialises at its own boundary
+— and none of them has to be told what the others did. At the point of materialisation the engine
+fuses the lot, pushing every filter and column selection from every layer down into the scan, so
+the result costs no more than if one omniscient function had written the whole query by hand.
+Without that, generality would be unaffordable: to avoid materialising a vast intermediate, the
+cross-validation code would have to know which columns the model wanted, which is exactly the
+model-awareness principle 5 exists to forbid.
 
 *Without it:* a full 51-member backtest needs a cluster instead of a laptop — an unpruned NWP
 materialisation is hundreds of gigabytes — and the pocket-money cost claim goes with it. The
@@ -491,7 +460,7 @@ validation prediction to the laptop-sized peak quoted under [principle
 
 ### 12 — Measure; do not assume
 
-Performance, size and cost claims are benchmarked on real data, through the real code path, before
+Performance, size, and cost claims are benchmarked on real data, through the real code path, before
 they are believed — and the measurement is written down next to the decision it justified, so a
 later reader can tell which numbers are still true.
 
@@ -512,25 +481,27 @@ rather than reasoned about.
 
 ### 13 — A new technology must earn its place against one we already operate
 
-This is a burden of proof, not a ban: where something we already run does the job, use it; where it
-genuinely does not, adopt the new thing deliberately and write down what it bought. The reason for
-the asymmetry is that every additional service is one more thing to deploy, monitor, secure,
-upgrade, document and — if the service is one day handed over to NGED — teach to a new operator: a
-cost that is paid forever and is easy to overlook at the moment of adoption.
+The requirement is a burden of proof, not a ban: where a technology we already run does the job,
+use it; where it genuinely does not, adopt the new technology deliberately and write down what it
+bought. The reason for the asymmetry is that every additional service is one more service to
+deploy, monitor, secure, upgrade, document and — if the service is one day handed over to NGED —
+teach to a new operator: a cost that is paid forever and is easy to overlook at the moment of
+adoption.
 
 *Without it:* the stack accretes one "obviously useful" service per quarter, each cheap to adopt
 and expensive forever after, until a very small team spends its time feeding infrastructure rather
 than improving forecasts.
 
 *Decided:* delivery to NGED reuses the Delta-on-S3 stack we already operate rather than adding a
-REST API — and the REST API is not rejected forever; it has a documented set of conditions under
-which it would earn its keep. We *did* adopt Delta Lake, Dagster, MLflow, Marimo and Sentry, each
-for a stated reason recorded at the time.
+REST (Representational State Transfer) API. The REST API is not rejected forever; it has a
+documented set of conditions under which it would earn its keep. We *did* adopt Delta Lake,
+Dagster, MLflow, Marimo, and Sentry, each for a stated reason recorded at the time.
 
 *Serves:*
 [Hypothesis 4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money),
 [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-— specifically T1.4, operability by a non-expert.
+— specifically
+[T1.4, operability by a non-expert](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 *Detail:*
 [An established industry pattern](../architecture/forecast-delivery.md#an-established-industry-pattern),
@@ -572,9 +543,9 @@ that edge become a gate in production.
 
 *Without it:* in a chained design, one failed 06:00 ingest suppresses the 06:00 forecast and the
 slots behind it, and someone has to replay the chain in order, out of hours, to catch up — the
-precise out-of-hours intervention that
-[T1.1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts will never be
-needed.
+precise out-of-hours intervention that the
+[T1.1 operability test](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts
+will never be needed.
 
 *Decided:* the three production jobs run on three independent schedules with no run-status
 coupling between them, and the `:55` offset on the telemetry pull is an optimisation for
@@ -604,7 +575,7 @@ large part of why the archive fits on a laptop. A transform that merely rewrites
 information in a different form has nothing to show, because feature engineering can produce that
 form on demand, differently for each experiment. Converting wind's `u` and `v` components into speed
 and direction is the second kind: it destroys nothing, and it hands every later stage an angle that
-wraps at 360°, which ordinary interpolation, averaging, quantiles and z-scores all get wrong.
+wraps at 360°, which ordinary interpolation, averaging, quantiles, and z-scores all get wrong.
 
 The saving has to be large, not merely positive. Converting wind to speed and direction does save
 storage — about 6% of the `nwp` table, measured, or roughly 2.4 GB of the ~39 GB a year of ECMWF ENS
@@ -634,37 +605,32 @@ frozen into the archive cannot be varied by an experiment.
 
 ### 16 — A failure names its own cause in the telemetry
 
-When something goes wrong, the cause should be legible from the Sentry event and from what Dagster
+When a failure occurs, the cause should be legible from the Sentry event and from what Dagster
 shows, rather than reconstructed by trawling logs. The standard to aim at is `rustc`'s diagnostics:
-name the thing that broke, and say where. That makes
-each event a design surface rather than a by-product — its tags decide whether an alert rule can
-route it, its fingerprint decides whether a stall recurring hourly is one issue or twenty-four, and
-its message decides whether the operator can act without opening a shell on the box. Two things make
-this load-bearing rather than good manners. [Principle 1 ("*the power forecast never
-stops*")](#1-the-power-forecast-never-stops) makes failure quiet by design, so the telemetry is
-often the only thing that speaks at all; and under the operating model preferred once this
-project's funding ends, the reader of the alert is a non-expert at NGED holding the runbooks and
-nothing else.
+name what broke, and say where. That makes each event a design surface rather than a by-product —
+its tags decide whether an alert rule can route it, its fingerprint decides whether a stall
+recurring hourly is one issue or 24, and its message decides whether the operator can act without
+opening a shell on the box. This is load-bearing rather than good manners for two reasons.
+[Principle 1 ("*the power forecast never stops*")](#1-the-power-forecast-never-stops) makes failure
+quiet by design, so the telemetry is often the only channel that speaks at all; and under the
+operating model preferred once this project's funding ends, the reader of the alert is a non-expert
+at NGED holding the runbooks and nothing else.
 
 *Without it:* the alert says a run failed. The operator opens Dagster, finds the run, reads the
 step's logs, and works out from a stack trace which time series, which weather run or which of our
 own assumptions actually broke — an hour per incident, and a cause recorded in the [intervention
 log](../live_service/intervention-log.md) that is a guess.
 
-*Decided:* every Sentry *event* sender carries a tag an alert rule can route on, including the
-failure hook's positive `fault_category:run_failed` marker rather than a rule phrased as "error
-level, and neither degradation tag is set", which would misclassify silently the day a fifth sender
-is added; an asset check that swallows its own exception still reports it through
-`report_check_degradation`, because log capture is off and the `ERROR` log alone would reach
-nobody; and the stale-power event names the worst late series and how late each is (`series 12:
-48.5h late`), caps that list so a whole-feed stall cannot attach thousands of rows, carries the true
-count in an `n_late` tag so the cap cannot make a large stall look small, and is fingerprinted per
-environment so an hourly-repeating stall stays one issue.
+*Decided:* every Sentry event sender carries a tag an alert rule can route on, and the stale-power
+event names the worst-affected series — see [Send telemetry to Sentry, and alarm on
+absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence) for
+the routing rules and the mechanisms that keep those tags trustworthy.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
-itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — specifically T1.4,
-operability by a non-expert, and T1.1's cause taxonomy, which is only as good as what the telemetry
-says caused the failure.
+itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — specifically
+[T1.4, operability by a non-expert](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
+and [T1.1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)'s cause taxonomy, which is
+only as good as what the telemetry says caused the failure.
 
 *Detail:* [Send telemetry to Sentry, and alarm on
 absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence),
@@ -684,8 +650,8 @@ never considered.
 ## Industry best practices we have not yet absorbed
 
 The list above is not finished, and pretending otherwise would undermine it. A review of what
-comparable systems practise surfaced five things we respect but have **not yet absorbed into the
-code or the plan**. They are parked on
+comparable systems practise surfaced five practices we respect but have **not yet absorbed into
+the code or the plan**. They are parked on
 [#449](https://github.com/openclimatefix/nged-substation-forecast/issues/449), to be considered
 once the live service has run for long enough to inform them; we expect to adopt whichever of them
 earn their keep. Recording them here keeps the gap honest — a reader comparing this project
@@ -702,19 +668,14 @@ genuinely open design question, because our inputs are **expected to drift**: cl
 the weather distributions, and the grid beneath the power data is changing fast (solar, EVs, heat
 pumps).
 
-Great Britain's summer of 2026 is the concrete case, and it arrived while this page was being
-written. All the figures here are the Met Office's provisional ones, current as of early August
-2026. July 2026 was the driest July in the England and Wales series that begins in 1836: England
-recorded 6.5 mm of rain, 10% of its long-term average, and southern England recorded 1.9 mm — 3% of
-average, and the driest month it has ever observed. The same month was the UK's sunniest July in a
-series running from 1910, and for England and Wales the sunniest *calendar month* ever observed; it
-was also the second-warmest July for the UK as a whole. Nor was this confined to one month: spring
-2026 was already the warmest on record for England and Wales, and at the summer's halfway point the
-UK was running 1.8 °C above the seasonal norm — warmer than 2025 at the same stage, and 2025 went
-on to be the UK's warmest summer on record. Every one of those is a real shift in the distribution
+Great Britain's summer of 2026 is the concrete case. July 2026 was the driest July in the England
+and Wales series that begins in 1836, with England recording 10% of its long-term average rainfall;
+it was also the UK's sunniest July in a series running from 1910, and spring 2026 had already been
+the warmest on record for England and Wales (Met Office provisional figures). Every one of those is
+a real shift in the distribution
 of an input we feed the model, and not one of them is a fault. A naive "distribution changed" alarm
 would have fired continuously from spring 2026 onwards while telling an operator nothing they could
-act on, which is exactly how such an alarm gets tuned into silence.
+act on, which is exactly how a naive alarm gets tuned into silence.
 
 Note also how much the *choice of statistic* does here, which is part of why the design question is
 open. Summer rainfall to mid-July stood at 42% of the full season's long-term average against the
@@ -737,18 +698,18 @@ right design; working it out is the task.
 
 ### Shadow (champion–challenger) deployment
 
-This means running a candidate model against live
-inputs in parallel with the champion, recorded but not delivered, so that a promotion decision can
-rest on live behaviour rather than on backtests alone. It catches the class of bug backtests cannot, such as
+Shadow deployment means running a candidate model against live inputs in parallel with the
+champion, recorded but not delivered, so that a promotion decision can rest on live behaviour
+rather than on backtests alone. It catches the class of bug backtests cannot, such as
 training/serving skew and availability differences that only exist live. It should be unusually
 cheap here, because `power_forecasts` already partitions by `experiment_name`, so a shadow run is
-just another partition scored by the existing production-monitoring metrics. Two things to resolve
-first: a shadow lane is exactly the kind of serving-path complexity that [principle 2 ("*complexity
-belongs offline, not in the serving
+just another partition scored by the existing production-monitoring metrics. Two open questions to
+resolve first: a shadow lane is exactly the kind of serving-path complexity that [principle 2
+("*complexity belongs offline, not in the serving
 path*")](#2-complexity-belongs-offline-not-in-the-serving-path) pushes against, so it must earn its
-place; and it interacts with
-[Hypothesis 3: one-click promotion, and one-click rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback),
-since one-command rollback is less frightening when the champion was already shadowed.
+place; and it interacts with [Hypothesis 3: one-click promotion, and one-click
+rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback), since
+one-command rollback is less frightening when the champion was already shadowed.
 
 ### A schema-evolution policy for the delivery contract
 
@@ -761,22 +722,59 @@ first time a delivered table needs to change.
 
 ### Statistical process control on forecast error
 
-Control charts and CUSUM are manufacturing's
-answer to "detect a shift without picking an arbitrary fixed threshold", with decades of theory
-behind them. Fixed thresholds on a seasonal signal are either too loose in winter or too noisy in
-summer; SPC is designed for exactly that problem, and it answers "is the champion quietly
+Control charts and CUSUM (cumulative sum) charts are manufacturing's answer to "detect a shift
+without picking an arbitrary fixed threshold", with decades of theory behind them. Fixed thresholds
+on a seasonal signal are either too loose in winter or too noisy in summer; SPC (statistical
+process control) is designed for exactly that problem, and it answers "is the champion quietly
 degrading?" cheaply. It shares the open question raised under [input drift
 detection](#input-drift-detection) above: a summer like 2026's will legitimately worsen forecast
 error, and the chart must not read that as a model regression.
 
-### Naming poka-yoke
+### Naming poka-yoke (mistake-proofing)
 
 Mistake-proofing, from manufacturing: design names and interfaces so the
 wrong usage fails to parse rather than being merely discouraged. The codebase already practises
 this in places — closed string vocabularies are `Literal` types, tabular shapes are validated
 schemas, and `delta_store`'s write helpers make the storage format the path of least resistance
-rather than something to remember — but it is a habit applied opportunistically, not yet a stated
+rather than a rule to remember — but it is a habit applied opportunistically, not yet a stated
 rule.
+
+## Where these principles come from
+
+The framing — a greenfield chance to test-drive other industries' best practice and produce a field
+report rather than a rulebook — is stated on the [section overview](index.md).
+
+We deliberately researched best practices across multiple industries. Several of the ideas on these
+pages are borrowed from disciplines that have been solving the same shape of problem for longer than
+data engineering has existed: *inherent stability* comes from vehicle dynamics, *fail-operational*
+from avionics autoland (the flight-deck technology that fully automates the landing phase) and
+ISO 26262, *blast radius* from site reliability engineering, and mobile telecoms supplies the case
+that a heavily-corrupted channel can still run genuinely unattended — see
+[H1, a service that mostly runs
+itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). Borrowing across disciplines
+is the point, not a flourish: some of them have been shipping safety-critical systems for fifty
+years.
+
+Not every borrowed idea survives contact with reality, and we record those outcomes too — that is
+what makes this a field report rather than a manifesto. *Error budgets* were examined and declined
+([Deliberately absent](#deliberately-absent)); [five practices we respect are not yet
+absorbed](#industry-best-practices-we-have-not-yet-absorbed); and Postel's law is named on the
+[Inherent
+Stability](inherent-stability.md#not-postels-law) page precisely so that nobody mistakes it for what
+we do.
+
+## How principles relate to hypotheses
+
+Principles are constraints on *decisions*; in contrast, hypotheses are claims about *outcomes*. A
+hypothesis can be falsified by a measurement. A principle cannot — it is a decision rule, not a
+factual claim — so it is retired by different routes: the hypothesis it serves is falsified, which
+discredits the bet behind it; or measurements override it in specific decisions often enough that
+the exceptions become the rule; or it turns out never to actually decide anything, and is deleted
+as decoration. The two are connected in one direction: the principles
+are the bets we are making in order to test the hypotheses. That gives us a test for admission to
+this list — **name the hypothesis it serves and a decision it actually decided**. A principle
+serving no hypothesis is either decoration or a sign of a missing hypothesis; a hypothesis with no
+principle behind it is a claim we are merely hoping comes true.
 
 ## How to use this list
 

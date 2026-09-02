@@ -42,8 +42,8 @@ $\tau$ (linear interpolation between order statistics).
 
 ## Deterministic metrics
 
-These score the **ensemble mean** — a single number per timestamp — and say nothing about
-whether the forecast's claimed uncertainty was honest.
+These deterministic metrics score the **ensemble mean** — a single number per timestamp —
+without saying anything about whether the forecast's claimed uncertainty was honest.
 
 ### Mean absolute error (MAE)
 
@@ -68,12 +68,16 @@ $$
 \mathrm{NMAE} = \frac{\mathrm{MAE}}{\text{effective capacity}}
 $$
 
-**Why a capacity denominator, not the mean:** intermittent generators (PV, wind) spend much of
-their time near zero output, so normalising by *mean* power would inflate their NMAE relative
-to a demand substation of similar peak size. The denominator is the series' full-history
-effective capacity (P99 of |power|), computed over the full history so that it stays stable
-across CV folds — see
-[Normalising NMAE by effective_capacity](../roadmap/metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity).
+**Why a capacity denominator, not the mean:** intermittent generators (photovoltaic (PV),
+wind) spend much of their time near zero output, so normalising by *mean* power would inflate
+their NMAE relative to a demand substation of similar peak size. The denominator is the
+series' full-history effective capacity (P99 of |power|), computed over the full history so
+that it stays stable across CV folds.
+
+**Why NMAE, not the unweighted `mae__all` / `rmse__all`, is the headline cross-series metric:**
+those aggregates, logged to MLflow, are unweighted means across series whose scales span roughly
+two orders of magnitude, so the GSPs dominate them. They are useful for tracking a single model
+over time, not for comparing skill across the population.
 
 ### Root mean squared error (RMSE)
 
@@ -97,12 +101,12 @@ $$
 
 ## Probabilistic metrics
 
-These score the ensemble **before** the mean collapse, and are the reason we pay 51× inference
-cost. A recurring caveat: of everything below, **only CRPS is fair across ensemble sizes** —
-PICP, pinball loss, interval width, and (residually) the spread-skill ratio all shift with the
-member count $m$, because empirical quantiles from few members are systematically too narrow.
-When comparing models with different ensemble sizes (e.g. the 51-member ML models against
-`nged_incumbent`'s 13 historical analogues), lean on CRPS.
+These probabilistic metrics score the ensemble **before** the mean collapse, which is why we
+pay 51× inference cost. A recurring caveat: of everything below, **only CRPS is fair across
+ensemble sizes** — PICP, pinball loss, interval width, and (residually) the spread-skill ratio
+all shift with the member count $m$, because empirical quantiles from few members are
+systematically too narrow. When comparing models with different ensemble sizes (e.g. the
+51-member ML models against `nged_incumbent`'s 13 historical analogues), lean on CRPS.
 
 ### CRPS (continuous ranked probability score)
 
@@ -160,7 +164,7 @@ true* rather than approximately true:
 
 - **RMS spread, not mean-of-stddev.** Averaging per-timestamp standard deviations and dividing
   by RMSE looks natural but is biased low by Jensen's inequality whenever spread varies across
-  timestamps — and power-forecast spread varies strongly (diurnally and synoptically). In a
+  timestamps. Power-forecast spread varies strongly (diurnally and synoptically). In a
   simulation of a *perfectly calibrated* heteroscedastic 51-member ensemble, the mean-of-stddev
   form read 0.80 while the RMS form read 0.99. We therefore aggregate variances and take one
   square root ("RMS spread"), so a calibrated model cannot be misdiagnosed as underdispersed.
@@ -175,19 +179,18 @@ The variance uses `ddof=1` (the sample variance), and a single-member forecast s
 — zero spread is the honest description of a deterministic forecast, and 0/RMSE keeps the
 ratio's meaning (maximally overconfident) rather than becoming null. The remaining corner is
 RMSE = 0 (a perfect forecast over the scored group): with zero spread the ratio is defined as
-0 rather than the indeterminate 0/0, and with positive spread (contradictory: claimed
-uncertainty around an error-free mean) the computation refuses to emit a value — NaN or
-infinity in any metric raises rather than silently poisoning the leaderboard aggregates.
+0 rather than the indeterminate 0/0. With positive spread (contradictory: claimed uncertainty
+around an error-free mean) the computation refuses to emit a value — NaN or infinity in any
+metric raises rather than silently poisoning the leaderboard aggregates.
 
-**A published instance shows why an accuracy score is never reported alone.** [Kaas et al.
-(2026)](https://arxiv.org/abs/2607.01966) scored models on 200 German low-voltage feeders with an
-overload-decision metric. The two models that came first and second on that metric for consumer
-peaks had 90% prediction intervals that captured the true value only 62% and 58% of the time across
-the series as a whole, and 43% and 49% of the time at the peaks themselves. The [energy-forecasting
+**A published instance shows why an accuracy score is never reported alone.** The
+[energy-forecasting
 review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
-draws the general point: a model that understates its uncertainty raises fewer false alarms. That
-model therefore scores well on a threshold-crossing test while being exactly the model an operator
-should not trust near a capacity limit.
+records a case where the two best-ranked models on a threshold-crossing metric had 90% prediction
+intervals that captured the truth only 58–62% of the time overall, and under half the time at the
+peaks — exactly the fault a spread-skill ratio below 1.0 flags. A model that understates its
+uncertainty raises fewer false alarms, so it can score well on a threshold-crossing test while
+being exactly the model an operator should not trust near a capacity limit.
 
 ### Pinball loss
 
@@ -209,13 +212,13 @@ L_\tau
 \end{cases}
 $$
 
-**Which quantiles — the NGED delivery thirteen.** Pinball loss is computed at exactly the
-levels agreed with NGED for the [delivery tables](../roadmap/delivery-tables.md) (p1, p2, p5,
-p10, p20, p35, p50, p65, p80, p90, p95, p98, p99; the single source of truth is
+**Which quantiles — the NGED delivery 13.** Pinball loss is computed at exactly the levels
+agreed with NGED for the [delivery tables](../roadmap/delivery-tables.md) (p1, p2, p5, p10,
+p20, p35, p50, p65, p80, p90, p95, p98, p99; the single source of truth is
 `contracts.common.DELIVERY_QUANTILES`), one `metric_param` row per level. Three reasons:
 evaluation should measure what we sell; the tails *are* the product (NGED is far more
-interested in the tails than the shoulders); and the
-[Phase D quantile pipeline](../roadmap/metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)
+interested in the tails than the shoulders); and the [Phase D quantile
+pipeline](../roadmap/metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)
 will be scored head-to-head at these same levels, so today's numbers are directly the baseline
 it must beat.
 
@@ -227,10 +230,10 @@ per-member quantile models.
 
 ### Mean pinball loss
 
-**MW; smaller is better.** the thirteen pinball losses averaged into one quantile-skill scalar, for
-leaderboard ranking. Because six of the thirteen delivery levels sit at or beyond p10/p90, this
-average is deliberately **tail-weighted** — a model that nails the median but botches the tails
-scores poorly, which matches NGED's priorities.
+**MW; smaller is better.** the 13 pinball losses averaged into one scalar for ranking the
+leaderboard. Because six of the 13 delivery levels sit at or beyond p10/p90, this average is
+deliberately **tail-weighted** — a model that nails the median but botches the tails scores poorly,
+which matches NGED's priorities.
 
 $$
 \overline{L} = \frac{1}{13} \sum_{\tau \in Q} L_\tau ,
@@ -252,10 +255,9 @@ $$
 $$
 
 **The calibrated reference is *below* nominal coverage.** Empirical quantiles from a finite
-ensemble sit inside the true ones, so even a perfectly calibrated $m$-member ensemble covers
-less than the nominal rate — approximately
-$\frac{m-1}{m+1}(\tau_{\mathrm{hi}} - \tau_{\mathrm{lo}})$.
-Judge PICP against these references, not the nominal rates:
+ensemble sit inside the true quantiles, so even a perfectly calibrated $m$-member ensemble
+covers less than the nominal rate — approximately $\frac{m-1}{m+1}(\tau_{\mathrm{hi}} -
+\tau_{\mathrm{lo}})$. Judge PICP against these references, not the nominal rates:
 
 | Band | Nominal coverage | Calibrated reference at $m = 51$ |
 |---|---|---|
@@ -297,7 +299,7 @@ $$
 = \frac{1}{T} \sum_t \left( \hat{q}_t(\tau_{\mathrm{hi}}) - \hat{q}_t(\tau_{\mathrm{lo}}) \right)
 $$
 
-It is computed for the same six bands as PICP.
+Interval width uses the same six bands as PICP.
 
 ## Tail and exceedance metrics 🚧
 
@@ -371,7 +373,7 @@ model is better. To *rank* models on tail skill, we instead re-weight a proper s
 **MW; smaller is better.** The threshold-weighted Continuous Ranked Probability Score is
 [CRPS](#crps-continuous-ranked-probability-score) with its attention confined to the region
 above a threshold. Plain-language version: ordinary CRPS asks "how far was the forecast
-distribution from what happened?" and cares equally about errors at every power level; twCRPS
+distribution from what happened?" and cares equally about errors at every power level. twCRPS
 asks the same question but only about behaviour *above the threshold* — how much probability
 the forecast placed above the line, and how far above. Distinctions entirely below the
 threshold contribute nothing. Because every half-hour is still scored (hours far below the
@@ -397,7 +399,7 @@ models can be compared on it directly. It is computed against the [per-series
 threshold](#choosing-the-thresholds-static-per-series-quantile-derived), with `metric_param`
 carrying the threshold label.
 
-**A GB distribution network has already been scored this way.** [Maia et al.
+**A Great Britain distribution network has already been scored this way.** [Maia et al.
 (2026)](https://arxiv.org/abs/2603.01653) compare fault-count forecasts for SP Energy Networks
 against a quantile-regression baseline on the threshold-weighted score, because an unweighted one
 "would place substantial emphasis on parts of the predictive distribution where the two models are
@@ -415,17 +417,19 @@ $$
 \mathrm{ER}_\tau = \frac{1}{T} \sum_t \mathbf{1}\!\left[ y_t > \hat{q}_t(\tau) \right]
 $$
 
-It is the one-sided companion to [PICP](#picp-prediction-interval-coverage-probability):
-PICP checks symmetric bands (p10–p90, etc.), but NGED's operating point is one-sided — an
-operator reads the p95 as "the level demand should stay under, 19 times out of 20" — so its
-honesty deserves its own directly-readable number. It is *not* a ranking metric (a model can
-hit perfect exceedance rates with absurdly wide quantiles; pinball loss and twCRPS punish
-that); it is the trust check for the delivered tail quantiles.
+The exceedance rate is the one-sided companion to
+[PICP](#picp-prediction-interval-coverage-probability): PICP checks symmetric bands
+(p10–p90, etc.), whereas NGED's operating point is one-sided — an operator reads the p95 as
+"the level demand should stay under, 19 times out of 20" — so its honesty deserves its own
+directly-readable number. It is *not* a ranking metric (a model can hit perfect exceedance
+rates with absurdly wide quantiles; pinball loss and twCRPS punish that); it is the trust
+check for the delivered tail quantiles.
 
-As with PICP, empirical quantiles from a finite ensemble sit slightly inside the true ones, so
-even a perfectly calibrated ensemble exceeds its p95 slightly *more* than 5% of the time. The
-exact calibrated reference per quantile and ensemble size will be derived and verified by
-Monte Carlo at implementation time, mirroring [PICP's reference table](#picp-prediction-interval-coverage-probability).
+As with PICP, empirical quantiles from a finite ensemble sit slightly inside the true
+quantiles, so even a perfectly calibrated ensemble exceeds its p95 slightly *more* than 5% of
+the time. The exact calibrated reference per quantile and ensemble size will be derived and
+verified by Monte Carlo at implementation time, mirroring [PICP's reference
+table](#picp-prediction-interval-coverage-probability).
 
 ### Brier score for threshold exceedance
 
@@ -459,14 +463,14 @@ lives in ad-hoc analyses — see
 ### Choosing the thresholds: static, per-series, quantile-derived
 
 The metrics above need a threshold $r$ per series, and here honesty matters: **a substation's
-true limit is not a single number.** Thermal ratings vary with ambient temperature, with the wind carrying heat away, and so
-with season; transformers tolerate being overloaded for short periods because of their thermal
-mass, so the *duration* of an exceedance matters (cyclic ratings); and switching changes what a feeder carries. NGED's own operator
-tool draws the limit as a time-varying "Flex Profile", not a constant. We do not attempt to
-model any of that for scoring. Instead we pick **static, per-series thresholds chosen for
-their scoring properties**, and state plainly that they are a proxy — these metrics measure
-"skill near a fixed line standing where the limit typically lives", not operational breach
-prediction:
+true limit is not a single number.** Thermal ratings vary with ambient temperature, with the
+wind carrying heat away, and so with season. Transformers tolerate being overloaded for short
+periods because of their thermal mass, so the *duration* of an exceedance matters (cyclic
+ratings). And switching changes what a feeder carries. NGED's own operator tool draws the
+limit as a time-varying "Flex Profile", not a constant. We do not attempt to model any of that
+for scoring. Instead we pick **static, per-series thresholds chosen for their scoring
+properties**, and state plainly that they are a proxy — these metrics measure "skill near a
+fixed line standing where the limit typically lives", not operational breach prediction:
 
 - **The threshold: the P99 of each series' full observation history** (of power in the
   constraint-side direction — see below), the rung NGED described when we discussed this in
@@ -475,15 +479,14 @@ prediction:
   a level of the forecast distribution. The prefix is spelled out rather than shortened to
   `hist_`, which reads as "histogram".
 
-- **Why historical quantiles rather than the physical ratings:** ratings are not available
-  for every series; a rating that is never breached in a 12-month validation window yields
-  *zero events* — and a warning system cannot be graded on events that never happen; and
-  per-series ratings sit at wildly different points of each series' distribution, breaking
+- **Why historical quantiles rather than the physical ratings:** ratings are not available for
+  every series. A rating that is never breached in a 12-month validation window yields *zero
+  events*, and a warning system cannot be graded on events that never happen. Per-series
+  ratings also sit at wildly different points of each series' distribution, breaking
   cross-series comparability. A full-history quantile threshold guarantees every series a
   scoreable event rate (~1% by construction), is identical in meaning across series, and is
-  stable across CV folds for the same reason the
-  [effective-capacity denominator](../roadmap/metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
-  is computed over the full history.
+  stable across CV folds for the same reason the [effective-capacity
+  denominator](#normalised-mae-nmae) is computed over the full history.
 
 - **NGED-supplied firm/flex ratings** for the trial area remain valuable — for ad-hoc case
   studies and dashboard overlays, where a zero-event outcome is informative rather than
@@ -496,11 +499,11 @@ prediction:
 
 ## Where the numbers live: Delta vs MLflow
 
-The `forecast_metrics` Delta table always holds the complete detail: all thirteen pinball
-levels, all six bands, every horizon slice, per series. MLflow — the leaderboard — receives
+The `forecast_metrics` Delta table always holds the complete detail: all 13 pinball levels,
+all six bands, every horizon slice, per series. MLflow — the leaderboard — receives
 per-experiment aggregates (unweighted means across series) under keys built from a token that
-is `{metric_name}` for scalar metrics and `{metric_name}_{metric_param}` for parametric ones,
-in three families: `{token}__all` (overall), `{token}__{type_slug}` (per
+is `{metric_name}` for scalar metrics and `{metric_name}_{metric_param}` for parametric
+metrics, in three families: `{token}__all` (overall), `{token}__{type_slug}` (per
 `time_series_type`), and `{token}__all__{horizon_slice}` (per lead-time band).
 
 To keep the leaderboard legible, parametric metrics are
@@ -508,8 +511,8 @@ restricted in MLflow to a **headline subset**: `pinball_loss` at p10/p50/p90 and
 `interval_width` at p10_p90 (the allowlist is `_MLFLOW_LOGGED_PARAMETRIC` in
 `ml_core.metrics`). The exact key count scales with how many distinct `time_series_type`
 values the scored population spans (each adds a per-type key family): 144 keys for the V1
-trial area's seven types, versus roughly 380 if every quantile and band were logged. Anything
-not in MLflow is still one Polars filter away in Delta.
+trial area's seven types, versus roughly 380 keys if every quantile and band were logged.
+Anything not in MLflow is still one Polars filter away in Delta.
 
 ## What is deliberately *not* here
 
@@ -517,7 +520,7 @@ not in MLflow is still one Polars filter away in Delta.
   miscalibrated (U-shaped = underdispersed, domed = overdispersed). A histogram is not a scalar,
   so it does not fit the tall metrics schema; it is computed in ad-hoc analyses (e.g. when
   choosing the
-  [Phase C calibration](../roadmap/metrics-and-leaderboard.md#phase-c-cheap-calibration-after-b-proves-the-diagnosis)
+  [Phase C calibration](../roadmap/metrics-and-leaderboard.md#phase-c-low-effort-calibration-after-b-proves-the-diagnosis)
   approach) rather than stored per experiment.
 - **Histogram of errors** — same reason; planned as a visual check on the
   [roadmap](../roadmap/metrics-and-leaderboard.md#evaluation-metrics).

@@ -2,7 +2,7 @@
 
 This section holds durable explainers of the **solution methods** we bring to the forecasting
 problem — what each technique is, how it works, and why it fits. It complements the other
-sections: [background](../background/network.md) describes the *problem*, the
+sections: [background](../background/index.md) describes the *problem*, the
 [roadmap](../roadmap/index.md) says *what* we plan to build and in what order, and
 [architecture](../architecture/overview.md) documents what is *already built*. Unlike roadmap
 pages, techniques pages are permanent: they stay put (and stay linkable — including from code
@@ -16,13 +16,13 @@ docstrings) as the work that applies them ships.
   [switching-events roadmap page](../roadmap/switching-events.md), and the convex candidate in
   the [v0.7 capacity head-to-head](../roadmap/capacity-estimation.md).
 - [Probabilistic forecasting from NWP ensembles](probabilistic-forecasting.md) — why pushing an
-  NWP ensemble through a deterministic power model is systematically overconfident
-  (under-dispersed), the three-term uncertainty decomposition, the fix (per-member conditional
-  quantile forecasts recombined by the linear-pool mixture), the pooling recipe, why
-  quantile-averaging (Vincentization) re-creates the under-dispersion, and the double-counting
-  caveat. Applied by the
-  [probabilistic evaluation & calibration plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
-  and the [delivery tables](../roadmap/delivery-tables.md#table-1-power_forecast).
+  NWP (Numerical Weather Prediction) ensemble through a deterministic power model is
+  systematically overconfident (under-dispersed), the three-term uncertainty decomposition, the
+  fix (per-member conditional quantile forecasts recombined by the linear-pool mixture), the
+  pooling recipe, why quantile-averaging (Vincentization) re-creates the under-dispersion, and
+  the double-counting caveat. Applied by the [probabilistic evaluation & calibration
+  plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics) and the
+  [delivery tables](../roadmap/delivery-tables.md#table-1-power_forecast).
 - [Evaluation metrics](evaluation-metrics.md) — every metric `compute_metrics` produces, each
   with a plain-language summary, the equation, and the design decisions behind it: the
   deterministic four (MAE, NMAE, RMSE, MBE), fair CRPS, the Fortin-corrected spread-skill

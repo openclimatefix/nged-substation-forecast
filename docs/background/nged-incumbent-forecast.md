@@ -13,7 +13,7 @@ For a given substation and target half-hour, the analogue ensemble is the observ
 **same time-of-day on the same weekday** from:
 
 - the **last 6 weeks** (6 analogues), and
-- the seven weeks spanning **49–55 weeks back** — roughly a year ago, bracketing the same calendar
+- the 7 weeks spanning **49–55 weeks back** — roughly a year ago, bracketing the same calendar
   point (7 analogues).
 
 That is **13 analogues** in total.

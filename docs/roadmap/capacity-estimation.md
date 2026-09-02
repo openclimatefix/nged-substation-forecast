@@ -24,7 +24,7 @@ series per metered generator**, feeding the
 this turns v0.1's single scalar-per-series capacity into a time-varying series, the metrics
 pipeline must also swap its `time_series_id`-only NMAE-denominator join for a temporal as-of
 join — see
-[Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity).
+[Effective-capacity normalisation, and the v0.7 upgrade to time-varying](metrics-and-leaderboard.md#effective-capacity-normalisation-and-the-v07-upgrade-to-time-varying).
 
 **How capacity feeds the forecast:** a **two-pass** approach. The first pass estimates effective
 capacity (this page); the second normalises each generator's time series by its effective
@@ -39,13 +39,14 @@ series that names its change dates doubles as a real-time health and availabilit
 
 ## Several estimators, one winner
 
-There is more than one credible way to estimate effective capacity, and they occupy genuinely
-different corners of the tooling space. Rather than pick on paper, **v0.7 races the candidates
-head-to-head on the same data and the same judging criteria, and the winner ships in v1.** The
-losers do not disappear: they stay on the leaderboard as permanent baselines and honesty checks.
+There is more than one credible way to estimate effective capacity. The candidates occupy
+genuinely different corners of the tooling space. Rather than pick on paper, **v0.7 races the
+candidates head-to-head on the same data and the same judging criteria, and the winner ships in
+v1.** The losers do not disappear: they stay on the leaderboard as permanent baselines and
+honesty checks.
 
-**No published method already solves this across a mixed fleet, which is why the contest starts from
-a head-to-head rather than adopting one paper's method.** The [energy-forecasting
+**No published method we found already solves this across a mixed fleet, which is why the contest
+starts from a head-to-head rather than adopting one paper's method.** The [energy-forecasting
 review](../background/energy-forecasting-review.md#3-estimating-the-effective-capacity-of-metered-generators)
 found a method for each generation technology separately. But none run across a mixed fleet of
 individually metered generators at a distribution network operator — which is NGED's position, with
@@ -69,16 +70,16 @@ The candidates:
   output, and SLAC's off-the-shelf convex capacity-change detection.
 
 Despite coming from different toolchains, the two serious candidates are the *same kind of
-thing*: both are **inverse modelling** — write down a forward model mapping unknown parameters
+method*: both are **inverse modelling** — write down a forward model mapping unknown parameters
 (capacities, orientation) to predicted power, then invert it against the observed power to
 recover the parameters. Neither is "more physical" than the other; a fixed pvlib per-unit curve
 inside a convex problem is exactly as much a physics model as a transposition calculation inside
 a PyTorch module. What genuinely separates them is **expressiveness versus guarantees**:
 Candidate A restricts its forward model to what convexity can certify and gets the exact,
-reproducible global optimum in return; Candidate B may write down any differentiable physics it
+reproducible global optimum in return. Candidate B may write down any differentiable physics it
 likes — and gives up the certificates. The head-to-head is therefore also a live measurement of
-that trade-off on NGED data; the framing is developed fully in
-[Two routes to the same inverse problem](../techniques/convex-optimisation.md#two-routes-to-the-same-inverse-problem).
+that trade-off on NGED data; the framing is developed fully in [Two routes to the same inverse
+problem](../techniques/convex-optimisation.md#two-routes-to-the-same-inverse-problem).
 
 There is a testable prediction to settle, made when this contest was designed: **the convex
 estimator wins per-site, and the PyTorch route only pulls ahead when pooling many sites to
@@ -172,8 +173,8 @@ uninformative gaps — that is precisely what the prior is for.
 Both candidates ingest metered generation that really does have gaps — stalled telemetry, missed
 NWP runs, a wholesale-absent weather variable — and the winner's capacity estimate feeds v1.0
 forecasting, so an estimator that mis-estimates under an outage propagates the error downstream.
-This is the same reasoning as the section above: the data going silent at night is missingness with
-a known cause, and an outage is missingness with an unknown one.
+The missing-data argument here is the same reasoning as the section above: the data going silent at
+night is missingness with a known cause, and an outage is missingness with an unknown one.
 
 So **missingness robustness is a head-to-head judging criterion**, scored against the same
 failure-scenario vocabulary the forecasting leaderboard uses
@@ -182,10 +183,10 @@ are checked: that the estimator still returns an estimate at all under each scen
 *uncertainty* widens honestly when it does — an estimator that quietly returns a confident number
 from half the data is worse than one that returns a wide interval.
 
-The differentiable-physics candidate has a structural advantage here, and it should count in the
-judging: a physical forward model
-[degrades most gracefully of all](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing)
-— an absent input is replaced with a prior or a physical bound, with no branching and no fallback
+The differentiable-physics candidate has a structural advantage here, and it should count in
+the judging. A physical forward model [degrades most gracefully of
+all](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing) —
+an absent input is replaced with a prior or a physical bound, with no branching and no fallback
 path. The wider principle is [Inherent Stability](../design-philosophy/inherent-stability.md).
 
 ### Keeping weather bias out of capacity
@@ -207,13 +208,14 @@ advantage of the differentiable-physics route and a documented
 ### Causal vs smoothed capacity — a lookahead trap in the two-pass scheme
 
 A capacity series regularised over the whole record is a *smoother*: it uses future
-observations, so the estimate for a given day changes once a later fault is seen. That is
-correct for the historical
+observations, so the estimate for a given day changes once a later fault is seen. The smoothed
+estimate is correct for the historical
 [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table and the NMAE
 denominator — but the capacity used to normalise at forecast init time, in live running *and in
 backtests*, must be the **causal (filtered) estimate available at that init time**, or backtest
-skill is quietly inflated by lookahead. This is the same no-lookahead invariant the feature
-pipeline enforces for power lags. It binds every candidate equally.
+skill is quietly inflated by lookahead. This causal-estimate requirement is the same
+no-lookahead invariant the feature pipeline enforces for power lags. It binds every candidate
+equally.
 
 ## Candidate A — the convex estimator (CVXPY)
 
@@ -261,8 +263,8 @@ tooling page:
   *and* the DC-side output must have exceeded the AC limit for clipping to occur — a linear
   inequality, added as a hinge penalty. Even censored points carry information.
 
-This is Tobit regression in energy clothing — and the plateau classifier is the formulation's
-weakest joint; see [the caveats](#honest-caveats-of-the-convex-route).
+This censoring treatment is Tobit regression in energy clothing — and the plateau classifier
+is where the formulation is weakest; see [the caveats](#honest-caveats-of-the-convex-route).
 
 ### Loss and penalties
 
@@ -361,8 +363,8 @@ problem.solve(solver=cp.CLARABEL)  # certified global optimum, warm-startable
 The variational single-site model
 ([`DifferentiableSolarPlant`](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant)
 and its wind analogue): site coordinates locked, live weather passed through the physics, and
-tilt, azimuth, DC and AC capacity fitted as mean-field posteriors by gradient descent on an
-ELBO. Its distinct strengths in this contest:
+tilt, azimuth, and DC and AC capacity fitted as mean-field posteriors by gradient descent on
+an evidence lower bound (ELBO). Its distinct strengths in this contest:
 
 - **Native posteriors.** Every parameter carries a fitted spread, so capacity uncertainty comes
   out of the estimator rather than being bolted on — directly relevant to
@@ -386,7 +388,7 @@ aggregating the thermal response of building stock up to a substation inside a p
 forecast — which is the half [the v2 engine](disaggregation.md) leans on instead.
 
 And its costs, mirror-images of Candidate A's strengths: gradient descent brings learning rates,
-schedules, seeds and stopping criteria for a per-site problem the convex route solves exactly;
+schedules, seeds, and stopping criteria for a per-site problem the convex route solves exactly;
 the fused-lasso-style penalty yields approximately-zero changes, so reading changepoints off the
 capacity trace needs a threshold; and there is no global-optimum certificate. Candidate B should
 also adopt the envelope-flavoured asymmetric reconstruction loss
@@ -454,24 +456,30 @@ below).
 
 All candidates run on the same sites, the same weather inputs, and the same folds. There is no
 direct ground truth for capacity, so judging combines proxies, each targeting a claim a
-candidate makes:
+candidate makes.
 
-1. **Downstream forecast skill** — the deciding metric. Each candidate's capacity series feeds
-   the two-pass normalisation; the resulting forecasts compete on the existing leaderboard
-   (NMAE and pinball, per
-   [metrics-and-leaderboard](metrics-and-leaderboard.md)).
-2. **Synthetic fault injection** — scale a known period of a healthy site's output down by a
-   known factor and check: does the estimator find the changepoint, at the right date, with the
-   right magnitude? Does its uncertainty interval cover the truth? (The same injection
-   discipline the [switching detector](switching-events.md) uses.)
-3. **Event-log quality** — precision/recall of fitted changepoints against NGED maintenance and
-   outage records, where records exist.
-4. **Robustness to curtailment label noise** — inject unlogged synthetic curtailment and measure
-   how far each estimate is dragged.
-5. **Uncertainty calibration** — coverage of the stated intervals under (2) and on held-out
-   periods, per [the criterion above](#uncertainty-a-first-class-judging-criterion).
-6. **Runtime and operability** — wall-clock per site, determinism across re-runs, and the count
-   of tunable knobs that had to be tuned.
+**Run downstream forecast skill first, and let it decide.** Each candidate's capacity series feeds
+the two-pass normalisation, and the resulting forecasts compete on the existing leaderboard (NMAE
+and pinball, per [metrics-and-leaderboard](metrics-and-leaderboard.md)). That is the deciding
+metric, and it is cheap because the leaderboard already exists.
+
+**The five checks below are diagnostics, built out for whichever candidate survives that first
+comparison** — and for a losing candidate only where the margin was close enough that the diagnosis
+changes what we do next. Running all six on every candidate up front costs more than the contest is
+worth, and none of the five can overturn a clear result on forecast skill:
+
+- **Synthetic fault injection** — scale a known period of a healthy site's output down by a
+  known factor and check: does the estimator find the changepoint, at the right date, with the
+  right magnitude? Does its uncertainty interval cover the truth? (The same injection
+  discipline the [switching detector](switching-events.md) uses.)
+- **Event-log quality** — precision/recall of fitted changepoints against NGED maintenance and
+  outage records, where records exist.
+- **Robustness to curtailment label noise** — inject unlogged synthetic curtailment and measure
+  how far each estimate is dragged.
+- **Uncertainty calibration** — coverage of the stated intervals under fault injection and on
+  held-out periods, per [the criterion above](#uncertainty-a-first-class-judging-criterion).
+- **Runtime and operability** — wall-clock per site, determinism across re-runs, and the count
+  of tunable knobs that had to be tuned.
 
 The winner ships in v1 and populates the
 [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table; the rest remain on
@@ -484,16 +492,12 @@ deliverable of the contest, feeding the v2 tooling choice and our advice to NGED
 The beam/diffuse decomposition the physics needs (for either candidate — pvlib's transposition
 wants the same inputs as
 [the differentiable model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant))
-is covered by the weather ingests. **CM SAF SARAH-3** (ingested in this milestone) provides global (SIS), direct (SID)
-and direct-normal (DNI) irradiance at 0.05° / 30-minute resolution from 1983 (diffuse =
-SIS − SID) — the primary input, matching the half-hourly metering. **ERA5** (already ingested, in
-[v0.5](index.md#v05-xgboost-upgrades-quick-wins)) provides global plus
-**direct** (`fdir`) short-wave (diffuse by subtraction), and its near-real-time ERA5T stream
-(~5 days behind) suits the near-real-time capacity estimate — unlike CERRA, whose ~3.5-month
-latency [rules it out here](data-sources.md#weather-data). The live **ECMWF ENS** feed carries only GHI — fine for
-v0.7, but v2 physics *forecasting* of PV needs a differentiable GHI → DNI/DHI decomposition
-model (or `fdir` added to the upstream dataset). See
-[data sources](data-sources.md#weather-data).
+is covered by the weather ingests: CM SAF SARAH-3 as the primary input, matching the half-hourly
+metering, and ERA5's near-real-time ERA5T stream for the capacity estimate's freshness — see
+[Data sources → Weather data](data-sources.md#weather-data) for both specs and why ERA5 beats
+CERRA here. The live **ECMWF ENS** feed carries only GHI — fine for v0.7, but v2 physics
+*forecasting* of PV needs a differentiable GHI → DNI/DHI decomposition model (or `fdir` added to
+the upstream dataset).
 
 > **Design caveat — should ERA5 stay offline?** Feeding ERA5 into the *live* system adds a new
 > near-real-time data dependency: another external feed to ingest on a daily-ish cadence, monitor,

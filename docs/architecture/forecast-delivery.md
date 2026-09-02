@@ -1,13 +1,14 @@
 # Forecast Delivery: Delta Lake on S3
 
-**In brief:** We deliver forecasts to NGED as Delta Lake tables on S3, not through a REST API.
-The workload is a poor fit for REST — one power-user consumer who wants routine access to the
-*entire* forecast history, which will reach trillions of rows at V2 scale — and Delta Lake on S3
-is a genuine database-grade delivery mechanism: an open protocol with ACID guarantees, lazy
-partition-pruned reads from off-the-shelf clients (Polars, DuckDB, Spark, …), and schema
-evolution, with no API server for OCF to build, run, or be on call for. If a future consumer
-needs small operational queries or per-customer permissions, a REST API can be added later as a
-purely additive layer over the same tables.
+**In brief:** We deliver forecasts to NGED as Delta Lake tables on S3, not through a
+Representational State Transfer (REST) application programming interface (API). The workload is
+a poor fit for REST — one power-user consumer who wants routine access to the *entire* forecast
+history, which will reach trillions of rows at V2 scale — and Delta Lake on S3 is a genuine
+database-grade delivery mechanism: an open protocol with ACID guarantees, lazy partition-pruned
+reads from off-the-shelf clients (Polars, DuckDB, Spark, …), and schema evolution, with no API
+server for OCF to build, run, or be on call for. If a future consumer needs small operational
+queries or per-customer permissions, a REST API can be added later as a purely additive layer
+over the same tables.
 
 ---
 
@@ -101,9 +102,9 @@ the wire — about 200× the Delta footprint**. Gzip narrows the gap to roughly 
 leaves ~4.5 terabytes per year of data. NGED wants routine access to all of it!
 
 Multiply that per-year figure out across multiple years of history and multiple ML models and it
-keeps climbing: four years of history across two concurrently-run models already reaches **a
-trillion rows** (125 billion × 4 × 2 = 1 trillion) — and both those multipliers are conservative
-once backtests and additional model families are counted.
+keeps climbing: 4 years of history across 2 concurrently-run models already reaches **a trillion
+rows** (125 billion × 4 × 2 = 1 trillion) — and both those multipliers are conservative once
+backtests and additional model families are counted.
 
 That volume is an awkward fit for JSON request/response cycles; in practice,
 REST designs for workloads like this tend to grow a "bulk export" endpoint that hands back files —
@@ -230,8 +231,8 @@ roughly **2 TB**. That 25–75× gap has
 structural teeth:
 
 - A single Postgres table [tops out at 32 TB](https://www.postgresql.org/docs/current/limits.html)
-  — even the low end of the 50–150 TB range needs splitting across multiple partitions to fit, and
-  production tables at this scale typically use far more partitions than that bare minimum, since
+  — even the low end of the 50–150 TB range needs splitting across multiple partitions to fit.
+  Production tables at this scale typically use far more partitions than that bare minimum, since
   autovacuum and reindex time scale with partition size, not just partition count.
 - RDS for PostgreSQL caps storage at 64 TiB per instance; Aurora PostgreSQL goes up to 256 TiB
   (after a 2025 limit increase). The low end of the 50–150 TB range fits either engine; the high
@@ -307,7 +308,7 @@ database with full **ACID** guarantees:
 - **Isolation** — readers are never blocked by, or corrupted by, a concurrent write. A query
   that starts mid-publish sees the previous complete version.
 - **Durability** — committed data lives on S3, with its
-  [eleven-nines object durability](https://aws.amazon.com/s3/faqs/#Durability_.26_Data_Protection).
+  [11-nines object durability](https://aws.amazon.com/s3/faqs/#Durability_.26_Data_Protection).
 
 On top of ACID, the transaction log gives **time-travel** (read the table exactly as it was at
 any past version we retain — useful for auditing what NGED saw at a given moment) and **schema
@@ -340,14 +341,11 @@ the bucket and query it like a database. The same mechanism powers our own pipel
 [lazy evaluation strategy](performance.md#lazy-evaluation-strategy) that keeps our training memory
 bounded is exactly what keeps NGED's reads cheap.
 
-One caveat for anyone querying the *whole* table with Polars: default Polars builds cap any
-single row count or materialised frame at 2³² (~4.29 billion) rows, and a count past the cap
-**silently wraps** rather than erroring — so once a table passes that size (our internal NWP
-table already has, and `power_forecasts` will at V2 scale), whole-table row counts must come from
-the Delta transaction log (`DeltaTable(path).count()`), not `pl.len()` over an unfiltered scan.
-Filtered queries whose results stay under the cap — i.e. every read pattern described above —
-are unaffected. Details in
-[Performance and Scale → The other hard ceiling](performance.md#the-other-hard-ceiling-polars-32-bit-row-index).
+One caveat for anyone querying the *whole* table with Polars: a table this large can silently
+defeat `pl.len()` under Polars' default 32-bit row index. See [Performance and Scale → The other
+hard ceiling](performance.md#the-other-hard-ceiling-polars-32-bit-row-index) for what wraps, what
+doesn't, and the fix (read counts from the Delta transaction log instead). Filtered queries whose
+results stay under the cap — i.e. every read pattern described above — are unaffected.
 
 ## An established industry pattern
 
@@ -376,7 +374,7 @@ Choosing Delta Lake over a bespoke REST API removes an entire service from the p
 - no endpoint schema to version and document alongside the table schemas;
 - no authentication microservice or token lifecycle to manage;
 - no client SDK for NGED to install and for us to maintain;
-- availability is S3's SLA, not something we are on call for: The on-call engineer _only_ has to
+- availability is S3's SLA, not a duty we are on call for: The on-call engineer _only_ has to
   check the forecast has run at 00, 06, 12, and 18 hours. They aren't _constantly_ on call;
 - no maintenance windows to negotiate with NGED: because NGED reads forecasts from S3 rather
   than from any OCF-run service, and new forecasts land only every 6 hours, the gap between one
@@ -412,30 +410,10 @@ service on AWS](../live_service/aws.md#step-1-create-the-s3-buckets)
 for the concrete bucket/IAM setup and [Delivery tables](../roadmap/delivery-tables.md) for
 exactly which five tables are the stable contract.
 
-**Why `eu-west-2`, not the cheaper `eu-west-1`?** AWS Price List API data (2026-07-03) shows
-Ireland (`eu-west-1`) consistently cheaper than London (`eu-west-2`) — not hugely for the
-always-on control-plane box, but noticeably for the Fargate compute that actually runs
-inference (AWS bills in US dollars; converted at **$1 = £0.75** — the ECB rate of 2026-07-03,
-the same basis as [AWS Running Costs](aws-costs.md); the premium percentages come from the
-underlying USD prices):
-
-| SKU | `eu-west-1` (Ireland) | `eu-west-2` (London) | London premium |
-|---|---|---|---|
-| EC2 `t4g.medium` on-demand | £0.0276/hr | £0.0282/hr | +2.2% |
-| Fargate ARM vCPU-hour | £0.0243/hr | £0.0279/hr | +15.0% |
-| Fargate ARM GB-hour | £0.00267/hr | £0.00307/hr | +14.9% |
-| S3 Standard storage (first 50 TB) | £0.0173/GB-mo | £0.0180/GB-mo | +4.3% |
-
-At v1 scale this premium is a rounding error — maybe £1–3/month on a ~£25–35/month bill (see
-[AWS Running Costs](aws-costs.md)). It matters more at
-v2 scale: NGED's population grows from 32 to ~2,500 time series, and `power_forecasts` could
-reach on the order of a **trillion rows** (see [How big is Flexpectation's power forecast
-data?](#how-big-is-flexpectations-power-forecast-data), above) — at that volume, a per-GB
-storage premium compounds into real money rather than staying a rounding error.
-
-`eu-west-2` is picked **now**, mainly because NGED's own S3 bucket is already in `eu-west-2`.
-The benefit that matters here is **data transfer**, not the compute/storage premium above — and
-it depends on *how* NGED reads, which the AWS Price List API pins down precisely:
+**Why `eu-west-2`, not the cheaper `eu-west-1`?** Because NGED's own S3 bucket is already in
+`eu-west-2`, and the benefit that matters is **data transfer** rather than the compute and storage
+prices. How much it is worth depends on *how* NGED reads, which the AWS Price List API pins down
+precisely:
 
 | Read path | Rate |
 |---|---|
@@ -449,13 +427,34 @@ AWS-hosted compute** (e.g. Athena, Glue, an EC2/Lambda job) in `eu-west-2`, not 
 a desktop client like Power BI over the public internet, where the region choice makes
 no difference to the bill. That AWS-native path is the one v2 scale points towards anyway:
 a spreadsheet caps out at ~1,048,576 rows, so once `power_forecasts` reaches the trillion-row range,
-NGED pulling "a sizeable chunk" of it stops being something a spreadsheet can do at all — they
+NGED pulling "a sizeable chunk" of it stops being a task a spreadsheet can handle at all — they
 would need their own query engine against our bucket, and running that in `eu-west-2` is what
 turns those reads free instead of £0.015–0.067/GB.
 
-This is still provisional: NGED haven't yet confirmed whether a GB-resident region is a hard
-requirement for this data, and we're waiting on their reply before treating the region choice as
-final.
+Ireland is the cheaper region on everything else, and the premium is small enough not to outweigh
+that. AWS Price List API data (2026-07-03) shows `eu-west-1` consistently cheaper than `eu-west-2` —
+not hugely for the always-on control-plane box, but noticeably for the Fargate compute that actually
+runs inference (AWS bills in US dollars; converted at **$1 = £0.75** — the ECB rate of 2026-07-03,
+the same basis as [AWS Running Costs](aws-costs.md); the premium percentages come from the
+underlying USD prices):
+
+| SKU | `eu-west-1` (Ireland) | `eu-west-2` (London) | London premium |
+|---|---|---|---|
+| EC2 `t4g.medium` on-demand | £0.0276/hr | £0.0282/hr | +2.2% |
+| Fargate ARM vCPU-hour | £0.0243/hr | £0.0279/hr | +15.0% |
+| Fargate ARM GB-hour | £0.00267/hr | £0.00307/hr | +14.9% |
+| S3 Standard storage (first 50 TB) | £0.0173/GB-mo | £0.0180/GB-mo | +4.3% |
+
+At v1 scale that premium is a rounding error — maybe £1–3/month on a ~£27–40/month bill (see
+[AWS Running Costs](aws-costs.md)). It matters more at
+v2 scale: NGED's population grows from 32 to ~2,500 time series, and `power_forecasts` could
+reach on the order of a **trillion rows** (see [How big is Flexpectation's power forecast
+data?](#how-big-is-flexpectations-power-forecast-data), above) — at that volume, a per-GB
+storage premium compounds into real money rather than staying a rounding error.
+
+The eu-west-2 choice is still provisional: NGED haven't yet confirmed whether a GB-resident region
+is a hard requirement for this data, and we're waiting on their reply before treating the region
+choice as final.
 
 ## Strict data contracts (machine-verifiable)
 

@@ -104,7 +104,7 @@ When the system was designed in August 2025, the current Airflow release was 3.0
   (April 2026); this project is 3.14-only.
 
 So the design-time claim is straightforward: in August 2025, Airflow could not deliver the
-per-cell experiment workflow this project was built around, and its nearest substitute had a
+per-cell experiment workflow this project was built around. Its nearest substitute had a
 broken per-fold retry story in the release we would have deployed. Choosing Dagster was not a
 matter of taste. Nor was choosing Dagster contrarian within OCF: we already ran Dagster for
 our on-prem data pipelines, and OCF's data-engineering view at the time favoured Dagster of
@@ -210,12 +210,12 @@ The orchestration layer was built thin on purpose, and three properties make it 
 - **Every write is an idempotent partition overwrite**, so retry semantics do not depend on
   orchestrator guarantees.
 
-The Dagster-specific surface is roughly 1,900 lines across five files
-(`defs/assets.py`, `defs/cv_assets.py`, `defs/production_assets.py`, `defs/jobs.py`,
-`defs/schedules.py`) plus `definitions.py`, `dagster.yaml`, and the Docker Compose control
-plane. Beyond code, a dozen docs pages — most of `docs/live_service/` and
-[Running an experiment end-to-end](../ml_experimentation/dagster-workflow.md) — are written
-around the Dagster UI and would need rewriting.
+The Dagster-specific surface is roughly 2,700 lines across 5 files (`defs/assets.py`,
+`defs/cv_assets.py`, `defs/production_assets.py`, `defs/jobs.py`, `defs/schedules.py`) plus
+`definitions.py`, `dagster.yaml`, and the Docker Compose control plane. Beyond code, a dozen
+docs pages — most of `docs/live_service/` and [Running an experiment
+end-to-end](../ml_experimentation/dagster-workflow.md) — are written around the Dagster UI and
+would need rewriting.
 
 ### What we actually use from Dagster, and how it maps
 
@@ -326,7 +326,7 @@ Move the production side to Airflow — `power_time_series_and_metadata`, `ecmwf
 `live_forecasts`, `h3_grid_weights`, and their schedules — and keep everything
 experiment-shaped (registration, training, CV forecasts, metrics, promotion) on Dagster.
 
-This works because **the seam already exists**: the
+Porting only the live service works because **the seam already exists**: the
 [R&D/production boundary](production-deployment.md#bake-the-model-into-the-image-at-build-time)
 means the production hot path never touches MLflow, the model crosses as a baked image, and all
 data crosses via Delta tables rather than orchestrator state. The two halves are coupled only
@@ -389,7 +389,8 @@ accepting that effort — so the option stays genuinely open rather than theoret
 
 We would happily revisit this page if any of the following happens:
 
-- **A concrete handover signal** — NGED (or a post-NIA operating agreement) indicating that
+- **A concrete handover signal** — NGED, or an operating agreement covering the period after the Network
+  Innovation Allowance (NIA) project, indicating that
   they run Airflow or want MWAA-managed orchestration. This is the strongest trigger, and it
   points at Option B, not Option A.
 - **OCF standardising on Airflow.** The discussion under way since around August 2025 becoming

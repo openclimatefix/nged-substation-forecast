@@ -1,17 +1,20 @@
 # Performance and Scale
 
-This page holds the measured performance engineering behind three of the
+**The full pipeline — training and a complete 51-member backtest — runs on an ordinary laptop.**
+Everything on this page exists to keep that true, because it is what keeps experimentation fast
+([H2, a hundred experiments per person in a peak
+month](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month))
+and the running service cheap
+([H4, it runs for pocket money](../design-philosophy/engineering-hypotheses.md#h4-it-runs-for-pocket-money)).
+
+The page holds the measured performance engineering behind three of the
 [design principles](../design-philosophy/design-principles.md) — [*the whole system must be
 exercisable on one
 laptop*](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop),
-[*push the work down to the engine; materialise once, as late as
-possible*](../design-philosophy/design-principles.md#11-push-the-work-down-to-the-engine-materialise-once-as-late-as-possible),
+[*push the work down to the query engine; materialise once, as late as
+possible*](../design-philosophy/design-principles.md#11-push-the-work-down-to-the-query-engine-materialise-once-as-late-as-possible),
 and [*measure; do not
-assume*](../design-philosophy/design-principles.md#12-measure-do-not-assume). Everything here exists so that the full
-pipeline — training and a complete 51-member backtest — runs on an ordinary laptop, which is what
-keeps experimentation fast
-([H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)) and the
-running service cheap ([H4](../design-philosophy/engineering-hypotheses.md#h4-it-runs-for-pocket-money)).
+assume*](../design-philosophy/design-principles.md#12-measure-do-not-assume).
 
 ## Storage formats: measured, not assumed
 
@@ -26,9 +29,9 @@ assumed:
   default dictionary+RLE encodings — `BYTE_STREAM_SPLIT` measures *worse* here, because the
   significand rounding collapses many cells/members onto repeated values that a dictionary exploits
   better. Rows are sorted member-early so single-member reads can skip row groups. The result is
-  ~40–41 GB per year for the full ECMWF ENS dataset for Great Britain, and a single day's NWP data
-  takes about one minute to download and convert. The measured numbers are in
-  [PR #271](https://github.com/openclimatefix/nged-substation-forecast/pull/271).
+  ~40–41 GB per year for the full ECMWF ENS dataset for Great Britain, and a single day's NWP
+  data takes about 1 minute to download and convert. The measured numbers are in [PR
+  #271](https://github.com/openclimatefix/nged-substation-forecast/pull/271).
 
 * **`power_forecasts`** (`delta_store.power_forecasts`) sorts ensemble members of the same target
   adjacent, uses `DELTA_BINARY_PACKED` timestamps and `BYTE_STREAM_SPLIT` for `power_fcst`

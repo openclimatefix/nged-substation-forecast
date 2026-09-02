@@ -59,8 +59,9 @@ telemetry to shift a series' full-history P99.
 
 Reads the full `power_time_series` Delta and writes one row per `time_series_id` to the
 `effective_capacity` Delta table: the 99th percentile of `abs(power)` over the series' entire
-observed history. This is the NMAE denominator the `metrics` asset (step 9) reads — materialise it
-before running `metrics`, or that step raises `FileNotFoundError`.
+observed history. This is the NMAE (normalised mean absolute error) denominator the `metrics`
+asset (step 9) reads — materialise it before running `metrics`, or that step raises
+`FileNotFoundError`.
 
 ---
 
@@ -84,10 +85,10 @@ verify the full pipeline is wired up before committing to a potentially long `fu
 
 1. Loads `base_model_config` as plain YAML and applies `config_overrides` to `model_params`.
 2. Constructs the forecaster's `CONFIG_CLASS`, so pydantic validates every hyperparameter before
-   anything is registered.
-3. Creates the MLflow experiment (or resolves the existing one if the name already exists), and
-   rejects the registration outright if that name is already registered under a *different*
-   config — see "An experiment's identity is its config" below.
+   the experiment is registered.
+3. Creates the MLflow experiment (or resolves the existing experiment if the name already
+   exists), and rejects the registration outright if that name is already registered under a
+   *different* config — see "An experiment's identity is its config" below.
 4. Creates the experiment's parent run (`cv_summary`) and logs the config as flattened params.
 5. Stamps three tags onto the experiment: the resolved config as JSON (`config`), the
    fully-qualified Python class path of the forecaster (`forecaster_target`), and your
@@ -105,10 +106,10 @@ Re-running the job with the same `experiment_name` but a **changed** config is r
 error naming the fields that differ. Register the new config under a new `experiment_name`.
 
 Every fold of an experiment must be trained and scored under one config, or the experiment's
-leaderboard row silently mixes two different models: folds already materialised cannot be
+leaderboard row silently mixes two different models. Folds already materialised cannot be
 un-trained, and `trained_cv_model` reads the config back from the experiment's `config` tag (see
 "Why `trained_cv_model` reads config from MLflow, not from YAML" below), so re-pointing that tag
-mid-flight would change what later folds train on. The refusal happens before anything is
+mid-flight would change what later folds train on. The refusal happens before any record is
 written, so a rejected re-registration leaves the experiment exactly as it was.
 
 ## Step 7 — Materialise `trained_cv_model`
@@ -140,12 +141,12 @@ written, so a rejected re-registration leaves the experiment exactly as it was.
 
 A fold run is reused on every re-materialisation of its partition and MLflow params are
 write-once, so nothing that can legitimately change between materialisations may be a param. The
-training window comes from the CV config (which is edited as the archive grows) and the counters
+training window comes from the CV config (which is edited as the archive grows), and the counters
 are outputs of the materialisation (the eligible population grows — and can shrink — with power
-coverage), so both would make a re-materialisation fail with "Changing param values is not
+coverage). Both would therefore make a re-materialisation fail with "Changing param values is not
 allowed" if logged as params. Tags, not metrics: MLflow resolves a metric's "latest" value as the
 max over `(step, timestamp, value)` rather than the newest write, which would under-report a
-shrunk count landing on the same timestamp/step as a prior larger one; tags are last-write-wins,
+shrunk count landing on the same timestamp/step as a prior larger one. Tags are last-write-wins,
 which is the semantic actually wanted. `fold_id` itself is already a tag from run creation
 (`get_or_create_fold_run`, which is also what resolves the run by it), so it is not logged again
 here.
@@ -186,7 +187,7 @@ Experiment "xgboost_smoke_test"
 5. Tags the fold run with `val_start`/`val_end` and the `n_forecast_rows`/
    `n_forecast_time_series`/`n_ensemble_members` counters. All five are tags rather than params or
    metrics because they legitimately change — and can shrink — between materialisations of the
-   same fold run: params are write-once, and MLflow reports a metric's latest value as the max
+   same fold run. Params are write-once, and MLflow reports a metric's latest value as the max
    over all its writes, so a shrunk count would read back too high.
 
 ---
@@ -273,7 +274,7 @@ in the run config dialog before launching.
 4. For `evaluation_scope="leaderboard"`: builds an aggregate metric dict and logs it to the
    fold's MLflow child run, then averages across folds and logs the mean to the parent run.
    The key token is `{metric_name}` for scalar metrics and `{metric_name}_{metric_param}` for
-   parametric ones, in three families: overall (`rmse__all`, `crps__all`), per type
+   parametric metrics, in three families: overall (`rmse__all`, `crps__all`), per type
    (`rmse__disaggregated_demand`), and per horizon slice (`nmae__all__day_ahead`). Parametric
    metrics are restricted to a headline subset in MLflow (`pinball_loss` at p10/p50/p90;
    `picp`/`interval_width` at p10_p90) — the full 13-quantile / 6-band detail stays in the

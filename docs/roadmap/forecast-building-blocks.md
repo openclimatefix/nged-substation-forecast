@@ -62,8 +62,9 @@ Sign convention depends on `substation_type` in `TimeSeriesMetadata`, whose five
 
 Multiply the [−1, +1] forecast by the asset's **maximum / nominal** capacity:
 
-- *Substations*: × the substation's capacity (for v1, likely just the maximum observed power flow
-  through that substation).
+- *Substations*: × the substation's
+  [effective capacity](delivery-tables.md#table-4-effective_capacity) — the 99th percentile of
+  observed power flow, written by the `effective_capacity` asset since v0.1.
 - *Generators*: × the **maximum estimated capacity** of that generator.
 
 This answers: *"what would this asset do if it were healthy and the network were in its normal
@@ -78,7 +79,8 @@ This forecast **prevails the most recent conditions**:
   [the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector):
   assembled from Table 5's discrete events, or delivered directly by the metered-power
   forecast, which carries the current switching state forward natively.)
-- *Both*: prevails the `generator_or_circuit_fault` flag.
+- *Both*: prevails the `GENERATOR OR CIRCUIT FAULT` value of `warning_type` (see
+  [Table 3 — `asset_health_history`](delivery-tables.md#table-3-asset_health_history)).
 
 This answers: *"what will this asset actually do over the next 14 days if current conditions
 persist?"*

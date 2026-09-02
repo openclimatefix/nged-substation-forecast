@@ -13,17 +13,18 @@ approach is a **basket of complementary partial evaluations**, each with differe
 agreement across them is the real signal.
 
 The evaluation protocol is not a detail — it is arguably the hardest and most publishable
-contribution of the v2 work. The same structural challenge arose in domestic NILM (where individual
-appliance ground truth is similarly hard to obtain), and building a credible multi-pronged protocol
-is a natural continuation of that prior work.
+contribution of the v2 work. The same structural challenge arose in domestic Non-Intrusive Load
+Monitoring (NILM), where individual appliance ground truth is similarly hard to obtain. Building a
+credible multi-pronged protocol is a natural continuation of that prior work.
 
 ---
 
 ## Spoke 1: Synthetic aggregation ("the Neural NILM move")
 
-Take individually metered sources (customer-metered PV/wind, the metered BESS, etc.), sum them into
-a synthetic "substation," disaggregate, score against the held-out components. This gives an exact
-ground truth because you constructed the aggregate.
+Take individually metered sources (customer-metered solar photovoltaic (PV) and wind, the metered
+battery energy storage system (BESS), etc.), sum them into a synthetic "substation," disaggregate,
+score against the held-out components. This gives an exact ground truth because you constructed the
+aggregate.
 
 **Caveat**: a synthetic clean sum lacks [switching events](../roadmap/switching-events.md), MVA bounce, false
 zeros, unmetered load, and correctly-scaled correlated co-movement. It systematically flatters
@@ -65,8 +66,10 @@ absent from the papers it read.
 ## Spoke 4: Cross-source corroboration (label-free, indirect)
 
 Where an independent dataset should predict your disaggregated quantity, agreement is evidence. The
-main example: estimated unmetered-PV capacity per primary vs. registered PV in the ECR / MCS for
-that substation's geographic catchment (recoverable via the MPAN→substation mapping).
+main example: estimated unmetered-PV capacity per primary vs. registered PV in the Embedded
+Capacity Register (ECR) / Microgeneration Certification Scheme (MCS) for that substation's
+geographic catchment (recoverable via the Meter Point Administration Number (MPAN)→substation
+mapping).
 
 **Caveat**: the gap between the estimate and the register is partly the unregistered fleet you are
 trying to find, so exact agreement is not expected. Gross disagreement in the wrong direction
@@ -91,7 +94,7 @@ for NGED, because their goal is better forecasts for flexibility procurement.
 ## Spoke 6: Recovery on a fully-instrumented holdout (strongest)
 
 A single substation, even briefly, where every feeder and embedded generator is individually
-metered, used purely as validation. One such site anchors the whole evaluation. Worth asking NGED and UKPN whether a fully metered substation already exists.
+metered, used purely as validation. One such site anchors the whole evaluation.
 
 ---
 
@@ -99,7 +102,7 @@ metered, used purely as validation. One such site anchors the whole evaluation. 
 
 A good method scores well across all six spokes despite their differing biases. A method that
 scores well on synthetic aggregation (Spoke 1) but fails physical-consistency checks (Spoke 3) on
-real data is telling you something — it has overfit to the easy case. The leaderboard columns for
-disaggregation are not "the metric" — they are these spokes. Because labels are weak, the protocol
-must be more carefully reasoned and transparently caveated than a standard forecasting evaluation:
-"no clean ground truth" must not slide into "any evaluation will do."
+real data has overfit to the easy case. The leaderboard columns for disaggregation are not "the
+metric" — they are these spokes. Because labels are weak, the protocol must be more carefully
+reasoned and transparently caveated than a standard forecasting evaluation: "no clean ground
+truth" must not slide into "any evaluation will do."

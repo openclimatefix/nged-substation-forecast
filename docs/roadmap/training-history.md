@@ -15,14 +15,14 @@ decisions to make up front.
 
 ## Scope the ingest to include the 2024+ overlap
 
-**Fetch ERA5 across the 2024+ ENS overlap as well as the 2020–2023 gap.** This is the one thing
-that changes what the ingest builds, and it exists to avoid *era confounding*: a feature value that
-occurs in only one time period is learned as a proxy for that period, not for the thing we mean by
-it. If NaN-NWP appears only before 2024, "weather is missing" becomes a perfect proxy for
-"2020–2023" — a demand regime carrying COVID distortions, less embedded PV, and lower EV and
-heat-pump penetration — so a 2027 feed failure would be forecast from a 2021 regime. The same trap
-applies to a source flag, to a lead-time-zero encoding, and to the ENS-only spread and quantile
-columns, which have no ERA5 equivalent.
+**Fetch ERA5 across the 2024+ ENS overlap as well as the 2020–2023 gap.** This is the one design
+decision that changes what the ingest builds, and it exists to avoid *era confounding*: a feature
+value that occurs in only one time period is learned as a proxy for that period, not for the
+underlying quantity we mean by it. If NaN-NWP appears only before 2024, "weather is missing"
+becomes a perfect proxy for "2020–2023" — a demand regime carrying COVID distortions, less
+embedded PV, and lower EV and heat-pump penetration. So a 2027 feed failure would be forecast from
+a 2021 regime. The same trap applies to a source flag, to a lead-time-zero encoding, and to the
+ENS-only spread and quantile columns, which have no ERA5 equivalent.
 
 The general rule: **an era covariate is safe exactly when the value production will see is
 well-represented in the modern era.** So, alongside the overlap fetch, randomly mask NWP features
@@ -34,19 +34,20 @@ reconciliation question below into estimation rather than guesswork.
 ## Reconciling ERA5 with ENS
 
 - **Lead-time-zero framing.** Do not degrade; treat ERA5 as a forecast at lead zero and let the
-  lead-time feature carry the discounting. This separates the physical weather-to-power response
-  (genuinely lead-time-invariant) from how far to trust it as forecast error grows. Cheapest arm
-  and the right first run, but note the tension: pre-2024 rows then carry only lead zero, so every
-  split on lead time partitions the modern rows off beneath it, and the extra history reaches the
-  3–10 day band only through the structure above such splits and in the trees that never make one.
-  Boosting shares more across trees than that phrasing might suggest, so this is a weakening rather
-  than a wall — but expect the win at short leads unless the invariance assumption holds strongly.
+  lead-time feature carry the discounting. That framing separates the physical weather-to-power
+  response (genuinely lead-time-invariant) from how far to trust it as forecast error grows.
+  Cheapest arm and the right first run, but note the tension: pre-2024 rows then carry only lead
+  zero, so every split on lead time partitions the modern rows off beneath it, and the extra
+  history reaches the 3–10 day band only through the structure above such splits and in the trees
+  that never make one. Boosting shares more across trees than that phrasing might suggest, so this
+  is a weakening rather than a wall — but expect the win at short leads unless the invariance
+  assumption holds strongly.
 
 - **Degrade ERA5 towards ENS error statistics.** Fit the `ENS − ERA5` residual distribution per
   variable, per lead time, per season on the overlap, then sample from it when synthesising
   pre-2024 features. Quantile mapping per horizon is the cheap version and is probably enough for
-  temperature. This is not merely an alternative to lead-zero framing: it is what makes the extra
-  history populate the long leads at all.
+  temperature. Degrading towards ENS error statistics is not merely an alternative to lead-zero
+  framing: it is what makes the extra history populate the long leads at all.
 
 - **ENS reforecasts — considered and rejected.** Under Cycle 49r1 the medium-range reforecasts run
   over the past 20 years with an 11-member ensemble, so they are real forecasts with real
@@ -58,7 +59,7 @@ reconciliation question below into estimation rather than guesswork.
 
 Today `nwp_lead_time_hours` (how old the weather is) and the forecast horizon (which power lags are
 available) differ only by the constant `NWP_PUBLICATION_DELAY_HOURS`, so one column carries both.
-ERA5 decouples them: weather age is zero, but power-lag availability must still mirror production,
+ERA5 decouples them: weather age is zero. But power-lag availability must still mirror production,
 or pre-training teaches the model to lean on lags that vanish at serve time. Pre-training rows
 therefore need a *sampled* pseudo-horizon driving `_nullify_leaky_lags`, carried separately from
 weather age.
@@ -73,8 +74,8 @@ weather age.
   page.
 
 - **Two-phase warm start.** Train on the ERA5 history, then continue boosting on 2024+ ENS data.
-  Warm start only *adds* trees, so the correcting trees see roughly two years and very few examples
-  of each season; and if phase one over-trusts weather, shrinking an over-confident component
+  Warm start only *adds* trees, so the correcting trees see roughly 2 years and very few examples
+  of each season. And if phase one over-trusts weather, shrinking an over-confident component
   additively is harder than never building it. **Mixed phase two** — keeping down-weighted (and
   possibly degraded) ERA5 rows in phase two — is the middle path.
 
@@ -96,68 +97,57 @@ absorb level drift for the same reason.
 **COVID lockdowns** are a pulse, and the case for a dedicated feature:
 
 - A lockdown scalar in $[0, 1]$ passes the era-covariate safety rule by construction: production
-  always sees 0, and 0 is abundant in the modern era. This is the opposite of the NaN-NWP case, and
-  the confounding is benign — the feature is the mechanism by which the model quarantines the
-  anomalous period.
+  always sees 0, and 0 is abundant in the modern era. That safety pattern is the opposite of the
+  NaN-NWP case, and the confounding is benign — the feature is the mechanism by which the model
+  quarantines the anomalous period.
 
-- **Source it rather than hand-coding dates.** The Oxford COVID-19 Government Response Tracker
-  publishes a daily UK stringency index (0–100) — the equivalent of the `holidays` package for this
-  problem. Google's COVID-19 Community Mobility Reports are the richer alternative, because
-  workplace and residential mobility sits closer to the causal driver of substation demand than the
-  legal state does, and it captures both the voluntary March-2020 withdrawal and the slow return
-  through 2021–22. Both series ended in 2022, so check they are still downloadable. But a lockdown
-  scalar is 0 for every future forecast, so a dead source is a back-fill problem, not a serving
-  problem.
-
-- **The measured evidence favours mobility over stringency, though it is thin.** [Chen et al.
-  (2020)](https://arxiv.org/abs/2006.08826) feed Apple Mobility Trends driving data and Google
-  Community Mobility Reports transit data straight into a day-ahead neural network across 12
-  regions. On UK national demand they take mean absolute percentage error from 10.11% for a
-  pre-pandemic model to 8.74% with mobility, and to 4.46% with mobility plus multi-task learning
-  across similar-sized regions. Retraining on pandemic data *without* mobility, though, made the UK
-  figure worse, at 13.78%. Two caveats before leaning on those figures: the test window is 1 to 15
-  May 2020, two weeks, and the paper is an arXiv preprint. The Oxford stringency index turned up in
-  our search only in explanatory econometrics, never as a forecasting input. There, though
-  ([Berezvai et al. (2022)](https://doi.org/10.1016/j.segan.2022.100930), 23 European Union member
-  states), a *quadratic* specification was needed, with "the partial effect of an increase in the
-  stringency index depend[ing] on the type of day (weekday or weekend), hour of the day, and
-  initial stringency level", which one linear scalar cannot express.
+- **Source it rather than hand-coding dates, and prefer mobility to stringency.** The Oxford
+  COVID-19 Government Response Tracker publishes a daily UK stringency index (0–100); Google's
+  COVID-19 Community Mobility Reports sit closer to the causal driver of substation demand, and
+  capture both the voluntary March-2020 withdrawal and the slow return through 2021–22. Both series
+  ended in 2022, so check they are still downloadable — though a scalar that reads 0 for every
+  future forecast makes a dead source a back-fill problem, not a serving problem. The measured
+  evidence favours mobility, thinly: [Chen et al. (2020)](https://arxiv.org/abs/2006.08826) take UK
+  national mean absolute percentage error from 10.11% to 8.74% by feeding mobility data into a
+  day-ahead neural network, on a two-week test window, in an arXiv preprint. Retraining on pandemic
+  data *without* mobility, though, made the UK figure worse, at 13.78% — so retraining across the
+  lockdown is not safe on its own. The stringency index
+  turned up in our search only in explanatory econometrics, and there [Berezvai et al.
+  (2022)](https://doi.org/10.1016/j.segan.2022.100930) needed a *quadratic* specification, which one
+  linear scalar cannot express.
 
 - **Check whether simply adapting faster does the same job, before building the covariate.** [de
-  Vilmarest and Goude (2021)](https://arxiv.org/abs/2110.00334) compare, on one dataset and horizon,
-  a Kalman filter handed the break date against one merely allowed to adapt faster everywhere with
-  no break date at all. The no-break version won on three of four model families: mean absolute
-  error 11.2 against 13.6 MW for a linear model, 12.4 against 14.3 for a generalised additive model,
-  and 14.3 against 16.2 for an autoregressive model, losing only on a neural network at 12.4 against
-  12.3. Learning the variances rather than fixing them matched the no-break version. The recency
-  sample weights above are the same idea. Run that arm first: the covariate has to beat faster
-  adaptation, not merely beat doing nothing.
+  Vilmarest and Goude (2021)](https://arxiv.org/abs/2110.00334) compare a Kalman filter handed the
+  break date against one merely allowed to adapt faster everywhere with no break date at all. The
+  no-break version won on three of four model families, and learning the variances rather than
+  fixing them matched it. The recency sample weights above are the same idea. Run that arm first: the covariate has to beat faster adaptation, not merely beat doing
+  nothing.
 
 - **The pre-lockdown regime may never come back, and a scalar that returns to 0 says it does.**
   [Prabowo et al. (2023)](https://doi.org/10.1145/3600100.3623726), on 13 building complexes in
-  Melbourne, report "significant shifts in distributions during the lockdown, which do not fully
-  revert to their pre-lockdown state even after restrictions are lifted". If GB substation demand
-  behaved the same way — and permanent home-working makes that plausible — then the post-lockdown
-  era is a third regime rather than a return to the first. A lockdown scalar cannot say so,
-  though: it reads 0 both before 2020 and after 2021, for two different worlds. Recency sample
-  weights can express that difference, which is a second reason to run them as the control arm.
+  Melbourne, report distribution shifts during lockdown "which do not fully revert to their
+  pre-lockdown state even after restrictions are lifted". If GB substation demand behaved the same
+  way — and permanent home-working makes that plausible — the post-lockdown era is a third regime
+  rather than a return to the first. A lockdown scalar cannot say so, because it reads 0 both before
+  2020 and after 2021, for two different worlds. Recency sample weights can, which is a second
+  reason to run them as the control arm.
 
 - **One published result supports the plan above: treat the lockdown as a labelled example rather
-  than as data to discard.** [Abélès et al. (2024)](https://arxiv.org/abs/2402.14684) calibrate two
-  process-noise variances — a slow one on pre-COVID data (2012 to 2019) and a fast one on 2020 —
-  then let a Markov switch choose between them at run time. Tested on French national half-hourly
-  demand over 2021 and 2022, *after* the lockdowns, the switching version beat both fixed-variance
-  filters. Note what that buys: the lockdown pays for itself by calibrating the fast regime.
-  Nothing about a stringency or mobility series is needed at inference.
+  than as data to discard.** [Abélès et al. (2024)](https://arxiv.org/abs/2402.14684) calibrate a
+  slow process-noise variance on pre-COVID data and a fast one on 2020, then let a Markov switch
+  choose between them at run time; tested on French national demand *after* the lockdowns, the
+  switching version beat both fixed-variance filters. The lockdown label justifies itself by
+  calibrating the fast regime, and nothing about a stringency or mobility series is needed at
+  inference.
 
-- **All of this evidence is national or building-level, none of it a distribution substation.** The
-  de Vilmarest, Abélès, and Berezvai results are national transmission demand. The only UK-level
-  figure anywhere in this set is Chen et al.'s national mean absolute percentage error. A primary
-  substation serves a few thousand customers with a strongly non-average mix. Its lockdown response
-  could therefore be far larger or far smaller than the national one, depending on whether it feeds
-  a city centre or a dormitory estate. A search of OpenAlex for COVID-19 load forecasting at
-  distribution substations returned nothing. This is therefore a per-substation question we will
-  have to answer from NGED's own history.
+- **All of this evidence is national or building-level, none of it a distribution substation.** A
+  de Vilmarest, Abélès, and Berezvai results are national transmission demand, and the only UK-level
+  figure anywhere in this set is Chen et al.'s national mean absolute percentage error. A
+  primary serves a few thousand customers with a strongly non-average mix, so its lockdown response
+  could be far larger or far smaller than the national one, depending on whether it feeds a city
+  centre or a dormitory estate. A search of OpenAlex for COVID-19 load forecasting at distribution
+  substations returned nothing, so the magnitude is a per-substation question we will have to answer
+  from NGED's own history.
 
 - **Keep exclusion as an ablation arm.** Dropping 2020-03 to 2021-07 costs roughly 1.3 of about
   5.5 winters. Probably the wrong trade — lockdown distorts the occupancy and calendar response far
@@ -181,7 +171,8 @@ absorb level drift for the same reason.
 back to at least 2019, so the gap years contain real switching events and need whatever masking the
 modern data gets. And the primaries' "Disaggregated Demand" depends on which embedded generators
 were metered at the time, so a meter coming online mid-history silently redefines that series — the
-[ECR](https://github.com/openclimatefix/nged-substation-forecast/issues/159) and
+[Embedded Capacity
+Register](https://github.com/openclimatefix/nged-substation-forecast/issues/159) and
 [MPAN-to-substation](https://github.com/openclimatefix/nged-substation-forecast/issues/241) ingests
 carry the connection dates needed to check.
 
@@ -213,7 +204,7 @@ carry the connection dates needed to check.
 
 - ERA5 is a single frozen IFS cycle across the whole archive, so year-over-year comparison within
   it is not contaminated by NWP system upgrades. The flipside: our ENS archive spans cycle changes,
-  so some apparent drift there is the weather model changing rather than the network.
+  so some apparent drift there is the weather model changing rather than the electricity network.
 
 ## The ECMWF ENS backfill will not arrive in time
 

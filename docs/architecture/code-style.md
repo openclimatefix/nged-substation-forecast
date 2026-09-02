@@ -90,7 +90,7 @@ stricter type exists — a genuinely heterogeneous or open-ended dict stays `dic
 `write_nwp(nwp, uri, options)`. The keyword names what each value is for, so the reader learns it
 from the call site instead of opening the callee; and if a parameter is later reordered, renamed or
 removed, the call fails loudly rather than binding the wrong value in silence. The payoff is
-biggest for bare strings, numbers and booleans, whose meaning is invisible without the keyword.
+biggest for bare strings, numbers, and booleans, whose meaning is invisible without the keyword.
 
 Three places where a positional argument is right:
 
@@ -131,7 +131,7 @@ Three places where a positional argument is right:
 - **One home per argument** — a design decision's *rationale* lives on one docs page, and the
   docstring links to it. The docstring's own job is to say what the function guarantees and what a
   caller must not assume. A sentence of "because" is fine; a paragraph of it means the paragraph
-  belongs on the page. Two copies of an argument drift, and the drift is silent — a later change
+  belongs on the page. Two copies of an argument drift. The drift is silent — a later change
   updates the page, the docstring goes on asserting the superseded reasoning, and no linter, type
   checker or test can tell. This is the same trade the durable-docs rule above makes: a link that
   might rot is cheaper than a copy that rots invisibly. It cuts the other way too — rationale
@@ -250,9 +250,9 @@ confusing failure:
 - **Research and production share one execution path.** There is no research-only implementation of
   a pipeline step — see
   [design principle 3](../design-philosophy/design-principles.md#3-one-execution-path-from-research-to-production).
-  What legitimately differs between them is failure policy, not code: the CV, training and metrics
-  assets fail fast, while the production service degrades (see
-  [Inherent stability](../design-philosophy/inherent-stability.md)).
+  What legitimately differs between them is failure policy, not code: the CV, training, and
+  metrics assets fail fast, while the production service degrades (see [Inherent
+  stability](../design-philosophy/inherent-stability.md)).
 
 ## Error Handling
 

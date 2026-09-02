@@ -31,7 +31,7 @@ every pass over everything:
 |---|---|
 | A docstring, a comment, a pull-request body, one or two paragraphs | The sentence sweep only |
 | Several paragraphs under one heading | Pass B, then the sentence sweep |
-| A whole page, or anything with headings | Passes A, B, D and E, then the sentence sweep |
+| A whole page, or anything with headings | Passes A, B, C, and D, then the sentence sweep |
 | A page nobody has audited, or beyond roughly 5,000 words | Every pass, chunked across sub-agents |
 | A whole section of the docs, or the docs as a whole | Pass F first, then the rest per page |
 
@@ -90,7 +90,17 @@ sub-headings and short paragraphs over bullet lists, because a list flattens an 
 of equal weight. A bulleted item carrying several sentences and a citation is a paragraph wearing a
 hyphen; a genuinely parallel set of short design notes is a list. Both directions are findings.
 
-## Pass D: does every count close?
+**Prose that should be bullets is the harder direction to spot, and the rule that decides it is
+the complexity of the concept, not the length of the passage.** CLAUDE.md's bullets rule allows a
+list wherever the items really are of equal weight and each one is simple — the options a setting
+takes, what a table holds, a run of short design notes — and forbids one wherever the passage
+introduces a complex new concept, because the connective tissue between the sentences is what
+makes a new concept followable. So the finding is not "this paragraph is long". The finding is
+that a reader meeting this material for the first time would lose nothing if the sentences stopped
+joining up. Where a paragraph is building an argument towards a conclusion, leave it as prose
+however long it runs.
+
+## Pass C: does every count close?
 
 **An enumeration that promises N items and delivers a different N is invisible to every other pass
 and mechanically detectable by this one.** It reads perfectly well sentence by sentence, so the
@@ -110,7 +120,7 @@ For every "the four in use", "three further", "six spokes", "the five are not", 
 **When prose restates a list another document owns, diff it item by item against the source list**
 rather than transcribing it from memory.
 
-## Pass E: do the headings work read cold?
+## Pass D: do the headings work read cold?
 
 **Read the table of contents alone, as a reader who has not read the page.** Pass A reads the bolded
 leads to test the argument's order; this pass reads the headings to test whether a reader can
@@ -144,7 +154,7 @@ same commit. That cost is real: of three headings renamed in this repo, two carr
 inbound links respectively. The link text is usually a fragment of the sentence around it rather than
 the heading itself, so only the anchor needs changing.
 
-## Pass C: the first-stumble reader
+## Pass E: the first-stumble reader
 
 **Spawn a fresh sub-agent that can see only the document, not this repository or this
 conversation.** Paste the document into the prompt, or point the sub-agent at a single scratchpad
@@ -236,25 +246,36 @@ expanded nowhere outside a table and the reference list.
 
 ### The order to sweep in
 
-The first position is fixed by a dependency; the rest run highest yield first, so that the
+The first two positions are fixed by dependencies; the rest run highest yield first, so that the
 expensive passes get the freshest attention:
 
-1. Long sentences carrying two claims, which a full stop would split
-2. Pronouns and demonstratives, including "one", "ones", and "such a"
-3. Unenumerated singletons and superlatives
-4. Umbrella nouns — "thing", "something", "anything", "metadata"
-5. Counting nouns that never say what was counted — "records", "sources", "items",
+1. Clauses that can be deleted without the sentence losing anything
+2. Long sentences carrying two claims, which a full stop would split
+3. Pronouns and demonstratives, including "one", "ones", and "such a"
+4. Unenumerated singletons and superlatives
+5. Umbrella nouns — "thing", "something", "anything", "metadata"
+6. Counting nouns that never say what was counted — "records", "sources", "items",
    "entries", "studies", "results"
-6. Money metaphors for performance
-7. Ambiguous "network"
-8. Numerals
-9. Serial commas
-10. Acronyms expanded on first use
-11. Sentences readable two ways, and noun-piles
+7. Money metaphors for performance
+8. Ambiguous "network"
+9. Numerals
+10. Serial commas
+11. Acronyms expanded on first use
+12. Sentences readable two ways, and noun-piles
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
 
-**The split pass goes first because splitting a sentence manufactures work for the passes behind
+**The deletion pass goes first because a clause that is about to be deleted is not worth
+splitting, naming a noun in, or expanding an acronym in.** Every later pass costs less on text the
+deletion pass has already thinned, and a sentence that loses a dead clause often stops being a
+two-claim sentence at all, so the split pass has less to do. The deletion finding is a whole
+clause the sentence can lose: the contrast that restates what the definition already settled, the
+half-sentence saying what a passage is *not* about, the aside that repeats the subject. Delete it,
+re-read the sentence, and keep the deletion unless the reader lost something. Where the reviewer
+cannot tell whether the clause carries anything, it stays — this pass is for the clauses whose
+deletion is obviously safe, not for close calls.
+
+**The split pass goes second because splitting a sentence manufactures work for the passes behind
 it.** A split leaves the second claim needing a subject, and the obvious subject is a pronoun
 standing for whatever the first half named: "it plays on substation load the role the combined
 reference plays on irradiance, and it is the bar that decides whether the project is worth its
@@ -309,7 +330,7 @@ never have been reported.
 - **Reference-list entries and author strings**, which follow the citation convention rather than
   the serial-comma rule.
 - **Code blocks and the code inside them**, including comments.
-- **Headings**, which Pass E owns. The sentence sweep leaves them alone. A heading rename changes
+- **Headings**, which Pass D owns. The sentence sweep leaves them alone. A heading rename changes
   the anchor slug and breaks inbound links from elsewhere in the docs, including absolute links
   from other pages, so it is worth doing deliberately rather than as a by-product.
 
@@ -388,7 +409,7 @@ costliest fault in the rule list. A confident empty pass on that rule is therefo
 wrong.
 
 **Opus also found a defect outside the rule list**, in a passage that had survived several earlier
-review rounds: the enumeration mismatch Pass D now looks for. A sweep is worth reading for what it
+review rounds: the enumeration mismatch Pass C now looks for. A sweep is worth reading for what it
 notices as well as for what it was asked to find.
 
 **Haiku's failure was recall and self-verification, not discipline.** Haiku honoured the
@@ -575,7 +596,7 @@ uv run python .claude/skills/prose-review/scripts/check_information_loss.py <old
 ## Re-run after a restructure
 
 Moving paragraphs can break a bolded lead that referred to "the previous section", or introduce a
-fact before its new position's prerequisites are met. Re-run Passes A to D after a restructure, not
+fact before its new position's prerequisites are met. Re-run Passes A to E after a restructure, not
 just once at the start, and re-run the balanced-bold count with them.
 
 ## See also

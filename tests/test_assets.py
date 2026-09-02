@@ -1257,7 +1257,7 @@ def test_definitions_resolve(env: Path) -> None:
     # `live_forecasts_schedule` is built by `build_schedule_from_partitioned_job`, so its cron is
     # *derived* from that inferred partitions_def — the one thing dropping the explicit argument
     # could plausibly have broken. Pin the resolved schedule, not just the job.
-    live_schedule = repo.get_schedule_def("live_forecasts_job_schedule")
+    live_schedule = repo.get_schedule_def("live_forecasts_schedule")
     assert live_schedule.cron_schedule == live_forecast_partitions.cron_schedule
     assert live_schedule.execution_timezone == "UTC"
 

@@ -2,8 +2,8 @@
 
 This page says how to read a value out of the `nwp` Delta table, and what the feature pipeline does
 to it on the way to the model. Every ECMWF ENS variable we store is listed with the convention that
-governs it: some values describe an instant, some describe the three or six hours before that
-instant, and two are angles that wrap.
+governs it: some values describe an instant, some describe the 3 or 6 hours before that instant,
+and two are angles that wrap.
 
 Everything here is a choice this project made, so a defect described on this page is a reason to
 change our code. Damage the data arrives with is the separate subject of [Known ECMWF ENS
@@ -21,7 +21,7 @@ identical in every run in the archive:
 | 3 h | 3 h → 144 h | 48 |
 | 6 h | 150 h → 360 h | 36 |
 
-The change at **144 h — six days** matters most, because the primary user band is 3–10 days
+The change at **144 h — 6 days** matters most, because the primary user band is 3–10 days
 ([XGBoost improvements](../roadmap/xgboost-improvements.md)), so days 6 to 10 of that band sit on
 the coarse half of the grid.
 
@@ -40,7 +40,7 @@ Three variables are period-ending: `downward_short_wave_radiation_flux_surface`,
 `downward_long_wave_radiation_flux_surface` and `precipitation_surface`. They are legitimately null
 at lead 0, because there is no preceding interval.
 
-Beyond 144 h the interval is **six hours long**, so a 12:00 shortwave value is the mean over
+Beyond 144 h the interval is **6 hours long**, so a 12:00 shortwave value is the mean over
 06:00–12:00. That window covers much of the morning ramp, so the value is far below the
 instantaneous irradiance at noon. What changes at day 6 is the averaging window, not the weather.
 
@@ -146,7 +146,7 @@ Both columns are in `conf/model/xgboost.yaml`'s `selected_features`, so this rea
 
 The resample interpolates between `valid_time` stamps, which treats a backward-looking mean as an
 instantaneous reading at the *end* of its window. The reconstructed day is therefore both flattened
-and shifted late — by half the step width, so **three hours** in the 6-hourly part of the horizon.
+and shifted late — by half the step width, so **3 hours** in the 6-hourly part of the horizon.
 Reconstructing a clear-sky day (Haurwitz clear-sky irradiance at 52.5° N, 1° W, 10 August):
 
 | step | reconstruction | peak W m⁻² | peak at |
@@ -157,7 +157,7 @@ Reconstructing a clear-sky day (Haurwitz clear-sky irradiance at 52.5° N, 1° W
 
 Read the 6-hourly row carefully: the reconstruction is a near-flat plateau from 12:00 to 18:00, and
 the argmax lands at 18:00 only because the two knots differ by about 6%. The honest summary is that
-the modelled solar day is shifted about three hours late and its peak cut by a quarter, not that it
+the modelled solar day is shifted about 3 hours late and its peak cut by a quarter, not that it
 peaks at 18:00. Daily *energy* is preserved (7.18 against 7.20 kWh m⁻²) — it is the shape and the
 timing that are wrong, which is what a PV site responds to.
 
@@ -165,7 +165,7 @@ The archive confirms the period-ending reading. Forming the clear-sky index two 
 2026-08-10 00Z run (1671 cells × 51 members, ~2.8 M rows after restricting to those where clear-sky
 irradiance exceeds 200 W m⁻², so the ratio is well conditioned) settles it. Cloud enhancement can
 lift irradiance a few tens of percent above the clear-sky value, so an index a little over 1 is real
-— but an index of 2 is not, least of all for a six-hour mean over a whole H3 cell:
+— but an index of 2 is not, least of all for a 6-hour mean over a whole H3 cell:
 
 | step | `GHI / CS(valid_time)` p99 / max | `GHI / CS(mean over preceding step)` p99 / max |
 |---|---|---|
@@ -218,7 +218,7 @@ significand](../api/delta_store/index.md) the table stores, costs at most
 6.8 × 10⁻³ ° of direction and 2.4 × 10⁻³ m s⁻¹ of speed over a full run — the same order as the
 rounding the table already applies, and far below anything a forecast responds to.
 
-Written through the production path (same significand rounding, sort order and writer properties),
+Written through the production path (same significand rounding, sort order, and writer properties),
 the full column set both ways:
 
 | run | speed + direction | u + v | change |

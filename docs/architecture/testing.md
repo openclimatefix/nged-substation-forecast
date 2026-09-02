@@ -153,9 +153,9 @@ not treated as a target and still runs in parallel, since a filtered run can sti
 worker's captured-off stdout never reaches the controller, so parallelising a `-s` run would
 silently drop the output `-s` exists to show — exactly the debug-print step of the "single test"
 loop this plugin otherwise protects. The plugin reads pytest's own parsed `known_args_namespace`
-rather than hand-scanning the raw argument list, so every pytest flag that takes a value (`-W`,
-`-o`, `--deselect`, …) is handled correctly, not just the ones the plugin happens to name (see the
-plugin's own docstring for the one narrow exception).
+rather than hand-scanning the raw argument list. Every pytest flag that takes a value (`-W`,
+`-o`, `--deselect`, …) is therefore handled correctly, not just the ones the plugin happens to
+name (see the plugin's own docstring for the one narrow exception).
 
 The auto-injection can't be a `pytest_load_initial_conftests` hook in the root `conftest.py`
 itself — that hook fires as part of loading the root `conftest.py`, so a hookimpl defined inside it
@@ -240,8 +240,8 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
   environment and would silently uninstall those extra workspace members. The job also sets
   dummy values for the three required `NGED_S3_*` `Settings` fields: most tests monkeypatch
   them, but a few construct `Settings()` directly and locally rely on the developer's `.env`,
-  which CI doesn't have. The `ci` job is a required status check on `main` (configured in the
-  GitHub branch-protection settings, not in the workflow file).
+  which CI doesn't have. The `ci` job is a required status check on `main` (configured in a
+  GitHub repository ruleset, not in the workflow file).
 - **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated
   tests (`uv run pytest --run-network -m network`) on a daily schedule, plus
   `workflow_dispatch` for on-demand runs. This is the only CI that touches the real

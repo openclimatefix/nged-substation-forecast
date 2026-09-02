@@ -15,30 +15,29 @@
 > illustrative sketch code, not the implementation. See the [roadmap index](index.md) for status
 > conventions.
 
-This is the deep-dive behind two of the "innovative and unique" capabilities highlighted in the
-Milestone 1 report: natively handling **unmetered generation** and **apparent-power (MVA)
+This page is the deep-dive behind two of the "innovative and unique" capabilities the Milestone
+1 report highlights: natively handling **unmetered generation** and **apparent-power (MVA)
 metering**. (The third — dynamically-changing **effective capacity** of metered generators — is
 the v0.7 deliverable, planned in [Capacity estimation](capacity-estimation.md); v2 builds on its
 output.)
 
 ## The problem: net power is not demand
 
-What a substation meter records is not demand. It is **net power** — the sum of true underlying
-demand minus behind-the-meter generation (rooftop PV, small wind, battery discharge) plus any
-unregistered or poorly-metered embedded generation. The "latent, unobserved demand" is the load
-that would be seen at the meter if all distributed energy resources (DERs) were removed.
-Recovering that latent signal is the disaggregation problem.
+What a substation meter records is not demand. The meter reading is **net power** — the sum of
+true underlying demand minus behind-the-meter generation (rooftop PV, small wind, battery
+discharge) plus any unregistered or poorly-metered embedded generation. The "latent, unobserved
+demand" is the load that would be seen at the meter if all distributed energy resources (DERs)
+were removed. Recovering that latent signal is the disaggregation problem.
 
 Compounding this, each primary substation spends roughly **10% of its operating time in an
 abnormal running arrangement** (ARA) — a state in which switching events reroute a block of load
-from its normal parent substation to a neighbour, so the metered signal is structurally different
-from what it would be under normal topology. NGED requires forecasts expressed **as if the
-network is always in its normal running arrangement** — the latent demand under nominal topology,
-which is precisely the quantity network planners need. The full problem statement lives in the
-background docs ([switching events](../background/switching-events.md),
-[NGED's network](../background/network.md));
-[forecast building blocks](forecast-building-blocks.md) covers how the "normal running
-arrangement" target is delivered.
+from its normal parent substation to a neighbour. The metered signal is therefore structurally
+different from what it would be under normal topology. NGED requires forecasts expressed **as if
+the network is always in its normal running arrangement** — the latent demand under nominal
+topology, which is precisely the quantity network planners need. The full problem statement lives
+in the background docs ([switching events](../background/switching-events.md), [NGED's
+network](../background/network.md)); [forecast building blocks](forecast-building-blocks.md)
+covers how the "normal running arrangement" target is delivered.
 
 The engine below attacks this by
 [inversion through a differentiable forward model](../techniques/differentiable-physics.md#the-core-idea-inversion-through-a-differentiable-forward-model):
@@ -57,7 +56,7 @@ compound. The tractability ranking across DER types is:
 |---|---|---|
 | PV | Excellent | Irradiance-driven; panel behaviour is near-identical across sites; errors average out at fleet level |
 | Wind | Good | Wind-speed-driven via a learnable power curve; more spatial heterogeneity than PV but still exogenous |
-| Heat pumps | Intermediate | Temperature-driven with COP rolloff; heterogeneity partly averages out at substation aggregate level |
+| Heat pumps | Intermediate | Temperature-driven with coefficient-of-performance (COP) rolloff; heterogeneity partly averages out at substation aggregate level |
 | EVs | Poor | No clean exogenous driver; behaviour is synchronised (school-run, cheap-rate charging), so errors compound rather than cancel; synchronised peaks are exactly what matters to the grid |
 | Batteries | Very poor | Pure latent control — tariff/market-driven with no physical exogenous signal; two identical batteries sitting next to each other can dispatch in opposite directions simultaneously |
 
@@ -71,15 +70,11 @@ hardest case.
 
 **The literature backs both calls and adds a caveat for heat pumps**, as the [energy-forecasting
 review](../background/energy-forecasting-review.md#9-disaggregating-other-distributed-energy-resources-heat-pumps-electric-vehicle-chargers-and-batteries)
-sets out. For batteries, a Northern Powergrid code of practice fits diversity curves to demand, heat
-pumps, and chargers alike, then states that diversity "should not be applied when considering a BESS
-device" — a diversity factor of exactly one. For electric vehicles, NGED's own Electric Nation trial
-found that under a time-of-use tariff the share of charging events starting in the 22:00 hour rose
-from 5.8% to 24.7%, and to 37.6% among participants using the smart-charging app: a population that
-had diversified re-synchronising around the cheap-rate window, which is the failure mode the caveat
-above covers. For heat pumps, the one measurement the review found showed demand per heat pump
-falling as more are aggregated, but in an average winter. Whether that diversity survives the cold
-snaps when a substation is under most strain is untested.
+sets out: a Northern Powergrid code of practice puts batteries at a diversity factor of exactly
+one; NGED's own Electric Nation trial found a time-of-use tariff re-synchronising EV charging
+into the 22:00 hour, the failure mode the caveat above covers; and the one heat-pump diversity
+measurement the review found holds only in an average winter, untested in the cold snaps when a
+substation is under most strain.
 
 ## The forward model
 
@@ -196,8 +191,8 @@ Where cross-site information genuinely helps the under-determined per-site fit, 
 universal basis shapes
 ([`UniversalSolarFleetNode`](../techniques/differentiable-physics.md#scaling-to-aggregate-fleets-universalsolarfleetnode);
 `BasisLoadNode` above), with only a per-site *style vector* learned locally. Each node's physics
-modules compute explicit physical generation, and a hard Kirchhoff balance node then aggregates
-the elements:
+modules compute explicit physical generation. A hard Kirchhoff balance node then aggregates the
+elements:
 
 $$\text{Net substation flow} = \text{Gross demand} - \gamma_{\text{PV}}\,(\text{PV}_{\text{metered}} + \text{PV}_{\text{unmetered}}) - \gamma_{\text{wind}}\,(\text{Wind}_{\text{metered}} + \text{Wind}_{\text{unmetered}})$$
 
@@ -286,14 +281,15 @@ few menu items genuinely present behind each substation
 the selection is literal); the
 [monotone-growth constraint](#unmetered-installed-capacity-grows-monotonically) encodes that
 fleets don't shrink; and fitting many substations jointly against shared weather sharpens the
-identification. There is respectable precedent: Wytock & Kolter's *contextually supervised source
+identification. There is respectable precedent: [Wytock and Kolter
+(2014)](https://arxiv.org/abs/1312.5023)'s *contextually supervised source
 separation* did convex energy disaggregation in exactly this spirit.
 
 **Hard limits of the convex-only route** — stated up front, because they define its role:
 
 - **It cannot refine the menu.** If reality sits between two menu items, the fit returns a blend;
-  systematic error in the physics curves becomes *bias*, not something learnable. (The full
-  engine, which learns shapes, can correct this.)
+  systematic error in the physics curves becomes *bias*, not a shape the model can learn to
+  correct. (The full engine, which learns shapes, can correct this.)
 - **It cannot do behaviour.** EV plugging and battery arbitrage are not weather-shaped dictionary
   atoms — see the [tractability ranking](#der-tractability-ranking); batteries are already ceded
   to price-driven methods regardless of estimator.
@@ -306,21 +302,21 @@ separation* did convex energy disaggregation in exactly this spirit.
 
 **Its role**: a transparent early disaggregator, and *permanently* the baseline on the
 [disaggregation leaderboard](../techniques/disaggregation-evaluation.md) — simple, reproducible,
-and embarrassing to any fancier model that cannot outperform it. The full engine earns its
-complexity only by beating this.
+and embarrassing to any fancier model that cannot outperform it. The full engine is worth its
+added complexity only if it beats this baseline.
 
 ## Apparent-power (MVA) metering
 
-Some substations are metered only in apparent power (MVA), which reports the *absolute value* of flow and so cannot distinguish import from export — when embedded generation pushes power back into the grid, an MVA trace "bounces" off zero instead of going negative. Because the forward model reconstructs signed demand and generation explicitly, it handles this natively: we compare the measured MVA reading against the *magnitude* of the reconstructed net flow,
+Some substations are metered only in apparent power (MVA), which reports the *absolute value* of flow and so cannot distinguish import from export. When embedded generation pushes power back into the grid, an MVA trace "bounces" off zero instead of going negative. Because the forward model reconstructs signed demand and generation explicitly, it handles this natively: we compare the measured MVA reading against the *magnitude* of the reconstructed net flow,
 
 $$\text{MVA}_{\text{measured}} \approx \bigl|\,\text{Net substation flow}\,\bigr|$$
 
-(assuming near-unity power factor). The physics grounds the model so that a sunny-day "bounce" is correctly attributed to reverse power flow from generation, not to a spike in demand. This is one of the two capabilities the Milestone 1 report highlights for this engine — the other being unmetered disaggregation. (Note this reconstruction is intrinsically non-convex — the sign ambiguity means two valleys by construction — so it belongs to the PyTorch side of the [tooling rule](../techniques/convex-optimisation.md#where-pytorch-is-the-right-tool).)
+(assuming near-unity power factor). The physics grounds the model so that a sunny-day "bounce" is correctly attributed to reverse power flow from generation, not to a spike in demand. This MVA-magnitude reconstruction is one of the two capabilities the Milestone 1 report highlights for this engine — the other being unmetered disaggregation. (Note this reconstruction is intrinsically non-convex — the sign ambiguity means two valleys by construction — so it belongs to the PyTorch side of the [tooling rule](../techniques/convex-optimisation.md#where-pytorch-is-the-right-tool).)
 
 Two implementation cautions:
 
 - **The magnitude loss needs smoothing.** $|x|$ is non-differentiable at zero and its gradient flips sign there — exactly where the bounce lives. Compare against a smoothed magnitude, e.g. $\sqrt{x^2 + \epsilon}$, and add a temporal-continuity prior on the *sign* of the reconstructed flow: flow direction persists for hours, it does not flicker half-hour to half-hour.
-- **The near-unity power-factor assumption is weakest precisely at the bounce.** As real power passes through zero, reactive power dominates the measured magnitude, so the MVA trace has a soft *floor* above zero rather than a clean reflection. Expect the reconstruction to under-fit the bottom of the bounce, and do not let the optimiser explain the floor with phantom demand. The [energy-forecasting review](../background/energy-forecasting-review.md#7-recovering-signed-power-from-apparent-power-meters) confirms both cautions: a magnitude-only reading leaves more than one state of the network consistent with it, a result power-system state estimation has worked with since the 1990s. And apparent power is the magnitude of real power only near unity power factor, so the approximation is weakest exactly at the bounce. [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/), the closest published attempt to NGED's position, resolves the ambiguity using the meter's own history together with a model of the generation behind the meter, rather than a second independent measurement.
+- **The near-unity power-factor assumption is weakest precisely at the bounce.** As real power passes through zero, reactive power dominates the measured magnitude, so the MVA trace has a soft *floor* above zero rather than a clean reflection. Expect the reconstruction to under-fit the bottom of the bounce, and do not let the optimiser explain the floor with phantom demand. The [energy-forecasting review](../background/energy-forecasting-review.md#7-recovering-signed-power-from-apparent-power-meters) confirms both cautions: a magnitude-only reading leaves more than one state of the network consistent with it, a result power-system state estimation has worked with since the 1990s. And apparent power is the magnitude of real power only near unity power factor, so the approximation is weakest exactly at the bounce. [SSEN's TRANSITION](https://ssen-innovation.co.uk/transition/), the closest published attempt to NGED's position we found, resolves the ambiguity using the meter's own history together with a model of the generation behind the meter, rather than a second independent measurement.
 
 ## Handling abnormal running arrangements
 
@@ -328,12 +324,12 @@ Abnormal running arrangements (ARAs) — where switching events reroute load bet
 so the metered signal no longer reflects the normal running arrangement — are covered in their
 own canonical doc: **[Switching events & latent demand](switching-events.md)**.
 
-In brief: the v0.6 stage detects switching events with unsupervised statistics on the power
-series; the v2 stages reconstruct the latent demand each substation would have metered under the
+In brief, the v0.6 stage detects switching events with unsupervised statistics on the power
+series. The v2 stages reconstruct the latent demand each substation would have metered under the
 normal running arrangement, using a time-varying **mixture over the neighbourhood graph**
-(optionally type-resolved into demand / PV / wind, each a physics module as in
-[the engine above](#the-graph-structured-engine)). Two points matter for consistency with the
-rest of this document:
+(optionally type-resolved into demand / PV / wind, each a physics module as in [the engine
+above](#the-graph-structured-engine)). Two points matter for consistency with the rest of this
+document:
 
 - The graph is a **data structure** — who can exchange load with whom.
 - Conservation is a **node-level flow balance** across a 2–3-way fan-out (a source's loss
@@ -355,33 +351,32 @@ work on separating net load into behind-the-meter PV and native demand, includin
 approaches where nodes are net-load measurements at neighbouring units and message passing encodes
 spatial correlation. Unsupervised methods that leverage the irradiance–PV correlation without any
 physical model also exist. "GNN over neighbouring nodes for net-load → PV + load disaggregation" is,
-by itself, a known approach. **Convex disaggregation** also has precedent: Wytock & Kolter's
+by itself, a known approach. **Convex disaggregation** also has precedent: [Wytock and Kolter
+(2014)](https://arxiv.org/abs/1312.5023)'s
 contextually supervised source separation is the direct ancestor of
 [the dictionary baseline above](#the-convex-dictionary-baseline).
 
-**The nearest GB precedent is a sibling Open Climate Fix project on the same problem, which has not
-yet published a result.** [UK Power Networks' Power Flow to Solar
-Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) infers the capacity of
-unmetered solar behind each primary substation from half-hourly substation load and weather, then
-forecasts that generation, and Open Climate Fix is a partner in both that project and Flexpectation.
-The [energy-forecasting
-review](../background/energy-forecasting-review.md#8-disaggregating-unmetered-solar-and-wind-from-a-substations-net-flow)
-found no published benchmark of inferring capacity from the net flow at primary-substation
-aggregation. The nearest published method at a comparable scale, [Teng et al.
-(2023)](https://doi.org/10.1016/j.rser.2023.113662)'s DAZLS, splits unmetered wind and solar out of
-Dutch substation measurements but needs each site's installed capacity as an input — half of what
-this engine has to infer. The one result the review found that separated solar from demand at a real
-distribution substation without being told the installed capacity, [Kara et al.
-(2018)](https://doi.org/10.1016/j.segan.2017.11.001), needed the substation's own reactive power
-and a nearby solar plant's output standing in for irradiance, neither of which NGED's primary
-substations routinely supply.
+**The nearest GB precedent we found is a sibling Open Climate Fix project on the same problem,
+which has not yet published a result** — see the [energy-forecasting
+review](../background/energy-forecasting-review.md#8-disaggregating-unmetered-solar-and-wind-from-a-substations-net-flow)'s
+assessment of UK Power Networks' Power Flow to Solar Capacity, the project this engine's
+unmetered-PV work builds on. The review found no published benchmark of inferring capacity from
+the net flow at primary-substation aggregation. The nearest published method at a comparable
+scale, [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662)'s DAZLS, splits unmetered
+wind and solar out of Dutch substation measurements but needs each site's installed capacity as
+an input — half of what this engine has to infer. The one result the review found that separated
+solar from demand at a real distribution substation without being told the installed capacity,
+[Kara et al. (2018)](https://doi.org/10.1016/j.segan.2017.11.001), needed the substation's own
+reactive power and a nearby solar plant's output standing in for irradiance, neither of which
+NGED's primary substations routinely supply.
 
 **Physics-informed neural networks for PV generation** are established. There is prior work on
 differentiable physics mapping weather to PV power, and at least one patent on unsupervised solar
 disaggregation using a physics-based irradiance-to-power model as the inversion constraint.
 
 **Switching state-space machinery** exists off the shelf. Recurrent switching linear dynamical
-systems (rSLDS; Linderman, Johnson et al., AISTATS 2017) and explicit-duration variants (RED-SDS) are
+systems (rSLDS; [Linderman et al.
+(2017)](https://proceedings.mlr.press/v54/linderman17a.html)) and explicit-duration variants (RED-SDS) are
 standard tools for unsupervised segmentation of multivariate time series into discrete latent modes.
 We considered this machinery for ARA handling but did **not** adopt it: it presumes a discrete,
 re-identifiable switching unit (a per-feeder "block") that NGED's meshed, radially-run network with
@@ -402,10 +397,11 @@ we only have half-hourly data, which blurs that info.
 The novelty lies in the **combination and problem framing**, not in any single component:
 
 **1. Switching events as the primary disaggregation target, not an afterthought.** Existing
-disaggregation literature treats the network topology as fixed and known. The ARA problem — where the
-topology itself is a latent variable that flips over timescales of minutes to months — has not been
-addressed in the disaggregation literature. This is not a minor extension; it changes the
-structure of the inference problem fundamentally. The [energy-forecasting
+disaggregation literature treats the electricity network's topology as fixed and known. The ARA
+problem — where the topology itself is a latent variable that flips over timescales of minutes to
+months — has not been addressed in the disaggregation literature we reviewed. This is not a minor
+extension; it changes the structure of the inference problem fundamentally. The
+[energy-forecasting
 review](../background/energy-forecasting-review.md#why-we-think-this-ambitious-plan-can-be-done)
 reports the nearest precedent it found as [Liu et al.
 (2019)](https://doi.org/10.1109/ACCESS.2019.2951422), who condition a forecast on an
@@ -433,7 +429,8 @@ publishable contribution that distinguishes OCF's approach from prior academic w
 operates at GSP/DNO-region scale (e.g. Sheffield Solar's PV Live) or at individual household level
 (NILM). The primary substation level — aggregating hundreds of customers, but below the GSP — is the
 level at which DER invisibility is operationally critical, and it is the level at which NGED's data
-exists. Systematic, open benchmarking at this resolution does not yet exist.
+exists. Systematic, open benchmarking at this resolution does not yet exist, as far as the published
+work we reviewed shows.
 
 **6. Real-power-only inference — the "no-voltage" constraint as a novelty claim, not just a
 limitation.** As [the prior art review](#what-already-exists-prior-art) notes, existing topology and switch-state identification work relies

@@ -5,10 +5,10 @@ disk, or S3 — Simple Storage Service, AWS's object store) and **what credentia
 This page is the reference; the step-by-step journeys that *use* these settings live elsewhere
 and deliberately aren't repeated here:
 
-- [Getting started on your laptop](../getting-started.md) owns first-time repo setup — installing
-  `uv`, `uv sync`, pre-commit hooks, creating `.env`, and materialising the first data and model.
-- [Running the whole stack locally](local.md) owns the laptop bring-up (persistent
-  `DAGSTER_HOME`, `dg dev`, the optional MinIO rehearsal).
+- [Getting started on your laptop](../getting-started.md) owns first-time repo setup and the
+  laptop bring-up — installing `uv`, `uv sync`, pre-commit hooks, creating `.env`, a persistent
+  `DAGSTER_HOME`, `dg dev`, materialising the first data and model, and the optional MinIO
+  rehearsal.
 - [Setting up the live service on AWS](aws.md) owns every AWS console step — buckets, IAM
   (Identity and Access Management — AWS's permissions system), the container image, and the
   control-plane box.
@@ -29,7 +29,7 @@ The single most important idea is that there are **three** roots, not one:
 | Root | Env var | May be `s3://`? | Holds |
 |---|---|---|---|
 | Internal data tables | `DATA_PATH_INTERNAL` | **Yes** | NWP, power observations, forecast metrics — everything not on the NGED-facing delivery list |
-| Delivery data tables | `DATA_PATH_DELIVERY` | **Yes** | The NGED-facing delivery tables (`power_forecast`, `effective_capacity`, …) |
+| Delivery data tables | `DATA_PATH_DELIVERY` | **Yes** | The NGED-facing delivery tables (`power_forecasts`, `effective_capacity`, …) |
 | Local artifacts | `LOCAL_ARTIFACTS_PATH` | No — always local | The promoted production model, plot HTML |
 
 > **On AWS, the two data-table roots point at two separate buckets** — `DATA_PATH_DELIVERY`
@@ -50,14 +50,14 @@ container image, not to shared storage:
   `load()` (see
   [Production Deployment — Design](../architecture/production-deployment.md),
   [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)). This local
-  directory is the build-time staging area that gets copied into the image; on the deployed task the
-  model is read from the image's own filesystem.
+  directory is the build-time staging area that gets copied into the image. On the deployed task,
+  the model is read from the image's own filesystem.
 - **Plot HTML** — a **local-dev convenience** only (materialise, open in a browser); see
   [Operating the live service: Inspecting a live forecast](operations.md#inspecting-a-live-forecast)
   for why it is not the way to view forecasts in a deployed service.
 
 So the deployed AWS runtime reads its model from the image, reads data from S3, and writes forecasts
-to S3 — it never uses `LOCAL_ARTIFACTS_PATH` as shared storage at all. All three roots default to
+to S3. It never uses `LOCAL_ARTIFACTS_PATH` as shared storage at all. All three roots default to
 `<repo>/data`, so out of the box everything lives under one local directory and the distinction is
 invisible; it only matters once `DATA_PATH_INTERNAL` and `DATA_PATH_DELIVERY` become `s3://` URIs.
 
@@ -111,12 +111,13 @@ NGED_S3_BUCKET_SECRET=<secret>
 `.env` is git-ignored — never commit real credentials.
 
 Leave them unset and `Settings` still builds: the ingest asset raises an error naming the unset
-variables when it runs, while every other asset, the test suite, training and the dashboards carry
-on. That keeps a laptop, a CI runner and a training job free of third-party credentials they never
-use ([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)),
-and it confines a mis-wired secret to the one schedule that needs it —
-[Step 8 of the AWS runbook](aws.md#step-8-store-secrets-in-parameter-store) explains why a deployment
-should *not* promote that into a start-up failure.
+variables when it runs, while every other asset, the test suite, training, and the dashboards
+carry on. That keeps a laptop, a CI runner and a training job free of third-party credentials they
+never use
+([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)),
+and it confines a mis-wired secret to the one schedule that needs it — [Step 8 of the AWS
+runbook](aws.md#step-8-store-secrets-in-parameter-store) explains why a deployment should *not*
+promote that into a start-up failure.
 
 The optional `SENTRY_*` settings (`SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_MONITOR_FORECASTS`,
 `SENTRY_TRACES_SAMPLE_RATE`) enable error telemetry and the missed-check-in alarm; an empty
@@ -139,7 +140,7 @@ depends on where the code runs:
   which user), but **not** `ENDPOINT_URL`.
 - **A local MinIO rehearsal** — set all four; `ENDPOINT_URL` is only for non-AWS/S3-compatible
   endpoints (and it deliberately allows plain HTTP, which dev endpoints rarely encrypt). See
-  [Running the whole stack locally](local.md#optional-rehearse-s3-locally-with-minio).
+  [Getting started on your laptop](../getting-started.md#optional-rehearse-s3-locally-with-minio).
 
 ### At-a-glance: which settings for which environment
 

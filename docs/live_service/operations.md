@@ -21,7 +21,8 @@ why this was chosen over fetching the champion model from MLflow dynamically at 
 Everything on this page is driven from the Dagster UI, and is the same whichever environment
 the stack runs in — bring one up first:
 
-- **Locally on a laptop** — [Running the whole stack locally](local.md); the UI is at
+- **Locally on a laptop** — [Getting started on your
+  laptop](../getting-started.md#running-the-live-service-on-your-laptop); the UI is at
   `http://localhost:3000` and runs execute on your machine.
 - **Deployed on AWS** — [Setting up the live service on AWS](aws.md); the UI is at
   `http://nged-forecast-ctrl:3000` over Tailscale, and each run executes on an ephemeral
@@ -30,7 +31,7 @@ the stack runs in — bring one up first:
 
 Either UI shows every asset, most of which are nothing to do with running the service. Paste
 `tag:layer=production` into the asset-selection box to cut the view down to the four that produce
-the forecasts: `power_time_series_and_metadata`, `h3_grid_weights`, `ecmwf_ens` and
+the forecasts: `power_time_series_and_metadata`, `h3_grid_weights`, `ecmwf_ens`, and
 `live_forecasts`. The promotion assets used in steps 1–2 below are deliberately *not* in that
 selection: they need MLflow, which the deployment does not reach, so you run them yourself —
 today from your laptop, as step 2 says — whichever environment serves the forecasts.
@@ -51,7 +52,7 @@ leaderboard in the MLflow UI (`uv run mlflow ui --gunicorn-opts "--workers 1"` �
 [ML Experimentation: Viewing results in the MLflow UI](../ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)).
 
 A run trained before a feature was renamed in the code cannot be served, and nothing in the table
-marks it — Step 2 refuses it rather than letting you discover that at the next 6-hourly tick.
+marks it. Step 2 refuses it rather than letting you discover that at the next 6-hourly tick.
 
 Copy the `run_id` of the fold you want to promote.
 
@@ -169,7 +170,8 @@ task definition at the tag — see
 that was previously deployed avoids the rebuild.
 
 This path works today but is not yet one command, which is what
-[T3.2](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) measures.
+[T3.2, rollback effort](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback)
+measures.
 
 ## Degraded input data — NWP feed down, or telemetry stalled
 
@@ -206,7 +208,7 @@ Mind the order when it *is* truncated: never-reported series come first, then th
 so a roster with more than 50 never-reported series fills the table and no stale series appears in
 it at all. Read `n_stale` and `n_never_reported` — never truncated — before concluding from the
 table that nothing has gone stale. All three counts, and `n_series_total` beside them, describe the
-series the check is *watching*: the silenced ones below are excluded from every one of them.
+series the check is *watching*: the silenced series below are excluded from every one of them.
 
 **Silencing a series we know is dead.** `_KNOWN_DEAD_TIME_SERIES_IDS` in
 `src/nged_substation_forecast/defs/checks.py` lists the `time_series_id`s the check ignores, so a
@@ -227,7 +229,7 @@ series keeps reporting, so a series that revives for an afternoon and dies again
 `n_silenced` counts the ids you listed, not the ids that were actually withheld, so an id that
 matches no series still appears: that is how a mistyped id shows itself rather than vanishing.
 
-One description means something different from all the others. `Could not evaluate power-data
+One description flags a different failure mode from all the others. `Could not evaluate power-data
 freshness: …` is the check reporting that it could not read its own inputs — suspect the object
 store, or a `metadata.parquet` left half-written by a killed process — not that the feed has
 stalled. The named exception is in the description, the full traceback is in the run's logs, and
@@ -249,7 +251,7 @@ a fix rather than a re-run.
 
 The 6-hourly forecasts are unaffected while this persists, however long it persists: `live_forecasts`
 locates each series from the promoted model's own frozen copy of the roster rows it trained against,
-never from the roster itself. What a stalled upsert costs is the metadata change, which matters at
+never from the roster itself. What a stalled upsert loses is the metadata change, which matters at
 the next training run.
 
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from
@@ -306,15 +308,15 @@ which fail ingest outright and show up as a missed run instead.
 **Reading the NWP completeness check.** `nwp_run_is_complete` also runs inside `ecmwf_ens`, also
 non-blocking WARN, and asks the other question: did the whole run arrive? Its description names
 the missing ensemble members and the missing lead times in hours, and its metadata carries the
-observed-versus-expected member, step, cell and row counts. **The run has already landed when this
-warns** — a short run is kept, because partial NWP forecasts better than falling back on
+observed-versus-expected member, step, cell, and row counts. **The run has already landed when
+this warns** — a short run is kept, because partial NWP forecasts better than falling back on
 yesterday's run. The action is to chase Dynamical.org, and to re-materialise the partition once
 they republish the complete run.
 
-**All three NWP checks share one description that means something different from all the others**,
-just as `power_data_is_fresh` does above. `Could not assess the ingested NWP run: …` says the
-assessment itself failed, not that the run is degraded — so it appears on all three checks at once,
-and the shape metadata (`n_ensemble_members` and the rest) and the grid-point metadata
+**All three NWP checks share one description that flags a different failure mode from all the
+others**, just as `power_data_is_fresh` does above. `Could not assess the ingested NWP run: …` says
+the assessment itself failed, not that the run is degraded — so it appears on all three checks at
+once, and the shape metadata (`n_ensemble_members` and the rest) and the grid-point metadata
 (`null_nwp_grid_point_fraction` and `n_null_nwp_grid_points`) are absent from that materialisation:
 there is no report to read them from. Treat the corruption rate as unknown for that run, not zero,
 and mind the gap when reading the trend. The run still lands. One Sentry event is sent, tagged
@@ -322,9 +324,9 @@ and mind the gap when reading the trend. The run still lands. One Sentry event i
 
 **Re-materialising a partition that has already landed replaces it.** `write_nwp` overwrites the
 `(nwp_model_id, init_time)` partition it is handed rather than appending to it, so re-running the
-partition after Dynamical republishes a run swaps the short copy for the complete one. Wait until
+partition after Dynamical republishes a run swaps the short copy for the complete copy. Wait until
 they actually have: a re-run against a run that is still incomplete replaces the good rows with the
-short ones. The same holds for a partition whose run *failed* — re-running replaces whatever
+short rows. The same holds for a partition whose run *failed* — re-running replaces whatever
 landed, so there is no need to inspect the table first.
 
 Two things a re-run does cost:
@@ -347,7 +349,7 @@ Two things a re-run does cost:
   immediately instead of seven days later.
 
 Every materialisation whose completeness assessment succeeded also publishes `n_ensemble_members`,
-`n_valid_times`, `n_h3_cells` and the `valid_time` range as metadata, so the Dagster UI timeline
+`n_valid_times`, `n_h3_cells`, and the `valid_time` range as metadata, so the Dagster UI timeline
 shows slow drift in the upstream dataset before it becomes a warning.
 
 **Reading the live-forecast check.** `live_forecasts_are_healthy` runs against `live_forecasts`
@@ -382,10 +384,10 @@ forecast uses the freshest run). Read it as follows.
 - **absent from the metadata** — the NWP table holds no run at or before this slot, so the count
   has no finite answer; the description says so. Expect `live_forecasts` itself to be failing too.
 
-One count deserves a caveat: the check demands the day's run by 14:00 UTC, late enough to clear the
-08:30 download plus its retry window, so a download that fails today first shows up at the 18:00
-slot rather than the 12:00 one. That six-hour lag is deliberate — the alternative is a false alarm
-on every morning the download merely ran slowly.
+One count deserves a caveat: the check demands the day's run by 14:00 UTC, so a download that
+fails today first shows up at the 18:00 slot rather than the 12:00 one — deliberately, for the
+reasoning in [Production Deployment — Design: the missed daily NWP run
+count](../architecture/production-deployment.md#read-the-live-forecast-back-off-disk-with-a-second-asset-check).
 
 **When `live_forecasts` fails outright.** Today, if no NWP run on disk is recent enough to cover
 the forecast horizon (roughly 15 days of staleness), the asset raises rather than producing a
@@ -399,9 +401,9 @@ series is *not* a data outage — it is a promotion bug, and it is meant to fail
 (step 2), or roll back
 ([above](#rolling-back-to-the-previous-champion)).
 
-**Log the intervention.** Every entry above that needed a human is a data point for
-[T1.1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself): append
-a row to the [intervention log](intervention-log.md) with the date, the trigger, the cause, the
+**Log the intervention.** Every entry above that needed a human is a data point for the
+[T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself):
+append a row to the [intervention log](intervention-log.md) with the date, the trigger, the cause, the
 minutes spent, and whether this runbook covered it. A gap in this page is itself the finding.
 
 ## Inspecting a live forecast
@@ -436,8 +438,8 @@ in [step 3](#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand))
 what NWP data was genuinely available at that historical `power_fcst_init_time`, rather than
 accidentally using data that only arrived afterwards.
 
-This is also the shape of the "local dress rehearsal" for
+Backfilling in replay mode is also the shape of the "local dress rehearsal" for
 [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208): run `dg dev`
-continuously for several days, confirm a forecast lands every 6 hours, then deliberately kill a
-run mid-flight and backfill the missed partition in replay mode — confirming no duplicate rows
+continuously for several days, confirm a forecast lands every 6 hours. Then deliberately kill a
+run mid-flight and backfill the missed partition in replay mode, confirming no duplicate rows
 land in `power_forecasts` either way.

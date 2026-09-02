@@ -30,10 +30,9 @@ the weekly re-train is priced as an ephemeral EC2 GPU instance (start, train, pr
 model, terminate); the GPU rates are from the price-list API on 2026-07-23, converted at the
 same \$1 = £0.75.
 
-## v1 (32 time series): ~£25–35/month
+## v1 (32 time series)
 
-**Headline cost: ~£25–35/month** (nudging ~£40 only if the polling-and-ingest line lands at
-its pessimistic top). The headline covers everything needed to keep the deployed service
+**Headline cost: ~£27–40/month.** The headline covers everything needed to keep the deployed service
 running unattended: the always-on control plane, every scheduled Fargate run (inference,
 ingest, and polling), S3 storage and requests, data transfer, and the planned weekly
 re-train. It excludes ML experimentation — backtests are priced per run rather than per
@@ -43,7 +42,7 @@ account to read the delivery bucket. It is made up of:
 | Component | £/month |
 |---|---|
 | Always-on control plane (EC2 `t4g.medium` + 20 GB EBS) | 15–22 (1-yr reserved vs on-demand) |
-| Live Fargate inference (4 runs/day) + hourly polling & ingest | 5–12 |
+| Live Fargate inference (4 runs/day) + hourly polling & ingest | 9–13 |
 | S3 storage (~100 GB) + requests | 2–4 |
 | Data transfer (ingress + egress) | ≈0 |
 | Weekly re-training (planned; ephemeral GPU instance) | ~£1 |
@@ -63,7 +62,7 @@ existing control-plane box — nothing new billable beyond a DNS domain and host
 (pennies per month). The only material new billable resource across all three stages is the
 second Fargate task/service for Stage 3's public Marimo instance, roughly priced by the
 same-shaped workload in
-[Option D](../roadmap/live-service.md#option-d-serverless-control-plane-no-pets-4145month)
+[Option D](production-deployment.md#option-d-serverless-control-plane-no-pets-4145month)
 (~£6.20/month for Marimo as its own tiny Fargate service).
 
 ### Workload model
@@ -111,7 +110,7 @@ at v1 scale come to **~£2–4/month in total**:
   internet egress (the Tailscale-tunnelled Dagster UI and Marimo dashboard) is a few
   GB/month, inside AWS's account-wide 100 GB/month free egress allowance (£0.067/GB
   beyond).
-- **Everything else — pennies.** ECR image storage and CloudWatch Logs ingestion for ~1,000
+- **Everything else — pennies.** Elastic Container Registry image storage and CloudWatch Logs ingestion for ~1,000
   task runs/month — one Fargate task per schedule tick, matching the ~1,000 materialisations/month
   above (see
   [Production Deployment — Design](production-deployment.md#running-the-data-ingest-runs-on-the-control-plane-vm))
@@ -145,10 +144,10 @@ bill does not follow it:
   — dragging inference compute and forecast storage with it.
 
 **Headline cost: projected ~£70–140/month** — roughly 3–4× the v1 bill, dominated by
-inference compute. The headline includes the same things as v1's: the control plane, every
-scheduled run (with inference on a larger task), storage and requests (now growing
+inference compute. The headline includes the same components as v1's: the control plane,
+every scheduled run (with inference on a larger task), storage and requests (now growing
 ~£5/month with each further year of history), and the weekly GPU re-train at its
-heavier-model bracket. It excludes the same things too — per-run backtests and
+heavier-model bracket. It excludes the same items too — per-run backtests and
 experimentation, and NGED's read-side compute — plus any internet-egress spend if NGED pull
 bulk history over the public internet rather than reading from eu-west-2 (both priced
 below). It is made up of:
@@ -216,8 +215,8 @@ experimentation.
 
 The weekly re-train scales the same way. We may also adopt somewhat heavier models at v2, so
 the ~10-minute v1 laptop train (~£1/month as an AWS GPU run — see the
-[v1 estimate](#v1-32-time-series-2535month)) grows on both axes at once. Bracketing one to
-four hours per weekly run on a single-GPU instance — `g4dn.xlarge` (1× T4, £0.46/hr) up to
+[v1 estimate](#v1-32-time-series)) grows on both axes at once. Bracketing 1 to 4
+hours per weekly run on a single-GPU instance — `g4dn.xlarge` (1× T4, £0.46/hr) up to
 `g6.xlarge` (1× L4, \$1.02/hr → £0.77/hr) — gives ~£0.50–3/run, or **~£2–15/month**. That
 range is wide because both the model family and its training time are still open; like the
 inference figures above, it is a bracket to re-measure, not a commitment.
