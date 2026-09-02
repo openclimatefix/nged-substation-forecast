@@ -79,3 +79,13 @@ repos:
         entry: uv run python scripts/lint_docstring_markdown.py
         language: system
         types: [python]
+      # `mkdocs build --strict` only validates links *inside* docs/, so a link to the published
+      # site from a docstring, a comment, or a workflow file can point at a page a rename moved,
+      # or an anchor a heading rewrite killed, with nothing to catch it. This hook does — see the
+      # script's docstring for why it converts each page with the real markdown converter instead
+      # of a hand-rolled slugify.
+      - id: check-docs-links
+        name: docs links (check_docs_links)
+        entry: uv run python scripts/check_docs_links.py
+        language: system
+        types_or: [python, markdown, yaml]

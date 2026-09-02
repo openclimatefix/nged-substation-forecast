@@ -48,5 +48,8 @@ jobs:
       - name: Markdown lint (pymarkdown)
         run: uv run --no-sync pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 
+      - name: Docs links (check_docs_links)
+        run: uv run --no-sync python scripts/check_docs_links.py
+
       - name: Test (pytest)
         run: uv run --no-sync pytest
