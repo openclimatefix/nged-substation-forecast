@@ -281,7 +281,8 @@ few menu items genuinely present behind each substation
 the selection is literal); the
 [monotone-growth constraint](#unmetered-installed-capacity-grows-monotonically) encodes that
 fleets don't shrink; and fitting many substations jointly against shared weather sharpens the
-identification. There is respectable precedent: Wytock & Kolter's *contextually supervised source
+identification. There is respectable precedent: [Wytock and Kolter
+(2014)](https://arxiv.org/abs/1312.5023)'s *contextually supervised source
 separation* did convex energy disaggregation in exactly this spirit.
 
 **Hard limits of the convex-only route** — stated up front, because they define its role:
@@ -350,7 +351,8 @@ work on separating net load into behind-the-meter PV and native demand, includin
 approaches where nodes are net-load measurements at neighbouring units and message passing encodes
 spatial correlation. Unsupervised methods that leverage the irradiance–PV correlation without any
 physical model also exist. "GNN over neighbouring nodes for net-load → PV + load disaggregation" is,
-by itself, a known approach. **Convex disaggregation** also has precedent: Wytock & Kolter's
+by itself, a known approach. **Convex disaggregation** also has precedent: [Wytock and Kolter
+(2014)](https://arxiv.org/abs/1312.5023)'s
 contextually supervised source separation is the direct ancestor of
 [the dictionary baseline above](#the-convex-dictionary-baseline).
 
@@ -373,7 +375,8 @@ differentiable physics mapping weather to PV power, and at least one patent on u
 disaggregation using a physics-based irradiance-to-power model as the inversion constraint.
 
 **Switching state-space machinery** exists off the shelf. Recurrent switching linear dynamical
-systems (rSLDS; Linderman, Johnson et al., AISTATS 2017) and explicit-duration variants (RED-SDS) are
+systems (rSLDS; [Linderman et al.
+(2017)](https://proceedings.mlr.press/v54/linderman17a.html)) and explicit-duration variants (RED-SDS) are
 standard tools for unsupervised segmentation of multivariate time series into discrete latent modes.
 We considered this machinery for ARA handling but did **not** adopt it: it presumes a discrete,
 re-identifiable switching unit (a per-feeder "block") that NGED's meshed, radially-run network with

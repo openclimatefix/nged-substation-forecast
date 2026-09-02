@@ -328,10 +328,12 @@ Sentry's `environment` tag (from `Settings.sentry_environment`) keeps the two ap
 box sets `environment=production`; each developer overrides the `local` default with
 `<name>-laptop` (e.g. `jacks-laptop`, `alexs-laptop`), so error events filter cleanly by origin.
 The missed-check-in alert rule is scoped to `environment:production`, so an intermittently-run
-laptop never pages. When a developer wants to exercise the heartbeat path locally, they set
-`SENTRY_MONITOR_FORECASTS=true` and point it at a *throwaway* monitor slug (`live-forecasts-test`),
-never the production `live-forecasts` monitor — otherwise the shared production monitor would be
-left expecting a 6-hourly check-in that the laptop won't keep sending, and would flag it as missed.
+laptop never pages. A developer exercising the heartbeat path locally leaves `SENTRY_MONITOR_FORECASTS` off and
+calls `send_forecast_checkin` with a *throwaway* `monitor_slug` (`live-forecasts-test`), as the
+[Sentry verification script](../live_service/sentry.md#verify-it-works-from-your-laptop) does.
+The production slug is a constant in `_sentry.py`, not a setting, so a laptop that merely
+switched the flag on would check in to the shared `live-forecasts` monitor and then stop,
+leaving it expecting a 6-hourly check-in the laptop won't keep sending.
 The [AWS runbook](../live_service/aws.md) lists the exact environment variables set on the box.
 
 ## Separate "is this run usable?" from "is it perfect?"

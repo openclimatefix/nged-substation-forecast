@@ -14,9 +14,12 @@ with additional tricks from the 2026-07 codebase review, grouped into **effort t
 ordered by expected skill per unit effort *within* each tier — so an item late in the list can
 still be high value; it just costs more to land.
 
-**Horizon focus: days 3–10.** The product delivers a 14-day horizon
-([requirements](../background/requirements.md#core-objectives)), but users mostly act on
-forecasts roughly 3 to 10 days ahead. That band shapes the ordering below in three ways:
+**Horizon focus: days 3–10.** The product delivers a 14-day horizon, and users mostly act on
+forecasts roughly 1 to 10 days ahead
+([requirements](../background/requirements.md#core-objectives)). Days 0 to 2 are already well
+served by persistence-like power lags, so this page narrows its own focus to the 3–10 day
+sub-band, where new features have the most room to help. That band shapes the ordering below
+in three ways:
 wins that are fully forecastable at any horizon (calendar features, weather physics) outrank
 wins concentrated at day 0–2 (persistence-like anchors); ECMWF ENS steps drop from 3-hourly to
 6-hourly beyond 144 h, so interpolation quality matters most exactly where users look; and by
@@ -57,8 +60,8 @@ the incumbent during an outage needs outage-shaped training data, not NaN routin
 the de-accumulated ECMWF variables carry are the one case the guarantee genuinely covers. Full
 argument:
 [Inherent Stability → Default directions, and their limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
-Note that the second consequence is narrower than it sounds. Only *leading* nulls reach the model
-as nulls: `_upsample_nwp_to_half_hourly` already interpolates interior ones away (see
+Note that the second consequence is narrower than it sounds. Only *leading and trailing* nulls
+reach the model as nulls: `_upsample_nwp_to_half_hourly` already interpolates interior ones away (see
 [the null-filling item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)), and
 the scattered per-pixel corruption mostly never becomes a null in the first place, because the
 ingest renormalises each H3 cell over the grid points that arrived.
@@ -242,12 +245,12 @@ in a wind component or a clear-sky index is invisible to the leaderboard and obv
 
 ### Feed the model the forecast lead time (review discovery; ~one line)
 
-`XGBoostForecaster` trains on `sorted(selected_features)` only (`forecaster.py:87-88`), and
+`XGBoostForecaster` trains on `sorted(selected_features)` only (`XGBoostForecaster._feature_cols`), and
 `conf/model/xgboost.yaml` does not select `nwp_lead_time_hours` — so despite the config's
 `training_strategy: "horizon_as_feature"` tag, **the model never sees the horizon**. It cannot
 learn that NWP inputs degrade with lead time; horizon information reaches it only through the
 coarse pattern of nullified lags. `nwp_lead_time_hours` is already computed and flows through
-`AllFeatures` (`tabular_feature_engineer.py:159`, `:222`), so the experiment is: add it to
+`AllFeatures` (computed in `tabular_feature_engineer.py`), so the experiment is: add it to
 `selected_features` and register. If it wins, add it to the base YAML (making the
 `horizon_as_feature` tag honest).
 
@@ -659,7 +662,7 @@ expected gain, cheap given the `geo` H3 machinery exists.
 The full design and caveats live in the switching-events roadmap:
 [Approach 1 — the two-stage forecaster](switching-events.md#approach-1-the-two-stage-forecaster).
 In brief: fit the v0.6 stage-1 baseline (this same forecaster, configured with weather/calendar
-features only and a quantile objective), then feed the production model normalised
+features only and a robust median objective), then feed the production model normalised
 "actual − expected" residuals at lag times instead of (or alongside) raw power lags — telling
 the model how *normal* each recent observation is, so it can carry a sustained switching-event
 offset forward instead of blending it into weather-driven variation. Beyond its expected metric
@@ -1086,7 +1089,7 @@ Issue: [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 Training on all 51 members multiplies training data ~51× for correlated rows. Run the
 dose-response experiment first: control-only (today) vs ~8 spread members vs all 51 (the NWP
-loader already takes `ensemble_members: list[int]`, `cv_assets.py:237`). Training on members
+loader already takes `ensemble_members: list[int]`, `_engineering_inputs.load_engineering_inputs`). Training on members
 also teaches the model the member-spread input distribution it actually sees at inference —
 the train/serve input-skew flagged in the review. That skew grows with lead time: by day 7–10
 the control member is an increasingly unrepresentative sample of the ensemble, so the value of

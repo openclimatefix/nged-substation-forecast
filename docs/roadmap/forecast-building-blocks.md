@@ -79,7 +79,8 @@ This forecast **prevails the most recent conditions**:
   [the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector):
   assembled from Table 5's discrete events, or delivered directly by the metered-power
   forecast, which carries the current switching state forward natively.)
-- *Both*: prevails the `generator_or_circuit_fault` flag.
+- *Both*: prevails the `GENERATOR OR CIRCUIT FAULT` value of `warning_type` (see
+  [Table 3 — `asset_health_history`](delivery-tables.md#table-3-asset_health_history)).
 
 This answers: *"what will this asset actually do over the next 14 days if current conditions
 persist?"*
