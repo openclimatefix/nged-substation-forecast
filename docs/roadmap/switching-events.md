@@ -1,4 +1,4 @@
-# Estimating Latent Demand Under Switching Events — Approach & Implementation Roadmap
+# Switching events — Approach & Implementation Roadmap
 
 **Scope.** How to make each NGED primary substation's forecast robust to switching events — and, further out, how to reconstruct its *latent demand under the normal running arrangement (NRA)* (the demand that would be metered if the electricity network were never reconfigured) — given that the electricity network is in fact reconfigured roughly 10% of the time by switching events. The nearest-term approach is a switching-robust forecaster; the latent-demand reconstruction is later research. Background on what switching events are and why they are hard is at [**Switching Events**](../background/switching-events.md). This document defines the ordered set of approaches, from the v0.6 forecaster and detector to the later v2-scale mixture models.
 
@@ -22,34 +22,37 @@
 
 ## The approaches
 
-The work is organised as a set of **named approaches**, tried in the order set out just below. The three v0.6 approaches all build on one shared baseline. "Baseline" here means a fitted model of expected power whose residual every approach consumes. Its purpose is to remove seasonality to help make the switching events visible. A substation's metered power moves for ordinary reasons — a cold snap, a sunny afternoon, a Sunday — and a change in the electricity network's topology is buried under that variation. Subtract the power the weather and the clock explain, and — we hope — the change surfaces in the residual as a sustained level shift. Work on v0.6 starts with a multiple seasonal-trend decomposition, which answers whether the events are visible above the noise before any of the rest is built. Two later approaches reconstruct latent demand at v2 scale, once v2.0 is operational. Each approach states its motivation, what it adds, what it misses, and its trade-offs. (We haven't fully specified the roadmap _after_ v2, so read anything "at v2 scale" as just meaning "some time after v2 is operational".) Escalation from a simpler approach to a heavier approach must be justified by *measured residual structure the simpler approach leaves behind*, not by anticipation — this keeps effort matched to demonstrated need, and it is the same principle [the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) applies to our own plan.
+The work is organised as a set of **named approaches**, tried in the order set out just below. The three v0.6 approaches all build on one shared baseline. "Baseline" here means a fitted model of expected power whose residual every approach consumes. Its purpose is to remove seasonality to help make the switching events visible. A substation's metered power moves for ordinary reasons — a cold snap, a sunny afternoon, a Sunday — and a change in the electricity network's topology is buried under that variation. Subtract the power the weather and the clock explain, and — we hope — switching events surface in the residual as a sustained level shift. Work on v0.6 starts with a multiple seasonal-trend decomposition, which answers whether the events are visible above the noise before any of the rest is built.   Escalation from a simpler approach to a heavier approach must be justified by *measured residual structure the simpler approach leaves behind*.
 
 ### Overview and ordering
 
 Everything in v0.6 rests on **one shared baseline**: a per-substation model of expected power
 from weather and calendar covariates alone (no power lags). The baseline's per-series-normalised
 residual is the raw material every approach below consumes. Before building that baseline, though,
-there is a cheaper first look: a [multiple seasonal-trend decomposition
+there is an easier first look: a [multiple seasonal-trend decomposition
 (MSTL)](#the-baseline-shared-foundation) needs no weather input and no training run, and answers the
 question that decides whether any of the rest is worth building — are the switching events visible
 above the noise at all? Work on v0.6 is starting there. On top of the baseline we could then try,
 in order:
 
-1. **The two-stage forecaster** — a good candidate for the first approach to try, and the current
-   v0.6.0 target. Its two stages are:
+1. **The two-stage forecaster**. Its two stages are:
 
     1. **The shared baseline.** Fit expected power per substation from weather and calendar
        covariates alone, using no power lags, then take the residual (observed power minus expected
        power) and normalise it by that series' own spread. This is the same shared baseline named
        above, and the two-stage forecaster's first stage *is* that baseline — nothing extra.
-    2. **The booster.** Feed that normalised residual, together with event-age and neighbour
-       features, into a gradient-boosted model that forecasts metered power *robustly to
-       switching*. Switching is handled implicitly: the model is never told an event happened, and
-       instead learns from features that make one visible.
+    2. **The same XGBoost forecaster used elsewhere in v1, but with more features that help explain
+       switching events:.** Plain lagged power features don't carry any information about whether
+       that lagged power features was in a switching event or not. The idea here is simple: Give
+       XGBoost enough information to allow it to infer which lagged features are in a switching
+       event. Feed the lagged normalised residual, together with event-age and neighbour features,
+       into a gradient-boosted model that forecasts metered power *robustly to switching*. Switching
+       is handled implicitly: the model is never told an event happened, and instead learns from
+       features that make switching events visible.
 
-    Withhold the anomaly features and the same machinery forecasts NRA power. This approach ships
-    none of the discrete detector artefacts (no event table, no abnormal running arrangement (ARA)
-    mask, no sensitivity floor).
+    But this approach has a major disadvantage: It never *explicitly* identifies switching events.
+    So it cannot supply the switching event table, or the abnormal running arrangement (ARA) mask,
+    or a sensitivity floor.
 
 2. **The staged statistical detector** — changepoint detection, balance attribution across
    neighbours, and a composition read-off, run on the same residual, producing an explicit event
@@ -59,29 +62,25 @@ in order:
    version head-to-head.
 
 [The decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) below
-governs how far down that list we go. The v1 priority is forecast skill. The two-stage forecaster
-therefore leads, and the explicit-detector approaches are pursued behind it — kept designed, and
-built as forecast skill and NGED's needs justify. Two further approaches sit further out as later
-research, built at **v2 scale once v2.0 is operational**, and numbered to continue the ordering.
-Approach 4 is the [magnitude-only mixture
+governs how far down that list we go. The v1 priority is forecast skill.
+
+Two further approaches sit further out as later research, built at **v2 scale once v2.0 is
+operational**, and numbered to continue the ordering. Approach 4 is the [magnitude-only mixture
 model](#approach-4-the-magnitude-only-mixture-model-the-workhorse), the workhorse: it models each
-substation's observed power as a time-varying blend of its own normal demand and its neighbours',
-so it estimates *how much* power moved between substations without saying what kind of demand or
+substation's observed power as a time-varying blend of its own normal demand and its neighbours', so
+it estimates *how much* power moved between substations without saying what kind of demand or
 generation moved — magnitude only. Approach 5 is the [type-resolved
 mixture](#approach-5-the-type-resolved-mixture-with-differentiable-physics-modules), which splits
 each substation into physically-typed components — demand, solar PV, and wind — and lets each type
-move with its own weights, so a switching event can shift proportionally more PV than load.
-
-We deliberately do **not** pin any approach to a specific patch version — neither the v0.6
-approaches to a v0.6.x nor the v2-scale approaches to a v2.x. The ordering above is the commitment,
-not the numbering. (v0.6.1, for instance, may well be a bug-fix of the two-stage forecaster rather
-than the next approach.)
+move with its own weights, so a switching event can shift proportionally more PV than load. (We
+haven't fully specified the roadmap _after_ v2, so read anything "at v2 scale" as just meaning "some
+time after v2 is operational".)
 
 ```text
 v0.6 scale ── First look: MSTL decomposition — are the events visible above the noise?
-  │            Then one shared baseline (weather/calendar expected power), and in order:
+  │            Then - if necessary - one shared baseline (weather/calendar expected power), and in order:
   │            1. The two-stage forecaster — switching-robust forecasting; handles switching
-  │               implicitly; the v0.6.0 target. No event table.
+  │               implicitly. No event table.
   │            2. The staged statistical detector — explicit events, ARA mask, sensitivity floor.
   │            3. The joint edge-flow estimator — detection + attribution in one convex solve.
   │            How far past (1) we build is set by the decision point, not fixed in advance.
