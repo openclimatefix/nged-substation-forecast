@@ -31,37 +31,23 @@ Each leaderboard will have tens (maybe hundreds) of rows. Each row is one **ML e
 particular model, trained with a particular set of features, processed a particular way. Entrants
 must be compared apples-to-apples — same test dataset, same metrics, same assumptions.
 
-**Running every entry ourselves is itself a threat to that comparison, and the failure is running a
-baseline badly rather than fabricating a result.** [Kleinebrahm et al.
-(2026)](https://arxiv.org/abs/2604.24705) describe the general problem with published comparisons,
-that competing methods "are not always implemented or optimized with equal care". Reported
-differences, they note, therefore "may reflect differences in implementation quality rather than
-inherent methodological advantages". [Hong et al.
-(2020)](https://doi.org/10.1109/OAJPE.2020.3029979) add two related habits: picking the error
-measure that favours the proposed method, and skipping the comparison with naive models altogether.
-A team that runs every entry on its own leaderboard is exposed to all three by construction. That is
-why every baseline here is run from its authors' own repository at its authors' recommended
-defaults, with no domain-specific tuning — the rule [Meyer et al.
-(2026)](https://arxiv.org/abs/2512.20761) apply on TS-Arena, set out under [Leaderboards of machine
-learning
-results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results).
-
 Per-experiment configuration, trained weights, and metrics are stored in the project's **MLflow**
 database. The leaderboard will be displayed as an interactive table showing multiple metrics at a
 glance, inspired by the [WeirdML leaderboard](https://htihle.github.io/weirdml.html):
 
 ![WeirdML leaderboard](assets/WeirdML_leaderboard.png)
 
-**The leaderboard is published with the material needed to check it, not just its rows.** We publish
-the telemetry, the evaluation protocol, the metric definitions, and the code that computes them.
-That lets someone outside the project reproduce a row rather than take it on trust. The reasoning
-behind this commitment, and behind the other reporting commitments spread through the rest of this
-page, is in [Publishing results that others can compare
-against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
-
-**A leaderboard carrying only the approaches that worked hides how much of the search space was
-tried, so negative results get a row too** — for the reason given under [Publishing results that
-others can compare
+**Three commitments guard the comparison, and each links to the reasoning behind it.** Every
+baseline is run from its authors' own repository at its authors' recommended defaults, with no
+domain-specific tuning, because a team that runs every entry on its own leaderboard risks reporting
+its own implementation quality as a methodological result — the rule TS-Arena applies, set out with
+its evidence under [Leaderboards of machine learning
+results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results). The
+leaderboard is published with the material needed to check it — the telemetry, the evaluation
+protocol, the metric definitions, and the code that computes them — so someone outside the project
+can reproduce a row rather than take it on trust. And negative results get a row, because a
+leaderboard carrying only the approaches that worked hides how much of the search space was tried;
+both commitments are argued under [Publishing results that others can compare
 against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
 
 ---

@@ -323,16 +323,13 @@ telemetry from NGED's bucket. Without them that schedule fails every hour — lo
 `Settings.get_nged_s3_store` raises an error naming the unset variables, which the asset retries
 twice (its guard cannot tell an unset variable from a transient S3 error) before the job's
 `sentry_capture_failure` hook reports it — while everything that does not read NGED's own bucket
-carries on. `Settings` deliberately does *not* require them at construction, for two reasons: a
-laptop, a test run or a training job then needs no third-party credentials
-([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)),
-and a mis-wired secret cannot take down inference. Requiring them would make the container
-refuse to start, which sounds like a useful fail-fast — until you notice that `live_forecasts`
-reads our own Delta tables and a model baked into the image. It needs no NGED credential, so
-stopping it because one is missing would break [principle
-1](../design-philosophy/design-principles.md#1-the-power-forecast-never-stops) to protect a
-schedule that already fails loudly on its own. Catch a mis-wired secret in the deploy pipeline
-instead, where the blast radius is the deploy rather than the forecast.
+carries on. That is deliberate: `Settings` does not require these credentials at construction, so a
+mis-wired secret cannot stop `live_forecasts`, which reads our own Delta tables and a model baked
+into the image. The reasoning is under [principle
+6](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)
+and in the [Configuration reference](setup.md#the-env-file-and-nged-source-credentials); catch a
+mis-wired secret in the deploy pipeline, where the blast radius is the deploy rather than the
+forecast.
 
 The three NGED credentials are also the one credential in this deployment that can't come
 from an IAM role: NGED's bucket lives in NGED's AWS account, so these are unavoidably static
@@ -406,51 +403,25 @@ keep the old values until they next start, since injection happens once per cont
 
 ## Step 9 — Create the ECS cluster and Fargate task definition
 
-First, a reminder of the deployment's shape, because from this step onwards it matters which half
-of it you're building. The stack runs **two different kinds of compute**, on two different AWS
-technologies:
+This step builds the scaffolding for the ephemeral half of the deployment: the cluster its tasks
+launch into, and the task definition describing how to run them. From here on it matters which half
+you are building. The **always-on control plane** — the Dagster daemon, webserver, code-location
+server, and Postgres — is a plain EC2 virtual machine (EC2 is Elastic Compute Cloud), launched by
+hand in [Step 11](#step-11-launch-the-control-plane-box), and the only compute in this deployment
+whose operating system we install and patch ourselves. **Every recurring job** its schedules
+dispatch — the hourly NGED telemetry ingest, the daily Dynamical.org NWP download, and the 6-hourly
+forecast — executes as an ephemeral ECS task on Fargate instead, where AWS owns and patches the
+machines. Why the compute is split this way, and why the control plane is not on Fargate too, is the
+[orchestration
+design](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm).
 
-- The **always-on control plane** — the Dagster daemon, webserver, code-location server, and
-  Postgres — runs on a plain **EC2 virtual machine** (EC2 is Elastic Compute Cloud), launched by
-  hand in [Step 11](#step-11-launch-the-control-plane-box) and managed with Docker Compose. ECS
-  and Fargate play no part in running it. Its schedules are responsible for **every recurring
-  job**, not just the forecasts: pulling fresh telemetry from NGED's bucket hourly, downloading
-  the daily ECMWF ensemble NWP from Dynamical.org, and issuing each 6-hourly forecast — though
-  the runs themselves execute on Fargate (next bullet). This is the **only compute in the deployment whose
-  operating system we install and maintain ourselves**: [Step 11](#step-11-launch-the-control-plane-box)
-  chooses its OS image (an Ubuntu Server AMI), and from then on the OS is ours to look after —
-  installing software on it ([Step 12](#step-12-join-the-tailnet) and
-  [Step 13](#step-13-install-docker-and-pull-the-image)) and keeping it patched (Ubuntu's
-  `unattended-upgrades`, checked in [Optional hardening](#optional-hardening)). (Running the
-  control plane on Fargate too would have removed even that OS burden — why we don't is covered
-  in [Considered but rejected designs](../architecture/production-deployment.md#an-always-on-fargate-service-for-the-control-plane).)
-  That maintenance never needs a scheduled outage agreed with NGED: forecasts are produced only
-  every 6 hours, and NGED reads published forecasts straight from S3, so the gap between one
-  forecast run and the next is a built-in maintenance window in which the box can be stopped,
-  patched, and rebooted — see
-  [Requirements → Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design).
-- The **ephemeral workers** — each scheduled run: the hourly NGED telemetry ingest, the daily
-  Dynamical.org NWP download, and the 6-hourly forecast — run as **ECS tasks on Fargate**: a
-  container is created for one run and destroyed when it exits. The control plane *dispatches*
-  these tasks but never executes one itself. Here there is **no
-  operating system for us to install or maintain**: AWS owns and patches the machines Fargate
-  tasks run on, and everything we are responsible for travels inside the container image from
-  [Step 6](#step-6-push-the-image-to-ecr).
-
-This step builds the scaffolding for the ephemeral half: the cluster its tasks launch into, and
-the task definition describing how to run them. Why the compute is split this way is the
-[orchestration design](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm).
-
-Two AWS terms do a lot of work in this step, so it's worth being precise about how they relate.
-**ECS** (Elastic Container Service) is AWS's container orchestrator: it takes a **task definition**
-— a recipe naming the container image to run plus the CPU, memory, IAM roles, environment variables,
-and secrets to run it with — and launches and supervises containers from that recipe. **Fargate** is
-one of ECS's two "launch types" — the two ways of providing the compute the containers run on. The
-other launch type (named "EC2") has ECS place containers onto EC2 instances that you provision and
-patch yourself. In contrast, with Fargate, AWS conjures right-sized compute for each task when it
-launches and tears it down when the task exits, billed by the second. We use ECS on Fargate so that
-every scheduled run — data ingest and forecast alike — gets a fresh, ephemeral machine and
-nothing sits idle between runs.
+Two AWS terms do a lot of work in this step. **ECS** (Elastic Container Service) is AWS's container
+orchestrator: it takes a **task definition** — a recipe naming the container image to run plus the
+CPU, memory, IAM roles, environment variables, and secrets to run it with — and launches and
+supervises containers from that recipe. **Fargate** is the ECS launch type that has AWS conjure
+right-sized compute for each task when it launches and tear it down when the task exits, billed by
+the second; the other launch type ("EC2") places containers onto instances you provision and patch
+yourself.
 
 **Why create a "cluster" when nothing here auto-scales?** On the EC2 launch type, a cluster
 really is a fleet — the pool of instances that tasks get placed onto. On Fargate there are no

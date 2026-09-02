@@ -108,52 +108,10 @@ We model each physical parameter as a learnable Normal distribution $\mathcal{N}
 
 Crucially, the training objective is an **ELBO**, not a bare reconstruction loss: a power-reconstruction term *plus* a KL term that pulls each posterior toward a fixed physical prior. ELBO stands for evidence lower bound, and KL for Kullback-Leibler. The KL term is not optional. Minimising power error alone always rewards shrinking $\sigma \to 0$, so the parameter "uncertainty" we are trying to capture would simply collapse. The prior does double duty: it keeps the posterior spreads honest, and it injects weak domain knowledge (e.g. "panels point roughly south at a typical UK roof pitch") that regularises sites with little data.
 
-**The fitted parameters are *effective* parameters, not the plant's true parameters, and the
-evaluation follows from that.** The [energy-forecasting
-review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports
-[Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024) finding a fitted
-azimuth 5° off the surveyed value that simulated better than the surveyed value itself, because the
-fit absorbs the physical model's own systematic error. Comparing a fitted tilt against a surveyed
-tilt is therefore a **diagnostic** — it catches a fit that has wandered somewhere physically absurd
-— and never the test. The test is the forecast score. The priors serve that same end: keeping the
-posterior spreads honest and regularising sites with little data, not pinning a posterior to a
-survey. That is why the priors below are weakly informative rather than tight. No published work
-has run that test: the [energy-forecasting
-review](../background/energy-forecasting-review.md#inferring-engineering-parameters) found no
-evidence for how much a photovoltaic power forecast improves from inferring tilt and azimuth rather
-than using a registered or nameplate value. The gain is therefore a hypothesis to test against the
-forecast score rather than a settled prize.
-
-**Every fitted parameter is constrained by construction to a physically possible range, and that constraint does a different job from the prior.** A tilt cannot leave 0° to 90°, a capacity cannot go negative, and an efficiency cannot exceed unity, because each posterior is parameterised in an unconstrained space and squashed into its admissible range. That range comes from a sigmoid or an exponential rather than a clamp, so gradients keep flowing everywhere. The constraint rules out what the physics forbids; the prior shapes what is merely implausible inside the range the constraint leaves. Prior widths are therefore a hyperparameter rather than a fixed choice. Where the experiment budget allows, we sweep them and read the answer off the forecast score.
-
-**Fitting capacity itself as a distribution, the way `log_dc_capacity` and `log_ac_capacity` are
-posteriors here, has a published precedent for wind — with a caveat on the headline number.** The
-[energy-forecasting
-review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports
-[Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421)'s 34.2% CRPS gain from
-jointly fitting a time-varying capacity bound, and their own isolated test showing most of that
-gain comes from the joint fit rather than the bound alone.
-
 Two practical details the ELBO must get right — both classic failure modes of hand-rolled variational inference:
 
 - **The reconstruction term must be a proper likelihood, not a bare MSE.** Bare MSE silently assumes an observation-noise scale of 1 in whatever units the power happens to be in. This assumption makes the balance between reconstruction and KL arbitrary — the posterior then either collapses onto the prior or ignores it, depending on nothing but the units. Use a Gaussian likelihood with a **learnable observation-noise scale** $\sigma_{\text{obs}}$ (see `negative_elbo` in the sketch).
 - **Scale the KL for minibatches.** The KL term regularises the *whole-dataset* objective once, so on a minibatch it must be weighted by `batch_size / dataset_size` — otherwise the effective prior strength depends on the batching.
-
-Three physics details the sketch gets right:
-
-- **Irradiance transposition.** Plane-of-array (POA) irradiance is *not* GHI scaled by the angle of incidence — GHI already bakes in a cosine-of-zenith projection. We decompose the resource into beam, sky-diffuse and ground-reflected components (an isotropic sky model) and transpose each correctly. The beam term uses DNI (not GHI) projected by the angle of incidence.
-- **DC and AC capacity.** The learnable `dc_capacity` is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. `ac_capacity` is a separate learnable parameter that clips the inverter output via `torch.minimum` — a single plant clips hard, unlike [the fleet soft clip](#scaling-to-aggregate-fleets-universalsolarfleetnode).
-- **Panel temperature derate.** Cell temperature sits above ambient in proportion to absorbed POA irradiance; efficiency then falls roughly linearly with temperature above 25 °C. The sketch adds a steady-state derate using two module-level constants; in the full variational model these become learnable posteriors — and the [subsection below](#panel-temperature) extends this to the broken-cloud effect.
-
-Getting the model chain right is not a rounding error: the [energy-forecasting
-review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports [Mayer
-and Gróf (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) finding a 13% mean-absolute-error
-gap between the best and worst of 32,400 model-chain combinations, even with every plant's geometry
-known exactly from its design documentation.
-
-Angle convention: azimuth is measured from due south, with east negative and west positive (east = −90°, south = 0°, west = +90°). Beware that this differs from [pvlib](https://pvlib-python.readthedocs.io/)'s convention (north = 0°, clockwise, in degrees); `pvlib-pytorch` should adopt pvlib's own convention and convert at the boundary — mismatched angle conventions are the classic silent bug in PV modelling.
-
-One detail the sketch deliberately ignores — **interval averaging**. NWP and satellite irradiance are half-hourly *period means* (period-ending in our NWP schema), but the sketch evaluates the solar geometry at an instant. Over 30 minutes the sun's hour angle moves ~7.5°, and near sunrise/sunset the transposition is strongly non-linear, so evaluating at a single timestamp biases the fit. Worse, a timestamp-convention error (period-start vs period-end vs mid-point) masquerades as an azimuth shift that the optimiser will happily absorb into the fitted parameters. The fix is cheap: evaluate the geometry at ~5-minute sub-steps across each half-hour and average the modelled power to the metered interval — and unit-test the timestamp convention end-to-end before trusting any fitted azimuth. This is not a V2-only concern: the same confusion is live in today's half-hourly NWP resample, where treating a period-ending radiation value as instantaneous shifts the modelled solar peak by up to three hours beyond forecast day 6. See [NWP variable conventions](../architecture/nwp-variable-conventions.md), and the [fix that lands first in v0.5](../roadmap/xgboost-improvements.md#fix-the-nwp-resample-to-honour-the-variable-conventions).
 
 Here's a quick Python code sketch of the rough idea for applying differentiable physics to solar:
 
@@ -296,6 +254,48 @@ class DifferentiableSolarPlant(nn.Module):
         ac_capacity = q["log_ac_capacity"].rsample().exp()
         return torch.minimum(dc_power, ac_capacity)
 ```
+
+Three physics details the sketch gets right:
+
+- **Irradiance transposition.** Plane-of-array (POA) irradiance is *not* GHI scaled by the angle of incidence — GHI already bakes in a cosine-of-zenith projection. We decompose the resource into beam, sky-diffuse and ground-reflected components (an isotropic sky model) and transpose each correctly. The beam term uses DNI (not GHI) projected by the angle of incidence.
+- **DC and AC capacity.** The learnable `dc_capacity` is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. `ac_capacity` is a separate learnable parameter that clips the inverter output via `torch.minimum` — a single plant clips hard, unlike [the fleet soft clip](#scaling-to-aggregate-fleets-universalsolarfleetnode).
+- **Panel temperature derate.** Cell temperature sits above ambient in proportion to absorbed POA irradiance; efficiency then falls roughly linearly with temperature above 25 °C. The sketch adds a steady-state derate using two module-level constants; in the full variational model these become learnable posteriors — and the [subsection below](#panel-temperature) extends this to the broken-cloud effect.
+
+Angle convention: azimuth is measured from due south, with east negative and west positive (east = −90°, south = 0°, west = +90°). Beware that this differs from [pvlib](https://pvlib-python.readthedocs.io/)'s convention (north = 0°, clockwise, in degrees); `pvlib-pytorch` should adopt pvlib's own convention and convert at the boundary — mismatched angle conventions are the classic silent bug in PV modelling.
+
+**Every fitted parameter is constrained by construction to a physically possible range, and that constraint does a different job from the prior.** A tilt cannot leave 0° to 90°, a capacity cannot go negative, and an efficiency cannot exceed unity, because each posterior is parameterised in an unconstrained space and squashed into its admissible range. That range comes from a sigmoid or an exponential rather than a clamp, so gradients keep flowing everywhere. The constraint rules out what the physics forbids; the prior shapes what is merely implausible inside the range the constraint leaves. Prior widths are therefore a hyperparameter rather than a fixed choice. Where the experiment budget allows, we sweep them and read the answer off the forecast score.
+
+**The fitted parameters are *effective* parameters, not the plant's true parameters, and the
+evaluation follows from that.** The [energy-forecasting
+review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports
+[Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024) finding a fitted
+azimuth 5° off the surveyed value that simulated better than the surveyed value itself, because the
+fit absorbs the physical model's own systematic error. Comparing a fitted tilt against a surveyed
+tilt is therefore a **diagnostic** — it catches a fit that has wandered somewhere physically absurd
+— and never the test. The test is the forecast score. The priors serve that same end: keeping the
+posterior spreads honest and regularising sites with little data, not pinning a posterior to a
+survey. That is why the priors below are weakly informative rather than tight. No published work
+has run that test: the [energy-forecasting
+review](../background/energy-forecasting-review.md#inferring-engineering-parameters) found no
+evidence for how much a photovoltaic power forecast improves from inferring tilt and azimuth rather
+than using a registered or nameplate value. The gain is therefore a hypothesis to test against the
+forecast score rather than a settled prize.
+
+**Fitting capacity itself as a distribution, the way `log_dc_capacity` and `log_ac_capacity` are
+posteriors here, has a published precedent for wind — with a caveat on the headline number.** The
+[energy-forecasting
+review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports
+[Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421)'s 34.2% CRPS gain from
+jointly fitting a time-varying capacity bound, and their own isolated test showing most of that
+gain comes from the joint fit rather than the bound alone.
+
+Getting the model chain right is not a rounding error: the [energy-forecasting
+review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports [Mayer
+and Gróf (2021)](https://doi.org/10.1016/j.apenergy.2020.116239) finding a 13% mean-absolute-error
+gap between the best and worst of 32,400 model-chain combinations, even with every plant's geometry
+known exactly from its design documentation.
+
+One detail the sketch deliberately ignores — **interval averaging**. NWP and satellite irradiance are half-hourly *period means* (period-ending in our NWP schema), but the sketch evaluates the solar geometry at an instant. Over 30 minutes the sun's hour angle moves ~7.5°, and near sunrise/sunset the transposition is strongly non-linear, so evaluating at a single timestamp biases the fit. Worse, a timestamp-convention error (period-start vs period-end vs mid-point) masquerades as an azimuth shift that the optimiser will happily absorb into the fitted parameters. The fix is cheap: evaluate the geometry at ~5-minute sub-steps across each half-hour and average the modelled power to the metered interval — and unit-test the timestamp convention end-to-end before trusting any fitted azimuth. This is not a V2-only concern: the same confusion is live in today's half-hourly NWP resample, where treating a period-ending radiation value as instantaneous shifts the modelled solar peak by up to three hours beyond forecast day 6. See [NWP variable conventions](../architecture/nwp-variable-conventions.md), and the [fix that lands first in v0.5](../roadmap/xgboost-improvements.md#fix-the-nwp-resample-to-honour-the-variable-conventions).
 
 ### Panel temperature
 

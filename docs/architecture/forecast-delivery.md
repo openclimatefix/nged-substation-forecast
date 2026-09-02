@@ -410,30 +410,10 @@ service on AWS](../live_service/aws.md#step-1-create-the-s3-buckets)
 for the concrete bucket/IAM setup and [Delivery tables](../roadmap/delivery-tables.md) for
 exactly which five tables are the stable contract.
 
-**Why `eu-west-2`, not the cheaper `eu-west-1`?** AWS Price List API data (2026-07-03) shows
-Ireland (`eu-west-1`) consistently cheaper than London (`eu-west-2`) — not hugely for the
-always-on control-plane box, but noticeably for the Fargate compute that actually runs
-inference (AWS bills in US dollars; converted at **$1 = £0.75** — the ECB rate of 2026-07-03,
-the same basis as [AWS Running Costs](aws-costs.md); the premium percentages come from the
-underlying USD prices):
-
-| SKU | `eu-west-1` (Ireland) | `eu-west-2` (London) | London premium |
-|---|---|---|---|
-| EC2 `t4g.medium` on-demand | £0.0276/hr | £0.0282/hr | +2.2% |
-| Fargate ARM vCPU-hour | £0.0243/hr | £0.0279/hr | +15.0% |
-| Fargate ARM GB-hour | £0.00267/hr | £0.00307/hr | +14.9% |
-| S3 Standard storage (first 50 TB) | £0.0173/GB-mo | £0.0180/GB-mo | +4.3% |
-
-At v1 scale this premium is a rounding error — maybe £1–3/month on a ~£25–35/month bill (see
-[AWS Running Costs](aws-costs.md)). It matters more at
-v2 scale: NGED's population grows from 32 to ~2,500 time series, and `power_forecasts` could
-reach on the order of a **trillion rows** (see [How big is Flexpectation's power forecast
-data?](#how-big-is-flexpectations-power-forecast-data), above) — at that volume, a per-GB
-storage premium compounds into real money rather than staying a rounding error.
-
-`eu-west-2` is picked **now**, mainly because NGED's own S3 bucket is already in `eu-west-2`.
-The benefit that matters here is **data transfer**, not the compute/storage premium above — and
-it depends on *how* NGED reads, which the AWS Price List API pins down precisely:
+**Why `eu-west-2`, not the cheaper `eu-west-1`?** Because NGED's own S3 bucket is already in
+`eu-west-2`, and the benefit that matters is **data transfer** rather than the compute and storage
+prices. How much it is worth depends on *how* NGED reads, which the AWS Price List API pins down
+precisely:
 
 | Read path | Rate |
 |---|---|
@@ -450,6 +430,27 @@ a spreadsheet caps out at ~1,048,576 rows, so once `power_forecasts` reaches the
 NGED pulling "a sizeable chunk" of it stops being a task a spreadsheet can handle at all — they
 would need their own query engine against our bucket, and running that in `eu-west-2` is what
 turns those reads free instead of £0.015–0.067/GB.
+
+Ireland is the cheaper region on everything else, and the premium is small enough not to outweigh
+that. AWS Price List API data (2026-07-03) shows `eu-west-1` consistently cheaper than `eu-west-2` —
+not hugely for the always-on control-plane box, but noticeably for the Fargate compute that actually
+runs inference (AWS bills in US dollars; converted at **$1 = £0.75** — the ECB rate of 2026-07-03,
+the same basis as [AWS Running Costs](aws-costs.md); the premium percentages come from the
+underlying USD prices):
+
+| SKU | `eu-west-1` (Ireland) | `eu-west-2` (London) | London premium |
+|---|---|---|---|
+| EC2 `t4g.medium` on-demand | £0.0276/hr | £0.0282/hr | +2.2% |
+| Fargate ARM vCPU-hour | £0.0243/hr | £0.0279/hr | +15.0% |
+| Fargate ARM GB-hour | £0.00267/hr | £0.00307/hr | +14.9% |
+| S3 Standard storage (first 50 TB) | £0.0173/GB-mo | £0.0180/GB-mo | +4.3% |
+
+At v1 scale that premium is a rounding error — maybe £1–3/month on a ~£25–35/month bill (see
+[AWS Running Costs](aws-costs.md)). It matters more at
+v2 scale: NGED's population grows from 32 to ~2,500 time series, and `power_forecasts` could
+reach on the order of a **trillion rows** (see [How big is Flexpectation's power forecast
+data?](#how-big-is-flexpectations-power-forecast-data), above) — at that volume, a per-GB
+storage premium compounds into real money rather than staying a rounding error.
 
 The eu-west-2 choice is still provisional: NGED haven't yet confirmed whether a GB-resident region
 is a hard requirement for this data, and we're waiting on their reply before treating the region

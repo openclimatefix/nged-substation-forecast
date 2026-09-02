@@ -26,43 +26,6 @@ hypotheses](engineering-hypotheses.md). A principle that fails its test will be 
 negative result, not rewritten out of the record. The defence against merely collecting fashionable
 engineering trends is the admission test described below.
 
-## Where these principles come from
-
-The framing — a greenfield chance to test-drive other industries' best practice and produce a field
-report rather than a rulebook — is stated on the [section overview](index.md).
-
-We deliberately researched best practices across multiple industries. Several of the ideas on these
-pages are borrowed from disciplines that have been solving the same shape of problem for longer than
-data engineering has existed: *inherent stability* comes from vehicle dynamics, *fail-operational*
-from avionics autoland (the flight-deck technology that fully automates the landing phase) and
-ISO 26262, *blast radius* from site reliability engineering, and mobile telecoms supplies the case
-that a heavily-corrupted channel can still run genuinely unattended — see
-[H1, a service that mostly runs
-itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). Borrowing across disciplines
-is the point, not a flourish: some of them have been shipping safety-critical systems for fifty
-years.
-
-Not every borrowed idea survives contact with reality, and we record those outcomes too — that is
-what makes this a field report rather than a manifesto. *Error budgets* were examined and declined
-([Deliberately absent](#deliberately-absent) below); [five practices we respect are not yet
-absorbed](#industry-best-practices-we-have-not-yet-absorbed); and Postel's law is named on the
-[Inherent
-Stability](inherent-stability.md#not-postels-law) page precisely so that nobody mistakes it for what
-we do.
-
-## How principles relate to hypotheses
-
-Principles are constraints on *decisions*; in contrast, hypotheses are claims about *outcomes*. A
-hypothesis can be falsified by a measurement. A principle cannot — it is a decision rule, not a
-factual claim — so it is retired by different routes: the hypothesis it serves is falsified, which
-discredits the bet behind it; or measurements override it in specific decisions often enough that
-the exceptions become the rule; or it turns out never to actually decide anything, and is deleted
-as decoration. The two are connected in one direction: the principles
-are the bets we are making in order to test the hypotheses. That gives us a test for admission to
-this list — **name the hypothesis it serves and a decision it actually decided**. A principle
-serving no hypothesis is either decoration or a sign of a missing hypothesis; a hypothesis with no
-principle behind it is a claim we are merely hoping comes true.
-
 ## The principles
 
 ### 1 — The power forecast never stops
@@ -775,6 +738,43 @@ this in places — closed string vocabularies are `Literal` types, tabular shape
 schemas, and `delta_store`'s write helpers make the storage format the path of least resistance
 rather than a rule to remember — but it is a habit applied opportunistically, not yet a stated
 rule.
+
+## Where these principles come from
+
+The framing — a greenfield chance to test-drive other industries' best practice and produce a field
+report rather than a rulebook — is stated on the [section overview](index.md).
+
+We deliberately researched best practices across multiple industries. Several of the ideas on these
+pages are borrowed from disciplines that have been solving the same shape of problem for longer than
+data engineering has existed: *inherent stability* comes from vehicle dynamics, *fail-operational*
+from avionics autoland (the flight-deck technology that fully automates the landing phase) and
+ISO 26262, *blast radius* from site reliability engineering, and mobile telecoms supplies the case
+that a heavily-corrupted channel can still run genuinely unattended — see
+[H1, a service that mostly runs
+itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). Borrowing across disciplines
+is the point, not a flourish: some of them have been shipping safety-critical systems for fifty
+years.
+
+Not every borrowed idea survives contact with reality, and we record those outcomes too — that is
+what makes this a field report rather than a manifesto. *Error budgets* were examined and declined
+([Deliberately absent](#deliberately-absent) below); [five practices we respect are not yet
+absorbed](#industry-best-practices-we-have-not-yet-absorbed); and Postel's law is named on the
+[Inherent
+Stability](inherent-stability.md#not-postels-law) page precisely so that nobody mistakes it for what
+we do.
+
+## How principles relate to hypotheses
+
+Principles are constraints on *decisions*; in contrast, hypotheses are claims about *outcomes*. A
+hypothesis can be falsified by a measurement. A principle cannot — it is a decision rule, not a
+factual claim — so it is retired by different routes: the hypothesis it serves is falsified, which
+discredits the bet behind it; or measurements override it in specific decisions often enough that
+the exceptions become the rule; or it turns out never to actually decide anything, and is deleted
+as decoration. The two are connected in one direction: the principles
+are the bets we are making in order to test the hypotheses. That gives us a test for admission to
+this list — **name the hypothesis it serves and a decision it actually decided**. A principle
+serving no hypothesis is either decoration or a sign of a missing hypothesis; a hypothesis with no
+principle behind it is a claim we are merely hoping comes true.
 
 ## How to use this list
 

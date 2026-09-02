@@ -73,6 +73,16 @@ v2 scale   ── Reconstruct latent NRA demand per substation, after v2.0 is op
                   lets a switching event move proportionally more PV than load.
 ```
 
+**Approaches 2 and 3 may never be built, and it is worth knowing that before reading their
+designs.** The [decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector)
+below weighs the explicit detector against a feature-based mainline in which the discrete layer is
+deferred behind forecast skill. NGED's top priority is probabilistic normal-running-arrangement
+forecasts, and handling switching *implicitly* inside the forecaster is an acceptable way to deliver
+them. An explicit switching record is still genuinely wanted — the [`substation_switching`
+table](delivery-tables.md#table-5-substation_switching) was specified in our most recent formal
+report to NGED — but it sits further down NGED's continuum of priorities. Approaches 4 and 5 are
+v2-scale and start only once v2.0 is operational.
+
 ---
 
 ### v0.6 — switching-robust forecasting, and switching detection
