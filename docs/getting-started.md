@@ -2,8 +2,9 @@
 
 This is the single walkthrough for going from a fresh clone to a running Dagster instance that
 downloads real data and trains a model — entirely on your laptop, with no AWS account of your own
-to set up. Follow it top to bottom the first time; later pages go deeper on each part and are
-linked as you reach them.
+to set up. A final section then covers running the live service continuously on the same laptop,
+once the daemon is up. Follow it top to bottom the first time; later pages go deeper on each part
+and are linked as you reach them.
 
 ## Prerequisites
 

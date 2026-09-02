@@ -99,8 +99,8 @@ uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mo
 | `power_fcst_model_version` | `int16` | Version of OCF's model. |
 
 **Internal-only extensions (beyond the report draft), which NGED does not receive:** the live
-`PowerForecast` schema also carries `experiment_name` (`categorical`), `ml_flow_experiment_id`
-(`int32`, nullable) and `fold_id` (`categorical`; the CV validation year, or `"live"` for production
+`PowerForecast` schema also carries `experiment_name` (`string`), `ml_flow_experiment_id`
+(`int32`, nullable) and `fold_id` (`string`; the CV validation year, or `"live"` for production
 forecasts). All three let cross-validation rows and live rows share one internal table — filter on
 `fold_id` to select the population you need — and all three are projected out of the
 `power_forecast` table delivered to NGED. See
@@ -250,13 +250,10 @@ static scalar per series — a robust capacity proxy that is less sensitive to o
 the maximum, and more capacity-representative than the mean (which is dragged down by
 zero-output periods for PV/wind). It is also the denominator used to normalise NMAE in the
 `forecast_metrics` table. The denominator comes from the `effective_capacity` Delta table
-(schema `contracts.power_schemas.EffectiveCapacity`), consumed by `compute_metrics`
-(`ml_core.metrics`).
-
-**v0.1 representation: one scalar row per series.** The `effective_capacity` asset writes one
-row per `time_series_id` — `effective_capacity_mw` = P99 of `|power|` over the whole observation
-history, `time` = the latest observed timestep. `compute_metrics` joins it onto the per-series
-metrics **on `time_series_id` alone** and divides.
+(schema `contracts.power_schemas.EffectiveCapacity`), which carries one row per
+`time_series_id` with `time` set to the latest observed timestep. `compute_metrics`
+(`ml_core.metrics`) joins that table onto the per-series metrics **on `time_series_id` alone**
+and divides.
 
 **Why v0.1 is a single row per series, not the value repeated at every half-hour.** The
 v0.7 upgrade below *will* store one row per `(time_series_id, time)` half-hour — but with a

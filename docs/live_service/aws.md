@@ -323,9 +323,11 @@ telemetry from NGED's bucket. Without them that schedule fails every hour — lo
 `Settings.get_nged_s3_store` raises an error naming the unset variables, which the asset retries
 twice (its guard cannot tell an unset variable from a transient S3 error) before the job's
 `sentry_capture_failure` hook reports it — while everything that does not read NGED's own bucket
-carries on. That is deliberate: `Settings` does not require these credentials at construction, so a
-mis-wired secret cannot stop `live_forecasts`, which reads our own Delta tables and a model baked
-into the image. The reasoning is under [principle
+carries on. That is deliberate. Requiring these credentials at `Settings` construction would make the
+container refuse to start, which sounds like a useful fail-fast until you notice that
+`live_forecasts` reads our own Delta tables and a model baked into the image — so stopping it
+because an NGED credential is missing would break [principle 1](../design-philosophy/design-principles.md#1-the-power-forecast-never-stops).
+The wider reasoning is under [principle
 6](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)
 and in the [Configuration reference](setup.md#the-env-file-and-nged-source-credentials); catch a
 mis-wired secret in the deploy pipeline, where the blast radius is the deploy rather than the
@@ -410,8 +412,8 @@ server, and Postgres — is a plain EC2 virtual machine (EC2 is Elastic Compute 
 hand in [Step 11](#step-11-launch-the-control-plane-box), and the only compute in this deployment
 whose operating system we install and patch ourselves. **Every recurring job** its schedules
 dispatch — the hourly NGED telemetry ingest, the daily Dynamical.org NWP download, and the 6-hourly
-forecast — executes as an ephemeral ECS task on Fargate instead, where AWS owns and patches the
-machines. Why the compute is split this way, and why the control plane is not on Fargate too, is the
+forecast — executes as an ephemeral ECS task on Fargate instead, so that every scheduled run gets
+a fresh machine, AWS owns and patches it, and nothing sits idle between runs. Why the compute is split this way, and why the control plane is not on Fargate too, is the
 [orchestration
 design](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm).
 

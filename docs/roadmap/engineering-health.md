@@ -12,7 +12,7 @@ Issue: [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 *Runs after the [live service and monitoring](live-service.md) land.* The feature-level
 no-lookahead tests, cross-mode equivalence test, idempotency tests, and the full-stack
-cross-process MLflow test all exist. Three "not cheating" guardrail tests from the original
+cross-process MLflow test all exist. Four "not cheating" guardrail tests from the original
 testing strategy remain unwritten, plus general cleanup.
 
 ### Implementation details — rigor tests (deleted when they ship)

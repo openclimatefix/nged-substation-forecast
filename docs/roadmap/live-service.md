@@ -341,7 +341,7 @@ side note.
 
 The alarm's *evaluation and delivery* must sit **outside** the service being watched, because
 a dead daemon cannot report itself — a Dagster sensor alone can never provide this alarm.
-The planned mechanism is **Sentry cron monitoring**
+The mechanism is **Sentry cron monitoring**
 ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): each successful
 forecast run checks in with Sentry, and Sentry alerts when an expected check-in fails to
 arrive. This satisfies both the outside-the-service requirement and the portability preference
@@ -393,7 +393,7 @@ Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > `DAGSTER_HOME`, which confirmed 6-hourly forecasts landing with no duplicate rows and a missed
 > slot backfillable in replay mode. No hand-rolled freshness op is needed, and neither is the
 > one-shot `live_pipeline_job` that [Option
-> A](../architecture/production-deployment.md#considered-but-rejected) would require (Option A has
+> A](../architecture/production-deployment.md#infrastructure-tier-options-considered-and-rejected) would require (Option A has
 > no daemon to hold schedules) — Option A is rejected, so that job is not specified here.
 
 ### Deployment workstream 3 — AWS infrastructure

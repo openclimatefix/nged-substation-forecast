@@ -86,12 +86,10 @@ field records how many rows the table actually holds, so a truncated table can n
 stall look small.
 
 **Dagster's Checks view becomes the operator's at-a-glance status for whether the power data is
-healthy, and the check stays a warning rather than a failure because a stalled feed is expected to
-self-heal.** It is the operator's at-a-glance "is the power data healthy?" status surface, showing
-a green tick when every series is current and a yellow warning when the feed has stalled — or when
-a series we had written off starts reporting again. The severity is a warning rather than a
-failure: a stalled feed is expected to self-heal once NGED recovers (the pipeline back-fills the
-gap automatically), so it must not block downstream assets.
+healthy.** The view shows a green tick when every series is current and a yellow warning when the
+feed has stalled — or when a series we had written off starts reporting again. The severity is a
+warning rather than a failure: a stalled feed is expected to self-heal once NGED recovers (the
+pipeline back-fills the gap automatically), so it must not block downstream assets.
 
 Nothing the check's **body** does can fail its own step. It runs as a step of the hooked
 `power_time_series_and_metadata_job`, and Dagster fails a run whose check step *errors* however
@@ -735,7 +733,7 @@ ephemeral Fargate task sized to the job. Add ~£1.80 EBS (Elastic Block Store, t
 £5–7/month live Fargate, ~£0.65/backtest.
 
 **One image, four roles.** The daemon, webserver, and code-location server all run from the
-*same* [production image](../architecture/production-deployment.md) the ephemeral Fargate runs
+*same* [production image](#bake-the-model-into-the-image-at-build-time) the ephemeral Fargate runs
 use (harmless — the baked-in champion model is dead weight for the first three, only a run's
 actual execution touches it) — a `docker-compose.yml` on the box just launches each as a
 separate service with a different command override. The compose file, and the entrypoint
@@ -757,7 +755,7 @@ starts with `dagster`, so the run task definition must neutralise the image's
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
   £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
 
-### Considered but rejected
+### Infrastructure-tier options considered and rejected
 
 The four alternatives below were researched alongside the accepted option above and rejected in
 its favour. They're kept here as a durable record of the decision, not as live options.
@@ -833,9 +831,10 @@ an RDS+ALB tax for purism; E's 1-user cap rules it out.
 
 ## See also
 
-- [Live service roadmap](../roadmap/live-service.md) — the full live-service design, including the
-  costed AWS architecture options behind the accepted architecture (small control-plane box +
-  `EcsRunLauncher`) and its implementation workstreams.
+- [Live service roadmap](../roadmap/live-service.md) — the full live-service design and its
+  implementation workstreams. The costed AWS infrastructure options behind the accepted
+  architecture live on this page, under [Infrastructure tier: alternatives to the EC2 control-plane
+  box](#infrastructure-tier-alternatives-to-the-ec2-control-plane-box).
 - [AWS Running Costs](aws-costs.md) — what this architecture costs to run: the v1 estimate as
   deployed, and the projected estimate at v2 scale.
 - [Setting up the live service on AWS](../live_service/aws.md) — the step-by-step runbook:

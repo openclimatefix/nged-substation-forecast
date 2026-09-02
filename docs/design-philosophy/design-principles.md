@@ -757,7 +757,7 @@ years.
 
 Not every borrowed idea survives contact with reality, and we record those outcomes too — that is
 what makes this a field report rather than a manifesto. *Error budgets* were examined and declined
-([Deliberately absent](#deliberately-absent) below); [five practices we respect are not yet
+([Deliberately absent](#deliberately-absent)); [five practices we respect are not yet
 absorbed](#industry-best-practices-we-have-not-yet-absorbed); and Postel's law is named on the
 [Inherent
 Stability](inherent-stability.md#not-postels-law) page precisely so that nobody mistakes it for what
