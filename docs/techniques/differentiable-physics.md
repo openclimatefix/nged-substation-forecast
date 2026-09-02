@@ -257,7 +257,7 @@ class DifferentiableSolarPlant(nn.Module):
 
 Three physics details the sketch gets right:
 
-- **Irradiance transposition.** Plane-of-array (POA) irradiance is *not* GHI scaled by the angle of incidence — GHI already bakes in a cosine-of-zenith projection. We decompose the resource into beam, sky-diffuse and ground-reflected components (an isotropic sky model) and transpose each correctly. The beam term uses DNI (not GHI) projected by the angle of incidence.
+- **Irradiance transposition.** Plane-of-array (POA) irradiance is *not* GHI scaled by the angle of incidence — GHI already bakes in a cosine-of-zenith projection. We decompose the resource into beam, sky-diffuse, and ground-reflected components (an isotropic sky model) and transpose each correctly. The beam term uses DNI (not GHI) projected by the angle of incidence.
 - **DC and AC capacity.** The learnable `dc_capacity` is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. `ac_capacity` is a separate learnable parameter that clips the inverter output via `torch.minimum` — a single plant clips hard, unlike [the fleet soft clip](#scaling-to-aggregate-fleets-universalsolarfleetnode).
 - **Panel temperature derate.** Cell temperature sits above ambient in proportion to absorbed POA irradiance; efficiency then falls roughly linearly with temperature above 25 °C. The sketch adds a steady-state derate using two module-level constants; in the full variational model these become learnable posteriors — and the [subsection below](#panel-temperature) extends this to the broken-cloud effect.
 

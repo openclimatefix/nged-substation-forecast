@@ -136,7 +136,7 @@ in choosing Dagster over Airflow (see
 ## Operating model & handover
 
 NGED confirmed (2026-07-14) that their preference for running Flexpectation business-as-usual
-*after* the NIA project is for **NGED to run our code themselves, on NGED's own AWS
+*after* the Network Innovation Allowance (NIA) project is for **NGED to run our code themselves, on NGED's own AWS
 infrastructure**. This is a statement of preference, not yet a commitment: NGED still need to
 check with their DSO, Cyber, and IT&D teams before giving a concrete answer. Even so, it sets
 a standing design requirement for everything we build:

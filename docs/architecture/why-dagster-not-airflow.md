@@ -389,7 +389,8 @@ accepting that effort — so the option stays genuinely open rather than theoret
 
 We would happily revisit this page if any of the following happens:
 
-- **A concrete handover signal** — NGED (or a post-NIA operating agreement) indicating that
+- **A concrete handover signal** — NGED, or an operating agreement covering the period after the Network
+  Innovation Allowance (NIA) project, indicating that
   they run Airflow or want MWAA-managed orchestration. This is the strongest trigger, and it
   points at Option B, not Option A.
 - **OCF standardising on Airflow.** The discussion under way since around August 2025 becoming

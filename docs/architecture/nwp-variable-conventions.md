@@ -218,7 +218,7 @@ significand](../api/delta_store/index.md) the table stores, costs at most
 6.8 × 10⁻³ ° of direction and 2.4 × 10⁻³ m s⁻¹ of speed over a full run — the same order as the
 rounding the table already applies, and far below anything a forecast responds to.
 
-Written through the production path (same significand rounding, sort order and writer properties),
+Written through the production path (same significand rounding, sort order, and writer properties),
 the full column set both ways:
 
 | run | speed + direction | u + v | change |

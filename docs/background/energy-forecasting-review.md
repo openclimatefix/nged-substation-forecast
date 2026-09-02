@@ -158,7 +158,8 @@ precedent means for Flexpectation. The sections that follow give the evidence be
 #### The challenge
 
 *Net* demand is *gross* demand minus whatever generation sits behind the substation. Flexpectation
-version 1 forecasts the 20 substations in NGED's trial area — 16 primary substations, 2 grid supply
+version 1 forecasts the 20 substations among the 32 series in NGED's trial
+area — 16 primary substations, 2 grid supply
 points, and 2 bulk supply points. Version 2 extends that to net demand at every grid supply
 point, bulk supply point, and primary substation in NGED's licence areas. Our forecasts will be
 half-hourly, 14 days ahead, updated every 6 hours, and probabilistic. NGED acts on the forecast 1 to 10 days ahead. The question NGED asks of the forecast is "how likely is net demand to run
@@ -2811,7 +2812,7 @@ Dagster, benchmarks no orchestrator at all. The published evidence therefore sho
 workable foundation for an energy-forecasting pipeline, and says nothing about whether Dagster is
 the better of the two tools Flexpectation weighed. The reasoning behind that choice is set out in
 [Why Dagster, not
-Airflow](https://openclimatefix.github.io/nged-substation-forecast/architecture/why-dagster-not-airflow/).
+Airflow](../architecture/why-dagster-not-airflow.md).
 
 ### Operational meteorology has tied production changes to measured skill for decades
 
@@ -3101,7 +3102,7 @@ Flexpectation version 1.** The other three strands belong to the scale-up across
 distribution network from 2027, as does the disaggregation of unmetered generation. That scale-up
 is itself a falsifiable claim the project has written down: the architecture goes from 32 to about
 2,500 time series without structural change
-([H5](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h5-scale-without-redesign)).
+([H5](../design-philosophy/engineering-hypotheses.md#h5-scale-without-redesign)).
 
 **The main reason for attempting all nine challenges at once is that the nine may be one challenge
 rather than nine.** A switching event, a turbine out for repair, and a stuck meter all surface in
@@ -3136,7 +3137,7 @@ realistic to run on the order of hundreds of machine-learning experiments a mont
 to this review makes the same argument. The project states the claim as a falsifiable hypothesis:
 when experimentation is the active workstream, one person can register at least 100 leaderboard
 experiments in a month
-([H2](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h2-a-hundred-experiments-per-person-in-a-peak-month)).
+([H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)).
 
 **Expecting several of the four model families to fail is what makes those model families research
 directions rather than engineering tasks, and both NGED and this project count a negative result as

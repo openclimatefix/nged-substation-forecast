@@ -460,7 +460,7 @@ validation prediction to the laptop-sized peak quoted under [principle
 
 ### 12 — Measure; do not assume
 
-Performance, size and cost claims are benchmarked on real data, through the real code path, before
+Performance, size, and cost claims are benchmarked on real data, through the real code path, before
 they are believed — and the measurement is written down next to the decision it justified, so a
 later reader can tell which numbers are still true.
 

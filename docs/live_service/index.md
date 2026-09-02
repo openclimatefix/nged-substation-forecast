@@ -19,7 +19,8 @@ picking one of those candidates as the running production model and keeping live
 flowing from it.
 
 **Audience note:** today these runbooks are written for OCF (Python-literate researchers), but
-after the NIA project the day-to-day operator is expected to be a non-expert at NGED — NGED's
+after the Network Innovation Allowance (NIA) project the day-to-day
+operator is expected to be a non-expert at NGED — NGED's
 stated preference (2026-07-14, pending their internal sign-off) is to run the service
 themselves, on their own AWS account. Every routine
 operator action must therefore eventually reduce to a dashboard check, a button in the Dagster

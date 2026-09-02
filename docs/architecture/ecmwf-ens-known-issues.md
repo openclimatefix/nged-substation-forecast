@@ -194,7 +194,7 @@ the check name says which is which.
 Both are needed because the aggregation deliberately breaks the link between them. Renormalising
 over the contributing grid points is what keeps a scattered upstream null out of the stored cells —
 and it is therefore also what stops a cell count from measuring the feed. A cell count is the
-grid-point rate convolved with our H3 resolution, our grid spacing and our aggregation policy, so a
+grid-point rate convolved with our H3 resolution, our grid spacing, and our aggregation policy, so a
 change to any of those three moves it without anything upstream having changed. Only the grid-point
 rate answers the provider question in
 [Three audiences, three channels](../design-philosophy/inherent-stability.md#three-audiences-three-channels).

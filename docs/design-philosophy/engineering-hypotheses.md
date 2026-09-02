@@ -12,7 +12,8 @@ the admission test it implies, are stated on that page.
 ## The claims, in brief
 
 **H*n*** is a hypothesis; **T*n.m*** is its *m*th **test**. These labels are cited from issues and
-from NIA reports, so **append, never renumber**.
+from Network Innovation Allowance (NIA) reports, so **append, never
+renumber**.
 
 There are five claims below. The [table of tests and thresholds](#the-tests-at-a-glance) follows
 them.
@@ -137,7 +138,7 @@ try at once.
 **The same case has been made before, by senior practitioners across several organisations, and the
 absence of any measurement of what fast iteration delivers is a known gap in the
 machine-learning-operations literature** — see [Fast, comparable iteration is argued for, not
-measured](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/#fast-comparable-iteration-is-argued-for-not-measured)
+measured](../background/energy-forecasting-review.md#fast-comparable-iteration-is-argued-for-not-measured)
 in the literature review. H2 and T2.1 exist to supply this project's own measurement rather than to
 add a fifth testimonial to the pile.
 

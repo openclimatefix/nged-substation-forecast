@@ -100,9 +100,10 @@ uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mo
 
 **Internal-only extensions (beyond the report draft), which NGED does not receive:** the live
 `PowerForecast` schema also carries `experiment_name` (`string`), `ml_flow_experiment_id`
-(`int32`, nullable) and `fold_id` (`string`; the CV validation year, or `"live"` for production
-forecasts). All three let cross-validation rows and live rows share one internal table — filter on
-`fold_id` to select the population you need — and all three are projected out of the
+(`int32`, nullable), and `fold_id` (`string`; the fold's label from `conf/cv/default.yaml`,
+such as `"mid_2025_to_mid_2026"`, or `"live"` for production forecasts). All three let
+cross-validation rows and live rows share one internal table — filter on `fold_id` to select
+the population you need — and all three are projected out of the
 `power_forecast` table delivered to NGED. See
 [metrics & leaderboard](metrics-and-leaderboard.md).
 

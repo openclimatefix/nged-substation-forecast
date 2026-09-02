@@ -89,7 +89,7 @@ Issue: [#221](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)). The design
 > rationale (single-run vs. bulk mode, the `live`/`replay` asymmetry, the trained-population
 > invariant) now lives at
-> [Production Deployment — Design: Live inference](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#run-live-inference-in-single-run-mode-not-bulk);
+> [Production Deployment — Design: Live inference](../architecture/production-deployment.md#run-live-inference-in-single-run-mode-not-bulk);
 > the operational runbook — promoting a model, running the schedule, backfilling a missed slot —
 > is [Operating the live service](../live_service/operations.md), the permanent home
 > this page's shipped material moves to (and, eventually, this whole page, once every section
@@ -101,9 +101,9 @@ Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 > **Status: ✅ Done.** The design decision (bake the champion model into the image at build
 > time; no MLflow at runtime) and its rationale now live at
-> [Production Deployment — Design](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/);
+> [Production Deployment — Design](../architecture/production-deployment.md);
 > the promotion/build/verify runbook lives at
-> [Setting up the live service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/).
+> [Setting up the live service on AWS](../live_service/aws.md).
 
 ## AWS architecture
 
@@ -277,14 +277,14 @@ monitor until live forecasts exist.*
 
 The `metrics` asset implements the `leaderboard` and `ad_hoc` scopes; `production_monitoring`
 is declared in `EVALUATION_SCOPES` but unimplemented (`EvalScopeType` in
-`contracts/ml_schemas.py:219` deliberately omits it). And with thousands of experiments
+`contracts/ml_schemas.py` deliberately omits it). And with thousands of experiments
 planned, the `cv_experiment_folds` dynamic partition set grows without bound — partition keys
 need a retirement path that cannot lose results.
 
 ### The `production_monitoring` evaluation scope
 
 - Extend `EvalScopeType` to `Literal["leaderboard", "production_monitoring", "ad_hoc"]`,
-  bringing it in sync with `EVALUATION_SCOPES` (the docstring at `ml_schemas.py:222` already
+  bringing it in sync with `EVALUATION_SCOPES` (`EvalScopeType`'s own docstring already
   anticipates this).
 - Remove the CV-folds-only restriction in `compute_metrics()` (documented in its docstring):
   `fold_id="live"` rows use the same join logic, with window bounds supplied by the caller
@@ -398,7 +398,7 @@ Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 ### Deployment workstream 3 — AWS infrastructure
 
-> **Status: ✅ Infrastructure built and running.** ECR, the two IAM roles, the Fargate
+> **Status: ✅ Infrastructure built and running.** The Elastic Container Registry repository, the two IAM roles, the Fargate
 > task definition, the always-on EC2 control-plane box (`EcsRunLauncher`, Postgres-in-Docker,
 > schedules, Tailscale, Marimo), and S3 run in production, serving v0.2 — stood up by hand and
 > documented step-by-step in [Setting up the live service on AWS](../live_service/aws.md). The

@@ -171,7 +171,8 @@ absorb level drift for the same reason.
 back to at least 2019, so the gap years contain real switching events and need whatever masking the
 modern data gets. And the primaries' "Disaggregated Demand" depends on which embedded generators
 were metered at the time, so a meter coming online mid-history silently redefines that series — the
-[ECR](https://github.com/openclimatefix/nged-substation-forecast/issues/159) and
+[Embedded Capacity
+Register](https://github.com/openclimatefix/nged-substation-forecast/issues/159) and
 [MPAN-to-substation](https://github.com/openclimatefix/nged-substation-forecast/issues/241) ingests
 carry the connection dates needed to check.
 

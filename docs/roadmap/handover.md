@@ -1,8 +1,8 @@
 # Handover to NGED
 
-> **Status: 🚧 Planned.** This page is the design record for the post-NIA operating model NGED
+> **Status: 🚧 Planned.** This page is the design record for the operating model NGED
 > stated as their preference on **2026-07-14**: NGED running Flexpectation themselves, on
-> NGED's own AWS account, after the NIA project ends. That stated intent is a preference, not yet a
+> NGED's own AWS account, after the Network Innovation Allowance (NIA) project ends. That stated intent is a preference, not yet a
 > commitment — NGED's DSO, Cyber, and IT&D teams still need to sign off — but we design for it
 > from now on. The requirement itself is recorded in
 > [Requirements → Operating model & handover](../background/requirements.md#operating-model-handover);

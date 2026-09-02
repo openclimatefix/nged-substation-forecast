@@ -234,7 +234,7 @@ appear nowhere else.
    imperative form.)*
 9. **Fail in the direction where being wrong is cheapest to recover from.** In production that is
    forward; in model R&D it is backward. See [R&D fails the other way](#rd-fails-the-other-way).
-10. **Damp the corrections.** Bounded retries with backoff, rate limits on retraining and hysteresis
+10. **Damp the corrections.** Bounded retries with backoff, rate limits on retraining, and hysteresis
     on model promotion — the rate limits and the hysteresis designed but not built 🚧 — are as much a part of this
     principle as the degradation ladder is.
 11. **Never make one production job's run status a precondition for another's.** Couple them through
@@ -297,7 +297,7 @@ depend on retraining staying cheap and promotion staying one command.
 A stuck meter reporting 2.1 MW for 52 hours is not missing data; it is actively misleading, and a
 lag-feature model will propagate it happily. The incumbent has the identical vulnerability.
 [NGED's network and its data](../background/network.md#data-quality-in-the-trial-area) documents
-both classes empirically — false zeros, stuck values and genuinely missing data as separate
+both classes empirically — false zeros, stuck values, and genuinely missing data as separate
 phenomena — and is the evidence base for this distinction.
 
 ### Default directions, and their limit
@@ -348,7 +348,7 @@ width, which are how we check that the widening is honest rather than merely pre
 
 ### The physical envelope
 
-Clear-sky irradiance needs only latitude, longitude and time, so as data degrades the forecast can
+Clear-sky irradiance needs only latitude, longitude, and time, so as data degrades the forecast can
 relax toward a physical envelope that is always computable — wide, honest, and still bounded by what
 the sky can deliver. That is rung 4.
 
@@ -478,7 +478,7 @@ constraints rather than roadmap items:
   inputs](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill).
 
 - **Do not lean on random dropout.** Random dropout simulates data that is missing *completely at
-  random*, and ours is not — outages correlate with time of day, weather systems and provider
+  random*, and ours is not — outages correlate with time of day, weather systems, and provider
   incidents — so a random-dropout-trained model surfaces its miscalibration as over-confident bands
   during a real outage. Use structured, outage-shaped dropout instead; the full argument is in
   [Encoders → Handling missing inputs](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill).

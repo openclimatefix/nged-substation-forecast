@@ -38,7 +38,7 @@ Deployment — Design](../architecture/production-deployment.md).
 We split storage across **two** buckets so the five tables that form NGED's stable delivery
 contract are physically separate from OCF's own working data, which may change shape at any time
 with no notice. See [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
-for why this split exists, and [Delivery tables](https://openclimatefix.github.io/nged-substation-forecast/roadmap/delivery-tables/)
+for why this split exists, and [Delivery tables](../roadmap/delivery-tables.md)
 for exactly which five tables count as "delivery."
 
 In the AWS console → **S3** → **Create bucket**, twice:
@@ -1129,7 +1129,7 @@ Four things in `dagster.yaml` deserve explanation:
       http://169.254.169.254/latest/meta-data/local-ipv4
     ```
 
-    This instance config is not only read on the box: the daemon serializes it into every run it
+    This instance config is not only read on the box: the daemon serialises it into every run it
     launches, and the **Fargate run worker connects back to this same Postgres** to record its
     events and heartbeats. The compose-network alias only resolves on the box, whereas the private
     IP is reachable both from Fargate (same VPC) and from the box's own containers (via the

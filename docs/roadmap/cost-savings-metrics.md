@@ -198,7 +198,7 @@ historical summed power. Where NGED supply a real rating for a node, we use that
 ### Tier 3 — full power-flow modelling
 
 Out of scope for Flexpectation, including v2. Tier 3 is documented as the eventual correct approach
-— modelling reactive power, voltage drop and N-1 contingencies explicitly — but it is gated on
+— modelling reactive power, voltage drop, and N-1 contingencies explicitly — but it is gated on
 power-flow integration work that sits outside this project.
 
 Tier 3 is also where a **real curtailment case study** becomes possible. Tiers 1 and 2 can each be computed and can rank models without Tier 3. What they cannot yet do is be validated against a real curtailment event, because no existing site maps a curtailment case to a specific series or a single hierarchy node — see [case studies](#case-studies) below.
@@ -294,7 +294,7 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
 
 - **Flexibility procurement (Metric 1) — Tavistock Primary, `CMZ_T9A_SWE_0050`, South West.**
   Buildable now. Tavistock has genuine winter exceedances, a seasonal transformer rating (13 MVA in
-  winter, 10 MVA in the intermediate-cool, intermediate-warm and summer periods — treated as MW,
+  winter, 10 MVA in the intermediate-cool, intermediate-warm, and summer periods — treated as MW,
   assuming negligible reactive power at this transformer), and real procurement history, all from
   public sources. "Winter" here is whatever calendar period NGED's own rating table uses, not a
   fixed date range; the exact month boundaries need confirming against the dataset rather than

@@ -1,6 +1,6 @@
 # Common incident classes in production forecasting services
 
-Production services that ingest third-party weather, satellite or telemetry feeds tend to fail in
+Production services that ingest third-party weather, satellite, or telemetry feeds tend to fail in
 a small number of recurring shapes, largely independent of the specific stack behind them. This
 page catalogues those shapes and states, for each, which mechanism in this project's design
 targets it — honestly marking what already exists against what is designed but not yet built, and
@@ -83,7 +83,7 @@ is the data-layer answer, and the [accepted AWS
 architecture](../roadmap/live-service.md#aws-architecture) extends the same instinct to compute:
 every live and backtest run dispatches to its own ephemeral Fargate task, so a bad run cannot
 starve another one. The gap sits on the always-on control-plane box itself, where the Dagster
-daemon, webserver and dashboard run as separate processes sharing one machine's memory and disk
+daemon, webserver, and dashboard run as separate processes sharing one machine's memory and disk
 with no per-process limit — today's mitigation is restart-on-failure plus the [missed-check-in
 alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm), both reactive
 rather than preventive

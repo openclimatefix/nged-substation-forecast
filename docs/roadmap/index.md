@@ -34,7 +34,7 @@ guarantee.
 - [Live service](live-service.md) — the AWS deployment: the `live_forecasts` inference
   asset, the champion-model container, the costed AWS architecture options, and production
   monitoring.
-- [Handover to NGED](handover.md) — the preferred post-NIA operating model (NGED runs the
+- [Handover to NGED](handover.md) — the preferred operating model after the Network Innovation Allowance (NIA) project ends (NGED runs the
   service themselves, on NGED's AWS — their stated preference as of 2026-07-14, pending NGED
   internal sign-off): the operator-contract design constraint, and the handover workstreams
   (runbooks, alert-on-absence, infra-as-code, NGED landing-zone probing, game days).

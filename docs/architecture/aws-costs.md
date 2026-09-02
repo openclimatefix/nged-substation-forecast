@@ -110,7 +110,7 @@ at v1 scale come to **~£2–4/month in total**:
   internet egress (the Tailscale-tunnelled Dagster UI and Marimo dashboard) is a few
   GB/month, inside AWS's account-wide 100 GB/month free egress allowance (£0.067/GB
   beyond).
-- **Everything else — pennies.** ECR image storage and CloudWatch Logs ingestion for ~1,000
+- **Everything else — pennies.** Elastic Container Registry image storage and CloudWatch Logs ingestion for ~1,000
   task runs/month — one Fargate task per schedule tick, matching the ~1,000 materialisations/month
   above (see
   [Production Deployment — Design](production-deployment.md#running-the-data-ingest-runs-on-the-control-plane-vm))
