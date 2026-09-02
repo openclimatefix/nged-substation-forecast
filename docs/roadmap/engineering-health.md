@@ -45,8 +45,9 @@ testing strategy remain unwritten, plus general cleanup.
 **Part 2 — cleanup:**
 
 - Remove any remaining dead code/imports from the phased build-out.
-- **Split `defs/cv_assets.py`** (898 lines — the complexity hotspot flagged in the 2026-07
-  codebase review) into `cv_assets.py` / `production_assets.py` / `metric_assets.py`. The
+- **Split `defs/cv_assets.py`** (the largest module in `defs/`, and the complexity hotspot
+  flagged in the 2026-07 codebase review) into `cv_assets.py` / `production_assets.py` /
+  `metric_assets.py`. The
   [`live_forecasts` work](live-service.md#the-live_forecasts-asset) already starts
   `production_assets.py`; move the `metrics` asset and its helpers into `metric_assets.py`
   here. Pure logic stays in `ml_core.cv_helpers`.

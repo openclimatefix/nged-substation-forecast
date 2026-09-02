@@ -3068,26 +3068,13 @@ percentiles where Artificial Forecasting's published bands run from the 5th to t
 ## Why we think this ambitious plan can be done
 
 **Measured against the studies we found, the plan for Flexpectation sits outside the published
-literature in nine ways at once.** The distance between Flexpectation's plan and the published
-literature says more about where our search fell short than about the quality of the work that fills
-the rest of the field. No study in this review drives a substation forecast from a weather ensemble
-across a 14-day horizon. No study we read models the tails explicitly at substation level, and the
-one study we found that models the tails explicitly works on regions far larger than a substation.
-No study we read pre-trains a weather encoder against observations and then reads a substation's
-probabilistic load forecast off that encoder. No study we read aggregates building thermal physics
-up to a substation and puts that physics inside a probabilistic forecast. No study we read tracks
-the available capacity of a mixed fleet of solar, wind, and dispatchable generators at one
-distribution network, or measures whether doing so improves the forecast. No study we read detects a
-switching event by checking that the power leaving one substation arrives at its neighbours. No
-study we read turns switching-contaminated history at a substation into a useful input rather than
-deleting that history, rewriting that history, or absorbing the accuracy loss of leaving that
-history in. The nearest precedent we found, [Liu et al.
-(2019)](https://doi.org/10.1109/ACCESS.2019.2951422), conditions a forecast on an operating-state
-label, but for switching between transformers inside one substation, where the substation total
-stays metered throughout. No study we read recovers a latent normal-running-arrangement demand for a
-distribution substation. No study we read puts unmetered generation inside a probabilistic forecast
-at substation level over a multi-day horizon, though unmetered generation, probabilistic forecasting
-at substation level, and a multi-day horizon each exist independently.
+literature in nine ways at once.** The nine absences are itemised in the [summary](#summary) above.
+The distance between Flexpectation's plan and the published literature says more about where our
+search fell short than about the quality of the work that fills the rest of the field. On the
+switching-events absences the nearest precedent we found is [Liu et al.
+(2019)](https://doi.org/10.1109/ACCESS.2019.2951422), which conditions a forecast on an
+operating-state label — but for switching between transformers inside one substation, where the
+substation total stays metered throughout.
 
 Flexpectation attempts all nine challenges above, across four families of model:
 

@@ -104,14 +104,13 @@ handover they need an editing pass with the NGED operator as the audience, plus 
 Per-task failure alerts miss whole classes of silent failure: a hung daemon, a full disk, an expired
 credential, a schedule that simply stopped firing. The fix is a **missed-check-in alarm** (Sentry's
 cron-monitoring terminology): an alarm that fires when *no successful forecast has landed in N
-hours* (e.g. 8 hours, i.e. one missed 6-hourly slot plus margin), regardless of why. The planned
-mechanism is **Sentry cron monitoring**
-([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): each successful run
-checks in with Sentry, and Sentry alerts on a missed check-in — Sentry sits outside the service
-being watched (a dead daemon simply stops checking in), and check-in pings are plain portable code.
-Details:
-[the missed-check-in alarm](live-service.md#alert-on-absence-the-missed-check-in-alarm). The
-handover consideration: the Sentry account is OCF's today, so at handover the alert routing (and
+hours* (e.g. 8 hours, i.e. one missed 6-hourly slot plus margin), regardless of why. That alarm is
+built and running on **Sentry cron monitoring**: each successful `live_forecasts` run checks in with
+Sentry, and Sentry alerts on a missed check-in — Sentry sits outside the service being watched (a
+dead daemon simply stops checking in), and check-in pings are plain portable code. The as-built
+mechanism is [Send telemetry to
+Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
+What handover still has to settle: the Sentry account is OCF's today, so the alert routing (and
 possibly the account itself) moves to NGED.
 
 The [production monitoring plan](live-service.md#production-monitoring) already sketches a "no fresh

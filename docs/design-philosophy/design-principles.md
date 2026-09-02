@@ -705,17 +705,11 @@ genuinely open design question, because our inputs are **expected to drift**: cl
 the weather distributions, and the grid beneath the power data is changing fast (solar, EVs, heat
 pumps).
 
-Great Britain's summer of 2026 is the concrete case, and it arrived while this page was being
-written. All the figures here are the Met Office's provisional figures, current as of early
-August
-2026. July 2026 was the driest July in the England and Wales series that begins in 1836: England
-recorded 6.5 mm of rain, 10% of its long-term average, and southern England recorded 1.9 mm — 3% of
-average, and the driest month it has ever observed. The same month was the UK's sunniest July in a
-series running from 1910, and for England and Wales the sunniest *calendar month* ever observed; it
-was also the second-warmest July for the UK as a whole. Nor was this confined to one month: spring
-2026 was already the warmest on record for England and Wales, and at the summer's halfway point the
-UK was running 1.8 °C above the seasonal norm — warmer than 2025 at the same stage, and 2025 went
-on to be the UK's warmest summer on record. Every one of those is a real shift in the distribution
+Great Britain's summer of 2026 is the concrete case. July 2026 was the driest July in the England
+and Wales series that begins in 1836, with England recording 10% of its long-term average rainfall;
+it was also the UK's sunniest July in a series running from 1910, and spring 2026 had already been
+the warmest on record for England and Wales (Met Office provisional figures). Every one of those is
+a real shift in the distribution
 of an input we feed the model, and not one of them is a fault. A naive "distribution changed" alarm
 would have fired continuously from spring 2026 onwards while telling an operator nothing they could
 act on, which is exactly how a naive alarm gets tuned into silence.

@@ -865,15 +865,11 @@ business case alone.
   supply schedule, because a large unmetered load is then partly known in advance. GB offers no
   such segregation, which is exactly why this stays an inference from weather rather than a
   measured quantity.
-- **Hydro** — physically the cleanest mechanism of the four, and the only one where a 90-day
-  rainfall total approaches being a *primary* driver rather than a correction. It is listed last
-  anyway, because NGED's network barely has any. It has **no v1 exposure**: `Hydro` is a valid
-  `time_series_type` in the contract, but the [32-series trial area](../index.md#scope) contains no
-  hydro series. Nor does v2 rescue it: NGED's [embedded hydro
-  capacity](../background/network.md#embedded-generation-on-the-network) is under half a percent
-  of connected solar capacity, overwhelmingly small run-of-river, and spread across 32 distinct
-  primary substations, so no primary is hydro-dominated and every scheme arrives diluted into a
-  much larger net-demand signal rather than as its own series.
+- **Hydro** — out of scope, despite being the mechanism a rainfall total would explain most
+  directly. The [32-series trial area](../index.md#scope) has no hydro series, and NGED's
+  [embedded hydro capacity](../background/network.md#embedded-generation-on-the-network) is under
+  half a percent of connected solar, spread thinly enough that no primary is hydro-dominated at v2
+  either.
 
 **Why this sits behind the instantaneous z-scores, and what the leaderboard will actually tell
 you.** The obstacle is not the feature, it is the effective sample size *on the training side*. A

@@ -94,8 +94,7 @@ for NGED, because their goal is better forecasts for flexibility procurement.
 ## Spoke 6: Recovery on a fully-instrumented holdout (strongest)
 
 A single substation, even briefly, where every feeder and embedded generator is individually
-metered, used purely as validation. One such site anchors the whole evaluation. Worth asking NGED
-and UK Power Networks (UKPN) whether a fully metered substation already exists.
+metered, used purely as validation. One such site anchors the whole evaluation.
 
 ---
 

@@ -62,8 +62,9 @@ Sign convention depends on `substation_type` in `TimeSeriesMetadata`, whose five
 
 Multiply the [−1, +1] forecast by the asset's **maximum / nominal** capacity:
 
-- *Substations*: × the substation's capacity (for v1, likely just the maximum observed power flow
-  through that substation).
+- *Substations*: × the substation's
+  [effective capacity](delivery-tables.md#table-4-effective_capacity) — the 99th percentile of
+  observed power flow, written by the `effective_capacity` asset since v0.1.
 - *Generators*: × the **maximum estimated capacity** of that generator.
 
 This answers: *"what would this asset do if it were healthy and the network were in its normal

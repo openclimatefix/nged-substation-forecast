@@ -251,10 +251,10 @@ event age, attributed magnitude) are themselves natural features for this model.
   run per past target time with no publication-time constraint, and is leak-free today only as a
   side effect of daily run cadence. The residual pipeline must therefore add an explicit
   availability cut, guarded by a leakage test in the spirit of the `_nullify_leaky_lags` tests.
-  The natural home for that cut is the planned central NWP analysis-proxy function
-  ([#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356)), which unifies
-  the dashboard's stitched proxy-analysis query with the feature pipeline's
-  freshest-run-per-valid-time join.
+  The natural home for that cut is `weather_utils.analysis_proxy.select_analysis_proxy`, the
+  shared NWP analysis-proxy function that already unifies the dashboard's stitched proxy-analysis
+  query with the feature pipeline's freshest-run-per-valid-time join, and already applies an
+  `available_at` cut.
 - **Cross-series features are new machinery.** Neighbour residuals need the trial-area adjacency
   list (a dependency in [Open items](#open-items-dependencies)) plus a cross-series join in feature engineering. The feature-schema
   question (each series has its own neighbour set, of varying size) is answered by the pooled
@@ -414,8 +414,8 @@ need.
 **The same no-lookahead discipline.** The draft at the target time must be hindcast on NWP *as
 available at that lead time*, not on fresh analysis-like data, or stage 2 calibrates its
 corrections against a draft that is systematically better than the live draft — the same
-availability cut the residual-lag hindcasts and the freshest-run join require
-([#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356)). The lead-time
+availability cut the residual-lag hindcasts and the freshest-run join require, which
+`weather_utils.analysis_proxy.select_analysis_proxy` applies. The lead-time
 feature belongs in stage 1 so the draft's own attenuation with horizon is honest.
 
 **The prize — a plausible route to a global corrector.** The correction target `(actual − draft)`
@@ -636,8 +636,6 @@ correlations per leg.
 *Order matters — read composition off the recipient, never the source.* The diurnal shape must be measured on **each recipient's individual step**, *after* attribution has identified which donor took which leg. It must **not** be read off the source substation's lumped drop. The reason: a source commonly sheds *different* slices to *different* donors at once — say a PV-heavy slice to donor $j$ and a demand-heavy slice to donor $k$. The source's own residual shows only the *sum* of everything it lost. That sum blends the two legs into a meaningless average that matches neither. Only the per-recipient steps separate cleanly into "what $j$ got" vs. "what $k$ got." (This is the same source-blends-everything pitfall noted for stage 1, applied to composition rather than magnitude.)
 
 ##### Validation, injection, and what the detector delivers
-
-Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/180)
 
 **Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**. The floor is not a single MW number: it is a frontier in **transferred magnitude × event duration**, reported per series relative to that series' residual noise. The duration axis exists because changepoint segmentation has a minimum detectable event length at half-hourly sampling (an event lasting minutes to a few hours appears as a spike or one odd interval, not a step), just as residual noise sets a minimum magnitude. Pair the frontier with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.* One caveat to carry into the scoring: measured **precision is a lower bound** — if the control-room logs are incomplete (worth asking NGED how complete they believe them to be), some "false positives" will be real, unlogged events.
 

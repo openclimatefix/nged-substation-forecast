@@ -98,10 +98,12 @@ uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mo
 | `power_fcst_model_name` | `categorical` (string) | Name of OCF's model, e.g. `"xgboost_baseline"`. Set by the `BaseForecaster` subclass. |
 | `power_fcst_model_version` | `int16` | Version of OCF's model. |
 
-**Implemented extensions (beyond the report draft):** the live `PowerForecast` schema also carries
-`ml_flow_experiment_id` (`int32`, nullable) and `fold_id` (`categorical`; the CV validation year, or
-`"live"` for production forecasts). These let cross-validation rows and live rows share one table —
-filter on `fold_id` to select the population you need. See
+**Internal-only extensions (beyond the report draft), which NGED does not receive:** the live
+`PowerForecast` schema also carries `experiment_name` (`categorical`), `ml_flow_experiment_id`
+(`int32`, nullable) and `fold_id` (`categorical`; the CV validation year, or `"live"` for production
+forecasts). All three let cross-validation rows and live rows share one internal table — filter on
+`fold_id` to select the population you need — and all three are projected out of the
+`power_forecast` table delivered to NGED. See
 [metrics & leaderboard](metrics-and-leaderboard.md).
 
 ### Representation 1 — ensemble of deterministic forecasts ✅

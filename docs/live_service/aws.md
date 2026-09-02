@@ -1079,8 +1079,8 @@ load_from:
 ```
 
 `~/nged-forecast/dagster_home/dagster.yaml` — the instance config. The `concurrency`,
-`run_monitoring`, and `python_logs` blocks are the same blocks the local `dagster.yaml` in the
-[repository README](https://github.com/openclimatefix/nged-substation-forecast#setup) uses, and
+`run_monitoring`, and `python_logs` blocks are the same blocks the local `dagster.yaml` in
+[Getting started](../getting-started.md#step-3-give-dagster-a-persistent-home) uses, and
 for the same reasons; what's new is Postgres storage and the run launcher:
 
 ```yaml

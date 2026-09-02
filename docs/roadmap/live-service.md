@@ -441,25 +441,15 @@ Still 🚧 after v0.1:
 
 ### Related GitHub issues
 
-Row order matches the sub-issue order on the #137 epic itself (the OCF project board), not the
-order issues were opened.
+The issues below are the ones still open. Everything else under the v0.1 epic
+([#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137)) has shipped, and
+that epic is the record of what landed when.
 
 | Issue | Where it lands in this plan |
 |---|---|
-| [#221 Add the `live_forecasts` Dagster asset](https://github.com/openclimatefix/nged-substation-forecast/issues/221) | [The `live_forecasts` asset](#the-live_forecasts-asset) — done |
-| [#208 Run every 6 hours locally and backfill missing runs (as a test)](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | [Deployment workstream 1](#deployment-workstream-1-the-production-job-local-dress-rehearsal) — done, via native per-asset schedules |
-| [#121 Use obstore instead of pathlib](https://github.com/openclimatefix/nged-substation-forecast/issues/121) | S3-capable data paths — done ([setup guide](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/)) |
-| [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | S3-capable data paths — done |
-| [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) — done ([promotion runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/)) |
-| [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis) — done; deployed and running |
-| [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — done; the option-agnostic pieces and the control-plane box are all in the [AWS runbook](../live_service/aws.md). Infra-as-code ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) is a separate 🚧 follow-up |
-| [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) — done; also removed the local model cache it depended on ([#469](https://github.com/openclimatefix/nged-substation-forecast/issues/469)) |
-| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — done; Sentry error telemetry + the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm), as-built in [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence). Per-task failure email alerting is a separate 🚧 follow-up |
 | [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not detailed on this page — decided 2026-07-03 (see the issue for the full worklist); an open follow-up, not required for v0.1 |
 | [#96 Write power forecasts in schema agreed with NGED](https://github.com/openclimatefix/nged-substation-forecast/issues/96) | Deferred to the v1.0 epic ([#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)) — v0.1 is "forecast running", not "delivery contract live" |
-| [#161 More Dagster-UI metrics + validation for NWP ingestion](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Deferred to the v0.2 epic ([#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)) — done; the run-completeness check and shape metadata are as-built in [Known ECMWF ENS data-quality issues](../architecture/ecmwf-ens-known-issues.md#an-incomplete-run-tolerated-and-reported) |
 | [#5 Backup procedure for data & models on Jack's workstation](https://github.com/openclimatefix/nged-substation-forecast/issues/5) | Deferred to the v0.2 epic ([#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)); largely superseded once S3 is the primary store |
-| [#209 Bump version number to v0.1](https://github.com/openclimatefix/nged-substation-forecast/issues/209) | The final ship step — done (`v0.1.0` tagged July 2026) |
 
 ### Monitoring — tests and verification
 
