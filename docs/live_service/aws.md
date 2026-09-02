@@ -29,9 +29,9 @@ Design](../architecture/production-deployment.md).
 > to start at Stage 2, when team access adds enough moving parts to justify it.
 >
 > **Sentry telemetry is already wired; only per-task failure emails are still to come.** Sentry
-> error telemetry and the missed-check-in alarm are wired (set the `SENTRY_*` vars in
-> [Step 14](#step-14-configure-dagster-on-the-box)); only per-task failure emails (SNS) are still
-> to come — see [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
+> error telemetry, the missed-check-in alarm, and the freshness warnings are wired (set the
+> `SENTRY_*` vars in [Step 14](#step-14-configure-dagster-on-the-box)); only per-task failure
+> emails (SNS) are still to come — see [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
 
 ## Step 1 — Create the S3 buckets
 

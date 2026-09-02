@@ -157,11 +157,12 @@ Two of those checks deserve a note. The **horizon** is checked because `live_for
 outside the selected NWP run's coverage, so a partly-ingested run delivers a much shorter forecast
 than NGED expect while every individual row stays perfectly well-formed — a fault nothing else would
 see. The floor is half the horizon we ask for, which is loose enough that a healthy slot (about
-13.75 of the 14 days, since the run it used is already 12–30 hours old) never trips it. And the read
-is scoped to the promoted model's own `experiment_name`, because `write_power_forecasts` replaces
-one `(experiment_name, fold_id)` partition at a time: promoting a champion from a different
-experiment leaves the outgoing experiment's rows for the same slot on disk, and without that filter
-the check would report faults sourced entirely from dead rows.
+13.75 of the 14 days, since the run it used is already 12–30 hours old) never trips it.
+
+**The read is scoped to the promoted model's own `experiment_name`, because `write_power_forecasts`
+replaces one `(experiment_name, fold_id)` partition at a time.** Promoting a champion from a
+different experiment leaves the outgoing experiment's rows for the same slot on disk, and without
+that filter the check would report faults sourced entirely from dead rows.
 
 The same check carries the **missed daily NWP run count**, because the second way a live slot goes
 quietly wrong is to be built from an increasingly ancient weather run. It is deliberately a count of
@@ -643,9 +644,12 @@ several-hours-apart intervals, spends most of its ticks discovering there is not
 for that task size), ~720 hourly runs of a few minutes each — most of them the no-ops described
 above — come to on the order of **\$5–10/month**: the same magnitude of saving the [EventBridge
 rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks) dismissed as "not real for
-this workload". A second, quieter cost: `ecmwf_ens`'s not-yet-published retry loop
-(`RetryRequested`, 30-minute waits) retries *inside the same run*, so on a late-publication day its
-16 GB task sits idle for up to 4 hours, billed the whole time (still well under \$1).
+this workload".
+
+**A second, quieter cost is idle time billed inside a single run.** `ecmwf_ens`'s
+not-yet-published retry loop (`RetryRequested`, 30-minute waits) retries *inside the same run*, so
+on a late-publication day its 16 GB task sits idle for up to 4 hours, billed the whole time (still
+well under \$1).
 
 **Door left open.** If those figures ever start to matter, two fixes exist inside the accepted
 architecture, and neither moves work onto the box:
@@ -694,7 +698,7 @@ chosen champion is copied out of the tracking store and baked into the image.
 The idea may still return in a stronger form: the **future work** note at the end of [Bake the model
 into the image at build time](#bake-the-model-into-the-image-at-build-time) — the section describing
 the accepted design this rejected idea lost to — describes fetching the champion dynamically once
-redeploys become frequent, At which point a production-resilience mechanism for serving through an
+redeploys become frequent. At that point a production-resilience mechanism for serving through an
 MLflow outage would need to be designed (tracked in [issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472)).
 `load_from_mlflow`
 does not supply a resilience mechanism of its own.
@@ -721,11 +725,8 @@ and ~£0.65/backtest.
 [production image](#bake-the-model-into-the-image-at-build-time) the ephemeral Fargate runs use
 (harmless — the baked-in champion model is dead weight for the first three, only a run's actual
 execution touches it) — a `docker-compose.yml` on the box just launches each as a separate service
-with a different command override. The compose file, and the entrypoint gotchas it has to navigate
-(`dagster-webserver`/`dagster-daemon` are separate console-script binaries, not `dagster`
-subcommands; and `EcsRunLauncher` generates a run command that itself starts with `dagster`, so the
-run task definition must neutralise the image's `ENTRYPOINT ["dagster"]`), are now written up in the
-runbook — [Setting up the live service on AWS: Steps 9 and
+with a different command override. The compose file, and the entrypoint gotchas it has to navigate,
+are now written up in the runbook — [Setting up the live service on AWS: Steps 9 and
 14](../live_service/aws.md#step-9-create-the-ecs-cluster-and-fargate-task-definition).
 
 - **Pros:** Dagster properly (history, UI backfills, sensors, concurrency pools enforced
@@ -742,8 +743,9 @@ runbook — [Setting up the live service on AWS: Steps 9 and
 
 ### Infrastructure-tier options considered and rejected
 
-The four alternatives below were researched alongside the accepted option above and rejected in its
-favour. They're kept here as a durable record of the decision, not as live options.
+The four alternatives below — labelled A, C, D and E, because B is reserved for the accepted
+small-box option above — were researched alongside the accepted option and rejected in its favour.
+They're kept here as a durable record of the decision, not as live options.
 
 #### Option A — Level 1: nothing always-on ~£12–22/month
 
