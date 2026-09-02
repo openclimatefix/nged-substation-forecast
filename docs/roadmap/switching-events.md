@@ -4,7 +4,8 @@
 
 > **Status: 🔬 Research / 🚧 Planned.** Epic:
 > [#151](https://github.com/openclimatefix/nged-substation-forecast/issues/151) (the v0.6
-> switching work). None of this is implemented yet. The nearest-term piece is the **two-stage
+> switching work). None of the switching-events work described on this page is implemented yet. The
+nearest-term piece is the **two-stage
 > forecaster** (approach 1), which makes the production forecast robust to switching by consuming
 > continuous switching-state features, and ships no discrete event table. Whether the explicit
 > **staged detector** is then built on top of it — feeding the
@@ -22,25 +23,35 @@
 
 ## The approaches
 
-The work is organised as a set of **named approaches**, tried in the order set out just below. The three v0.6 approaches all build on one shared baseline. "Baseline" here means a fitted model of expected power whose residual every approach consumes. Its purpose is to remove seasonality to help make the switching events visible. A substation's metered power moves for ordinary reasons — a cold snap, a sunny afternoon, a Sunday — and a change in the electricity network's topology is buried under that variation. Subtract the power the weather and the clock explain, and — we hope — switching events surface in the residual as a sustained level shift. Work on v0.6 starts with a multiple seasonal-trend decomposition, which answers whether the events are visible above the noise before any of the rest is built. Escalation from a simpler approach to a heavier approach must be justified by *measured residual structure the simpler approach leaves behind*.
+The work is organised as a set of **named approaches**, tried in the order set out just below. The
+three v0.6 approaches all build on one shared baseline. "Baseline" here means a fitted model of
+expected power whose residual every approach consumes. The baseline's purpose is to remove
+seasonality to help make the switching events visible. A substation's metered power moves for
+ordinary reasons — a cold snap, a sunny afternoon, a Sunday — and a change in the electricity
+network's topology is buried under that variation. Subtract the power the weather and the clock
+explain, and — we hope — switching events surface in the residual as a sustained level shift. Work
+on v0.6 starts with a multiple seasonal-trend decomposition, which answers whether the events are
+visible above the noise before any of the rest is built. Escalation from a simpler approach to a
+heavier approach must be justified by *measured residual structure the simpler approach leaves
+behind*.
 
 ### Overview and ordering
 
-Everything in v0.6 rests on **one shared baseline**: a per-substation model of expected power
-from weather and calendar covariates alone (no power lags). The baseline's per-series-normalised
-residual is the raw material every approach below consumes. Before building that baseline, though,
-there is an easier first look: a [multiple seasonal-trend decomposition
+Everything in v0.6 rests on **one shared baseline**: a per-substation model of expected power from
+weather and calendar covariates alone (no power lags). The baseline's per-series-normalised residual
+is the raw material every approach below consumes. Before building that baseline, though, there is
+an easier first look: a [multiple seasonal-trend decomposition
 (MSTL)](#the-baseline-shared-foundation) needs no weather input and no training run, and answers the
 question that decides whether any of the rest is worth building — are the switching events visible
-above the noise at all? Work on v0.6 is starting there. On top of the baseline we could then try,
-in order:
+above the noise at all? Work on v0.6 is starting there. On top of the baseline we could then try, in
+order:
 
 1. **The two-stage forecaster**. Its two stages are:
 
     1. **The shared baseline.** Fit expected power per substation from weather and calendar
        covariates alone, using no power lags, then take the residual (observed power minus expected
-       power) and normalise it by that series' own spread. This is the same shared baseline named
-       above, and the two-stage forecaster's first stage *is* that baseline — nothing extra.
+       power) and That procedure is the same shared baseline named above, and the two-stage
+       forecaster's first stage *is* that baseline — nothing extra.
     2. **The same XGBoost forecaster used elsewhere in v1, but with more features that help explain
        switching events:.** Plain lagged power features don't carry any information about whether
        that lagged power features was in a switching event or not. The idea here is simple: Give
@@ -98,18 +109,18 @@ deferred behind forecast skill. NGED's top priority is probabilistic normal-runn
 forecasts, and handling switching *implicitly* inside the forecaster is an acceptable way to deliver
 them. An explicit switching record is still genuinely wanted — the [`substation_switching`
 table](delivery-tables.md#table-5-substation_switching) was specified in our most recent formal
-report to NGED — but it sits further down NGED's continuum of priorities. Approaches 4 and 5 are
-v2-scale and start only once v2.0 is operational.
+report to NGED — but that record sits further down NGED's continuum of priorities. Approaches 4 and
+5 are v2-scale and start only once v2.0 is operational.
 
 ---
 
 ### v0.6 — switching-robust forecasting, and switching detection
 
 Everything below builds on the shared baseline. The two-stage forecaster (approach 1) is the
-nearest-term deliverable and needs nothing but that baseline. The staged detector (approach 2)
-and the joint edge-flow estimator (approach 3) add the explicit event machinery. Past that, [the
-decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) sets how far
-past approach 1 we go.
+nearest-term deliverable and needs nothing but that baseline. The staged detector (approach 2) and
+the joint edge-flow estimator (approach 3) add the explicit event machinery. Past approach 1, [the
+decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) sets how far we
+go.
 
 #### The baseline (shared foundation)
 
@@ -140,12 +151,11 @@ pipeline. Configuring the production forecaster with **no power-lag features** y
 switching-independent baseline (a lag feature would smuggle the lagged-power contamination above
 back in through the side door). Fit with a **robust (median) objective**, which doubles as the
 robust loss required below. A median (absolute-error) fit is a config-only change to the existing
-forecaster today. The per-series, per-time spread estimate used by the normalisation step below
-can come from either of two sources: additional quantile heads (e.g. 10%/90%) once the
-[quantile-objective model
-family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics) lands — the tidiest
-option — or an interim rolling median absolute deviation (MAD) of the residuals. The baseline is
-therefore not hard-blocked on that model family.
+forecaster today. The per-series, per-time spread estimate used by the normalisation step below can
+come from either of two sources: additional quantile heads (e.g. 10%/90%) once the
+[quantile-objective model family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
+lands — the tidiest option — or an interim rolling median absolute deviation (MAD) of the residuals.
+The baseline is therefore not hard-blocked on that model family.
 
 **What "normal" means for demand-driven series — the behavioural calendar.** For weather-driven
 series (solar photovoltaic (PV), wind), "normal for this weather at this time of day" is
@@ -159,20 +169,20 @@ quirks](../background/network.md#behavioural-calendar-effects-on-demand)).
 
 **A calendar event the baseline does not know about looks like a switching event, so the calendar
 features decide how many phantom events the detector reports.** An unmodelled calendar event
-surfaces as a coherent residual excursion that [approach 2's changepoint detector](#stage-1-changepoint-detection-on-the-baseline-residual)
-may flag, erroneously, as a switching event. Two safeguards keep the phantom-event risk manageable.
-First, the failure has a distinctive shape: a holiday miss hits many demand-driven series
-*simultaneously and with the same sign*, whereas a real switching event is localised and
-balance-conserving. [Approach 2's balance-attribution stage](#stage-2-balance-attribution-across-neighbours) therefore
-discriminates a holiday miss from a switching event, because its neighbourhood sum does not balance
-for a holiday miss. Second, the fix must come from the feature side — richer holiday encodings (the
-[planned quick win](xgboost-improvements.md#uk-holiday-and-calendar-features)) and, at V2 scale,
-cross-series pooling (a [global model](xgboost-improvements.md#global-model-per-time_series_type)
-sees dozens of Easters where a per-series model sees about three) — and **never** from trailing
-same-weekday power averages, however naturally they express "recent similar days". Trailing averages
-would smuggle the lagged-power contamination above back in through the side door, absorbing a
-persistent switching event into "expected" within a few weeks and blinding the detector to exactly
-the events it exists to find.
+surfaces as a coherent residual excursion that [approach 2's changepoint
+detector](#stage-1-changepoint-detection-on-the-baseline-residual) may flag, erroneously, as a
+switching event. Two safeguards keep the phantom-event risk manageable. First, the failure has a
+distinctive shape: a holiday miss hits many demand-driven series *simultaneously and with the same
+sign*, whereas a real switching event is localised and balance-conserving. [Approach 2's
+balance-attribution stage](#stage-2-balance-attribution-across-neighbours) therefore discriminates a
+holiday miss from a switching event, because its neighbourhood sum does not balance for a holiday
+miss. Second, the fix must come from the feature side — richer holiday encodings (the [planned quick
+win](xgboost-improvements.md#uk-holiday-and-calendar-features)) and, at V2 scale, cross-series
+pooling (a [global model](xgboost-improvements.md#global-model-per-time_series_type) sees dozens of
+Easters where a per-series model sees about three) — and **never** from trailing same-weekday power
+averages. Trailing averages would smuggle the lagged-power contamination above back in through the
+side door, absorbing a persistent switching event into "expected" within a few weeks and blinding
+the detector to exactly the events it exists to find.
 
 **Fitting the baseline has three traps, all of them caused by the switching events sitting in its
 own training history.**
@@ -181,13 +191,14 @@ own training history.**
   straight, the baseline is biased toward the contaminated periods. Fit with a **robust loss**
   (quantile or Huber), or iteratively: fit → flag large residuals as candidate events → refit
   excluding them. Because events occupy only ~10% of the time, a robust fit recovers the
-  NRA relationship and the events fall out as residuals. This closes a virtuous loop with the
-  detector itself — detected events feed back to clean the baseline's training data.
+  That robust-fit recovery closes a virtuous loop with the detector itself — detected events feed
+  back to clean the baseline's training data.
 
     **Use v1's logged events to measure, once, the contamination penalty the robust fit leaves
     behind.** In **v1 we also hold NGED's logged switching events**, which enables the cleanest
     of the three options: train the baseline with labelled event periods excluded. Labels will not exist
-    beyond the trial area, so v1 should run this as a small experiment family: the shared
+    beyond the trial area, so v1 should run labelled-event exclusion as a small experiment family:
+    the shared
     baseline trained **with and without** labelled-event exclusion, plus a third arm that
     excludes the *same volume* of randomly chosen non-event periods. The random-exclusion
     control separates the effect of removing contamination from the effect of simply training on
@@ -198,8 +209,8 @@ own training history.**
     that the robust fit fails to absorb, i.e. the accuracy the label-free V2 fleet will lose — cheap
     to measure now, impossible to measure later.
 
-- *Keep the baseline static, so that a months-long event stays visible.* A months-long ARA
-  appears as a residual level shift that *stays* shifted, not as a transient. The changepoint
+- *Keep the baseline static, so that a months-long event stays visible.* A months-long ARA appears
+  as a residual level shift that *stays* shifted. The changepoint
   detector handles a sustained shift, because it catches the onset step. What breaks the detector
   is a baseline that slowly adapts and comes to treat the new level as normal. Drive the baseline
   from weather and calendar alone over the detection window, and a sustained ARA stays visible as
@@ -214,13 +225,13 @@ own training history.**
 #### Approach 1 — the two-stage forecaster
 
 The **two-stage forecaster** is a good candidate for the first approach to try, and the current
-v0.6.0 target. Stage 1 is the shared baseline above. Stage 2 is a booster that replaces (or augments) the forecaster's raw
-power-lag features with **residual lags** — the normalised "actual − expected" delta at each lag
-time, for the target substation and, optionally, its neighbours. The intuition: a raw power lag
-conflates "what the weather was doing" with "what is anomalous"; handing the model the anomaly
-component directly tells it how *normal* each recent observation is. The two-stage forecaster
-needs nothing beyond the baseline, so it can run as soon as normalised residuals exist — ahead
-of any detector machinery.
+v0.6.0 target. Stage 1 is the shared baseline above. Stage 2 is a booster that replaces (or
+augments) the forecaster's raw power-lag features with **residual lags** — the normalised "actual −
+expected" delta at each lag time, for the target substation and, optionally, its neighbours. The
+intuition: a raw power lag conflates "what the weather was doing" with "what is anomalous". Handing
+the model the anomaly component directly tells it how *normal* each recent observation is. The
+two-stage forecaster needs nothing beyond the baseline, so it can run as soon as normalised
+residuals exist — ahead of any detector machinery.
 
 ##### What it buys
 
@@ -230,9 +241,9 @@ The two-stage forecaster is plausibly the largest forecast-*accuracy* win availa
   part of each lagged observation is plausibly useful everywhere, not only during switching
   events.
 - **Learned event persistence.** During an ongoing switching event the residual is a sustained
-  level shift, so the model can learn "sustained recent residual → carry the offset forward".
-  This is the model-learned version of the
-  [zeroth-order patch](#approach-2-the-staged-statistical-detector), applied at
+  level shift, so the model can learn "sustained recent residual → carry the offset forward". That
+  learned persistence is the model-learned version of the [zeroth-order
+  patch](#approach-2-the-staged-statistical-detector), applied at
   forecast time instead of to the training data. For pure forecast accuracy, "the current shift
   will persist" is most of the value switching-handling can deliver, since event *onsets* are
   unpredictable from power data by definition.
@@ -248,12 +259,11 @@ This approach makes the *forecaster* robust to switching. The approach produces 
 detector's discrete deliverables. There is no event list or donor attribution (so no
 [`substation_switching` table](delivery-tables.md#table-5-substation_switching)), no ARA mask, no
 sensitivity floor, and no latent-NRA reconstruction. A good forecast of *metered* power is a
-different product from an estimate of what demand would have been under NRA. How much each of
-those absences matters is a requirements question as much as a technical question, and is taken
-up at the [decision point
-below](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector). The two paths still
-compose rather than compete: if the staged detector is built, its outputs (an in-event flag,
-event age, attributed magnitude) are themselves natural features for this model.
+different product from an estimate of what demand would have been under NRA. How much each of those
+absences matters is a requirements question as much as a technical question, and is taken up at the
+[decision point below](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector). The two
+paths still compose rather than compete: if the staged detector is built, its outputs (an in-event
+flag, event age, attributed magnitude) are themselves natural features for this model.
 
 ##### Caveats to build in from the start
 
@@ -277,7 +287,8 @@ event age, attributed magnitude) are themselves natural features for this model.
 - **No lookahead.** Residual lags must obey the same nullification rule as raw power lags
   (`_nullify_leaky_lags()`). The expected-power values at past lag times must be hindcast from
   NWP runs that had been published by forecast time. The existing
-  freshest-NWP-for-past-target-times join does **not** guarantee this — it selects the freshest
+  freshest-NWP-for-past-target-times join does **not** guarantee no lookahead — it selects the
+  freshest
   run per past target time with no publication-time constraint, and is leak-free today only as a
   side effect of daily run cadence. The residual pipeline must therefore add an explicit
   availability cut, guarded by a leakage test in the spirit of the `_nullify_leaky_lags` tests.
@@ -304,22 +315,23 @@ event age, attributed magnitude) are themselves natural features for this model.
   normalised residual and it will pick its own cutpoints. The simplest basis: signed **EWMAs
   (exponentially weighted moving averages) of the normalised residual at two or three
   half-lives** (say 12 hours, 3 days, 2 weeks) — one `ewm_mean` per half-life, no thresholds
-  anywhere. Duration is encoded in the relationship between the columns: a fresh event makes
-  the short-half-life EWMA large while the long-half-life EWMA is still small; a weeks-old
-  event saturates all of them. A two-sided **CUSUM (cumulative-sum) statistic** is the fancier
-  alternative — its magnitude grows roughly as shift-size × duration and it self-resets at zero
-  (its only parameter is the slack, set in normalised units), and "hours since the CUSUM last
-  touched zero" gives a literal event age where a literal age is wanted. Two disciplines apply.
+  anywhere. Duration is encoded in the relationship between the columns: a fresh event makes the
+  short-half-life EWMA large while the long-half-life EWMA is still small. A weeks-old event
+  saturates all of them. A two-sided **CUSUM (cumulative-sum) statistic** is the fancier
+  alternative — its magnitude grows roughly as shift-size × duration and it self-resets at zero (its
+  only parameter is the slack, set in normalised units), and "hours since the CUSUM last touched
+  zero" gives a literal event age. Two disciplines apply.
   First, the accumulator must be computed only from residuals available at
   `power_fcst_init_time` — the same no-lookahead rule as every other lag feature.
 
     **Feed the accumulators normalised residuals, never the detector's whitened innovations.**
-    It is easy to get this backwards, because whitening sounds like a strictly better input. The opposite holds here: whitening removes whatever was predictable from the residuals just
-    before, and a persistent level shift is *exactly* the kind of predictable component whitening removes, so after an
-    event's onset the whitened innovations fall back toward zero and an accumulator of them
-    decays. The accumulator stops encoding age, which is the one quantity it exists to encode. The detector
-    whitens because its question is "did a step occur *just now*"; the accumulator's question is
-    "how far from normal has the level *been*", and the persistence must be left in to answer it.
+    It is easy to get this backwards, because whitening sounds like a strictly better input. The opposite holds
+    here: whitening removes whatever was predictable from the residuals just before, and a
+    persistent level shift is *exactly* the kind of predictable component whitening removes. So
+    after an event's onset the whitened innovations fall back toward zero and an accumulator of them
+    decays. The accumulator stops encoding age, which is the one quantity it exists to encode. The detector whitens
+    because its question is "did a step occur *just now*". The accumulator's question is "how far
+    from normal has the level *been*", and the persistence must be left in to answer it.
     The drawback of skipping whitening is that the accumulators also integrate slow NWP-error waves —
     acceptable for a *feature* (the booster holds the weather covariates and the neighbour pools
     that provide discriminating context) in a way it never would be for a detector that must
@@ -346,8 +358,9 @@ event age, attributed magnitude) are themselves natural features for this model.
     cancellation.
 
     **Complement the sum with the most-anomalous neighbour's own signed residual.** Select and
-    express it in that neighbour's own normalised units, since "anomalous" is a per-series
-    notion — this covers the case the sum dilutes: one strongly anomalous neighbour among several
+    express it in that neighbour's own normalised units, since "anomalous" is a per-series notion —
+    the most-anomalous-neighbour feature covers the case the sum dilutes: one strongly anomalous
+    neighbour among several
     quiet neighbours. Keep the sign, since whether that neighbour gained or shed load is exactly what
     predicts whether this series is about to give load back. The two families of features in
     these notes compose: the sum of neighbours' residual EWMAs is "how long has the neighbourhood
@@ -365,30 +378,30 @@ event age, attributed magnitude) are themselves natural features for this model.
 
 ##### When it runs, and the single-stage ablation control that precedes it
 
-The two-stage forecaster can begin as soon as the baseline exists (implementation step 2 below) and is itself
-implementation step 5, evaluated by cross-validation; its result also doubles as evidence of the
-baseline's quality. So that the work gets scheduled alongside the other forecaster experiments,
-the two-stage forecaster is also tracked on the XGBoost quick-wins backlog as [the residual-lag
-features](xgboost-improvements.md#residual-lag-features-from-the-switching-detector-baseline),
-where the horizon-band and init-time-anchoring interactions specific to that page are noted.
-Before any of that machinery is built, its config-only *single-stage* cousin should run first as
-the ablation control: [aligned lagged-weather
-features](xgboost-improvements.md#aligned-lagged-weather-the-single-stage-ablation-control) (a
-quick win), which lets the booster judge each lag's normality without an explicit baseline and
-bounds how much of the anomaly signal a tabular learner extracts unaided.
+The two-stage forecaster can begin as soon as the baseline exists (implementation step 2 below) and
+is itself implementation step 5, evaluated by cross-validation; its result also doubles as evidence
+of the baseline's quality. So that the work gets scheduled alongside the other forecaster
+experiments, the two-stage forecaster is also tracked on the XGBoost quick-wins backlog as [the
+residual-lag
+features](xgboost-improvements.md#residual-lag-features-from-the-switching-detector-baseline), where
+the horizon-band and init-time-anchoring interactions specific to that page are noted. Before any of
+that machinery is built, its config-only *single-stage* cousin should run first as the ablation
+control: [aligned lagged-weather
+features](xgboost-improvements.md#aligned-lagged-weather-the-single-stage-ablation-control) (a quick
+win), which lets the booster judge each lag's normality without an explicit baseline and bounds how
+much of the anomaly signal a tabular learner extracts unaided.
 
 ##### A second way to use the stage-1 baseline: correct a draft
 
-The residual-lag design evaluates the stage-1 baseline at *lag* times, to tell stage 2 how
-anomalous each recent observation was. The same fitted baseline can also be evaluated at the
-*target* time, producing a "first-draft" forecast of the power we are trying to predict. Stage 2
-then *corrects the draft* rather than forecasting from scratch. The draft is a design axis
-orthogonal to the residual lags: the residual lags concern what stage 2 receives as
-recent-observation features, while the draft concerns what stage 2 predicts and starts from. The
-two therefore compose (a booster can take a draft as its starting point *and* residual lags as
-features) rather than competing. The draft re-uses exactly the per-fold, out-of-sample hindcast
-machinery the residual lags already require, so the draft is cheap to try once that machinery
-exists. There are two ways to hand stage 2 the draft:
+The residual-lag design evaluates the stage-1 baseline at *lag* times, to tell stage 2 how anomalous
+each recent observation was. The same fitted baseline can also be evaluated at the *target* time,
+producing a "first-draft" forecast of the power we are trying to predict. Stage 2 then *corrects the
+draft* rather than forecasting from scratch. The draft is a design axis orthogonal to the residual
+lags: the residual lags concern what stage 2 receives as recent-observation features, while the
+draft concerns what stage 2 predicts and starts from. The two therefore compose (a booster can take
+a draft as its starting point *and* residual lags as features) rather than competing. The draft
+re-uses exactly the per-fold, out-of-sample hindcast machinery the residual lags already require, so
+the draft is cheap to try once that machinery exists. There are two ways to hand stage 2 the draft:
 
 - **Draft as an ordinary feature; stage 2 predicts total power.** A soft specialisation: the
   booster usually latches onto the draft as a dominant split variable and spends the rest on
@@ -400,29 +413,29 @@ exists. There are two ways to hand stage 2 the draft:
   regularisation shrinks naturally toward "no correction". base_margin is the version that
   genuinely forces specialisation. The margin also degrades gracefully with horizon: as the
   anomaly signal decays and valid-time lags null out, the correction tends to zero and the
-  forecast falls back to the draft. It also sharpens interpretation: because the draft is an
-  offset rather than a column, it never competes for splits, so the trees' feature importances
-  and SHapley Additive exPlanations (SHAP) values describe *only* what drives the correction — a
-  cleaner read on the switching/anomaly signal than the soft variant, where the draft soaks up
-  most of the gain and entangles everything else. (That interpretability win comes from
+  forecast falls back to the draft. It also sharpens interpretation: because the draft is an offset
+  rather than a column, it never competes for splits. So the trees' feature importances and SHapley
+  Additive exPlanations (SHAP) values describe *only* what drives the correction — a cleaner read on
+  the switching/anomaly signal than the soft variant, where the draft soaks up most of the gain and
+  entangles everything else. (That interpretability win comes from
   predicting the correction, so the equivalent delta-regression shares the win. The
   interpretability win is a reason to prefer this hard corrector over draft-as-feature, not
   `base_margin` over the delta trick.)
 
-**What `base_margin` adds over predicting the delta directly.** For plain squared-error
-regression, supplying the draft as `base_margin` is mathematically identical to training stage 2
-on `(actual − draft)` and adding the draft back — same gradients, same trees. Under that
-objective, predicting the delta is fine and arguably more transparent. That equivalence is not
-special to squared error. The equivalence holds for *any* identity-link loss that is a function
-of the residual alone, including the pinball/quantile objective this project wants, because
-pinball loss is translation-invariant (`ρ_τ(actual − draft − correction) = ρ_τ((actual − draft) −
-correction)`): same gradients, same trees, and an identical early-stopping metric either way. The
-margin is only worth the extra machinery once the *link* is not the identity — a Poisson/Tweedie
-link (natural for a non-negative quantity), where the margin lives in log-space so the correction
-becomes *multiplicative*, the loss is no longer a function of `actual − prediction`, and the
-output cannot go negative. There the delta trick has no clean analogue and the margin is doing
-real work. The operational footgun is that the margin must be passed at *both* train and predict
-time; forgetting it at inference silently falls back to the default base score.
+**What `base_margin` adds over predicting the delta directly.** For plain squared-error regression,
+supplying the draft as `base_margin` is mathematically identical to training stage 2 on `(actual −
+draft)` and adding the draft back — same gradients, same trees. Under that objective, predicting the
+delta is fine and arguably more transparent. That equivalence is not special to squared error. The
+equivalence holds for *any* identity-link loss that is a function of the residual alone, including
+the pinball/quantile objective this project wants, because pinball loss is translation-invariant
+(`ρ_τ(actual − draft − correction) = ρ_τ((actual − draft) − correction)`): same gradients, same
+trees, and an identical early-stopping metric either way. The margin is only worth the extra
+machinery once the *link* is not the identity — a Poisson/Tweedie link (natural for a non-negative
+quantity), where the margin lives in log-space so the correction becomes *multiplicative*, the loss
+is no longer a function of `actual − prediction`, and the output cannot go negative. There the delta
+trick has no clean analogue and the margin is doing real work. The operational footgun is that the
+margin must be passed at *both* train and predict time; forgetting it at inference silently falls
+back to the default base score.
 
 **Drawbacks of the hard corrector, and the hedge.** Because stage 2 starts from the draft, any
 stage-1 *bias at the target time* flows straight into the output unless stage 2 can see the raw
@@ -432,56 +445,57 @@ list *even under* `base_margin`, trading some of the specialisation for a route 
 bias.
 
 **Quantiles need care.** The draft is a single deterministic number per row, so adding it shifts
-every quantile equally — $Q_\tau(\text{actual} \mid x) = \text{draft} + Q_\tau(\text{correction} \mid x)$
-holds exactly, for *any* fixed draft used as the margin. What that means is that correctness comes
-from training stage 2 *per target quantile* (each $\tau$ its own pinball fit), not from any special
-choice of margin: a probabilistic version needs one stage-2 model per quantile, and using the
-*corresponding* stage-1 quantile as each model's margin is a warm-start convenience (smaller
-corrections), not a requirement. Stage 1's quantile *spread* then does double duty: as a stage-2
-feature it supplies exactly the per-series "usual wobble" normalisation the residual lags already
-need.
+every quantile equally — $Q_\tau(\text{actual} \mid x) = \text{draft} + Q_\tau(\text{correction}
+\mid x)$ holds exactly, for *any* fixed draft used as the margin. What this equivalence means is
+that correctness comes from training stage 2 *per target quantile* (each $\tau$ its own pinball
+fit), not from any special choice of margin: a probabilistic version needs one stage-2 model per
+quantile, and using the *corresponding* stage-1 quantile as each model's margin is a warm-start
+convenience (smaller corrections), not a requirement. Stage 1's quantile *spread* then does double
+duty: as a stage-2 feature it supplies exactly the per-series "usual wobble" normalisation the
+residual lags already need.
 
 **The same no-lookahead discipline.** The draft at the target time must be hindcast on NWP *as
-available at that lead time*, not on fresh analysis-like data, or stage 2 calibrates its
-corrections against a draft that is systematically better than the live draft — the same
-availability cut the residual-lag hindcasts and the freshest-run join require, which
-`weather_utils.analysis_proxy.select_analysis_proxy` applies. The lead-time
-feature belongs in stage 1 so the draft's own attenuation with horizon is honest.
+available at that lead time*, not on fresh analysis-like data, or stage 2 calibrates its corrections
+against a draft that is systematically better than the live draft — the same availability cut the
+residual-lag hindcasts and the freshest-run join require, which
+`weather_utils.analysis_proxy.select_analysis_proxy` applies. The lead-time feature belongs in stage
+1 so the draft's own attenuation with horizon is honest.
 
 **The prize — a plausible route to a global corrector.** The correction target `(actual − draft)`
 has far smaller variance than raw power and is far more stationary across series: recent-anomaly
-persistence looks similar at a 200 MW grid supply point (GSP) and a 5 MW feeder once residuals
-are on a comparable scale. So a *global* corrector becomes plausible long before a global
-raw-power model does, sidestepping the per-series-level problem that is the [global
+persistence looks similar at a 200 MW grid supply point (GSP) and a 5 MW feeder once residuals are
+on a comparable scale. So a *global* corrector becomes plausible long before a global raw-power
+model does, sidestepping the per-series-level problem that is the [global
 model](xgboost-improvements.md#global-model-per-time_series_type)'s hard prerequisite. The
 global-model item notes the same `base_margin` move for its capacity-factor-normalised physics
 proxy.
 
 ##### Attributing the uplift: calibration versus switching
 
-A residual-lag booster would sharpen
-the forecast even on a grid that never switched, simply by telling the model how high or low the
-series is currently running relative to weather and clock — an inference-time *calibration* that
-corrects NWP bias, meter drift, distributed energy resource (DER) growth, or any persistent
-regime offset. That general uplift is worth having, but it is not evidence the model has learned
-anything about switching. The two contributions must therefore be measured apart. They separate
-cleanly because they live in different feature families and leave different signatures:
+A residual-lag booster would sharpen the forecast even on a grid that never switched, simply by
+telling the model how high or low the series is currently running relative to weather and clock — an
+inference-time *calibration* that corrects NWP bias, meter drift, distributed energy resource (DER)
+growth, or any persistent regime offset. That general uplift is worth having, but it is not evidence
+the model has learned anything about switching. The two contributions must therefore be measured
+apart. They separate cleanly because they live in different feature families and leave different
+signatures:
 
 - **Stratify by switching state.** Score the two-stage forecaster against the stage-1 baseline
   separately on NRA- and ARA-labelled rows of the trial area (the switching logs used as a test
   set, never a training input). The uplift on NRA rows is the pure-calibration benefit; the extra
   uplift on ARA rows is the switching-specific part. Break the ARA rows down by event age too:
   calibration is briefly *harmful* at an onset — the recent residuals still describe the pre-event
-  level. A genuine switching benefit should therefore concentrate in the *body* of an event, not
-  its first few hours, and that shape is itself a check that the switching-specific uplift is what
-  is being measured.
+  level. A genuine switching benefit should therefore concentrate in the *body* of an event, not its
+  first few hours. That shape is itself a check that the switching-specific uplift is what is being
+  measured.
 - **Ablate by feature family.** Self-residual lags can only calibrate; the pooled
   **neighbourhood-sum** feature has no calibration pathway and delivers its uplift only through
   conservation. So three arms — baseline, baseline + self-lags, baseline + self-lags + neighbour
   pools — split the gain almost by construction: the second minus the first bounds calibration,
-  the third minus the second isolates the switching-specific contribution. This is the label-free
-  version of the decomposition, so unlike the stratification above it also predicts what the
-  label-less V2 fleet gains. The two should agree: the neighbour arm's extra uplift should be
+  the third minus the second isolates the switching-specific contribution. This three-arm ablation
+  is the label-free version of the decomposition, so unlike the stratification above it also
+  predicts what the label-less V2 fleet gains. The two should agree: the neighbour arm's extra
+  uplift should be
   near-zero on NRA rows and positive on ARA-body rows.
 - **Bound calibration with a naive control.** Mirror the random-exclusion control used for the
   baseline's training-contamination test: add a deliberately switching-blind calibrator — the
@@ -491,17 +505,15 @@ cleanly because they live in different feature families and leave different sign
   bracket the split.
 
 One honest limitation: a small, undetected switching event and a generic persistent offset look
-identical to a self-residual lag, and the logs have a detection floor of their own. The
-NRA/calibration bucket is therefore really an *upper* bound on the truly switching-free benefit,
-and the neighbour ablation is the cleaner attribution of the part that unambiguously needs
-conservation.
+identical to a self-residual lag. The logs have a detection floor of their own. The NRA/calibration
+bucket is therefore really an *upper* bound on the truly switching-free benefit. The neighbour
+ablation is the cleaner attribution of the part that unambiguously needs conservation.
 
 **Semi-synthetic injection recovers the switching-specific component causally, at the cost of
-realism.** For a controlled rather than observational answer, **semi-synthetic injection** — move
-a conserved load slice from a series to its neighbours over a clean NRA period, then measure how
-much of the *known* contamination the forecaster removes — recovers the switching-specific
-component causally, at the cost of having to make the injected magnitude, fan-out, and duration
-realistic.
+realism.** For a controlled rather than observational answer, **semi-synthetic injection** — move a
+conserved load slice from a series to its neighbours over a clean NRA period, then measure how much
+of the *known* contamination the forecaster removes — recovers the switching-specific component
+causally, at the cost of having to make the injected magnitude, fan-out, and duration realistic.
 
 #### Approach 2 — the staged statistical detector
 
@@ -520,26 +532,25 @@ The detector adds three stages on top of the shared baseline: it detects level s
 
 Detect **sustained level shifts** in the baseline's normalised residual — the switching-event signature is a step, not a spike or a slope — with a standard mean-shift changepoint method (PELT — pruned exact linear time — or binary segmentation, both with an L2 cost, or CUSUM). The **output** is candidate step times and magnitudes per substation. But baseline residuals violate the assumptions those detectors make, so the residual must be prepared first.
 
-**A published detector already runs close to this whole chain, on distribution load alone, but
-never checks neighbours or reports a sensitivity floor.** The closest of a four-paper Korean
-series, [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), scores each distribution
-line on its own — the redundancy Stage 2 exists to exploit. Kim reports no sensitivity floor
-in transferred magnitude × duration, so the paper does not answer the question this stage is
-built to answer. The simplest of the four, a moving-average threshold on a decomposition
-residual, scores best on the shared nine-transfer benchmark. Implementing that route first
-therefore makes sense, because Stage 1's baseline has to beat it. Full comparison and scores:
-[energy-forecasting review, §4 Detecting switching
-events](../background/energy-forecasting-review.md#4-detecting-switching-events).
+**A published detector already runs close to this whole chain, on distribution load alone, but never
+checks neighbours or reports a sensitivity floor.** The closest of a four-paper Korean series, [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757), scores each distribution line on its own —
+the redundancy Stage 2 exists to exploit. Kim reports no sensitivity floor in transferred magnitude
+× duration, so the paper does not answer the question this stage is built to answer. The simplest of
+the four, a moving-average threshold on a decomposition residual, scores best on the shared
+nine-transfer benchmark. Implementing that route first therefore makes sense, because Stage 1's
+baseline has to beat it. Full comparison and scores: [energy-forecasting review, §4 Detecting
+switching events](../background/energy-forecasting-review.md#4-detecting-switching-events).
 
-**Changepoint detection must respect the residual's real statistics.** Textbook mean-shift
-detectors (PELT and binary segmentation with an L2 cost, CUSUM) assume roughly independent noise
-with constant variance. Baseline residuals violate both assumptions. They are **autocorrelated**:
-an NWP error or an unmodelled local effect persists for hours to days, and a naive detector fires
-on that slow wander as if it were a step. The classic failure mode of changepoint-on-residual
-pipelines is hundreds of confident detections that are just weather-model error. And baseline
-residuals are **heteroscedastic**: residual spread differs across substations by orders of
-magnitude and varies by time of day (PV-heavy substations are noisiest at midday). Two standard
-fixes, both required — detection runs on residuals that have been *normalised* and *whitened*:
+**Changepoint detection must respect the residual's real statistics.** Textbook mean-shift detectors
+(PELT and binary segmentation with an L2 cost, CUSUM) assume roughly independent noise with constant
+variance. Baseline residuals violate both assumptions. They are **autocorrelated**: an NWP error or
+an unmodelled local effect persists for hours to days, and a naive detector fires on that slow
+wander as if it were a step. The classic failure mode of changepoint-on-residual pipelines is
+hundreds of confident detections that are just weather-model error. And baseline residuals are
+**heteroscedastic**: residual spread differs across substations by orders of magnitude and varies by
+time of day (PV-heavy substations are noisiest at midday). Two standard fixes, both required —
+detection runs on residuals that have been *normalised* and *whitened*:
 
 - **Normalise: measure surprise in units of each substation's usual wobble.** A 2 MW residual is
   an earthquake at a small rural substation and background noise at a large urban substation —
@@ -578,9 +589,8 @@ residuals around time t (observed - expected), one row per substation:
 ```
 
 **Checking both sides of a transfer has no published precedent we could find.** The
-[energy-forecasting
-review](../background/energy-forecasting-review.md#4-detecting-switching-events) ran an
-exhaustive literature search and found every switching detector it turned up scoring one
+[energy-forecasting review](../background/energy-forecasting-review.md#4-detecting-switching-events)
+ran an exhaustive literature search and found every switching detector it turned up scoring one
 substation against its own history alone; the closest candidate it turned up, a 1984 regression,
 could not be confirmed as coupling substations because the full text was unobtainable.
 
@@ -590,52 +600,51 @@ sharper statistic than "the rises sum to the drop": over the candidate set {sour
 So, once a candidate attribution exists, compute the set's summed residual and require it to be
 (approximately — see the tolerance note below) step-free at $t$. The neighbourhood-sum test
 discriminates exactly the failure mode the per-series view cannot: a **regional weather-model
-error** steps every nearby series *and their sum*; a genuine transfer steps the members but
-leaves the sum flat. The test does not *replace* per-series detection — a flat sum alone cannot
-say which substations moved or by how much (a flat sum is equally consistent with "no event at
-all"). The test corroborates an attribution after stage 1 has proposed the candidate steps. The
-same statistic, computed around the *logged* events, is also the very first diagnostic to run,
-before any detector code exists (see the diagnostic precursor below). The [joint edge-flow
+error** steps every nearby series *and their sum*; a genuine transfer steps the members but leaves
+the sum flat. The test does not *replace* per-series detection — a flat sum alone cannot say which
+substations moved or by how much (a flat sum is equally consistent with "no event at all"). The test
+corroborates an attribution after stage 1 has proposed the candidate steps. The same statistic,
+computed around the *logged* events, is also the very first diagnostic to run, before any detector
+code exists (see the diagnostic precursor below). The [joint edge-flow
 estimator](#approach-3-the-joint-edge-flow-estimator) goes one step further: its parameterisation
 builds this test in, rather than running it as a separate check.
 
-**Calibrate the attribution score against chance.** With about five neighbours each carrying
-noisy candidate steps, *some* subset will approximately sum to $\Delta$ surprisingly often by
-luck alone — subset-sum matching on noisy data is generous. The score therefore needs an explicit
-null: estimate, by permutation (run the same subset search at randomly chosen event-free times),
-how often a balancing subset of a given quality arises by chance, and only accept attributions
-that clear that null. Without this, the event list gets padded with confident-looking
-coincidences.
+**Calibrate the attribution score against chance.** With about five neighbours each carrying noisy
+candidate steps, *some* subset will approximately sum to $\Delta$ surprisingly often by luck alone —
+subset-sum matching on noisy data is generous. The score therefore needs an explicit null: estimate,
+by permutation (run the same subset search at randomly chosen event-free times), how often a
+balancing subset of a given quality arises by chance, and only accept attributions that clear that
+null. Without that null check, the event list gets padded with confident-looking coincidences.
 
 **Conservation is only approximate — set the tolerance band accordingly.** [Background: the two
 facts that make this hard](../background/switching-events.md#the-two-facts-that-make-this-hard)
-explains why: donor pickups miss the source drop by a few percent, in either direction. The
-balance and neighbourhood-sum tests both need that tolerance band, not an equality. The
-imbalance distribution observed on the logged events is itself worth reporting.
+explains why: donor pickups miss the source drop by a few percent, in either direction. The balance
+and neighbourhood-sum tests both need that tolerance band, not an equality. The imbalance
+distribution observed on the logged events is itself worth reporting.
 
 **Events are intervals, not onsets.** Everything downstream (the ARA mask, the delivered event
-table) needs `[start, end]`, so the reversion step must be detected and **paired** with its
-onset: an opposite-sign, magnitude-similar step on the same source/donor set. Pairing is not
-always clean — restorations can happen in stages; a section of the electricity network can be
-reconfigured directly from one ARA into another without passing through NRA; and a fault event
-has a brief total-loss interim (during which conservation does *not* hold — the load is simply
-off) before restoration completes. Treat unpaired onsets as open intervals (event still in force
-at the end of the record) rather than discarding them.
+table) needs `[start, end]`, so the reversion step must be detected and **paired** with its onset:
+an opposite-sign, magnitude-similar step on the same source/donor set. Pairing is not always clean —
+restorations can happen in stages; a section of the electricity network can be reconfigured directly
+from one ARA into another without passing through NRA; and a fault event has a brief total-loss
+interim (during which conservation does *not* hold — the load is simply off) before restoration
+completes. Treat unpaired onsets as open intervals (event still in force at the end of the record)
+rather than discarding them.
 
 **Filter fleet-wide artifacts before attribution.** Telemetry re-basing, unit changes, or other
-data-pipeline shifts on NGED's side produce coincident steps across *many* series at once. Any
-step time shared by a large fraction of the fleet is a data artifact, not a switching event, and
-must be excluded before the subset search runs. An unexcluded artifact manufactures spurious
+data-pipeline shifts on NGED's side produce coincident steps across *many* series at once. Any step
+time shared by a large fraction of the fleet is a data artifact, not a switching event, and must be
+excluded before the subset search runs. An unexcluded artifact manufactures spurious
 multi-substation "events".
 
-**A GB precedent already draws this distinction at fleet scale, on power alone.** Electricity
-North West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted
-step changes into meter-fault and switching-event categories across a fleet more than ten times
-the number of series in this project's trial area, using power alone — but published no
-precision or recall for either rule (full description: [energy-forecasting review,
-§4](../background/energy-forecasting-review.md#4-detecting-switching-events)). The ATLAS
-project therefore does not settle how well the distinction can be drawn — only that GB
-substations have been sorted this way before.
+**A GB precedent already draws this distinction at fleet scale, on power alone.** Electricity North
+West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted step changes
+into meter-fault and switching-event categories across a fleet more than ten times the number of
+series in this project's trial area, using power alone — but published no precision or recall for
+either rule (full description: [energy-forecasting review,
+§4](../background/energy-forecasting-review.md#4-detecting-switching-events)). The ATLAS project
+therefore does not settle how well the distinction can be drawn — only that GB substations have been
+sorted this way before.
 
 ##### Stage 3 — composition corroboration
 
@@ -653,54 +662,61 @@ The composition read-off is a histogram (step magnitude vs. hour-of-day), not a 
 
 *Two preconditions the read-off needs.* First, a **duration floor**: the diurnal histogram only
 fills if the event spans several days — for shorter events there is no hour-of-day coverage to
-average over, so composition should not be reported below (say) ~3–5 days of event duration.
-Second, a **weather-realisation confound**: the histogram measures the slice's shape *under the
-weather that actually occurred* — a PV-heavy slice moved during an overcast week reads as
-demand-heavy. Both are mitigated the same way: rather than hour-of-day alone, **correlate each
-recipient's residual step against the NWP covariates we already hold** (irradiance for PV, wind
-speed for wind, and temperature and time-of-week for demand). Correlating each recipient's step
-against the NWP covariates conditions on the weather that actually happened instead of assuming
-a canonical sunny day. The read-off is still regression-free in the v0.6 spirit — a few
-correlations per leg.
+average over, so composition should not be reported below (say) ~3–5 days of event duration. Second,
+a **weather-realisation confound**: the histogram measures the slice's shape *under the weather that
+actually occurred* — a PV-heavy slice moved during an overcast week reads as demand-heavy. Both are
+mitigated the same way: rather than hour-of-day alone, **correlate each recipient's residual step
+against the NWP covariates we already hold** (irradiance for PV, wind speed for wind, and
+temperature and time-of-week for demand). Correlating each recipient's step against the NWP
+covariates conditions on the weather that actually happened instead of assuming a canonical sunny
+day. The read-off is still regression-free in the v0.6 spirit — a few correlations per leg.
 
-*Order matters — read composition off the recipient, never the source.* The diurnal shape must be measured on **each recipient's individual step**, *after* attribution has identified which donor took which leg. It must **not** be read off the source substation's lumped drop. The reason: a source commonly sheds *different* slices to *different* donors at once — say a PV-heavy slice to donor $j$ and a demand-heavy slice to donor $k$. The source's own residual shows only the *sum* of everything it lost. That sum blends the two legs into a meaningless average that matches neither. Only the per-recipient steps separate cleanly into "what $j$ got" vs. "what $k$ got." (This is the same source-blends-everything pitfall noted for stage 1, applied to composition rather than magnitude.)
+*Order matters — read composition off the recipient, never the source.* The diurnal shape must be
+measured on **each recipient's individual step**, *after* attribution has identified which donor
+took which leg. The diurnal shape must **not** be read off the source substation's lumped drop. The
+reason: a source commonly sheds *different* slices to *different* donors at once — say a PV-heavy
+slice to donor $j$ and a demand-heavy slice to donor $k$. The source's own residual shows only the
+*sum* of everything it lost. That sum blends the two legs into a meaningless average that matches
+neither. Only the per-recipient steps separate cleanly into "what $j$ got" vs. "what $k$ got."
+(Reading composition off the source rather than the recipient is the same source-blends-everything
+pitfall noted for stage 1, applied to composition rather than magnitude.)
 
 ##### Validation, injection, and what the detector delivers
 
 **Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**. The floor is not a single MW number: it is a frontier in **transferred magnitude × event duration**, reported per series relative to that series' residual noise. The duration axis exists because changepoint segmentation has a minimum detectable event length at half-hourly sampling (an event lasting minutes to a few hours appears as a spike or one odd interval, not a step), just as residual noise sets a minimum magnitude. Pair the frontier with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.* One caveat to carry into the scoring: measured **precision is a lower bound** — if the control-room logs are incomplete (worth asking NGED how complete they believe them to be), some "false positives" will be real, unlogged events.
 
-**Report an F1 score per event-duration band, so the detector can be set beside the one
-published measurement we found.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) is
-the one published measurement of switching detection we found that is scored on both precision
-and recall, and the [energy-forecasting
-review](../background/energy-forecasting-review.md#4-detecting-switching-events) explains their
-F1.5 scoring choice and reports their scores (≈0.2 on events under 3 days, ≈0.5 on events of 42
-days or more). Report **both**: F1 as the headline number, F1.5 alongside it wherever the
-head-to-head with Bouman et al. is the point, banded by duration the way they band theirs.
+**Report an F1 score per event-duration band, so the detector can be set beside the one published
+measurement we found.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) is the one
+published measurement of switching detection we found that is scored on both precision and recall,
+and the [energy-forecasting
+review](../background/energy-forecasting-review.md#4-detecting-switching-events) explains their F1.5
+scoring choice and reports their scores (≈0.2 on events under 3 days, ≈0.5 on events of 42 days or
+more). Report **both**: F1 as the headline number, F1.5 alongside it wherever the head-to-head with
+Bouman et al. is the point, banded by duration the way they band theirs.
 
 **Synthetic event injection (the workhorse of tuning and validation).** The logs contain only however many events the trial period happens to contain, which caps the statistical power of any sensitivity estimate. Injection removes that cap: take periods believed clean, move a synthetic slice between real neighbours (subtract a scaled, plausibly-shaped signal from one series and add it across one to three other series), and measure detection and attribution over a controlled **magnitude × duration grid**. Injection maps the full sensitivity frontier with arbitrary precision, tunes every threshold and penalty in stages 1–2 *without touching the gold-standard logs*, and works at any scale — including, later, on unlabelled full-fleet data. The real logs then play their proper role: confirming that the synthetic frontier transfers to reality, rather than carrying the whole measurement burden alone.
 
 **Diagnostic precursor.** Before formal changepoints, a near-trivial check: first-difference each residual (steps → spikes) and, over rolling windows, confirm that a source's negative spike coincides with the *summed* rises of a neighbour subset. Equivalently, around each *logged* event, plot the member residuals and the neighbourhood-sum residual: members should step, the sum should stay (approximately) flat. If known-neighbour groups show no coinciding drop and summed rise, the neighbour list or the baseline is wrong — fix the neighbour list or the baseline first.
 
-**What it delivers.** A labelled list of detected events (time, source, donor set, per-leg magnitude, rough per-leg composition, score); an ARA mask for the forecasting data; a validation set for later stages; and the quantified sensitivity floor.
+**What the staged detector delivers.** A labelled list of detected events (time, source, donor set, per-leg magnitude, rough per-leg composition, score); an ARA mask for the forecasting data; a validation set for later stages; and the quantified sensitivity floor.
 
-**A zeroth-order NRA reconstruction needs no extra machinery.** The event table is more than
-flags: each event carries an interval, a donor set, and per-leg magnitudes, so a first-cut
-reconstruction of the NRA signal is plain arithmetic. Over each event interval, add each leg's
-magnitude back onto the source and subtract it from its donor (with the [edge-flow
+**A zeroth-order NRA reconstruction needs no extra machinery.** The event table is more than flags:
+each event carries an interval, a donor set, and per-leg magnitudes, so a first-cut reconstruction
+of the NRA signal is plain arithmetic. Over each event interval, add each leg's magnitude back onto
+the source and subtract it from its donor (with the [edge-flow
 estimator](#approach-3-the-joint-edge-flow-estimator) this is literally observed minus the fitted
 flows). What the arithmetic restores is each series' mean *level* under NRA. What the arithmetic
 cannot restore is the moved slice's *shape*: the transferred load is live demand with its own
-diurnal and seasonal variation. Subtracting a flat block leaves all of that variation sitting in
-the "corrected" donor series (and missing from the source), an error that grows with event
-duration. Closing that shape gap is exactly what [the mixture
+diurnal and seasonal variation. Subtracting a flat block leaves all of that variation sitting in the
+"corrected" donor series (and missing from the source), an error that grows with event duration.
+Closing that shape gap is exactly what [the mixture
 model](#approach-4-the-magnitude-only-mixture-model-the-workhorse) is for.
 
 **The same subtraction turns the ARA mask into an optional patch, keeping switching-affected
 training rows instead of discarding them.** The subtraction version is still useful in its own
 right: it turns the ARA *mask* into an optional *patch* — keep switching-affected periods in the
-forecast training data with corrected values rather than discarding ~10% of the record. Whether
-the patch beats the hole is cheap to measure on the synthetic-injection harness.
+forecast training data with corrected values rather than discarding ~10% of the record. Whether the
+patch beats the hole is cheap to measure on the synthetic-injection harness.
 
 **What this approach misses / cons.**
 
@@ -721,19 +737,19 @@ the patch beats the hole is cheap to measure on the synthetic-injection harness.
 
 #### The decision point — a feature-based mainline vs the staged detector
 
-The staged detector — approach 2's stages 2–3 and the approach-3 joint edge-flow escalation —
-should be weighed against the project's actual priorities, which form a continuum rather than a
-must-have list (see [Requirements](../background/requirements.md#core-objectives)). The top
-priority is **probabilistic NRA forecasts**, and switching-event handling is pursued first and
-foremost because it improves those forecasts — an *implicit* handling inside the forecaster is
-acceptable. An explicit switching record is still genuinely wanted, further down the continuum:
-the [`substation_switching` table](delivery-tables.md#table-5-substation_switching) was specified
-in our most recent formal report to NGED (so changing its shape is a decision to agree with NGED,
-not to make unilaterally — an [open question for NGED](#open-items-dependencies)), and although
-NGED's internal systems do record switching, getting data *out* of those systems is surprisingly
-hard, so a switching log inferred from the time series is a deliverable NGED would likely
-welcome. That prioritisation opens a genuine alternative mainline in which the detector's
-discrete layer is deferred behind forecast skill rather than built up front:
+The staged detector — approach 2's stages 2–3 and the approach-3 joint edge-flow escalation — should
+be weighed against the project's actual priorities, which form a continuum rather than a must-have
+list (see [Requirements](../background/requirements.md#core-objectives)). The top priority is
+**probabilistic NRA forecasts**, and switching-event handling is pursued first and foremost because
+it improves those forecasts — an *implicit* handling inside the forecaster is acceptable. An
+explicit switching record is still genuinely wanted, further down the continuum: the
+[`substation_switching` table](delivery-tables.md#table-5-substation_switching) was specified in our
+most recent formal report to NGED (so changing its shape is a decision to agree with NGED, not to
+make unilaterally — an [open question for NGED](#open-items-dependencies)). Although NGED's internal
+systems do record switching, getting data *out* of those systems is surprisingly hard, so a
+switching log inferred from the time series is a deliverable NGED would likely welcome. That
+prioritisation opens a genuine alternative mainline in which the detector's discrete layer is
+deferred behind forecast skill rather than built up front:
 
 - **The NRA forecast** is the stage-1 model itself, generalised from hindcast to forward
   forecast: the weather/calendar forecaster, trained with switching-event periods excluded from
@@ -750,8 +766,8 @@ discrete layer is deferred behind forecast skill rather than built up front:
   dichotomy to defend. For situational awareness the continuous signals are arguably a
   *better* product than a discrete event table, not a consolation prize.
 
-**What the feature path cannot recover.** Three capabilities lapse if the attribution layer is
-never built, and the choice should be made with all three named.
+**What the feature path cannot recover.** Three capabilities lapse if the attribution layer is never
+built, and the choice should be made with all three named.
 
 - **Counterfactual NRA *history*.** Reconstructing what demand would have been *during* a past
   event requires subtracting an estimated step magnitude, which needs the
@@ -771,96 +787,95 @@ never built, and the choice should be made with all three named.
   leans on the training-hygiene fallbacks below. The same training-window caveat is stated for
   the capacity multiplier at the end of this section — it applies to the NRA product identically.
 
-**Evaluating an NRA forecast needs synthetic injection.** During a real event there is no NRA
-ground truth — the metered power is precisely *not* the target — so out-of-event periods are
-the only place the NRA product can be scored directly. Synthetic injection fills the in-event
-gap, because injecting an event into believed-clean data *creates* the missing counterfactual:
-we hold both the modified series and the clean original.
+**Evaluating an NRA forecast needs synthetic injection.** During a real event there is no NRA ground
+truth — the metered power is precisely *not* the target — so out-of-event periods are the only place
+the NRA product can be scored directly. Synthetic injection fills the in-event gap, because
+injecting an event into believed-clean data *creates* the missing counterfactual: we hold both the
+modified series and the clean original.
 
-**The training-side injection test is the one that can actually fail.** The training-side test
-injects events into the *training history*, fits the NRA baseline under each hygiene strategy
-(label-excluded, robust-loss, accumulator-down-weighted), and scores its predictions against the
-clean pre-injection series — a direct measurement of how much contamination each strategy lets
-through into "normal". A forecast-window injection — perturb the recent observed power that feeds
-the anomaly features, and require the metered-power output to track the shift while the NRA
-output ignores it — exercises only the *metered* leg. Beware the trap in that second check: the
-NRA model has no power-derived inputs at all, so "the NRA output ignores the injection" is true
-by construction — a wiring sanity check, not evidence of NRA quality. The NRA evidence comes from
-out-of-event scoring plus the training-side stress above. The harness — already the staged plan's
-tuning workhorse — is the piece that transfers wholesale, and becomes the validation backbone of
-the feature path too.
+**Only the training-side injection test can actually fail.** The training-side test injects events
+into the *training history*, fits the NRA baseline under each hygiene strategy (label-excluded,
+robust-loss, accumulator-down-weighted), and scores its predictions against the clean pre-injection
+series — a direct measurement of how much contamination each strategy lets through into "normal". A
+forecast-window injection — perturb the recent observed power that feeds the anomaly features, and
+require the metered-power output to track the shift while the NRA output ignores it — exercises only
+the *metered* leg. Beware the trap in that second check: the NRA model has no power-derived inputs
+at all, so "the NRA output ignores the injection" is true by construction — a wiring sanity check,
+not evidence of NRA quality. The NRA evidence comes from out-of-event scoring plus the training-side
+stress above. The harness — already the staged plan's tuning workhorse — is the piece that transfers
+wholesale, and becomes the validation backbone of the feature path too.
 
 **The V2 hygiene question.** "Train with labelled events excluded" presumes labels. Whether
-label-based exclusion extends beyond the trial area depends on how completely NGED's own logs
-cover the fleet — a question added to [Open items / dependencies](#open-items-dependencies). If
-coverage turns out poor, the label-free fallbacks are the robust median fit (whose adequacy the
-v1 exclusion experiments measure directly) and soft down-weighting of training rows by the
-event-age accumulator itself — an implicit detector, but threshold-free and tunable on the
-injection harness.
+label-based exclusion extends beyond the trial area depends on how completely NGED's own logs cover
+the fleet — a question added to [Open items / dependencies](#open-items-dependencies). If coverage
+turns out poor, the label-free fallbacks are the robust median fit (whose adequacy the v1 exclusion
+experiments measure directly) and soft down-weighting of training rows by the event-age accumulator
+itself — an implicit detector, but threshold-free and tunable on the injection harness.
 
-**The decision.** After implementation step 2 (the baseline), the
-[aligned lagged weather](xgboost-improvements.md#aligned-lagged-weather-the-single-stage-ablation-control)
-and
-[the residual-lag features](xgboost-improvements.md#residual-lag-features-from-the-switching-detector-baseline)
+**The decision.** After implementation step 2 (the baseline), the [aligned lagged
+weather](xgboost-improvements.md#aligned-lagged-weather-the-single-stage-ablation-control) and [the
+residual-lag
+features](xgboost-improvements.md#residual-lag-features-from-the-switching-detector-baseline)
 experiments, and the v1 label-exclusion experiments, evaluate. The v1 priority is **maximising
 NRA-forecast skill**, even where that means the model handles switching implicitly. So if the
-feature path delivers that skill (measured on out-of-event periods plus the training-side
-injection stress above) and NGED confirm the continuous signals meet their needs (an
-[open question for NGED](#open-items-dependencies)), approaches 2 and 3 demote from mainline to **contingency — kept designed, built
-if time allows once forecast skill is secured**, and an explicit inferred event log is then a
-valued nice-to-have rather than a requirement. The downstream artefacts that assume the discrete
-detector — [Table 5](delivery-tables.md#table-5-substation_switching), [Table 4's in-event
-capacity patch](delivery-tables.md#table-4-effective_capacity), the [prevailing-conditions
-switching block](forecast-building-blocks.md), and the [in-event metrics
+feature path delivers that skill (measured on out-of-event periods plus the training-side injection
+stress above) and NGED confirm the continuous signals meet their needs (an [open question for
+NGED](#open-items-dependencies)), approaches 2 and 3 demote from mainline to **contingency — kept
+designed, built if time allows once forecast skill is secured**. An explicit inferred event log is
+then a valued nice-to-have rather than a requirement. The downstream artefacts that assume the
+discrete detector — [Table 5](delivery-tables.md#table-5-substation_switching), [Table 4's in-event
+capacity patch](delivery-tables.md#table-4-effective_capacity), the [prevailing-conditions switching
+block](forecast-building-blocks.md), and the [in-event metrics
 flags](metrics-and-leaderboard.md#measuring-performance-during-switching-events) — are marked
 conditional on this decision where they are defined. The two v2-scale mixture escalations become
 still more conditional than the [escalation principle](#the-approaches) already makes them. The
-escalation principle applied honestly to our own plan says the staged detector must be justified
-by a measured gap the feature path leaves, not by anticipation.
+escalation principle applied honestly to our own plan says the staged detector must be justified by
+a measured gap the feature path leaves, not by anticipation.
 
-**Relationship to the v2 disaggregation ambition.** The full-fat v2 vision is a *single* model
-that sees everything — switching, capacity changes, embedded DERs — and makes an informed joint
-attribution among them: [the mixture model](#approach-4-the-magnitude-only-mixture-model-the-workhorse)'s mixture and
-[the typed mixture](#approach-5-the-type-resolved-mixture-with-differentiable-physics-modules)'s typed physics modules,
-with the per-node anomaly slack catching what neither explains. The two-stage forecaster is a
-step *toward* that vision, not a detour from it. Stage 1's residual is exactly the
+**Relationship to the v2 disaggregation ambition.** The full-fat v2 vision is a *single* model that
+sees everything — switching, capacity changes, embedded DERs — and makes an informed joint
+attribution among them: [the mixture
+model](#approach-4-the-magnitude-only-mixture-model-the-workhorse)'s mixture and [the typed
+mixture](#approach-5-the-type-resolved-mixture-with-differentiable-physics-modules)'s typed physics
+modules, with the per-node anomaly slack catching what neither explains. The two-stage forecaster is
+a step *toward* that vision, not a detour from it. Stage 1's residual is exactly the
 undifferentiated lump v2 exists to explain — everything the weather and clock don't account for:
 switching, DER growth, new connections, capacity changes alike. The engineered features are
 hand-crafted summaries of precisely the structure v2 uses to attribute that lump: conservation
 across neighbours (the signed sum), persistence (the EWMAs), diurnal shape. The booster consumes
 those fingerprints for *prediction without attribution*. What v2 adds is the structured generative
-layer that turns the same fingerprints into *named causes* — a persistent level shift is
-switching if it conserves across a neighbour subset, load growth if it is partnerless, embedded
-PV if its shape tracks irradiance. So a demonstrated win from these features is direct evidence
-that the residual carries attribution-relevant signal — de-risking v2. The shared infrastructure
-(the baseline, the normalised residuals, the injection harness, the adjacency) carries over
-wholesale whichever way the decision point goes.
+layer that turns the same fingerprints into *named causes* — a persistent level shift is switching
+if it conserves across a neighbour subset, load growth if it is partnerless, embedded PV if its
+shape tracks irradiance. So a demonstrated win from these features is direct evidence that the
+residual carries attribution-relevant signal — de-risking v2. The shared infrastructure (the
+baseline, the normalised residuals, the injection harness, the adjacency) carries over wholesale
+whichever way the decision point goes.
 
-**A further reuse — effective generator capacity.** The same abnormality machinery may double as
-a simple read-out of the *effective capacity* of **metered generator** series (switching
-detection, by contrast, targets *substation* series; estimating the capacity of unmetered
-generators is out of scope for v1). A capacity change — a derating, one unit of several tripping,
-an uprating, new plant commissioning — has a residual fingerprint different from switching's: it
-is **persistent, partnerless (no equal-and-opposite neighbour), and multiplicative** — the
-deviation from the stage-1 weather-expected output scales with the weather drive, large when it
-is windy or sunny and near zero when it is calm or dark. A switching transfer, on the other hand,
-is an additive level shift. The event-age and pooled features above *detect* a capacity change (a
-persistent, partnerless residual) but cannot by themselves *distinguish* multiplicative from
-additive: none of them conditions on the weather drive, and a long EWMA of a derated wind farm's
-residual is just a persistent negative number. The distinguishing statistic must divide by the
-drive, and the simplest statistic that does so falls straight out of the machinery: the **ratio
-of two long-half-life, init-time-locked EWMAs, actual over weather-expected** — a threshold-free
-effective-capacity multiplier per series, plottable in the [feature-visualisation
+**A further reuse — effective generator capacity.** The same abnormality machinery may double as a
+simple read-out of the *effective capacity* of **metered generator** series (switching detection, by
+contrast, targets *substation* series; estimating the capacity of unmetered generators is out of
+scope for v1). A capacity change — a derating, one unit of several tripping, an uprating, new plant
+commissioning — has a residual fingerprint different from switching's: it is **persistent,
+partnerless (no equal-and-opposite neighbour), and multiplicative** — the deviation from the stage-1
+weather-expected output scales with the weather drive, large when it is windy or sunny and near zero
+when it is calm or dark. A switching transfer, on the other hand, is an additive level shift. The
+event-age and pooled features above *detect* a capacity change (a persistent, partnerless residual)
+but cannot by themselves *distinguish* multiplicative from additive: none of them conditions on the
+weather drive, and a long EWMA of a derated wind farm's residual is just a persistent negative
+number. The distinguishing statistic must divide by the drive, and the simplest statistic that does
+so falls straight out of the machinery: the **ratio of two long-half-life, init-time-locked EWMAs,
+actual over weather-expected** — a threshold-free effective-capacity multiplier per series,
+plottable in the [feature-visualisation
 UI](https://github.com/openclimatefix/nged-substation-forecast/issues/359) like every other
 engineered signal, and a natural extra "cheap baseline" entrant for the v0.7 [capacity-estimator
-head-to-head](capacity-estimation.md). Three caveats to carry: curtailment or export limitation
-looks identical to a derating from the meter's side; the ratio's denominator (the EWMA of
+head-to-head](capacity-estimation.md). Three caveats to carry. Curtailment or export limitation
+looks identical to a derating from the meter's side. The ratio's denominator (the EWMA of
 weather-expected output) runs small and noisy through calm or dark stretches, so the ratio should
-only be read when that EWMA clears a floor; and slow capacity growth contaminates the baseline
+only be read when that EWMA clears a floor. And slow capacity growth contaminates the baseline
 itself (the baseline's training window silently defines what "capacity 1.0" means), so the
-multiplier is an *effective* capacity relative to the training period, not an absolute rating.
-Since capacity changes are one of the attribution categories the v2 paragraph above names, a
-working read-out here is one more de-risking step for v2.
+multiplier is an *effective* capacity relative to the training period, not an absolute rating. Since
+capacity changes are one of the attribution categories the v2 paragraph above names, a working
+read-out here is one more de-risking step for v2.
 
 #### Approach 3 — the joint edge-flow estimator
 
@@ -874,59 +889,56 @@ working read-out here is one more de-risking step for v2.
 > Optimisation](../techniques/convex-optimisation.md).
 
 **The core idea, in plain language.** The three stages above look at each substation on its own,
-spot moments where its residual suddenly jumps or drops, and then play matchmaker afterwards:
-this substation dropped 9 megawatts, those two neighbours rose by 5 and 4, so presumably they
-belong together. Detection first, matching second.
+spot moments where its residual suddenly jumps or drops, and then play matchmaker afterwards: this
+substation dropped 9 megawatts, those two neighbours rose by 5 and 4, so presumably they belong
+together. Detection first, matching second.
 
 The edge-flow estimator flips what we search for. Instead of asking "which substations stepped?",
 ask "how much load is flowing across each boundary between neighbouring substations, at every
-moment?" Think of the electricity network as a map where each pair of substations that can
-exchange load has an invisible pipe between them. Normally every pipe carries nothing. When
-engineers perform a switching operation, one or two pipes suddenly carry, say, 5 megawatts, for a
-few days, and then go back to nothing.
+moment?" Think of the electricity network as a map where each pair of substations that can exchange
+load has an invisible pipe between them. Normally every pipe carries nothing. When engineers perform
+a switching operation, one or two pipes suddenly carry, say, 5 megawatts, for a few days, and then
+go back to nothing.
 
 Describing the world in terms of pipes rather than steps makes conservation of power automatic.
-Whatever flows out of one substation through a pipe necessarily flows into its neighbour — the
-same number appears with a minus sign on one side and a plus sign on the other. It is impossible,
-in this vocabulary, to describe 9 megawatts vanishing from one substation while only 8 appear
-elsewhere. The balance check that stage 2 performs as a separate verification step disappears: it
-is built into the parameterisation.
+Whatever flows out of one substation through a pipe necessarily flows into its neighbour — the same
+number appears with a minus sign on one side and a plus sign on the other. It is impossible, in this
+vocabulary, to describe 9 megawatts vanishing from one substation while only 8 appear elsewhere. The
+balance check that stage 2 performs as a separate verification step disappears: it is built into the
+parameterisation.
 
 The estimation question then becomes: given the residuals observed at every substation (stage 1's
-baseline is untouched by this proposal), what is the most plausible story about what all the
-pipes were carrying? "Plausible" encodes exactly the two priors stated throughout this page:
-switching is **rare**, so almost all pipes should carry exactly zero almost all the time; and it
-is **abrupt**, so when a pipe does carry load it should be a flat block — switch on, hold steady,
-switch off — rather than a gentle wiggle. We write down a score that rewards explaining the
-residuals and penalises stories with many active pipes or many changes, and find the single story
-with the best score. Because the problem is **convex**, the solver certifies that story as the
-best-scoring story, and finds it deterministically every run — see [Convex
+baseline is untouched by this proposal), what is the most plausible story about what all the pipes
+were carrying? "Plausible" encodes exactly the two priors stated throughout this page: switching is
+**rare**, so almost all pipes should carry exactly zero almost all the time; and it is **abrupt**,
+so when a pipe does carry load it should be a flat block — switch on, hold steady, switch off —
+rather than a gentle wiggle. We write down a score that rewards explaining the residuals and
+penalises stories with many active pipes or many changes, and find the single story with the best
+score. Because the problem is **convex**, the solver certifies that story as the best-scoring story,
+and finds it deterministically every run — see [Convex
 Optimisation](../techniques/convex-optimisation.md) for what that promise means and why
 gradient-descent tooling cannot make it.
 
-**Everything falls out of that one answer.** Every stretch where a pipe carries a nonzero flow
-*is* a detected event; the pipe identifies source and donor; the level is the transferred MW; the
-stretch's endpoints are the event interval; "any incident pipe active" is the ARA mask.
-Overlapping events on one neighbourhood — a listed weakness of the sequential matcher — are
-handled natively: they are simply two pipe variables active over overlapping intervals. The fit
-apportions each node's residual across its incident edges because the two events touch different
-node subsets. Two events only become confusable if they hit identical edges at identical times.
-At that point no method could separate them, and the honest answer is non-identifiability, not a
-matcher bug.
+**Everything falls out of that one answer.** Every stretch where a pipe carries a nonzero flow *is*
+a detected event; the pipe identifies source and donor; the level is the transferred MW; the
+stretch's endpoints are the event interval; "any incident pipe active" is the ARA mask. Overlapping
+events on one neighbourhood — a listed weakness of the sequential matcher — are handled natively:
+they are simply two pipe variables active over overlapping intervals. The fit apportions each node's
+residual across its incident edges because the two events touch different node subsets. Two events
+only become confusable if they hit identical edges at identical times. At that point no method could
+separate them, and the honest answer is non-identifiability, not a matcher bug.
 
-**Formally.** The edge-flow estimator is a **group fused lasso** on signed edge flows
-$e_{ij}(t)$, with a per-node anomaly slack $u_i(t)$:
+**Formally.** The edge-flow estimator is a **group fused lasso** on signed edge flows $e_{ij}(t)$,
+with a per-node anomaly slack $u_i(t)$:
 
-$$
-\text{residual}_i(t) \;\approx\; \sum_j \pm\, e_{ij}(t) + u_i(t)
-$$
+$$ \text{residual}_i(t) \;\approx\; \sum_j \pm\, e_{ij}(t) + u_i(t) $$
 
 ($+$ where flow enters $i$, $-$ where it leaves.)
 
 Each term in that equation, and each penalty applied to it, is a deliberate design choice. The
-bullets below unpack them in turn: the two penalties that encode the switching priors, the
-anomaly slack that keeps non-switching steps out of the flows, the residuals the fit term
-consumes, the approximation the parameterisation makes, and how the penalty weights are set.
+bullets below unpack them in turn: the two penalties that encode the switching priors, the anomaly
+slack that keeps non-switching steps out of the flows, the residuals the fit term consumes, the
+approximation the parameterisation makes, and how the penalty weights are set.
 
 - **Fused penalty on grouped increments** → each flow is piecewise-constant with sparse changes.
   The *group* structure ties the increments across edges at each timestep. A fan-out event — one
@@ -944,10 +956,10 @@ consumes, the approximation the parameterisation makes, and how the penalty weig
   nothing balancing it at neighbours. Without $u$, the optimiser's only vocabulary is pipes, so
   the optimiser would be *forced* to invent flows. With it, partnerless steps land in $u$ and are
   reported as "anomaly, unknown cause" — exactly as stage 2 would classify them.
-- **It consumes stage 1's normalised, whitened residuals** (see stage 1 for the plain-language
-  version: measure surprise in units of each substation's usual wobble, after subtracting the
-  predictable stickiness of weather-model error). Feeding it raw residuals would inflate phantom
-  flows exactly as it inflates phantom changepoints.
+- **The edge-flow estimator consumes stage 1's normalised, whitened residuals** (see stage 1 for the
+  plain-language version: measure surprise in units of each substation's usual wobble, after
+  subtracting the predictable stickiness of weather-model error). Feeding it raw residuals would
+  inflate phantom flows exactly as raw residuals inflate phantom changepoints in a naive detector.
 - **Flat blocks are an approximation — the same approximation stage 1 makes.** A real transferred
   slice is live load with its own diurnal shape. A piecewise-constant flow captures the slice's
   *mean level* and leaves the shape in the residual. The flat-block approximation is no worse
@@ -964,9 +976,9 @@ consumes, the approximation the parameterisation makes, and how the penalty weig
   final scoring — and injection-based tuning is the only kind available at full scale, where no
   logs exist.
 
-**Which of the staged pipeline's failure modes it solves — and which it doesn't.** Several of
-the statistical traps that stages 1–2 must handle with explicit machinery simply cannot occur in
-this parameterisation:
+**Which of the staged pipeline's failure modes the edge-flow estimator solves — and which it
+doesn't.** Several of the statistical traps that stages 1–2 must handle with explicit machinery
+simply cannot occur in this parameterisation:
 
 - *Onset/reversion pairing disappears.* Stage 2 must detect each reversion step and pair it with
   its onset — messy under staged restorations and ARA-to-ARA reconfigurations. Here an event is a
@@ -987,22 +999,21 @@ this parameterisation:
   change with path length, load is mildly voltage-dependent) is absorbed by the fit term
   and $u$, with no hand-set band.
 
-What it does **not** solve: the dependency on well-behaved residuals (the
-normalised-and-whitened bullet above — phantom flows replace phantom changepoints, but only if
-that step is skipped), the sensitivity floor (noise and half-hourly sampling still impose a
-magnitude × duration limit, measured the same way on injections), the fleet-wide artifact
-pre-filter, and stage 3's composition preconditions (duration floor, weather-realisation
-confound).
+What the edge-flow estimator does **not** solve: the dependency on well-behaved residuals (the
+normalised-and-whitened bullet above — phantom flows replace phantom changepoints, but only if that
+step is skipped), the sensitivity floor (noise and half-hourly sampling still impose a magnitude ×
+duration limit, measured the same way on injections), the fleet-wide artifact pre-filter, and stage
+3's composition preconditions (duration floor, weather-realisation confound).
 
-**What it reuses, and why it is not the day-one build.** Everything upstream: the same
-weather/calendar baseline, the same normalised/whitened residuals, the same adjacency, and the
-same synthetic-injection harness. The joint edge-flow estimator replaces only stages 1–2's
-detect-then-match logic. Stage 3 applies unchanged to the estimator's output. The joint estimator
-is an escalation rather than the starting point because the staged detector fails *legibly*: every
-flag traces to a visible step and a named neighbour subset. A joint optimiser is harder to
-inspect when it misbehaves. Build the transparent version first, keep it as the reference, and
-adopt the joint estimator where the head-to-head comparison (on logs + injections) shows it wins.
-A CVXPY implementation sketch is directly below.
+**What the edge-flow estimator reuses, and why it is not the day-one build.** Everything upstream:
+the same weather/calendar baseline, the same normalised/whitened residuals, the same adjacency, and
+the same synthetic-injection harness. The joint edge-flow estimator replaces only stages 1–2's
+detect-then-match logic. Stage 3 applies unchanged to the estimator's output. The joint estimator is
+an escalation rather than the starting point because the staged detector fails *legibly*: every flag
+traces to a visible step and a named neighbour subset. A joint optimiser is harder to inspect when
+it misbehaves. Build the transparent version first, keep it as the reference, and adopt the joint
+estimator where the head-to-head comparison (on logs + injections) shows it wins. A CVXPY
+implementation sketch is directly below.
 
 ##### Sketch of the edge-flow estimator
 
@@ -1107,10 +1118,10 @@ Notes on the sketch:
 
 The build order for v0.6 is simplest-first, with each step delivering a testable result before the
 next adds complexity. **Steps 1–4 are the shared infrastructure** every approach needs — the
-labelled event table, the baseline, the diagnostics, and the injection harness. **Step 5 is
-approach 1, the two-stage forecaster** — the v0.6.0 target, which ships on that infrastructure
-alone. **Steps 6–8 are approach 2, the staged detector**, and **step 9 is approach 3, the joint
-edge-flow estimator**; both are built only as [the decision
+labelled event table, the baseline, the diagnostics, and the injection harness. **Step 5 is approach
+1, the two-stage forecaster** — the v0.6.0 target, which ships on that infrastructure alone. **Steps
+6–8 are approach 2, the staged detector**, and **step 9 is approach 3, the joint edge-flow
+estimator**; both are built only as [the decision
 point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) retains them (step 9
 also to test out convex optimisation as a warm-up for v2).
 
@@ -1162,30 +1173,28 @@ also to test out convex optimisation as a warm-up for v2).
 ### After v2 is live — reconstructing latent NRA demand
 
 The two approaches below reconstruct each substation's *latent NRA demand* — the demand that would
-be metered under normal running — and are built at **v2 scale, once v2.0 is operational**; read
-them as "some time after v2.0". They share the v0.6 infrastructure above (the baseline, the
-normalised residuals, the injection harness, the adjacency).
+be metered under normal running — and are built at **v2 scale, once v2.0 is operational**; read them
+as "some time after v2.0". They share the v0.6 infrastructure above (the baseline, the normalised
+residuals, the injection harness, the adjacency).
 
 #### Approach 4 — the magnitude-only mixture model (the workhorse)
 
 **Goal.** Reconstruct a latent NRA demand $d_i(t)$ per substation by modelling observed power as a time-varying mixture of each substation's own normal demand and its neighbours'.
 
-**Motivation.** v0.6 already supports a
-[zeroth-order NRA reconstruction by subtraction](#approach-2-the-staged-statistical-detector)
-— but that correction is a flat block per event: it restores each series' mean NRA *level* while
-leaving the moved slice's time-varying *shape* behind. Of the approaches on this page, this
-mixture is the simplest whose reconstruction carries shape — the correction is a scaled copy of a
-live, jointly-inferred demand signal rather than a constant. The mixture also produces latent
-demand **without modelling any structure below the primary**, sidestepping the (non-existent)
-feeder-discovery problem entirely. The latent objects are the substations themselves, which we
-observe. The mixture model is the workhorse: faithful to how the electricity network actually
-behaves, and fully unsupervised.
+**Motivation.** v0.6 already supports a [zeroth-order NRA reconstruction by
+subtraction](#approach-2-the-staged-statistical-detector) — but that correction is a flat block per
+event: it restores each series' mean NRA *level* while leaving the moved slice's time-varying
+*shape* behind. Of the approaches on this page, this mixture is the simplest whose reconstruction
+carries shape — the correction is a scaled copy of a live, jointly-inferred demand signal rather
+than a constant. The mixture also produces latent demand **without modelling any structure below the
+primary**, sidestepping the (non-existent) feeder-discovery problem entirely. The latent objects are
+the substations themselves, which we observe. The mixture model is the workhorse: faithful to how
+the electricity network actually behaves, and fully unsupervised.
 
 **Method.** Each substation $i$ has a latent normal-demand signal $d_i(t)$. Observed power is a time-varying mixture over the neighbourhood:
 
-$$
-\text{observed}_i(t) = \alpha_{ii}(t)\, d_i(t) + \sum_{j \,\in\, \text{neighbours}(i)} \alpha_{ij}(t)\, d_j(t)
-$$
+$$ \text{observed}_i(t) = \alpha_{ii}(t)\, d_i(t) + \sum_{j \,\in\, \text{neighbours}(i)}
+\alpha_{ij}(t)\, d_j(t) $$
 
 - **The neighbourhood is the graph:** $\text{neighbours}(i)$ is exactly $i$'s neighbour set in the network graph, so the edges act as a *sparsity pattern* on the mixing matrix — most $\alpha_{ij}$ are structurally fixed at zero, and only the handful corresponding to real edges are free parameters. The sparsity pattern is what makes the model identifiable and cheap rather than an $N \times N$ free-for-all.
 - Under NRA: $\alpha_{ii} \approx 1$, $\alpha_{ij} \approx 0$.
@@ -1201,7 +1210,7 @@ $$
   minima are a real risk. Initialise/anchor the $\alpha$ jump times from the v0.6 event list (or the
   edge-flow estimator's fitted flows, which are the same object in additive form) so the
   optimiser starts near the right switching structure. v0.6's output is thus a direct *input* to
-  the mixture model, not just its validation set.
+  the mixture model, not just the mixture model's validation set.
 - **Known degeneracies to guard.** (a) *Scale:* $\alpha_{ii} d_i$ is invariant to rescaling one against
   the other; the identity prior resolves this except for a substation observed under ARA for
   (nearly) its whole record, where v0.6's record-straddling blind spot applies unchanged.
@@ -1213,11 +1222,11 @@ $$
   zero, the transfer's magnitude information vanishes around the crossing. The typed mixture's
   decomposition removes that vanishing magnitude by mixing gross components instead.
 
-**Tooling: the mixture model can be built entirely with CVXPY — by alternation, with one honest caveat.** As
-written, it is *not* one convex problem: $\alpha \cdot d$ multiplies two unknowns, which is exactly the
-kind of expression CVXPY's disciplined convex programming (DCP) check refuses (see [Convex
-Optimisation](../techniques/convex-optimisation.md)). But the bilinearity has a special structure
-— the problem is convex in each unknown *separately* — and that enables the classic
+**Tooling: the mixture model can be built entirely with CVXPY — by alternation, with one honest
+caveat.** As written, it is *not* one convex problem: $\alpha \cdot d$ multiplies two unknowns,
+which is exactly the kind of expression CVXPY's disciplined convex programming (DCP) check refuses
+(see [Convex Optimisation](../techniques/convex-optimisation.md)). But the bilinearity has a special
+structure — the problem is convex in each unknown *separately* — and that enables the classic
 **alternating** scheme, where every step is a plain CVXPY solve:
 
 - **$\alpha$-step (fix $d$, solve for $\alpha$).** With $d$ treated as known data, the mixture is linear in
@@ -1228,29 +1237,29 @@ Optimisation](../techniques/convex-optimisation.md)). But the bilinearity has a 
 - **$d$-step (fix $\alpha$, solve for $d$).** With the routing fixed, the observation model is linear in
   $d$, and "weather/calendar backbone plus smooth residual" is a convex regression.
 
-Iterate the two steps to convergence. There is also a natural **convex warm start**: fixing $d$
-to the exogenous baseline makes the whole model one convex problem — it is essentially
-the [joint edge-flow estimator's](#approach-3-the-joint-edge-flow-estimator) shaped-flow refinement
-$e_{ij}(t) = f_{ij}(t) \cdot \text{baseline}_j(t)$ in mixture clothing. Solve that warm start
-first, then let alternation release $d$. The caveat to state plainly: convexity now holds per
-*step*, not overall. Alternation converges, but to a *local* optimum of the bilinear problem. The
-certified-global-optimum promise of the pure-convex world does **not** come back just because
-each step uses CVXPY. The v0.6 initialisation (bullet above) and the convex warm start are what
-manage that risk. No part of the mixture model needs PyTorch.
+Iterate the two steps to convergence. There is also a natural **convex warm start**: fixing $d$ to
+the exogenous baseline makes the whole model one convex problem — it is essentially the [joint
+edge-flow estimator's](#approach-3-the-joint-edge-flow-estimator) shaped-flow refinement $e_{ij}(t)
+= f_{ij}(t) \cdot \text{baseline}_j(t)$ in mixture clothing. Solve that warm start first, then let
+alternation release $d$. The caveat to state plainly: convexity now holds per *step*, not overall.
+Alternation converges, but to a *local* optimum of the bilinear problem. The
+certified-global-optimum promise of the pure-convex world does **not** come back just because each
+step uses CVXPY. The v0.6 initialisation (bullet above) and the convex warm start are what manage
+that risk. No part of the mixture model needs PyTorch.
 
 **Where `cvxpylayers` enters (and where it doesn't).** The bridge that embeds a convex solve as a
-differentiable layer inside a PyTorch model
-([the techniques page explains it](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch))
-is *not needed* for the mixture model — alternation above is CVXPY in a loop. The bridge earns
-its place in the typed mixture, when $d_i$ decomposes into physics modules (panel trigonometry,
-power curves, products of unknowns) that are genuinely non-convex and force PyTorch for the outer
-model. See the [typed-mixture tooling
+differentiable layer inside a PyTorch model ([the techniques page explains
+it](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch)) is *not needed* for
+the mixture model — alternation above is CVXPY in a loop. The bridge earns its place in the typed
+mixture, when $d_i$ decomposes into physics modules (panel trigonometry, power curves, products of
+unknowns) that are genuinely non-convex and force PyTorch for the outer model. See the
+[typed-mixture tooling
 paragraph](#approach-5-the-type-resolved-mixture-with-differentiable-physics-modules) for why the
 routing estimation should stay a convex layer even then.
 
 **Why "arbitrary continuous slice" is handled natively.** $\alpha_{ij}(t)$ is a continuous fraction, so "some load, cut anywhere, moved to several donors" is exactly representable. The continuous-fraction form — which earlier looked like a limitation — is in fact *fidelity* to an electricity network where the transferred amount is genuinely continuous and the cut point is free.
 
-**What it adds over v0.6 (including the joint edge-flow estimator).**
+**What the mixture model adds over v0.6 (including the joint edge-flow estimator).**
 
 - **Shape, not just level.** Both v0.6 reconstructions correct an event with a flat block — the
   staged detector's subtraction and the edge-flow estimator's piecewise-constant flows alike —
@@ -1269,7 +1278,7 @@ routing estimation should stay a convex layer even then.
 - Models routing continuously rather than detecting it after the fact.
 - Accommodates multi-donor partial transfer through the summed mixture + node-level balance.
 
-**What it misses / cons.**
+**What the mixture model misses / cons.**
 
 - A fractional mixture $\alpha_{ij} d_j$ moves a *scaled copy of neighbour j's whole aggregate demand*. The slice that really moved may have a *different shape* (e.g. unusually PV-heavy). The mixture model can match the step magnitude but carries the wrong shape with it. **Important nuance:** because there is *no stable sub-unit* with a "true" recoverable shape (movable cut points), the wrong-shape error is largely **not a fixable limitation** — the mixture model's approximation is about as good as the data structurally permits for the *demand* total. The typed mixture only partially improves it, and only for the DER component.
 - DERs are folded implicitly into $d_i$ (no explicit PV/wind separation yet).
@@ -1293,9 +1302,8 @@ routing estimation should stay a convex layer even then.
 
 **Method.** Decompose each substation into typed components, each from its own differentiable forward module:
 
-$$
-d_i(t) = \text{gross\_demand}_i(t) - \text{pv\_metered}_i(t) - \text{pv\_unmetered}_i(t) - \text{wind\_metered}_i(t) - \text{wind\_unmetered}_i(t)
-$$
+$$ d_i(t) = \text{gross\_demand}_i(t) - \text{pv\_metered}_i(t) - \text{pv\_unmetered}_i(t) -
+\text{wind\_metered}_i(t) - \text{wind\_unmetered}_i(t) $$
 
 - **Demand:** temperature- and time-of-week-shaped.
 - **PV:** irradiance-driven (NWP/satellite) via differentiable panel physics (temperature/spectral correction, inverter clipping); capacity is a latent parameter.
@@ -1304,23 +1312,26 @@ $$
 
 Mixing operates **per component-type**, each with its own routing weights:
 
-$$
-\text{observed}_i(t) = \sum_j \Big[\, \alpha^{\text{dem}}_{ij}(t)\, \text{gross\_demand}_j(t) - \alpha^{\text{pv}}_{ij}(t)\, \text{pv}_j(t) - \alpha^{\text{wind}}_{ij}(t)\, \text{wind}_j(t) \,\Big]
-$$
+$$ \text{observed}_i(t) = \sum_j \Big[\, \alpha^{\text{dem}}_{ij}(t)\, \text{gross\_demand}_j(t) -
+\alpha^{\text{pv}}_{ij}(t)\, \text{pv}_j(t) - \alpha^{\text{wind}}_{ij}(t)\, \text{wind}_j(t)
+\,\Big] $$
 
-Each substation is now a small *bundle* of typed nodes rather than one node, and routing happens per type. But the graph stays a plain **data structure**, exactly as in the earlier stages: when the i→j boundary is active, each *type* moves with its own weight — structure plus arithmetic, with nothing learned along the edges.
+Each substation is now a small *bundle* of typed nodes rather than one node. Routing happens per
+type. But the graph stays a plain **data structure**, exactly as in the earlier stages: when the i→j
+boundary is active, each *type* moves with its own weight — structure plus arithmetic, with nothing
+learned along the edges.
 
 **Tooling.** The type-resolved mixture is the stage where PyTorch becomes unavoidable: the typed
 forward modules are genuinely non-convex (see [Convex
 Optimisation](../techniques/convex-optimisation.md) for why), so the outer model lives in PyTorch
-per the [differentiable-physics](../techniques/differentiable-physics.md) plan. The per-type
-routing weights $\alpha^{\text{type}}_{ij}(t)$, however, should **remain a differentiable convex
-layer** inside that model (via
-[`cvxpylayers`](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch))
-rather than becoming free tensors. The layer preserves exact zeros ("nonzero routing = detected
-event") and built-in conservation, while gradients flow through the solve to the physics modules.
-The full rationale, and the alternation-only path that gets the mixture model built without any
-PyTorch, is in the mixture-model tooling note above.
+per the [differentiable-physics](../techniques/differentiable-physics.md) plan. The per-type routing
+weights $\alpha^{\text{type}}_{ij}(t)$, however, should **remain a differentiable convex layer**
+inside that model (via
+[`cvxpylayers`](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch)) rather
+than becoming free tensors. The layer preserves exact zeros ("nonzero routing = detected event") and
+built-in conservation, while gradients flow through the solve to the physics modules. The full
+rationale, and the alternation-only path that gets the mixture model built without any PyTorch, is
+in the mixture-model tooling note above.
 
 **Prior structure.**
 
@@ -1328,13 +1339,13 @@ PyTorch, is in the mixture-model tooling note above.
 2. **Per-pair composition prior — weak and shared, never per-boundary.** The tempting design here is a *learnable per-boundary* prior $\theta_{ij}$ ("the i→j boundary is usually 90% PV"), treating it as a stable feeder fingerprint. **Use at most a weak, shared empirical prior, or drop it entirely.** Reason: movable cut points mean a boundary has *no stable composition* — what crosses depends on where the switch was opened this time. And $\theta_{ij}$ could not be fitted at scale anyway, since fitting $\theta_{ij}$ requires labels we won't have. Do **not** rely on per-boundary learned composition.
 3. **Multi-donor (one-to-many).** As in the mixture model, several $s_{ij}(t)$ may be active for one source at once; conservation is node-level flow balance across the donor set, not pairwise.
 
-**What it adds over the mixture model.**
+**What the type-resolved mixture adds over the mixture model.**
 
 - Captures disproportionate-*type* transfer (more PV than load can move).
 - Differentiable modules give separately-shaped PV/wind/demand signals, so a step can be attributed to the right type by its temporal signature (midday irradiance-shaped → PV; evening temperature-tracking → load).
 - Cleans DERs from the demand estimate generally, not just during switching.
 
-**What it misses / cons.**
+**What the type-resolved mixture misses / cons.**
 
 - Still moves a *scaled fraction of neighbour j's total PV/wind/demand*, not the specific moved slice's profile. Fixes wrong *type-mix*; does **not** fix wrong *within-type shape*. Given movable cut points, the within-type shape is not stably recoverable anyway, so this residual is largely irreducible and almost certainly second-order for forecasting.
 - Larger latent space (three routing matrices): risk the optimiser trades PV- vs wind- vs demand-transfer to fit one step. **Mitigation:** the three types have distinct observable temporal signatures and cannot masquerade as each other if priors lean on irradiance/wind/temperature covariates. Regularise each routing weight toward the identity and toward piecewise-constant in time. When genuinely confounded (a windless, overcast event), accept non-identifiability and let uncertainty reflect it.

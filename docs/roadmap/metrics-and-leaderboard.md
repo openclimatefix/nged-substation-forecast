@@ -57,9 +57,9 @@ against](../background/energy-forecasting-review.md#publishing-results-that-othe
 Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147)
 
 No naive baseline exists anywhere in the codebase (only docstring mentions, e.g.
-`contracts/power_schemas.py:242`). Until the leaderboard carries naive rows, XGBoost's NMAE
-numbers aren't interpretable — and, more to the point, we can't answer the question this project
-exists to answer: **do we beat what NGED does today?**
+`contracts/power_schemas.py:242`). Until the leaderboard carries naive rows, XGBoost's NMAE numbers
+aren't interpretable — and, more to the point, we can't answer the question this project exists to
+answer: **do we beat what NGED does today?**
 
 **Every comparison against a baseline publishes the fraction of series that beat it alongside the
 average error, never the average alone** — see [Publishing results that others can compare
@@ -68,33 +68,34 @@ for why an average can hide a model getting worse at a substantial minority of s
 
 ### The headline baseline — `nged_incumbent`
 
-`nged_incumbent` is a faithful reproduction of
-[NGED's incumbent forecast](../background/nged-incumbent-forecast.md) — the analogue-ensemble method
-they use today, with no weather model and no ML. In brief (full description and the operator's-eye
-view are in the background page): for each target half-hour it takes the observed power at the
-**same weekday & time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13
-analogues** — which NGED plot and read by eye (taking the 95th percentile if they need a single
-number). Reproducing it matters because it is *the bar we have to clear to justify the project* —
-"XGBoost beats persistence" is the least we must do; "XGBoost beats the incumbent" is the
-deliverable. It is the first baseline we implement; if we implement only one, it is this one.
+`nged_incumbent` is a faithful reproduction of [NGED's incumbent
+forecast](../background/nged-incumbent-forecast.md) — the analogue-ensemble method they use today,
+with no weather model and no ML. In brief (full description and the operator's-eye view are in the
+background page): for each target half-hour it takes the observed power at the **same weekday &
+time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13 analogues**. NGED plot
+and read the analogues by eye, taking the 95th percentile if they need a single number. Reproducing
+it matters because it is *the bar we have to clear to justify the project* — "XGBoost beats
+persistence" is the least we must do; "XGBoost beats the incumbent" is the deliverable. It is the
+first baseline we implement; if we implement only one, it is this one.
 
-It fits our existing machinery, because every one of its 13 members is just a **power lag**:
+`nged_incumbent` fits our existing machinery, because every one of its 13 members is just a **power
+lag**:
 
 - Weekly group (last 6 weeks, same weekday & time): `power_lag_168h, 336h, 504h, 672h, 840h, 1008h`
 - Annual group (49–55 weeks ago, same weekday & time): `power_lag_8232h, 8400h, 8568h, 8736h,
   8904h, 9072h, 9240h`
 
-So it rides the same audited, no-lookahead pipeline as `PersistenceForecaster` (below) with zero
-new time-series logic. `_nullify_leaky_lags` already sheds the shortest members as lead time grows
-(past 7 days the 168 h member nullifies, past 14 days the 336 h, and so on), leaving the annual
-members to carry the full 14-day horizon. Because the shortest member is a week old, the incumbent
-has *no* short-horizon skill from recent power — realistic, since that is exactly what NGED do
-today, and a reason to keep the pure `PersistenceForecaster` as a contrast rather than to sneak a
-recent-power member in.
+So it rides the same audited, no-lookahead pipeline as `PersistenceForecaster` (below) with zero new
+time-series logic. `_nullify_leaky_lags` already sheds the shortest members as lead time grows (past
+7 days the 168 h member nullifies, past 14 days the 336 h, and so on). That shedding leaves the
+annual members to carry the full 14-day horizon. Because the shortest member is a week old, the
+incumbent has *no* short-horizon skill from recent power — realistic, since that is exactly what
+NGED do today, and a reason to keep the pure `PersistenceForecaster` as a contrast rather than to
+sneak a recent-power member in.
 
-**It is also our first _probabilistic_ baseline — and this is the faithful representation, not a
-bonus.** The plotted spread *is* the incumbent's output — an operator reads it by eye. We emit the
-13 analogues as 13 `ensemble_member` rows and let the [probabilistic
+**`nged_incumbent` is also our first _probabilistic_ baseline — and this is the faithful
+representation, not a bonus.** The plotted spread *is* the incumbent's output — an operator reads it
+by eye. We emit the 13 analogues as 13 `ensemble_member` rows and let the [probabilistic
 metrics](#phase-b-probabilistic-metrics-from-the-existing-ensemble) score them for free — scoring
 the spread is the closest automatable proxy for the plot a human actually reads. Two consequences
 worth stating plainly:
@@ -112,47 +113,47 @@ worth stating plainly:
   NGED's *actual* operating point — the **95th percentile** — as a labelled secondary number
   (`mae`/`mbe` at `metric_param="p95"`). Being deliberately conservative, the P95 carries a large
   *positive* MBE **by design** (a peak-safety choice, not a forecasting error), so it belongs
-  *beside* the central metric, not in place of it. Either way NGED weight the analogues equally ("no
+  *beside* the central metric. Either way NGED weight the analogues equally ("no
   further processing at all"), so equiprobable members — and the probabilistic metrics (CRPS etc.)
   computed over them — are faithful, not an approximation.
 
 ### A faithful replica and a "cheap upgrades" variant
 
-**Most of the benefit may come from a few simple upgrades to what NGED already do, not from heavy
-ML — the message the pair of baselines is built to test.** We implement two closely-related
-incumbent baselines:
+**Most of the benefit may come from a few simple upgrades to what NGED already do, not from heavy ML
+— the message the pair of baselines is built to test.** We implement two closely-related incumbent
+baselines:
 
 - `nged_incumbent` — the faithful replica above. No holiday handling; warts and all. Pure lag
   features.
 - `nged_incumbent_holiday_aligned` — the same skeleton, but analogue *selection* becomes
-  calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type
-  (a bank-holiday Monday behaves like a Sunday), and moveable feasts align holiday-to-holiday
+  calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type (a
+  bank-holiday Monday behaves like a Sunday). Moveable feasts align holiday-to-holiday
   (Easter→Easter) rather than by fixed week offset. This no longer rides the pure lag machinery —
   the analogue offset is conditional on the calendar — so it needs a bespoke picker plus a GB
   bank-holiday calendar (the pure-Python `holidays` package), and ships as an immediate follow-up
-  PR, not part of the first one.
+  PR.
 
 ### Persistence and climatology — diagnostic bookends
 
-The incumbent is really a *hybrid* — its weekly group is persistence-like recency, its annual
-group is climatology-like seasonality — so the two pure forms are still worth having: they isolate
+The incumbent is really a *hybrid* — its weekly group is persistence-like recency, its annual group
+is climatology-like seasonality — so the two pure forms are still worth having: they isolate
 short-horizon from long-horizon naive skill. Persistence is famously hard to beat at 0 to 6 hours.
 
 **The climatology row measures where the weather ensemble stops adding skill over a plain seasonal
-average — a cross-over point with no published figure for substation load.** The climatology row
-asks the same question at the far end of the horizon: once the weather ensemble has run out of
-lead time to be informative, does the forecast still beat a plain seasonal average? We have found
-no published figure for where that cross-over falls for substation load. [Buizza and
-Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put the lead time beyond which a weather
-ensemble stops beating a climatological distribution at 16 to 23 days. But that figure was measured
-on upper-air variables rather than on a load forecast against a load climatology (see [Horizon,
-ensembles, and tails](../background/energy-forecasting-review.md#horizon-ensembles-and-tails)). The
-climatology row is therefore how we measure the cross-over, not a number we can already assert. A
-model could "win" the leaderboard while adding no skill over either bookend, and without these rows
-nobody would know.
+average — a cross-over point with no published figure for substation load, so far as we have
+found.** The climatology row asks the same question at the far end of the horizon: once the weather
+ensemble has run out of lead time to be informative, does the forecast still beat a plain seasonal
+average? We have found no published figure for where that cross-over falls for substation load.
+[Buizza and Leutbecher (2015)](https://doi.org/10.1002/qj.2619) put the lead time beyond which a
+weather ensemble stops beating a climatological distribution at 16 to 23 days. But that figure was
+measured on upper-air variables rather than on a load forecast against a load climatology (see
+[Horizon, ensembles, and
+tails](../background/energy-forecasting-review.md#horizon-ensembles-and-tails)). The climatology row
+is therefore how we measure the cross-over, not a number we can already assert. A model could "win"
+the leaderboard while adding no skill over either bookend, and without these rows nobody would know.
 
-Side benefit: several more `BaseForecaster` implementations pressure-test the abstraction (the
-docs promise the interface is model-agnostic; today only `XGBoostForecaster` exercises it).
+Side benefit: several more `BaseForecaster` implementations pressure-test the abstraction (the docs
+promise the interface is model-agnostic; today only `XGBoostForecaster` exercises it).
 
 **How much the choice of reference moves the answer has been measured, and it argues for reading a
 win over either bookend as the optimistic end of the range.** [Nguyen and Müsgens
@@ -167,13 +168,13 @@ than the rows described here, and their sample is deterministic solar forecastin
 probabilistic substation net demand. The direction survives both — a margin over persistence alone,
 or over climatology alone, flatters a forecast that a combined reference would judge more harshly.
 
-**That is an argument for keeping `nged_incumbent` as the headline bar, not for building a fourth
-baseline.** The incumbent already blends recency with seasonality — the last 6 weeks of
-same-weekday, same-time-of-day analogues alongside the 49-to-55-weeks-back group — so it plays on
-substation load the role the combined reference plays on irradiance. The incumbent is also the
-bar that decides whether the project is worth its money. Persistence and climatology stay as
-diagnostic bookends, read as the loose end of the range rather than as the benchmark a win should
-be claimed against.
+**This sensitivity to the choice of reference is an argument for keeping `nged_incumbent` as the
+headline bar, not for building a fourth baseline.** The incumbent already blends recency with
+seasonality — the last 6 weeks of same-weekday, same-time-of-day analogues alongside the
+49-to-55-weeks-back group — so it plays on substation load the role the combined reference plays on
+irradiance. The incumbent is also the bar that decides whether the project is worth its money.
+Persistence and climatology stay as diagnostic bookends, read as the loose end of the range rather
+than as the benchmark a win should be claimed against.
 
 **Carrying a loose bookend and a tight bookend is what the published guidance recommends** — see
 [Leaderboards of machine learning
@@ -185,26 +186,25 @@ yardstick here; `nged_incumbent` is the point on it.
 ### Implementation details — baselines (deleted when they ship)
 
 Five PRs, in order. PRs 1–2 are shared-framework groundwork (no baseline yet); PRs 3–5 add one
-baseline each. The `nged_incumbent_holiday_aligned` variant (described under [A faithful replica
-and a "cheap upgrades" variant](#a-faithful-replica-and-a-cheap-upgrades-variant)) is a later
-sixth PR, out of scope for this arc but given its own tracked issue so it is not lost when #147
-closes.
+baseline each. The `nged_incumbent_holiday_aligned` variant (described under [A faithful replica and
+a "cheap upgrades" variant](#a-faithful-replica-and-a-cheap-upgrades-variant)) is a later sixth PR,
+out of scope for this arc but given its own tracked issue so it is not lost when #147 closes.
 
 **Guiding principle — no special path.** New workspace package `packages/baseline_forecasters/`
-mirroring the `xgboost_forecaster` layout (`pyproject.toml`, `src/baseline_forecasters/`,
-`tests/`), added to the root `pyproject.toml` `[tool.uv.sources]` and dependencies. Every baseline
-subclasses `BaseForecaster` and rides the **identical** asset chain
-(`register_experiment_job` → `trained_cv_model` → `cv_power_forecasts` → `metrics`) that
-`XGBoostForecaster` uses — a `train()` that only records `trained_time_series_ids` and a
-`meta.json`-only `save()` cost nothing, and the uniform provenance is exactly what makes re-running
-routine. Re-running CV for any algo is then a native Dagster operation: select **`trained_cv_model++`**
-in the asset graph (two `+` — `metrics` is two hops downstream, so a single `+` would silently stop
-at `cv_power_forecasts` and skip scoring), choose the experiment's partitions, launch a backfill;
-the unpartitioned `metrics` asset materialises once afterwards with its default config (no filter,
-`leaderboard` scope). Verify this drill end-to-end on a smoke-test fold before documenting it — the
-Dagster version supports mixed partitioned/unpartitioned backfill selections, but confirm the UI
-behaviour rather than assuming it. To re-score a *single* experiment without touching the rest, use
-the `metrics` asset's `PopulationFilter` config instead.
+mirroring the `xgboost_forecaster` layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`),
+added to the root `pyproject.toml` `[tool.uv.sources]` and dependencies. Every baseline subclasses
+`BaseForecaster` and rides the **identical** asset chain (`register_experiment_job` →
+`trained_cv_model` → `cv_power_forecasts` → `metrics`) that `XGBoostForecaster` uses — a `train()`
+that only records `trained_time_series_ids` and a `meta.json`-only `save()` cost nothing, and the
+uniform provenance is exactly what makes re-running routine. Re-running CV for any algo is then a
+native Dagster operation: select **`trained_cv_model++`** in the asset graph (two `+` — `metrics` is
+two hops downstream, so a single `+` would silently stop at `cv_power_forecasts` and skip scoring),
+choose the experiment's partitions, and launch a backfill. The unpartitioned `metrics` asset
+materialises once afterwards with its default config (no filter, `leaderboard` scope). Verify this
+drill end-to-end on a smoke-test fold before documenting it — the Dagster version supports mixed
+partitioned/unpartitioned backfill selections, but confirm the UI behaviour rather than assuming it.
+To re-score a *single* experiment without touching the rest, use the `metrics` asset's
+`PopulationFilter` config instead.
 
 **PR 1 — deterministic-collapse rework in `compute_metrics`.** Implements the [metric-matched
 collapse decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast). Forecasters
@@ -246,8 +246,8 @@ docs.** Three changes to the shared rails, none baseline-specific.
   `False` → the forecaster does **not fan out across NWP members** — it either passes member 0
   through (persistence) or synthesises its own member axis (`nged_incumbent`: 13 analogues;
   `climatology`: quantile-derived members). This is model-family identity, like `MODEL_NAME`, so a
-  `ClassVar` is correct — and the class is resolved from the experiment's `forecaster_target` MLflow
-  tag *before* inputs are loaded, so the flag is available in time. Document alongside it that
+  `ClassVar` is correct. The class is resolved from the experiment's `forecaster_target` MLflow tag
+  *before* inputs are loaded, so the flag is available in time. Document alongside it that
   `weather_source: "none"` does **not** mean "no NWP input": in bulk mode the control-member NWP scan
   defines the shared `(init_time, valid_time)` forecast-run grid, which is what keeps every
   leaderboard row — baseline or ML — scored on the identical grid.
@@ -268,7 +268,7 @@ docs.** Three changes to the shared rails, none baseline-specific.
   hard-coded 15-day equivalent for the live path — leave it, but cross-reference it from the new
   parameter so a future long-lag live model is not silently starved. Add a comment where
   `cv_power_forecasts` re-scans the widened power window per `init_time` chunk (cheap next to NWP,
-  but worth flagging so nobody blames the wrong thing when profiling).
+  but worth flagging so nobody blames the wrong step when profiling).
 - **Document the `ensemble_member` overload** on `PowerForecast` and `AllFeatures`: an NWP-member
   index for NWP-consuming models, a historical-analogue index for `nged_incumbent`, a
   quantile-sample index for `climatology`. Nobody may assume `ensemble_member ⇒ NWP`.
@@ -356,10 +356,10 @@ only skill floor the NWP ensemble must clear at long horizons.
   forecaster from `valid_time`, aligning with the demand rhythm (and matching the `local_*` time
   features). `save()` writes the lookup as one parquet + `meta.json`.
 - **Member emission — equiprobable levels, not the delivery levels.** Emit members at *equiprobable*
-  quantile levels `(i − 0.5)/m`, **not** at the tail-heavy `DELIVERY_QUANTILES` levels. Fair CRPS and
-  the per-run empirical delivery quantiles the metrics layer derives from members treat members as an
-  equiprobable sample; feeding 13 members at the delivery levels in with equal weight would put 7.7 %
-  of the mass at `q(0.01)` and `q(0.02)`, i.e. an ensemble materially wider-tailed than the
+  quantile levels `(i − 0.5)/m`, **not** at the tail-heavy `DELIVERY_QUANTILES` levels. Fair CRPS and the
+  per-run empirical delivery quantiles the metrics layer derives from members treat members as an
+  equiprobable sample. Feeding 13 members at the delivery levels in with equal weight would put 7.7
+  % of the mass at `q(0.01)` and `q(0.02)`, i.e. an ensemble materially wider-tailed than the
   climatology it represents, corrupting CRPS, PICP, and the derived delivery quantiles. The delivery
   quantiles are still produced — by `compute_metrics`' per-run quantile aggregation, same as every
   other model. Keep `m = 13`: over the ~14-month training window a weekend cell holds only ~9–17
@@ -389,8 +389,8 @@ only skill floor the NWP ensemble must clear at long horizons.
   details — baselines" section (summary → PR body), close #147, and update the status banner plus the
   milestone section in [`docs/roadmap/index.md`](index.md) if the arc changed.
 
-**Recipe confirmed by NGED (July 2026).** No open questions remain. Full write-up in
-[NGED's incumbent forecast](../background/nged-incumbent-forecast.md); the implementation spec:
+**Recipe confirmed by NGED (July 2026).** No open questions remain. Full write-up in [NGED's
+incumbent forecast](../background/nged-incumbent-forecast.md); the implementation spec:
 
 - **Weekly analogues:** the last **6** weeks, same weekday & time-of-day.
 - **Annual analogues:** the **7** weeks spanning **49–55 weeks back**, same weekday & time.
@@ -398,77 +398,78 @@ only skill floor the NWP ensemble must clear at long horizons.
   values ("more of a vibe") — reported alongside the metric-matched **median** headline (PR 1).
 - **No further processing:** no weighting, no holiday handling, no anomaly rejection, no
   load-growth scaling. (This is precisely why the holiday-aligned variant is a genuine, un-done
-  upgrade — not a reimplementation of something NGED already do.)
+  upgrade — not a reimplementation of a method NGED already uses.)
 
 **Cross-cutting.** (1) **Issue hygiene:** create one tracked sub-issue per PR under epic
 [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) / #147 following the
-`github-issue-pr-workflow` skill's issue-creation rules (labels, Type, OCF project fields,
-sub-issue ordering), *including* one for `nged_incumbent_holiday_aligned` so it survives #147 closing. (2) **Re-run recipe:** add a
-short "Re-running CV for an experiment" subsection to `docs/ml_experimentation/dagster-workflow.md`
-describing the `trained_cv_model++` backfill, written only after the drill is verified end-to-end,
-and mentioning `PopulationFilter` for single-experiment scoring. (3) **MLflow re-logging** on a
-re-run is idempotent in effect (latest value wins; history accumulates harmlessly).
+`github-issue-pr-workflow` skill's issue-creation rules (labels, Type, OCF project fields, sub-issue
+ordering), *including* one for `nged_incumbent_holiday_aligned` so it survives #147 closing. (2)
+**Re-run recipe:** add a short "Re-running CV for an experiment" subsection to
+`docs/ml_experimentation/dagster-workflow.md` describing the `trained_cv_model++` backfill, written
+only after the drill is verified end-to-end, and mentioning `PopulationFilter` for single-experiment
+scoring. (3) **MLflow re-logging** on a re-run is idempotent in effect (latest value wins; history
+accumulates harmlessly).
 
 ---
 
 ## Cross-fold validation
 
-The cross-validation protocol is **implemented**, so it has moved to its permanent home:
-[ML Experimentation → Cross-validation folds](../ml_experimentation/cross-validation-folds.md).
-That page covers the expanding-window protocol, the current single fold (and why the available
-weather data constrains us to it), the target multiple-yearly-fold protocol, and the fold-design
+The cross-validation protocol is **implemented**, so it has moved to its permanent home: [ML
+Experimentation → Cross-validation folds](../ml_experimentation/cross-validation-folds.md). That
+page covers the expanding-window protocol, the current single fold (and why the available weather
+data constrains us to it), the target multiple-yearly-fold protocol, and the fold-design
 alternatives we considered.
 
 ### Fold hygiene: selection bias and a final-test window 🚧
 
 Issue: [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226)
 
-**The single leaderboard fold (`mid_2025_to_mid_2026` in `conf/cv/default.yaml`) serves as both
-the model-selection set and the reported skill number, which the review already names as a
-source of optimistic bias** — see [Leaderboards of machine learning
+**The single leaderboard fold (`mid_2025_to_mid_2026` in `conf/cv/default.yaml`) serves as both the
+model-selection set and the reported skill number, which the review already names as a source of
+optimistic bias** — see [Leaderboards of machine learning
 results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results) for
-[Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 warning and [Pinheiro
-et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of which
-our own fold already meets in length but not in independence. With hundreds of planned experiments
-(the roadmap mentions LLM-driven auto-experimentation in v0.5), the winner's reported skill will
-grow more optimistically biased over time. Our own fold is small in effective sample size rather
-than in row count, because consecutive half-hours are strongly correlated. The epoch mechanism
-handles *data* changes but not *adaptive selection* on a fixed fold.
+[Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 warning and [Pinheiro et
+al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of which our
+own fold already meets in length but not in independence. With hundreds of planned experiments (the
+roadmap mentions LLM-driven auto-experimentation in v0.5), the winner's reported skill will grow
+more optimistically biased over time. Our own fold is small in effective sample size rather than in
+row count, because consecutive half-hours are strongly correlated. The epoch mechanism handles
+*data* changes but not *adaptive selection* on a fixed fold.
 
-**The structural fix — reserving a genuinely untouched final-test window — waits on
-Dynamical.org's ECMWF ENS backfill, which is not expected until ~November 2027, after v1.0.** A
-second independent year of data is what makes that reservation possible without shrinking the fold
-that decides promotion, and that year does not exist yet ([the backfill will not arrive in
+**The structural fix — reserving a genuinely untouched final-test window — waits on Dynamical.org's
+ECMWF ENS backfill, which is not expected until ~November 2027, after v1.0.** A second independent
+year of data is what makes that reservation possible without shrinking the fold that decides
+promotion, and that year does not exist yet ([the backfill will not arrive in
 time](training-history.md#the-ecmwf-ens-backfill-will-not-arrive-in-time)). Everything below is what
 guards the leaderboard in the meantime.
 
 **We adopt the Ladder, so a new best is published only when it beats the standing best by more than
-a margin, and the published score is reported rounded to that margin.** [Blum and Hardt
+a margin. The published score is then reported rounded to that margin.** [Blum and Hardt
 (2015)](https://arxiv.org/abs/1502.04585) designed the Ladder for machine-learning competitions that
 publish a leaderboard and accept repeated submissions — the same shape of risk hundreds of
-experiments create when every one of them is adjudicated on one fold. Every query against a
-held-out set leaks a little information about it back to the experimenter, and the
-margin-plus-rounding rule caps how much a single query can leak.
+experiments create when every one of them is adjudicated on one fold. Every query against a held-out
+set leaks a little information about it back to the experimenter. The margin-plus-rounding rule caps
+how much a single query can leak.
 
 **The persistence and climatology baselines are rerun, unchanged, on every leaderboard epoch's
 evaluation window, so growth in the data is never mistaken for improvement in the method.** A new
-epoch can widen the leaderboard's telemetry archive or its NWP archive, and that widening moves
-every metric on the leaderboard, including the baselines' own. Rerunning the same frozen baseline
-code on the same epoch's window is what lets a widening gap between a model and a baseline be read
-as a project result rather than as the dataset simply growing. The precedent is CAMEO, a
+epoch can widen the leaderboard's telemetry archive or its NWP archive. That widening moves every
+metric on the leaderboard, including the baselines' own. Rerunning the same frozen baseline code on
+the same epoch's window is what lets a widening gap between a model and a baseline be read as a
+project result rather than as the dataset simply growing. The precedent is CAMEO, a
 structure-prediction benchmark that keeps its baseline pipelines frozen while the protein-structure
 databases behind them keep updating ([Robin et al. (2021)](https://doi.org/10.1002/prot.26213)).
 
-Until the structural fix lands: leaderboard metrics are selection metrics; differences smaller
-than fold-level noise should not drive decisions; and the number of experiments per epoch is
-itself a relevant statistic (visible as the MLflow experiment count).
+Until the structural fix lands: leaderboard metrics are selection metrics; differences smaller than
+fold-level noise should not drive decisions; and the number of experiments per epoch is itself a
+relevant statistic (visible as the MLflow experiment count).
 
 **The `mid_2025_to_mid_2026` fold, at its full 12 validation months, is what decides promotion — not
 a separate, untouched final-test set.** A promotion decision has to be made in minutes rather than
-months, so it has to be judged against a window of history that already exists rather than one still
-arriving. It also cannot be judged on less than a year, because a shorter window cannot show whether
-a model handles both ends of the annual cycle — the one-year minimum Pinheiro et al. set out above,
-and the same minimum the [cross-validation
+months, so it has to be judged against a window of history that already exists rather than a window
+still arriving. It also cannot be judged on less than a year, because a shorter window cannot show
+whether a model handles both ends of the annual cycle — the one-year minimum Pinheiro et al. set out
+above, and the same minimum the [cross-validation
 protocol](../ml_experimentation/cross-validation-folds.md#why-expanding-window-cross-validation)
 already builds the single fold around. That fold is read through the Ladder guard and the caveats
 already stated in this section.
@@ -478,8 +479,8 @@ model to promote, and this page keeps the two apart.** Every model running in pr
 scored against live data as it runs ([production
 monitoring](live-service.md#production-monitoring)), which answers "is the promoted model still
 performing", continuously and after the fact. The fold above answers "which candidate should we
-promote", once and ahead of the fact, and the two answers must not be blurred into one. TS-Arena
-avoids reusing any fixed evaluation window at all ([Meyer et al.
+promote", once and ahead of the fact, and the two answers must not be blurred into a single answer.
+TS-Arena avoids reusing any fixed evaluation window at all ([Meyer et al.
 (2026)](https://arxiv.org/abs/2512.20761)); Flexpectation's promotion decision cannot work that way,
 for the reason just given, and it is the live-monitoring check where our practice matches the
 TS-Arena pattern instead.
@@ -497,24 +498,26 @@ leaderboard folds are founded in one new epoch in `conf/cv/default.yaml` rather 
 `final_test` fold needs a per-fold flag that keeps it out of every run mode, so no experiment trains
 or scores on it in the normal flow: extend `CvConfig` / the fold schema in
 `packages/contracts/src/contracts/config_schemas.py`, and make sure `_fold_ids_for_run_mode` in
-`defs/jobs.py` includes the fold in no run mode at all. Scoring against it is then a deliberate, rare act — champion
-candidates immediately before promotion only — through the `metrics` asset's existing `ad_hoc`
-evaluation scope, so no new asset is needed and the discipline is procedural. Whether the
-leaderboard-fold model can be reused as-is, or needs its own training run, depends on where the
-disjoint year sits relative to `mid_2025_to_mid_2026` — decide that once the backfill lands. **Two rules go in
-alongside it**: final-test results are never used to *choose between* candidates, because that
-re-creates the problem the window exists to solve; they exist to report honest skill for the chosen
-champion and to detect gross overfitting (final-test NMAE ≫ validation NMAE).
+`defs/jobs.py` includes the fold in no run mode at all. Scoring against it is then a deliberate,
+rare act — champion candidates immediately before promotion only — through the `metrics` asset's
+existing `ad_hoc` evaluation scope, so no new asset is needed and the discipline is procedural.
+Whether the leaderboard-fold model can be reused as-is, or needs its own training run, depends on
+where the disjoint year sits relative to `mid_2025_to_mid_2026` — decide that once the backfill
+lands. **Two rules go in alongside it**: final-test results are never used to *choose between*
+candidates, because that re-creates the problem the window exists to solve; they exist to report
+honest skill for the chosen champion and to detect gross overfitting (final-test NMAE ≫ validation
+NMAE).
 
 **A multi-fold gotcha to handle when folds proliferate.** The parent-MLflow-run aggregation in the
 `metrics` asset averages each metric key over *only the folds in which that key appears*
 (`exp_metrics.setdefault(key, []).append(value)` then `sum/len` in `defs/cv_assets.py`). Today every
 fold emits the same key set, so this is invisible. Folds with *different horizon coverage* — one
-fold's forecasts stopping at 36 h, another's reaching day 14 — would emit different per-horizon-slice
-keys, and `rmse__all__extended_range` would then silently average over a different fold subset than
-`rmse__all`, with nothing marking the smaller denominator. Per-`time_series_type` keys have the same
-property if fold populations differ. When adding any fold, either guarantee every leaderboard fold
-emits an identical key set, or make the parent-run aggregation record its per-key denominator.
+fold's forecasts stopping at 36 h, another's reaching day 14 — would emit different
+per-horizon-slice keys. `rmse__all__extended_range` would then silently average over a different
+fold subset than `rmse__all`, with nothing marking the smaller denominator. Per-`time_series_type`
+keys have the same property if fold populations differ. When adding any fold, either guarantee every
+leaderboard fold emits an identical key set, or make the parent-run aggregation record its per-key
+denominator.
 
 **Verification.** `register_experiment_job` must never create a partition for the `final_test` fold
 in any run mode (extend `tests/test_register_experiment_job.py`); and once the disjoint year lands,
@@ -550,18 +553,17 @@ runs.
 > per-fold and mean-across-folds aggregates logged to MLflow — see
 > [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-9-materialise-metrics).
 
-**Every metric above is also broken out by named population-filter slices**, which appear as
-extra leaderboard columns. Most are legitimate ranking columns, because the filter is fixed by
-information known *before* the outcome: the
-[horizon slice](#time-slices-for-performance-evaluation) a forecast falls in, the
-[Tricky days](#tricky-days-a-calendar-deterministic-metric-filter) calendar, and logged
-[switching events](#measuring-performance-during-switching-events). Two are **diagnostic only
-and must never drive ranking**, because they select hours by what actually happened and so
-reward a model that simply over-forecasts (the
-[forecaster's-dilemma trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened)):
+**Every metric above is also broken out by named population-filter slices**, which appear as extra
+leaderboard columns. Most are legitimate ranking columns, because the filter is fixed by information
+known *before* the outcome: the [horizon slice](#time-slices-for-performance-evaluation) a forecast
+falls in, the [Tricky days](#tricky-days-a-calendar-deterministic-metric-filter) calendar, and
+logged [switching events](#measuring-performance-during-switching-events). Two are **diagnostic only
+and must never drive ranking**, because they select hours by what actually happened and so reward a
+model that simply over-forecasts (the [forecaster's-dilemma
+trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened)):
 the **peak-events slice** (the top 5% highest *observed* demand) and NGED's hand-picked **hard
-examples**. Both are described under
-[Tail & exceedance metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
+examples**. Both are described under [Tail & exceedance
+metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
 
 **Every ratio between a model and a reference carries its reference forecast, population, and
 ensemble-member count, corrected for the ensemble-size bias [Weigel et al.
@@ -569,24 +571,24 @@ ensemble-member count, corrected for the ensemble-size bias [Weigel et al.
 compare
 against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
 for the general commitment. The fair, finite-ensemble-unbiased CRPS in the table above is the form
-that carries this correction. PICP is judged against the finite-ensemble calibrated reference
-rather than the nominal rate for the same reason.
+that carries this correction. PICP is judged against the finite-ensemble calibrated reference rather
+than the nominal rate for the same reason.
 
 ### Which ensemble collapse defines the deterministic point forecast? 🚧
 
 **Decided: metric-matched collapse, uniform across every model.** Implemented as part of the
 baseline work ([PR 1 in the baseline implementation
 details](#implementation-details-baselines-deleted-when-they-ship)); the reasoning below is the
-durable design rationale, promoted to
-[the evaluation-metrics reference](../techniques/evaluation-metrics.md) when that PR ships.
+durable design rationale, promoted to [the evaluation-metrics
+reference](../techniques/evaluation-metrics.md) when that PR ships.
 
 #### The problem
 
 The deterministic metrics (MAE, NMAE, RMSE, MBE) score a **single point forecast**, but every model
-on the leaderboard is really an *ensemble* (51 NWP members for the ML models; 13 historical analogues
-for `nged_incumbent`; a quantile sample for `climatology`). Something has to collapse each ensemble
-to one number. `compute_metrics` today collapses every ensemble to its **mean**
-(`packages/ml_core/src/ml_core/metrics.py`), and the risk we were guarding against was that
+on the leaderboard is really an *ensemble* (51 NWP members for the ML models; 13 historical
+analogues for `nged_incumbent`; a quantile sample for `climatology`). The metrics layer has to
+collapse each ensemble to one number. `compute_metrics` today collapses every ensemble to its
+**mean** (`packages/ml_core/src/ml_core/metrics.py`), and the risk we were guarding against was that
 different models would be scored on *different* collapses — e.g. the ML models on their mean and
 `nged_incumbent` on the median NGED effectively reads off its analogue spread. Mean and median
 diverge for skewed or underdispersed ensembles, so scoring some models on one and some on the other
@@ -600,9 +602,9 @@ interchangeable, and the difference between them decides which one to use where:
 - The **mean** is the point forecast that minimises **squared error** — so RMSE (and MBE, which is
   a mean-of-errors and inherits the mean's clean energy-balance / expectations-aggregate reading)
   is *consistent* with the mean. Our squared-error XGBoost models literally learn a conditional
-  mean, and the ensemble mean of 51 such members is a coherent estimate of `E[power]`. Scoring the
-  mean on RMSE rewards a model for doing the statistically correct thing; the mean also averages out
-  member noise, so it is the more stable statistic on a small ensemble, and it matches standard NWP
+  mean, and the ensemble mean of 51 such members is a coherent estimate of `E[power]`. Scoring the mean on
+  RMSE rewards a model for reporting its honest conditional mean. The mean also averages out member
+  noise, so it is the more stable statistic on a small ensemble, and it matches standard NWP
   verification practice.
 - The **median** is the point forecast that minimises **absolute error** — so MAE and NMAE are
   *consistent* with the median. It is robust to the skew that is real in this problem (holiday
@@ -614,10 +616,10 @@ interchangeable, and the difference between them decides which one to use where:
 
 The key realisation is that **MAE and RMSE elicit *different* functionals, so no single collapse is
 fair on both columns.** A uniform median is inconsistent for RMSE (it penalises squared-error models
-for forecasting their honest mean); a uniform mean is inconsistent for MAE (a model could improve its
-MAE ranking by warping its forecast away from its honest mean — Gneiting 2011, *Making and Evaluating
-Point Forecasts*). The apples-to-apples requirement is only that the collapse be uniform *across
-models*, not *across metrics*.
+for forecasting their honest mean); a uniform mean is inconsistent for MAE (a model could improve
+its MAE ranking by warping its forecast away from its honest mean — Gneiting 2011, *Making and
+Evaluating Point Forecasts*). The apples-to-apples requirement is only that the collapse be uniform
+*across models*, not *across metrics*.
 
 #### The decision
 
@@ -633,14 +635,14 @@ every model**:
 
 Everything else is an **extra, labelled** row, never a headline: NGED's **P95** operating point
 (`mae`/`mbe` at `metric_param="p95"` — conservative by design, so a large positive MBE that belongs
-*beside* the central number, not in place of it), and the **median's own bias** (`mbe` at
-`metric_param="p50"`, so the delivered central forecast has an honest bias number distinct from the
-mean's energy-balance bias). No model is structurally disadvantaged on any column — which a single
-uniform statistic cannot achieve — and the trap is closed because the collapse is uniform across
-models. Because the collapse lives entirely *downstream* of the stored forecasts, switching it
-re-scores the whole leaderboard from a single `metrics` re-materialisation with no retraining or
-re-prediction — and doing it now, before the leaderboard adjudicates anything, is the cheapest moment
-to shift every existing deterministic number.
+*beside* the central number), and the **median's own bias** (`mbe` at `metric_param="p50"`, so the
+delivered central forecast has an honest bias number distinct from the mean's energy-balance bias).
+No model is structurally disadvantaged on any column — which a single uniform statistic cannot
+achieve — and the trap is closed because the collapse is uniform across models. Because the collapse
+lives entirely *downstream* of the stored forecasts, switching it re-scores the whole leaderboard
+from a single `metrics` re-materialisation with no retraining or re-prediction. Doing it now, before
+the leaderboard adjudicates anything, is the cheapest moment to shift every existing deterministic
+number.
 
 ### Effective-capacity normalisation, and the v0.7 upgrade to time-varying 🚧
 
@@ -648,13 +650,13 @@ NMAE's denominator is each series' full-history **effective capacity** — why a
 denominator is used rather than the mean, and why NMAE rather than `mae__all` is the headline
 cross-series metric, is durable metric-design rationale that lives in [Normalised MAE
 (NMAE)](../techniques/evaluation-metrics.md#normalised-mae-nmae). The `effective_capacity` Delta
-table itself, and why v0.1 stores one scalar row per series, is described in
-[Table 4 — `effective_capacity`](delivery-tables.md#table-4-effective_capacity).
+table itself, and why v0.1 stores one scalar row per series, is described in [Table 4 —
+`effective_capacity`](delivery-tables.md#table-4-effective_capacity).
 
 **v0.7 upgrade: time-varying, and the join changes.** The
 [differentiable-physics](capacity-estimation.md) capacity model produces a value that changes over
-time (panel degradation, inverter trips, seasonal derating). At that point two things change, and
-nothing else:
+time (panel degradation, inverter trips, seasonal derating). At that point the asset body and the
+metrics join both change, and nothing else:
 
 - the `effective_capacity` asset body emits one row per `(time_series_id, time)`; and
 - `compute_metrics` changes its capacity join from `time_series_id`-only to a **temporal as-of join**
@@ -663,9 +665,9 @@ nothing else:
 
 The `Metrics` schema and the rest of the metrics pipeline are untouched. Note the table is
 **backward-looking only** (it holds no future `valid_time`s): fine for historical CV folds (whose
-validation windows lie inside the observed history), but live-forecast scoring
-([production monitoring](live-service.md#production-monitoring)) must
-choose which reference time's capacity to apply rather than expecting a row at a future `valid_time`.
+validation windows lie inside the observed history), but live-forecast scoring ([production
+monitoring](live-service.md#production-monitoring)) must choose which reference time's capacity to
+apply rather than expecting a row at a future `valid_time`.
 
 **Each metered generator's series is also normalised by its estimated effective capacity before
 training** — unless the comparison described under [effective-capacity
@@ -675,22 +677,22 @@ tracked as it changes.
 One related distinction to keep straight: the *metric denominator* may use the full-history
 **smoothed** capacity estimate, but any capacity used to normalise model inputs at forecast init
 time (the two-pass training scheme) must be the **causal** estimate available at that init time, or
-backtests gain lookahead — see
-[Capacity estimation](capacity-estimation.md#causal-vs-smoothed-capacity-a-lookahead-trap-in-the-two-pass-scheme).
+backtests gain lookahead — see [Capacity
+estimation](capacity-estimation.md#causal-vs-smoothed-capacity-a-lookahead-trap-in-the-two-pass-scheme).
 
 ### Tail & exceedance metrics — scoring the question NGED actually asks 🚧
 
 Issue: [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254)
 
 **This section is the delivery plan for the three ranking-grade metrics that answer NGED's actual
-question — "will load cross the limit?"** Why mean pinball loss and PICP under-serve that
-question, and why a model can only be ranked on hours selected by something other than the
+question — "will load cross the limit?"** Why mean pinball loss and PICP under-serve that question,
+and why a model can only be ranked on hours selected by a criterion fixed in advance, other than the
 observed load, is durable reasoning that lives in [Why the tails need their own
 metrics](../techniques/evaluation-metrics.md#why-the-tails-need-their-own-metrics) and [The trap:
 scoring only the hours when the worst case actually
 happened](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
-Definitions, equations, and intuitive explanations for each metric are in the
-[evaluation-metrics reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
+Definitions, equations, and intuitive explanations for each metric are in the [evaluation-metrics
+reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
 
 - **Threshold-weighted CRPS
   ([twCRPS](../techniques/evaluation-metrics.md#threshold-weighted-crps-twcrps))** — CRPS
@@ -717,19 +719,19 @@ Definitions, equations, and intuitive explanations for each metric are in the
   "70% chance of rain" forecast; the most *decision-legible* number, scoring exactly the
   warning NGED acts on.
 
-All three fit the existing `Metrics` shape — `metric_param` carries the threshold or quantile
-label — but they need a contract change to get there: `METRIC_NAMES` has no `twcrps` or `brier`
-entry, and `METRIC_PARAMS` no `historical_p99`, and both fields are `pl.Enum`.
+All three fit the existing `Metrics` shape — `metric_param` carries the threshold or quantile label
+— but they need a contract change to get there: `METRIC_NAMES` has no `twcrps` or `brier` entry, and
+`METRIC_PARAMS` no `historical_p99`, and both fields are `pl.Enum`.
 
 **Thresholds: static, per-series, quantile-derived.** Each series gets one static threshold — the
 P99 of its full observation history, in the series type's constraint-side direction (high load for
 demand; reverse power flow for generation) — the same rung NGED described setting capacity at when
-we discussed this in July 2026, and the same rung the
-[cost-savings metrics](cost-savings-metrics.md#choosing-the-limit) use, so the leaderboard
-carries one threshold concept rather than several. Physical firm/flex ratings, where NGED
-supplies them, feed ad-hoc case studies and dashboard overlays instead. The full rationale — why a
-full-history quantile threshold beats the physical rating for scoring — and the explicit "this is
-a proxy" caveat live in [the threshold-choice
+we discussed this in July 2026, and the same rung the [cost-savings
+metrics](cost-savings-metrics.md#choosing-the-limit) use, so the leaderboard carries one threshold
+concept rather than several. Physical firm/flex ratings, where NGED supplies them, feed ad-hoc case
+studies and dashboard overlays instead. The full rationale — why a full-history quantile threshold
+beats the physical rating for scoring — and the explicit "this is a proxy" caveat live in [the
+threshold-choice
 section](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived)
 of the reference.
 
@@ -773,29 +775,29 @@ before/after instruments for Phases C and D.
 
 Issue: [#255](https://github.com/openclimatefix/nged-substation-forecast/issues/255)
 
-Alongside the tail & exceedance metrics, we add a **"Tricky days"** filter: score models separately on the handful of
-calendar dates whose demand shape departs sharply from the usual weekly rhythm. We scope it
-deliberately to the **calendar-deterministic** set — fixed and moveable public holidays (Christmas,
-Easter, and the rest of the GB bank holidays) plus the two annual daylight-saving transitions —
-because these are exactly the days our weekday/seasonal analogues are *built* to mishandle. Days
-that are hard for *data-dependent* reasons stay in their own already-planned filters:
-[switching-event days](#measuring-performance-during-switching-events) and NGED's hand-picked
-"hard examples" (above). One shared filter *mechanism*, several named filters — folding genuinely
-different failure modes into one bucket would make the number impossible to act on ("bad on tricky
-days" — is that Christmas, or a switching event?).
+Alongside the tail & exceedance metrics, we add a **"Tricky days"** filter: score models separately
+on the handful of calendar dates whose demand shape departs sharply from the usual weekly rhythm. We
+scope it deliberately to the **calendar-deterministic** set — fixed and moveable public holidays
+(Christmas, Easter, and the rest of the GB bank holidays) plus the two annual daylight-saving
+transitions — because these dates are exactly the days our weekday/seasonal analogues are *built* to
+mishandle. Days that are hard for *data-dependent* reasons stay in their own already-planned
+filters: [switching-event days](#measuring-performance-during-switching-events) and NGED's
+hand-picked "hard examples" (above). One shared filter *mechanism*, several named filters — folding
+genuinely different failure modes into one bucket would make the number impossible to act on ("bad
+on tricky days" — is that Christmas, or a switching event?).
 
-Mechanically it is another population filter (the same mechanism the peak-events diagnostic
-slice uses): a boolean flag per timestep, derived from `valid_time` alone. Unlike that
-observed-peak slice, this one *is* a legitimate ranking column: the flag depends only on the
-calendar, which every forecaster knew in advance, so it does not fall into the
-[forecaster's-dilemma
-trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened). Because it is purely
-calendar-driven it **shares its calendar module with `nged_incumbent_holiday_aligned`** — the same
-GB bank-holiday calendar (the pure-Python `holidays` package) plus the two DST dates feed both the
-holiday-aligned baseline and this metric filter. And the two reinforce each other: `nged_incumbent`
-(no holiday logic) should be *visibly* worst on tricky days, and `nged_incumbent_holiday_aligned`
-should recover most of the gap — turning "we added holiday alignment" into a *measurable* number,
-exactly the cheap-upgrades story we want to show NGED.
+Mechanically it is another population filter (the same mechanism the peak-events diagnostic slice
+uses): a boolean flag per timestep, derived from `valid_time` alone. Unlike that observed-peak
+slice, this filter *is* a legitimate ranking column: the flag depends only on the calendar, which
+every forecaster knew in advance, so it does not fall into the [forecaster's-dilemma
+trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
+Because it is purely calendar-driven it **shares its calendar module with
+`nged_incumbent_holiday_aligned`** — the same GB bank-holiday calendar (the pure-Python `holidays`
+package) plus the two DST dates feed both the holiday-aligned baseline and this metric filter. And
+the two reinforce each other: `nged_incumbent` (no holiday logic) should be *visibly* worst on
+tricky days, and `nged_incumbent_holiday_aligned` should recover most of the gap — turning "we added
+holiday alignment" into a *measurable* number, exactly the cheap-upgrades story we want to show
+NGED.
 
 **Flag the day _and_ its analogue-relevant neighbours, not just the day itself.** The disruption
 spills onto surrounding timesteps:
@@ -811,8 +813,9 @@ widths are an implementation-time choice.
 **A subtlety to document now but _not_ model yet.** The shape of the Christmas run-up depends not
 just on the number of days before Christmas but also on **which weekday Christmas falls on** — the
 run-up demand pattern shifts year to year with that day-of-week alignment. We record it here as a
-known effect; the v0.3 tricky-days *flag* ignores it (it simply marks the window), and we defer any
-explicit day-of-week-aware modelling of the run-up until there is evidence it moves the leaderboard.
+known effect; the v0.3 tricky-days *flag* ignores it (the flag simply marks the window), and we
+defer any explicit day-of-week-aware modelling of the run-up until there is evidence it moves the
+leaderboard.
 
 #### Implementation details — tricky days (deleted when this ships)
 
@@ -833,10 +836,10 @@ explicit day-of-week-aware modelling of the run-up until there is evidence it mo
 > **Status: 🚧 Planned (v0.3).** Nothing scores a model under degraded inputs today, which means a
 > v0.5 champion would be picked on clean-data skill alone.
 
-The [inherent-stability principle](../design-philosophy/inherent-stability.md) claims that the service
-keeps beating NGED's incumbent forecast as its inputs degrade. That claim is only worth anything if
-it is *scored*, so degradation becomes a dimension of the leaderboard rather than an aspiration in a
-design document.
+The [inherent-stability principle](../design-philosophy/inherent-stability.md) claims that the
+service keeps beating NGED's incumbent forecast as its inputs degrade. That claim is only worth
+anything if it is *scored*, so degradation becomes a dimension of the leaderboard rather than an
+aspiration in a design document.
 
 **A canonical failure-scenario suite.** A named, versioned set of degradation transforms over an
 `AllFeatures` frame — NWP {fresh, *n* runs missed, absent} × telemetry {present, partial, absent} ×
@@ -848,20 +851,20 @@ models](../design-philosophy/inherent-stability.md#missingness-in-learned-models
 is a **contract**: it is stamped onto every metrics row, so changing it later invalidates historical
 comparisons.
 
-**How it is scored.** Train once, then predict once per scenario — the cost is N× *predict* plus
-N× metrics, not N× train. The scenario becomes a dimension on the metrics rows (and on the
-`power_forecasts` rows the metrics are computed from) rather than a new evaluation scope, so
+**How each scenario is scored.** Train once, then predict once per scenario — the cost is N×
+*predict* plus N× metrics, not N× train. The scenario becomes a dimension on the metrics rows (and
+on the `power_forecasts` rows the metrics are computed from) rather than a new evaluation scope, so
 degradation behaviour is a first-class property of every experiment instead of a separate study
 somebody has to remember to run.
 
 **The acceptance criterion is `nged_incumbent`, not a fixed error threshold.** The incumbent
 consumes no NWP and is indifferent to recent telemetry staleness, so it barely degrades — which
 makes it the honest bar to clear, and a far better failure criterion than any arbitrary staleness
-threshold. Concretely: at rungs 0–2 of the degradation ladder, every time series should still emit
-a forecast, and that forecast should still beat `nged_incumbent`. That is
-[T1.2, graceful degradation](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself);
-the interval-calibration counterpart, PICP within tolerance in every regime, is
-[T1.3, faithful uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+threshold. Concretely: at rungs 0–2 of the degradation ladder, every time series should still emit a
+forecast, and that forecast should still beat `nged_incumbent`. That is [T1.2, graceful
+degradation](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself);
+the interval-calibration counterpart, PICP within tolerance in every regime, is [T1.3, faithful
+uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 This suite is shared machinery: the same transforms drive the CI degradation smoke-tests in
 [Engineering Health](engineering-health.md) and, later, the outage-shaped training augmentation that
@@ -870,17 +873,17 @@ makes the weather-blind claim true rather than hopeful.
 ## Scoring against reanalysis — a diagnostic scope 🚧
 
 Once [ERA5 is ingested](training-history.md), scoring an experiment on ERA5 rather than ENS
-separates the two things total error confounds: the weather-to-power response, which we can
+separates the two components total error confounds: the weather-to-power response, which we can
 actually improve, and the implicit hedging against forecast error, which we cannot (NWP error is
 exogenous to us). Without the split, a change in the ENS-scored number could be either.
 
-It lands as a **new `evaluation_scope`** alongside `leaderboard` / `production_monitoring` /
-`ad_hoc`, never as a fold. The **ENS-scored leaderboard stays the promotion criterion**, because
-total error at real lead times is what NGED receives — and keeping ERA5 out of the fold set is what
-preserves both
-[principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically)
-and the standing
-[rejection of reanalysis-backed validation folds](../architecture/ml-orchestration.md#yearly-folds-backed-by-era5-rejected-for-validation).
+Scoring against reanalysis lands as a **new `evaluation_scope`** alongside `leaderboard` /
+`production_monitoring` / `ad_hoc`, never as a fold. The **ENS-scored leaderboard stays the
+promotion criterion**, because total error at real lead times is what NGED receives — and keeping
+ERA5 out of the fold set is what preserves both [principle
+8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically) and the
+standing [rejection of reanalysis-backed validation
+folds](../architecture/ml-orchestration.md#yearly-folds-backed-by-era5-rejected-for-validation).
 
 ### The perfect-weather ceiling — what it gates
 
@@ -888,8 +891,8 @@ Train *and* score on near-perfect weather, and the resulting skill bounds what w
 removing **forecast error** from the weather input — the channel that more ensemble members, better
 ensemble post-processing and sharper interpolation all work through. If that ceiling sits close to
 today's ENS-scored skill, most of our error is not the weather forecast's fault and the effort
-belongs in the modelling instead. So run this **before** ingesting another NWP source, not after:
-it is the cheap test that sizes the prize the expensive one is chasing.
+belongs in the modelling instead. So run this **before** ingesting another NWP source: it is the
+cheap test that sizes the prize that ingesting another NWP source would chase.
 
 Two rungs, in increasing order of "cheating":
 
@@ -904,10 +907,12 @@ Two rungs, in increasing order of "cheating":
 
 Three conditions on reading the result.
 
-- **It must be trained on the better weather, not merely scored on it.** Feeding reanalysis to an
+- **The ceiling must be trained on the better weather, not merely scored on it.** Feeding reanalysis
+to an
   ENS-trained model measures a train/serve mismatch instead of a ceiling.
 
-- **It bounds forecast error, not resolution.** ERA5 is a 31 km field, while ICON-EU is ~6.5 km and
+- **The ceiling bounds forecast error, not resolution.** ERA5 is a 31 km field, while ICON-EU is
+~6.5 km and
   post-2023 ENS is 9 km, so a finer *forecast* can carry site-relevant structure that a coarse
   *analysis* averages away. A low ERA5 ceiling therefore deprioritises a second NWP source without
   ruling one out; it is the observations rung that closes this gap, since station and satellite data
@@ -915,7 +920,8 @@ Three conditions on reading the result.
 
 - **It is a ceiling for the current model family and feature set.** A model that cannot exploit
   perfect weather shows a low ceiling for reasons that have nothing to do with weather availability.
-  That does not weaken the decision it gates — a model that cannot use perfect weather will not be
+  That does not weaken the decision the ceiling gates — a model that cannot use perfect weather will
+  not be
   rescued by a better forecast of it — but it does mean the ceiling is re-measured after any large
   modelling change rather than treated as a standing fact.
 
@@ -923,8 +929,8 @@ Three conditions on reading the result.
 
 ## Time-slices for performance evaluation
 
-We compute every metric separately per horizon slice, because the driver of model skill changes
-with lead time:
+We compute every metric separately per horizon slice, because the driver of model skill changes with
+lead time:
 
 | Horizon slice | Industry term | Primary driver of model skill |
 |---|---|---|
@@ -944,10 +950,10 @@ flexibility for.
 We will flag each timestep for whether it contains a switching event, and compute metrics separately
 for periods with switching events in the model inputs (or in the forecast's `valid_time`). This
 distinguishes models that perform well *only* on clean periods from models that handle switching
-events in their inputs. In v1 the flags can come straight from NGED's logged switching events
-for the trial area; a fleet-scale version would need the discrete detector described in
-[Switching events & latent demand](switching-events.md), whose fate is an open question — see
-[the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).
+events in their inputs. In v1 the flags can come straight from NGED's logged switching events for
+the trial area; a fleet-scale version would need the discrete detector described in [Switching
+events & latent demand](switching-events.md), whose fate is an open question — see [the decision
+point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).
 
 ---
 
@@ -955,28 +961,26 @@ for the trial area; a fleet-scale version would need the discrete detector descr
 
 Issue: [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225)
 
-The 51-member ensemble is very likely **underdispersed**: XGBoost trained with squared error on
-the control member (`cv_assets.py:373`) learns a conditional mean, so pushing 51 members through
-it yields spread from *weather uncertainty only* — no model or observation uncertainty. Such
-ensembles are systematically overconfident, worst at short horizons where members haven't
-diverged. Flexibility procurement is a tails problem (P90+ peaks), so this hits the use case
-directly. Phases A and B below (both shipped) built the measurement machinery — every metric in
-the [evaluation-metrics reference](../techniques/evaluation-metrics.md), per horizon slice; the
-remaining phases act on what those numbers show. The planned
-[tail & exceedance metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
-will sharpen the picture further: an underdispersed ensemble pushes its exceedance
-probabilities to 0 or 1 too early, so the Brier score and the quantile exceedance rates are
-the clearest before/after instruments for Phases C and D.
+The 51-member ensemble is very likely **underdispersed**: XGBoost trained with squared error on the
+control member (`cv_assets.py:373`) learns a conditional mean, so pushing 51 members through it
+yields spread from *weather uncertainty only* — no model or observation uncertainty. Underdispersed
+ensembles are systematically overconfident, worst at short horizons where members haven't diverged.
+Flexibility procurement is a tails problem (P90+ peaks), so this overconfidence hits the use case
+directly. Phases A and B below (both shipped) built the measurement machinery — every metric in the
+[evaluation-metrics reference](../techniques/evaluation-metrics.md), per horizon slice; the
+remaining phases act on what those numbers show. The planned [tail & exceedance
+metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks) will sharpen the picture
+further: an underdispersed ensemble pushes its exceedance probabilities to 0 or 1 too early, so the
+Brier score and the quantile exceedance rates are the clearest before/after instruments for Phases C
+and D.
 
-The theory behind this diagnosis — the three-term uncertainty decomposition, why a
-deterministic model driven by an NWP ensemble captures only the weather term, and what the
-principled fix looks like — is the durable explainer
-[Probabilistic forecasting from NWP ensembles](../techniques/probabilistic-forecasting.md).
-This section is the *plan* that applies it.
+The theory behind this diagnosis — the three-term uncertainty decomposition, why a deterministic
+model driven by an NWP ensemble captures only the weather term, and what the principled fix looks
+like — is the durable explainer [Probabilistic forecasting from NWP
+ensembles](../techniques/probabilistic-forecasting.md). This section is the *plan* that applies it.
 
-Fix in four phases, each an independent PR (Phase D is itself several PRs). Phases A and B are
-pure evaluation (no model changes) and should land before any further MAE-driven
-experimentation.
+Fix in four phases, each an independent PR (Phase D is itself several PRs). Phases A and B are pure
+evaluation (no model changes) and should land before any further MAE-driven experimentation.
 
 ### Phase A — horizon-sliced metrics ✅
 
@@ -986,40 +990,37 @@ Shipped. `compute_metrics` now scores every metric per `HORIZON_SLICES` band (de
 
 ### Phase B — probabilistic metrics from the existing ensemble ✅
 
-Shipped. `compute_metrics` now computes fair CRPS, the Fortin-corrected spread-skill ratio,
-pinball loss at the 13 NGED delivery quantiles (plus their mean), and PICP and interval width
-for the six symmetric delivery bands — all member-aware, computed before the ensemble-mean
-collapse, per horizon slice. Definitions, equations, and the design decisions (fair CRPS
-divisor, RMS spread, delivery quantiles, MLflow allowlist) live in the [evaluation-metrics
+Shipped. `compute_metrics` now computes fair CRPS, the Fortin-corrected spread-skill ratio, pinball
+loss at the 13 NGED delivery quantiles (plus their mean), and PICP and interval width for the six
+symmetric delivery bands — all member-aware, computed before the ensemble-mean collapse, per horizon
+slice. Definitions, equations, and the design decisions (fair CRPS divisor, RMS spread, delivery
+quantiles, MLflow allowlist) live in the [evaluation-metrics
 reference](../techniques/evaluation-metrics.md).
 
 ### Phase C — cheap calibration (after B proves the diagnosis)
 
-Decide based on Phase B's spread-skill numbers — and on the **rank (Talagrand) histogram** of
-the observations among the 51 members, computed ad hoc per horizon slice: a U-shape confirms
-plain underdispersion (a single multiplicative inflation can fix it), whereas a sloped or
-asymmetric histogram means bias or shape error, which a symmetric inflation cannot repair and
-which would push toward a rank-dependent correction instead. **Post-hoc spread inflation**
-(EMOS-lite): per
-horizon slice, fit a scalar `s` on the *training* window so that inflating members around the
-ensemble mean (`mean + s·(member − mean)`) makes spread match error. Zero schema change, zero
-new model — implementable as an optional step in `predict` or as a wrapper forecaster. Fit on
-train, apply on validation (no tuning on the fold being scored).
+Decide based on Phase B's spread-skill numbers — and on the **rank (Talagrand) histogram** of the
+observations among the 51 members, computed ad hoc per horizon slice: a U-shape confirms plain
+underdispersion (a single multiplicative inflation can fix it), whereas a sloped or asymmetric
+histogram means bias or shape error, which a symmetric inflation cannot repair and which would push
+toward a rank-dependent correction instead. **Post-hoc spread inflation** (EMOS-lite): per horizon
+slice, fit a scalar `s` on the *training* window so that inflating members around the ensemble mean
+(`mean + s·(member − mean)`) makes spread match error. Zero schema change, zero new model —
+implementable as an optional step in `predict` or as a wrapper forecaster. Fit on train, apply on
+validation (no tuning on the fold being scored).
 
 Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
-forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn its
-build cost.
+forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn its build
+cost.
 
 ### Phase D — ensemble of quantile forecasts (Representation 3 → pooled Representation 2)
 
-The full fix from the
-[probabilistic-forecasting explainer](../techniques/probabilistic-forecasting.md): have the
-model emit a **conditional distribution per ensemble member** (per-member quantiles —
-[Representation 3](delivery-tables.md#representation-3-ensemble-of-percentile-forecasts) in the
-delivery tables), then recombine the 51 members with the **linear-pool mixture** into one set
-of delivered percentiles
-([Representation 2](delivery-tables.md#representation-2-percentiles)). Three steps, one PR
-each:
+The full fix from the [probabilistic-forecasting
+explainer](../techniques/probabilistic-forecasting.md): have the model emit a **conditional
+distribution per ensemble member** (per-member quantiles — [Representation
+3](delivery-tables.md#representation-3-ensemble-of-percentile-forecasts) in the delivery tables),
+then recombine the 51 members with the **linear-pool mixture** into one set of delivered percentiles
+([Representation 2](delivery-tables.md#representation-2-percentiles)). Three steps, one PR each:
 
 1. **Percentile representations in `PowerForecast`**
    ([#262](https://github.com/openclimatefix/nged-substation-forecast/issues/262)) — extend the
