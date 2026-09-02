@@ -115,22 +115,22 @@ past approach 1 we go.
 
 For each substation, form an expected-power baseline that is a function of **exogenous, switching-independent covariates only** — temperature, solar irradiance, recent weather, time-of-day, day-of-week, holidays — fitted across a long history (e.g. an XGBoost or generalised additive model (GAM) regression). Take the residual (observed − expected): a switching event shows up in it as a *sustained level shift* — not a spike, not a slope. This residual, normalised by each series' own spread, is the raw material both the two-stage forecaster and the staged detector consume.
 
-**Why the baseline must be weather/calendar-based and *not* a lagged-power baseline.** A tempting cheap baseline is "same half-hour last week." That baseline is unsound here, and disqualified. If last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the **sign reversed**, because the contamination is in the *reference*, not the observation. Stage 2's balance attribution would then hunt for donor rises coincident with a source drop that is a baseline artifact. The hunt manufactures phantom events and mis-attributes them. Worse, because switching events can persist for days to months, a lag can land *inside the same ongoing event*. There is then no step at all, and a real event is masked entirely. Weather and clock time are unaffected by the electricity network's topology, so a baseline built only from them cannot be contaminated by switching state. The residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.
+**Why the baseline must be weather/calendar-based and *not* a lagged-power baseline.** A tempting cheap baseline is "same half-hour last week." But, if last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the **sign reversed**, because the contamination is in the *reference*, not the observation. Stage 2's balance attribution would then hunt for donor rises coincident with a source drop that is a baseline artifact. The hunt manufactures phantom events and mis-attributes them. Worse, because switching events can persist for days to months, a lag can land *inside the same ongoing event*. There is then no step at all, and a real event is masked entirely. Weather and clock time are unaffected by the electricity network's topology, so a baseline built only from them cannot be contaminated by switching state. The residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.
 
-**The first approach to try is a classical seasonal decomposition, which needs no weather input and
-no training run.** Multiple seasonal-trend decomposition (MSTL) splits each substation's series into
-a trend, one seasonal component per period — daily and weekly, plus annual where the history is long
-enough — and a remainder. The remainder plays the same role as the model residual above: a switching
-event appears in it as a sustained level shift. MSTL has no features to engineer and no fitting run
-to wait for. MSTL is therefore the cheapest way to answer the question that decides whether the rest
-is worth building — are the level shifts visible above the noise at all? Two limits keep MSTL a
-first look rather than the baseline. MSTL carries no weather covariate, so a cold snap or a still
-week lands in the remainder alongside the switching events. And MSTL also estimates the trend and
-the seasonal components from the series' own history, so a months-long event can be partly absorbed
-into the trend it ought to be standing out against. Absorbing an event into the trend is a milder
-form of the lagged-power contamination described above. Both limits are why the XGBoost baseline
-follows. A published detector, [Kim (2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) under
-stage 1 below, is built on a robust seasonal-trend decomposition used in exactly this role.
+**The first approach to try is a classical multiple seasonal-trend decomposition (MSTL).** MSTL
+splits each substation's series into a trend, one seasonal component per period — daily and weekly,
+plus annual where the history is long enough — and a remainder. The remainder plays the same role as
+the model residual above: a switching event appears in it as a sustained level shift. MSTL has no
+features to engineer. MSTL is therefore the simplest way to answer the question that decides whether
+the rest is worth building — are the level shifts visible above the noise at all? Two limits keep
+MSTL a first look rather than the baseline. MSTL carries no weather covariate, so a cold snap or a
+still week lands in the remainder alongside the switching events. And MSTL also estimates the trend
+and the seasonal components from the series' own history, so a months-long event can be partly
+absorbed into the trend it ought to be standing out against. Absorbing an event into the trend is a
+milder form of the lagged-power contamination described above. A published detector, [Kim
+(2025)](https://doi.org/10.5370/KIEE.2025.74.11.1757) described [under stage 1
+below](#stage-1-changepoint-detection-on-the-baseline-residual), is built on a robust seasonal-trend
+decomposition used in exactly this role.
 
 **Baseline implementation: reuse the existing XGBoost forecaster with no lag features.** The
 production forecaster already consumes most of the covariates the baseline needs — weather from
@@ -149,34 +149,27 @@ therefore not hard-blocked on that model family.
 
 **What "normal" means for demand-driven series — the behavioural calendar.** For weather-driven
 series (solar photovoltaic (PV), wind), "normal for this weather at this time of day" is
-well-defined and the covariates above capture it. For demand-driven series, "normal" also depends
-on human behaviour, and the baseline is only as good as its calendar features. The saving grace
-is that the baseline is a supervised *model*, not an empirical climatology. The baseline pools
-across days whose feature vectors look alike (all Mondays in May borrow strength from each other
-automatically), so the fiddly question "which days count as similar?" reduces to "is the calendar
-encoding rich enough?". [Background: GB demand's calendar-driven
-quirks](../background/network.md#behavioural-calendar-effects-on-demand) sets out the days a
-day-of-year feature structurally cannot represent — Easter, bank-holiday bridge days,
-county-varying school half-terms, and major broadcast events such as an England World Cup run.
-For detection purposes the stage-1 baseline is a *hindcast*, so past broadcast events are
-perfectly known and a simple dated event list suffices. The production *forecaster* faces a
-harder version of the same problem, taken up in the [holiday quick
-win](xgboost-improvements.md#uk-holiday-and-calendar-features).
+well-defined and the covariates above capture it. For demand-driven series, "normal" also depends on
+human behaviour, and the baseline is only as good as its calendar features. The saving grace is that
+the baseline is a supervised *model*, not an empirical climatology. The baseline pools across days
+whose feature vectors look alike (all Mondays in May borrow strength from each other automatically),
+so the fiddly question "which days count as similar?" reduces to "is the calendar encoding rich
+enough?" (see [background: GB demand's calendar-driven
+quirks](../background/network.md#behavioural-calendar-effects-on-demand)).
 
-An unmodelled behavioural day surfaces as a coherent residual excursion that the changepoint
-detector can flag as a phantom switching event. Two safeguards keep the phantom-event risk
-manageable. First, the failure has a distinctive shape: a holiday miss hits many demand-driven
-series *simultaneously and with the same sign*, whereas a real switching event is localised and
-balance-conserving. Stage 2's neighbourhood-sum check therefore discriminates a holiday miss
-from a switching event. Second, the fix must come from the feature side — richer holiday
-encodings (the [planned quick win](xgboost-improvements.md#uk-holiday-and-calendar-features))
-and, at V2 scale, cross-series pooling (a [global
-model](xgboost-improvements.md#global-model-per-time_series_type) sees dozens of Easters where a
-per-series model sees about three) — and **never** from trailing same-weekday power averages,
-however naturally they express "recent similar days". Trailing averages would smuggle the
-lagged-power contamination above back in through the side door, absorbing a persistent switching
-event into "expected" within a few weeks and blinding the detector to exactly the events it
-exists to find.
+An unmodelled calendar event surfaces as a coherent residual excursion that the changepoint detector
+may flag (erroneously) as a switching event. Two safeguards keep the phantom-event risk manageable.
+First, the failure has a distinctive shape: a holiday miss hits many demand-driven series
+*simultaneously and with the same sign*, whereas a real switching event is localised and
+balance-conserving. Stage 2's neighbourhood-sum check therefore discriminates a holiday miss from a
+switching event. Second, the fix must come from the feature side — richer holiday encodings (the
+[planned quick win](xgboost-improvements.md#uk-holiday-and-calendar-features)) and, at V2 scale,
+cross-series pooling (a [global model](xgboost-improvements.md#global-model-per-time_series_type)
+sees dozens of Easters where a per-series model sees about three) — and **never** from trailing
+same-weekday power averages, however naturally they express "recent similar days". Trailing averages
+would smuggle the lagged-power contamination above back in through the side door, absorbing a
+persistent switching event into "expected" within a few weeks and blinding the detector to exactly
+the events it exists to find.
 
 **Three residual-contamination routes to handle:**
 
