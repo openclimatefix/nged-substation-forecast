@@ -435,13 +435,20 @@ grow more optimistically biased over time. Our own fold is small in effective sa
 than in row count, because consecutive half-hours are strongly correlated. The epoch mechanism
 handles *data* changes but not *adaptive selection* on a fixed fold.
 
+**The structural fix — reserving a genuinely untouched final-test window — waits on
+Dynamical.org's ECMWF ENS backfill, which is not expected until ~November 2027, after v1.0.** A
+second independent year of data is what makes that reservation possible without shrinking the fold
+that decides promotion, and that year does not exist yet ([the backfill will not arrive in
+time](training-history.md#the-ecmwf-ens-backfill-will-not-arrive-in-time)). Everything below is what
+guards the leaderboard in the meantime.
+
 **We adopt the Ladder, so a new best is published only when it beats the standing best by more than
 a margin, and the published score is reported rounded to that margin.** [Blum and Hardt
-(2015)](https://arxiv.org/abs/1502.04585) designed the Ladder for machine-learning competitions
-that publish a leaderboard and accept repeated submissions — the same shape of risk hundreds of
+(2015)](https://arxiv.org/abs/1502.04585) designed the Ladder for machine-learning competitions that
+publish a leaderboard and accept repeated submissions — the same shape of risk hundreds of
 experiments create when every one of them is adjudicated on one fold. Every query against a
-held-out set leaks a little information about it back to the experimenter. The margin-plus-rounding
-rule is what caps how much a single query can leak.
+held-out set leaks a little information about it back to the experimenter, and the
+margin-plus-rounding rule caps how much a single query can leak.
 
 **The persistence and climatology baselines are rerun, unchanged, on every leaderboard epoch's
 evaluation window, so growth in the data is never mistaken for improvement in the method.** A new
@@ -450,94 +457,66 @@ every metric on the leaderboard, including the baselines' own. Rerunning the sam
 code on the same epoch's window is what lets a widening gap between a model and a baseline be read
 as a project result rather than as the dataset simply growing. The precedent is CAMEO, a
 structure-prediction benchmark that keeps its baseline pipelines frozen while the protein-structure
-databases behind them keep updating ([Robin et al. (2021)](https://doi.org/10.1002/prot.26213)). We
-adopt the same discipline here.
+databases behind them keep updating ([Robin et al. (2021)](https://doi.org/10.1002/prot.26213)).
 
 Until the structural fix lands: leaderboard metrics are selection metrics; differences smaller
 than fold-level noise should not drive decisions; and the number of experiments per epoch is
 itself a relevant statistic (visible as the MLflow experiment count).
 
-**A promotion decision has to be judged against historical data, because it has to be made in
-minutes, not months — there is no time to wait for fresh production data to accumulate.**
-
-**Judging that decision on less than a year of data is dangerous, because a shorter window cannot
-show whether a model handles both ends of the annual cycle** — the one-year minimum Pinheiro et
-al. set out above. That is the same minimum the [cross-validation
+**The `mid_2025_to_mid_2026` fold, at its full 12 validation months, is what decides promotion — not
+a separate, untouched final-test set.** A promotion decision has to be made in minutes rather than
+months, so it has to be judged against a window of history that already exists rather than one still
+arriving. It also cannot be judged on less than a year, because a shorter window cannot show whether
+a model handles both ends of the annual cycle — the one-year minimum Pinheiro et al. set out above,
+and the same minimum the [cross-validation
 protocol](../ml_experimentation/cross-validation-folds.md#why-expanding-window-cross-validation)
-already builds the single fold around.
-
-**The `mid_2025_to_mid_2026` fold, at its full 12 validation months, is therefore what decides
-promotion.** It is the same fixed historical fold every experiment above is adjudicated on, read
-through the Ladder guard and the caveats already stated in this section — not a separate, untouched
-final-test set.
+already builds the single fold around. That fold is read through the Ladder guard and the caveats
+already stated in this section.
 
 **Measuring a promoted model's performance on live data is a separate question from deciding which
 model to promote, and this page keeps the two apart.** Every model running in production is also
 scored against live data as it runs ([production
 monitoring](live-service.md#production-monitoring)), which answers "is the promoted model still
-performing", continuously, after the fact. The fold above answers a different question, "which
-candidate should we promote", once, ahead of the fact, and the two answers must not be blurred into
-one.
-
-**This page therefore holds two different attitudes to a fixed evaluation window, and the
-difference is deliberate, not an oversight.** TS-Arena avoids reusing any fixed evaluation window
-at all ([Meyer et al. (2026)](https://arxiv.org/abs/2512.20761)). Flexpectation's promotion
-decision cannot work that way, because it has to be made in minutes, not months. It therefore has
-to be judged against a window of history that already exists rather than one still arriving — the
-fold above is that window. The live-monitoring check above is where Flexpectation's practice
-matches the TS-Arena pattern instead, because the question it answers — is the promoted model still
-performing — is a live, ongoing question rather than a promotion decision. The implementation
-details below are updated accordingly: the fold that decides promotion is not shrunk to buy a
-final-test window early.
+performing", continuously and after the fact. The fold above answers "which candidate should we
+promote", once and ahead of the fact, and the two answers must not be blurred into one. TS-Arena
+avoids reusing any fixed evaluation window at all ([Meyer et al.
+(2026)](https://arxiv.org/abs/2512.20761)); Flexpectation's promotion decision cannot work that way,
+for the reason just given, and it is the live-monitoring check where our practice matches the
+TS-Arena pattern instead.
 
 #### Implementation details — final-test window (deleted when it ships)
 
 **1. Document the caveat (immediately).** A short "Selection bias" subsection in
-`docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above.
+`docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above. This is the only
+step that can be taken now.
 
 **2. Reserve a final-test window once a second, independent year of data exists — not by shrinking
-the fold that decides promotion.** The `mid_2025_to_mid_2026` fold stays at its full 12 validation
-months (above). This reservation therefore waits for Dynamical.org's backfill to make a second
-year of ECMWF data available, disjoint from that fold. At that point, found a new epoch in
-`conf/cv/default.yaml` (the epoch mechanism exists for exactly this):
+the fold that decides promotion.** That waits on Dynamical.org's backfill, which is also what turns
+the single fold into a genuine multi-fold epoch, so the `final_test` fold and the further
+leaderboard folds are founded in one new epoch in `conf/cv/default.yaml` rather than over two. The
+`final_test` fold needs a per-fold flag that keeps it out of every run mode, so no experiment trains
+or scores on it in the normal flow. Scoring against it is then a deliberate, rare act — champion
+candidates immediately before promotion only — through the `metrics` asset's existing `ad_hoc`
+evaluation scope, so no new asset is needed and the discipline is procedural. **Two rules go in
+alongside it**: final-test results are never used to *choose between* candidates, because that
+re-creates the problem the window exists to solve; they exist to report honest skill for the chosen
+champion and to detect gross overfitting (final-test NMAE ≫ validation NMAE).
 
-- Add a `final_test` fold covering that disjoint year, with a new per-fold flag `final_test: true`
-  (extend `CvConfig` / the fold schema in `packages/contracts/src/contracts/config_schemas.py`; it
-  is neither a leaderboard fold nor a dev fold — `_fold_ids_for_run_mode` in `defs/jobs.py` must
-  *not* include it in any run mode, so no experiment trains or scores on it in the normal flow).
-- Scoring against the final-test window is a deliberate, rare act — only for champion candidates
-  immediately before promotion — via the `metrics` asset with `evaluation_scope="ad_hoc"` and the
-  window's `valid_time` bounds in the existing `PopulationFilter`. No new asset needed; the
-  discipline is procedural. Whether the leaderboard-fold model can be reused as-is, or needs its
-  own training run, depends on where the disjoint year sits relative to `mid_2025_to_mid_2026` —
-  decide once the backfill fixes that.
-- Rule, documented alongside: final-test results are never used to *choose between* candidates
-  (that re-creates the problem); they exist to report honest skill for the chosen champion and to
-  detect gross overfitting (final-test NMAE ≫ validation NMAE).
+**A multi-fold gotcha to handle when folds proliferate.** The parent-MLflow-run aggregation in the
+`metrics` asset averages each metric key over *only the folds in which that key appears*
+(`exp_metrics.setdefault(key, []).append(value)` then `sum/len` in `defs/cv_assets.py`). Today every
+fold emits the same key set, so this is invisible. Folds with *different horizon coverage* — one
+fold's forecasts stopping at 36 h, another's reaching day 14 — would emit different per-horizon-slice
+keys, and `rmse__all__extended_range` would then silently average over a different fold subset than
+`rmse__all`, with nothing marking the smaller denominator. Per-`time_series_type` keys have the same
+property if fold populations differ. When adding any fold, either guarantee every leaderboard fold
+emits an identical key set, or make the parent-run aggregation record its per-key denominator.
 
-**A multi-fold gotcha to handle when folds proliferate.** The parent-MLflow-run aggregation in
-the `metrics` asset averages each metric key over *only the folds in which that key appears*
-(`exp_metrics.setdefault(key, []).append(value)` then `sum/len` in `defs/cv_assets.py`). Today
-every fold emits the same key set, so this is invisible — but folds with *different horizon
-coverage* (one fold's forecasts stop at 36 h, another's reach day 14) would emit different
-per-horizon-slice keys, and a key like `rmse__all__extended_range` would then silently average
-over a different fold subset than `rmse__all`, with nothing marking the smaller denominator.
-Per-`time_series_type` keys have the same property if fold populations differ. When adding
-folds (the multi-fold epoch below, or the `final_test` fold), either guarantee every
-leaderboard fold emits an identical key set, or make the parent-run aggregation record its
-per-key denominator.
-
-**3. When the backfill lands.** Dynamical.org's backfill is what turns the single fold above into a
-genuine multi-fold epoch — enough independent years of ECMWF data to add both further leaderboard
-folds and the disjoint `final_test` fold in the same epoch, rather than spending a separate epoch
-on the `final_test` fold alone. Until then, the Ladder guard and the caveats above are the
-mitigation. The fold that decides promotion is not shrunk to buy a final-test window early.
-
-**Verification.** (1) `register_experiment_job` in all three run modes never creates a partition
-for the `final_test` fold (extend `tests/test_register_experiment_job.py`). (2) Once the disjoint
-year lands: end-to-end, score one existing experiment against the reserved window via the `ad_hoc`
-metrics path and confirm rows land in `forecast_metrics.delta` with the window label, and nothing
-is logged to the leaderboard MLflow runs.
+**Verification.** `register_experiment_job` must never create a partition for the `final_test` fold
+in any run mode (extend `tests/test_register_experiment_job.py`); and once the disjoint year lands,
+score one existing experiment against the reserved window end-to-end and confirm the rows reach
+`forecast_metrics.delta` with the window label while nothing is logged to the leaderboard MLflow
+runs.
 
 ---
 

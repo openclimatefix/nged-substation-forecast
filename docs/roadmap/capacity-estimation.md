@@ -456,24 +456,30 @@ below).
 
 All candidates run on the same sites, the same weather inputs, and the same folds. There is no
 direct ground truth for capacity, so judging combines proxies, each targeting a claim a
-candidate makes:
+candidate makes.
 
-1. **Downstream forecast skill** — the deciding metric. Each candidate's capacity series feeds
-   the two-pass normalisation; the resulting forecasts compete on the existing leaderboard
-   (NMAE and pinball, per
-   [metrics-and-leaderboard](metrics-and-leaderboard.md)).
-2. **Synthetic fault injection** — scale a known period of a healthy site's output down by a
-   known factor and check: does the estimator find the changepoint, at the right date, with the
-   right magnitude? Does its uncertainty interval cover the truth? (The same injection
-   discipline the [switching detector](switching-events.md) uses.)
-3. **Event-log quality** — precision/recall of fitted changepoints against NGED maintenance and
-   outage records, where records exist.
-4. **Robustness to curtailment label noise** — inject unlogged synthetic curtailment and measure
-   how far each estimate is dragged.
-5. **Uncertainty calibration** — coverage of the stated intervals under (2) and on held-out
-   periods, per [the criterion above](#uncertainty-a-first-class-judging-criterion).
-6. **Runtime and operability** — wall-clock per site, determinism across re-runs, and the count
-   of tunable knobs that had to be tuned.
+**Run downstream forecast skill first, and let it decide.** Each candidate's capacity series feeds
+the two-pass normalisation, and the resulting forecasts compete on the existing leaderboard (NMAE
+and pinball, per [metrics-and-leaderboard](metrics-and-leaderboard.md)). That is the deciding
+metric, and it is cheap because the leaderboard already exists.
+
+**The five checks below are diagnostics, built out for whichever candidate survives that first
+comparison** — and for a losing candidate only where the margin was close enough that the diagnosis
+changes what we do next. Running all six on every candidate up front costs more than the contest is
+worth, and none of the five can overturn a clear result on forecast skill:
+
+- **Synthetic fault injection** — scale a known period of a healthy site's output down by a
+  known factor and check: does the estimator find the changepoint, at the right date, with the
+  right magnitude? Does its uncertainty interval cover the truth? (The same injection
+  discipline the [switching detector](switching-events.md) uses.)
+- **Event-log quality** — precision/recall of fitted changepoints against NGED maintenance and
+  outage records, where records exist.
+- **Robustness to curtailment label noise** — inject unlogged synthetic curtailment and measure
+  how far each estimate is dragged.
+- **Uncertainty calibration** — coverage of the stated intervals under fault injection and on
+  held-out periods, per [the criterion above](#uncertainty-a-first-class-judging-criterion).
+- **Runtime and operability** — wall-clock per site, determinism across re-runs, and the count
+  of tunable knobs that had to be tuned.
 
 The winner ships in v1 and populates the
 [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table; the rest remain on

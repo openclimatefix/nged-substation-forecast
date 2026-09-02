@@ -774,32 +774,23 @@ higher-resolution option but is deprioritised.) The most self-consistent source 
 a climatology from our own archived ENS, but a robust day-of-year climatology wants 10+ years and
 the archive is nowhere near that yet, so ERA5 wins in practice.
 
-**Storage and ingestion — an H3-indexed Delta table built by a Dagster asset.** Store the
-climatology the way the rest of the project stores gridded weather: an **H3-indexed Delta table**
-keyed by `(h3_index, day_of_year, half_hour_of_day)` with a mean and standard-deviation column
-per weather variable — not a bespoke Zarr. The **mean** grid need not be built from scratch:
-Google's **WeatherBench2** publishes a precomputed ERA5 climatology
-(`gs://weatherbench2/datasets/era5-hourly-climatology/`) — the smoothed mean by day-of-year and
-6-hour, over 1990–2019 with a 61-day window, at ERA5's native 0.25° — so μ can start from that
-(regridded to our H3 cells and interpolated from 6-hourly to half-hourly), leaving only **σ** for
-us to compute over the same window (WeatherBench2 stores means only, no standard deviation). The
-alternative is a single **Dagster asset** that ingests ERA5 (the same shape as the `ecmwf_ens` NWP
-ingest, now on the [data-sources roadmap](data-sources.md#weather-data)) and reduces it to both μ
-and σ in one pass, fitting each as a smooth function of day-of-year and half-hour-of-day (a
-low-order harmonic fit or a ±15-day rolling window, because a raw per-calendar-day climatology is
-noisy even from 30 years of data). Either way the ERA5 ingest is the dependency that places this
-item late in the tier.
+**Storage and ingestion — settle the design when the experiment earns it.** The climatology wants
+storing the way the rest of the project stores gridded weather: an **H3-indexed Delta table** keyed
+by `(h3_index, day_of_year, half_hour_of_day)`, with a mean and standard-deviation column per
+weather variable, rather than a bespoke Zarr. Google's **WeatherBench2** publishes a precomputed
+ERA5 mean (`gs://weatherbench2/datasets/era5-hourly-climatology/` — smoothed by day-of-year and
+6-hour over 1990–2019, at ERA5's native 0.25°), so μ can start from that and leave only σ for us to
+compute; building both in one pass from our own ERA5 ingest is the alternative. Which route, and how
+μ and σ are smoothed across the calendar, is a decision to take once the instantaneous z-score
+experiment has shown the feature earns its ingest — not before. Either way the ERA5 ingest is the
+dependency that places this item late in the tier.
 
-Be precise about the update cadence, though — it is *not* near-real-time. A 30-year climatology
-is slowly varying, so the reducing asset recomputes only when a fresh chunk of ERA5 lands
-(monthly at most, and even yearly would barely move μ,σ). Nothing in the feature needs live data:
-μ and σ for a forecast's valid times — up to 14 days out — are fully determined in advance by the
-calendar, and the z-score itself is computed at feature-engineering time in `_parsed_features.py`
-from the forecast NWP value minus the climatology lookup. That derived-feature slot is also what
-lets this become the anomaly-vs-climatology combinator if the composable grammar ever
-materialises. (A *trailing-window* "how unusual versus the last few weeks" anomaly would need
-near-real-time ingestion — but that is a different, and weaker, feature than the climatological
-norm, and is not what this item builds.)
+Nothing in the feature needs live data. μ and σ for a forecast's valid times — up to 14 days out —
+are fully determined in advance by the calendar, and the z-score itself is computed at
+feature-engineering time in `_parsed_features.py` from the forecast NWP value minus the climatology
+lookup, so the reducing asset recomputes only when a fresh chunk of ERA5 lands. (A *trailing-window*
+"how unusual versus the last few weeks" anomaly would need near-real-time ingestion — a different,
+and weaker, feature than the climatological norm, and not what this item builds.)
 
 **Scope the first experiment to temperature.** Storms mostly do not need this — the
 [wind power-curve proxy](#linearised-physics-features-for-solar-and-wind)'s cut-out masking
