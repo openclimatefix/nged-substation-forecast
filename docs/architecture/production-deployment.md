@@ -115,7 +115,7 @@ table.
 ## Silence the series we already know are dead
 
 A broken monitor keeps the check yellow for months, and an always-yellow channel trains the human
-operator to ignore it. That habit costs us the [provider
+operator to ignore it. That habit ruins the [provider
 channel](../design-philosophy/inherent-stability.md#three-audiences-three-channels) entirely.
 `_KNOWN_DEAD_TIME_SERIES_IDS` in `defs/checks.py` names the `time_series_id`s the check ignores.
 
@@ -136,7 +136,7 @@ clears when a human deletes the line.
 **The list lives with the code because a dead series is a fact about the world, not about a
 deployment** — it is equally dead whether we run on a laptop or on AWS. The same fact is the
 argument against the obvious alternative of Dagster's own database, which is per-deployment. The
-cost is that silencing a series takes a commit and a redeploy, which is the wrong interface for a
+drawback is that silencing a series takes a commit and a redeploy, which is the wrong interface for a
 list expected to change several times a month at V2 scale. Making the list operator-editable from
 the UI is designed alongside the `asset_health_history` table, so that operator-facing health state
 has one home rather than two.
@@ -174,12 +174,12 @@ The count is a subtraction — how many daily runs separate the freshest run on 
 that ought to exist by now — and all the care goes into that second term. It is derived from a
 deadline — how long after a run's `init_time` a healthy ingest should have landed it — rather than
 from the publication time, because what matters is when the run reaches *our* disk. The deadline
-therefore has to clear `ecmwf_ens_schedule`'s 08:30 UTC start plus that asset's retry ladder — eight
-retries at 30 minutes, plus a download on each attempt, for the failure mode that is only detectable
+therefore has to clear `ecmwf_ens_schedule`'s 08:30 UTC start plus that asset's retry ladder — 8 retries
+at 30 minutes, plus a download on each attempt, for the failure mode that is only detectable
 after downloading — so it sits at 14 hours. The consequence is a one-run leniency at the 12:00 slot,
 where today's run has landed but is not yet *demanded*: a download that fails today is reported from
 the 18:00 slot onwards rather than six hours earlier. That one-run leniency is the right way round
-to be wrong. A tighter deadline would buy those six hours at the price of a false alarm on every
+to be wrong. A tighter deadline would recover those six hours but trigger a false alarm on every
 morning the download merely ran slowly, which is the failure mode counting runs exists to avoid.
 
 Two design points follow the `power_data_is_fresh` pattern deliberately. The check is **WARN** and
@@ -191,7 +191,7 @@ its own step and trip `live_forecasts_job`'s failure hook.
 Beyond that shared pattern, this check salvages more before falling back on the shared pattern: an
 absent `power_forecasts` or NWP table reads as empty, and an absent *or unreadable* promoted-model
 `meta.json` degrades to "population unknown", so the rest of the report survives. (A read *error* on
-either table still costs the whole report.) `power_data_is_fresh` deliberately salvages nothing —
+either table still voids the whole report.) `power_data_is_fresh` deliberately salvages nothing —
 its only per-read fallback would be "roster unknown", which a fresh power table would then render as
 a green tick over a corrupt roster.
 
@@ -303,7 +303,7 @@ configured — so laptops and CI stay silent by default.
   are capped — the message to a short leading slice with an `…and N more` line, the context
   to a larger slice — so a whole-feed stall at V2 scale can't attach thousands of rows; the
   true late count is always carried by the `n_late` tag. Sending is best-effort:
-  `report_power_freshness` never raises, so a Sentry hiccup costs no more than its own event.
+  `report_power_freshness` never raises, so a Sentry hiccup affects no more than its own event.
   Were it to raise, the check's catch-all would swallow it and discard the whole freshness
   evaluation with it — every late series, in the very hour they went late.
 
@@ -374,7 +374,8 @@ roster that is unreadable, or has lost rows, cannot fail a slot or silently drop
 (The rejected alternative — fetching the model from MLflow at container startup — is covered in
 [Considered but rejected designs](#fetching-the-champion-model-from-mlflow-at-container-startup).)
 
-This design also serves the preferred post-NIA operating model, in which a non-expert at NGED
+This design also serves the preferred operating model once this Network Innovation Allowance
+(NIA) project ends, in which a non-expert at NGED
 operates the service day to day (see [Requirements → Operating model &
 handover](../background/requirements.md#operating-model-handover)): there is no tracking server on
 the hot path to break. The model simply freezes between OCF's scheduled expert interventions — under
@@ -509,8 +510,8 @@ storage.
    roughly \$10–15/month while adding architectural surface area.
 
 4. **Run-level retry is no better under EventBridge.** EventBridge Scheduler retries the
-   *invocation* of a task (with backoff, a configurable max age/attempt count, and an SQS
-   dead-letter queue for failed invocations). But once ECS accepts the task, EventBridge considers
+   *invocation* of a task (with backoff, a configurable max age/attempt count, and a Simple
+   Queue Service (SQS) dead-letter queue for failed invocations). But once ECS accepts the task, EventBridge considers
    its job done — it does not notice a run that starts and then crashes. Relaunching
    a whole crashed run would have required wrapping the task in a Step Functions state machine
    using the `.sync` integration, while failures *inside* a run are already handled by
@@ -595,7 +596,7 @@ maintains the hosts), so the one piece of self-maintained OS in the deployment w
 Dynamical.org NWP download — are deliberately much lighter than inference, so they could run
 directly on the always-on box instead of each being dispatched to its own Fargate task. Running
 ingest on the box would save the per-run Fargate cost and the minute or so of task-provisioning
-latency each dispatch pays.
+latency each dispatch adds.
 
 One sizing fact frames the whole question: Dagster launches **runs, not assets**, onto Fargate. A
 schedule tick launches one job run, which becomes one Fargate task, and every asset in that job's
@@ -621,7 +622,7 @@ several-hours-apart intervals, spends most of its ticks discovering there is not
    rows) and is CPU-hungry enough that its download once starved *itself* through thread
    contention ([#276](https://github.com/openclimatefix/nged-substation-forecast/issues/276)).
    Several busy worker threads on a 2-vCPU box would starve daemon heartbeats and the UI. A memory
-   spike (upstream format drift, an unusually large file) risks the OOM killer taking out Postgres
+   spike (upstream format drift, an unusually large file) risks the out-of-memory (OOM) killer taking out Postgres
    or the daemon. A bad data file killing an ephemeral task is a shrug; killing
    the control plane is the exact failure this architecture exists to avoid.
 
@@ -677,7 +678,7 @@ champion model from it at startup, instead of [baking the model into the
 image](#bake-the-model-into-the-image-at-build-time).
 
 **Why we rejected it.** It adds runtime moving parts, needs tracking-store access from production,
-and slows cold starts. Baking the model in has none of those costs. The rejection gets stronger
+and slows cold starts. Baking the model in has none of those drawbacks. The rejection gets stronger
 under the preferred post-NIA operating model, in which NGED run this code themselves (see
 [Requirements → Operating model &
 handover](../background/requirements.md#operating-model-handover)): With the model baked in, NGED
@@ -743,7 +744,7 @@ are now written up in the runbook — [Setting up the live service on AWS: Steps
 
 ### Infrastructure-tier options considered and rejected
 
-The four alternatives below — labelled A, C, D and E, because B is reserved for the accepted
+The four alternatives below — labelled A, C, D, and E, because B is reserved for the accepted
 small-box option above — were researched alongside the accepted option and rejected in its favour.
 They're kept here as a durable record of the decision, not as live options.
 

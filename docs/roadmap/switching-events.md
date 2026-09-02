@@ -81,7 +81,7 @@ substation's observed power as a time-varying blend of its own normal demand and
 it estimates *how much* power moved between substations without saying what kind of demand or
 generation moved — magnitude only. Approach 5 is the [type-resolved
 mixture](#approach-5-the-type-resolved-mixture-with-differentiable-physics-modules), which splits
-each substation into physically-typed components — demand, solar PV, and wind — and lets each type
+each substation into physically-typed components — demand, solar photovoltaic (PV), and wind — and lets each type
 move with its own weights, so a switching event can shift proportionally more PV than load. (We
 haven't fully specified the roadmap _after_ v2, so read anything "at v2 scale" as just meaning "some
 time after v2 is operational".)
@@ -125,7 +125,7 @@ go.
 
 For each substation, form an expected-power baseline that is a function of **exogenous, switching-independent covariates only** — temperature, solar irradiance, recent weather, time-of-day, day-of-week, holidays — fitted across a long history (e.g. an XGBoost or generalised additive model (GAM) regression). Take the residual (observed − expected): a switching event shows up in it as a *sustained level shift* — not a spike, not a slope. This residual, normalised by each series' own spread, is the raw material both the two-stage forecaster and the staged detector consume.
 
-**Why the baseline must be weather/calendar-based and *not* a lagged-power baseline.** A tempting cheap baseline is "same half-hour last week." But, if last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the **sign reversed**, because the contamination is in the *reference*, not the observation. [Approach 2's balance-attribution stage](#stage-2-balance-attribution-across-neighbours) would then hunt for donor rises coincident with a source drop that is a baseline artifact. The hunt manufactures phantom events and mis-attributes them. Worse, because switching events can persist for days to months, a lag can land *inside the same ongoing event*. There is then no step at all, and a real event is masked entirely. Weather and clock time are unaffected by the electricity network's topology, so a baseline built only from them cannot be contaminated by switching state. The residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.
+**Why the baseline must be weather/calendar-based and *not* a lagged-power baseline.** A tempting simple baseline is "same half-hour last week." But, if last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the **sign reversed**, because the contamination is in the *reference*, not the observation. [Approach 2's balance-attribution stage](#stage-2-balance-attribution-across-neighbours) would then hunt for donor rises coincident with a source drop that is a baseline artifact. The hunt manufactures phantom events and mis-attributes them. Worse, because switching events can persist for days to months, a lag can land *inside the same ongoing event*. There is then no step at all, and a real event is masked entirely. Weather and clock time are unaffected by the electricity network's topology, so a baseline built only from them cannot be contaminated by switching state. The residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.
 
 **The first approach to try is a classical multiple seasonal-trend decomposition (MSTL).** MSTL
 splits each substation's series into a trend, one seasonal component per period — daily and weekly,
@@ -207,7 +207,7 @@ own training history.**
     target is precisely what a label-clean model is *supposed* to disagree with. In-event
     scoring would penalise the cleaner model for being right. The gap between the
     labelled-exclusion arm and the random-exclusion control measures the contamination penalty
-    that the robust fit fails to absorb, i.e. the accuracy the label-free V2 fleet will lose — cheap
+    that the robust fit fails to absorb, i.e. the accuracy the label-free V2 fleet will lose — quick
     to measure now, impossible to measure later.
 
 - *Keep the baseline static, so that a months-long event stays visible.* A months-long ARA appears
@@ -234,7 +234,7 @@ the model the anomaly component directly tells it how *normal* each recent obser
 two-stage forecaster needs nothing beyond the baseline, so it can run as soon as normalised
 residuals exist — ahead of any detector machinery.
 
-##### What the two-stage forecaster buys
+##### What the two-stage forecaster improves
 
 The two-stage forecaster is plausibly the largest forecast-*accuracy* win available from switching-awareness, because:
 
@@ -284,7 +284,7 @@ flag, event age, attributed magnitude) are themselves natural features for this 
   systematically wider, differently-shaped distribution in production. The standard stacking
   remedy applies: every residual the booster trains on should be **out-of-sample** for the
   baseline that produced it (rolling-origin refits within the training period). Both
-  directions make the experiment pipeline more expensive than adding an ordinary feature.
+  directions make the experiment pipeline more work to build than adding an ordinary feature.
 - **No lookahead.** Residual lags must obey the same nullification rule as raw power lags
   (`_nullify_leaky_lags()`). The expected-power values at past lag times must be hindcast from
   NWP runs that had been published by forecast time. The existing
@@ -403,7 +403,7 @@ lags: the residual lags concern what stage 2 receives as recent-observation feat
 draft concerns what stage 2 predicts and starts from. The two therefore compose (a booster can take
 a draft as its starting point *and* residual lags as features) rather than competing. The draft
 re-uses exactly the per-fold, out-of-sample hindcast machinery the residual lags already require, so
-the draft is cheap to try once that machinery exists. There are two ways to hand stage 2 the draft:
+the draft is easy to try once that machinery exists. There are two ways to hand stage 2 the draft:
 
 - **Draft as an ordinary feature; stage 2 predicts total power.** A soft specialisation: the
   booster usually latches onto the draft as a dominant split variable and spends the rest on
@@ -577,7 +577,7 @@ detection runs on residuals that have been *normalised* and *whitened*:
 
 A level shift at one substation could have many causes (fault, new connection, meter error). What makes it a *switching event* is the conservation fingerprint: coincident, opposite-sign shifts at neighbours that *collectively balance*.
 
-**Attribution solves a small constrained subset-sum search over each substation's neighbours.** Because transfers fan out to two or three neighbours, **do not match pairwise.** Instead, for each candidate drop of magnitude $\Delta$ at substation $i$ at time $t$, solve a small constrained attribution: *which subset of $i$'s neighbours show coincident rises ($\approx t$) that sum to $\approx \Delta$?* With a handful of neighbours per primary substation the search is cheap — enumerate subsets, or run a small non-negative least-squares of neighbour rises against the source drop. That candidate neighbour set is a fixed lookup from the network graph (the adjacency of who-can-exchange-load), with no learning over the graph — the lookup is what keeps the search to a handful of substations rather than all $N$. Score by timing coincidence × magnitude-balance agreement. High score → switching event with an identified donor set; low score → "anomaly, unknown cause."
+**Attribution solves a small constrained subset-sum search over each substation's neighbours.** Because transfers fan out to two or three neighbours, **do not match pairwise.** Instead, for each candidate drop of magnitude $\Delta$ at substation $i$ at time $t$, solve a small constrained attribution: *which subset of $i$'s neighbours show coincident rises ($\approx t$) that sum to $\approx \Delta$?* With a handful of neighbours per primary substation the search is fast — enumerate subsets, or run a small non-negative least-squares of neighbour rises against the source drop. That candidate neighbour set is a fixed lookup from the electricity-network graph (the adjacency of who-can-exchange-load), with no learning over the graph — the lookup is what keeps the search to a handful of substations rather than all $N$. Score by timing coincidence × magnitude-balance agreement. High score → switching event with an identified donor set; low score → "anomaly, unknown cause."
 
 ```text
 residuals around time t (observed - expected), one row per substation:
@@ -600,7 +600,7 @@ ran an exhaustive literature search and found every switching detector it turned
 substation against its own history alone; the closest candidate it turned up, a 1984 regression,
 could not be confirmed as coupling substations because the full text was unobtainable.
 
-**The neighbourhood-sum test (cheap, powerful corroboration).** Conservation offers a second,
+**The neighbourhood-sum test (simple, powerful corroboration).** Conservation offers a second,
 sharper statistic than "the rises sum to the drop": over the candidate set {source + donors}, the
 **summed residual should show no step at all** across the event, while every member shows a step.
 So, once a candidate attribution exists, compute the set's summed residual and require it to be
@@ -646,8 +646,8 @@ multi-substation "events".
 
 **A GB precedent already draws this distinction at fleet scale, on power alone.** Electricity North
 West's [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/) project sorted step changes
-into meter-fault and switching-event categories across a fleet more than ten times the number of
-series in this project's trial area, using power alone — but published no precision or recall for
+into meter-fault and switching-event categories across a fleet more than 10 times the number of
+series in this project's trial area — but published no precision or recall for
 either rule (full description: [energy-forecasting review,
 §4](../background/energy-forecasting-review.md#4-detecting-switching-events)). The ATLAS project
 therefore does not settle how well the distinction can be drawn — only that GB substations have been
@@ -655,9 +655,9 @@ sorted this way before.
 
 ##### Stage 3 — the composition read-off
 
-**Stage 3 reads off what kind of power moved — demand, PV, or wind — without changing whether an event was flagged.** Stages 1–2 tell us *that* a switching event happened, *when*, and *how much net power* moved to each donor. They do **not** tell us *what kind* of power moved. A slice of the distribution network carries a mix of underlying demand and embedded generation (rooftop PV, small wind), and the meter only ever sees the *net* (demand minus generation). Two transferred slices with the same net magnitude can have completely different make-ups — one slice might be 8 MW of demand with negligible generation, another 11 MW of demand offset by 3 MW of PV, both netting to +8 MW at the donor. The aim of stage 3 is to get a cheap, qualitative read on that make-up: *was the moved slice demand-dominated, PV-dominated, or wind-dominated?* Stage 3 is corroboration and enrichment, not detection: it does not change whether we flagged the event, but it characterises the event.
+**Stage 3 reads off what kind of power moved — demand, PV, or wind — without changing whether an event was flagged.** Stages 1–2 tell us *that* a switching event happened, *when*, and *how much net power* moved to each donor. They do **not** tell us *what kind* of power moved. A slice of the distribution network carries a mix of underlying demand and embedded generation (rooftop PV, small wind), and the meter only ever sees the *net* (demand minus generation). Two transferred slices with the same net magnitude can have completely different make-ups — one slice might be 8 MW of demand with negligible generation, another 11 MW of demand offset by 3 MW of PV, both netting to +8 MW at the donor. The aim of stage 3 is to get a quick, qualitative read on that make-up: *was the moved slice demand-dominated, PV-dominated, or wind-dominated?* Stage 3 is corroboration and enrichment, not detection: it does not change whether we flagged the event, but it characterises the event.
 
-**Stage 3's cheap read-off has three uses: it sanity-checks the attribution, previews the typed mixture, and enriches the delivered event labels.** (a) **Sanity-checking the attribution:** a leg whose inferred composition is physically implausible (e.g. "pure PV moved at 2 a.m.") is a signal the attribution in stage 2 mis-assigned that donor. (b) **A free preview of the typed mixture:** the later type-resolved model estimates per-type transfer properly; having a rough independent read here lets us check the heavy model agrees with the cheap read. (c) **Richer event labels:** the delivered event list becomes "source → donors, magnitude *and* rough composition per leg," which is more useful to NGED and to downstream stages.
+**Stage 3's quick read-off has three uses: it sanity-checks the attribution, previews the typed mixture, and enriches the delivered event labels.** (a) **Sanity-checking the attribution:** a leg whose inferred composition is physically implausible (e.g. "pure PV moved at 2 a.m.") is a signal the attribution in stage 2 mis-assigned that donor. (b) **An early preview of the typed mixture:** the later type-resolved model estimates per-type transfer properly; having a rough independent read here lets us check the heavy model agrees with the quick read. (c) **Richer event labels:** the delivered event list becomes "source → donors, magnitude *and* rough composition per leg," which is more useful to NGED and to downstream stages.
 
 **The moved slice's power-type composition shows in the shape of the recipient's residual step across the hours of the day.** The make-up of a slice is exposed by *when, within the day,* its power moved — because demand, PV, and wind each have a distinct, well-known diurnal signature. After stage 2 has told us donor $j$ picked up some load at event onset, look at the **shape of $j$'s residual step across the hours of the day** (e.g. average the step magnitude by half-hour-of-day over the event's duration):
 
@@ -665,7 +665,7 @@ sorted this way before.
 - a step that is **roughly flat, or tracks the evening demand peak** → **demand-heavy**;
 - a step that is **large but uncorrelated with daylight, gusty/variable** → **wind-heavy**.
 
-The composition read-off is a histogram (step magnitude vs. hour-of-day), not a fitted model — deliberately cheap, matching v0.6's simple-statistics spirit.
+The composition read-off is a histogram (step magnitude vs. hour-of-day), not a fitted model — deliberately lightweight, matching v0.6's simple-statistics spirit.
 
 **A duration floor and a weather-realisation confound both limit when the read-off can run.**
 First, a **duration floor**: the diurnal histogram only fills if the event spans several days — for shorter events there is no hour-of-day coverage to
@@ -723,7 +723,7 @@ model](#approach-4-the-magnitude-only-mixture-model-the-workhorse) is for.
 training rows instead of discarding them.** The subtraction version is still useful in its own
 right: it turns the ARA *mask* into an optional *patch* — keep switching-affected periods in the
 forecast training data with corrected values rather than discarding ~10% of the record. Whether the
-patch beats the hole is cheap to measure on the synthetic-injection harness.
+patch beats the hole is quick to measure on the synthetic-injection harness.
 
 **What this approach misses / cons.**
 
@@ -1155,7 +1155,7 @@ also to test out convex optimisation as a warm-up for v2).
 3. **Diagnostic precursor — the first detection result, with zero detector code.** Around each
    *logged* event, plot the member residuals and the neighbourhood-sum residual: members should
    step, the sum should stay flat. That plot validates the baseline, the adjacency list, and the
-   conservation premise in one cheap pass. If the check fails, fix the data before building any
+   conservation premise in one quick pass. If the check fails, fix the data before building any
    detector on top.
 4. **Synthetic-injection harness.** Inject shaped transfers between real neighbours over a
    magnitude × duration grid into believed-clean periods. Built early because every later
@@ -1213,7 +1213,7 @@ the electricity network actually behaves, and fully unsupervised.
 $$ \text{observed}_i(t) = \alpha_{ii}(t)\, d_i(t) + \sum_{j \,\in\, \text{neighbours}(i)}
 \alpha_{ij}(t)\, d_j(t) $$
 
-- **The neighbourhood is the graph:** $\text{neighbours}(i)$ is exactly $i$'s neighbour set in the network graph, so the edges act as a *sparsity pattern* on the mixing matrix — most $\alpha_{ij}$ are structurally fixed at zero, and only the handful corresponding to real edges are free parameters. The sparsity pattern is what makes the model identifiable and cheap rather than an $N \times N$ free-for-all.
+- **The neighbourhood is the graph:** $\text{neighbours}(i)$ is exactly $i$'s neighbour set in the electricity-network graph, so the edges act as a *sparsity pattern* on the mixing matrix — most $\alpha_{ij}$ are structurally fixed at zero, and only the handful corresponding to real edges are free parameters. The sparsity pattern is what makes the model identifiable and tractable rather than an $N \times N$ free-for-all.
 - Under NRA: $\alpha_{ii} \approx 1$, $\alpha_{ij} \approx 0$.
 - During an ARA: weight shifts from a source onto **one or more** neighbours. Multiple $\alpha_{ij}(t)$ may be active at once for a single source.
 - **Conservation = node-level flow balance:** weight leaving $i$ is distributed across a subset of neighbours and must sum to the weight lost at $i$ (approximately mass-preserving over the affected neighbourhood). **Do not** implement this as independent pairwise equal-and-opposite constraints — that is wrong given confirmed 2–3-way fan-out.
