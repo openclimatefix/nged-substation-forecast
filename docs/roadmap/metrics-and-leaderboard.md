@@ -590,7 +590,7 @@ analogues for `nged_incumbent`; a quantile sample for `climatology`). The metric
 collapse each ensemble to one number. `compute_metrics` today collapses every ensemble to its
 **mean** (`packages/ml_core/src/ml_core/metrics.py`), and the risk we were guarding against was that
 different models would be scored on *different* collapses — e.g. the ML models on their mean and
-`nged_incumbent` on the median NGED effectively reads off its analogue spread. Mean and median
+`nged_incumbent` on the median that NGED effectively reads off its analogue spread. Mean and median
 diverge for skewed or underdispersed ensembles, so scoring some models on one and some on the other
 is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
 
@@ -966,9 +966,11 @@ control member (`cv_assets.py:373`) learns a conditional mean, so pushing 51 mem
 yields spread from *weather uncertainty only* — no model or observation uncertainty. Underdispersed
 ensembles are systematically overconfident, worst at short horizons where members haven't diverged.
 Flexibility procurement is a tails problem (P90+ peaks), so this overconfidence hits the use case
-directly. Phases A and B below (both shipped) built the measurement machinery — every metric in the
-[evaluation-metrics reference](../techniques/evaluation-metrics.md), per horizon slice; the
-remaining phases act on what those numbers show. The planned [tail & exceedance
+directly.
+
+**Phases A and B already built the measurement machinery, and the remaining phases act on what those
+numbers show.** Phases A and B (both shipped) deliver every metric in the
+[evaluation-metrics reference](../techniques/evaluation-metrics.md), per horizon slice. The planned [tail & exceedance
 metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks) will sharpen the picture
 further: an underdispersed ensemble pushes its exceedance probabilities to 0 or 1 too early, so the
 Brier score and the quantile exceedance rates are the clearest before/after instruments for Phases C

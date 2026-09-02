@@ -57,9 +57,10 @@ trained with NWP features does **not** behave like a weather-blind model when NW
 the incumbent during an outage needs outage-shaped training data, not NaN routing), and the nulls
 the de-accumulated ECMWF variables carry are the one case the guarantee genuinely covers. Full
 argument: [Inherent Stability → Default directions, and their
-limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit). Note that the
-second consequence is narrower than it sounds. Only *leading and trailing* nulls reach the model as
-nulls: `_upsample_nwp_to_half_hourly` already interpolates interior ones away (see [the null-filling
+limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
+
+**The null-covered case is narrower than it sounds, because most nulls never reach the model as
+nulls at all.** Only *leading and trailing* nulls reach the model as nulls: `_upsample_nwp_to_half_hourly` already interpolates interior ones away (see [the null-filling
 item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)), and the scattered
 per-pixel corruption mostly never becomes a null in the first place, because the ingest renormalises
 each H3 cell over the grid points that arrived.
