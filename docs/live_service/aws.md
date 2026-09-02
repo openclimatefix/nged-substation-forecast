@@ -1211,8 +1211,8 @@ scheduler and run-monitoring daemons with green heartbeats.
 ## Step 16 — Turn on the schedules and verify end-to-end
 
 1. **UI → Automation**: switch on `power_time_series_and_metadata_schedule`,
-   `ecmwf_ens_schedule`, and `live_forecasts_schedule`. Schedule state lives in Postgres, so
-   this is a one-time action — it survives restarts and reboots.
+   `ecmwf_ens_schedule`, and `live_forecasts_job_schedule`. Schedule state lives in Postgres,
+   so this is a one-time action — it survives restarts and reboots.
 2. **First time only — materialise the upstream assets once so `live_forecasts` has something
    to read.** A Dagster `deps=[...]` declaration records lineage; it does *not* make
    materialising `live_forecasts` reach back and build its parents first. On a brand-new box the

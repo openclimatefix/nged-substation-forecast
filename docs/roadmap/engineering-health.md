@@ -21,8 +21,8 @@ testing strategy remain unwritten, plus general cleanup.
 
 - **CV-windowing no-lookahead** (complements the feature-level tests, which cover lag leakage
   but not window construction): assert no *training* row has `valid_time >= val_start` for its
-  fold — i.e. the training window built by `training_window(fold)` and applied in
-  `trained_cv_model` never bleeds into validation.
+  fold — i.e. the training window `trained_cv_model` builds from `fold.train_start` and
+  `fold.train_end` never bleeds into validation.
 - **Leaderboard fairness**: two different experiments over the same fold are scored on the
   **identical** `(time_series_id, fold)` population — a regression guard on the
   experiment-independence of `eligible_time_series`.

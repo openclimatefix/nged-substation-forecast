@@ -388,7 +388,8 @@ Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 > **Status: ✅ Done** (closed 2026-07-10). The native per-asset Dagster schedules that ship with
 > [The `live_forecasts` asset](#the-live_forecasts-asset)
-> (`power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`, `live_forecasts_schedule`)
+> (`power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`,
+> `live_forecasts_job_schedule`)
 > do the whole job. Closing #208 took a several-day soak under `dg dev` with a persistent
 > `DAGSTER_HOME`, which confirmed 6-hourly forecasts landing with no duplicate rows and a missed
 > slot backfillable in replay mode. No hand-rolled freshness op is needed, and neither is the

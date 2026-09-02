@@ -240,8 +240,8 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
   environment and would silently uninstall those extra workspace members. The job also sets
   dummy values for the three required `NGED_S3_*` `Settings` fields: most tests monkeypatch
   them, but a few construct `Settings()` directly and locally rely on the developer's `.env`,
-  which CI doesn't have. The `ci` job is a required status check on `main` (configured in the
-  GitHub branch-protection settings, not in the workflow file).
+  which CI doesn't have. The `ci` job is a required status check on `main` (configured in a
+  GitHub repository ruleset, not in the workflow file).
 - **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated
   tests (`uv run pytest --run-network -m network`) on a daily schedule, plus
   `workflow_dispatch` for on-demand runs. This is the only CI that touches the real

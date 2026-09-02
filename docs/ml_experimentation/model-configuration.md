@@ -69,7 +69,7 @@ These are the NWP variables available directly from ECMWF ENS at `valid_time`.
 | `geopotential_height_500hpa` | 500 hPa geopotential height (m) |
 | `downward_long_wave_radiation_flux_surface` | Downward LW radiation (W/m²) |
 | `downward_short_wave_radiation_flux_surface` | Downward SW radiation (W/m²) |
-| `precipitation_surface` | Total precipitation (kg/m²) |
+| `precipitation_surface` | Total precipitation rate (kg/m²/s) |
 | `categorical_precipitation_type_surface` | Precipitation type (categorical) |
 
 ### Weather lags and rolling means

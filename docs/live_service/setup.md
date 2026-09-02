@@ -29,7 +29,7 @@ The single most important idea is that there are **three** roots, not one:
 | Root | Env var | May be `s3://`? | Holds |
 |---|---|---|---|
 | Internal data tables | `DATA_PATH_INTERNAL` | **Yes** | NWP, power observations, forecast metrics — everything not on the NGED-facing delivery list |
-| Delivery data tables | `DATA_PATH_DELIVERY` | **Yes** | The NGED-facing delivery tables (`power_forecast`, `effective_capacity`, …) |
+| Delivery data tables | `DATA_PATH_DELIVERY` | **Yes** | The NGED-facing delivery tables (`power_forecasts`, `effective_capacity`, …) |
 | Local artifacts | `LOCAL_ARTIFACTS_PATH` | No — always local | The promoted production model, plot HTML |
 
 > **On AWS, the two data-table roots point at two separate buckets** — `DATA_PATH_DELIVERY`

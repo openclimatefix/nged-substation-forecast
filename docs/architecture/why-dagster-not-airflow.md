@@ -210,7 +210,7 @@ The orchestration layer was built thin on purpose, and three properties make it 
 - **Every write is an idempotent partition overwrite**, so retry semantics do not depend on
   orchestrator guarantees.
 
-The Dagster-specific surface is roughly 1,900 lines across 5 files (`defs/assets.py`,
+The Dagster-specific surface is roughly 2,700 lines across 5 files (`defs/assets.py`,
 `defs/cv_assets.py`, `defs/production_assets.py`, `defs/jobs.py`, `defs/schedules.py`) plus
 `definitions.py`, `dagster.yaml`, and the Docker Compose control plane. Beyond code, a dozen
 docs pages — most of `docs/live_service/` and [Running an experiment

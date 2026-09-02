@@ -95,7 +95,7 @@ uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mo
 | `valid_time` | `datetime` (UTC) | The time the forecast is *about*. |
 | `nwp_init_time` | `datetime` (UTC), nullable | When the NWP model was initialised. Uniquely identifies the NWP ensemble member, and matters when NWP is delayed or when we deliberately use lagged NWP runs to grow the ensemble. Null for models that do not use NWP (e.g. persistence baselines). |
 | `power_fcst_init_time` | `datetime` (UTC) | When OCF's power-forecast model was initialised (the "t0"). |
-| `power_fcst_model_name` | `categorical` (string) | Name of OCF's model, e.g. `"xgboost_baseline"`. Set by the `BaseForecaster` subclass. |
+| `power_fcst_model_name` | `string` | Name of OCF's model, e.g. `"xgboost_baseline"`. Set by the `BaseForecaster` subclass. |
 | `power_fcst_model_version` | `int16` | Version of OCF's model. |
 
 **Internal-only extensions (beyond the report draft), which NGED does not receive:** the live
