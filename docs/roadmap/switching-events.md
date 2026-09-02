@@ -28,15 +28,29 @@ The work is organised as a set of **named approaches**, tried in the order set o
 
 Everything in v0.6 rests on **one shared baseline**: a per-substation model of expected power
 from weather and calendar covariates alone (no power lags). The baseline's per-series-normalised
-residual is the raw material every approach below consumes. On top of that baseline we will try,
+residual is the raw material every approach below consumes. Before building that baseline, though,
+there is a cheaper first look: a [multiple seasonal-trend decomposition
+(MSTL)](#the-baseline-shared-foundation) needs no weather input and no training run, and answers the
+question that decides whether any of the rest is worth building — are the switching events visible
+above the noise at all? Work on v0.6 is starting there. On top of the baseline we could then try,
 in order:
 
-1. **The two-stage forecaster** — the first approach we build, and the v0.6.0 target. A booster
-   consumes the baseline's normalised residual together with event-age and neighbour features and
-   forecasts metered power *robustly to switching*, handling switching implicitly. Withhold the
-   anomaly features and the same machinery forecasts NRA power. It ships none of the discrete
-   detector artefacts (no event table, no abnormal running arrangement (ARA) mask, no sensitivity
-   floor).
+1. **The two-stage forecaster** — a good candidate for the first approach to try, and the current
+   v0.6.0 target. Its two stages are:
+
+    1. **The shared baseline.** Fit expected power per substation from weather and calendar
+       covariates alone, using no power lags, then take the residual (observed power minus expected
+       power) and normalise it by that series' own spread. This is the same shared baseline named
+       above, and the two-stage forecaster's first stage *is* that baseline — nothing extra.
+    2. **The booster.** Feed that normalised residual, together with event-age and neighbour
+       features, into a gradient-boosted model that forecasts metered power *robustly to
+       switching*. Switching is handled implicitly: the model is never told an event happened, and
+       instead learns from features that make one visible.
+
+    Withhold the anomaly features and the same machinery forecasts NRA power. This approach ships
+    none of the discrete detector artefacts (no event table, no abnormal running arrangement (ARA)
+    mask, no sensitivity floor).
+
 2. **The staged statistical detector** — changepoint detection, balance attribution across
    neighbours, and a composition read-off, run on the same residual, producing an explicit event
    table, an ARA mask for the training data, and a quantified detection sensitivity floor.
@@ -48,11 +62,15 @@ in order:
 governs how far down that list we go. The v1 priority is forecast skill. The two-stage forecaster
 therefore leads, and the explicit-detector approaches are pursued behind it — kept designed, and
 built as forecast skill and NGED's needs justify. Two further approaches sit further out as later
-research, built at **v2 scale once v2.0 is operational**, and numbered to continue the ordering:
-approach 4, the [magnitude-only mixture
-model](#approach-4-the-magnitude-only-mixture-model-the-workhorse) (the workhorse), then approach
-5, the [type-resolved
-mixture](#approach-5-the-type-resolved-mixture-with-differentiable-physics-modules).
+research, built at **v2 scale once v2.0 is operational**, and numbered to continue the ordering.
+Approach 4 is the [magnitude-only mixture
+model](#approach-4-the-magnitude-only-mixture-model-the-workhorse), the workhorse: it models each
+substation's observed power as a time-varying blend of its own normal demand and its neighbours',
+so it estimates *how much* power moved between substations without saying what kind of demand or
+generation moved — magnitude only. Approach 5 is the [type-resolved
+mixture](#approach-5-the-type-resolved-mixture-with-differentiable-physics-modules), which splits
+each substation into physically-typed components — demand, solar PV, and wind — and lets each type
+move with its own weights, so a switching event can shift proportionally more PV than load.
 
 We deliberately do **not** pin any approach to a specific patch version — neither the v0.6
 approaches to a v0.6.x nor the v2-scale approaches to a v2.x. The ordering above is the commitment,
@@ -60,7 +78,8 @@ not the numbering. (v0.6.1, for instance, may well be a bug-fix of the two-stage
 than the next approach.)
 
 ```text
-v0.6 scale ── One shared baseline (weather/calendar expected power), then, in order:
+v0.6 scale ── First look: MSTL decomposition — are the events visible above the noise?
+  │            Then one shared baseline (weather/calendar expected power), and in order:
   │            1. The two-stage forecaster — switching-robust forecasting; handles switching
   │               implicitly; the v0.6.0 target. No event table.
   │            2. The staged statistical detector — explicit events, ARA mask, sensitivity floor.
@@ -193,8 +212,8 @@ exists to find.
 
 #### Approach 1 — the two-stage forecaster
 
-The **two-stage forecaster** is the first approach we build, and the v0.6.0 target. Stage 1 is
-the shared baseline above. Stage 2 is a booster that replaces (or augments) the forecaster's raw
+The **two-stage forecaster** is a good candidate for the first approach to try, and the current
+v0.6.0 target. Stage 1 is the shared baseline above. Stage 2 is a booster that replaces (or augments) the forecaster's raw
 power-lag features with **residual lags** — the normalised "actual − expected" delta at each lag
 time, for the target substation and, optionally, its neighbours. The intuition: a raw power lag
 conflates "what the weather was doing" with "what is anomalous"; handing the model the anomaly
