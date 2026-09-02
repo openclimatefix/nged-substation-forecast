@@ -457,24 +457,48 @@ the replacement in run by run, copying raw characters wherever the wording is un
 links and bold markers the agent dropped survive. The replacement is written without markup too,
 so splicing it in whole would delete every link in the sentence.
 
+**The offset map records where each character's markup ends, not only where the character sits.** A
+map of bare character positions resumes the raw text before a closing backtick, so a serial comma
+inserted after `n_h3_cells` is written as `` `n_h3_cells,` `` — the comma inside the code span. The
+backtick count is unchanged, so every markup check below is satisfied and only `check_structure.py`
+catches it. Each projected character therefore carries the opening backtick, `[` or `**` before it
+and the closing backtick, `](url)` or `**` after it, and a splice writes between those bounds
+rather than across them.
+
 **A quote that stops short of a trailing clause matches nothing at all.** A sub-agent routinely
 ends its quote before a parenthetical the file actually carries, while every change it proposes
 sits in the head of the sentence. Trimming the words the quote and the replacement share at the end
 makes the truncated quote match, which the script does before searching.
 
-**A split whose full stop lands on a closing marker deletes that marker.** Splitting is the pass
-that does this, because the join it breaks is often the comma right after a bolded phrase or a code
-span. `**the same information**, and they are harder to spot` wants to become `**the same
-information.** They are harder to spot`, and a substitution written without the markers produces
-`**the same information. They are harder to spot` instead, with the bold left open. A link is
-worse, because the split drops the whole `](url)` half and the citation stops being a citation. The
-script counts `**`, backticks and links in the paragraph either side of the splice and refuses any
-edit that changes a count.
+**A bolded lead is the one span whose full stop belongs inside its markers, and the splice puts it
+there.** Splitting is the pass that reaches this boundary, because the join it breaks is often the
+comma right after a bolded phrase or a code span. `**the same information**, and they are harder to
+spot` becomes `**the same information.** They are harder to spot`, with the stop pulled inside the
+`**` that opens the block — through a blockquote's `>` and a list item's bullet alike. Every other
+span takes its punctuation outside: a serial comma after a code span, a link or a mid-sentence bold
+is written after the closing marker. Counts over the 78 markdown files under `docs/`, in the
+repository root and in `.claude/skills/` are what set that rule. A lead opening a paragraph carries
+the stop inside its `**` 451 times against 6 that do not, a lead on a list item 404 times against
+1, and a lead in a blockquote 38 times against 1. A bold span in the middle of a sentence goes the
+other way, with 144 commas and 70 full stops after its closing `**` against no comma and 2 full
+stops inside one. Single-asterisk emphasis was never counted, so a stop after one is left where the
+replacement put it. The script still counts `**`, backticks and links in the paragraph either side of the splice,
+and refuses any edit that changes a count.
 
 **An insertion anchored on a sentence can land inside a bolded lead**, between the lead's opening
 `**` and its closing `**`, leaving both markers unbalanced. The rendered page then turns bold on
 and leaves it on for the rest of the section. The same marker count catches this case, and the
 per-paragraph check below catches one that reaches the file by another route.
+
+**A quote can match inside a fenced code block, where the words are a command rather than prose.**
+The getting-started page carries the comment `# create the virtualenv and install all workspace
+packages` inside a fenced block, and a serial-comma finding quoting those words rewrites the
+command. Nothing downstream notices: the page still lints, still builds, and `check_structure.py`
+sees no marker move. The script reports such a finding as `code block` and writes nothing, the way
+it already refuses one landing in a skill file's YAML frontmatter. Reword the finding to quote the
+prose it meant, or leave the block alone. A fence indented under a list item counts, because that
+is where most of this repo's fenced blocks sit — every one on the code-style page, and two of the
+six on the getting-started page.
 
 **A replacement spanning a different number of lines from the text it replaced invalidates every
 line index taken before the splice.** A three-line span rewritten as one line moves every following
@@ -492,6 +516,11 @@ sibling bullet. The width is not uniform across this repo either — the pages t
 are wrapped anywhere between 94 and 100 characters — so the script solves each unit's width by
 finding the width that reproduces the unit exactly, and falls back to the width most of the file's
 other units solve to.
+
+**Each guard above has a regression test in `tests/test_prose_review_apply_findings.py`**, run by
+the repo's own `uv run pytest`. The tests live in the root `tests/` directory because pytest skips
+hidden directories, so a suite inside `.claude/skills/` would never run. Change the splice, the
+projection or the re-wrap and run them.
 
 **Then check that the batch changed the words and nothing else**, before running the repo's own
 gates:
