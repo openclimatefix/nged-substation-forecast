@@ -128,11 +128,13 @@ solar day late and cuts its peak, worst of all the numeric variables
 ([measured](../architecture/nwp-variable-conventions.md#period-ending-variables-are-interpolated-as-though-they-were-instantaneous)).
 
 The fix is the clear-sky-index resample, and it has **four requirements**. Getting the first wrong
-makes the result worse than doing nothing: normalising by the instantaneous clear-sky value at
-`valid_time`, the most natural reading, produces a physically impossible **1221 W m⁻²** peak on a
-clear day. Requirements 1, 3, and 4 were each verified on a reconstructed clear-sky day; requirement
-2 was not, because a clear-sky day has a constant clear-sky index, which no anchoring choice can
-disturb. Verify it on a partly-cloudy day when implementing.
+makes the result worse than doing nothing. Normalising by the instantaneous clear-sky value at
+`valid_time` is the most natural reading, and on archive data it pushes the clear-sky index to about
+2, implying irradiance twice what the sky can deliver
+([measured](../architecture/nwp-variable-conventions.md#period-ending-variables-are-interpolated-as-though-they-were-instantaneous)).
+Requirements 1, 3, and 4 were each verified on a reconstructed clear-sky day; requirement 2 was not,
+because a clear-sky day has a constant clear-sky index, which no anchoring choice can disturb.
+Verify it on a partly-cloudy day when implementing.
 
 1. Normalise against the clear-sky **mean over the same window**, not the instantaneous clear-sky
    value at `valid_time`.
