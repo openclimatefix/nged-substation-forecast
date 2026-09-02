@@ -342,7 +342,10 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     )
 
     # Params before tags: MLflow params are write-once, so a rejected write can never leave the
-    # experiment tagged with a config its params contradict. log_params is not itself atomic — a
+    # experiment tagged with a config its params contradict. `_reject_changed_identity` normally
+    # rejects before either write, but an experiment registered earlier can already carry params
+    # that disagree with its tags, so the ordering keeps that case one-sided. log_params is not
+    # itself atomic — a
     # batch carrying one conflicting key still writes the batch's other keys before raising — so
     # the ordering bounds the damage to the params rather than eliminating it.
     parent_run_id = get_or_create_parent_run(experiment_id)

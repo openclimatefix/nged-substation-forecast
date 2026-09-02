@@ -228,8 +228,12 @@ its 00Z run has actually landed, matching Dynamical's publication lag; shared wi
 _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
 """Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` gives at least 4h of coverage past the 08:30 UTC
 schedule. Applies to ``NwpRunNotYetAvailable`` and ``NwpVariableWhollyMissing`` — both mean the
-upstream run is not ready yet; anything else fails immediately. See [A wholly-missing variable is
-retried, not failed
+upstream run is not ready yet; anything else fails immediately.
+
+``NwpVariableWhollyMissing`` is raised by validation *after* the download, so each of those retries
+also re-pays a full download and re-takes an ``ECMWF`` concurrency-pool slot. Raising this budget
+therefore holds pool slots for longer, which is the contention the pool exists to bound. See [A
+wholly-missing variable is retried, not failed
 outright](https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright)."""
 
 _ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800

@@ -890,7 +890,8 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     pruned_scan = config.population_filter.apply(scan)
 
     # engine="streaming" is essential even though only two columns are projected: the in-memory
-    # engine materialises the full-length columns before .unique(), and OOMs at V2 fold scale.
+    # engine materialises the full-length columns before .unique(), and OOMs on today's fold
+    # size (measured on the 364M-row V1 fold, against 0.3 GB peak streaming).
     # Each group is then scored in per-series batches, so peak memory is one batch, never a
     # whole fold.
     groups = (

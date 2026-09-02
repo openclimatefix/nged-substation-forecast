@@ -27,6 +27,9 @@ power_time_series_and_metadata_schedule = ScheduleDefinition(
 """Fires at :55 past every hour — 5 minutes *before* the top of the hour — so this hour's pull
 has landed by the time ``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
 
+The NWP run used is stamped on every forecast row as ``nwp_init_time``, but telemetry staleness
+is not recorded on the forecast row.
+
 ``live_forecasts`` declares ``power_time_series_and_metadata`` as a dep, but the two run as
 separate jobs on separate schedules and nothing enforces the ordering at runtime — deliberately:
 if this pull is missed or runs long, ``live_forecasts`` still fires on time against whatever

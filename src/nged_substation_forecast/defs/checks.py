@@ -67,7 +67,14 @@ _LATE_TABLE_SCHEMA: Final[TableSchema] = TableSchema(
 
 _MAX_LATE_SERIES_IN_TABLE: Final[int] = 50
 """Cap on how many late series the check's metadata table lists. Matches
-``_sentry.MAX_LATE_SERIES_IN_CONTEXT``. Why capped, and at this number:
+``_sentry.MAX_LATE_SERIES_IN_CONTEXT``.
+
+The rows follow ``_LATE_STATUS_ORDER``, so the listing is the head of that order rather than the 50
+series in most trouble: when never-reported series outnumber the cap, no stale series is listed at
+all, however stale it is. ``n_stale`` and ``n_never_reported`` stay exact, and are what the operator
+should read first.
+
+Why capped, and at this number:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>
 """
 
@@ -76,7 +83,10 @@ _LATE_STATUS_ORDER: Final[tuple[str, ...]] = ("never", "stale")
 row order in the late-series table (never-reported series listed before merely-stale ones)."""
 
 _POWER_DATA_STALENESS_THRESHOLD: Final[timedelta] = timedelta(hours=24)
-"""A ``time_series_id`` is 'late' if its most recent observation is older than this."""
+"""A ``time_series_id`` is 'late' if its most recent observation is older than this.
+
+Why 24 hours: <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>
+"""
 
 _KNOWN_DEAD_TIME_SERIES_IDS: Final[tuple[int, ...]] = (33,)
 """Series ``power_data_is_fresh`` stops warning about, because we already know they are dead.
