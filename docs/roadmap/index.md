@@ -250,9 +250,31 @@ beats the ambiguity of "v0.6 or v0.7"; we'll swap them later if reality disagree
 *Epic: [#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141). Internal
 only for first month, then shared with NGED.*
 
-**Dynamic effective capacity estimation for *metered* generators ([capacity estimation](capacity-estimation.md))**:
+**Dynamic effective capacity estimation for *metered* generators ([capacity estimation](capacity-estimation.md))**
 
-- Estimate the effective capacity of the *metered* wind and solar PV generators over time — it bumps up and down with maintenance, faults, and build-out — by racing several candidate estimators head-to-head on the same data: a [convex (CVXPY)](../techniques/convex-optimisation.md) censored quantile-envelope estimator, a [differentiable-physics (PyTorch)](../techniques/differentiable-physics.md) variational estimator, and cheap baselines. The winner ships in v1; the judging criteria (including uncertainty quality and [robustness to missing inputs](capacity-estimation.md#robustness-to-missing-inputs), scored against the same failure-scenario vocabulary the forecasting leaderboard uses) are on the [capacity estimation](capacity-estimation.md) page. Capacity estimation is the first model family we must actively *build* for missingness — a differentiable-physics estimator [degrades most gracefully of all](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing), and that should count in the judging. A deliberate secondary goal of the contest is building hands-on CVXPY experience, to inform v2 tooling choices and our advice to NGED. The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is [v2 research](disaggregation.md).
+**The estimator is chosen by racing candidates head-to-head on the same data, and the winner ships
+in v1.** What they estimate is the effective capacity of the *metered* wind and solar PV generators
+over time, which bumps up and down with maintenance, faults, and build-out. The contenders are a
+[convex (CVXPY)](../techniques/convex-optimisation.md) censored quantile-envelope estimator, a
+[differentiable-physics (PyTorch)](../techniques/differentiable-physics.md) variational estimator,
+and cheap baselines. The judging criteria — including uncertainty quality and [robustness to missing
+inputs](capacity-estimation.md#robustness-to-missing-inputs), scored against the same
+failure-scenario vocabulary the forecasting leaderboard uses — are on the [capacity
+estimation](capacity-estimation.md) page.
+
+**Capacity estimation is the first model family we must actively *build* for missingness.** A
+differentiable-physics estimator [degrades most gracefully of
+all](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing), and
+that should count in the judging.
+
+**A deliberate secondary goal of the contest is building hands-on CVXPY experience**, to inform v2
+tooling choices and our advice to NGED.
+
+**The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly not in scope
+here.** That inversion is [v2 research](disaggregation.md).
+
+The remaining work items for metered-generator capacity:
+
 - Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
 - Ingest **CM SAF** (Satellite Application Facility on Climate Monitoring) — high-resolution satellite-derived irradiance, used to estimate solar PV capacity ([data sources](data-sources.md#weather-data)). Capacity estimation also needs ERA5, which [v0.5](#v05-xgboost-upgrades-quick-wins) already ingests to serve the pre-training experiments
 - Consider testing **CAMS** (the Copernicus Atmosphere Monitoring Service solar radiation time-series) alongside CM SAF ([data sources](data-sources.md#weather-data)). Both are **offline** sources — they feed historical capacity estimation, and the production serving path depends on neither — so CAMS's near-real-time freshness is not the reason to look at it. The reason is that CAMS offers steps down to 1 minute where SARAH-3 stops at 30, which is what the [dynamic thermal model](../techniques/differentiable-physics.md) would need. The cost of looking is small: CAMS serves one point per request rather than a grid, but the [v1 trial area](../index.md#scope) needs at most 32 requests, and 6 of those requests cover its solar farms, so a head-to-head against SARAH-3 on those sites settles whether sub-hourly irradiance improves the fitted plant model before anything larger is committed to
