@@ -549,11 +549,11 @@ block stops closing. A count that *rises* is reported and not gated, because nam
 pronoun stood for legitimately adds a code span — writing `file` or `prose-review` where the
 sentence said "it" — while no sweep can legitimately lose one.
 
-**Neither command checks an anchor inside an absolute URL.** `mkdocs build --strict` validates
-relative links only, so a link to
-`https://openclimatefix.github.io/nged-substation-forecast/...#wrong-anchor` passes every check in
-the repo. Compare a changed anchor against the `id=` attributes in the built page under `site/`, or
-against how another docs page spells the same anchor. A heading whose text contains an em dash
+**Renaming a heading breaks every absolute link to its old anchor, and `scripts/check_docs_links.py`
+is what tells you.** `mkdocs build --strict` validates relative links only, so a link from a
+docstring or a comment to the published site survives a heading rewrite with nothing to catch it.
+Run `uv run python scripts/check_docs_links.py` after any heading change; it reports the file, the
+line and the closest real anchors on the target page. A heading whose text contains an em dash
 generates a single separator, not two: `## H2 — a hundred experiments` becomes
 `#h2-a-hundred-experiments`.
 

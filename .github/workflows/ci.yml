@@ -48,5 +48,13 @@ jobs:
       - name: Markdown lint (pymarkdown)
         run: uv run --no-sync pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 
+      # Two halves of one job: mkdocs validates links within docs/, check_docs_links validates
+      # links from anywhere else to the published site. Neither sees what the other does.
+      - name: Docs build (mkdocs --strict)
+        run: uv run --no-sync mkdocs build --strict --site-dir /tmp/ci-site
+
+      - name: Docs links (check_docs_links)
+        run: uv run --no-sync python scripts/check_docs_links.py
+
       - name: Test (pytest)
         run: uv run --no-sync pytest

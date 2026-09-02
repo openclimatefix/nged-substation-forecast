@@ -83,7 +83,7 @@ discussion before proposing an approach.
 The docs are published at <https://openclimatefix.github.io/nged-substation-forecast>. When
 linking to a docs page from anywhere outside `docs/` itself (GitHub issues, PR bodies, code
 docstrings), link to that rendered site (e.g.
-`https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#anchor`),
+`https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#production-monitoring`),
 never to a `github.com/.../blob/main/docs/...` path.
 
 **Chart images — optimise an SVG before committing it.** A Vega/Altair chart exported straight to
