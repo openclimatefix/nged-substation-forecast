@@ -106,9 +106,11 @@ Three places where a positional argument is right:
 
 ## Comments, docstrings and links
 
-- **Do not remove existing comments** unless they are misleading or out of date. Only add new
-  comments if you're doing something that isn't obvious from the code. Write self-documenting
-  code, and assume the reader is fluent in Python.
+- **Do not remove existing comments** unless they are misleading, out of date, or a second copy of
+  an argument a `docs/` page already makes. Only add new comments if you're doing something that
+  isn't obvious from the code. Write self-documenting code, and assume the reader is fluent in
+  Python. The third ground is the "One home per argument" rule below, applied in the direction of
+  deletion: where the page carries the argument, the comment carries the link.
 - **Comments and docs must reflect current state only** — never reference previous iterations of
   the code or deleted files. This is the same rule as "Write about the present, not the past" in
   `CLAUDE.md`, applied to code.
@@ -137,6 +139,17 @@ Three places where a positional argument is right:
   might rot is cheaper than a copy that rots invisibly. It cuts the other way too — rationale
   worth a paragraph does not belong *only* in a docstring, where no reader browsing the docs will
   find it.
+- **A Dagster docstring is operator documentation, and is where "one home per argument" gives
+  way.** Dagster renders the docstring of an asset, asset check, job, schedule and sensor in its
+  UI, where it is the only documentation an operator running the pipeline reads. Each one has to
+  make sense read on its own, by someone who has not opened the source file, and has to place the
+  asset in the pipeline: what it consumes, what it produces, what triggers it, and what a degraded
+  run looks like. Link into `docs/` for the reasoning behind a design, but keep the account of what
+  the asset does and what it sits between in the docstring, even where a docs page says the same
+  — an operator reading the Dagster UI cannot follow a link they never see. Text passed as
+  `description=` to an `AssetCheckSpec`, a `define_asset_job` call or a Dagster `Config` field
+  renders in that same UI and carries the same duty; a check with no `description` shows the
+  operator a blank.
 - **Say why a guard exists, when the reason is not "this state happens"** — validation that
   defends a reusable package's public API, rather than a state production can reach, says so in a
   clause: `# Reusable-package input validation, not a reachable production state: the ecmwf_ens
