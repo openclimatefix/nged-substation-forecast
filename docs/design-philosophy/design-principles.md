@@ -178,7 +178,7 @@ month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-m
 rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 
 *Detail:* [Nothing gets rewritten on the way to
-production](../ml_experimentation/mlops-approach.md#nothing-gets-rewritten-on-the-way-to-production),
+production](../ml_experimentation/index.md#nothing-gets-rewritten-on-the-way-to-production),
 [Why Dagster, not Airflow?](../architecture/why-dagster-not-airflow.md).
 
 ### 4 — An experiment must be cheap to try, and cheap to abandon
@@ -384,7 +384,8 @@ source is assessed by a controlled ablation before it may enter the leaderboard 
 *Detail:*
 [Eligibility](../ml_experimentation/cross-validation-folds.md#eligibility),
 [Complete validation windows only](../architecture/ml-orchestration.md#complete-validation-windows-only),
-[Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).
+[Evaluating a data source whose history is shorter than the
+folds](../ml_experimentation/cross-validation-folds.md#evaluating-a-data-source-whose-history-is-shorter-than-the-folds).
 
 ### 9 — Provenance travels with the forecast data
 

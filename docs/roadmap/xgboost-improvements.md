@@ -267,7 +267,7 @@ unmodelled behavioural day becomes a phantom event candidate. Prefer encodings t
 across sparse examples — a days-to-nearest-holiday feature and a holiday-name categorical
 rather than a lone `is_bank_holiday` flag — and cover the days a day-of-year feature
 structurally cannot represent:
-[background on GB demand's calendar-driven quirks](../background/data-quality.md#behavioural-calendar-effects-on-demand)
+[background on GB demand's calendar-driven quirks](../background/network.md#behavioural-calendar-effects-on-demand)
 covers Easter, regional school half-terms, and major broadcast events such as England playing
 in the later stages of a Football World Cup.
 

@@ -21,7 +21,8 @@ why this was chosen over fetching the champion model from MLflow dynamically at 
 Everything on this page is driven from the Dagster UI, and is the same whichever environment
 the stack runs in — bring one up first:
 
-- **Locally on a laptop** — [Running the whole stack locally](local.md); the UI is at
+- **Locally on a laptop** — [Getting started on your
+  laptop](../getting-started.md#running-the-live-service-on-your-laptop); the UI is at
   `http://localhost:3000` and runs execute on your machine.
 - **Deployed on AWS** — [Setting up the live service on AWS](aws.md); the UI is at
   `http://nged-forecast-ctrl:3000` over Tailscale, and each run executes on an ephemeral

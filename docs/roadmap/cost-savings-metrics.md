@@ -314,8 +314,9 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
   interventions we are pricing.
 - **Ten trial-area sites cannot see direction at all.** They are metered in MVA, which reports the
   magnitude of flow, so reverse power flow appears as a *rise* rather than a sign change (see
-  [data quality](../background/data-quality.md)). At those sites an export event would be billed as
-  demand-side procurement, and multiplying MVA by half an hour gives MVAh, which is not the
+  [data quality](../background/network.md#apparent-power-mva-metering)). At those sites an export
+  event would be billed as demand-side procurement, and multiplying MVA by half an hour gives
+  MVAh, which is not the
   megawatt-hour a flexibility price is quoted against.
 - **Unmet energy is pooled across series and half-hours.** A model can hit the 5% target by covering
   the largest site well and abandoning many small ones, and 5% concentrated in one deep breach is

@@ -1336,8 +1336,8 @@ configured. Rotate the key periodically once this is live.
 
 - [Operating the live service](operations.md) — driving the deployed service day to day:
   promotion, the 6-hourly schedule, inspecting forecasts, backfilling missed slots.
-- [Running the whole stack locally](local.md) — the same service end-to-end on a laptop, no
-  AWS involved.
+- [Getting started on your laptop](../getting-started.md) — the same service end-to-end on a
+  laptop, no AWS involved.
 - [Configuration reference](setup.md) — what the storage roots and `DATA_STORE_*`/credential
   settings mean, and which combination each environment uses.
 - [Production Deployment — Design](../architecture/production-deployment.md) — why the image is

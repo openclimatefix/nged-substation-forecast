@@ -127,7 +127,7 @@ is that the baseline is a supervised *model*, not an empirical climatology. The 
 across days whose feature vectors look alike (all Mondays in May borrow strength from each other
 automatically), so the fiddly question "which days count as similar?" reduces to "is the calendar
 encoding rich enough?". [Background: GB demand's calendar-driven
-quirks](../background/data-quality.md#behavioural-calendar-effects-on-demand) sets out the days a
+quirks](../background/network.md#behavioural-calendar-effects-on-demand) sets out the days a
 day-of-year feature structurally cannot represent — Easter, bank-holiday bridge days,
 county-varying school half-terms, and major broadcast events such as an England World Cup run.
 For detection purposes the stage-1 baseline is a *hindcast*, so past broadcast events are

@@ -29,11 +29,12 @@ them. See [Handover to NGED](../roadmap/handover.md).
 
 ## Documents
 
-The pages split by *which environment you're bringing up* and then *how to drive it* — the
-driving is identical in both environments, so it lives on one shared page:
+Bringing the whole service up on a laptop is part of [Getting started on your
+laptop](../getting-started.md#running-the-live-service-on-your-laptop) rather than a page here,
+because the laptop stack is the same one a first-time setup already produces. The pages below
+cover the AWS bring-up and then how to drive a running stack; the driving is identical in both
+environments, so it lives on one shared page.
 
-- [Running the whole stack locally](local.md) — bring the entire service up on a laptop:
-  `.env`, a persistent `DAGSTER_HOME`, `dg dev`, and the optional MinIO rehearsal.
 - [Setting up the live service on AWS](aws.md) — every step to stand the service up on AWS, in
   order: S3 buckets and IAM (AWS's storage and permissions services; every AWS acronym is
   spelled out on first use there), promote a champion and build/verify/push its image, the

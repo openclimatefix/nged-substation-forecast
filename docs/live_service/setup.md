@@ -5,10 +5,10 @@ disk, or S3 — Simple Storage Service, AWS's object store) and **what credentia
 This page is the reference; the step-by-step journeys that *use* these settings live elsewhere
 and deliberately aren't repeated here:
 
-- [Getting started on your laptop](../getting-started.md) owns first-time repo setup — installing
-  `uv`, `uv sync`, pre-commit hooks, creating `.env`, and materialising the first data and model.
-- [Running the whole stack locally](local.md) owns the laptop bring-up (persistent
-  `DAGSTER_HOME`, `dg dev`, the optional MinIO rehearsal).
+- [Getting started on your laptop](../getting-started.md) owns first-time repo setup and the
+  laptop bring-up — installing `uv`, `uv sync`, pre-commit hooks, creating `.env`, a persistent
+  `DAGSTER_HOME`, `dg dev`, materialising the first data and model, and the optional MinIO
+  rehearsal.
 - [Setting up the live service on AWS](aws.md) owns every AWS console step — buckets, IAM
   (Identity and Access Management — AWS's permissions system), the container image, and the
   control-plane box.
@@ -140,7 +140,7 @@ depends on where the code runs:
   which user), but **not** `ENDPOINT_URL`.
 - **A local MinIO rehearsal** — set all four; `ENDPOINT_URL` is only for non-AWS/S3-compatible
   endpoints (and it deliberately allows plain HTTP, which dev endpoints rarely encrypt). See
-  [Running the whole stack locally](local.md#optional-rehearse-s3-locally-with-minio).
+  [Getting started on your laptop](../getting-started.md#optional-rehearse-s3-locally-with-minio).
 
 ### At-a-glance: which settings for which environment
 

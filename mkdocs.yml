@@ -47,10 +47,9 @@ nav:
   - Documentation guide: documentation-guide.md
   - Background:
       - Overview: background/index.md
-      - NGED's network: background/network.md
+      - NGED's network and its data: background/network.md
       - Requirements: background/requirements.md
       - NGED's incumbent forecast: background/nged-incumbent-forecast.md
-      - Data quality: background/data-quality.md
       - Switching events: background/switching-events.md
       - The state of the art in energy forecasting: background/energy-forecasting-review.md
   - Design philosophy:
@@ -81,14 +80,11 @@ nav:
       - Testing: architecture/testing.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md
-      - Our approach to MLOps: ml_experimentation/mlops-approach.md
       - Model configuration: ml_experimentation/model-configuration.md
       - Running an ML experiment end-to-end: ml_experimentation/dagster-workflow.md
       - Cross-validation folds: ml_experimentation/cross-validation-folds.md
-      - Evaluating data sources with limited history: ml_experimentation/evaluating-new-data-sources.md
   - Live service:
       - Overview: live_service/index.md
-      - Running the whole stack locally: live_service/local.md
       - Setting up the live service on AWS: live_service/aws.md
       - Connecting to the AWS control plane: live_service/connecting.md
       - Operating the live service: live_service/operations.md

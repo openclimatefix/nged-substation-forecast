@@ -140,6 +140,42 @@ Then register an experiment and train a model. The full recipe — the run confi
 experiment with `run_mode="smoke_test"` to check the whole pipeline is wired up before committing to
 a long `full_cv` training run.
 
+## Running the live service on your laptop
+
+The entire live service — telemetry ingestion, NWP download, the 6-hourly forecast schedule, and
+the Dagster UI — runs on the laptop you have just set up, with no AWS involved. Running the whole
+stack locally is a deliberate portability requirement rather than a development convenience: no
+cloud-specific service may be load-bearing for scheduling or orchestration (see [the orchestration
+decision](architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm)).
+
+The 6-hourly schedule fires only while `dg dev` keeps running, so closing the laptop lid stops the
+service. That gap is exactly what the [AWS deployment](live_service/aws.md) exists to close, and
+why a missed slot is backfillable — see [Operating the live service: Backfilling a missed
+slot](live_service/operations.md#backfilling-a-missed-slot). Driving a running stack is identical
+in both environments — promotion, the schedule, inspecting a forecast, backfills — and lives in
+[Operating the live service](live_service/operations.md).
+
+### Optional — rehearse S3 locally with MinIO
+
+To exercise the exact S3 (Simple Storage Service — AWS's object store) read/write code paths
+without touching AWS, point both `DATA_PATH_INTERNAL`
+and `DATA_PATH_DELIVERY` at the same local [MinIO](https://min.io/) (or any S3-compatible) endpoint
+and supply all four `DATA_STORE_*` settings:
+
+```dotenv
+DATA_PATH_INTERNAL=s3://my-bucket/data
+DATA_PATH_DELIVERY=s3://my-bucket/data
+DATA_STORE_ENDPOINT_URL=http://localhost:9000
+DATA_STORE_ACCESS_KEY_ID=minioadmin
+DATA_STORE_SECRET_ACCESS_KEY=minioadmin
+DATA_STORE_REGION=us-east-1
+```
+
+`LOCAL_ARTIFACTS_PATH` is left unset, so models and plots stay under `<repo>/data` on your disk while
+the data tables round-trip through MinIO. Setting `DATA_STORE_ENDPOINT_URL` also allows plain HTTP,
+since dev endpoints rarely have TLS. (This is the same machinery the S3 integration test drives
+against an in-process `moto` server.)
+
 ## Where to go next
 
 - [Running an ML experiment end-to-end](ml_experimentation/dagster-workflow.md) — the data-to-model
@@ -147,8 +183,6 @@ a long `full_cv` training run.
   choosing features and hyperparameters.
 - [Configuration reference](live_service/setup.md) — every `.env` setting, the storage-root model,
   and how to point the data tables at real S3.
-- [Running the whole stack locally](live_service/local.md) — keeping the daemon and the 6-hourly
-  forecast schedule running continuously, and an optional MinIO rehearsal of the S3 code paths.
 - The [dashboard README](https://github.com/openclimatefix/nged-substation-forecast/tree/main/packages/dashboard#readme)
   — Marimo apps for inspecting forecasts, and the `.env.s3` toggle for viewing production data.
 - [Viewing results in the MLflow UI](ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)

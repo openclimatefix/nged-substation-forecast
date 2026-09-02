@@ -53,7 +53,7 @@ testing strategy remain unwritten, plus general cleanup.
 
 **Part 3 — docs freshness pass.** The permanent-docs migration from the old `dagster_plan.md`
 is already done (July 2026): `docs/architecture/ml-orchestration.md` and
-`docs/ml_experimentation/evaluating-new-data-sources.md` capture its important ideas. What
+`docs/ml_experimentation/cross-validation-folds.md` capture its important ideas. What
 remains:
 
 - Check `docs/` against the code after the live service and monitoring land — in particular

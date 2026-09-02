@@ -296,9 +296,9 @@ depend on retraining staying cheap and promotion staying one command.
 
 A stuck meter reporting 2.1 MW for 52 hours is not missing data; it is actively misleading, and a
 lag-feature model will propagate it happily. The incumbent has the identical vulnerability.
-[Data Quality](../background/data-quality.md) documents both classes empirically — false zeros,
-stuck values and genuinely missing data as separate phenomena — and is the evidence base for this
-distinction.
+[NGED's network and its data](../background/network.md#data-quality-in-the-trial-area) documents
+both classes empirically — false zeros, stuck values and genuinely missing data as separate
+phenomena — and is the evidence base for this distinction.
 
 ### Default directions, and their limit
 

@@ -340,7 +340,8 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   representativeness, which that ceiling does not bound. Because ICON-EU's history starts early
   2026 (shorter than the canonical CV folds) it is assessed via a controlled ad-hoc ablation,
   not the leaderboard, until it has ~1–2 complete years of history. See
-  [Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).
+  [Evaluating a data source whose history is shorter than the
+  folds](../ml_experimentation/cross-validation-folds.md#evaluating-a-data-source-whose-history-is-shorter-than-the-folds).
 
 ---
 
