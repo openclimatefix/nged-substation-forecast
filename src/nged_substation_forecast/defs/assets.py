@@ -75,7 +75,9 @@ _POWER_INGEST_MAX_RETRIES: Final[int] = 2
 """How many times to retry the NGED S3 read before letting the hourly ingest fail.
 
 Deliberately small: nothing is lost by waiting, since this asset re-lists NGED's bucket from
-scratch on every attempt and the next hourly run back-fills whatever this one missed. See [Send
+scratch on every attempt and the next hourly run back-fills whatever this one missed. A longer
+budget would buy nothing the next hour does not, and each retry re-runs the whole listing,
+download and parse, which at V2 scale costs far more than the delay does. See [Send
 telemetry to
 Sentry](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
 for why this retry is in-band rather than a Dagster ``RetryPolicy``."""
@@ -334,8 +336,9 @@ _UPSTREAM_PER_VARIABLE_SCHEMA: Final[TableSchema] = TableSchema(
     # `concurrency.pools.default_limit`. See
     # https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools.
     #
-    # The cap protects the download, not memory — each partition runs in its own Fargate task, so
-    # partitions never share an address space. But each partition also runs
+    # The cap protects the download, not memory — the conversion holds one
+    # `(lead_time, ensemble_member)` slice at a time, and each partition runs in its own Fargate
+    # task, so partitions never share an address space. But each partition also runs
     # `download_ecmwf_ens_data`'s own thread pool, so Dynamical.org sees this limit multiplied by
     # that pool's `max_workers` at once (issue #276 measured 13 concurrent fetches self-contending
     # into multi-minute stragglers). Lower `max_workers` if per-partition downloads grow a long

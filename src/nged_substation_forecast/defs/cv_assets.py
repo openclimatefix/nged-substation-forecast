@@ -205,6 +205,10 @@ def _time_series_ids_missing_metadata(
 ) -> list[int]:
     """The requested series that have no row in the metadata parquet.
 
+    Named explicitly rather than inferred from an empty result, so the error says which series are
+    missing, and cheap to compute because the metadata frame is already eager and already filtered
+    to ``time_series_ids``.
+
     Such a series cannot be forecast: ``TabularFeatureEngineer`` maps NWP to series through the
     metadata's ``h3_res_5``, so a series missing from the roster has no weather and produces no
     output rows.

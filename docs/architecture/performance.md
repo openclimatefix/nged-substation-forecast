@@ -99,7 +99,8 @@ batching sound. Measured on the V1 fold (28 series, about 13M rows each), a batc
 completes in roughly 50 seconds at about 18 GB peak process resident set size. That peak is
 dominated by the streaming Delta scan rather than by the data: each batch re-scans the partition,
 while the materialised batch frame itself is a few GB. A batch of 2 measured only about 2 GB lower,
-so a smaller batch buys little — the scan overhead is roughly constant in the batch size.
+so a smaller batch buys little — the scan overhead is roughly constant in the *fold* size, which is
+what keeps the approach workable as folds grow to V2 scale.
 
 **Every scan in the scoring path streams, because the eager equivalent materialises full-length rows
 before it reduces them.** Collecting the distinct `time_series_id` values eagerly materialises them

@@ -62,13 +62,17 @@ def init_sentry(settings: Settings) -> None:
     """Initialise the Sentry SDK for this process, or do nothing if Sentry is disabled.
 
     A no-op when ``settings.sentry_dsn`` is empty (the default), so nothing is sent from laptops
-    or CI unless a DSN is explicitly configured. Never raises: ``sentry_sdk.init`` raises
-    ``BadDsn`` during DSN parsing, before any global state is touched, so catching that failure
-    leaves the SDK with a ``NonRecordingClient`` — identical to never having called ``init`` at
-    all. Every other sender in this module already treats an inactive client as a silent no-op, so
-    none of them needs its own guard as a result.
+    or CI unless a DSN is explicitly configured. Never raises, because a malformed DSN must not
+    stop the Dagster code location from loading: the daemon would then run no schedule and produce
+    no forecast at all, and that is the one failure Sentry itself cannot alert on. Catching is
+    safe because ``sentry_sdk.init`` raises ``BadDsn`` during DSN parsing, before any global state
+    is touched, so the SDK is left with a ``NonRecordingClient`` — identical to never having called
+    ``init`` at all. Every other sender in this module already treats an inactive client as a
+    silent no-op, so none of them needs its own guard as a result.
 
     Log-to-event capture is deliberately switched off (see the module docstring for why).
+    Breadcrumbs are kept, so log context still rides along with the events the explicit senders do
+    send.
 
     Args:
         settings: The project settings carrying the Sentry DSN, environment, and sample rate.

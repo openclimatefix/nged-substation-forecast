@@ -302,7 +302,9 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
     return AssetCheckResult(
         # WARN, never blocking (design page linked from the module docstring). A resurrection is
         # the one yellow nothing else can raise: the series is healthy, so `is_healthy` stays true,
-        # and only an edit to the dead list clears it.
+        # and only an edit to the dead list clears it. `is_healthy` is `n_late == 0`, which is
+        # vacuously true with no data at all, so the `n_series_total` guard stops a fresh deployment
+        # or a wholly-silenced feed reading as a green tick.
         passed=result.is_healthy and result.n_series_total > 0 and not result.resurrected_ids,
         severity=AssetCheckSeverity.WARN,
         description=_describe_power_freshness(result),
