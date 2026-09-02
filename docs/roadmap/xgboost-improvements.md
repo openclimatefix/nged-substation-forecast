@@ -325,8 +325,11 @@ For each power lag the model already receives, also feed it the *weather at that
 `LagFeature.base_col` already accepts weather variables — and lagged *datetime* adds nothing new (it
 is deterministic given the target's datetime features and the fixed lag offset; the same holds for
 holiday flags at the lag time once the holiday and calendar features land), so aligned weather is
-the only genuinely new information. In principle the booster can then judge how *normal* each lagged
-power value is — power at the lagged time relative to what the weather then would predict. That
+the only genuinely new information.
+
+**In principle the booster can then judge how *normal* each lagged power value is — exactly the
+anomaly signal the residual-lag features compute explicitly.** A lagged power value is normal or
+not relative to what the weather at that lagged time would predict. That
 judgement is exactly the anomaly signal that [the residual-lag
 features](#residual-lag-features-from-the-switching-detector-baseline) engineers explicitly with a
 two-stage residual pipeline (the [full
@@ -654,7 +657,7 @@ into weather-driven variation. Beyond its expected metric win, this experiment's
 point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector)
 between a feature-based switching mainline and the staged detector — extra reason to schedule it.
 
-Five scheduling notes specific to this page:
+Four scheduling notes specific to this page, and one larger caveat that follows them:
 
 - **Run [aligned lagged weather](#aligned-lagged-weather-the-single-stage-ablation-control)
   first.** The config-only single-stage variant — aligned lagged-weather features, letting the
@@ -679,25 +682,6 @@ Five scheduling notes specific to this page:
   feature-visualisation tool
   ([#359](https://github.com/openclimatefix/nged-substation-forecast/issues/359)) is the
   vehicle.
-- **It needs more than a config change.** The two-pass pipeline (fit the baseline per cross-validation (CV) fold on that fold's training period only; hindcast residuals over history, generating the booster's
-  *training-row* residuals out-of-sample for the baseline via rolling-origin refits, so the booster
-  never calibrates on in-sample residuals it will not see live; join them in as features) is new
-  machinery. The hindcast leg should consume the central NWP analysis-proxy function planned in
-  [#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356); that function owns
-  the publication-time availability cut the no-lookahead caveat requires. And while the baseline's
-  *feature list* and robust median objective are both just config, residual *normalisation*
-  needs a per-series spread estimate — from the
-  [quantile-objective model family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
-  once it lands, or an interim rolling MAD (median absolute deviation) of the residuals. The
-  neighbour-residual variant additionally needs the trial-area adjacency list
-  ([switching-events open items](switching-events.md#open-items-dependencies)) and
-  cross-series feature engineering — entering as a fixed set of permutation-invariant pooled
-  columns (the signed neighbourhood sum and the signed most-anomalous neighbour; see the full
-  design), never one column per neighbour; the self-residual version needs neither and should
-  run first.
-
-    **Adopting a winner still adds work: the live service must then run the baseline model too.** That means a second deployed model, plus a hindcast-residual step in the predict path.
-
 - **A related variant reuses the same machinery to *correct a draft*, not only to supply residual
   lags.** The stage-1 baseline can be evaluated at the target time to make a first-draft forecast
   that stage 2 then corrects — supplied either as an ordinary feature or as an XGBoost
@@ -706,6 +690,26 @@ Five scheduling notes specific to this page:
   [full treatment](switching-events.md#approach-1-the-two-stage-forecaster) — soft-vs-hard
   corrector, the quantile subtlety, and why the low-variance correction target is a plausible route
   to a *global* model — is on the switching-events page.
+
+**It needs more than a config change.** The two-pass pipeline (fit the baseline per cross-validation
+(CV) fold on that fold's training period only; hindcast residuals over history, generating the
+booster's *training-row* residuals out-of-sample for the baseline via rolling-origin refits, so the
+booster never calibrates on in-sample residuals it will not see live; join them in as features) is
+new machinery. The hindcast leg should consume the central NWP analysis-proxy function planned in
+[#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356); that function owns
+the publication-time availability cut the no-lookahead caveat requires. And while the baseline's
+*feature list* and robust median objective are both just config, residual *normalisation* needs a
+per-series spread estimate — from the [quantile-objective model
+family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics) once it lands, or an
+interim rolling MAD (median absolute deviation) of the residuals. The neighbour-residual variant
+additionally needs the trial-area adjacency list ([switching-events open
+items](switching-events.md#open-items-dependencies)) and cross-series feature engineering — entering
+as a fixed set of permutation-invariant pooled columns (the signed neighbourhood sum and the signed
+most-anomalous neighbour; see the full design), never one column per neighbour; the self-residual
+version needs neither and should run first.
+
+**Adopting a winner still adds work: the live service must then run the baseline model too.** That
+means a second deployed model, plus a hindcast-residual step in the predict path.
 
 ### Weather-abnormality (climatology z-score) features
 
@@ -720,9 +724,11 @@ features](#weather-delta-compensation-for-power-lags-an-implicit-handle-on-unmet
 already make: a z-score is a difference of two continuous inputs, exactly the structure trees are
 otherwise bad at. A per-series booster could in principle learn "hot for June" from a `day_of_year ×
 temperature` interaction, but on the 10⁴–10⁵ rows one series provides it mostly will not, so handing
-it the precomputed anomaly is legitimate inductive bias rather than information it already holds. It
-sits at the end of Tier 3 because its expected win is modest (see below) yet it carries a new
-data-ingestion dependency — far more effort per unit skill than the residual-lag features above it.
+it the precomputed anomaly is legitimate inductive bias rather than information it already holds.
+
+**The weather-abnormality feature sits at the end of Tier 3 because its expected win is modest but
+its data-ingestion dependency is new.** The expected win is modest (see below) yet the feature
+carries a new data-ingestion dependency — far more effort per unit skill than the residual-lag features above it.
 
 **Is the anomaly the signal, or is the raw value?** For GB demand the first-order response is to
 *actual* (effective) temperature, which the Tier-2 [effective-temperature and degree-day
@@ -797,32 +803,30 @@ in an arid climate and only a refinement in a wet climate, and a sharp washing s
 identifies a reversible cleanliness factor at all. Building these features for Great Britain is
 therefore lower-effort than it looks on the GB business case alone.
 
-**Where the signal plausibly is**, in roughly descending order of confidence:
+**Where the signal plausibly is**, in roughly descending order of confidence. PV soiling comes
+first, then the three shorter cases below it.
 
-- **PV soiling** — the mechanism this project has already worked out in most detail, which is why
-  it leads. Dust, pollen, and bird droppings accumulate on panel glass and a decent fall of rain
-  washes most of it off. [Differentiable physics →
-  Soiling](../techniques/differentiable-physics.md#soiling) makes the central point for us:
-  Britain's *long-run average* effect is small, but the loss tracks **time since the last washing
-  rainfall** rather than any climate mean, so a multi-month dry spell is exactly the regime in
-  which it stops being small — and that page says the correction is worth adding for Great
-  Britain, not only for dustier climates. The tabular feature is the state variable of that
-  model, `d_t`, taken directly: time since precipitation last exceeded a washing threshold.
+**PV soiling** — the mechanism this project has already worked out in most detail, which is why it
+leads. Dust, pollen, and bird droppings accumulate on panel glass and a decent fall of rain washes
+most of it off. [Differentiable physics → Soiling](../techniques/differentiable-physics.md#soiling)
+makes the central point for us: Britain's *long-run average* effect is small, but the loss tracks
+**time since the last washing rainfall** rather than any climate mean, so a multi-month dry spell is
+exactly the regime in which it stops being small — and that page says the correction is worth adding
+for Great Britain, not only for dustier climates. The tabular feature is the state variable of that
+model, `d_t`, taken directly: time since precipitation last exceeded a washing threshold.
 
-    **The feature itself needs no new data source and no climatological normalisation.**
-    `precipitation_surface` is already among the ECMWF ENS variables
-    we download, so the rainfall history sits in the archive (though reconstructing a dry spell
-    longer than one 15-day run still means stitching across archived runs, and so inherits the
-    availability-cut caveat below). It is the one member of this family that needs no climatological
-    normalisation at all, because "37 days since washing rain" is already interpretable in absolute
-    terms. A reversible cleanliness
-    factor is probably worth adding for Britain even so, precisely because Britain's rainy
-    *average* hides real dry-spell episodes. Note the
-    division of labour with capacity estimation, which absorbs the long-run *average* soiling
-    bias into the effective-capacity estimate
-    ([honest caveats of the convex route](capacity-estimation.md#honest-caveats-of-the-convex-route)):
-    that leaves precisely the time-varying part for a feature to explain, and this is the low-effort
-    XGBoost-era stand-in for the differentiable-physics treatment.
+**The feature itself needs no new data source and no climatological normalisation.**
+`precipitation_surface` is already among the ECMWF ENS variables we download, so the rainfall
+history sits in the archive (though reconstructing a dry spell longer than one 15-day run still
+means stitching across archived runs, and so inherits the availability-cut caveat below). It is the
+one member of this family that needs no climatological normalisation at all, because "37 days since
+washing rain" is already interpretable in absolute terms. A reversible cleanliness factor is
+probably worth adding for Britain even so, precisely because Britain's rainy *average* hides real
+dry-spell episodes. Note the division of labour with capacity estimation, which absorbs the long-run
+*average* soiling bias into the effective-capacity estimate ([honest caveats of the convex
+route](capacity-estimation.md#honest-caveats-of-the-convex-route)): that leaves precisely the
+time-varying part for a feature to explain, and this is the low-effort XGBoost-era stand-in for the
+differentiable-physics treatment.
 
 - **Sustained-heat demand** — the largest case by *magnitude* for the v1 population, because most
   of that population is demand. The Tier-2
@@ -1130,23 +1134,24 @@ want is spread-as-a-feature or the resilience property.
 
 **Disadvantages.**
 
-- **It gives up the weather-versus-model uncertainty decomposition.** This is the serious
-  disadvantage, and it is a decision about the *product*, not just the model. The planned
-  probabilistic design is a
-  [mixture of conditional distributions](../techniques/probabilistic-forecasting.md#the-fix-formally-a-mixture-of-conditional-distributions):
-  each member yields a conditional distribution $F_m$ ("how uncertain is power *given* this
-  weather story"), and the disagreement *between* members carries the weather uncertainty. Pool
-  them and both survive. Collapse the member axis and there is no $F_m$, so there is no linear
-  pool and no source for
-  [Representation 3](delivery-tables.md#representation-3-ensemble-of-percentile-forecasts) — the
-  ensemble-of-percentiles delivery table. A quantile-regression model fed weather quantiles still
-  produces a predictive distribution, but it is a single conflated one: it cannot answer "is this
-  forecast uncertain because the weather is uncertain, or because the model is?" — the question
-  behind a control-room user asking whether to wait for tomorrow's run.
-    - The honest counterweight: that conflation removes the
-      [double-counting](../techniques/probabilistic-forecasting.md#caveat-double-counting-weather-uncertainty)
-      risk by construction, so the collapsed model might be *better calibrated* while being less
-      informative. Calibration and attribution are genuinely different goods here.
+**It gives up the weather-versus-model uncertainty decomposition.** This is the serious
+disadvantage, and it is a decision about the *product*, not just the model. The planned
+probabilistic design is a [mixture of conditional
+distributions](../techniques/probabilistic-forecasting.md#the-fix-formally-a-mixture-of-conditional-distributions):
+each member yields a conditional distribution $F_m$ ("how uncertain is power *given* this weather
+story"), and the disagreement *between* members carries the weather uncertainty. Pool them and both
+survive. Collapse the member axis and there is no $F_m$, so there is no linear pool and no source
+for [Representation 3](delivery-tables.md#representation-3-ensemble-of-percentile-forecasts) — the
+ensemble-of-percentiles delivery table. A quantile-regression model fed weather quantiles still
+produces a predictive distribution, but it is a single conflated one: it cannot answer "is this
+forecast uncertain because the weather is uncertain, or because the model is?" — the question behind
+a control-room user asking whether to wait for tomorrow's run.
+
+**The honest counterweight is that the conflation removes the
+[double-counting](../techniques/probabilistic-forecasting.md#caveat-double-counting-weather-uncertainty)
+risk by construction**, so the collapsed model might be *better calibrated* while being less
+informative. Calibration and attribution are genuinely different goods here.
+
 - **Aggregating in weather space rather than power space.** Substation net load is a strongly
   non-linear function of irradiance and wind speed (PV clipping, the cubic turbine ramp), so
   $\mathbb{E}[f(x)] \neq f(\mathbb{E}[x])$. Pushing each member through the model and combining in
@@ -1200,8 +1205,11 @@ proxy as its `base_margin` and learn only the site-specific deviation — physic
 cross-site shape, trees the correction. This is the scale match the per-series net-demand models
 lack — there the capacity-free proxy is the wrong tool as a margin (the [physics-features
 section](#linearised-physics-features-for-solar-and-wind) explains why), and capacity-factor
-normalisation is what supplies it. Using the physics proxy as that `base_margin` is also the same
-base-margin move the [two-stage forecaster](switching-events.md#approach-1-the-two-stage-forecaster)
+normalisation is what supplies it.
+
+**Using the physics proxy as that `base_margin` is the same move the two-stage forecaster already
+makes with its stage-1 draft.** It is the same base-margin move the [two-stage
+forecaster](switching-events.md#approach-1-the-two-stage-forecaster)
 makes with its stage-1 draft; there, the correction target's low variance and cross-series
 stationarity are part of what makes a *global* corrector tractable at all — the same property that
 helps here. (Under a log-link generation objective the margin would be `log(proxy)`, which needs a

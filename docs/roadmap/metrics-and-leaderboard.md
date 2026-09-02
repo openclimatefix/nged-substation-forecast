@@ -98,24 +98,24 @@ representation, not a bonus.** The plotted spread *is* the incumbent's output �
 by eye. We emit the 13 analogues as 13 `ensemble_member` rows and let the [probabilistic
 metrics](#phase-b-probabilistic-metrics-from-the-existing-ensemble) score them with no extra
 implementation work — scoring the spread is the closest automatable proxy for the plot a human
-actually reads. Two consequences worth stating plainly:
+actually reads. Two consequences follow.
 
-- **`ensemble_member` is overloaded here.** For NWP models that column indexes an NWP ensemble
-  member; for `nged_incumbent` it indexes a *historical analogue*. Same column, different meaning.
-  We document this on the `PowerForecast` / `AllFeatures` schema so nobody assumes
-  `ensemble_member ⇒ NWP`. The incumbent *synthesises* its ensemble inside `predict()` (by
-  unpivoting its analogue-lag columns into member rows) rather than consuming an NWP ensemble; it
-  runs with `weather_source: "none"`.
-- **Deterministic collapse is a property of the metrics layer, not the incumbent.** The incumbent
-  emits its 13 members and nothing else; the [metric-matched collapse
-  decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast) then scores its MAE
-  on the members' median (apples-to-apples with every other model's central forecast) and reports
-  NGED's *actual* operating point — the **95th percentile** — as a labelled secondary number
-  (`mae`/`mbe` at `metric_param="p95"`). Being deliberately conservative, the P95 carries a large
-  *positive* MBE **by design** (a peak-safety choice, not a forecasting error), so it belongs
-  *beside* the central metric. Either way NGED weight the analogues equally ("no
-  further processing at all"), so equiprobable members — and the probabilistic metrics (CRPS etc.)
-  computed over them — are faithful, not an approximation.
+**`ensemble_member` is overloaded here.** For NWP models that column indexes an NWP ensemble member;
+for `nged_incumbent` it indexes a *historical analogue*. Same column, different meaning. We document
+this on the `PowerForecast` / `AllFeatures` schema so nobody assumes `ensemble_member ⇒ NWP`. The
+incumbent *synthesises* its ensemble inside `predict()` (by unpivoting its analogue-lag columns into
+member rows) rather than consuming an NWP ensemble; it runs with `weather_source: "none"`.
+
+**Deterministic collapse is a property of the metrics layer, not the incumbent.** The incumbent
+emits its 13 members and nothing else; the [metric-matched collapse
+decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast) then scores its MAE on
+the members' median (apples-to-apples with every other model's central forecast) and reports NGED's
+*actual* operating point — the **95th percentile** — as a labelled secondary number (`mae`/`mbe` at
+`metric_param="p95"`). Being deliberately conservative, the P95 carries a large *positive* MBE **by
+design** (a peak-safety choice, not a forecasting error), so it belongs *beside* the central metric.
+Either way NGED weight the analogues equally ("no further processing at all"), so equiprobable
+members — and the probabilistic metrics (CRPS etc.) computed over them — are faithful, not an
+approximation.
 
 ### A faithful replica and a "simple upgrades" variant
 
@@ -402,6 +402,7 @@ incumbent forecast](../background/nged-incumbent-forecast.md); the implementatio
 [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) / #147 following the
 `github-issue-pr-workflow` skill's issue-creation rules (labels, Type, OCF project fields, sub-issue
 ordering), *including* one for `nged_incumbent_holiday_aligned` so it survives #147 closing. (2)
+
 **Re-run recipe:** add a short "Re-running CV for an experiment" subsection to
 `docs/ml_experimentation/dagster-workflow.md` describing the `trained_cv_model++` backfill, written
 only after the drill is verified end-to-end, and mentioning `PopulationFilter` for single-experiment
@@ -594,22 +595,23 @@ is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
 #### Mean versus median — the trade-off
 
 The instinct is to "pick one central statistic and apply it everywhere". But mean and median are not
-interchangeable, and the difference between them decides which one to use where:
+interchangeable, and the difference between them decides which one to use where.
 
-- The **mean** is the point forecast that minimises **squared error** — so RMSE (and MBE, which is
-  a mean-of-errors and inherits the mean's clean energy-balance / expectations-aggregate reading)
-  is *consistent* with the mean. Our squared-error XGBoost models literally learn a conditional
-  mean, and the ensemble mean of 51 such members is a coherent estimate of `E[power]`. Scoring the mean on
-  RMSE rewards a model for reporting its honest conditional mean. The mean also averages out member
-  noise, so it is the more stable statistic on a small ensemble, and it matches standard NWP
-  verification practice.
-- The **median** is the point forecast that minimises **absolute error** — so MAE and NMAE are
-  *consistent* with the median. It is robust to the skew that is real in this problem (holiday
-  weeks, solar clipping) and to the ensemble underdispersion the [probabilistic
-  section](#delivering-the-probabilistic-metrics) documents, it is the faithful reading of NGED's
-  equally-weighted analogue spread, and it is coherent with the quantile columns already on the
-  leaderboard: median MAE is exactly `2 × pinball_loss@p50`, so a median headline makes the
-  deterministic and probabilistic columns tell one story.
+The **mean** is the point forecast that minimises **squared error** — so RMSE (and MBE, which is a
+mean-of-errors and inherits the mean's clean energy-balance / expectations-aggregate reading) is
+*consistent* with the mean. Our squared-error XGBoost models literally learn a conditional mean, and
+the ensemble mean of 51 such members is a coherent estimate of `E[power]`. Scoring the mean on RMSE
+rewards a model for reporting its honest conditional mean. The mean also averages out member noise,
+so it is the more stable statistic on a small ensemble, and it matches standard NWP verification
+practice.
+
+The **median** is the point forecast that minimises **absolute error** — so MAE and NMAE are
+*consistent* with the median. It is robust to the skew that is real in this problem (holiday weeks,
+solar clipping) and to the ensemble underdispersion the [probabilistic
+section](#delivering-the-probabilistic-metrics) documents, it is the faithful reading of NGED's
+equally-weighted analogue spread, and it is coherent with the quantile columns already on the
+leaderboard: median MAE is exactly `2 × pinball_loss@p50`, so a median headline makes the
+deterministic and probabilistic columns tell one story.
 
 The key realisation is that **MAE and RMSE elicit *different* functionals, so no single collapse is
 fair on both columns.** A uniform median is inconsistent for RMSE (it penalises squared-error models
@@ -689,20 +691,20 @@ metrics](../techniques/evaluation-metrics.md#why-the-tails-need-their-own-metric
 scoring only the hours when the worst case actually
 happened](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
 Definitions, equations, and intuitive explanations for each metric are in the [evaluation-metrics
-reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
+reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics).
 
-- **Threshold-weighted CRPS
-  ([twCRPS](../techniques/evaluation-metrics.md#threshold-weighted-crps-twcrps))** — CRPS
-  confined to behaviour above a per-series threshold, which is [Gneiting and Ranjan
-  (2011)](https://doi.org/10.1198/jbes.2010.08110)'s way of putting the emphasis inside the score
-  while it stays a proper scoring rule; the headline *ranking* metric for tail skill. A GB
-  distribution network has already been scored this way: [Maia et al.
-  (2026)](https://arxiv.org/abs/2603.01653) compare fault-count forecasts for SP Energy Networks
-  against a quantile-regression baseline on the threshold-weighted score, because an unweighted one
-  "would place substantial emphasis on parts of the predictive distribution where the two models are
-  identical". Implementation needs almost no extra work: replace members and observation by `max(value,
-  threshold)` and reuse the existing fair-CRPS aggregation unchanged, inheriting its
-  comparability across ensemble sizes.
+**Threshold-weighted CRPS
+([twCRPS](../techniques/evaluation-metrics.md#threshold-weighted-crps-twcrps))** — CRPS confined to
+behaviour above a per-series threshold, which is [Gneiting and Ranjan
+(2011)](https://doi.org/10.1198/jbes.2010.08110)'s way of putting the emphasis inside the score
+while it stays a proper scoring rule; the headline *ranking* metric for tail skill. A GB
+distribution network has already been scored this way: [Maia et al.
+(2026)](https://arxiv.org/abs/2603.01653) compare fault-count forecasts for SP Energy Networks
+against a quantile-regression baseline on the threshold-weighted score, because an unweighted one
+"would place substantial emphasis on parts of the predictive distribution where the two models are
+identical". Implementation needs almost no extra work: replace members and observation by
+`max(value, threshold)` and reuse the existing fair-CRPS aggregation unchanged, inheriting its
+comparability across ensemble sizes.
 
 - **[Exceedance rate of the upper delivery
   quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles)**
