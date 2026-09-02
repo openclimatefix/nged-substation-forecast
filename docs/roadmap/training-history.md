@@ -109,7 +109,9 @@ absorb level drift for the same reason.
   future forecast makes a dead source a back-fill problem, not a serving problem. The measured
   evidence favours mobility, thinly: [Chen et al. (2020)](https://arxiv.org/abs/2006.08826) take UK
   national mean absolute percentage error from 10.11% to 8.74% by feeding mobility data into a
-  day-ahead neural network, on a two-week test window, in an arXiv preprint. The stringency index
+  day-ahead neural network, on a two-week test window, in an arXiv preprint. Retraining on pandemic
+  data *without* mobility, though, made the UK figure worse, at 13.78% — so retraining across the
+  lockdown is not safe on its own. The stringency index
   turned up in our search only in explanatory econometrics, and there [Berezvai et al.
   (2022)](https://doi.org/10.1016/j.segan.2022.100930) needed a *quadratic* specification, which one
   linear scalar cannot express.
@@ -117,8 +119,8 @@ absorb level drift for the same reason.
 - **Check whether simply adapting faster does the same job, before building the covariate.** [de
   Vilmarest and Goude (2021)](https://arxiv.org/abs/2110.00334) compare a Kalman filter handed the
   break date against one merely allowed to adapt faster everywhere with no break date at all. The
-  no-break version won on three of four model families. The recency sample weights above are the
-  same idea. Run that arm first: the covariate has to beat faster adaptation, not merely beat doing
+  no-break version won on three of four model families, and learning the variances rather than
+  fixing them matched it. The recency sample weights above are the same idea. Run that arm first: the covariate has to beat faster adaptation, not merely beat doing
   nothing.
 
 - **The pre-lockdown regime may never come back, and a scalar that returns to 0 says it does.**
@@ -139,6 +141,8 @@ absorb level drift for the same reason.
   inference.
 
 - **All of this evidence is national or building-level, none of it a distribution substation.** A
+  de Vilmarest, Abélès, and Berezvai results are national transmission demand, and the only UK-level
+  figure anywhere in this set is Chen et al.'s national mean absolute percentage error. A
   primary serves a few thousand customers with a strongly non-average mix, so its lockdown response
   could be far larger or far smaller than the national one, depending on whether it feeds a city
   centre or a dormitory estate. A search of OpenAlex for COVID-19 load forecasting at distribution

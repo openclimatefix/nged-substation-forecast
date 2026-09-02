@@ -44,9 +44,9 @@ priced in engineer-hours.
 
 The textbook way to price a forecast charges it for what goes wrong: £X per action taken, £Y per
 limit breach nobody saw coming. We cannot follow that route, because £Y — the cost of a breach — is
-not a figure NGED hold in a form we can use. And the literature that does price a forecast this way
-has never done so on a real distribution network at a money-denominated cost — the
-[energy-forecasting
+not a figure NGED hold in a form we can use. And in the literature that does price a forecast this
+way, we found no case of it being done on a real distribution network at a money-denominated cost.
+The [energy-forecasting
 review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
 reports [Richardson (2000)](https://doi.org/10.1002/qj.49712656313)'s cost-loss framing, [Bernecker
 et al. (2025)](https://doi.org/10.1016/j.ijepes.2025.110713)'s 97% synthetic-network saving, and
@@ -54,7 +54,10 @@ et al. (2025)](https://doi.org/10.1016/j.ijepes.2025.110713)'s 97% synthetic-net
 (2021)](https://arxiv.org/abs/2103.10335)'s capacity- and volume-denominated results.
 
 So we invert the question. **Models are aimed at equal safety, and we compare what each one spends
-to get there.**
+to get there.** Each model may be as conservative as it likes, and we tune that conservatism until
+it leaves the same small amount of risk unaddressed. Then the only thing left to compare is cost.
+This matches the framing the design is built on: the risk to manage is unnecessary spend, not an
+unaddressed breach.
 
 The knob is the **procurement quantile** $\tau$ — how far up its own forecast distribution a model
 looks when deciding to act. A timid model uses a high $\tau$, buys a lot, and is rarely caught out.

@@ -270,11 +270,13 @@ evaluation follows from that.** The [energy-forecasting
 review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports
 [Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024) finding a fitted
 azimuth 5° off the surveyed value that simulated better than the surveyed value itself, because the
-fit absorbs the physical model's own systematic error. Comparing a fitted tilt against a surveyed
+fit absorbs the physical model's own systematic error. Saint-Drenan et al. concluded that the
+output "should be seen as a set of parameters that lead to the best simulation and not necessarily
+as the actual characteristics of the PV plant". Comparing a fitted tilt against a surveyed
 tilt is therefore a **diagnostic** — it catches a fit that has wandered somewhere physically absurd
 — and never the test. The test is the forecast score. The priors serve that same end: keeping the
 posterior spreads honest and regularising sites with little data, not pinning a posterior to a
-survey. That is why the priors below are weakly informative rather than tight. No published work
+survey. That is why the priors in the sketch above are weakly informative rather than tight. No published work
 has run that test: the [energy-forecasting
 review](../background/energy-forecasting-review.md#inferring-engineering-parameters) found no
 evidence for how much a photovoltaic power forecast improves from inferring tilt and azimuth rather

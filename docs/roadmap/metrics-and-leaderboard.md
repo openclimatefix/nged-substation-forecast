@@ -495,9 +495,13 @@ the fold that decides promotion.** That waits on Dynamical.org's backfill, which
 the single fold into a genuine multi-fold epoch, so the `final_test` fold and the further
 leaderboard folds are founded in one new epoch in `conf/cv/default.yaml` rather than over two. The
 `final_test` fold needs a per-fold flag that keeps it out of every run mode, so no experiment trains
-or scores on it in the normal flow. Scoring against it is then a deliberate, rare act — champion
+or scores on it in the normal flow: extend `CvConfig` / the fold schema in
+`packages/contracts/src/contracts/config_schemas.py`, and make sure `_fold_ids_for_run_mode` in
+`defs/jobs.py` includes the fold in no run mode at all. Scoring against it is then a deliberate, rare act — champion
 candidates immediately before promotion only — through the `metrics` asset's existing `ad_hoc`
-evaluation scope, so no new asset is needed and the discipline is procedural. **Two rules go in
+evaluation scope, so no new asset is needed and the discipline is procedural. Whether the
+leaderboard-fold model can be reused as-is, or needs its own training run, depends on where the
+disjoint year sits relative to `mid_2025_to_mid_2026` — decide that once the backfill lands. **Two rules go in
 alongside it**: final-test results are never used to *choose between* candidates, because that
 re-creates the problem the window exists to solve; they exist to report honest skill for the chosen
 champion and to detect gross overfitting (final-test NMAE ≫ validation NMAE).
@@ -638,7 +642,7 @@ re-scores the whole leaderboard from a single `metrics` re-materialisation with 
 re-prediction — and doing it now, before the leaderboard adjudicates anything, is the cheapest moment
 to shift every existing deterministic number.
 
-### The v0.7 upgrade: effective capacity becomes time-varying 🚧
+### Effective-capacity normalisation, and the v0.7 upgrade to time-varying 🚧
 
 NMAE's denominator is each series' full-history **effective capacity** — why a capacity-like
 denominator is used rather than the mean, and why NMAE rather than `mae__all` is the headline

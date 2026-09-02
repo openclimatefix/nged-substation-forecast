@@ -290,7 +290,7 @@ single `effective_capacity_mw` column is upgraded to a mean + std pair
 Normal-distribution convention); the asset body changes to emit one row per
 `(time_series_id, time)`, and the metrics pipeline swaps
 its `time_series_id`-only capacity join for a temporal as-of join (see
-[The v0.7 upgrade: effective capacity becomes time-varying](metrics-and-leaderboard.md#the-v07-upgrade-effective-capacity-becomes-time-varying)).
+[Effective-capacity normalisation, and the v0.7 upgrade to time-varying](metrics-and-leaderboard.md#effective-capacity-normalisation-and-the-v07-upgrade-to-time-varying)).
 
 | Field | Data type | Notes |
 |---|---|---|

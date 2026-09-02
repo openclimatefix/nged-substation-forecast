@@ -779,8 +779,10 @@ storing the way the rest of the project stores gridded weather: an **H3-indexed 
 by `(h3_index, day_of_year, half_hour_of_day)`, with a mean and standard-deviation column per
 weather variable, rather than a bespoke Zarr. Google's **WeatherBench2** publishes a precomputed
 ERA5 mean (`gs://weatherbench2/datasets/era5-hourly-climatology/` — smoothed by day-of-year and
-6-hour over 1990–2019, at ERA5's native 0.25°), so μ can start from that and leave only σ for us to
-compute; building both in one pass from our own ERA5 ingest is the alternative. Which route, and how
+6-hour over 1990–2019 with a 61-day window, at ERA5's native 0.25°), so μ can start from that,
+regridded to our H3 cells and interpolated from 6-hourly to half-hourly. That leaves only σ for us
+to compute over the same window, because WeatherBench2 stores means only, no standard deviation.
+Building both in one pass from our own ERA5 ingest is the alternative. Which route, and how
 μ and σ are smoothed across the calendar, is a decision to take once the instantaneous z-score
 experiment has shown the feature earns its ingest — not before. Either way the ERA5 ingest is the
 dependency that places this item late in the tier.
@@ -788,7 +790,8 @@ dependency that places this item late in the tier.
 Nothing in the feature needs live data. μ and σ for a forecast's valid times — up to 14 days out —
 are fully determined in advance by the calendar, and the z-score itself is computed at
 feature-engineering time in `_parsed_features.py` from the forecast NWP value minus the climatology
-lookup, so the reducing asset recomputes only when a fresh chunk of ERA5 lands. (A *trailing-window*
+lookup, so the reducing asset recomputes only when a fresh chunk of ERA5 lands — monthly at most,
+and even yearly would barely move μ and σ. (A *trailing-window*
 "how unusual versus the last few weeks" anomaly would need near-real-time ingestion — a different,
 and weaker, feature than the climatological norm, and not what this item builds.)
 
