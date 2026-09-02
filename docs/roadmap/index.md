@@ -277,8 +277,19 @@ The remaining work items for metered-generator capacity:
 
 - Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
 - Ingest **CM SAF** (Satellite Application Facility on Climate Monitoring) — high-resolution satellite-derived irradiance, used to estimate solar PV capacity ([data sources](data-sources.md#weather-data)). Capacity estimation also needs ERA5, which [v0.5](#v05-xgboost-upgrades-quick-wins) already ingests to serve the pre-training experiments
-- Consider testing **CAMS** (the Copernicus Atmosphere Monitoring Service solar radiation time-series) alongside CM SAF ([data sources](data-sources.md#weather-data)). Both are **offline** sources — they feed historical capacity estimation, and the production serving path depends on neither — so CAMS's near-real-time freshness is not the reason to look at it. The reason is that CAMS offers steps down to 1 minute where SARAH-3 stops at 30, which is what the [dynamic thermal model](../techniques/differentiable-physics.md) would need. The cost of looking is small: CAMS serves one point per request rather than a grid, but the [v1 trial area](../index.md#scope) needs at most 32 requests, and 6 of those requests cover its solar farms, so a head-to-head against SARAH-3 on those sites settles whether sub-hourly irradiance improves the fitted plant model before anything larger is committed to
 - Populate the `effective_capacity` Delta table
+
+**Consider testing CAMS — the Copernicus Atmosphere Monitoring Service solar radiation time
+series — alongside CM SAF ([data sources](data-sources.md#weather-data)).** Both are **offline** sources:
+each feeds historical capacity estimation, and the production serving path depends on neither, so
+CAMS's near-real-time freshness is not the reason to look at it. The reason is that CAMS offers
+steps down to 1 minute where SARAH-3 stops at 30, which is what the [dynamic thermal
+model](../techniques/differentiable-physics.md) would need.
+
+**The cost of looking is small.** CAMS serves one point per request rather than a grid, but the [v1
+trial area](../index.md#scope) needs at most 32 requests, and 6 of those requests cover its solar
+farms. A head-to-head against SARAH-3 on those sites settles whether sub-hourly irradiance improves
+the fitted plant model before anything larger is committed to.
 
 **Dynamic effective capacity estimation for substations**:
 
