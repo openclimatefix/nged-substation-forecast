@@ -145,10 +145,10 @@ bill does not follow it:
   — dragging inference compute and forecast storage with it.
 
 **Headline cost: projected ~£70–140/month** — roughly 3–4× the v1 bill, dominated by
-inference compute. The headline includes the same things as v1's: the control plane, every
-scheduled run (with inference on a larger task), storage and requests (now growing
+inference compute. The headline includes the same components as v1's: the control plane,
+every scheduled run (with inference on a larger task), storage and requests (now growing
 ~£5/month with each further year of history), and the weekly GPU re-train at its
-heavier-model bracket. It excludes the same things too — per-run backtests and
+heavier-model bracket. It excludes the same items too — per-run backtests and
 experimentation, and NGED's read-side compute — plus any internet-egress spend if NGED pull
 bulk history over the public internet rather than reading from eu-west-2 (both priced
 below). It is made up of:
@@ -216,8 +216,8 @@ experimentation.
 
 The weekly re-train scales the same way. We may also adopt somewhat heavier models at v2, so
 the ~10-minute v1 laptop train (~£1/month as an AWS GPU run — see the
-[v1 estimate](#v1-32-time-series-2535month)) grows on both axes at once. Bracketing one to
-four hours per weekly run on a single-GPU instance — `g4dn.xlarge` (1× T4, £0.46/hr) up to
+[v1 estimate](#v1-32-time-series-2535month)) grows on both axes at once. Bracketing 1 to 4
+hours per weekly run on a single-GPU instance — `g4dn.xlarge` (1× T4, £0.46/hr) up to
 `g6.xlarge` (1× L4, \$1.02/hr → £0.77/hr) — gives ~£0.50–3/run, or **~£2–15/month**. That
 range is wide because both the model family and its training time are still open; like the
 inference figures above, it is a bracket to re-measure, not a commitment.

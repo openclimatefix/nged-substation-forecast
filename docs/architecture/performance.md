@@ -28,9 +28,9 @@ assumed:
   default dictionary+RLE encodings — `BYTE_STREAM_SPLIT` measures *worse* here, because the
   significand rounding collapses many cells/members onto repeated values that a dictionary exploits
   better. Rows are sorted member-early so single-member reads can skip row groups. The result is
-  ~40–41 GB per year for the full ECMWF ENS dataset for Great Britain, and a single day's NWP data
-  takes about one minute to download and convert. The measured numbers are in
-  [PR #271](https://github.com/openclimatefix/nged-substation-forecast/pull/271).
+  ~40–41 GB per year for the full ECMWF ENS dataset for Great Britain, and a single day's NWP
+  data takes about 1 minute to download and convert. The measured numbers are in [PR
+  #271](https://github.com/openclimatefix/nged-substation-forecast/pull/271).
 
 * **`power_forecasts`** (`delta_store.power_forecasts`) sorts ensemble members of the same target
   adjacent, uses `DELTA_BINARY_PACKED` timestamps and `BYTE_STREAM_SPLIT` for `power_fcst`

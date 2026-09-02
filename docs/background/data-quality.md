@@ -10,7 +10,7 @@ Availability of the data for the 32 time series in the trial area:
 
 ## Early ramp-up period
 
-The first couple of months after a meter is installed tend to have poor data quality. This is handled by simply dropping the first two months of each time series. ![Bad data for the first few months for 3 substations](assets/bad_data_for_first_months.png)
+The first couple of months after a meter is installed tend to have poor data quality. Poor data quality in that period is handled by simply dropping the first 2 months of each time series. ![Bad data for the first few months for 3 substations](assets/bad_data_for_first_months.png)
 
 ## False zeros
 
@@ -32,7 +32,7 @@ Some substations only have MVA meters, which report the *absolute value* of powe
 
 **GB electricity demand depends on human behaviour as well as on weather, and a plain
 day-of-year feature cannot represent the calendar's sharp cases.** Easter wanders across
-roughly five weeks of the calendar, from late March to late April, so its behavioural signature
+roughly 5 weeks of the calendar, from late March to late April, so its behavioural signature
 smears into "normal spring" unless an explicit holiday feature marks it. The bridge days around
 bank holidays and the Christmas–New Year "run of Sundays" are milder versions of the same
 problem, and school half-terms vary by county across NGED's licence areas. Demand on a bank
@@ -45,6 +45,6 @@ this kind are not knowable years ahead.
 
 ## Switching events
 
-Power is periodically diverted from one substation to another during maintenance or in response to faults ("abnormal running arrangement"). Each substation spends roughly 10% of its operating time in an abnormal arrangement. This severely biases lagged-power features (the single most informative feature for demand forecasting) if not detected and handled. Recovering the demand that *would* have been metered under the normal running arrangement is described in [Switching Events](switching-events.md); the staged solution plan is in the [roadmap](../roadmap/switching-events.md) (v0.6 detector → v2 mixture models).
+Power is periodically diverted from one substation to another during maintenance or in response to faults ("abnormal running arrangement"). Each substation spends roughly 10% of its operating time in an abnormal arrangement. Switching events severely bias lagged-power features (the single most informative feature for demand forecasting) if not detected and handled. Recovering the demand that *would* have been metered under the normal running arrangement is described in [Switching Events](switching-events.md); the staged solution plan is in the [roadmap](../roadmap/switching-events.md) (v0.6 detector → v2 mixture models).
 
 See the ["Data sources" section of our Milestone 1 report](https://docs.google.com/document/d/1UF-mjfSdQfQxefAunDqEOr_GyYTjSlGk4EeuiNoXAxk/edit?tab=t.0#heading=h.etqoj9ahy92h) for a more detailed discussion, and plenty of graphs!

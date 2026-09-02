@@ -153,9 +153,9 @@ not treated as a target and still runs in parallel, since a filtered run can sti
 worker's captured-off stdout never reaches the controller, so parallelising a `-s` run would
 silently drop the output `-s` exists to show — exactly the debug-print step of the "single test"
 loop this plugin otherwise protects. The plugin reads pytest's own parsed `known_args_namespace`
-rather than hand-scanning the raw argument list, so every pytest flag that takes a value (`-W`,
-`-o`, `--deselect`, …) is handled correctly, not just the ones the plugin happens to name (see the
-plugin's own docstring for the one narrow exception).
+rather than hand-scanning the raw argument list. Every pytest flag that takes a value (`-W`,
+`-o`, `--deselect`, …) is therefore handled correctly, not just the ones the plugin happens to
+name (see the plugin's own docstring for the one narrow exception).
 
 The auto-injection can't be a `pytest_load_initial_conftests` hook in the root `conftest.py`
 itself — that hook fires as part of loading the root `conftest.py`, so a hookimpl defined inside it

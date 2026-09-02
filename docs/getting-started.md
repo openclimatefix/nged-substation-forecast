@@ -37,13 +37,13 @@ cp .env.example .env
 ```
 
 Every setting has a working default, so you can stop there: with an untouched `.env` all data and
-artifacts live under `<repo>/data` as plain files on disk, and the test suite, a training run and
-the dashboards all work.
+artifacts live under `<repo>/data` as plain files on disk, and the test suite, a training run,
+and the dashboards all work.
 
 To ingest NGED telemetry you also need the three `NGED_S3_BUCKET_*` values from the prerequisites.
-They authenticate reads of NGED's own bucket, so nothing else needs them — without them the
-`power_time_series_and_metadata` asset raises an error naming the ones that are unset, and the rest
-of the system carries on:
+They authenticate reads of NGED's own bucket, so nothing else needs them. Without them, the
+`power_time_series_and_metadata` asset raises an error naming the unset variables, and the rest of
+the system carries on:
 
 ```dotenv
 NGED_S3_BUCKET_URL=<nged source bucket url>

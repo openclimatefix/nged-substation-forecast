@@ -50,14 +50,14 @@ container image, not to shared storage:
   `load()` (see
   [Production Deployment — Design](../architecture/production-deployment.md),
   [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)). This local
-  directory is the build-time staging area that gets copied into the image; on the deployed task the
-  model is read from the image's own filesystem.
+  directory is the build-time staging area that gets copied into the image. On the deployed task,
+  the model is read from the image's own filesystem.
 - **Plot HTML** — a **local-dev convenience** only (materialise, open in a browser); see
   [Operating the live service: Inspecting a live forecast](operations.md#inspecting-a-live-forecast)
   for why it is not the way to view forecasts in a deployed service.
 
 So the deployed AWS runtime reads its model from the image, reads data from S3, and writes forecasts
-to S3 — it never uses `LOCAL_ARTIFACTS_PATH` as shared storage at all. All three roots default to
+to S3. It never uses `LOCAL_ARTIFACTS_PATH` as shared storage at all. All three roots default to
 `<repo>/data`, so out of the box everything lives under one local directory and the distinction is
 invisible; it only matters once `DATA_PATH_INTERNAL` and `DATA_PATH_DELIVERY` become `s3://` URIs.
 
@@ -111,12 +111,13 @@ NGED_S3_BUCKET_SECRET=<secret>
 `.env` is git-ignored — never commit real credentials.
 
 Leave them unset and `Settings` still builds: the ingest asset raises an error naming the unset
-variables when it runs, while every other asset, the test suite, training and the dashboards carry
-on. That keeps a laptop, a CI runner and a training job free of third-party credentials they never
-use ([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)),
-and it confines a mis-wired secret to the one schedule that needs it —
-[Step 8 of the AWS runbook](aws.md#step-8-store-secrets-in-parameter-store) explains why a deployment
-should *not* promote that into a start-up failure.
+variables when it runs, while every other asset, the test suite, training, and the dashboards
+carry on. That keeps a laptop, a CI runner and a training job free of third-party credentials they
+never use
+([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)),
+and it confines a mis-wired secret to the one schedule that needs it — [Step 8 of the AWS
+runbook](aws.md#step-8-store-secrets-in-parameter-store) explains why a deployment should *not*
+promote that into a start-up failure.
 
 The optional `SENTRY_*` settings (`SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_MONITOR_FORECASTS`,
 `SENTRY_TRACES_SAMPLE_RATE`) enable error telemetry and the missed-check-in alarm; an empty

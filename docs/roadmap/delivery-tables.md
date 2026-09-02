@@ -14,15 +14,15 @@ For v1 of the live service, OCF delivers live forecasts (and the supporting tabl
 [stretch goal](index.md#v20-scale-up-future-research)); an API may be added later if it brings
 additional benefit.
 
-- **Why Delta Lake?** It is just Parquet files plus a transaction log, giving ACID guarantees
-  on cheap object storage — NGED never reads a half-written forecast, and the tables are
-  readable from Excel, Polars, pandas, DuckDB, Power BI, etc. The full rationale (including the
-  comparison with a custom REST API) is on the durable
-  [Forecast Delivery](../architecture/forecast-delivery.md) architecture page.
+- **Why Delta Lake?** It is just Parquet files plus a transaction log, giving ACID guarantees on
+  cheap object storage. NGED never reads a half-written forecast, and the tables are readable
+  from Excel, Polars, pandas, DuckDB, Power BI, etc. The full rationale (including the
+  comparison with a custom REST API) is on the durable [Forecast
+  Delivery](../architecture/forecast-delivery.md) architecture page.
 - **Which bucket, and how it's secured**: these five tables live in a dedicated
   `nged-forecast-delivery` S3 bucket, separate from OCF's internal working tables. Neither bucket
   is public — both need S3/IAM authentication — and only the five tables below are a stable
-  contract; the internal bucket's tables may change shape at any time. See [Forecast Delivery:
+  contract. The internal bucket's tables may change shape at any time. See [Forecast Delivery:
   Securing it](../architecture/forecast-delivery.md#securing-it) for the full reasoning and the
   concrete bucket/IAM setup.
 - **Update cadence**: every 6 hours, when a new forecast run is generated.
@@ -78,13 +78,14 @@ for the implementation plan.
 **🚧 The bands must widen when the inputs degrade (v0.5).** Percentiles produced from clean-data
 residuals alone would be over-confident during an NWP outage or a telemetry stall — precisely when
 the consumer most needs to be told to be cautious. The interval width is the **in-band** signal
-that a forecast is degraded: it is the only number the consumer is certain to read, so it must not
-be left to the warnings table alone. The mechanism is conformal calibration **per degradation
-regime**, which works with today's XGBoost and needs no retraining
-([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)); the principle is
-[Inherent Stability → Widening bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal),
-and whether it worked is measured by
-[T1.3, faithful uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+that a forecast is degraded: it is the only number the consumer is certain to read. So it must
+not be left to the warnings table alone. The mechanism is conformal calibration **per
+degradation regime**, which works with today's XGBoost and needs no retraining
+([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)); the principle
+is [Inherent Stability → Widening
+bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal), and
+whether it worked is measured by [T1.3, faithful
+uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 ### Fields common to all three representations
 
@@ -116,17 +117,17 @@ filter on `fold_id` to select the population you need. See
 > capacity to obtain MW/MVA (see [forecast building blocks](forecast-building-blocks.md)). The code
 > still forecasts raw MW/MVA, but now that the static P99 `effective_capacity` estimate exists
 > there is no need to wait for dynamic capacity estimation: the switch to [−1, +1] is planned for
-> **v0.5**. This is also noted in a comment on the `PowerForecast.power_fcst` field in
+> **v0.5**. This planned change is also noted in a comment on the `PowerForecast.power_fcst` field in
 > `power_schemas.py`.
 
 ### Representation 2 — percentiles 🚧
 
-One row per `valid_time`, with one column per percentile. This is the primary NGED-facing
-probabilistic representation, derived from
-[Representation 3](#representation-3-ensemble-of-percentile-forecasts) by pooling the
-per-member quantiles (the equal-weight mixture — *not* per-level averaging, which would discard
-the between-member spread; see
-[the explainer](../techniques/probabilistic-forecasting.md#the-tempting-shortcut-that-doesnt-work-averaging-the-quantiles)):
+One row per `valid_time`, with one column per percentile. Representation 2 is the primary
+NGED-facing probabilistic representation, derived from [Representation
+3](#representation-3-ensemble-of-percentile-forecasts) by pooling the per-member quantiles (the
+equal-weight mixture — *not* per-level averaging, which would discard the between-member spread;
+see [the
+explainer](../techniques/probabilistic-forecasting.md#the-tempting-shortcut-that-doesnt-work-averaging-the-quantiles)):
 
 | Fields | Data type | Notes |
 |---|---|---|
@@ -242,12 +243,13 @@ timestep of the historical time series data. This table is **backward-looking on
 not cover the forecast period.
 
 **v0.1 approach:** one row per `time_series_id`, `effective_capacity_mw` = P99 of
-`|power|` over the full available observation history. This is a static scalar per series — a
-robust capacity proxy that is less sensitive to outlier spikes than the maximum, and more
-capacity-representative than the mean (which is dragged down by zero-output periods for PV/wind).
-It is also the denominator used to normalise NMAE in the `forecast_metrics` table. The denominator
-comes from the `effective_capacity` Delta table (schema `contracts.power_schemas.EffectiveCapacity`),
-consumed by `compute_metrics` (`ml_core.metrics`).
+`|power|` over the full available observation history. The v0.1 effective_capacity_mw value is a
+static scalar per series — a robust capacity proxy that is less sensitive to outlier spikes than
+the maximum, and more capacity-representative than the mean (which is dragged down by
+zero-output periods for PV/wind). It is also the denominator used to normalise NMAE in the
+`forecast_metrics` table. The denominator comes from the `effective_capacity` Delta table
+(schema `contracts.power_schemas.EffectiveCapacity`), consumed by `compute_metrics`
+(`ml_core.metrics`).
 
 **v0.1 representation: one scalar row per series.** The `effective_capacity` asset writes one
 row per `time_series_id` — `effective_capacity_mw` = P99 of `|power|` over the whole observation

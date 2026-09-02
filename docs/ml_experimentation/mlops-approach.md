@@ -26,11 +26,11 @@ Modern MLOps (as used in this project) changes throughput and closes the transla
    it lives in the pipeline's own code. The debt this avoids has a name: [Sculley et al.
    (2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems)
    call the code written to bridge research and production *glue code*, and the tangle that
-   glue code grows into *pipeline jungles*. Their list of debts also constrains how the gap is
-   allowed to close, because *dead experimental codepaths* is what accrues when experiments run
-   as conditional branches inside production code: an experiment here selects a different
-   [configuration](model-configuration.md) and runs the same code path, rather than adding a
-   branch the production pipeline then has to carry.
+   glue code grows into *pipeline jungles*. Sculley et al.'s list of debts also constrains
+   how the gap is allowed to close, because *dead experimental codepaths* is what accrues
+   when experiments run as conditional branches inside production code: an experiment here
+   selects a different [configuration](model-configuration.md) and runs the same code path,
+   rather than adding a branch the production pipeline then has to carry.
 
 ## An analogy
 
@@ -45,7 +45,7 @@ night — because nothing about it needs translating.
 
 The model that wins the evaluation is, bit for bit, the model we deploy — not a
 re-implementation of it. Promotion to production takes minutes, and that speed is a
-*consequence* of rigour, not a trade against it: by the time promotion is on the table, the
+*consequence* of rigour, not a trade against it. By the time promotion is on the table, the
 candidate has already been trained, cross-validated (see [Cross-validation
 folds](cross-validation-folds.md)), and evaluated on the same pipeline, under the same
 standardised protocol, as every model before it. Holding that protocol fixed is what makes two
@@ -54,10 +54,12 @@ autoresearch](https://github.com/karpathy/autoresearch) fixes every training run
 5-minute budget: a fixed budget "makes experiments directly comparable regardless of what the
 agent changes".
 
-Holding the protocol fixed is what makes a one-command promotion *safe* to press rather than merely quick. One risk in a conventional setup — that the artifact measured and the artifact deployed are
-two different pieces of code — does not exist here; the comparison that picked the winner was
-made against every other candidate on identical folds; and the way back to the previous
-champion is a single command too. A fast promotion route that nobody trusts enough to use is worth no more than a slow route. The speed comes from the protocol rather than from haste, a
-distinction [Karpathy (2019)](https://karpathy.github.io/2019/04/25/recipe/) puts bluntly: "a
-'fast and furious' approach to training neural networks does not work and only leads to
-suffering".
+Holding the protocol fixed is what makes a one-command promotion *safe* to press rather than
+merely quick. One risk in a conventional setup — that the artifact measured and the artifact
+deployed are two different pieces of code — does not exist here. The comparison that picked
+the winner was made against every other candidate on identical folds. And the way back to the
+previous champion is a single command too. A fast promotion route that nobody trusts enough
+to use is worth no more than a slow route. The speed comes from the protocol rather than from
+haste, a distinction [Karpathy (2019)](https://karpathy.github.io/2019/04/25/recipe/) puts
+bluntly: "a 'fast and furious' approach to training neural networks does not work and only
+leads to suffering".

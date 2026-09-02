@@ -13,9 +13,10 @@ missed-check-in alarm; still to come: production monitoring, and per-task failur
 Once production monitoring lands and its design is promoted, the roadmap page is deleted and this
 section is the sole home for how the live service works.
 
-This is distinct from [ML Experimentation](../ml_experimentation/index.md): that area covers
-training and backtesting candidate models against historical data; this area covers picking one
-of those candidates as the running production model and keeping live forecasts flowing from it.
+The live service is distinct from [ML Experimentation](../ml_experimentation/index.md): that
+area covers training and backtesting candidate models against historical data; this area covers
+picking one of those candidates as the running production model and keeping live forecasts
+flowing from it.
 
 **Audience note:** today these runbooks are written for OCF (Python-literate researchers), but
 after the NIA project the day-to-day operator is expected to be a non-expert at NGED — NGED's

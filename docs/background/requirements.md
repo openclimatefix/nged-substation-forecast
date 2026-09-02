@@ -2,18 +2,19 @@
 
 ## Phased Rollout
 
-**Version 1** (current focus): 32 time series in NGED's trial area — 16 primary substations, 6 solar PV farms (5 EHV, 1 HV), 3 wind farms, 2 GSPs, 2 BSPs, 1 biofuel generator, 1 BESS, and 1 reciprocating gas generator. All implemented with a single XGBoost model family.
+**Version 1** (current focus): 32 time series in NGED's trial area — 16 primary substations, 6 solar PV farms (5 extra-high-voltage, 1 high-voltage), 3 wind farms, 2 grid supply points (GSPs), 2 bulk supply points (BSPs), 1 biofuel generator, 1 battery energy storage system (BESS), and 1 reciprocating gas generator. All implemented with a single XGBoost model family.
 
 **Version 2** (future): Scale to approximately 2,500 time series (all of NGED's primary substations, BSPs, GSPs, and most customer meters). See [Roadmap](../roadmap/index.md).
 
 ## Core Objectives
 
-This is a research project, and our NGED partners treat it as one: the single hard requirement
-is that the project gives NGED **new information about forecasting for their assets**. Even a
-negative result carries value — if we try our hardest and cannot, say, detect switching events
-from power data alone, that is evidence NGED can take to their senior leadership to argue for
-investing in technology to extract switching labels from their operational systems. The
-objectives below therefore sit on a **priority continuum**, not a must-have/nice-to-have split.
+This is a research project, and our NGED partners treat it as a research project: the single
+hard requirement is that the project gives NGED **new information about forecasting for their
+assets**. Even a negative result carries value — if we try our hardest and cannot, say, detect
+switching events from power data alone, that is evidence NGED can take to their senior
+leadership to argue for investing in technology to extract switching labels from their
+operational systems. The objectives below therefore sit on a **priority continuum**, not a
+must-have/nice-to-have split.
 
 **Highest priority — probabilistic power forecasts under the normal running arrangement
 (NRA):**
@@ -60,13 +61,13 @@ curtailment**: holding embedded generation down through Active Network Managemen
 risks running beyond a limit. That limit is usually not the substation's own: a generation
 constraint typically binds above the primary, driven by the aggregated flow across several
 substations rather than by any single meter in isolation. The forecasts that matter for
-curtailment are therefore the ones that net and sum correctly up the hierarchy — which is why
-[curtailment scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at
-one primary before summing up the substation hierarchy. The money is counted differently too —
-curtailment today is priced as a whole-system cost rather than as NGED's own spend. But NGED
-rate the saving as highly, so the forecast requirement is unchanged. So the question users ask
-of a forecast is rarely "what is the most likely load?" and usually "**how likely is net
-demand to cross this limit?**" — NGED's [incumbent forecasting
+curtailment are therefore the forecasts that net and sum correctly up the hierarchy — which is
+why [curtailment scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets
+at one primary before summing up the substation hierarchy. The money is counted differently
+too — curtailment today is priced as a whole-system cost rather than as NGED's own spend. But
+NGED rate the saving as highly, so the forecast requirement is unchanged. So the question
+users ask of a forecast is rarely "what is the most likely load?" and usually "**how likely is
+net demand to cross this limit?**" — NGED's [incumbent forecasting
 tool](nged-incumbent-forecast.md#the-operators-view) literally plots demand as headroom below
 a constraint line.
 
@@ -77,7 +78,7 @@ turns on the upper tail, where demand rises towards firm capacity, and bites in 
 Curtailment turns on the lower tail, where export rises towards whichever limit binds because
 embedded generation is high and demand is low, and bites in summer. The 13
 `DELIVERY_QUANTILES` are deliberately tail-heavy at both ends and symmetric about the median —
-p1, p2 and p5 matching p95, p98 and p99. The delivery shape therefore already serves both
+p1, p2, and p5 matching p95, p98, and p99. The delivery shape therefore already serves both
 decisions. This is why evaluation includes [tail & exceedance
 metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
 alongside average-error metrics. (One honest complication: a substation's real limit is not a
@@ -146,7 +147,7 @@ a standing design requirement for everything we build:
   workstreams.
 * **Uptime requirements are deliberately lenient** — recovery is "next business day, via
   runbook", never a 2am page. See [Uptime: lenient by design](#uptime-lenient-by-design) below
-  for exactly why an outage costs so little.
+  for exactly why an outage does so little damage.
 
 The phasing:
 
@@ -170,12 +171,12 @@ product). This makes account-portable infrastructure doubly valuable — see
 Flexpectation carries **no hard availability target**. We aim for a highly robust service, but
 the requirement when something breaks is recovery "next business day, via runbook" — never a
 2am page, and no on-call rota. This leniency is a property of how NGED consumes the forecasts,
-not an aspiration; three things bound the damage of an outage:
+not an aspiration. Three factors bound the damage of an outage:
 
 1. **Every forecast extends 14 days ahead**, refreshed every 6 hours, and users mostly act on
    the forecast roughly 1 to 10 days ahead (see [Core Objectives](#core-objectives)). If the
    service stops producing new forecasts for a few hours — or even a day — the most recent
-   forecast remains useful; it merely ages, degrading skill gradually rather than cutting NGED
+   forecast remains useful. It merely ages, degrading skill gradually rather than cutting NGED
    off.
 2. **Delivery is decoupled from compute.** Forecasts are delivered as Delta tables on S3 (see
    [Forecast Delivery](#forecast-delivery) below), so every previously published forecast stays
@@ -185,17 +186,18 @@ not an aspiration; three things bound the damage of an outage:
    legacy forecasting approach while Flexpectation is fixed.
 
 **One case these three arguments do not cover.** All three assume the outage is *our compute
-stopping*. An extended NWP outage is different in kind: compute keeps running, but the forecast
-either degrades silently or — as the code stands today — hard-fails, and meanwhile the last good
-forecast ages out, so the 14-day-horizon argument expires along with it. Leniency about *our*
-uptime is therefore not the same as leniency about *input* outages, and the second is handled by a
-separate design principle: see [Inherent Stability](../design-philosophy/inherent-stability.md), whose
-degradation ladder sets out what the service should produce at each stage of input loss.
+stopping*. An extended NWP outage is different in kind: compute keeps running, but the
+forecast either degrades silently or — as the code stands today — hard-fails. Meanwhile the
+last good forecast ages out, so the 14-day-horizon argument expires along with it. Leniency
+about *our* uptime is therefore not the same as leniency about *input* outages, and the second
+is handled by a separate design principle: see [Inherent
+Stability](../design-philosophy/inherent-stability.md), whose degradation ladder sets out what
+the service should produce at each stage of input loss.
 
-This section is the *defensive* half of the argument — an outage does not cost much. The
-corresponding *positive* claim, that interventions will be rare in the first place, is stated and
-tested as
-[H1, a service that mostly runs itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+This section is the *defensive* half of the argument — an outage does little damage. The
+corresponding *positive* claim, that interventions will be rare in the first place, is stated
+and tested as [H1, a service that mostly runs
+itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 Missed forecasts are also not lost for evaluation purposes: once the service is back, missed
 slots are backfilled in replay mode, reconstructing what would have been forecast at the time —
@@ -203,11 +205,11 @@ see [Operating the live service: Backfilling a missed slot](../live_service/oper
 
 The same properties give the service **built-in maintenance windows**. New forecasts are
 produced only once every 6 hours, and NGED reads published forecasts directly from S3 rather
-than from any OCF-run service — so the gap between one forecast run and the next is a regular,
-roughly six-hour window in which OCF can stop, patch, upgrade, or even rebuild its compute
-(most notably the always-on control-plane VM) without NGED noticing. No downtime needs to be
-negotiated or announced, and even a maintenance overrun costs only a missed slot, recovered by
-the replay-mode backfill above.
+than from any OCF-run service. So the gap between one forecast run and the next is a regular,
+roughly 6-hour window in which OCF can stop, patch, upgrade, or even rebuild its compute (most
+notably the always-on control-plane VM) without NGED noticing. No downtime needs to be
+negotiated or announced, and even a maintenance overrun causes only a missed slot, recovered
+by the replay-mode backfill above.
 
 This requirement shapes the architecture: it is why a single always-on control-plane VM is an
 acceptable single point of failure (see

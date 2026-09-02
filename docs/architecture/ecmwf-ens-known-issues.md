@@ -56,7 +56,7 @@ after 2024-11-12.
 
 We do not store the raw 0.25° grid. `convert_nwp_xarray_dataset_to_polars_dataframe` aggregates it
 onto H3 cells, each of which is the area-weighted mean of the grid points overlapping it, so a
-grid point's null is resolved before anything on this page ever sees it. On the V1 grid (H3
+grid point's null is resolved before any check on this page ever sees it. On the V1 grid (H3
 resolution 5 over the GB boundary) a cell averages **2.93 grid points**, and only 10 of its 1671
 cells are fed by a single point.
 
@@ -165,16 +165,16 @@ better of the two.
 
 Which of those two a slice gets depends on where it sits in the horizon, and the dswrf example
 above is the awkward case: 360 h is the *last* of the 85 steps, and `interpolate()` leaves trailing
-nulls alone exactly as it leaves leading ones. So that slice is neither absorbed nor bridged — it
+nulls alone exactly as it leaves leading nulls. So that slice is neither absorbed nor bridged — it
 reaches the model as a null, which is benign for a variable that is already null at lead-0 in every
-run, but it is not the "absorbed" case. Second, the
-run that failing would discard is overwhelmingly good. Take that 2026-08-09 run as the worked example: 0.05% of one
-already-nullable variable is not worth the other 4282 slices of that same variable, nor the twelve
-other variables that arrived complete, and rejecting it leaves the live forecast on a run 24 hours
-older. That is exactly the trade
-[principle 7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary)
-warns against, in its own words: throwing away an otherwise-good NWP run converts a tolerable
-problem into an outage.
+run, but it is not the "absorbed" case. Second, the run that failing would discard is
+overwhelmingly good. Take that 2026-08-09 run as the worked example: 0.05% of one already-nullable
+variable is not worth the other 4282 slices of that same variable, nor the 12 other variables that
+arrived complete. Rejecting it leaves the live forecast on a run 24 hours older. That is exactly
+the trade [principle
+7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary) warns against,
+in its own words: throwing away an otherwise-good NWP run converts a tolerable problem into an
+outage.
 
 `Nwp.validate` therefore permits both patterns, and the `nwp_has_no_unexpected_nulls` asset check
 reports them (WARN, non-blocking), naming the affected `(variable, ensemble_member, valid_time)`
@@ -217,10 +217,10 @@ from a worsening one.
 Two null patterns *do* fail ingest:
 
 - **A null in any instantaneous variable** (temperature, dew point, winds, pressures,
-  geopotential height). These are never legitimately null, so any null is an anomalous structural
-  gap. They stay non-nullable in the `Nwp` contract, so base validation rejects them. This is the
-  pattern behind the 2026-07-14 run, where a whole forecast step went missing for 50 of 51
-  ensemble members across every variable — reported upstream as
+  geopotential height). Instantaneous variables are never legitimately null, so any null is an
+  anomalous structural gap. They stay non-nullable in the `Nwp` contract, so base validation
+  rejects them. This is the pattern behind the 2026-07-14 run, where a whole forecast step went
+  missing for 50 of 51 ensemble members across every variable — reported upstream as
   [dynamical-org/reformatters#765](https://github.com/dynamical-org/reformatters/issues/765).
 
     A cell reaches this state only when *every* grid point feeding it is missing, because of the
@@ -275,9 +275,9 @@ yet seen in an instantaneous variable, whose nulls have only ever arrived as who
 
 `NwpVariableWhollyMissing` is its own exception type because the `ecmwf_ens` asset **retries** it,
 on the same ladder as a run that is not in the catalog yet: every 30 minutes, up to 8 times. (That
-is *at least* four hours of waiting — this failure is only detectable after downloading, so each
-of those attempts pays for a download too.)
-Both mean "the upstream run is not ready yet"; they just say it at different points.
+is *at least* 4 hours of waiting — this failure is only detectable after downloading, so each of
+those attempts pays for a download too.) Both mean "the upstream run is not ready yet"; they just
+say it at different points.
 
 That is worth doing because Dynamical.org publishes each 00Z run as roughly 40 separate Icechunk
 commits between 08:05 and 08:20 UTC, one per worker. A run being written is therefore genuinely
@@ -293,7 +293,7 @@ run also gets republished — the 2026-08-09 00Z run was repaired by a second sw
 3 hours 25 minutes after its first publication, and well inside the retry budget.
 
 The retry stays deliberately narrow: it covers these two exceptions and nothing else, so a genuine
-bug still fails immediately rather than retrying for four hours. The partition simply stays
+bug still fails immediately rather than retrying for 4 hours. The partition simply stays
 unmaterialised if every retry is exhausted, until the upstream data is fixed and it is re-run.
 
 ## An incomplete run (tolerated, and reported)
@@ -321,7 +321,7 @@ The **cell count and the total row count cannot fire through today's converter**
 defence-in-depth rather than as live detections. That converter left-joins the NWP values onto the
 H3 grid and then groups by `h3_index`, so its output always carries exactly the cells the grid
 weights name, and always as a dense cross-product. The row count is what would catch a *ragged*
-run — every member, step and cell present, but some (member, step, cell) combinations absent —
+run — every member, step, and cell present, but some (member, step, cell) combinations absent —
 which the three marginal counts all miss. Both would start to matter if that converter were ever
 replaced by one that can emit such a frame.
 

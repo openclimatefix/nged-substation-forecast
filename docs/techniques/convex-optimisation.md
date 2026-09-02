@@ -34,14 +34,14 @@ globally. (If the score is *strictly* convex the bottom is a single point; with 
 the absolute value the bottom can be a small flat face — but every point on it scores
 identically, so any answer the solver returns is a best answer.)
 
-Formally, a function $f$ is convex when, for all $x$, $y$ and $0 \le \lambda \le 1$:
+Formally, a function $f$ is convex when, for all $x$, $y$, and $0 \le \lambda \le 1$:
 
 $$
 f(\lambda x + (1-\lambda) y) \;\le\; \lambda f(x) + (1-\lambda) f(y)
 $$
 
 You rarely check this by hand, because convexity has a *calculus* — a small rulebook that builds
-complicated convex functions from simple ones:
+complicated convex functions from simple functions:
 
 - **Atoms.** Squared error $x^2$; absolute value $|x|$; norms, including group norms such as the
   $\ell_2$ norm of a vector of increments; $\max$; the quantile/pinball loss; the Huber loss — all
@@ -83,7 +83,7 @@ solvers provide for free.
 ## CVXPY: the modelling language
 
 [CVXPY](https://www.cvxpy.org/) is a Python modelling language for convex problems. You write the
-score in NumPy-like syntax; CVXPY checks *at construction time* — using the compositional
+score in NumPy-like syntax. CVXPY checks *at construction time* — using the compositional
 rulebook above, formalised as **disciplined convex programming (DCP)** — that the problem really
 is convex, and refuses to build it otherwise. It then compiles the problem and hands it to a
 solver backend (Clarabel, ECOS, SCS, …).
@@ -98,9 +98,9 @@ problem.solve(solver=cp.CLARABEL)  # certified global optimum in x.value
 ```
 
 The construction-time check cuts both ways, and both directions are useful: it *certifies* the
-formulations it accepts, and it *refuses* the ones it cannot certify — which is a feature, not an
-obstacle, because it says honestly when a problem has left the convex world and needs the other
-toolchain.
+formulations it accepts, and it *refuses* the formulations it cannot certify. That split is a
+feature, not an obstacle, because it says honestly when a problem has left the convex world and
+needs the other toolchain.
 
 ## Why not just PyTorch for the convex problems too?
 
@@ -114,10 +114,10 @@ convex formulation in the first place:
 2. **Exact zeros.** As above: crisp zeros come from solvers that respect the $\ell_1$ corner; gradient
    descent leaves trickles and brings thresholds back.
 
-The residual attractions of PyTorch are real — one toolchain across the project, GPUs at
-~2,500-series scale, and the freedom to later make a model non-convex — but they do not outweigh
-the two properties above *for a formulation that is actually convex*. And the bridge below means
-the choice is not a wall.
+The residual attractions of PyTorch are real — one toolchain across the project, GPUs that scale
+to the project's ~2,500-substation V2 rollout, and the freedom to later make a model non-convex
+— but they do not outweigh the two properties above *for a formulation that is actually convex*.
+And the bridge below means the choice is not a wall.
 
 ## Two routes to the same inverse problem
 
@@ -179,16 +179,16 @@ The predicted signal is then *linear* in the unknowns — and a convex loss on a
 plus convex penalties on the coefficients, is a convex problem end to end. The pattern shows up
 everywhere once you look for it:
 
-- a metered PV site's per-unit output curve (fixed, from
-  [pvlib](https://pvlib-python.readthedocs.io/) at a given orientation) × its unknown DC
-  capacity — the
-  [convex capacity candidate](../roadmap/capacity-estimation.md#candidate-a-the-convex-estimator-cvxpy);
+- a metered photovoltaic (PV) site's per-unit output curve (fixed, from
+  [pvlib](https://pvlib-python.readthedocs.io/) at a given orientation), multiplied by its
+  unknown DC capacity — the [convex capacity
+  candidate](../roadmap/capacity-estimation.md#candidate-a-the-convex-estimator-cvxpy);
 - a small set of orientation basis curves × unknown per-basis installed capacity — the convex
   view of the
   [fleet node](differentiable-physics.md#scaling-to-aggregate-fleets-universalsolarfleetnode);
-- a menu of candidate DER output curves × the unknown amount of each behind a substation — the
-  [convex dictionary baseline](../roadmap/disaggregation.md#the-convex-dictionary-baseline) for
-  disaggregation;
+- a menu of candidate distributed energy resource (DER) output curves × the unknown amount of
+  each behind a substation — the [convex dictionary
+  baseline](../roadmap/disaggregation.md#the-convex-dictionary-baseline) for disaggregation;
 - a frozen dictionary of universal demand shapes × a substation's unknown "style vector"
   (see the `BasisLoadNode` in
   [the graph-structured engine](../roadmap/disaggregation.md#node-definitions)).
@@ -207,7 +207,7 @@ non-negativity (a hard constraint), sparsity ($\ell_1$, giving
 successive differences — the **fused lasso**), and monotone growth (a hard constraint on the
 differences).
 
-It is worth comparing this with the devices the
+It is worth comparing these priors with the devices the
 [differentiable-physics](differentiable-physics.md) sketches use to express the *same* priors
 inside PyTorch:
 
@@ -322,7 +322,8 @@ no error bars. The available bolt-ons are all imperfect:
 - **Sensitivity re-solves** (perturb the penalty strengths, watch the answer move): a cheap
   honesty check, not a calibrated interval.
 - **Bayesian reinterpretation** (the fused lasso is the MAP estimate under Laplace priors):
-  obtaining the full posterior means leaving CVXPY for MCMC or variational inference.
+  obtaining the full posterior means leaving CVXPY for Markov chain Monte Carlo (MCMC)
+  methods or variational inference.
 
 By contrast, the [variational differentiable-physics route](differentiable-physics.md) produces
 (approximate) posteriors natively. Where calibrated, decomposable uncertainty is a first-class
@@ -335,8 +336,9 @@ this is the honest structural con of the convex route, to be weighed against its
 "Non-convex" is not one condition — it comes in grades, and the grade decides the tool:
 
 1. **Convex outright.** Everything above:
-   [fixed shapes × unknown coefficients](#the-recurring-pattern-fixed-shapes-unknown-coefficients)
-   under convex losses, penalties and constraints. CVXPY, no contest.
+   [fixed shapes × unknown
+   coefficients](#the-recurring-pattern-fixed-shapes-unknown-coefficients) under convex losses,
+   penalties, and constraints. CVXPY, no contest.
 
 2. **Jointly non-convex, but convex once you condition on a small set of unknowns.** Estimating a
    metered PV site's capacity *and* its panel orientation is non-convex — capacity multiplies a
@@ -352,14 +354,14 @@ this is the honest structural con of the convex route, to be weighed against its
    it does not scale to genuinely high-dimensional parameter spaces.
 
 3. **Intrinsically non-convex.** Anything where the *shapes themselves* are being learnt —
-   wind-turbine power curves, heat-pump COP rolloff, thermal time constants, neural-network
-   layers — and all variational machinery (CVXPY has no notion of a posterior; the ELBO training
-   in [differentiable physics](differentiable-physics.md) is outside its world). Some problems
-   are non-convex *by construction*: reconstructing signed flow from magnitude-only MVA metering
-   has a sign ambiguity, i.e. two valleys. CVXPY's DCP check refuses all of these at construction
-   time — correctly. PyTorch offers the opposite deal: write down almost anything, gradients flow
-   through it, GPUs make it fast, and the dented landscape is managed with initialisation,
-   restarts, and validation.
+   wind-turbine power curves, heat-pump coefficient-of-performance (COP) rolloff, thermal time
+   constants, neural-network layers — and all variational machinery (CVXPY has no notion of a
+   posterior; the ELBO training in [differentiable physics](differentiable-physics.md) is outside
+   its world). Some problems are non-convex *by construction*: reconstructing signed flow from
+   magnitude-only MVA metering has a sign ambiguity, i.e. two valleys. CVXPY's DCP check refuses
+   all of these at construction time — correctly. PyTorch offers the opposite deal: write down
+   almost anything, gradients flow through it, GPUs make it fast, and the dented landscape is
+   managed with initialisation, restarts, and validation.
 
 **Rule of thumb:** convex estimation subproblems → **CVXPY**, for certainty, reproducibility, and
 little code. Learning shapes, or anything needing posteriors → **PyTorch**, because nothing else

@@ -37,10 +37,10 @@ testing strategy remain unwritten, plus general cleanup.
   **identical** `(time_series_id, fold)` population — a regression guard on the
   experiment-independence of `eligible_time_series`.
 - **Determinism**: training a fold twice with a fixed `random_seed` yields identical
-  predictions. This underpins idempotent retries and a stable leaderboard.
+  predictions. Determinism underpins idempotent retries and a stable leaderboard.
   `test_random_seed_makes_training_deterministic` exists and evidences this at the forecaster
-  level — it trains an `XGBoostForecaster` twice directly on an in-memory frame — but never goes
-  through `trained_cv_model` or fold-window loading, so the fold-level claim above is not
+  level — it trains an `XGBoostForecaster` twice directly on an in-memory frame. But it never
+  goes through `trained_cv_model` or fold-window loading, so the fold-level claim above is not
   evidenced by it and remains one of the guardrail tests below that are still unwritten.
 - **Degradation smoke-tests**: ablate whole input groups — NWP absent, telemetry absent, a single
   weather variable nulled — and assert that a forecast is still produced for every time series, that

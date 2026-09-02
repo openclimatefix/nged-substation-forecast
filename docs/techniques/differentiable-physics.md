@@ -36,7 +36,8 @@ the computational graph, for three core reasons:
   audit the model's assumptions.
 
 **Adding a learned residual on top of a physical generator model is established practice, and
-adding the physics buys interpretability without costing accuracy** — the [energy-forecasting
+adding the physics makes the forecast interpretable without making it less accurate** — the
+[energy-forecasting
 review](../background/energy-forecasting-review.md#differentiable-physics-for-generators) reports
 [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344)'s turbine result and its limits: the gain
 is measured from wind at the moment predicted, not from a multi-day forecast, and nobody has put a
@@ -45,10 +46,10 @@ differentiable generator model inside a distribution network's probabilistic net
 ### Graceful degradation when an input is missing
 
 A fourth reason, less often stated: **a physical forward model has a defined output for any input
-state.** Where an input is absent — a missed NWP run, an unavailable variable, stalled telemetry —
-you substitute a climatological prior or a physical bound and let the physics propagate it. There is
-no branch, no fallback path, and no `if data_is_missing:`. The same code does the right thing
-because of how it is arranged.
+state.** Where an input is absent — a missed NWP (Numerical Weather Prediction) run, an unavailable
+variable, stalled telemetry — you substitute a climatological prior or a physical bound and let the
+physics propagate it. There is no branch, no fallback path, and no `if data_is_missing:`. The same
+code does the right thing because of how it is arranged.
 
 The behaviour that falls out is exactly the degradation behaviour this project wants from its
 forecasts.
@@ -57,11 +58,12 @@ head has less to work with, so the answer relaxes toward the prior: wider, still
 true. Contrast a purely learned model, which under an unfamiliar missingness pattern rides
 default-routing decisions that were never evaluated against any data.
 
-This makes missingness robustness a **design requirement of any DP estimator we build**, not a
-nice-to-have: the priors and bounds substituted for each absent input have to be chosen
-deliberately, and the estimator's uncertainty must widen honestly when it leans on them. It is
-scored that way in the [capacity-estimation head-to-head](../roadmap/capacity-estimation.md#robustness-to-missing-inputs).
-The wider principle is [Inherent Stability](../design-philosophy/inherent-stability.md).
+This graceful-degradation behaviour makes missingness robustness a **design requirement of any DP
+estimator we build**, rather than a nice-to-have: the priors and bounds substituted for each
+absent input have to be chosen deliberately, and the estimator's uncertainty must widen honestly
+when it leans on them. It is scored that way in the [capacity-estimation
+head-to-head](../roadmap/capacity-estimation.md#robustness-to-missing-inputs). The wider
+principle is [Inherent Stability](../design-philosophy/inherent-stability.md).
 
 ## The core idea: inversion through a differentiable forward model
 
@@ -71,8 +73,8 @@ takes the unobserved quantities as inputs. For a substation:
 $$P_{\text{obs}}(t) = P_{\text{demand}}(t) - P_{\text{pv}}(t) - P_{\text{wind}}(t) + P_{\text{loss}}(t)$$
 
 where $P_{\text{obs}}$ is the observed meter reading, $P_{\text{demand}}$ the latent (unobserved)
-demand, and $P_{\text{pv}}$, $P_{\text{wind}}$, $P_{\text{loss}}$ are the PV generation, wind
-generation, and network losses respectively.
+demand, and $P_{\text{pv}}$, $P_{\text{wind}}$, $P_{\text{loss}}$ are the photovoltaic (PV)
+generation, wind generation, and network losses respectively.
 
 Each right-hand-side term is modelled explicitly as a physical function of weather and time, with
 its own latent parameters (capacities, orientations, power curves). The forward model is
@@ -104,10 +106,10 @@ expressiveness of the forward model versus the guarantees on the inversion — u
 
 We model each physical parameter as a learnable Normal distribution $\mathcal{N}(\mu, \sigma^2)$ — a mean-field variational posterior — and train with the reparameterisation trick (`rsample()`) so gradients flow through the sampling step.
 
-Crucially, the training objective is an **ELBO**, not a bare reconstruction loss: a power-reconstruction term *plus* a KL term that pulls each posterior toward a fixed physical prior. The KL term is not optional. Minimising power error alone always rewards shrinking $\sigma \to 0$, so the parameter "uncertainty" we are trying to capture would simply collapse. The prior does double duty: it keeps the posterior spreads honest, and it injects weak domain knowledge (e.g. "panels point roughly south at a typical UK roof pitch") that regularises sites with little data.
+Crucially, the training objective is an **ELBO**, not a bare reconstruction loss: a power-reconstruction term *plus* a KL term that pulls each posterior toward a fixed physical prior. ELBO stands for evidence lower bound, and KL for Kullback-Leibler. The KL term is not optional. Minimising power error alone always rewards shrinking $\sigma \to 0$, so the parameter "uncertainty" we are trying to capture would simply collapse. The prior does double duty: it keeps the posterior spreads honest, and it injects weak domain knowledge (e.g. "panels point roughly south at a typical UK roof pitch") that regularises sites with little data.
 
-**The fitted parameters are *effective* parameters, not the plant's true ones, and the evaluation
-follows from that.** The [energy-forecasting
+**The fitted parameters are *effective* parameters, not the plant's true parameters, and the
+evaluation follows from that.** The [energy-forecasting
 review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports
 [Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024) finding a fitted
 azimuth 5° off the surveyed value that simulated better than the surveyed value itself, because the
@@ -134,7 +136,7 @@ gain comes from the joint fit rather than the bound alone.
 
 Two practical details the ELBO must get right — both classic failure modes of hand-rolled variational inference:
 
-- **The reconstruction term must be a proper likelihood, not a bare MSE.** Bare MSE silently assumes an observation-noise scale of 1 in whatever units the power happens to be in, which makes the balance between reconstruction and KL arbitrary — the posterior then either collapses onto the prior or ignores it, depending on nothing but the units. Use a Gaussian likelihood with a **learnable observation-noise scale** $\sigma_{\text{obs}}$ (see `negative_elbo` in the sketch).
+- **The reconstruction term must be a proper likelihood, not a bare MSE.** Bare MSE silently assumes an observation-noise scale of 1 in whatever units the power happens to be in. This assumption makes the balance between reconstruction and KL arbitrary — the posterior then either collapses onto the prior or ignores it, depending on nothing but the units. Use a Gaussian likelihood with a **learnable observation-noise scale** $\sigma_{\text{obs}}$ (see `negative_elbo` in the sketch).
 - **Scale the KL for minibatches.** The KL term regularises the *whole-dataset* objective once, so on a minibatch it must be weighted by `batch_size / dataset_size` — otherwise the effective prior strength depends on the batching.
 
 Three physics details the sketch gets right:
@@ -307,7 +309,7 @@ $$\eta_T = 1 + \gamma\,(T_{\text{cell}} - 25\,^\circ\text{C})$$
 
 with $\gamma \approx -0.004\,/\,^\circ\text{C}$ ($-0.4\,\%/^\circ\text{C}$) for crystalline silicon. The constant `NOCT_TEMP_RISE` in the sketch is $1/U_0$ with wind neglected — a useful simplification that removes the need for a wind-speed input in the code example. In the full variational model, $U_0$, $U_1$, and $\gamma$ become learnable posteriors with tight physical priors, exactly like `tilt`, `azimuth`, and `dc_capacity`; the two new inputs (air temperature and POA) are already available: NWP temperature, and POA computed midway through the forward pass.
 
-**Thermal-mass upgrade and the broken-cloud effect.** The steady-state model assumes the panel equilibrates to the current irradiance instantaneously. Real panels have thermal mass and lag by several minutes — and this is exactly what produces the *broken-cloud effect*: a panel emerging cool from beneath cloud cover is briefly more efficient than one that has been baking under a clear sky, so the power peak immediately after cloud clearance can transiently *exceed* the steady-state clear-sky peak. This is also why peak daily yield on a partly-cloudy summer day can occasionally beat that on a fully clear day.
+**Thermal-mass upgrade and the broken-cloud effect.** The steady-state model assumes the panel equilibrates to the current irradiance instantaneously. Real panels have thermal mass and lag by several minutes. This lag is exactly what produces the *broken-cloud effect*: a panel emerging cool from beneath cloud cover is briefly more efficient than one that has been baking under a clear sky, so the power peak immediately after cloud clearance can transiently *exceed* the steady-state clear-sky peak. This is also why peak daily yield on a partly-cloudy summer day can occasionally beat that on a fully clear day.
 
 Capture this by promoting cell temperature from an instantaneous quantity to a dynamic latent state — first-order relaxation toward the equilibrium temperature with a learnable thermal time constant $\tau$:
 
@@ -323,7 +325,13 @@ Already anticipated in outline — [Capacity estimation](../roadmap/capacity-est
 soiling as one of the shared physics corrections a learned fleet-scale model should absorb, and
 notes that a capacity estimate silently absorbs it otherwise. This section makes the
 parameterisation concrete. It is not yet implemented, and it is worth adding for Great Britain —
-not only for dustier climates. Dirt, dust, pollen and bird droppings accumulate on panel glass and depress output by a few percent, and a decent fall of rain washes most of it off. Britain is normally rainy enough for the long-run average effect to be small, but the effect is driven by *time since the last washing rainfall*, not by climate averages, so a multi-month dry spell — London rooftops under Saharan dust after a rainless summer — is exactly the regime in which it stops being small. It is also one of the largest remaining unmodelled losses for any deployment in a dry or dusty climate.
+not only for dustier climates. Dirt, dust, pollen, and bird droppings accumulate on panel glass
+and depress output by a few percent, and a decent fall of rain washes most of it off. Britain is
+normally rainy enough for the long-run average effect to be small, but the effect is driven by
+*time since the last washing rainfall*, not by climate averages, so a multi-month dry spell —
+London rooftops under Saharan dust after a rainless summer — is exactly the regime in which it
+stops being small. It is also one of the largest remaining unmodelled losses for any deployment
+in a dry or dusty climate.
 
 **How it would fit.** Soiling is a multiplicative loss, so it enters as a ratio $s_t \in (0, 1]$ applied to DC output alongside the temperature derate $\eta_T$, driven by a small differentiable state that accumulates with dry time and resets with rain:
 
@@ -331,7 +339,7 @@ $$s_t = \max\!\left(s_{\min},\; 1 - \delta \cdot d_t\right), \qquad d_t = \begin
 
 where $d_t$ is time since the last washing rainfall and $r_t$ is the rainfall rate. That is three learnable parameters — a soiling rate $\delta$, a wash-off threshold $r_{\text{wash}}$, and a floor $s_{\min}$ — each with a tight physical prior, learned exactly like `tilt` and `azimuth`. The hard reset above wants softening (a sigmoid in $r_t$, and a soft floor) so gradients flow, and the state-space recurrence is the same pattern as the thermal-mass upgrade above. **No new input is needed**: `precipitation_surface` is already in `_ECMWF_ENS_VARS_TO_DOWNLOAD`, so the rainfall history is in the NWP we already download.
 
-**Why it composes cleanly with the fleet node.** [`UniversalSolarFleetNode`](#4-implementation-universalsolarfleetnode) carries magnitude in a *non-decreasing* per-week capacity series, because installed capacity only ever grows. Soiling is the opposite — a loss that reverses — so it cannot be expressed by bending that series, and trying to would destroy the monotone prior that is doing real work identifying installations. Factoring the two apart (monotone installed capacity **×** reversible soiling ratio) keeps both intact and adds only the three parameters above.
+**Why it composes cleanly with the fleet node.** [`UniversalSolarFleetNode`](#4-implementation-universalsolarfleetnode) carries magnitude in a *non-decreasing* per-week capacity series, because installed capacity only ever grows. Soiling is the opposite — a loss that reverses — so it cannot be expressed by bending that series. Trying to would destroy the monotone prior that is doing real work identifying installations. Factoring the two apart (monotone installed capacity **×** reversible soiling ratio) keeps both intact and adds only the three parameters above.
 
 **The real cost is identifiability, not implementation.** Soiling and slower-than-assumed capacity growth both depress output, and they are separable only because soiling tracks rainfall history with a sawtooth shape whereas installations arrive as steps. Whether that separation actually holds at realistic noise levels needs demonstrating on synthetic data before the extra parameters are let anywhere near a real fit. In the aggregate-fleet case there is a second confound worth naming: real fleets are cleaned and rained on unevenly, so the fleet-level soiling ratio is a smeared average of many site-level sawtooths, which makes $\delta$ easier to identify than $r_{\text{wash}}$.
 
@@ -339,14 +347,14 @@ where $d_t$ is time since the last washing rainfall and $r_t$ is the rainfall ra
 
 ## Scaling to aggregate fleets: `UniversalSolarFleetNode`
 
-A single tilt/azimuth pair cannot represent a "mishmash" of hundreds or thousands of rooftops. A fleet facing east, south and west produces a broad, flat "mound" of power, whereas a single south-facing parameter produces a sharp "hill". Used on a primary substation, the single-array model will fail to fit the wide shoulders of morning and evening generation.
+A single tilt/azimuth pair cannot represent a "mishmash" of hundreds or thousands of rooftops. A fleet facing east, south, and west produces a broad, flat "mound" of power, whereas a single south-facing parameter produces a sharp "hill". Used on a primary substation, the single-array model will fail to fit the wide shoulders of morning and evening generation.
 
 We fix this with a **physics-informed basis expansion** rather than simulating every individual system. (Aggregate, unmetered fleets behind a primary are a v2 concern — this node becomes one of the node types in
 [the graph-structured engine](../roadmap/disaggregation.md#the-graph-structured-engine).)
 
 ### 1. The basis-function insight
 
-Think of the fleet not as a physical simulation of thousands of houses but as a signal-reconstruction problem. The aggregate curve of many fixed-tilt systems is a linear combination of a few fundamental shapes. East, south and west span the space of fixed-tilt orientations: by mixing them (e.g. 30% east, 70% south) you can approximate almost any aggregate fixed-tilt curve, including SE/SW.
+Think of the fleet not as a physical simulation of thousands of houses but as a signal-reconstruction problem. The aggregate curve of many fixed-tilt systems is a linear combination of a few fundamental shapes. East, south, and west span the space of fixed-tilt orientations: by mixing them (e.g. 30% east, 70% south) you can approximate almost any aggregate fixed-tilt curve, including SE/SW.
 
 **A basis mixture answers a documented failure of single-orientation fitting.** The [energy-forecasting review](../background/energy-forecasting-review.md#inferring-engineering-parameters) records that [Saint-Drenan et al. (2015)](https://doi.org/10.1016/j.solener.2015.07.024)'s algorithm "performs poorly" on an unmetered fleet, because it assumes one orientation per plant where the series is really the aggregated production of modules at many orientations. For a single metered site the same approach works well: [Meng et al. (2020)](https://doi.org/10.1016/j.solener.2020.09.077) infer the tilt and azimuth of 13 roof photovoltaic systems to mean absolute errors of 4.3° and 4.5° by matching the shape of metered output against irradiance measured elsewhere, needing no nameplate rating because both curves are normalised before matching. Meng et al. infer orientation and do not forecast power, though.
 
@@ -356,7 +364,7 @@ Single-axis trackers produce a flat-topped "top hat" shape that no mixture of fi
 
 ### 3. Soft clipping for diverse inverters
 
-A fleet contains many inverters of different sizes. An individual inverter hard-clips (a brick wall), but the *aggregate* clips softly: as irradiance rises the most undersized inverters saturate first, then the average ones, then the oversized ones — a smooth, curved shoulder rather than a sharp corner.
+A fleet contains many inverters of different sizes. An individual inverter hard-clips (a brick wall), but the *aggregate* clips softly: as irradiance rises the most undersized inverters saturate first, then the average inverters, then the oversized inverters — a smooth, curved shoulder rather than a sharp corner.
 
 A `tanh` clip is tempting but wrong: `P_max · tanh(P / P_max)` already attenuates *mid-range* power (at `P = P_max` it returns only ≈0.76 `P_max`), so it biases the whole curve down, not just the shoulder. Instead use a **smooth-min** that stays roughly linear until the limit and only then rolls off:
 

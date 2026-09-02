@@ -54,9 +54,9 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
   services).
 - **Portability**: the entire stack must also run on a local laptop (or any cloud) via
   `docker compose up` — no AWS-specific service (EventBridge, Step Functions) may be
-  load-bearing for scheduling or orchestration. This is both a development convenience and a
-  handover requirement — see
-  [the orchestration decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm).
+  load-bearing for scheduling or orchestration. Portability is both a development convenience
+  and a handover requirement — see [the orchestration
+  decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm).
 - AWS infrastructure with **no static AWS keys** (IAM roles throughout), basic alerting on task
   failure (SNS → email), and cost-conscious operation (~£25–35/month target).
 
@@ -116,17 +116,17 @@ Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > [access-phasing](#access-phasing) Stages 2–3 and the future-work items (MLflow server, dev
 > dashboard) remain post-v0.1.
 
-The Level 1 ("nothing always-on") design proposed in issue #206 is rejected: its cost case does
+The Level 1 ("nothing always-on") design proposed in issue #206 is rejected. Its cost case does
 not hold, and there are two requirements it cannot serve. The cost case rests on pricing the
-always-on control plane at ~£70–105/month, which is a 16 GB box big enough to run the
-*compute*; a small control-plane box costs ~£10–20/month (costed 2026-07-02). Its RDS
-prerequisite goes away on a single machine too (Postgres-in-Docker, or SQLite on a real local
-filesystem). The two requirements Level 1 does not serve:
+always-on control plane at ~£70–105/month, which is a 16 GB box big enough to run the *compute*.
+A small control-plane box costs ~£10–20/month (costed 2026-07-02). Its RDS prerequisite goes
+away on a single machine too (Postgres-in-Docker, or SQLite on a real local filesystem). The
+two requirements Level 1 does not serve:
 
 1. **Use Dagster "properly"** — persistent run history, one-click UI backfills of missed
    partitions, and the ability to launch backtests on AWS whenever the model improves.
 2. **An always-on dev dashboard** (a simple Marimo web app showing the latest forecasts) —
-   so *something* must be always-on regardless.
+   so a dashboard must be always-on regardless.
 
 **Decision: small EC2 control-plane box + `EcsRunLauncher`, decided 2026-07-11.** The
 implementation workstreams are identical under every option except the infrastructure one.
@@ -171,7 +171,7 @@ stage is reworked in a later one.
 The constraint driving all three stages: **none of the three web UIs has any built-in
 authentication.** Open-source `dagster-webserver` has no users, roles, or login (auth/RBAC is a
 Dagster+ feature) — anyone who can reach the port can launch and terminate runs and wipe
-materialisations; MLflow's tracking UI and the Marimo dashboard are equally open. So the network
+materialisations. MLflow's tracking UI and the Marimo dashboard are equally open. So the network
 layer *is* the auth layer: "no public inbound ports" in Stage 1 and the read-only-second-webserver
 pattern in Stage 2 are load-bearing security decisions, not tidiness.
 
@@ -208,7 +208,7 @@ Issue: [#328](https://github.com/openclimatefix/nged-substation-forecast/issues/
 - The full-access Dagster webserver, Marimo, and MLflow remain exactly as in Stage 1.
 - **Lighter alternative if (and only if) the audience is a couple of OCF colleagues:** skip
   Caddy, oauth2-proxy, DNS, and the security-group change entirely by inviting them into the
-  tailnet instead — Tailscale already authenticates members with their Google accounts, and a
+  tailnet instead. Tailscale already authenticates members with their Google accounts, and a
   Tailscale ACL can expose just the read-only webserver's port to the team while the full-access
   webserver stays restricted. Worth checking whether OCF already runs an organisation tailnet
   before building this — if so, most of the setup (and the per-user pricing question below) is
@@ -264,9 +264,9 @@ codifying and reproducing — see the open Terraform-vs-CDK question in
 (the preferred post-NIA operating model — see [Handover to NGED](handover.md)), Tailscale
 specifically may not survive NGED's security review, and because the network layer is the auth
 layer here, that would require an NGED-compatible replacement for the whole access design, not
-just a component swap. This is a reason to
-[probe NGED's landing-zone constraints early](handover.md#5-probe-ngeds-aws-landing-zone-early)
-— not a reason to change Stages 1–3, which remain correct for the OCF-run phase.
+just a component swap. That risk is a reason to [probe NGED's landing-zone constraints
+early](handover.md#5-probe-ngeds-aws-landing-zone-early) — not a reason to change Stages 1–3,
+which remain correct for the OCF-run phase.
 
 ## Production monitoring
 
@@ -327,14 +327,14 @@ provides one.
 > edge (SNS → email).
 
 Per-task failure alerts ([Deployment workstream 3](#deployment-workstream-3-aws-infrastructure))
-only fire when something runs and fails. Whole classes of failure are silent: a hung daemon, a
+only fire when a task runs and fails. Whole classes of failure are silent: a hung daemon, a
 full disk, an expired credential, a schedule that stopped firing. The **primary** production
 alert is therefore a **missed-check-in alarm** (Sentry's cron-monitoring terminology): it fires
 when **no successful forecast has landed in N hours** (e.g. 8 hours — one missed 6-hourly slot
 plus margin), regardless of cause. An alert feeding a runbook — rather than paging or automatic
-failover — is a proportionate response because the project's
-[uptime requirements are lenient by design](../background/requirements.md#uptime-lenient-by-design).
-The accepted option's "daemon silently dead" staleness alarm (described in [the architecture
+failover — is a proportionate response because the project's [uptime requirements are lenient
+by design](../background/requirements.md#uptime-lenient-by-design). The accepted option's
+"daemon silently dead" staleness alarm (described in [the architecture
 options](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month))
 is this alarm; recording it here makes it a first-class monitoring deliverable rather than a
 side note.

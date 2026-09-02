@@ -2,7 +2,7 @@
 
 > **Status: 🚧 Planned.** This page is the design record for the post-NIA operating model NGED
 > stated as their preference on **2026-07-14**: NGED running Flexpectation themselves, on
-> NGED's own AWS account, after the NIA project ends. This is a preference, not yet a
+> NGED's own AWS account, after the NIA project ends. That stated intent is a preference, not yet a
 > commitment — NGED's DSO, Cyber, and IT&D teams still need to sign off — but we design for it
 > from now on. The requirement itself is recorded in
 > [Requirements → Operating model & handover](../background/requirements.md#operating-model-handover);
@@ -39,7 +39,7 @@ explicit so we don't accidentally undo them:
 - **No static AWS keys** (IAM roles throughout) removes a whole class of credential-expiry
   incidents, and matches the constraints corporate AWS environments typically impose anyway.
 - **The pipeline runs end-to-end on a laptop** — the live schedules were dress-rehearsed
-  locally under `dg dev` before any AWS compute existed, and the standing preference is
+  locally under `dg dev` before any AWS compute existed. And the standing preference is
   portable application logic over cloud-native glue (e.g. no EventBridge rules) wherever a
   portable option exists. Portability is what makes the service cheap to move into NGED's
   account — or anyone else's.
@@ -50,27 +50,34 @@ explicit so we don't accidentally undo them:
   compute, and NGED's legacy fallback).
 
 The honest caveat: the failures a non-expert can't handle mostly live at the *boundaries*, not
-in our code — an NWP provider changing formats, NGED SCADA feed schema drift, credential and
-certificate expiry, and AWS account plumbing. We expect the most common failure mode to be
-"bad" input data, whose fix lives upstream of the forecasting service rather than in the
-service itself. The workstreams below are aimed squarely at those boundaries.
+in our code — an NWP provider changing formats, NGED SCADA (Supervisory Control and Data
+Acquisition) feed schema drift, credential and certificate expiry, and AWS account plumbing.
+We expect the most common failure mode to be "bad" input data, whose fix lives upstream of the
+forecasting service rather than in the service itself. The workstreams below are aimed
+squarely at those boundaries.
 
 ## Workstreams
 
 ### 1. The operator contract
 
 Write an explicit, short **operator contract**: an enumeration of every action the NGED operator is
-ever expected to take — acknowledge an alert, backfill a missed slot via replay mode, restart the
-daemon, rebuild the control-plane box, escalate to OCF. Keep it to roughly **ten items or fewer**,
-each one a documented button-press or a single command with a runbook page in
-[`docs/live_service/`](../live_service/index.md).
+ever expected to take.
+
+- Acknowledge an alert.
+- Backfill a missed slot via replay mode.
+- Restart the daemon.
+- Rebuild the control-plane box.
+- Escalate to OCF.
+
+Keep the contract to roughly **ten items or fewer**, each one a documented button-press or a single
+command with a runbook page in [`docs/live_service/`](../live_service/index.md).
 
 Everything *not* on that list — model promotion, dependency upgrades, schema changes, infrastructure
 changes — is OCF's job by definition, handled on a scheduled maintenance cadence (and, post-NIA,
 under whatever support arrangement is agreed). Model re-training sits in this category too: the
 re-training pipeline is automated end-to-end, so "re-training" means triggering and reviewing an
-automated run — something OCF could do on a regular cadence (say, monthly) post-NIA, or NGED could
-take on themselves if they choose.
+automated run — a task OCF could do on a regular cadence (say, monthly) post-NIA, or NGED could take
+on themselves if they choose.
 
 One **optional tier** sits between "follow a runbook" and "escalate to OCF", for the more
 mysterious bugs that fall outside the contract but that NGED may want to try fixing themselves:
@@ -126,9 +133,9 @@ build order:
   the accepted-option plan).
 - Log rotation and scheduled disk-cleanup jobs on the box.
 - Most importantly: a **tested, unattended rebuild-from-scratch script**, so the runbook
-  answer to "the box is sick" is *destroy and recreate*, never *diagnose*. This is the point
-  at which infrastructure-as-code stops being premature complexity and becomes the thing that
-  lets a non-expert redeploy safely.
+  answer to "the box is sick" is *destroy and recreate*, never *diagnose*. A tested rebuild
+  script is the point at which infrastructure-as-code stops being premature complexity and
+  becomes the mechanism that lets a non-expert redeploy safely.
 
 ### 4. Infrastructure-as-code, portable to NGED's account
 
@@ -157,19 +164,19 @@ same IaC is OCF's own.
 NGED's corporate AWS environment is the biggest unknown, and the one item on this page that
 should start **well before** the final months of the project. Corporate DNO cloud environments
 commonly impose service control policies, mandatory patching/security agents, restricted
-egress, and bans on long-lived credentials — and **Tailscale specifically may not survive
-NGED's security review**. That matters because in the current design
-[the network layer *is* the auth layer](live-service.md#access-phasing): none of the web UIs
-(Dagster, MLflow, Marimo) has built-in authentication, so if Tailscale is prohibited, the
-access design needs an NGED-compatible replacement (e.g. their VPN + private subnets, or an
-SSO-fronted proxy), not just a substitution.
+egress, and bans on long-lived credentials. And **Tailscale specifically may not survive
+NGED's security review**. That matters because in the current design [the network layer *is*
+the auth layer](live-service.md#access-phasing): none of the web UIs (Dagster, MLflow,
+Marimo) has built-in authentication, so if Tailscale is prohibited, the access design needs
+an NGED-compatible replacement (e.g. their VPN + private subnets, or an SSO-fronted proxy),
+not just a substitution.
 
 Concrete steps:
 
 - Raise landing-zone constraints with NGED early: what can and can't run in their account,
   what network ingress/egress is permitted, how their teams authenticate to internal web UIs.
   These conversations overlap with the internal sign-off NGED needs anyway — their DSO,
-  Cyber, and IT&D teams must approve the operating model before NGED can commit to it — so
+  Cyber, and IT&D teams must approve the operating model before NGED can commit to it. So
   they double as progress on turning the stated preference into a concrete answer.
 - Clarify **who the operator actually is**. NGED has IT/infrastructure teams; the realistic
   split may be a domain person doing the Dagster-level operating while their infrastructure
@@ -180,9 +187,16 @@ Concrete steps:
 
 ### 6. Game days and in-person training
 
-Before handover, run deliberate failure exercises with the actual NGED operator, using only
-the runbooks: break the NWP feed, fill the disk, kill the daemon, expire a credential, let a
-forecast slot get missed. The operator recovers each one unaided (or the runbook gets fixed).
+Before handover, run deliberate failure exercises with the actual NGED operator, using only the
+runbooks.
+
+- Break the NWP feed.
+- Fill the disk.
+- Kill the daemon.
+- Expire a credential.
+- Let a forecast slot get missed.
+
+The operator recovers from each failure unaided, or the runbook gets fixed.
 Game days find documentation gaps faster than any amount of review, and they double as
 operator training.
 
@@ -205,8 +219,8 @@ work:
 - A **budget line** at NGED for the AWS spend and for any OCF support retainer.
 - A written support agreement defining what OCF does post-NIA (scheduled maintenance,
   emergency fixes, model updates) — the details are TBD, but "in writing" is the requirement.
-  This also hedges the staff-turnover risk above: an agreement survives the departure of the
-  individuals who championed it.
+  A written agreement also hedges the staff-turnover risk above: an agreement survives the
+  departure of the individuals who championed it.
 
 ## Timing and decision gates
 
@@ -217,6 +231,7 @@ work:
   should start well before that final-months handoff; the rest land alongside the v1/v2
   milestones they depend on.
 - **The decision is reversible.** The NIA project's original plan was for OCF to deliver
-  recommendations informing an RFP, through which NGED would procure a forecast service from a
-  third party. That remains the fallback throughout: NGED can treat self-operation as an
-  experiment, and if running the service proves too burdensome, revert to publishing the RFP.
+  recommendations informing an RFP (request for proposal), through which NGED would procure
+  a forecast service from a third party. Publishing the RFP remains the fallback throughout:
+  NGED can treat self-operation as an experiment, and if running the service proves too
+  burdensome, revert to publishing the RFP.

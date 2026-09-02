@@ -78,8 +78,8 @@ training-time technique, distinct from the validation folds described here; the 
 
 ## Overlapping forecasts: what the fold boundary does and does not protect
 
-A 14-day forecast reissued every six hours covers each target half-hour 56 times, so it is
-worth saying precisely which problems that creates and which it does not.
+A 14-day forecast reissued every 6 hours covers each target half-hour 56 times. It is
+therefore worth saying precisely which problems that creates and which it does not.
 
 **It does not contaminate the test set.** `load_engineering_inputs` bounds both power and NWP by
 *target* time — power on `time` and NWP on `valid_time`, each within `[window_start, window_end]` —
@@ -102,8 +102,8 @@ review](../background/energy-forecasting-review.md) found no paper offering a me
 closest is [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335), who build the
 consistency intervals on their calibration diagrams "considering the temporal correlation of
 net-load, as the usual assumption of independence between samples does not hold" — the right
-instinct, applied to day-ahead forecasts that are not reissued. Until we do something better, the
-rule is the one already in force for [fold
+instinct, applied to day-ahead forecasts that are not reissued. Until we adopt a better method,
+the same rule already in force for [fold
 hygiene](../roadmap/metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window):
 differences smaller than fold-level noise must not drive decisions, and the per-slice point count
 is not a sample size.

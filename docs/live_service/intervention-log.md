@@ -28,8 +28,8 @@ unlogged:
 | **Runbook?** | Did [Operating the live service](operations.md) already cover it? `yes` / `partial` / `no` |
 | **Notes** | One sentence. Link the issue or PR if there is one |
 
-An intervention is **any occasion a human had to do something to the running service**, including
-the ones that turn out to be trivial. Feature work and deliberate upgrades are not interventions;
+An intervention is **any occasion a human had to intervene in the running service**, including
+occasions that turn out to be trivial. Feature work and deliberate upgrades are not interventions;
 unglamorous keep-it-running chores — a credential rotation, a certificate, a dependency bump forced
 by an upstream deprecation — are, and belong in `routine-ops`.
 
@@ -46,23 +46,23 @@ that claim.
 
 The taxonomy is the substance of the test. The
 [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-predicts that **at least 90% of entries fall into `upstream-contract`** — that essentially the only thing
-that should ever need a human is an upstream provider changing the shape of what they publish.
-Every entry in another category counts against that 90%, which is exactly why the categories are
-recorded separately rather than lumped together. The threshold is deliberately not 100%, so a
-single fluke cannot falsify the claim on its own.
+predicts that **at least 90% of entries fall into `upstream-contract`** — that essentially the
+only cause that should ever need a human is an upstream provider changing the shape of what they
+publish. Every entry in another category counts against that 90%, which is exactly why the
+categories are recorded separately rather than lumped together. The threshold is deliberately not
+100%, so a single fluke cannot falsify the claim on its own.
 
 | Category | Meaning |
 |---|---|
-| `upstream-contract` | An upstream provider changed a format, schema, column, unit or file layout. **The one category the [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts.** |
+| `upstream-contract` | An upstream provider changed a format, schema, column, unit, or file layout. **The one category the [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts.** |
 | `upstream-outage` | Upstream data absent or stuck for long enough that a human had to act, without the contract itself changing |
-| `infrastructure` | The host, container, scheduler, network or cloud account — anything below our own code |
+| `infrastructure` | The host, container, scheduler, network, or cloud account — anything below our own code |
 | `our-bug` | A defect in this codebase |
 | `model` | Forecast quality required a human decision — a promotion, a rollback, a retrain |
 | `routine-ops` | Keep-it-running work that needed a human without anything having failed: credential rotation, a certificate, a dependency bump forced by an upstream deprecation |
 | `self-recovered` | Not an intervention at all — a run that failed and recovered on its own retry, logged with `Minutes = 0` because self-recovery is evidence for the design |
 
-Categories are append-only, like the hypothesis labels themselves. If something genuinely does not
+Categories are append-only, like the hypothesis labels themselves. If a cause genuinely does not
 fit, add a category rather than stretching an existing one — a taxonomy bent to fit the data
 measures nothing.
 
@@ -79,8 +79,8 @@ from, and they are the honest record of what the service actually demanded of us
 
 The reverse also holds, and matters more. A *quiet* pre-v1.0 stretch does not score in favour of
 [H1, a service that mostly runs itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-either. Counting the good weeks of an excluded window while discounting the bad ones would be
-the plainest possible case of the selective reading these hypotheses exist to prevent.
+either. Counting the good weeks of an excluded window while discounting the bad weeks would be the
+plainest possible case of the selective reading these hypotheses exist to prevent.
 
 ## The log
 
@@ -116,8 +116,8 @@ unattended but not entirely so.
 
 *Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` and
 `experiment_name = "xgboost_cv_0001"` — v0.1's promoted model — in the `power_forecasts` Delta table
-on S3. All 117 scheduled slots are present, every consecutive pair is exactly six hours apart, and
-all 28 time series appear in every one of the 117.
+on S3. All 117 scheduled slots are present, every consecutive pair is exactly 6 hours apart, and all
+28 time series appear in every one of the 117.
 
 ### The 9 August ECMWF run, and what it shows
 
@@ -135,21 +135,20 @@ That is [Principle 1](../design-philosophy/design-principles.md) — the power f
 working in production rather than on paper, and it is the more interesting result on this page. A
 missing input degraded the forecast instead of stopping it, and the degradation was bounded and
 visible after the fact. v0.2 closes the gap that made the intervention necessary at all: a
-wholly-missing variable is now a retryable "not ready yet" rather than a fatal error, with a
-four-hour retry budget that covers the 3h25m this republication took.
+wholly-missing variable is now a retryable "not ready yet" rather than a fatal error, with a 4-hour
+retry budget that covers the 3h25m this republication took.
 
 Three caveats, without which the window would be worth more than it is:
 
 - **The deployment had no telemetry at all, so nothing on AWS *could* have alerted.** The earliest
   Sentry commit of any kind — the failure hook, the check-in and the freshness warning all arrived
-  in the same week — lands on `main` on 21 July, six days after the box was deployed and never
+  in the same week — lands on `main` on 21 July, 6 days after the box was deployed and never
   updated. Whatever was running there therefore predates Sentry entirely: the missed-check-in
   monitor never existed on that box, and the alarm that did surface the missed run came from newer
-  code running on a laptop.
-  `live_forecasts_are_healthy`, the check that reads each slot's rows back and counts missed NWP
-  runs, landed later still. The four degraded slots were reconstructable only because
-  `nwp_init_time` travels on every forecast row: the degradation was recoverable from the data, but
-  nothing in the deployment announced it.
+  code running on a laptop. `live_forecasts_are_healthy`, the check that reads each slot's rows
+  back and counts missed NWP runs, landed later still. The four degraded slots were
+  reconstructable only because `nwp_init_time` travels on every forecast row: the degradation was
+  recoverable from the data, but nothing in the deployment announced it.
 - **A month is short, and this is the easy case.** v0.1 is 28 time series and one ECMWF run
   per day. The dominant cause predicted by the
   [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
@@ -180,13 +179,13 @@ called for 58 consecutive 6-hourly slots. **Every one of those slots produced a 
 *Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` and
 `experiment_name = "xgboost_cv_0003"` — v0.2's promoted model — in the `power_forecasts` Delta table
 on S3, the same query that verified the v0.1 window. All 58 scheduled slots are present, every
-consecutive pair is exactly six hours apart, all 31 time series appear in every one of the 58, and
-no slot's `nwp_init_time` is more than 30 hours before its `power_fcst_init_time`.
+consecutive pair is exactly 6 hours apart, all 31 time series appear in every one of the 58, and no
+slot's `nwp_init_time` is more than 30 hours before its `power_fcst_init_time`.
 
-Three things make the next stretch better evidence than the last. `live_forecasts_are_healthy`
+Three changes make the next stretch better evidence than the last. `live_forecasts_are_healthy`
 reads each succeeding slot's rows back and reports missed NWP runs, so a slot forecasting from
 stale inputs is recorded as degraded rather than passing unremarked. A wholly-missing NWP variable
-is now retried for four hours instead of failing, which is what would have made the 9 August
+is now retried for 4 hours instead of failing, which is what would have made the 9 August
 intervention unnecessary. And the deployment carries Sentry, which v0.1's never did, so an
 `ecmwf_ens` run that *does* exhaust its retries reports itself from AWS rather than waiting for
 somebody to run the code on a laptop.

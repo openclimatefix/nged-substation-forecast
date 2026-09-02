@@ -137,7 +137,7 @@ are recorded so the decision is auditable and so we can revisit them as more dat
 
 ### Monthly expanding CV — rejected (redundant folds)
 
-Slide a 12-month validation window forward by one month per fold, expanding training by one month
+Slide a 12-month validation window forward by 1 month per fold, expanding training by 1 month
 each time (fold 1 validates 2025-04→2026-03, fold 2 validates 2025-05→2026-04, …). This "buys"
 several folds from today's data, but consecutive folds share **11/12 of the validation window** and
 >90% of the training data, so their metrics are correlated ~0.9+. The effective number of
@@ -173,10 +173,10 @@ apples-to-oranges. Reanalysis is valuable, but for **pre-training** (see
 [Cross-validation folds: Target](../ml_experimentation/cross-validation-folds.md#target-multiple-yearly-folds)),
 not for validation.
 
-This rejects reanalysis as a *promotion criterion*, not as a measurement. Scoring against ERA5 is
-legitimate as a **diagnostic** — it decomposes total error into the weather-to-power response and
-the implicit hedging against forecast error — and lands as its own `evaluation_scope`, leaving the
-leaderboard folds ENS-only. See
+Rejecting ERA5-backed folds excludes reanalysis only as a *promotion criterion*, not as a
+measurement. Scoring against ERA5 is legitimate as a **diagnostic** — it decomposes total
+error into the weather-to-power response and the implicit hedging against forecast error —
+and lands as its own `evaluation_scope`, leaving the leaderboard folds ENS-only. See
 [Extending the training history](../roadmap/training-history.md#evaluation).
 
 ## Two metric stores, one division of labour

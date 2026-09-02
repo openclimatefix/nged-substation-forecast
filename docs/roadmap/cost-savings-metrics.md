@@ -29,7 +29,7 @@ them up:
 
 1. **Flexibility procurement.** NGED pay flexible customers to reduce demand when a site risks
    running beyond its limit. Procurement today is deliberately conservative, so a sharper forecast
-   buys less flexibility for the same security. This is money NGED spend.
+   buys less flexibility for the same security. Flexibility procurement is money NGED spend.
 2. **Curtailment of generation.** Generators are curtailed to keep exports within network limits.
    Curtailment avoided is generation sold, priced as a whole-system cost rather than a saving to
    NGED or the connected generator specifically — see [curtailment price
@@ -37,14 +37,14 @@ them up:
 
 A third saving — the engineer-hours freed by replacing a manual review of time-series plots with an
 automated forecast — is real, but it is **not a leaderboard metric**: it is identical for every
-model we train, so it cannot rank them. It belongs in the project's final report, priced in
-engineer-hours.
+model we train, so it cannot rank them. This third saving belongs in the project's final report,
+priced in engineer-hours.
 
 ## The shared idea: same risk, then compare the spend
 
 The textbook way to price a forecast charges it for what goes wrong: £X per action taken, £Y per
 limit breach nobody saw coming. We cannot follow that route, because £Y — the cost of a breach — is
-not a figure NGED hold in a form we can use, and the literature that does price a forecast this way
+not a figure NGED hold in a form we can use. And the literature that does price a forecast this way
 has never done so on a real distribution network at a money-denominated cost — the
 [energy-forecasting
 review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
@@ -72,9 +72,10 @@ them is too noisy to rank models by.
 
 **$\tau$ is calibrated on the training window of the leaderboard fold, never on the validation
 window it is scored on** — otherwise a model sees its own future and every pound of the "saving" is
-lookahead. That has a price: the training window is data the model was fitted to, so its residuals
-are smaller than they will be out of sample, $\tau$ comes out too low, and every model
-under-procures on the scored window. The model that overfits hardest gains most from this.
+lookahead. This has a methodological drawback: the training window is data the model was fitted to,
+so its residuals are smaller than they will be out of sample. As a result, $\tau$ comes out too
+low, and every model under-procures on the scored window. The model that overfits hardest gains
+most from this.
 
 **Equal risk is therefore a target, not a guarantee, and this is the design's main weakness.** What
 a model *realises* on the scored window is whatever its tail calibration delivers there. A model
@@ -95,16 +96,16 @@ C = p_{\text{avail}} \sum_{i,t} V_{i,t} \;+\; p_{\text{util}} \sum_{i,t} \min(V_
 $$
 
 The second term is nearly identical for every model — it is set by what the network actually
-needed — so the ranking is carried by the first. Charging one blended price against all procured
+needed. So the ranking is carried by the first. Charging one blended price against all procured
 volume would overstate the cost of over-procurement several times over.
 
 This formula only holds for **short-term contracts**, tendered day-ahead against a forecast. NGED
 also buy **long-term contracts**, whose availability is tendered roughly a year ahead of delivery,
-independent of any forecast we produce now — a better forecast cannot reduce that volume, because
+independent of any forecast we produce now. A better forecast cannot reduce that volume, because
 it is already committed by the time our forecast exists. Only the **utilisation** decision on
-long-term-covered volume — whether to call on capacity already secured, decided day-ahead (up to
-five days ahead around a weekend or bank holiday) — is forecast-sensitive. Metric 1 therefore has
-two components, scored separately per `(time_series_id, direction)`:
+long-term-covered volume — whether to call on capacity already secured, decided day-ahead (up to 5
+days ahead around a weekend or bank holiday) — is forecast-sensitive. Metric 1 therefore has two
+components, scored separately per `(time_series_id, direction)`:
 
 - **Long-term-covered volume**: only the utilisation term is scored against $N$. Availability spend
   is fixed regardless of forecast and is excluded from the metric.
@@ -166,9 +167,9 @@ generation curtailed for nothing.
 **Caveat.** This tier is only valid where a primary's export is electrically isolated from its
 neighbours. Where primaries share a constraint — operate "in parallel" — curtailment must be
 assessed jointly across the group, not per primary. Which primaries in the trial area operate in
-parallel is an **open per-site question**, not something this tier can assume away; treating every
-primary as isolated will overstate how much curtailment Tier 1 avoids at any site that actually
-shares a constraint.
+parallel is an **open per-site question**, not a question this tier can assume away. Treating
+every primary as isolated will overstate how much curtailment Tier 1 avoids at any site that
+actually shares a constraint.
 
 ### Tier 2 — substation hierarchy, no power-flow
 
@@ -193,8 +194,8 @@ historical summed power. Where NGED supply a real rating for a node, we use that
 
 ### Tier 3 — full power-flow modelling
 
-Out of scope for Flexpectation, including v2. This is documented as the eventual correct approach —
-modelling reactive power, voltage drop and N-1 contingencies explicitly — but it is gated on
+Out of scope for Flexpectation, including v2. Tier 3 is documented as the eventual correct approach
+— modelling reactive power, voltage drop and N-1 contingencies explicitly — but it is gated on
 power-flow integration work that sits outside this project.
 
 Tier 3 is also where a **real curtailment case study** becomes possible. Tiers 1 and 2 can each be computed and can rank models without Tier 3. What they cannot yet do is be validated against a real curtailment event, because no existing site maps a curtailment case to a specific series or a single hierarchy node — see [case studies](#case-studies) below.
@@ -404,7 +405,8 @@ recommendation is not forgotten in the meantime.
   `time_series_id` — this needs its own key, still to be resolved with the contract change.
 - **Flexibility-price computation is a data pipeline task**, not hardcoded: pull National Grid's
   published flexibility-trades resources (see [case studies](#case-studies)), split by contract
-  type, and compute a volume-weighted average price per type. This has no home in the codebase yet.
+  type, and compute a volume-weighted average price per type. This price-computation step has no
+  home in the codebase yet.
 - **`_log_metrics_to_mlflow` aggregates with `mean()`**, which is right for every metric that exists
   today and wrong for these: the portfolio headline is a *sum* over series, and pooled
   `unmet_fraction` is $\sum N$-weighted, not an unweighted mean that a tiny site can dominate. The

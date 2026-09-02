@@ -1,6 +1,6 @@
 # Learned Encoders
 
-> **Status: 🔬 Research.** Encoders are a v2 research direction. V1 uses raw NWP features directly.
+> **Status: 🔬 Research.** Encoders are a v2 research direction. V1 uses raw NWP (Numerical Weather Prediction) features directly.
 
 In the full graph-structured architecture, many components need to transform the same raw inputs — NWP
 grid values, timestamps, substation location — into useful representations. Rather than re-learning these
@@ -17,12 +17,12 @@ above.
 
 ## Why encoders are a natural fit with differentiable physics
 
-This is the key insight: the differentiable physics layer handles DER-specific physical relationships
-(how much irradiance a panel converts to power given its geometry; how wind speed maps to turbine
-power via the cubic law). This means the **weather encoder does not need to learn anything about
-solar panels or wind turbines** — it just needs to produce a good representation of the atmospheric
-state. The physics layer then interprets that shared representation through the appropriate equations
-for each DER type.
+This is the key insight: the differentiable physics (DP) layer handles distributed energy resource
+(DER)-specific physical relationships (how much irradiance a panel converts to power given its
+geometry; how wind speed maps to turbine power via the cubic law). This means the **weather encoder
+does not need to learn anything about solar panels or wind turbines** — it just needs to produce a
+good representation of the atmospheric state. The physics layer then interprets that shared
+representation through the appropriate equations for each DER type.
 
 The practical payoff: a single shared weather encoder can be trained jointly across all DER types and
 all substations, benefiting from the full dataset. The encoder learns weather; the physics handles
@@ -75,11 +75,12 @@ Encoder inputs go missing in production — a missed NWP run, a variable absent 
 stalled meter — so how absence is represented is an architectural decision, not an afterthought.
 
 **Do not zero-fill.** Zero is a meaningful value in physical units: 0 MW, 0 W/m² and 0 °C are all
-real physical states. Substituting zero for an unknown therefore asserts something false, and the
-network cannot tell the two apart, so it learns a conditional mean contaminated by fabricated data.
+real physical states. Substituting zero for an unknown therefore asserts that the reading was zero,
+which is often false. The network cannot tell a true zero from a missing one, so it learns a
+conditional mean contaminated by fabricated data.
 
-**Treat inputs as a set of tokens and simply omit the absent ones.** Each token carries a value
-embedding, a feature-identity embedding and a time embedding; attention is natively
+**Treat inputs as a set of tokens and simply omit the absent tokens.** Each token carries a value
+embedding, a feature-identity embedding, and a time embedding. Attention is natively
 permutation-invariant and variable-length, so a missing input is *structurally* absent rather than
 encoded as a sentinel. Mask the attention matrix for padding only. The dense alternative, for
 architectures that need a fixed-width input, is **value + mask channels**, so the network can still
@@ -87,12 +88,13 @@ distinguish "zero" from "unknown" — GRU-D is the standard precedent, pairing m
 decay of the last observation toward an empirical mean.
 
 **Do not train for missingness with random dropout alone.** Random dropout simulates data that is
-*missing completely at random*, and production missingness is not: outages correlate with time of
-day, weather systems and provider incidents, and a meter that drops out during the storm that caused
-an extreme reading is missing *because* the value was extreme. A model trained on random dropout is
-calibrated for a world it does not live in, and the miscalibration shows up as over-confident
-predictions during a real outage — the worst possible moment. Use **structured, outage-shaped**
-dropout drawn from the same failure-scenario vocabulary the rest of the project scores against.
+*missing completely at random*, and production missingness is not. Outages correlate with time of
+day, weather systems, and provider incidents, and a meter that drops out during the storm that
+caused an extreme reading is missing *because* the value was extreme. A model trained on random
+dropout is calibrated for a world it does not live in, and the miscalibration shows up as
+over-confident predictions during a real outage — the worst possible moment. Use **structured,
+outage-shaped** dropout drawn from the same failure-scenario vocabulary the rest of the project
+scores against.
 
 See [Inherent Stability](../design-philosophy/inherent-stability.md) for the whole principle.
 
@@ -100,6 +102,6 @@ See [Inherent Stability](../design-philosophy/inherent-stability.md) for the who
 
 Because the DP layer hard-codes solar geometry, the weather encoder does not need to learn that
 "noon → peak irradiance" or "winter → low sun angle." The time encoder does not need to represent
-seasonality for PV — that is handled by the ephemeris computation in the DP module. The encoders can
-focus entirely on the residual structure the physics does not explain: NWP biases, local
-microclimatic effects, and behavioural anomalies.
+seasonality for solar photovoltaic (PV) power — that is handled by the ephemeris computation in the
+DP module. The encoders can focus entirely on the residual structure the physics does not explain:
+NWP biases, local microclimatic effects, and behavioural anomalies.

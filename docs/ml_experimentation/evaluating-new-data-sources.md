@@ -2,16 +2,17 @@
 
 How to assess a **new input data source whose history is shorter than the canonical CV folds** —
 the motivating case is adding ICON-EU NWP (from Dynamical.org), whose archive starts later than
-the leaderboard folds. Such a source **cannot** enter the canonical folds (there is no
-overlapping history), so its evaluation lives entirely in the `metrics` asset's
+the leaderboard folds. A source with no overlapping history **cannot** enter the canonical folds
+(there is no overlapping history), so its evaluation lives entirely in the `metrics` asset's
 `evaluation_scope="ad_hoc"` and **never** feeds the leaderboard.
 
-**For a new *weather* source, check the ceiling first.** Before ingesting one at all, measure what
-near-perfect weather would buy — see
-[the perfect-weather ceiling](../roadmap/metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates).
-If a model trained and scored on reanalysis barely beats the ENS-scored champion, there is little
-forecast-error headroom for a further source to recover, and the patterns below are not yet worth
-running — unless the candidate's case rests on *resolution*, which that ceiling does not bound.
+**For a new *weather* source, check the ceiling first.** Before ingesting one at all, measure
+how much forecast skill near-perfect weather would add — see [the perfect-weather
+ceiling](../roadmap/metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates). If a
+model trained and scored on reanalysis barely beats the ENS-scored champion, there is little
+forecast-error headroom for a further source to recover, and the patterns below are not yet
+worth running — unless the candidate's case rests on *resolution*, which that ceiling does not
+bound.
 
 Three patterns, answering three different questions.
 

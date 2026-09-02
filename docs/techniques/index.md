@@ -16,13 +16,13 @@ docstrings) as the work that applies them ships.
   [switching-events roadmap page](../roadmap/switching-events.md), and the convex candidate in
   the [v0.7 capacity head-to-head](../roadmap/capacity-estimation.md).
 - [Probabilistic forecasting from NWP ensembles](probabilistic-forecasting.md) — why pushing an
-  NWP ensemble through a deterministic power model is systematically overconfident
-  (under-dispersed), the three-term uncertainty decomposition, the fix (per-member conditional
-  quantile forecasts recombined by the linear-pool mixture), the pooling recipe, why
-  quantile-averaging (Vincentization) re-creates the under-dispersion, and the double-counting
-  caveat. Applied by the
-  [probabilistic evaluation & calibration plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
-  and the [delivery tables](../roadmap/delivery-tables.md#table-1-power_forecast).
+  NWP (Numerical Weather Prediction) ensemble through a deterministic power model is
+  systematically overconfident (under-dispersed), the three-term uncertainty decomposition, the
+  fix (per-member conditional quantile forecasts recombined by the linear-pool mixture), the
+  pooling recipe, why quantile-averaging (Vincentization) re-creates the under-dispersion, and
+  the double-counting caveat. Applied by the [probabilistic evaluation & calibration
+  plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics) and the
+  [delivery tables](../roadmap/delivery-tables.md#table-1-power_forecast).
 - [Evaluation metrics](evaluation-metrics.md) — every metric `compute_metrics` produces, each
   with a plain-language summary, the equation, and the design decisions behind it: the
   deterministic four (MAE, NMAE, RMSE, MBE), fair CRPS, the Fortin-corrected spread-skill

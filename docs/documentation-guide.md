@@ -1,7 +1,7 @@
 # Documentation Guide
 
 How this repository's documentation and planning content is organized — where to look for
-something, and where to put something new.
+existing content, and where to put new content.
 
 > **Status legend** (used throughout the design docs below):
 > ✅ **Implemented** — exists in code today ·
@@ -17,7 +17,7 @@ Planning content lives in five places with deliberately non-overlapping jobs:
 | **[`docs/design-philosophy/engineering-hypotheses.md`](design-philosophy/engineering-hypotheses.md)** | **Our own falsifiable claims** — what we assert the engineering will achieve, the threshold that decides it, and what would falsify it. Not design (that is `roadmap/` or `architecture/`) and not NGED-derived requirement (that is `background/`): a claim we are on the hook for, and a natural NIA deliverable. One page; append tests, never renumber them. |
 | **GitHub** ([issues](https://github.com/openclimatefix/nged-substation-forecast/issues) + the OCF Project board) | The **complete, ordered task list** — including quick tweaks and non-code tasks — plus all discussion. **Fine-grained prioritisation lives only in GitHub.** Epics map 1:1 to the [roadmap milestones](roadmap/index.md#milestones); dependencies are recorded as `blocked by` issue relationships. |
 | **[`docs/roadmap/`](roadmap/index.md)** | Design depth: What we plan to build and *why*. The milestone arc and inter-plan dependencies are recorded here; fine-grained task-level ordering is not. |
-| **`docs/`[techniques](techniques/index.md), [background](background/index.md), [architecture](architecture/overview.md), [ml_experimentation](ml_experimentation/index.md), [live_service](live_service/index.md)** | What is already built — design (`architecture/`) and operational how-to (`ml_experimentation/`, `live_service/`) alike. This is where content moves to from `docs/roadmap/` after implementation. |
+| **`docs/`[techniques](techniques/index.md), [background](background/index.md), [architecture](architecture/overview.md), [ml_experimentation](ml_experimentation/index.md), [live_service](live_service/index.md)** | What is already built — design (`architecture/`) and operational how-to (`ml_experimentation/`, `live_service/`) alike. These pages are where content moves to from `docs/roadmap/` after implementation. |
 | **`plans/`** (repo root, not published) | At most **one** file per branch: the implementation plan for the work in flight on that branch, written before any code is touched and deleted when it merges. One worktree per branch is what keeps it to one file. Usually empty on `main`. |
 
 **Relationship between `docs/roadmap/` and GitHub**: Every substantial 🚧 plan in the
@@ -56,11 +56,11 @@ roadmap items that apply them.
 | Think through a substantial design | A `docs/roadmap/` page, reviewed via PR |
 | Communicate direction to NGED / leadership | The [milestones](roadmap/index.md#milestones) (published site) |
 | Give an AI coding tool context on the broader plan | `docs/roadmap/` (plus `gh` for live task priorities) |
-| Understand a method (DP, encoders, …) | [`docs/techniques/`](techniques/index.md) |
+| Understand a method (differentiable physics, encoders, …) | [`docs/techniques/`](techniques/index.md) |
 | Understand the principles the whole design answers to | [`docs/design-philosophy/`](design-philosophy/index.md) — the portable argument, readable without knowing the codebase |
-| Understand *why* something already built works the way it does | [`docs/architecture/`](architecture/overview.md) — the local rationale, recorded next to each component |
+| Understand *why* an existing system works the way it does | [`docs/architecture/`](architecture/overview.md) — the local rationale, recorded next to each component |
 | State — or check — a measurable claim about the engineering | [`docs/design-philosophy/engineering-hypotheses.md`](design-philosophy/engineering-hypotheses.md). Add a test with a threshold and a resolution point; never renumber an existing one |
 | Record an assessment of work we decided **not** to do | [`docs/architecture/`](architecture/overview.md), with a `Status:` banner saying so — e.g. [Why Dagster, not Airflow?](architecture/why-dagster-not-airflow.md). Not `docs/roadmap/`, which implies intent to build and is deleted on ship. |
-| Learn *how* to run/operate something already built, step by step | [`docs/ml_experimentation/`](ml_experimentation/index.md), [`docs/live_service/`](live_service/index.md) |
+| Learn *how* to run or operate an existing system, step by step | [`docs/ml_experimentation/`](ml_experimentation/index.md), [`docs/live_service/`](live_service/index.md) |
 | File a quick tweak or a non-code task | A GitHub issue only — no markdown needed |
 | Plan how to implement an issue, before writing code | `plans/<branch-name>.md` on that issue's branch (one file per branch, deleted on merge) |

@@ -23,8 +23,8 @@ file on disk — see the [Configuration reference](setup.md#three-storage-roots)
 ## Step 2 — A persistent Dagster instance
 
 The 6-hourly schedule only fires while Dagster's daemon is running continuously, so `uv run dg
-dev` needs to keep running (rather than being started and stopped around each manual step) and
-needs a persistent `DAGSTER_HOME` so its schedule state survives a restart:
+dev` needs to keep running rather than being started and stopped around each manual step. It
+also needs a persistent `DAGSTER_HOME` so its schedule state survives a restart:
 
 1. `mkdir ~/dagster_home/` and put the `dagster.yaml` shown in
    [Getting started → Give Dagster a persistent home](../getting-started.md#step-3-give-dagster-a-persistent-home)
