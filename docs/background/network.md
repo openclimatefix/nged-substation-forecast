@@ -23,7 +23,8 @@ sites, West Midlands 0.5 MW over 5 sites — under half a percent of the connect
 **The hydro fleet is overwhelmingly small run-of-river with no storage.** 39 of the 44 hydro
 entries are `Hydro - Run of river`, and 29 of the 41 connected sites join at 0.4 kV, so output
 tracks catchment flow almost directly. The largest connected schemes are Llyn Brianne (5.45 MW,
-Dyfed), Elan Valley (4.0 MW, Powys), Chatsworth (3.7 MW, Derbyshire), Mary Tavy (2.6 MW, Devon)
-and Ystradffin (1.99 MW, Dyfed). One entry is much larger — a 58.5 MW Cwm Rheidol scheme accepted
-to connect in the South Wales area — but its target energisation date is 2037. The 41 connected
-sites are spread across **32 distinct primary substations**, so no primary is hydro-dominated.
+Dyfed), Elan Valley (4.0 MW, Powys), Chatsworth (3.7 MW, Derbyshire), Mary Tavy (2.6 MW,
+Devon), and Ystradffin (1.99 MW, Dyfed). One entry is much larger — a 58.5 MW Cwm Rheidol
+scheme accepted to connect in the South Wales area — but its target energisation date is 2037.
+The 41 connected sites are spread across **32 distinct primary substations**, so no primary is
+hydro-dominated.

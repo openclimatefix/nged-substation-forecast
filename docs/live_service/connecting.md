@@ -5,12 +5,12 @@ is how a laptop reaches it — both the Dagster UI and a shell on the always-on 
 over Tailscale.
 
 Everything routes through the OCF tailnet. The control-plane box has **no publicly-reachable
-ports** (its security group allows no inbound traffic except Postgres from the Fargate workers),
-and the Dagster webserver has **no login of its own**, so joining the tailnet is what grants — and
+ports** (its security group allows no inbound traffic except Postgres from the Fargate workers).
+And the Dagster webserver has **no login of its own**, so joining the tailnet is what grants — and
 gates — access. Anyone on the OCF tailnet can reach the UI and, via Tailscale SSH, a shell as
-`ubuntu`; that is intended for this box. See
-[the access-phasing plan](../roadmap/live-service.md#access-phasing) for why the security model is
-"tailnet membership is the authentication" at this stage.
+`ubuntu`; that is intended for this box. See [the access-phasing
+plan](../roadmap/live-service.md#access-phasing) for why the security model is "tailnet membership
+is the authentication" at this stage.
 
 This page is the client-laptop counterpart to [Step 12](aws.md#step-12-join-the-tailnet) of the
 AWS runbook: that step joins the *box* to the tailnet, once; this page gets *your* laptop onto the
@@ -42,7 +42,7 @@ same tailnet so it can see the box.
 ## Step 2 — Join the OCF tailnet
 
 Sign in **with your OCF Google Workspace account** (`…@openclimatefix.org`) so your laptop joins
-the shared OCF org tailnet rather than a personal one:
+the shared OCF org tailnet rather than a personal tailnet:
 
 - **GUI client**: launch Tailscale, choose **Log in**, then **Sign in with Google**, and pick your
   `…@openclimatefix.org` account.
@@ -69,8 +69,8 @@ output and use that instead.
 ## Step 4 — Open the Dagster UI
 
 In a browser, open **`http://nged-forecast-ctrl:3000`** (plain `http`, MagicDNS name; the raw
-`100.x` Tailscale IP works too). There is no login prompt — that is by design (see the security
-note at the top of this page).
+`100.x` Tailscale IP works too). There is no login prompt — that omission is by design (see the
+security note at the top of this page).
 
 From here, driving the running service — promoting a champion, materialising or backfilling a slot,
 inspecting a forecast — is [Operating the live service](operations.md).
