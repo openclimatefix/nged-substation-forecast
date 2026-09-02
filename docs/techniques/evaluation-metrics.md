@@ -520,7 +520,7 @@ Anything not in MLflow is still one Polars filter away in Delta.
   miscalibrated (U-shaped = underdispersed, domed = overdispersed). A histogram is not a scalar,
   so it does not fit the tall metrics schema; it is computed in ad-hoc analyses (e.g. when
   choosing the
-  [Phase C calibration](../roadmap/metrics-and-leaderboard.md#phase-c-cheap-calibration-after-b-proves-the-diagnosis)
+  [Phase C calibration](../roadmap/metrics-and-leaderboard.md#phase-c-low-effort-calibration-after-b-proves-the-diagnosis)
   approach) rather than stored per experiment.
 - **Histogram of errors** — same reason; planned as a visual check on the
   [roadmap](../roadmap/metrics-and-leaderboard.md#evaluation-metrics).

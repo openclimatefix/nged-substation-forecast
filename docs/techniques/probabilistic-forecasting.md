@@ -223,7 +223,7 @@ over-stated risk) is a far safer failure mode than the under-dispersion it repla
   [probabilistic evaluation plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
 - **Cheap stopgap**: post-hoc spread inflation of the existing deterministic ensemble ([Phase C
   of the probabilistic evaluation
-  plan](../roadmap/metrics-and-leaderboard.md#phase-c-cheap-calibration-after-b-proves-the-diagnosis))
+  plan](../roadmap/metrics-and-leaderboard.md#phase-c-low-effort-calibration-after-b-proves-the-diagnosis))
   achieves calibration without any of this machinery — the full mixture pipeline must beat it
   to justify the added complexity.
 - **The full pipeline** ([Phase D of the probabilistic evaluation plan](../roadmap/metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)): a quantile-objective XGBoost emits Representation 3;

@@ -96,9 +96,9 @@ sneak a recent-power member in.
 **`nged_incumbent` is also our first _probabilistic_ baseline — and this is the faithful
 representation, not a bonus.** The plotted spread *is* the incumbent's output — an operator reads it
 by eye. We emit the 13 analogues as 13 `ensemble_member` rows and let the [probabilistic
-metrics](#phase-b-probabilistic-metrics-from-the-existing-ensemble) score them for free — scoring
-the spread is the closest automatable proxy for the plot a human actually reads. Two consequences
-worth stating plainly:
+metrics](#phase-b-probabilistic-metrics-from-the-existing-ensemble) score them with no extra
+implementation work — scoring the spread is the closest automatable proxy for the plot a human
+actually reads. Two consequences worth stating plainly:
 
 - **`ensemble_member` is overloaded here.** For NWP models that column indexes an NWP ensemble
   member; for `nged_incumbent` it indexes a *historical analogue*. Same column, different meaning.
@@ -117,7 +117,7 @@ worth stating plainly:
   further processing at all"), so equiprobable members — and the probabilistic metrics (CRPS etc.)
   computed over them — are faithful, not an approximation.
 
-### A faithful replica and a "cheap upgrades" variant
+### A faithful replica and a "simple upgrades" variant
 
 **Most of the benefit may come from a few simple upgrades to what NGED already do, not from heavy ML
 — the message the pair of baselines is built to test.** We implement two closely-related incumbent
@@ -187,24 +187,24 @@ yardstick here; `nged_incumbent` is the point on it.
 
 Five PRs, in order. PRs 1–2 are shared-framework groundwork (no baseline yet); PRs 3–5 add one
 baseline each. The `nged_incumbent_holiday_aligned` variant (described under [A faithful replica and
-a "cheap upgrades" variant](#a-faithful-replica-and-a-cheap-upgrades-variant)) is a later sixth PR,
-out of scope for this arc but given its own tracked issue so it is not lost when #147 closes.
+a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a later sixth
+PR, out of scope for this arc but given its own tracked issue so it is not lost when #147 closes.
 
 **Guiding principle — no special path.** New workspace package `packages/baseline_forecasters/`
 mirroring the `xgboost_forecaster` layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`),
 added to the root `pyproject.toml` `[tool.uv.sources]` and dependencies. Every baseline subclasses
 `BaseForecaster` and rides the **identical** asset chain (`register_experiment_job` →
 `trained_cv_model` → `cv_power_forecasts` → `metrics`) that `XGBoostForecaster` uses — a `train()`
-that only records `trained_time_series_ids` and a `meta.json`-only `save()` cost nothing, and the
-uniform provenance is exactly what makes re-running routine. Re-running CV for any algo is then a
-native Dagster operation: select **`trained_cv_model++`** in the asset graph (two `+` — `metrics` is
-two hops downstream, so a single `+` would silently stop at `cv_power_forecasts` and skip scoring),
-choose the experiment's partitions, and launch a backfill. The unpartitioned `metrics` asset
-materialises once afterwards with its default config (no filter, `leaderboard` scope). Verify this
-drill end-to-end on a smoke-test fold before documenting it — the Dagster version supports mixed
-partitioned/unpartitioned backfill selections, but confirm the UI behaviour rather than assuming it.
-To re-score a *single* experiment without touching the rest, use the `metrics` asset's
-`PopulationFilter` config instead.
+that only records `trained_time_series_ids` and a `meta.json`-only `save()` need no extra
+engineering effort, and the uniform provenance is exactly what makes re-running routine. Re-running
+cross-validation (CV) for any algo is then a native Dagster operation: select
+**`trained_cv_model++`** in the asset graph (two `+` — `metrics` is two hops downstream, so a single
+`+` would silently stop at `cv_power_forecasts` and skip scoring), choose the experiment's
+partitions, and launch a backfill. The unpartitioned `metrics` asset materialises once afterwards
+with its default config (no filter, `leaderboard` scope). Verify this drill end-to-end on a
+smoke-test fold before documenting it — the Dagster version supports mixed partitioned/unpartitioned
+backfill selections, but confirm the UI behaviour rather than assuming it. To re-score a *single*
+experiment without touching the rest, use the `metrics` asset's `PopulationFilter` config instead.
 
 **PR 1 — deterministic-collapse rework in `compute_metrics`.** Implements the [metric-matched
 collapse decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast). Forecasters
@@ -267,8 +267,7 @@ docs.** Three changes to the shared rails, none baseline-specific.
   `trained_cv_model` and `cv_power_forecasts`. `LIVE_POWER_HISTORY` in `production_assets.py` is a
   hard-coded 15-day equivalent for the live path — leave it, but cross-reference it from the new
   parameter so a future long-lag live model is not silently starved. Add a comment where
-  `cv_power_forecasts` re-scans the widened power window per `init_time` chunk (cheap next to NWP,
-  but worth flagging so nobody blames the wrong step when profiling).
+  `cv_power_forecasts` re-scans the widened power window per `init_time` chunk (fast next to NWP, but worth flagging so nobody blames the wrong step when profiling).
 - **Document the `ensemble_member` overload** on `PowerForecast` and `AllFeatures`: an NWP-member
   index for NWP-consuming models, a historical-analogue index for `nged_incumbent`, a
   quantile-sample index for `climatology`. Nobody may assume `ensemble_member ⇒ NWP`.
@@ -283,7 +282,7 @@ docs.** Three changes to the shared rails, none baseline-specific.
   written into `docs/ml_experimentation/dagster-workflow.md`. Treat both PRs as a single leaderboard
   epoch event, since each shifts existing numbers.
 
-**PR 3 — package skeleton + `PersistenceForecaster` (seasonal-naive; the cheapest end-to-end
+**PR 3 — package skeleton + `PersistenceForecaster` (seasonal-naive; the lowest-effort end-to-end
 probe).** Ships the package and proves the PR-2 framework on the simplest model.
 
 - Shared helper `_meta_io.py`: the `meta.json` save/load round-trip (config dump,
@@ -319,8 +318,7 @@ landing on a now-proven rail.
 - `MODEL_NAME = "nged_incumbent"`, `MODEL_VERSION = 1`, `uses_nwp_ensemble = False`,
   `weather_source: "none"`. Config `n_weekly_analogues = 6` and `annual_week_span = (49, 55)` drive
   the 13 analogue lags (weekly `168h × {1..6}`; annual `168h × {49..55}` = 8232…9240 h — all within
-  the feature parser's 17 520 h cap), with `selected_features` derived from them so variants stay one
-  override cheap.
+  the feature parser's 17 520 h cap), with `selected_features` derived from them so a variant needs only one override.
 - `predict()` unpivots the 13 analogue-lag columns into `ensemble_member` rows (member index =
   analogue index; Int8 holds 0–12). Members nulled by `_nullify_leaky_lags` (as lead time grows, the
   short weekly members shed first) or by insufficient history are dropped; rows where *all* members
@@ -431,10 +429,10 @@ results](../background/energy-forecasting-review.md#leaderboards-of-machine-lear
 [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 warning and [Pinheiro et
 al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of which our
 own fold already meets in length but not in independence. With hundreds of planned experiments (the
-roadmap mentions LLM-driven auto-experimentation in v0.5), the winner's reported skill will grow
-more optimistically biased over time. Our own fold is small in effective sample size rather than in
-row count, because consecutive half-hours are strongly correlated. The epoch mechanism handles
-*data* changes but not *adaptive selection* on a fixed fold.
+roadmap mentions auto-experimentation driven by a large language model (LLM) in v0.5), the winner's
+reported skill will grow more optimistically biased over time. Our own fold is small in effective
+sample size rather than in row count, because consecutive half-hours are strongly correlated. The
+epoch mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
 
 **The structural fix — reserving a genuinely untouched final-test window — waits on Dynamical.org's
 ECMWF ENS backfill, which is not expected until ~November 2027, after v1.0.** A second independent
@@ -565,10 +563,9 @@ the **peak-events slice** (the top 5% highest *observed* demand) and NGED's hand
 examples**. Both are described under [Tail & exceedance
 metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
 
-**Every ratio between a model and a reference carries its reference forecast, population, and
-ensemble-member count, corrected for the ensemble-size bias [Weigel et al.
-(2007)](https://doi.org/10.1175/MWR3280.1) describe** — see [Publishing results that others can
-compare
+**Every ratio between a model and a reference is corrected for the ensemble-size bias [Weigel et al.
+(2007)](https://doi.org/10.1175/MWR3280.1) describe, and carries its reference forecast, population,
+and ensemble-member count** — see [Publishing results that others can compare
 against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
 for the general commitment. The fair, finite-ensemble-unbiased CRPS in the table above is the form
 that carries this correction. PICP is judged against the finite-ensemble calibrated reference rather
@@ -641,7 +638,7 @@ No model is structurally disadvantaged on any column — which a single uniform 
 achieve — and the trap is closed because the collapse is uniform across models. Because the collapse
 lives entirely *downstream* of the stored forecasts, switching it re-scores the whole leaderboard
 from a single `metrics` re-materialisation with no retraining or re-prediction. Doing it now, before
-the leaderboard adjudicates anything, is the cheapest moment to shift every existing deterministic
+the leaderboard adjudicates anything, is the easiest moment to shift every existing deterministic
 number.
 
 ### Effective-capacity normalisation, and the v0.7 upgrade to time-varying 🚧
@@ -703,7 +700,7 @@ reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
   (2026)](https://arxiv.org/abs/2603.01653) compare fault-count forecasts for SP Energy Networks
   against a quantile-regression baseline on the threshold-weighted score, because an unweighted one
   "would place substantial emphasis on parts of the predictive distribution where the two models are
-  identical". Implementation is nearly free: replace members and observation by `max(value,
+  identical". Implementation needs almost no extra work: replace members and observation by `max(value,
   threshold)` and reuse the existing fair-CRPS aggregation unchanged, inheriting its
   comparability across ensemble sizes.
 
@@ -769,7 +766,7 @@ before/after instruments for Phases C and D.
   twCRPS against the `scoringrules` reference implementation; Monte-Carlo the finite-ensemble
   one-sided exceedance references (mirroring the PICP reference-table verification); on a
   smoke fold, confirm `nged_incumbent`'s P95 operating point scores well on the p95 exceedance
-  rate while paying for its conservatism on Brier/twCRPS sharpness.
+  rate while its conservatism reduces its sharpness on Brier/twCRPS.
 
 ### Tricky days — a calendar-deterministic metric filter 🚧
 
@@ -796,7 +793,7 @@ Because it is purely calendar-driven it **shares its calendar module with
 package) plus the two DST dates feed both the holiday-aligned baseline and this metric filter. And
 the two reinforce each other: `nged_incumbent` (no holiday logic) should be *visibly* worst on
 tricky days, and `nged_incumbent_holiday_aligned` should recover most of the gap — turning "we added
-holiday alignment" into a *measurable* number, exactly the cheap-upgrades story we want to show
+holiday alignment" into a *measurable* number, exactly the simple-upgrades story we want to show
 NGED.
 
 **Flag the day _and_ its analogue-relevant neighbours, not just the day itself.** The disruption
@@ -866,9 +863,9 @@ degradation](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mo
 the interval-calibration counterpart, PICP within tolerance in every regime, is [T1.3, faithful
 uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
-This suite is shared machinery: the same transforms drive the CI degradation smoke-tests in
-[Engineering Health](engineering-health.md) and, later, the outage-shaped training augmentation that
-makes the weather-blind claim true rather than hopeful.
+This suite is shared machinery: the same transforms drive the continuous-integration (CI)
+degradation smoke-tests in [Engineering Health](engineering-health.md) and, later, the outage-shaped
+training augmentation that makes the weather-blind claim true rather than hopeful.
 
 ## Scoring against reanalysis — a diagnostic scope 🚧
 
@@ -892,12 +889,12 @@ removing **forecast error** from the weather input — the channel that more ens
 ensemble post-processing and sharper interpolation all work through. If that ceiling sits close to
 today's ENS-scored skill, most of our error is not the weather forecast's fault and the effort
 belongs in the modelling instead. So run this **before** ingesting another NWP source: it is the
-cheap test that sizes the prize that ingesting another NWP source would chase.
+quick test that sizes the prize that ingesting another NWP source would chase.
 
 Two rungs, in increasing order of "cheating":
 
 - **ERA5.** A reanalysis, so it assimilates observations, but still a 31 km model field — good, not
-  perfect. Free once the [ingest](training-history.md) lands.
+  perfect. Needs no extra work once the [ingest](training-history.md) lands.
 
 - **Observations.** Closer to truth at the site, and worth the second rung precisely because ERA5's
   remaining error is not small. The UK Met Office's MIDAS Open (via CEDA, the Centre for
@@ -999,21 +996,21 @@ slice. Definitions, equations, and the design decisions (fair CRPS divisor, RMS 
 quantiles, MLflow allowlist) live in the [evaluation-metrics
 reference](../techniques/evaluation-metrics.md).
 
-### Phase C — cheap calibration (after B proves the diagnosis)
+### Phase C — low-effort calibration (after B proves the diagnosis)
 
 Decide based on Phase B's spread-skill numbers — and on the **rank (Talagrand) histogram** of the
 observations among the 51 members, computed ad hoc per horizon slice: a U-shape confirms plain
 underdispersion (a single multiplicative inflation can fix it), whereas a sloped or asymmetric
 histogram means bias or shape error, which a symmetric inflation cannot repair and which would push
-toward a rank-dependent correction instead. **Post-hoc spread inflation** (EMOS-lite): per horizon
-slice, fit a scalar `s` on the *training* window so that inflating members around the ensemble mean
-(`mean + s·(member − mean)`) makes spread match error. Zero schema change, zero new model —
-implementable as an optional step in `predict` or as a wrapper forecaster. Fit on train, apply on
-validation (no tuning on the fold being scored).
+toward a rank-dependent correction instead. **Post-hoc spread inflation** (a cut-down Ensemble Model
+Output Statistics, or EMOS): per horizon slice, fit a scalar `s` on the *training* window so that
+inflating members around the ensemble mean (`mean + s·(member − mean)`) makes spread match error.
+Zero schema change, zero new model — implementable as an optional step in `predict` or as a wrapper
+forecaster. Fit on train, apply on validation (no tuning on the fold being scored).
 
 Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
-forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn its build
-cost.
+forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn the effort of
+building it.
 
 ### Phase D — ensemble of quantile forecasts (Representation 3 → pooled Representation 2)
 
