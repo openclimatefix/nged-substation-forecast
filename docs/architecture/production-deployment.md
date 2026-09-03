@@ -86,6 +86,11 @@ and there is one less threshold to keep in sync. The counts beside it are uncapp
 `n_late_listed` field records how many rows the table actually holds, so a truncated table can never
 make a large stall look small.
 
+**The table lists never-reported series before stale ones, so the 50 rows are the head of that order
+rather than the 50 series in most trouble.** When never-reported series alone fill the cap, no stale
+series is listed at all, however stale it is. The counts `n_stale` and `n_never_reported` stay exact
+for the whole watched population, so read those two before reading the table.
+
 **Dagster's Checks view becomes the operator's at-a-glance status for whether the power data is
 healthy.** The view shows a green tick when every series is current and a yellow warning when the
 feed has stalled — or when a series we had written off starts reporting again. The severity is a
@@ -186,9 +191,9 @@ after downloading — so it sits at 14 hours. The retry delays alone put the las
 about 12:30 UTC, and paying a download and convert on every attempt moves that to about 12:40 UTC,
 which leaves 81 minutes of margin spread over 9 attempts. The deadline is therefore breached only if
 download-and-convert *averages* about 10 minutes across all 9 attempts, not if one attempt is slow:
-a single 645-second download costs only about 10 of those 81 minutes. The consequence is a one-run leniency at the 12:00 slot,
-where today's run has landed but is not yet *demanded*: a download that fails today is reported from
-the 18:00 slot onwards rather than six hours earlier. That one-run leniency is the right way round
+a single 645-second download costs only about 10 of those 81 minutes. The consequence is a one-run
+leniency at the 12:00 slot, where today's run has landed but is not yet *demanded*: a download that
+fails today is reported from the 18:00 slot onwards rather than six hours earlier. That one-run leniency is the right way round
 to be wrong. A tighter deadline would recover those six hours but trigger a false alarm on every
 morning the download merely ran slowly, which is the failure mode counting runs exists to avoid.
 

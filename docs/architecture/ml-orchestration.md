@@ -43,13 +43,11 @@ registration and read back by the assets, never re-read from YAML — is explain
 
 ## Re-registering an experiment under a changed config is rejected
 
-**An experiment's identity is its config**, not its `experiment_name` alone. Every fold of an
-experiment must be trained and scored under one config, or its leaderboard row silently mixes two
-different models. Folds already materialised under the old config cannot be un-trained, and the
-downstream assets read the config back from the MLflow experiment tag (`load_experiment_forecaster`),
-so re-pointing that tag mid-flight would poison every comparison built on the experiment. A changed
-config is therefore treated as a *new* experiment: `register_experiment_job` rejects a
-re-registration that would change it, before writing anything.
+**An experiment's identity is its config**, not its `experiment_name` alone, so a changed config is
+treated as a *new* experiment: `register_experiment_job` rejects a re-registration that would change
+it. Why one config per experiment is the only workable rule, and what the operator should do
+instead, is in [An experiment's identity is its
+config](../ml_experimentation/dagster-workflow.md#an-experiments-identity-is-its-config).
 
 The rejection compares the two identity tags — the canonical JSON dump of the resolved config, and
 the forecaster's class target — against what MLflow already has stored for that `experiment_name`.

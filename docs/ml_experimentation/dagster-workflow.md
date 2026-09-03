@@ -112,6 +112,10 @@ un-trained, and `trained_cv_model` reads the config back from the experiment's `
 mid-flight would change what later folds train on. The refusal happens before any record is
 written, so a rejected re-registration leaves the experiment exactly as it was.
 
+How the refusal decides that a config changed — which tags it compares, and why an absent tag does
+not count as a change — is in [Re-registering an experiment under a changed config is
+rejected](../architecture/ml-orchestration.md#re-registering-an-experiment-under-a-changed-config-is-rejected).
+
 ## Step 7 — Materialise `trained_cv_model`
 
 **Trigger:** Materialise the partition `"{experiment_name}__{fold_id}"`, e.g.
