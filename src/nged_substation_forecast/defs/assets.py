@@ -92,12 +92,12 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     This asset is the entry point for NGED data into the pipeline. It fetches the latest available
     data from NGED's external S3 bucket, appends new readings to the local ``PowerTimeSeries`` Delta
     table, and upserts the latest substation metadata parquet. Nothing cleans this data further:
-    ``eligible_time_series``, ``trained_cv_model`` and ``cv_power_forecasts`` in
-    ``defs/cv_assets.py``, and ``live_forecasts`` in ``defs/production_assets.py``, all read the
-    Delta table this asset writes directly.
+    ``eligible_time_series``, ``effective_capacity``, ``trained_cv_model`` and
+    ``cv_power_forecasts`` in ``defs/cv_assets.py``, and ``live_forecasts`` in
+    ``defs/production_assets.py``, all read the Delta table this asset writes directly.
 
-    Runs hourly on ``power_time_series_and_metadata_schedule``, five minutes before
-    ``live_forecasts_schedule`` ticks. A failed or skipped run costs nothing structurally: this
+    Runs hourly on ``power_time_series_and_metadata_schedule``, 5 minutes before
+    ``live_forecasts_schedule`` ticks. A failed or skipped run leaves nothing behind to repair: this
     asset re-lists NGED's bucket from scratch on every run, so the next hourly run appends whatever
     this one missed.
 
@@ -218,10 +218,11 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 def h3_grid_weights(context: AssetExecutionContext) -> None:
     """Computes H3 grid weights for the Great Britain boundary.
 
-    This production-layer asset calculates the fractional overlap of H3 cells with the GB boundary
-    at the NWP grid resolution. The result, written to ``h3_grid_weights.parquet``, is the lookup
-    table ``ecmwf_ens`` depends on (``deps=["h3_grid_weights"]``) to map gridded NWP forecasts onto
-    the H3 cells attached to each substation.
+    This production-layer asset calculates the fractional overlap of each H3 cell with the GB
+    boundary, at H3 resolution ``ECMWF_ENS_H3_RESOLUTION`` against the 0.25-degree NWP grid. The
+    result, written to ``h3_grid_weights.parquet``, is the lookup table ``ecmwf_ens`` depends on
+    (``deps=["h3_grid_weights"]``) to map gridded NWP forecasts onto the H3 cells attached to each
+    substation.
 
     Effectively one-off: re-materialise only when the GB boundary geometry or the H3 resolution
     changes, not on a recurring schedule — unlike ``ecmwf_ens`` and
@@ -309,7 +310,8 @@ all the rows. Computed in-asset from the frame in memory, for the same reason.""
 
 _NWP_COMPLETENESS_CHECK_DESCRIPTION: Final[str] = (
     "Whether the ingested run is the full cartesian product of 51 ensemble members, 85 native "
-    "forecast steps, and every H3 cell in the H3 grid weights. `Nwp.validate` cannot see a missing "
+    "forecast steps, and as many H3 cells as the H3 grid weights say the run should cover (cells "
+    "are compared by count, not by set). `Nwp.validate` cannot see a missing "
     "ensemble member or a run stopping short of the 15-day horizon — every row it does contain is "
     "well-formed — so this check compares the ingested shape against the expected one and names "
     "exactly which members and lead times are absent. WARN, never fail: an incomplete run is "
@@ -419,7 +421,14 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     Its ``nwp_has_no_unexpected_nulls`` check reports null counts for both the raw NWP grid and the
     stored H3 cells; that check's own description says which keys are which and why they differ.
     ``nwp_instantaneous_variables_have_no_nulls`` counts the raw grid again, over the variables that
-    are never legitimately null, where a single null is worth acting on.
+    are never legitimately null, where a single null is worth acting on. ``nwp_run_is_complete``
+    compares the ingested shape against the 51 members and 85 forecast steps a whole run carries,
+    and names the members and lead times that are absent. All three warn rather than block, so a
+    degraded run is still written and still forecast from.
+
+    A run Dynamical.org has not published yet is retried up to 8 times, 30 minutes apart, covering
+    more than 4 hours past the 08:30 UTC schedule. A materialisation that runs for hours and then
+    fails is therefore this asset waiting for an upstream run that never arrived, not a bug.
     """
     settings = Settings()
     storage_options = settings.storage_options

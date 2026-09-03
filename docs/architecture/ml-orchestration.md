@@ -45,18 +45,22 @@ registration and read back by the assets, never re-read from YAML — is explain
 
 **An experiment's identity is its config**, not its `experiment_name` alone, so a changed config is
 treated as a *new* experiment: `register_experiment_job` rejects a re-registration that would change
-it. Why one config per experiment is the only workable rule, and what the operator should do
-instead, is in [An experiment's identity is its
+it. Why an experiment carries one config, and what the operator should do instead, is in [An
+experiment's identity is its
 config](../ml_experimentation/dagster-workflow.md#an-experiments-identity-is-its-config).
 
-The rejection compares the two identity tags — the canonical JSON dump of the resolved config, and
-the forecaster's class target — against what MLflow already has stored for that `experiment_name`.
-A tag absent from the stored experiment is not treated as a change: that is the untagged experiment
-`get_or_create_experiment` creates as its self-healing fallback, and this registration is entitled
-to complete it. The comparison runs, and any rejection happens, before the registration writes a
-single MLflow param or tag, so a rejected re-registration leaves the experiment exactly as it found
-it. The `description` tag is deliberately excluded from the comparison: prose about an experiment is
-not part of what makes it that experiment, so it stays freely editable by re-registering.
+**The rejection compares two identity tags: the canonical JSON dump of the resolved config, and the
+forecaster's class target.** Both are compared against what MLflow already has stored for that
+`experiment_name`. A tag absent from the stored experiment does not count as a change, because an
+absent tag is what `get_or_create_experiment` leaves behind when its self-healing fallback creates
+an untagged experiment, and this registration is entitled to complete that experiment.
+
+**A rejected re-registration leaves the experiment exactly as it found it.** The comparison runs,
+and any rejection happens, before the registration writes a single MLflow param or tag.
+
+**The `description` tag is excluded from the comparison, so an experiment's prose stays freely
+editable by re-registering.** What an experiment is called and what it is for are not part of what
+makes an experiment that experiment — only the config and the forecaster class are.
 
 ## Model artifacts: one replaceable archive, no local cache
 

@@ -109,8 +109,7 @@ Every fold of an experiment must be trained and scored under one config, or the 
 leaderboard row silently mixes two different models. Folds already materialised cannot be
 un-trained, and `trained_cv_model` reads the config back from the experiment's `config` tag (see
 "Why `trained_cv_model` reads config from MLflow, not from YAML" below), so re-pointing that tag
-mid-flight would change what later folds train on. The refusal happens before any record is
-written, so a rejected re-registration leaves the experiment exactly as it was.
+mid-flight would change what later folds train on.
 
 How the refusal decides that a config changed — which tags it compares, and why an absent tag does
 not count as a change — is in [Re-registering an experiment under a changed config is

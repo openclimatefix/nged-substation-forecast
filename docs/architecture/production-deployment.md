@@ -68,9 +68,10 @@ maximum `time` per `time_series_id` — rather than the asset's materialisation 
 when any series has no data within a 24-hour staleness threshold. A native materialisation-freshness
 policy would miss this exact failure, because the materialisation keeps succeeding.
 
-The threshold is 24 hours because NGED publishes at irregular intervals several hours apart, and the
-pipeline back-fills the gaps by itself once the feed recovers. Twenty-four hours therefore sits
-comfortably past the normal jitter, while still catching a genuine multi-slot stall the same day.
+**The 24-hour threshold clears NGED's normal publishing jitter while still catching a genuine stall
+the same day.** NGED publishes at irregular intervals several hours apart, and the pipeline
+back-fills the gaps by itself once the feed recovers. A shorter threshold would fire on that
+ordinary jitter, while 24 hours still catches a multi-slot stall within the day.
 
 The check is attached to `power_time_series_and_metadata`, so the existing hourly schedule runs it
 every hour with no extra wiring. The check reports two kinds of lateness: a series that once
@@ -140,7 +141,8 @@ a feed whose only late series are silenced sends no event.
 source code shipped read-only in the container image, so the check could not edit it. A check that
 writes anything is a warning path that can fail, which [rule
 7](../design-philosophy/inherent-stability.md#the-rules) forbids. The yellow is the prompt, and it
-clears when a human deletes the line.
+clears when a human deletes the line. The check also names every silenced id in its own output
+every hour it runs, so the silencing stays visible and cannot quietly be forgotten.
 
 **The list lives with the code because a dead series is a fact about the world, not about a
 deployment** — it is equally dead whether we run on a laptop or on AWS. The same fact is the
@@ -269,9 +271,9 @@ configured — so laptops and CI stay silent by default.
     check's name, and `report_asset_degradation` does the same tagged `degraded_asset` for an *asset*
     that degrades rather than failing — today, `power_time_series_and_metadata`'s roster upsert. Since
     log capture is off, either handler's `ERROR` log alone would reach nobody.
-    `power_time_series_and_metadata_job` compounds this: it has no cron monitor of its own, so
-    absent `report_check_degradation`, a check that cannot read its own inputs would show up only
-    as a yellow tick in Dagster's Checks view, and nobody would be told.
+    `power_time_series_and_metadata_job` compounds that silence: it has no cron monitor of its own.
+    Absent `report_check_degradation`, a check that cannot read its own inputs would show up only as
+    a yellow tick in Dagster's Checks view, and nobody would be told.
 
     Those tags are what an alert rule routes on, and the failure hook is the one sender that would
     otherwise arrive with nothing to route on — so it tags `fault_category:run_failed`. That tag is
@@ -298,6 +300,8 @@ configured — so laptops and CI stay silent by default.
     Either way the hook receives a `RetryRequested` wrapper once the budget is exhausted, and
     Dagster unwraps only its own `RetryRequestedFromPolicy` — so the hook unwraps the plain class
     too, or every exhausted retry would group under `RetryRequested` rather than under its cause.
+    Unwrapping discards nothing: the whole exception chain is serialised either way, and what the
+    unwrap fixes is the event's title and how Sentry groups it.
 
 - **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
   `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron

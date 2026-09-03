@@ -29,6 +29,13 @@ power_time_series_and_metadata_schedule = ScheduleDefinition(
     name="power_time_series_and_metadata_schedule",
     job=power_time_series_and_metadata_job,
     cron_schedule="55 * * * *",
+    description=(
+        "Fires at :55 past every hour, 5 minutes before live_forecasts_schedule ticks at"
+        " 00/06/12/18 UTC, so this hour's telemetry has landed first. A missed or late pull does"
+        " not hold live_forecasts back: the two schedules couple through data at rest, never"
+        " through run status, so the forecast runs on time against whatever telemetry is already"
+        " on disk."
+    ),
 )
 """Fires at :55 past every hour — 5 minutes *before* the top of the hour — so this hour's pull
 has landed by the time ``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
@@ -89,7 +96,14 @@ live_forecasts_job = define_asset_job(
 # registered name from the job's — `live_forecasts_job_schedule` — which is not the name this
 # variable, the runbook, and the operator's Dagster UI all use.
 live_forecasts_schedule = build_schedule_from_partitioned_job(
-    live_forecasts_job, name="live_forecasts_schedule"
+    live_forecasts_job,
+    name="live_forecasts_schedule",
+    description=(
+        "Ticks at 00/06/12/18 UTC and materialises the just-completed window with"
+        " availability_mode='live'. The schedule is always live; replays are manual, launched"
+        " from the UI with availability_mode='replay'. The slot fires on the clock whether or"
+        " not the ingest jobs succeeded."
+    ),
 )
 """Ticks at 00/06/12/18 UTC, materialising the just-completed window with default run config
 (``availability_mode="live"``) — the schedule is always live; replays are manual, launched from

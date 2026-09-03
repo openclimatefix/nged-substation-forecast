@@ -95,20 +95,22 @@ Prediction is bounded by chunking on **`init_time`** (`_PREDICT_INIT_CHUNK`, 14 
 
 **Scoring a whole fold at once OOM-kills a 29 GB machine, so `_score_forecast_group` scores a batch
 of time series at a time.** `compute_metrics` is independent per series, which is what makes the
-batching sound. Measured on the V1 fold (28 series, about 13M rows each), a batch of 4 series
-completes in roughly 50 seconds at about 18 GB peak process resident set size. That peak is
-dominated by the streaming Delta scan rather than by the data: each batch re-scans the partition,
-while the materialised batch frame itself is a few GB. A batch of 2 measured only about 2 GB lower,
-so a smaller batch buys little — the scan overhead is roughly constant in the *fold* size, which is
-what keeps the approach workable as folds grow to V2 scale.
+batching sound. Measured on the `mid_2025_to_mid_2026` fold (28 series, about 13M forecast rows
+each), a batch of 4 series completes in roughly 50 seconds at about 18 GB peak process resident set
+size. That peak is dominated by the streaming Delta scan rather than by the data: each batch
+re-scans the partition, while the materialised batch frame itself is a few GB. A batch of 2 measured
+only about 2 GB lower, so a smaller batch saves little memory — the scan overhead is roughly
+constant in the *fold* size, which is what keeps the approach workable as folds grow to V2 scale.
 
 **Every scan in the scoring path streams, because the eager equivalent materialises full-length rows
-before it reduces them.** Collecting the distinct `time_series_id` values eagerly materialises them
-at full row length before the unique, which OOM-killed the 364M-row fold; the streaming collect peaks
-at 0.3 GB. The same rule applies to the per-chunk `init_time` values in `cv_power_forecasts`: taking
-the unique values gives a roughly 30-element Python list per chunk instead of a roughly 14M-element
-one. Measured on a 14M-row `Int32` column, the full-length list cost 2.78 seconds and 560 MB peak
-against 0.05 seconds and no measurable allocation — and that 560 MB landed inside the loop whose
+before it reduces them.** Discovering which groups a fold holds projects just the two partition
+columns, `experiment_name` and `fold_id`, and takes their distinct values. Collected eagerly, those
+two columns are still materialised at full row length before the unique, which OOM-killed the
+364M-row fold; the streaming collect peaks at 0.3 GB. The same rule applies to the `time_series_id`
+and `ensemble_member` values `cv_power_forecasts` accumulates from each chunk: taking the unique
+values gives a roughly 30-element Python list per chunk instead of a roughly 14M-element one.
+Measured on a 14M-row `Int32` column, the full-length list cost 2.78 seconds and 560 MB peak against
+0.05 seconds and no measurable allocation — and that 560 MB landed inside the loop whose
 whole job is holding the frame at 2 to 3 GB.
 
 ## The other hard ceiling: Polars' 32-bit row index

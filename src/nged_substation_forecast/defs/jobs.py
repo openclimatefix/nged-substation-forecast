@@ -175,8 +175,9 @@ IdentityTagType = Literal["config", "forecaster_target"]
 IDENTITY_TAGS: Final[tuple[IdentityTagType, ...]] = ("config", "forecaster_target")
 """Runtime tuple — iterated when comparing a re-registration against the stored identity.
 
-The ``description`` tag is deliberately absent: prose about an experiment is not part of what
-makes it that experiment, so it stays freely editable by re-registering.
+Why the ``description`` tag is absent, and what an absent tag means when the stored experiment
+lacks one:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-an-experiment-under-a-changed-config-is-rejected>
 """
 
 IdentityTagsType = dict[IdentityTagType, str]
@@ -411,13 +412,8 @@ def register_experiment_job() -> None:
     Register the changed config under a new ``experiment_name`` instead.
 
     Next manual step: materialise ``trained_cv_model`` for the partition keys this run added, then
-    ``cv_power_forecasts`` to populate the leaderboard. See
+    ``cv_power_forecasts``, then ``metrics`` to populate the leaderboard. See
     <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/#step-6-launch-register_experiment_job>
     for the full walkthrough.
-
-    Raises:
-        ExperimentIdentityChangedError: If ``experiment_name`` is already registered under a
-            different config. Raised before any MLflow write, so the experiment is left exactly
-            as it was.
     """
     register_experiment()

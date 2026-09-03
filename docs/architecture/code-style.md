@@ -141,15 +141,22 @@ Three places where a positional argument is right:
   find it.
 - **A Dagster docstring is operator documentation, and is where "one home per argument" gives
   way.** Dagster renders the docstring of an asset, asset check, job, schedule and sensor in its
-  UI, where it is the only documentation an operator running the pipeline reads. Each one has to
-  make sense read on its own, by someone who has not opened the source file, and has to place the
-  asset in the pipeline: what it consumes, what it produces, what triggers it, and what a degraded
-  run looks like. Link into `docs/` for the reasoning behind a design, but keep the account of what
-  the asset does and what it sits between in the docstring, even where a docs page says the same
-  — an operator reading the Dagster UI cannot follow a link they never see. Text passed as
-  `description=` to an `AssetCheckSpec`, a `define_asset_job` call or a Dagster `Config` field
-  renders in that same UI and carries the same duty; a check with no `description` shows the
-  operator a blank.
+  UI, and that docstring is often the only documentation an operator sees while running the
+  pipeline. Each docstring has to make sense read on its own, by someone who has not opened the
+  source file, and has to place the asset in the pipeline: what it consumes, what it produces, what
+  triggers it, and what a degraded run looks like. Link into `docs/` for the reasoning behind a
+  design, but keep the account of what the asset does and what it sits between in the docstring,
+  even where a docs page says the same — an operator reading the Dagster UI cannot follow a link
+  they never see. Text passed as `description=` to an `AssetCheckSpec`, a `define_asset_job` call
+  or a Dagster `Config` field renders in that same UI and carries the same duty; a check with no
+  `description` shows the operator a blank.
+
+    **Only a decorated definition has a docstring Dagster can read.** A schedule built by calling
+    `ScheduleDefinition(...)` or `build_schedule_from_partitioned_job(...)` is an assignment, and
+    the string literal underneath it is a module-level variable docstring that the UI never
+    renders — so its operator-facing summary has to be passed as `description=`. Keep the string
+    literal for the reasoning a developer reading the file wants, and let `description=` carry
+    what the operator needs.
 - **Say why a guard exists, when the reason is not "this state happens"** — validation that
   defends a reusable package's public API, rather than a state production can reach, says so in a
   clause: `# Reusable-package input validation, not a reachable production state: the ecmwf_ens
