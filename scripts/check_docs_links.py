@@ -29,22 +29,44 @@ import markdown
 import yaml
 
 DOCS_SITE_PREFIX: Final[str] = "https://openclimatefix.github.io/nged-substation-forecast/"
+"""The canonical spelling of the site root, which CLAUDE.md requires every docs link to use."""
 
-_LINK_PATTERN: Final[re.Pattern[str]] = re.compile(re.escape(DOCS_SITE_PREFIX) + r"\S*")
+_SITE_ROOT_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"https?://(?:www\.)?" + re.escape(DOCS_SITE_PREFIX.removeprefix("https://"))
+)
+"""Matches the site root whatever scheme or `www.` prefix it is written with.
+
+A link typo'd as `http://` still points at a page that can be renamed away, so it has to be
+checked. Matching only the canonical `https://` spelling would skip it silently — worse than
+reporting it, because the summary line would not even count it.
+"""
+
+_LINK_PATTERN: Final[re.Pattern[str]] = re.compile(_SITE_ROOT_PATTERN.pattern + r"\S*")
+
+_WRAPPED_ANCHOR_PATTERN: Final[re.Pattern[str]] = re.compile(r"^\s*#(?![#\s])[^\s#]+")
+"""Matches a line that opens with an anchor fragment, which means the URL above it wrapped.
+
+A URL reflowed across two lines is broken for the reader as well as for this script: the anchor
+is no longer part of the link. Three spellings are deliberately excluded. An ordinary `# comment`
+and a `##` markdown heading both put a space or a second `#` after the first one, and the
+pattern requires a character after the `#`, which keeps out the bare `#` that separates
+paragraphs in a commented file header — `.env.example` has one directly under a docs link.
+"""
 
 _TRAILING_SENTENCE_PUNCTUATION: Final[str] = ".,;:!?*_|"
-"""Characters a regex sweep picks up that can never end one of this site's URLs or anchors.
+"""Characters that a regex sweep commonly picks up from the prose around a link.
 
-Sentence punctuation, the `*` and `_` of markdown emphasis around a link, and the `|` of a table
-cell written without a space. Emphasis is stripped here rather than as a self-paired run because
-`**bold**` leaves a run of two, and `_strip_trailing_self_paired_run` only strips odd-length runs.
-A heading ending in `_` would be mis-stripped, but Python-Markdown's slugify drops trailing
-punctuation from every other heading, so no anchor in these docs ends in one of these characters.
+Sentence punctuation, the `*` and `_` of markdown emphasis, and the `|` of a table cell written
+without a space. None of these is stripped unconditionally: `_candidate_urls` tries the URL
+exactly as written first and only peels when that fails, because a real anchor can end in one of
+them. `#credentials-for-our-own-s3-data-data_store_` on the AWS setup page is a live example —
+Python-Markdown's slugify drops the `*` from the heading `Credentials ... (DATA_STORE_*)` and
+leaves the underscore before it.
 """
 
 _TRAILING_CLOSERS: Final[dict[str, str]] = {")": "(", "]": "[", ">": "<"}
 """Closing bracket -> its opener, used to detect a closer a regex sweep picked up (e.g. the `)`
-that closes a markdown `[label](url)`) rather than one that is genuinely part of the URL."""
+that closes a markdown `[label](url)`) rather than a closer genuinely part of the URL."""
 
 _TRAILING_SELF_PAIRED: Final[str] = "`'\""
 """Quote/backtick characters: unlike a bracket, these have no distinct opening character to count
@@ -56,7 +78,7 @@ _BUILTIN_MARKDOWN_EXTENSIONS: Final[tuple[str, ...]] = ("toc", "tables", "fenced
 declares these as `markdown_extensions`' `builtins`. Omitting `fenced_code` in particular would
 mis-parse a `#` inside a fenced code block as a heading."""
 
-LinkStatusType = Literal["ok", "skipped_anchor", "bad_page", "bad_anchor"]
+LinkStatusType = Literal["ok", "skipped_anchor", "bad_page", "bad_anchor", "wrapped"]
 
 
 def _strip_trailing_self_paired_run(url: str) -> str | None:
@@ -75,31 +97,49 @@ def _strip_trailing_self_paired_run(url: str) -> str | None:
     return trimmed if (len(url) - len(trimmed)) % 2 == 1 else None
 
 
-def _strip_trailing_punctuation(url: str) -> str:
-    """Strip trailing sentence punctuation and unbalanced closers a regex sweep picked up."""
-    while url:
-        last = url[-1]
-        if last in _TRAILING_SENTENCE_PUNCTUATION:
-            url = url[:-1]
-            continue
-        opener = _TRAILING_CLOSERS.get(last)
-        if opener is not None:
-            if url.count(opener) < url.count(last):
-                url = url[:-1]
-                continue
-            break
-        stripped = _strip_trailing_self_paired_run(url)
-        if stripped is None:
-            break
-        url = stripped
-    return url
+def _peel_one_trailing_character(url: str) -> str | None:
+    """Return `url` minus one trailing character a regex sweep may have taken, else `None`."""
+    if not url:
+        return None
+    last = url[-1]
+    if last in _TRAILING_SENTENCE_PUNCTUATION:
+        return url[:-1]
+    opener = _TRAILING_CLOSERS.get(last)
+    if opener is not None:
+        return url[:-1] if url.count(opener) < url.count(last) else None
+    return _strip_trailing_self_paired_run(url)
 
 
-def _iter_links(text: str) -> Iterator[tuple[int, str]]:
-    """Yield `(1-indexed line number, cleaned url)` for every docs-site link in `text`."""
-    for lineno, line in enumerate(text.splitlines(), start=1):
+def _candidate_urls(url: str) -> Iterator[str]:
+    """Yield `url` as written, then each shorter form left by peeling trailing punctuation.
+
+    The caller accepts the first candidate that resolves, so peeling only ever runs on a URL that
+    already failed. Stripping up front instead damages a real anchor that ends in one of the
+    peeled characters — see `_TRAILING_SENTENCE_PUNCTUATION` for the one in these docs today.
+    """
+    yield url
+    candidate = _peel_one_trailing_character(url)
+    while candidate is not None:
+        yield candidate
+        candidate = _peel_one_trailing_character(candidate)
+
+
+def _iter_links(text: str) -> Iterator[tuple[int, str, bool]]:
+    """Yield `(1-indexed line number, url as written, whether the URL wrapped)` for `text`.
+
+    A URL is treated as wrapped when it carries no anchor, ends its own line, and the next line
+    holds nothing but an anchor fragment.
+    """
+    lines = text.splitlines()
+    for lineno, line in enumerate(lines, start=1):
+        next_line = lines[lineno] if lineno < len(lines) else ""
         for match in _LINK_PATTERN.finditer(line):
-            yield lineno, _strip_trailing_punctuation(match.group())
+            wrapped = (
+                match.end() == len(line)
+                and "#" not in match.group()
+                and _WRAPPED_ANCHOR_PATTERN.match(next_line) is not None
+            )
+            yield lineno, match.group(), wrapped
 
 
 def _iter_git_tracked_files() -> Iterator[Path]:
@@ -164,7 +204,7 @@ def _markdown_extensions_from_mkdocs_yml(
 
 
 def _walk_toc_ids(tokens: list[dict[str, Any]]) -> Iterator[str]:
-    """Yield every heading id in a `markdown.Markdown().toc_tokens` tree, headings nest."""
+    """Yield every heading id in a `markdown.Markdown().toc_tokens` tree, which nests."""
     for token in tokens:
         yield str(token["id"])
         yield from _walk_toc_ids(token.get("children", []))
@@ -191,16 +231,15 @@ def _anchors_for_page(
     return cache[path]
 
 
-def _check_link(
+def _check_candidate(
     url: str,
     docs_dir: Path,
     extensions: Sequence[str],
     extension_configs: dict[str, dict[str, Any]],
     anchor_cache: dict[Path, set[str] | None],
 ) -> tuple[LinkStatusType, str]:
-    """Check one docs-site `url`; return its status and, for a bad anchor, the closest matches."""
-    rest = url[len(DOCS_SITE_PREFIX) :]
-    url_path, _, anchor = rest.partition("#")
+    """Check one exact `url`; return its status and, for a bad anchor, the closest matches."""
+    url_path, _, anchor = _SITE_ROOT_PATTERN.sub("", url, count=1).partition("#")
     page = _resolve_page(docs_dir, url_path)
     if page is None:
         return "bad_page", ""
@@ -215,6 +254,31 @@ def _check_link(
     return "bad_anchor", ", ".join(close) if close else "(no close matches on this page)"
 
 
+def _check_link(
+    url: str,
+    docs_dir: Path,
+    extensions: Sequence[str],
+    extension_configs: dict[str, dict[str, Any]],
+    anchor_cache: dict[Path, set[str] | None],
+) -> tuple[LinkStatusType, str]:
+    """Check `url`, accepting the first candidate spelling of it that resolves.
+
+    A candidate that resolves wins outright. When none does, a `bad_anchor` outcome is reported in
+    preference to a `bad_page` one, because a resolving page with a wrong anchor tells the author
+    more — and comes with the closest real anchors attached.
+    """
+    worst: tuple[LinkStatusType, str] = ("bad_page", "")
+    for candidate in _candidate_urls(url):
+        status, detail = _check_candidate(
+            candidate, docs_dir, extensions, extension_configs, anchor_cache
+        )
+        if status in ("ok", "skipped_anchor"):
+            return status, detail
+        if status == "bad_anchor" and worst[0] == "bad_page":
+            worst = (status, detail)
+    return worst
+
+
 def main(argv: list[str]) -> int:
     """Check every docs-site link in `argv`'s files, or the whole repo if `argv` is empty."""
     docs_dir = Path("docs")
@@ -225,7 +289,12 @@ def main(argv: list[str]) -> int:
     # without `pymdownx.superfences` a `#` comment inside an indented fenced code block parses as
     # a heading, so the script would invent anchors the real site does not have and pass links
     # that are broken. Exact parity with the real converter is the whole design.
-    markdown.Markdown(extensions=list(extensions), extension_configs=extension_configs)
+    try:
+        markdown.Markdown(extensions=list(extensions), extension_configs=extension_configs)
+    except Exception as exc:
+        raise SystemExit(
+            f"mkdocs.yml configures a markdown extension this script cannot load: {exc}"
+        ) from exc
 
     paths = [Path(arg) for arg in argv] if argv else list(_iter_git_tracked_files())
     anchor_cache: dict[Path, set[str] | None] = {}
@@ -236,8 +305,12 @@ def main(argv: list[str]) -> int:
         text = _read_text(path)
         if text is None:
             continue
-        for lineno, url in _iter_links(text):
+        for lineno, url, wrapped in _iter_links(text):
             checked += 1
+            if wrapped:
+                bad += 1
+                print(f"{path}:{lineno}: WRAPPED URL {url} (its anchor is on the next line)")
+                continue
             status, detail = _check_link(url, docs_dir, extensions, extension_configs, anchor_cache)
             if status == "bad_page":
                 bad += 1
