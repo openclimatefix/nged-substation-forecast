@@ -737,7 +737,7 @@ def _write_metrics_to_delta(
 _METRICS_SERIES_BATCH_SIZE: Final[int] = 4
 """How many ``time_series_id`` values to materialise per scoring batch in the ``metrics`` asset.
 
-A single V1 fold is far too big to collect whole (~370M rows with the full ``PowerForecast``
+A single V1 fold is far too big to collect whole (364M rows with the full ``PowerForecast``
 schema OOM-kills a 29 GB machine), but ``compute_metrics`` is independent per
 ``time_series_id`` — every group key includes it — so scoring per-series batches and
 concatenating the tall ``Metrics`` results is exactly equivalent to one big call. For the
