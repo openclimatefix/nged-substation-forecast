@@ -258,12 +258,14 @@ whose page a rename moved or whose anchor a heading rewrite killed.
 
 `check_docs_links.py` resolves each anchor by running the real `markdown.Markdown()` converter over
 the target page rather than guessing a slug, because Python-Markdown's `toc` extension preserves
-underscores. An extension it cannot load fails the run rather than being skipped: dropping
+underscores. An extension the script cannot load fails the run rather than being skipped: dropping
 `pymdownx.superfences` makes a `#` comment inside an indented fenced code block parse as a heading,
-which would invent anchors the real site does not have and pass links that are broken. The one gap
-is a `docs/api/` page, whose anchors mkdocstrings generates at build time, so only the page's
-existence is checked there. It runs in `ci.yml` and as a pre-commit hook, scanning the whole repo
-each time because a link can sit in any text file.
+which would invent anchors the real site does not have and pass links that are broken. The script
+also reports a URL that has been reflowed across two lines, because the anchor left stranded on the
+second line is no longer part of the link for the reader either. The one gap is a `docs/api/` page,
+whose anchors mkdocstrings generates at build time, so only the page's existence is checked there.
+The check runs in `ci.yml` and as a pre-commit hook, scanning the whole repo each time because a
+link can sit in any text file.
 
 ### Why a bespoke workflow rather than OCF's template
 

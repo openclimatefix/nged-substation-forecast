@@ -3,7 +3,7 @@
 The script resolves an anchor by converting the page with the real `markdown.Markdown`
 converter rather than a hand-rolled slugify, because Python-Markdown's `toc` extension preserves
 underscores — a guessed `_` -> `-` rule produced 15 false failures the first time this was tried.
-`test_underscore_anchor_resolves` is the regression for that.
+`test_underscore_anchor_resolves` is the regression for that guessed slug rule.
 
 Each test builds a throwaway `mkdocs.yml` + `docs/` tree under `tmp_path` rather than depending on
 the real docs staying put. Most call `main()` with explicit file arguments;
@@ -46,9 +46,10 @@ SITE_PREFIX: Final[str] = check_docs_links.DOCS_SITE_PREFIX
 def _make_docs_site(tmp_path: Path) -> None:
     """Write a minimal `mkdocs.yml` + `docs/` tree, exercising both the file and folder URL forms.
 
-    `docs/architecture/performance.md` carries three headings: a plain one, one whose id contains
-    an underscore, and one that only a folder-form API page's `:::` sibling should be confused
-    with. `docs/api/contracts.md` mimics a real mkdocstrings page.
+    `docs/architecture/performance.md` is the `<path>.md` form and carries a plain heading plus one
+    whose id contains an underscore. `docs/guide/index.md` is the `<path>/index.md` form, which most
+    of the real `docs/` tree uses, and its heading slugifies to an id *ending* in an underscore.
+    `docs/api/contracts.md` mimics a real mkdocstrings page.
     """
     (tmp_path / "mkdocs.yml").write_text("markdown_extensions: []\n", encoding="utf-8")
     docs = tmp_path / "docs"
@@ -65,6 +66,10 @@ def _make_docs_site(tmp_path: Path) -> None:
     )
     (docs / "api" / "contracts.md").write_text(
         "# Contracts API\n\n::: contracts.common\n", encoding="utf-8"
+    )
+    (docs / "guide").mkdir(parents=True)
+    (docs / "guide" / "index.md").write_text(
+        "# Guide\n\n## Storage roots (`DATA_STORE_*`)\n\nsome text\n", encoding="utf-8"
     )
 
 
@@ -185,3 +190,84 @@ def test_whole_repo_scan_finds_a_bad_link(
 
     assert check_docs_links.main([]) == 1
     assert "BAD PAGE" in capsys.readouterr().out
+
+
+def test_folder_form_page_resolves(docs_site: Path) -> None:
+    """`docs/guide/index.md` is reached as `guide/`, the form most of the real docs tree uses."""
+    consumer = _write_consumer(docs_site, f"{SITE_PREFIX}guide/\n")
+    assert check_docs_links.main([str(consumer)]) == 0
+
+
+def test_site_root_resolves(docs_site: Path) -> None:
+    """The bare site root is `docs/index.md`."""
+    consumer = _write_consumer(docs_site, f"{SITE_PREFIX}\n")
+    assert check_docs_links.main([str(consumer)]) == 0
+
+
+def test_anchor_ending_in_underscore_resolves(docs_site: Path) -> None:
+    """Regression: peeling trailing punctuation up front breaks a real anchor.
+
+    Python-Markdown's slugify drops the `*` from a heading like ``Storage roots (`DATA_STORE_*`)``
+    and leaves the underscore before it, so the anchor genuinely ends in `_`. The live docs carry
+    one of these on the AWS setup page. Trying the URL exactly as written before peeling anything
+    is what keeps it working.
+    """
+    consumer = _write_consumer(docs_site, f"{SITE_PREFIX}guide/#storage-roots-data_store_\n")
+    assert check_docs_links.main([str(consumer)]) == 0
+
+
+def test_wrapped_url_is_reported(docs_site: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A URL reflowed across two lines loses its anchor, so the link is broken for the reader too.
+
+    The page half still resolves, so without this check the scan passes a link whose anchor was
+    never looked at.
+    """
+    consumer = _write_consumer(
+        docs_site,
+        f"See {SITE_PREFIX}architecture/performance/\n#no-such-anchor for detail.\n",
+    )
+    assert check_docs_links.main([str(consumer)]) == 1
+    assert "WRAPPED URL" in capsys.readouterr().out
+
+
+def test_bare_hash_comment_line_is_not_a_wrapped_url(docs_site: Path) -> None:
+    """A commented file header puts a bare `#` under a link; that is a separator, not an anchor."""
+    consumer = _write_consumer(
+        docs_site, f"# See {SITE_PREFIX}architecture/performance/\n#\n# More prose.\n"
+    )
+    assert check_docs_links.main([str(consumer)]) == 0
+
+
+def test_http_scheme_is_checked_not_skipped(
+    docs_site: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A link typo'd as `http://` still points at a page that can be renamed away."""
+    consumer = _write_consumer(docs_site, f"{SITE_PREFIX.replace('https', 'http')}no-such-page/\n")
+    assert check_docs_links.main([str(consumer)]) == 1
+    assert "BAD PAGE" in capsys.readouterr().out
+
+
+def test_bad_anchor_names_the_closest_real_anchor(
+    docs_site: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The suggestion is the whole value of the failure message, so assert on its content."""
+    consumer = _write_consumer(docs_site, f"{SITE_PREFIX}architecture/performance/#tunning\n")
+    assert check_docs_links.main([str(consumer)]) == 1
+    assert "tuning" in capsys.readouterr().out
+
+
+def test_mkdocs_yml_extension_entries_are_parsed(tmp_path: Path) -> None:
+    """`markdown_extensions` mixes bare names with single-key `{name: config}` mappings.
+
+    Reading both forms is what keeps this script's anchors identical to the built site's, so it is
+    worth a test that does not go through the `markdown_extensions: []` fixture.
+    """
+    names, configs = check_docs_links._markdown_extensions_from_mkdocs_yml(
+        {"markdown_extensions": ["pymdownx.highlight", {"pymdownx.arithmatex": {"generic": True}}]}
+    )
+    assert names == [
+        *check_docs_links._BUILTIN_MARKDOWN_EXTENSIONS,
+        "pymdownx.highlight",
+        "pymdownx.arithmatex",
+    ]
+    assert configs == {"pymdownx.arithmatex": {"generic": True}}
