@@ -194,6 +194,18 @@ When a dependency upgrade introduces a new upstream warning, the suite fails lou
 entry in that same form rather than widening an existing one; if the warning comes from our code,
 fix the code. Later entries take precedence, so `error` stays first.
 
+## A production `except BaseException` swallows pytest's `fail` and `skip` too
+
+**`pytest.fail()` and `pytest.skip()` raise from `BaseException`, so a broad `except BaseException`
+in the code under test swallows them along with every real error.** `defs/checks.py` and
+`defs/assets.py` each guard an asset check's body with `except BaseException`, because a Rust panic
+from a compiled dependency does not derive from `Exception` — see [Warn on stale power data with a
+Dagster asset
+check](production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check) for the full
+reasoning. Calling `pytest.fail()` or `pytest.skip()` *inside* such a guarded body, as a "this
+branch must not run" sentinel, is caught by the same guard instead of failing the test. Assert
+after the call returns instead of relying on either one inside it.
+
 ## Network-gated tests
 
 Most tests run fully offline, mocking any network call (for example, patching

@@ -128,8 +128,8 @@ written, so a rejected re-registration leaves the experiment exactly as it was.
 5. Loads inputs for the training window and eligible population. The NWP scan is pruned at the
    source — control member only, the eligible series' H3 cells, and the window's `init_time`
    partitions — and collected with the **streaming engine**, so a multi-month fold trains in a few
-   GB rather than OOMing on the tens-of-GB NWP table (see the "Bounding feature-engineering memory"
-   notes in `docs/architecture/overview.md`).
+   GB rather than OOMing on the tens-of-GB NWP table (see
+   [Bounding feature-engineering memory: prune the inputs, not the output](../architecture/performance.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)).
 6. Engineers features via the forecaster's `feature_engineer.engineer()`.
 7. Calls `forecaster.train(features, eligible_ids)` (the population is passed explicitly). The asset
    then **raises** if zero boosters were trained (e.g. no series had usable power in the window).

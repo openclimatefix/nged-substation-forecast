@@ -1,42 +1,12 @@
 """Sentry.io telemetry: error reporting, the missed-check-in alarm, and freshness warnings.
 
 Three independent mechanisms, all no-ops when Sentry is unconfigured, so laptops and CI need no
-Sentry configuration:
-
-- **Error telemetry** — :func:`init_sentry` initialises the SDK once per process (a no-op unless
-  ``Settings.sentry_dsn`` is set), and the :data:`sentry_capture_failure` Dagster failure hook
-  reports the real exception (with traceback) from inside the run worker, tagged
-  :data:`FAULT_CATEGORY_TAG` so an alert rule can tell a failed run from the degradation events
-  below. It reports neither a cancelled run nor the bare ``RetryRequested`` wrapper around an
-  exhausted in-band retry.
-  :func:`report_check_degradation` and :func:`report_asset_degradation` cover the production faults
-  the hook cannot see, because they never fail a run: a check, or an asset, that caught its own
-  exception instead of raising. The hook is used
-  rather than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry`
-  explicitly disables — because Dagster logs a step failure without ``exc_info``, so the log-based
-  path would yield a message-only event with no stack trace, *and* would fire for every ``ERROR``
-  log anywhere in the process (Dagster's own startup/step logs, ad-hoc materialisations, even a
-  swallowed telemetry error), swamping Sentry with events the design never intended to send. The
-  hook is attached to the *scheduled* asset jobs only, so it covers the unattended production
-  workload; manual/backfill/experiment runs are watched by the operator at the Dagster UI, not
-  Sentry.
-- **The missed-check-in alarm** — :func:`send_forecast_checkin` sends a *success-only* heartbeat to
-  a Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
-  ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error testing
-  never heartbeats the production monitor. Sentry fires the alarm on the *absence* of a heartbeat
-  past the margin (a dead daemon cannot report itself); in-band run errors are handled by the
-  failure hook above, never by this heartbeat.
-- **Freshness warnings** — :func:`report_power_freshness` forwards the ``power_data_is_fresh`` asset
-  check's per-series staleness to Sentry as a *warning*-level event when any series is late. Gated
-  on the DSN like error telemetry (not the heartbeat flag), and fingerprinted per environment so
-  each deployment gets its own ongoing issue. Because a warning event models only one direction of
-  a two-way state (stale vs recovered), recovery is signalled by the events *stopping* and is
-  resolved by the operator — see the design page's freshness section.
-
-The ``environment`` tag (``Settings.sentry_environment``) separates deployments: ``production`` on
-the always-on box, ``<name>-laptop`` on each developer's machine. The alarm's alert rule is scoped
-to ``environment:production`` so intermittently-run laptops never page. See
-[Production Deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/).
+Sentry configuration: error telemetry (:func:`init_sentry`, :data:`sentry_capture_failure`,
+:func:`report_asset_degradation`, :func:`report_check_degradation`), the missed-check-in alarm
+(:func:`send_forecast_checkin`), and freshness warnings (:func:`report_power_freshness`). See [Send
+telemetry to Sentry, and alarm on
+absence](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+for what each mechanism carries, means, and is routed on.
 """
 
 import logging
@@ -68,8 +38,9 @@ logger = logging.getLogger(__name__)
 LIVE_FORECAST_MONITOR_SLUG: Final[str] = "live-forecasts"
 """Slug of the Sentry cron monitor fed by ``live_forecasts``' success heartbeat.
 
-Laptop testing must use a *different*, throwaway slug (e.g. ``"live-forecasts-test"``) so an
-intermittently-run laptop never registers a stale environment on the production monitor."""
+Laptop testing must use a different, throwaway slug (e.g. ``"live-forecasts-test"``). See
+[Separating laptop telemetry from
+production](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#separating-laptop-telemetry-from-production)."""
 
 LIVE_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {  # noqa: UP037
     # DUPLICATED SCHEDULE: this crontab must match live_forecast_partitions.cron_schedule in
@@ -83,11 +54,10 @@ LIVE_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {  # noqa: UP037
     "checkin_margin": 120,
 }
 """Declarative config upserted with each heartbeat: the 6-hourly live schedule plus 120 minutes of
-grace after each expected check-in before that slot counts as missed — so the alarm effectively
-fires ~8 hours after the last success (one 6-hourly slot plus the 2-hour margin). Only *success*
-check-ins are ever sent, so the alarm keys off missed check-ins alone; ``max_runtime`` is
-deliberately omitted because it needs an ``in_progress`` check-in to time against, which the
-success-only heartbeat never sends.
+grace after each expected check-in before that slot counts as missed. See [Send telemetry to
+Sentry, and alarm on
+absence](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+for the derived alarm timing and why ``max_runtime`` is not set.
 
 The ``schedule`` crontab is a hand-kept copy of ``live_forecast_partitions.cron_schedule`` in
 ``defs/production_assets.py`` — see the inline comment above for why it is copied, not imported."""
@@ -96,27 +66,20 @@ The ``schedule`` crontab is a hand-kept copy of ``live_forecast_partitions.cron_
 def init_sentry(settings: Settings) -> None:
     """Initialise the Sentry SDK for this process, or do nothing if Sentry is disabled.
 
-    A no-op when ``settings.sentry_dsn`` is empty (the default), so nothing is sent from laptops
-    or CI unless a DSN is explicitly configured. Called once per process at import of the Dagster
-    definitions module, so it runs in the daemon, the webserver, and every run worker. Never
-    raises: a malformed DSN must not stop the Dagster code location from loading, or the daemon
-    runs no schedule and no forecast is produced at all — the worst possible outcome for a typo in
-    one environment variable, and one Sentry itself cannot alert on. ``sentry_sdk.init`` raises
-    ``BadDsn`` early in ``Client.__init__``, during DSN parsing, before any global state is
+    A no-op when ``settings.sentry_dsn`` is empty. Called once per process at import of the Dagster
+    definitions module. See [Send telemetry to Sentry, and alarm on
+    absence](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+    for where that runs and what each mechanism sends, including why log-to-event capture is
+    disabled here.
+
+    Never raises: a malformed DSN must not stop the Dagster code location from loading, or the
+    daemon runs no schedule and no forecast is produced at all — the worst possible outcome for a
+    typo in one environment variable, and one Sentry itself cannot alert on. ``sentry_sdk.init``
+    raises ``BadDsn`` early in ``Client.__init__``, during DSN parsing, before any global state is
     touched, so catching that failure leaves the SDK with a ``NonRecordingClient``
     (``is_active() == False``) — identical to never having called ``init`` at all. Every other
     sender in this module already treats an inactive/uninitialised client as a silent no-op, so
     none of them needs extra guarding as a consequence of this one being guarded.
-
-    Log-to-event capture is deliberately switched off: passing a ``LoggingIntegration`` with
-    ``event_level=None`` overrides the SDK's default integration (whose default ``event_level`` is
-    ``ERROR``), so ``ERROR``-level log records no longer become Sentry events. Without this, every
-    ``ERROR`` log anywhere in the process — Dagster's startup/step logs, ad-hoc materialisations,
-    even the swallowed telemetry error in :func:`report_power_freshness` — would be shipped as an
-    event, defeating the design where *only* the four explicit senders reach Sentry: the failure
-    hook, the freshness ``capture_message``, :func:`report_check_degradation` and
-    :func:`report_asset_degradation`. Breadcrumbs (the integration's default ``level=INFO``) are
-    kept, so log context still rides along with the events those senders do send.
 
     Args:
         settings: The project settings carrying the Sentry DSN, environment, and sample rate.
@@ -158,18 +121,12 @@ def sentry_capture_failure(context: HookContext) -> None:
     ``fault_category=run_failed`` (see :data:`FAULT_CATEGORY_TAG`). A no-op when Sentry is
     uninitialised (empty DSN), because ``capture_exception`` needs an active Sentry client.
 
-    Two exceptions are treated specially, so that what reaches Sentry names the actual fault:
-
-    - **A retry request is unwrapped to its cause.** Dagster's own ``HookContext.op_exception``
-      unwraps a ``RetryRequestedFromPolicy`` but not the plain ``RetryRequested`` that ``ecmwf_ens``
-      and ``power_time_series_and_metadata`` raise in-band, so an exhausted retry would otherwise
-      be titled and grouped as ``RetryRequested`` — hiding, say, ``NwpRunNotYetAvailable``. The
-      whole chain is serialized either way; what this fixes is the title and the grouping.
-    - **A deliberate exit is not reported at all.** A cancelled or terminated run is an operator's
-      decision, not a fault. ``SystemExit`` is the shape that gets this far: Dagster re-raises
-      ``KeyboardInterrupt`` and ``DagsterExecutionInterruptedError`` ahead of the hook, but a
-      ``SystemExit`` reaches it as an ordinary step failure. All three are named anyway, matching
-      the guards in ``defs/assets.py`` and ``defs/checks.py``.
+    A ``RetryRequested`` is unwrapped to its cause before reporting, and a cancelled or terminated
+    run (``KeyboardInterrupt``, ``SystemExit``, ``DagsterExecutionInterruptedError``) is not
+    reported at all. See [Send telemetry to Sentry, and alarm on
+    absence](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+    for why those two cases are special-cased, and why the retry that lands here is raised in-band
+    rather than via a Dagster ``RetryPolicy``.
 
     Args:
         context: The Dagster hook context for the failed step, carrying ``op_exception``.
@@ -215,12 +172,11 @@ def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str)
 def report_asset_degradation(asset_name: str, exc: BaseException) -> None:
     """Report an asset that degraded rather than failing, as a Sentry error event.
 
-    Closes the same gap as :func:`report_check_degradation` below, for an asset:
-    ``power_time_series_and_metadata`` catches a failure of the ``TimeSeriesMetadata`` roster upsert
-    so that the power write still happens (rule 1 of
-    [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
-
-    A no-op when Sentry is uninitialised (empty DSN), and never raises.
+    Sends ``exc`` as an ``error``-level event tagged ``degraded_asset=<asset_name>``. A no-op when
+    Sentry is uninitialised (empty DSN), and never raises. See [Send telemetry to Sentry, and alarm
+    on
+    absence](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+    for which assets call this and why.
 
     Args:
         asset_name: The Dagster asset name, attached as a ``degraded_asset`` tag so events can be
@@ -238,17 +194,15 @@ def report_asset_degradation(asset_name: str, exc: BaseException) -> None:
 def report_check_degradation(check_name: str, exc: BaseException) -> None:
     """Report an asset check that could not evaluate its own inputs, as a Sentry error event.
 
-    Every caller catches everything rather than raising (rule 7 of
-    [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)),
-    so the run no longer fails and :data:`sentry_capture_failure` no longer fires. Without this,
-    a check that cannot read its own inputs would show up only as a yellow tick in Dagster's Checks
-    view — and ``power_time_series_and_metadata_job`` has no cron monitor to notice the silence, so
-    nobody would be told. Sending the same exception the failure hook used to send restores the
-    signal without restoring the failure.
-
-    A no-op when Sentry is uninitialised (empty DSN), like every other path here, and never raises:
-    it is called from inside a check's own ``except`` handler, where a raise would escape the guard
-    and fail the run outright — the very thing the handler exists to prevent.
+    Sends ``exc`` as an ``error``-level event tagged ``asset_check=<check_name>``, restoring the
+    signal that :data:`sentry_capture_failure` no longer sends once a check's catch-all keeps the
+    run from failing (rule 7 of
+    [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+    A no-op when Sentry is uninitialised (empty DSN), and never raises: it is called from inside a
+    check's own ``except`` handler, where a raise would escape the guard and fail the run outright —
+    the very thing the handler exists to prevent. See [Send telemetry to Sentry, and alarm on
+    absence](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+    for which checks call this and why.
 
     Args:
         check_name: The Dagster asset-check name, attached as a tag so events can be filtered per
@@ -269,12 +223,10 @@ def send_forecast_checkin(
     """Send a success heartbeat to the Sentry cron monitor, or do nothing if disabled.
 
     A no-op unless ``settings.sentry_monitor_forecasts`` is set (True only on the always-on
-    production box), so a laptop never registers a monitor environment that Sentry would then mark
-    as missed. Sends a single ``OK`` check-in — never ``in_progress`` or ``error`` — so the alarm
-    fires purely on the *absence* of a heartbeat. Never raises: this runs after ``live_forecasts``
-    has already committed its Delta write, so a raise here would leave the run reported as failed
-    while the rows it produced sit committed — the run looking like it produced nothing when it in
-    fact produced everything.
+    production box). Sends a single ``OK`` check-in — never ``in_progress`` or ``error``. Never
+    raises. See [Send telemetry to Sentry, and alarm on
+    absence](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+    for the alarm this feeds and why this never raises.
 
     Args:
         settings: The project settings carrying ``sentry_monitor_forecasts`` and the environment.
@@ -336,14 +288,12 @@ def report_power_freshness(settings: Settings, result: "PowerFreshnessResult") -
     """Forward per-series power-data staleness to Sentry as a warning, or do nothing if healthy.
 
     A no-op when Sentry is unconfigured (empty ``settings.sentry_dsn``) or when no series is late
-    (``result.is_healthy``), so a healthy feed and an un-configured environment both stay silent.
-    Sends a single ``warning``-level event fingerprinted per environment; the hourly re-reports of
-    an ongoing stall collapse into one issue, and recovery is signalled by the events stopping (a
-    warning event has no "resolved" counterpart — the operator resolves the issue). Never raises:
-    ``power_data_is_fresh`` calls this from inside its own catch-all, so a raise here would not
-    fail the run but would cost the *whole* freshness report — every late series, in the very hour
-    they went late — by degrading the check to "could not evaluate". Guarding here keeps a
-    telemetry hiccup from taking the evaluation down with it.
+    (``result.is_healthy``). Sends a single ``warning``-level event, fingerprinted per environment.
+    Never raises: ``power_data_is_fresh`` calls this from inside its own catch-all, so a raise here
+    would cost the *whole* freshness report — every late series, in the very hour they went late —
+    rather than just this one event. See [Send telemetry to Sentry, and alarm on
+    absence](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+    for the fingerprinting, the message and context caps, and how recovery is signalled.
 
     Args:
         settings: The project settings carrying the Sentry DSN and environment.

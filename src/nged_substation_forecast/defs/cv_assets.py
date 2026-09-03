@@ -111,15 +111,22 @@ is still read exactly once. See ``cv_power_forecasts``.
 def eligible_time_series(context: AssetExecutionContext) -> None:
     """Compute and persist the canonical eligible ``time_series_id``s for one CV fold.
 
-    A time series is eligible for a fold when its observed-power coverage has at least
-    ``min_training_months`` of history before the fold's ``val_start`` *and* reaches the fold's
-    ``val_end``. Eligibility is derived from data coverage alone (not from any model/config), so
-    every experiment evaluates the fold on the identical population — this is what keeps the
-    leaderboard apples-to-apples.
+    Reads observed-power coverage from the ``power_time_series_and_metadata`` Delta table. A time
+    series is eligible for a fold when its coverage has at least ``min_training_months`` of history
+    before the fold's ``val_start`` *and* reaches the fold's ``val_end``. Eligibility is derived
+    from data coverage alone (not from any model/config), so every experiment evaluates the fold on
+    the identical population — this is what keeps the leaderboard apples-to-apples. See
+    "Eligibility" in
+    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/cross-validation-folds/#eligibility>
+    for the fold definitions this population is computed against.
 
     The result is written to the ``eligible_time_series`` Delta table as one partition per
-    ``fold_id`` via an idempotent partition overwrite, so re-materialising a fold replaces its
-    rows rather than duplicating them.
+    ``fold_id`` via an idempotent partition overwrite, so re-materialising a fold replaces its rows
+    rather than duplicating them. ``trained_cv_model`` reads this fold's partition to select which
+    series to train on; ``cv_power_forecasts`` does not read it directly, but inherits the same
+    population through the trained model's ``trained_time_series_ids``. A stale or missing
+    partition here therefore shows up downstream as a fold trained on the wrong population, not as
+    a failure at either of those assets.
     """
     settings = Settings()
     storage_options = settings.storage_options
@@ -295,9 +302,11 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     the training window and population.
 
     The fold run is resolved **by tag**, never by a handle passed between assets, so this is safe
-    across processes and idempotent under Dagster retries. Because that run is *reused* on every
-    re-materialisation, the training window and population go in tags rather than MLflow params
-    (which are write-once and would reject a changed value).
+    across processes and idempotent under Dagster retries — see "Cross-process run resolution:
+    discover by tag, never pass handles" in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#cross-process-run-resolution-discover-by-tag-never-pass-handles>.
+    Because that run is *reused* on every re-materialisation, the training window and population go
+    in tags rather than MLflow params (which are write-once and would reject a changed value).
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -433,8 +442,9 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     (``_PREDICT_INIT_CHUNK``). The full validation window fans every NWP run out across all ~51
     ensemble members and all trained series — tens of GB. ``init_time`` is the NWP partition key
     *and* the axis that inflates the output, so chunking by it bounds the per-iteration forecast
-    frame (~2-3 GB) while each partition is still read exactly once. See the "NWP scan pruning"
-    notes in <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
+    frame (~2-3 GB) while each partition is still read exactly once. See "Bounding
+    feature-engineering memory: prune the inputs, not the output" in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
     Forecasts are written to the ``power_forecasts`` Delta table keyed by
     ``(experiment_name, fold_id)``: the **first** chunk overwrites the partition (clearing any prior
@@ -730,13 +740,10 @@ _METRICS_SERIES_BATCH_SIZE: Final[int] = 4
 A single V1 fold is far too big to collect whole (~370M rows with the full ``PowerForecast``
 schema OOM-kills a 29 GB machine), but ``compute_metrics`` is independent per
 ``time_series_id`` — every group key includes it — so scoring per-series batches and
-concatenating the tall ``Metrics`` results is exactly equivalent to one big call.
-
-Measured on the V1 fold (28 series, ~13M rows each): batch size 4 completes in ~50 s with
-~18 GB peak process RSS, dominated by the streaming Delta scan (each batch re-scans the
-partition; the materialised batch frame itself is a few GB). Batch size 2 measured only
-~2 GB lower, so shrinking the batch buys little — the scan overhead is roughly constant in
-fold size, which is what keeps this workable at V2 scale.
+concatenating the tall ``Metrics`` results is exactly equivalent to one big call. For the
+batch-size measurements behind the value 4, see "Scoring the metrics: batch the series, and
+stream every scan" in
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#scoring-the-metrics-batch-the-series-and-stream-every-scan>.
 """
 
 
@@ -949,11 +956,13 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     ).set_model(PowerForecast)
     pruned_scan = config.population_filter.apply(scan)
 
-    # Discover the matching groups from the pruned scan. The streaming engine is essential
-    # here even though only the two partition columns are projected: the in-memory engine
-    # materialises them at full row length before the unique (measured: OOM-killed on the
-    # 364M-row fold vs 0.3 GB peak streaming). Each group is then scored in per-series
-    # batches, so peak memory is one batch, never a whole fold.
+    # Discover the matching groups from the pruned scan. The streaming engine is essential here
+    # even though only the two partition columns are projected — the eager equivalent still
+    # materialises every row before the unique. See "Scoring the metrics: batch the series, and
+    # stream every scan":
+    # <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#scoring-the-metrics-batch-the-series-and-stream-every-scan>.
+    # Each group is then scored in per-series batches, so peak memory is one batch, never a whole
+    # fold.
     groups = (
         pruned_scan.select(["experiment_name", "fold_id"])
         .unique()

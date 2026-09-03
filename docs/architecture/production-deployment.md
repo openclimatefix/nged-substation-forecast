@@ -249,9 +249,12 @@ configured — so laptops and CI stay silent by default.
   deliberately disables (it passes a `LoggingIntegration` with `event_level=None`): Dagster logs a
   step failure without `exc_info`, so a purely log-based capture would yield a message-only event
   with no stack trace, and — left at its default `event_level=ERROR` — it would turn *every* `ERROR`
-  log in the process into a Sentry event, including Dagster's own startup and ad-hoc-run logs. The
-  hook is attached to the three *scheduled* asset jobs, so it covers the whole unattended production workload. Because log capture is off, failures in a manual UI materialisation, a replay backfill,
-  or an experiment job are watched by the operator at the Dagster UI, not routed to Sentry.
+  log in the process into a Sentry event, including Dagster's own startup and ad-hoc-run logs.
+  Breadcrumbs — the integration's default `level=INFO` — stay on, so log context still rides along
+  with the events the senders below do send. The hook is attached to the three *scheduled* asset
+  jobs, so it covers the whole unattended production workload. Because log capture is off, failures
+  in a manual UI materialisation, a replay backfill, or an experiment job are watched by the
+  operator at the Dagster UI, not routed to Sentry.
 
     One production fault the hook cannot see is an asset check that caught its own exception
     instead of failing the run — which, by design, is every one of them: the two standalone
@@ -261,6 +264,9 @@ configured — so laptops and CI stay silent by default.
     check's name, and `report_asset_degradation` does the same tagged `degraded_asset` for an *asset*
     that degrades rather than failing — today, `power_time_series_and_metadata`'s roster upsert. Since
     log capture is off, either handler's `ERROR` log alone would reach nobody.
+    `power_time_series_and_metadata_job` compounds this: it has no cron monitor of its own, so
+    absent `report_check_degradation`, a check that cannot read its own inputs would show up only
+    as a yellow tick in Dagster's Checks view, and nobody would be told.
 
     Those tags are what an alert rule routes on, and the failure hook is the one sender that would
     otherwise arrive with nothing to route on — so it tags `fault_category:run_failed`. That tag is
@@ -291,12 +297,19 @@ configured — so laptops and CI stay silent by default.
 - **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
   `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron
   monitor; Sentry raises the alarm when no heartbeat lands within the margin (the 6-hourly schedule
-  plus ~2 h grace), regardless of cause. Evaluation must live outside the deployment because a dead
+  plus ~2 h grace), regardless of cause. Because the alarm only fires once the following slot's own
+  grace period has elapsed, a missed heartbeat is flagged roughly 8 hours after the last success —
+  one 6-hourly slot plus the ~2 h grace. Evaluation must live outside the deployment because a dead
   daemon cannot report itself — the reasoning for why this, not a Dagster sensor, is the mechanism
   is in [Alert on absence](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
-  Only *success* heartbeats are ever sent (never an `error` check-in), so the alarm keys purely off
-  absence: an in-band run error is the failure hook's job, and a manual `replay` backfill — which
-  reprocesses the past rather than proving the service is live now — deliberately does not check in.
+  Only *success* heartbeats are ever sent (never an `error` or `in_progress` check-in), so the alarm
+  keys purely off absence: an in-band run error is the failure hook's job, and a manual `replay`
+  backfill — which reprocesses the past rather than proving the service is live now — deliberately
+  does not check in. Sentry's `max_runtime` setting is deliberately left unset: it would time a
+  check-in against an `in_progress` counterpart, which the success-only heartbeat never sends, so
+  there is nothing for it to measure against. Sending the heartbeat never raises: `live_forecasts`
+  has already committed its Delta write by the time `send_forecast_checkin` runs, so a raise here
+  would report the run as failed while the rows it produced sit committed.
 
 - **Freshness warnings.** When the `power_data_is_fresh` asset check finds late series,
   `report_power_freshness` forwards that per-series staleness to Sentry as a `warning`-level event,

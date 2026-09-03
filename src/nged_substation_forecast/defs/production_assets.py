@@ -70,13 +70,7 @@ live_forecast_partitions = TimeWindowPartitionsDefinition(
 """One partition per 6-hourly tick (00/06/12/18 UTC). ``start`` is a few days before this asset
 shipped — no need for a deep empty backlog on a brand-new live asset.
 
-**Partition semantics**: a partition key names the *start* of its 6-hour window; the window runs
-until the *next* partition's key, 6 hours later. A partition's ``power_fcst_init_time`` (when its
-forecast is initialised) is that window's *end* — i.e. the next tick's timestamp, not the key's
-own timestamp (see ``live_forecasts``'s docstring for why). E.g. partition key
-``"2026-07-04-00:00"`` covers the window from 2026-07-04 00:00 UTC (the key itself) to
-2026-07-04 06:00 UTC (the next tick), so its ``power_fcst_init_time`` is 2026-07-04 06:00 UTC —
-six hours after the timestamp named in the key, not at the midnight the key names.
+See ``live_forecasts``'s docstring for the partition-key/``power_fcst_init_time`` worked example.
 """
 
 
@@ -227,13 +221,10 @@ class LiveForecastsConfig(Config):
             partition_mapping=TimeWindowPartitionMapping(start_offset=-16, end_offset=0),
         ),
         "power_time_series_and_metadata",
-        # `promoted_model` is deliberately NOT a dep. The model reaches
-        # `Settings.production_model_path` out-of-band, by a different mechanism per environment:
-        # the `promoted_model` asset (an MLflow fetch) when running on a laptop, and the Docker
-        # image it was baked into when running on the production box. Either way it is a filesystem
-        # input, not a Dagster data-flow edge. Declaring the edge would render a permanently
-        # un-materialised `promoted_model` parent on the box, which has no MLflow and never runs
-        # promotion. The docstring below records the coupling instead.
+        # `promoted_model` is deliberately NOT a dep: the model reaches
+        # `Settings.production_model_path` by filesystem, not by a Dagster data-flow edge. See
+        # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status
+        # The docstring below records the coupling instead.
     ],
 )
 def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) -> None:

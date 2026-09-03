@@ -89,11 +89,17 @@ _POWER_INGEST_RETRY_DELAY_SECONDS: Final[int] = 2
 def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     """Ingests raw telemetry and metadata from NGED S3 into our local storage.
 
-    This asset acts as the entry point for NGED data into our system. It fetches
-    the latest available data from the external S3 bucket and appends it to our
-    local Delta table for time series data, while upserting the latest metadata.
-    This raw data will later be consumed by downstream cleaning assets to prepare
-    it for forecasting models.
+    This asset is the entry point for NGED data into the pipeline. It fetches the latest available
+    data from NGED's external S3 bucket, appends new readings to the local ``PowerTimeSeries`` Delta
+    table, and upserts the latest substation metadata parquet. Nothing cleans this data further:
+    ``eligible_time_series``, ``trained_cv_model`` and ``cv_power_forecasts`` in
+    ``defs/cv_assets.py``, and ``live_forecasts`` in ``defs/production_assets.py``, all read the
+    Delta table this asset writes directly.
+
+    Runs hourly on ``power_time_series_and_metadata_schedule``, five minutes before
+    ``live_forecasts_schedule`` ticks. A failed or skipped run costs nothing structurally: this
+    asset re-lists NGED's bucket from scratch on every run, so the next hourly run appends whatever
+    this one missed.
 
     WHY UNPARTITIONED? Because NGED's JSON files land at irregular, several-hours-apart intervals
     with no fixed schedule, so the start time changes every day. And because we don't want people
@@ -212,8 +218,14 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 def h3_grid_weights(context: AssetExecutionContext) -> None:
     """Computes H3 grid weights for the Great Britain boundary.
 
-    This asset calculates the fractional overlap of H3 cells with the GB boundary
-    at various resolutions, which is used for spatial aggregation of weather data.
+    This production-layer asset calculates the fractional overlap of H3 cells with the GB boundary
+    at the NWP grid resolution. The result, written to ``h3_grid_weights.parquet``, is the lookup
+    table ``ecmwf_ens`` depends on (``deps=["h3_grid_weights"]``) to map gridded NWP forecasts onto
+    the H3 cells attached to each substation.
+
+    Effectively one-off: re-materialise only when the GB boundary geometry or the H3 resolution
+    changes, not on a recurring schedule — unlike ``ecmwf_ens`` and
+    ``power_time_series_and_metadata``, it has no schedule of its own in ``defs/schedules.py``.
     """
     settings = Settings()
     boundary = load_gb_boundary()
@@ -246,10 +258,11 @@ its 00Z run has actually landed, matching Dynamical's publication lag; shared wi
 
 _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
 """Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≥ 4h of coverage past the 08:30 UTC schedule
-(``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time — and past the
-3h25m a measured republication took. Applies to ``NwpRunNotYetAvailable`` and
-``NwpVariableWhollyMissing``, the two ways an upstream run says "not ready yet"; a genuine bug
-fails immediately instead of retrying for hours.
+(``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time. Applies to
+``NwpRunNotYetAvailable`` and ``NwpVariableWhollyMissing``, the two ways an upstream run says "not
+ready yet"; a genuine bug fails immediately instead of retrying for hours. Why those two failures
+are retried rather than failed outright, and why 4h is enough:
+https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright
 
 "≥" rather than "≈" because only ``NwpRunNotYetAvailable`` is raised before the download.
 ``NwpVariableWhollyMissing`` comes from validation *after* it, so each of those retries also pays
@@ -293,6 +306,21 @@ _NWP_COMPLETENESS_CHECK_NAME: Final[str] = "nwp_run_is_complete"
 Separate from ``nwp_has_no_unexpected_nulls`` because the two answer different questions with
 different remedies: that one asks whether the rows we got are usable, this one asks whether we got
 all the rows. Computed in-asset from the frame in memory, for the same reason."""
+
+_NWP_COMPLETENESS_CHECK_DESCRIPTION: Final[str] = (
+    "Whether the ingested run is the full cartesian product of 51 ensemble members, 85 native "
+    "forecast steps, and every H3 cell in the H3 grid weights. `Nwp.validate` cannot see a missing "
+    "ensemble member or a run stopping short of the 15-day horizon — every row it does contain is "
+    "well-formed — so this check compares the ingested shape against the expected one and names "
+    "exactly which members and lead times are absent. WARN, never fail: an incomplete run is "
+    "absent input, not malformed input, and the live forecast falling back on yesterday's run is a "
+    "worse degradation than forecasting from a slightly short run today. See "
+    "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
+)
+"""Standing explanation shown in the Dagster UI's Checks view.
+
+The per-run ``AssetCheckResult.description`` carries that run's numbers; this says what they
+mean."""
 
 _NWP_INSTANTANEOUS_CHECK_NAME: Final[str] = "nwp_instantaneous_variables_have_no_nulls"
 """Name of the per-run check on the instantaneous variables' raw-grid nulls.
@@ -354,7 +382,12 @@ _UPSTREAM_PER_VARIABLE_SCHEMA: Final[TableSchema] = TableSchema(
             blocking=False,
             description=_NWP_INSTANTANEOUS_CHECK_DESCRIPTION,
         ),
-        AssetCheckSpec(name=_NWP_COMPLETENESS_CHECK_NAME, asset="ecmwf_ens", blocking=False),
+        AssetCheckSpec(
+            name=_NWP_COMPLETENESS_CHECK_NAME,
+            asset="ecmwf_ens",
+            blocking=False,
+            description=_NWP_COMPLETENESS_CHECK_DESCRIPTION,
+        ),
     ],
     # `pool="ECMWF"` caps how many partitions of this asset run at once, in conjunction with
     # the Dagster instance configuration: `concurrency: pools: default_limit` in `dagster.yaml`,
@@ -375,10 +408,13 @@ _UPSTREAM_PER_VARIABLE_SCHEMA: Final[TableSchema] = TableSchema(
 def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     """Downloads and processes ECMWF ensemble NWP data for a specific day.
 
-    This asset fetches the 00Z NWP run for the partition date, converts it to a
+    This production-layer asset fetches the 00Z NWP run for the partition date, converts it to a
     Polars DataFrame, and writes it to the Delta table through
     ``delta_store.nwp.write_nwp`` (Float32, significand-rounded), which replaces that
-    ``(nwp_model_id, init_time)`` partition.
+    ``(nwp_model_id, init_time)`` partition. Runs daily on ``ecmwf_ens_schedule``, and depends on
+    ``h3_grid_weights`` for the grid that its aggregation maps onto. ``live_forecasts`` in
+    ``defs/production_assets.py`` reads this table for production inference; ``trained_cv_model``
+    and ``cv_power_forecasts`` in ``defs/cv_assets.py`` read it for cross-validation.
 
     Its ``nwp_has_no_unexpected_nulls`` check reports null counts for both the raw NWP grid and the
     stored H3 cells; that check's own description says which keys are which and why they differ.
@@ -399,11 +435,9 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
 
     # Download and convert. Both retryable failures mean "the upstream run is not ready yet", they
     # just say it at different points: the run is absent from the catalog, or it is present but a
-    # weather variable is still wholesale empty. Dynamical.org publishes each run as ~40 separate
-    # Icechunk commits, so an in-progress publication is genuinely readable and genuinely
-    # incomplete, and a defective one gets republished — the 2026-08-09 00Z run was repaired 3h25m
-    # after its first publication, inside this asset's four-hour retry budget. Every other error
-    # still fails immediately.
+    # weather variable is still wholesale empty. Every other error still fails immediately. Why
+    # these two are retried rather than failed outright: see _ECMWF_ENS_MAX_RETRIES above, or
+    # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright
     try:
         ds_lazy = open_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
         context.log.info("Lazily opened Icechunk store.")
@@ -419,13 +453,10 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         ) from exc
     context.log.info(f"Converted NWP data to Polars. Columns: {nwp.columns}")
 
-    # Three non-fatal per-run checks. The first surfaces the tolerated scattered nulls (known
-    # upstream ECMWF ENS corruption) that Nwp.validate deliberately let through. The second counts
-    # the same raw grid over the variables that are never legitimately null, where the aggregation
-    # absorbs scattered corruption so completely that nothing downstream of it can see any. The
-    # third asks whether the run is *whole*; a short run is the upstream provider misbehaving, so we
-    # keep the rows that did arrive and WARN rather than discarding the run. Computed before the
-    # write, not merely under a guard — rule 7 of
+    # Three non-fatal per-run checks: nwp_has_no_unexpected_nulls (tolerated scattered nulls
+    # Nwp.validate deliberately let through), nwp_instantaneous_variables_have_no_nulls (the same
+    # raw grid, over variables that are never legitimately null), and nwp_run_is_complete (is the
+    # run whole). Computed before the write, not merely under a guard — rule 7 of
     # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules
     try:
         quality = assess_nwp_quality(nwp)
@@ -520,9 +551,8 @@ def _nwp_completeness_check_result(report: NwpRunCompletenessReport) -> AssetChe
     """Wrap an :class:`NwpRunCompletenessReport` into a WARN-severity Dagster check result."""
     return AssetCheckResult(
         check_name=_NWP_COMPLETENESS_CHECK_NAME,
-        # WARN, never fail: an incomplete upstream run is absent input, not malformed input, and
-        # partial NWP still forecasts far better than yesterday's run would. See
-        # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/.
+        # WARN, never fail: an incomplete run is absent input, not malformed input. See
+        # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#why-it-warns-instead-of-failing-the-run
         passed=report.is_complete,
         severity=AssetCheckSeverity.WARN,
         description=report.describe(),
@@ -545,16 +575,16 @@ def _nwp_quality_check_result(
 ) -> AssetCheckResult:
     """Wrap the two null reports for one run into a WARN-severity Dagster check result.
 
-    ``passed`` follows the H3 cells alone. The upstream rate is a trend across runs, not a verdict
-    on this one, and the archive has no threshold that separates a healthy feed from a degrading
-    one — so it is published and plotted rather than gated. Escalating a badly-degraded run is
+    ``passed`` follows the H3 cells alone, not the upstream rate. Why:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#two-populations-counted-separately>.
+    Escalating a badly-degraded run is
     <https://github.com/openclimatefix/nged-substation-forecast/issues/501>.
     """
     return AssetCheckResult(
         check_name=_NWP_QUALITY_CHECK_NAME,
-        # WARN, never fail: these nulls are expected upstream corruption we deliberately ingest.
-        # Only a variable empty in *every* slice is fatal, and Nwp.validate has already rejected
-        # that before this runs.
+        # These nulls are expected upstream corruption, tolerated by design — Nwp.validate has
+        # already rejected the one fatal case (a variable empty in every slice) before this runs.
+        # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#why-it-warns-instead-of-failing-the-run
         passed=report.is_healthy,
         severity=AssetCheckSeverity.WARN,
         description=_nwp_quality_description(report=report, upstream=upstream),
