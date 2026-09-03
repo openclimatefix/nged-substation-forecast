@@ -298,6 +298,22 @@ here). If OCF's reusable workflow ever grows first-class uv-workspace support, r
 would shrink `ci.yml` to a few lines — but until then the bespoke workflow is smaller than the
 configuration the template would need.
 
+## Keeping the interpreter and dependencies current
+
+**`.python-version` pins the exact interpreter patch `uv` resolves, so `uv sync` gives the same
+Python everywhere — local development, CI, and pre-commit — rather than whatever patch happens to
+already be installed or however `uv`'s own downloader resolves on the day a job runs.** Without a
+pin, CI's `astral-sh/setup-uv` step (see above) can pick up a newer patch on a later run with no
+diff in this repo, so a bug that depends on the interpreter's exact patch version can stop
+reproducing between two runs of the same commit.
+
+**Bump `.python-version` in the same pull request that runs `uv lock --upgrade`, not on its own
+schedule.** Run `uv python install <version>` then `uv python pin <version>` for the newest
+released patch of the pinned major version (check with `uv python list`), so the interpreter and
+the locked dependencies age together and both get retested at once. A release candidate for the
+next major version is not a candidate for the pin: wait until it ships as final and the compiled
+dependencies this repo relies on — pyarrow, polars, deltalake — publish wheels for it.
+
 ## NWP grid → H3 orientation coverage
 
 The NWP-grid-to-H3 mapping is the classic place for a silent orientation bug — a vertically or
