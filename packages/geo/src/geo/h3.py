@@ -66,11 +66,6 @@ def compute_h3_grid_weights(
             strictly greater than the resolution of the input `h3_index` list. If None,
             it defaults to that resolution + 2.
     """
-    _LOG.info(
-        f"Computing H3 grid weights for grid size {nwp_grid_size_degrees}"
-        f" with child_h3_res {child_h3_res} for {len(h3_index)} H3 indices..."
-    )
-
     # Reusable-package input validation, not a reachable production state: the only non-test caller
     # is `compute_h3_grid_weights_for_boundary` above, which has already raised on an empty cell
     # list. This guards direct callers of the public function; `test_h3.py` exercises it.
@@ -100,6 +95,14 @@ def compute_h3_grid_weights(
 
     if child_h3_res <= h3_res:
         raise ValueError(f"{child_h3_res=} must be strictly greater than {h3_res=}.")
+
+    # Logged here rather than on entry so that child_h3_res is the resolution actually used: on the
+    # default path the argument is None until the line above resolves it, and the message used to
+    # report that None.
+    _LOG.info(
+        f"Computing H3 grid weights for grid size {nwp_grid_size_degrees} from {len(h3_index)}"
+        f" H3 cells at resolution {h3_res}, sampled at child resolution {child_h3_res}..."
+    )
 
     half_grid_size = nwp_grid_size_degrees / 2
 
