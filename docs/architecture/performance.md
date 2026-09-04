@@ -72,7 +72,7 @@ What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 
 | Predicate on the **raw NWP scan** | Effect |
 |---|---|
-| `init_time ∈ [start − 16d, end]` | **Partition prune** — NWP is partitioned by `init_time`, so only those partition directories are opened. A `valid_time` filter *alone* does **not** prune partitions (it scanned ~887 files). |
+| `init_time ∈ [start − 16d, end]` | **Partition prune** — NWP is partitioned by `(nwp_model_id, init_time)`, so only those partition directories are opened. A `valid_time` filter *alone* does **not** prune partitions (it scanned ~887 files). |
 | `ensemble_member ∈ {…}` on the raw scan | Only the requested members are decoded — this requires the predicate to reach the Parquet scan unchanged, which in turn requires `Nwp`'s declared `ensemble_member` dtype to match what delta-rs actually stores (see `Nwp.ensemble_member`). Once it does, rows sorted member-early (`delta_store.nwp.NWP_SORT_COLS`) let row-group min/max stats skip most of each partition outright for a single-member predicate. The exact speed-up needs re-measuring against real data. |
 | `h3_index ∈ {cells}` | Restricts to the cells the requested series sit in, on the same condition as `ensemble_member` above (the declared dtype must match what's on disk). `h3_index` is not a sort-early column (see below), so this is row-level filtering during decode rather than row-group skipping. |
 | `time_series_id == x` on the **output** | Prunes the power scan + metadata join, but **not** the NWP scan (no `time_series_id` there), and only after the upsample. Doesn't help. |
@@ -89,7 +89,7 @@ What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 | All eligible series at once | ~5 GB → `train` collects once, groups in memory | ~25 GB ✘ (OOMs) |
 | One `init_time` chunk at a time | — | ~9 GB → `cv_power_forecasts` chunks by `init_time`, appends to Delta |
 
-Prediction is bounded by chunking on **`init_time`** (`_PREDICT_INIT_CHUNK`, 14 days), *not* by cell. `init_time` is both the partition key and the axis that fans the output out across runs, so a chunk's forecast frame stays small while each partition is read exactly once and all series/cells/members are processed together (a per-*cell* loop instead OOMs on the busiest cell — 10 series × 51 members × the 10-month window ≈ 116M rows ≈ 25 GB). Measured end-to-end on the `mid_2025_to_mid_2026` fold: training peaks ~5 GB and the full 51-member validation prediction (~321M forecast rows) peaks ~9 GB — both well under a 24 GB laptop.
+Prediction is bounded by chunking on **`init_time`** (`_PREDICT_INIT_CHUNK`, 14 days), *not* by cell. `init_time` is one of the table's two partition columns and the axis that fans the output out across runs, so a chunk's forecast frame stays small while each partition is read exactly once and all series/cells/members are processed together (a per-*cell* loop instead OOMs on the busiest cell — 10 series × 51 members × the 10-month window ≈ 116M rows ≈ 25 GB). Measured end-to-end on the `mid_2025_to_mid_2026` fold: training peaks ~5 GB and the full 51-member validation prediction (~321M forecast rows) peaks ~9 GB — both well under a 24 GB laptop.
 
 ### Scoring the metrics: batch the series, and stream every scan
 

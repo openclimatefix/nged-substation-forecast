@@ -20,18 +20,18 @@ def compute_h3_grid_weights_for_boundary(
 ) -> pt.DataFrame[H3GridWeights]:
     """Computes the H3 grid weights for a geospatial boundary.
 
-    Attributes:
+    Generates the spatial mapping between the hexagonal H3 grid and the regular lat/lon NWP grid.
+
+    The mapping is calculated by sampling each H3 cell with finer-resolution child cells and
+    determining which regular grid cell each child falls into. The `nwp_grid_size_degrees`
+    parameter is used to snap high-resolution H3 cells to the nearest regular NWP grid points.
+
+    Args:
         boundary: The geospatial boundary to find H3 cells for.
         nwp_grid_size_degrees: The size of the regular lat/lon grid in degrees.
         h3_res: The H3 resolution to use for the grid.
         child_h3_res: The H3 resolution to use for the underlying points. If None,
             it defaults to h3_res + 2.
-
-    Generates the spatial mapping between the hexagonal H3 grid and the regular lat/lon NWP grid.
-
-    The mapping is calculated by sampling each H3 cell with finer-resolution child cells and
-    determining which regular grid cell each child falls into. The `grid_size` parameter is used to
-    snap high-resolution H3 cells to the nearest regular NWP grid points.
     """
     _LOG.info(f"Generating H3 cells at resolution {h3_res}...")
 
@@ -52,31 +52,28 @@ def compute_h3_grid_weights(
 ) -> pt.DataFrame[H3GridWeights]:
     """Computes the proportion mapping for H3 grid cells to a regular lat/lng grid.
 
-    This function takes a DataFrame containing H3 indices and calculates how many
-    child H3 cells at a finer resolution (`child_res`) fall into each cell of a
-    regular lat/lng grid of size `grid_size`.
+    This function takes a list of H3 indices and calculates how many child H3 cells at a finer
+    resolution (`child_h3_res`) fall into each cell of a regular lat/lng grid of size
+    `nwp_grid_size_degrees`.
 
-    The regular grid is assumed to be perfectly aligned to 0.0 (e.g., 0.0, `grid_size`,
-    `grid_size * 2`).
+    The regular grid is assumed to be perfectly aligned to 0.0 (e.g., 0.0,
+    `nwp_grid_size_degrees`, `nwp_grid_size_degrees * 2`).
 
     Args:
         h3_index: List of 64-bit H3 discrete spatial indices.
         nwp_grid_size_degrees: The size of the regular NWP lat/lng grid in degrees (e.g., 0.25).
         child_h3_res: The H3 resolution to use for the underlying points. Must be
-            strictly greater than the resolution of the input 'h3_index' column.
+            strictly greater than the resolution of the input `h3_index` list. If None,
+            it defaults to that resolution + 2.
     """
-    _LOG.info(
-        f"Computing H3 grid weights for grid size {nwp_grid_size_degrees}"
-        f" with child_res {child_h3_res} for {len(h3_index)} H3 indicies..."
-    )
-
     # Reusable-package input validation, not a reachable production state: the only non-test caller
     # is `compute_h3_grid_weights_for_boundary` above, which has already raised on an empty cell
     # list. This guards direct callers of the public function; `test_h3.py` exercises it.
     if len(h3_index) == 0:
         raise ValueError("h3_index is empty.")
 
-    # Ensure grid_size is strictly positive to avoid division by zero or nonsensical snapping.
+    # Ensure nwp_grid_size_degrees is strictly positive to avoid division by zero or
+    # nonsensical snapping.
     if nwp_grid_size_degrees <= 0:
         raise ValueError(
             f"nwp_grid_size_degrees must be strictly positive, not {nwp_grid_size_degrees}."
@@ -92,22 +89,30 @@ def compute_h3_grid_weights(
 
     # The `+2` heuristic provides ~49 sample points per H3 cell (7^2), which is a sufficient balance
     # between spatial precision (for area-weighting against a 0.25-degree grid) and computation
-    # time/memory overhead. Increasing it further could cause an exponential explosion in the number
-    # of child cells and potentially trigger OOM errors.
+    # time/memory overhead. Increasing the resolution gap further could cause an exponential
+    # explosion in the number of child cells and potentially trigger OOM errors.
     child_h3_res = h3_res + 2 if child_h3_res is None else child_h3_res
 
     if child_h3_res <= h3_res:
         raise ValueError(f"{child_h3_res=} must be strictly greater than {h3_res=}.")
+
+    # Logged here rather than on entry so that child_h3_res is the resolution actually used: on the
+    # default path the argument is None until the line above resolves it, and the message used to
+    # report that None.
+    _LOG.info(
+        f"Computing H3 grid weights for grid size {nwp_grid_size_degrees} from {len(h3_index)}"
+        f" H3 cells at resolution {h3_res}, sampled at child resolution {child_h3_res}..."
+    )
 
     half_grid_size = nwp_grid_size_degrees / 2
 
     def _snap_to_grid(lat_or_lon: pl.Expr) -> pl.Expr:
         """Snap a latitude or longitude to the closest NWP grid line.
 
-        The half-grid offset binning `((lat + grid_size/2) / grid_size).floor() * grid_size`
-        ensures that points are snapped to the *closest* grid center rather than the bottom-left
-        corner of the grid cell. Adding `grid_size/2` before flooring shifts the bin boundaries so
-        that the grid points (0, 0.25, 0.5, etc.) are at the center of each bin.
+        The half-grid offset binning below ensures that points are snapped to the *closest* grid
+        center rather than the bottom-left corner of the grid cell. Adding `half_grid_size` before
+        flooring shifts the bin boundaries so that the grid points (0, 0.25, 0.5, etc.) are at the
+        center of each bin.
         """
         return (
             (lat_or_lon + half_grid_size) / nwp_grid_size_degrees
@@ -123,6 +128,16 @@ def compute_h3_grid_weights(
         # explodes to a single null row under both settings -- which H3GridWeights.validate() below
         # rejects regardless -- so there is no silent-data-loss risk from the choice either way.)
         .explode("child_h3", empty_as_null=False)
+        # nwp_lat takes cell_to_lat and nwp_lon takes cell_to_lng: swapping the two is the one
+        # orientation bug this expression can introduce, and it survives the row-count and
+        # weight-sum assertions in `test_grid_weights_invariant`, because the output stays
+        # well-formed and only its geography is wrong. Two tests in `geo/tests/test_h3.py` do
+        # catch it, both verified by mutation: `test_grid_weights_snap_to_nearest_grid_centre`,
+        # whose oracle builds the expected points geographically, and
+        # `test_grid_weights_preserve_geographic_orientation`, which pins two well-separated GB
+        # landmarks. The orientation-coverage table lists the three tests guarding this mapping
+        # and the mutation each one catches:
+        # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#nwp-grid-h3-orientation-coverage>
         .with_columns(
             nwp_lat=_snap_to_grid(plh3.cell_to_lat("child_h3")),
             nwp_lon=_snap_to_grid(plh3.cell_to_lng("child_h3")),

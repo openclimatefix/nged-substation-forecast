@@ -97,7 +97,8 @@ _PREDICT_INIT_CHUNK: Final[timedelta] = timedelta(days=14)
 """``init_time`` window processed per ``cv_power_forecasts`` iteration.
 
 Prediction fans every NWP run out across all ~51 ensemble members, so the full validation window at
-once is tens of GB. ``init_time`` is both the partition key and the axis that inflates the output,
+once is tens of GB. ``init_time`` is one of the table's two partition columns and the axis that
+inflates the output,
 so chunking by it bounds the per-iteration forecast frame (~2-3 GB at 14 days) while each partition
 is still read exactly once. See ``cv_power_forecasts``.
 """
@@ -443,10 +444,10 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
 
     To keep RAM bounded, prediction runs **one ``init_time`` window at a time**
     (``_PREDICT_INIT_CHUNK``). The full validation window fans every NWP run out across all ~51
-    ensemble members and all trained series — tens of GB. ``init_time`` is the NWP partition key
-    *and* the axis that inflates the output, so chunking by it bounds the per-iteration forecast
-    frame (~2-3 GB) while each partition is still read exactly once. See "Bounding
-    feature-engineering memory: prune the inputs, not the output" in
+    ensemble members and all trained series — tens of GB. ``init_time`` is one of the NWP table's
+    two partition columns *and* the axis that inflates the output, so chunking by it bounds the
+    per-iteration forecast frame (~2-3 GB) while each partition is still read exactly once. See
+    "Bounding feature-engineering memory: prune the inputs, not the output" in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
     Forecasts are written to the ``power_forecasts`` Delta table keyed by
