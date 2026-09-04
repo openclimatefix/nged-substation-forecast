@@ -323,6 +323,12 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     assets — the user materialises ``trained_cv_model`` / ``cv_power_forecasts`` for the new
     partitions afterwards.
 
+    Args:
+        context: The Dagster execution context, supplied by the framework rather than by a caller.
+            Used for logging.
+        config: The experiment to register — its name, description, base model config and any
+            config overrides. Dagster builds it from the run config the launcher was given.
+
     Raises:
         ExperimentIdentityChangedError: If ``experiment_name`` is already registered under a
             different config. Raised before any MLflow write, so the experiment is left exactly

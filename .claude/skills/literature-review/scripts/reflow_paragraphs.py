@@ -80,6 +80,12 @@ def reflow(path: Path, anchors: list[str]) -> int:
         anchors: Phrases identifying the paragraphs to rewrap. Matching ignores the existing line
             breaks, so an anchor may span them.
 
+    Returns:
+        The number of paragraphs rewrapped: the count of paragraphs matching an anchor that were not
+        skipped as a heading, table row, code fence, list item, blockquote, or indented block. Zero
+        means no paragraph matched or every match was skipped, and the file is left unwritten in
+        that case.
+
     Raises:
         AssertionError: If rewrapping changed the text rather than only its line breaks.
     """

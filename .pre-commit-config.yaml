@@ -87,6 +87,17 @@ repos:
       # Scans the whole repo rather than the staged files: a link to the site can sit in any text
       # file, and a `types_or` list missed `.env.example` and `pyproject.toml`, both of which carry
       # one today. A full scan takes under a second, so there is nothing to buy by narrowing it.
+      # Ruff's D417 fires only when an `Args:` section is present and incomplete. A parameter block
+      # written under `Attributes:`, and an `Args:` entry naming a parameter that a rename removed,
+      # both pass every rule ruff has selected — and `geo.h3` carried one of each for months.
+      # pydoclint reads the signature and the docstring and compares them; `[tool.pydoclint]` in
+      # pyproject.toml says which of its checks this repo wants and why.
+      - id: pydoclint
+        name: pydoclint (docstrings match signatures)
+        entry: uv run pydoclint --quiet
+        language: system
+        types: [python]
+        exclude: *marimo_notebooks
       - id: check-docs-links
         name: docs links (check_docs_links)
         entry: uv run python scripts/check_docs_links.py

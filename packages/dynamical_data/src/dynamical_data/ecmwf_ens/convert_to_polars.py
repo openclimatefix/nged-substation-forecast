@@ -172,6 +172,12 @@ def _aggregate_grid_points_to_h3_cells(
             have been normalised to null, since the contributing weight is computed from nullness.
         numeric_vars: Weather variables aggregated as a renormalised weighted mean.
         categorical_vars: Weather variables aggregated as an area-weighted mode.
+
+    Returns:
+        One row per `h3_index`, holding each of `numeric_vars` as its renormalised
+        area-weighted mean and each of `categorical_vars` as its area-weighted modal
+        category, with the per-variable contributing-weight helper columns dropped before
+        return.
     """
     contributing_weights = [
         pl.col("proportion")

@@ -219,6 +219,25 @@ Three places where a positional argument is right:
   preconditions are rigorously documented on the function" is the shape to copy. Which of the
   three homes a given paragraph belongs in is decided by the tests in [Documentation
   Guide](../documentation-guide.md#docstrings-readmes-and-docs-hold-three-different-jobs).
+- **A docstring must describe the signature the function actually has, and a rename is where that
+  breaks.** Parameters go under `Args:`, never under `Attributes:`, `Parameters:` or `Arguments:`
+  — on a function those three render as ordinary prose rather than as parameter documentation, so
+  the parameters end up undocumented while looking documented. Ruff's `D417` catches only the case
+  where an `Args:` section is present and incomplete; a block under the wrong heading, and an entry
+  naming a parameter a rename removed, both pass every rule this repo configures. `pydoclint`
+  catches those two, as a pre-commit hook and a CI step, and also requires a `Returns:` section on
+  every function that returns something. Which of its checks this repo wants, and why each of the
+  others is switched off, is in the `[tool.pydoclint]` block in `pyproject.toml`. Nothing catches a
+  stale name in the *prose* around the parameter list, which is why `compute_h3_grid_weights`
+  described "a DataFrame" for months after it began taking a list — check the description against
+  the signature whenever you rename anything.
+- **When a prose sweep meets an obviously wrong claim outside the change it set out to make, fix
+  it.** A sweep is the one occasion anybody reads these files closely, so filing the defect for
+  later spends the pass that found it and leaves the wrong version in front of readers meanwhile.
+  The bar is that the claim is checkably wrong against the code, not merely improvable — six
+  passages called `init_time` "the NWP partition key" when `delta_store.nwp` partitions on
+  `(nwp_model_id, init_time)`. Say in the pull-request body why the change reaches outside its
+  stated scope, so a reviewer expecting one thing is not surprised by another.
 
 ## Data Handling
 

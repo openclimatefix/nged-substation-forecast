@@ -42,6 +42,12 @@ jobs:
       - name: Format (ruff format --check)
         run: uv run --no-sync ruff format --check .
 
+      # Ruff's D417 only catches an `Args:` section that is present and incomplete; pydoclint
+      # compares the whole of `Args:` and `Returns:` against the signature. See `[tool.pydoclint]`
+      # in pyproject.toml.
+      - name: Docstring lint (pydoclint)
+        run: uv run --no-sync pydoclint --quiet .
+
       - name: Type-check (ty)
         run: uv run --no-sync ty check
 

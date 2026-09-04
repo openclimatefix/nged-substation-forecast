@@ -498,6 +498,11 @@ class Nwp(pt.Model):
             storage_options: delta-rs object-store options (credentials/endpoint) for a remote
                 ``path``; defaults to ``get_settings().storage_options`` (empty for a local
                 ``path``).
+
+        Returns:
+            A lazy frame over the ``nwp`` Delta table, set to the ``Nwp`` model and cast to its
+            declared dtypes — one row per (NWP model, init time, ensemble member, valid time,
+            H3 cell), with the weather variables already in physical units.
         """
         settings = get_settings()
         if path is None:
@@ -786,6 +791,13 @@ def assess_nwp_run_completeness(
             ensemble, the only `NwpModelId` we ingest today.
         expected_lead_time_hours: Forecast steps, in hours after `init_time`, the run should carry.
             Defaults to the ECMWF ENS native step structure.
+
+    Returns:
+        A `NwpRunCompletenessReport` giving the observed row count against the expected
+        complete-grid row count, the observed versus expected ensemble members and H3 cell
+        count, the earliest and latest `valid_time` (`None` for an empty frame), and which
+        expected lead times are missing or which observed `valid_time`s are unexpected — the
+        latter two both empty when the frame does not hold exactly one `init_time`.
     """
     init_times = tuple(sorted(dataframe["init_time"].unique().to_list()))
     observed_members = set(dataframe["ensemble_member"].unique().to_list())

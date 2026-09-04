@@ -63,6 +63,11 @@ def open_ecmwf_ens_run(
     Args:
         nwp_init_time: The initialization time to open. Must be timezone aware.
         h3_grid: The H3 grid to use for spatial bounds.
+
+    Returns:
+        The catalog's dataset, sliced to the one `init_time` and to the latitude/longitude
+        bounding box of `h3_grid`'s `nwp_lat`/`nwp_lon` columns, still lazy and holding the
+        13 downloaded ECMWF ENS variables.
     """
     # Convention-sensitive to the *real* Dynamical.org catalog: this function bakes in assumptions
     # about its shape (longitude in [-180, 180], descending latitude, coordinate/dimension names).
@@ -128,6 +133,11 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
 
     Args:
         ds_sliced: A lazy dataset as returned by :func:`open_ecmwf_ens_run`.
+
+    Returns:
+        The same variables and coordinates as `ds_sliced`, each variable now backed by an
+        in-memory `xr.DataArray` rather than a lazy Dask/Zarr array, fetched with up to 4
+        variables downloaded concurrently.
     """
 
     def download_array(var_name: str) -> dict[str, xr.DataArray]:

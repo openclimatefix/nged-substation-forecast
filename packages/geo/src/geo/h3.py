@@ -32,6 +32,12 @@ def compute_h3_grid_weights_for_boundary(
         h3_res: The H3 resolution to use for the grid.
         child_h3_res: The H3 resolution to use for the underlying points. If None,
             it defaults to h3_res + 2.
+
+    Returns:
+        One row per (H3 cell, NWP grid point) pair that overlap within `boundary`, with
+        `proportion` holding the fraction of that H3 cell's child cells falling inside the grid
+        point's box — see `compute_h3_grid_weights`, which this delegates to once the
+        boundary has been resolved to its covering `h3_index` list.
     """
     _LOG.info(f"Generating H3 cells at resolution {h3_res}...")
 
@@ -60,11 +66,16 @@ def compute_h3_grid_weights(
     `nwp_grid_size_degrees`, `nwp_grid_size_degrees * 2`).
 
     Args:
-        h3_index: List of 64-bit H3 discrete spatial indices.
         nwp_grid_size_degrees: The size of the regular NWP lat/lng grid in degrees (e.g., 0.25).
+        h3_index: List of 64-bit H3 discrete spatial indices.
         child_h3_res: The H3 resolution to use for the underlying points. Must be
             strictly greater than the resolution of the input `h3_index` list. If None,
             it defaults to that resolution + 2.
+
+    Returns:
+        One row per (H3 cell, NWP grid point) pair that overlap, with `proportion` holding the
+        fraction of that H3 cell's child cells falling inside the grid point's box. The
+        `proportion` values for any one `h3_index` sum to 1.
     """
     # Reusable-package input validation, not a reachable production state: the only non-test caller
     # is `compute_h3_grid_weights_for_boundary` above, which has already raised on an empty cell

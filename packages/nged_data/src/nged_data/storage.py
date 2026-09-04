@@ -395,7 +395,13 @@ def upsert_metadata(
         storage_options: Object-store credentials/endpoint for a remote `metadata_path`;
             ``None``/empty for a local path.
 
-    Returns stats about new metadata
+    Returns:
+        An `UpsertMetadataStats` counting how many `time_series_id`s in `new_metadata` are new
+        to the roster (`metadata_n_new_TimeSeriesIDs`) and how many existing ones changed
+        (`metadata_n_updated_TimeSeriesIDs`), plus the sorted list of changed
+        `time_series_id`s (`metadata_updated_TimeSeriesIDs`). Both counts are 0 and the id list
+        is omitted when the parquet file was up to date already. The id list is also omitted on
+        a first-ever write, when every id in `new_metadata` counts as new rather than updated.
     """
     COMPRESSION: Final[str] = "zstd"
 
