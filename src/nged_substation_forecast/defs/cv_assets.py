@@ -737,8 +737,9 @@ def _write_metrics_to_delta(
 _METRICS_SERIES_BATCH_SIZE: Final[int] = 4
 """How many ``time_series_id`` values to materialise per scoring batch in the ``metrics`` asset.
 
-A single V1 fold is far too big to collect whole (364M rows with the full ``PowerForecast``
-schema OOM-kills a 29 GB machine), but ``compute_metrics`` is independent per
+A single leaderboard fold is far too big to collect whole: at 364M rows — the
+``mid_2025_to_mid_2026`` fold as it stood at 28 series, and it has gained series since — the full
+``PowerForecast`` schema OOM-kills a 29 GB machine. But ``compute_metrics`` is independent per
 ``time_series_id`` — every group key includes it — so scoring per-series batches and
 concatenating the tall ``Metrics`` results is exactly equivalent to one big call. For the
 batch-size measurements behind the value 4, see "Scoring the metrics: batch the series, and
@@ -818,7 +819,7 @@ def _score_forecast_group(
     Writes ``Metrics`` to Delta and optionally logs to MLflow.
 
     The group is scored in per-series batches of ``_METRICS_SERIES_BATCH_SIZE`` so that peak
-    memory is one batch, never the whole fold (a single V1 fold is already too big to
+    memory is one batch, never the whole fold (a single leaderboard fold is already too big to
     materialise). ``compute_metrics`` is independent per ``time_series_id``, so concatenating
     the per-batch ``Metrics`` frames produces exactly the metric values a whole-group call
     would. A batch whose series have no overlapping actuals is skipped — mirroring how such

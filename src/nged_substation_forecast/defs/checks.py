@@ -1,24 +1,62 @@
 """Dagster asset checks: the operator's at-a-glance data-health status.
 
-Two independent checks live here. ``power_data_is_fresh`` watches the hourly
-``power_time_series_and_metadata`` materialisation; ``live_forecasts_are_healthy`` watches the
-6-hourly ``live_forecasts`` materialisation. Both read the relevant Delta table back off disk after
-the write rather than trusting the asset's own success, both warn
-(``AssetCheckSeverity.WARN``, ``blocking=False``) rather than fail, and both guard their whole body
-with a ``BaseException`` catch-all so a bug in the check can never fail the production run that
-hosts it. See each function's own docstring for what it looks for, and
-[Warn on stale power data with a Dagster asset check](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check)
-and
-[Read the live forecast back off disk with a second asset check](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check)
-for the design reasoning behind both, including why the two checks differ in how much they salvage
-before falling back to that catch-all.
+``power_data_is_fresh`` warns when NGED's telemetry feed has stalled — no new
+``power_time_series`` data for over ``_POWER_DATA_STALENESS_THRESHOLD``. The hourly
+``power_time_series_and_metadata_job`` runs this check every time it materialises the asset, so
+Dagster's Checks view is the single "is the data up to date and healthy?" surface: a green tick
+when every series is current, a yellow **WARN** naming the late count when the feed has stalled.
 
-``evaluate_power_freshness``'s result also feeds ``report_power_freshness`` (in
-``nged_substation_forecast._sentry``), which forwards the same per-series staleness as a Sentry
-warning rather than recomputing it. The two mechanisms stay complementary — the
+The check reads the Delta table's *actual* data recency, not the asset's materialisation
+timestamp — the job succeeds hourly even when NGED publishes nothing, so only the on-disk
+``time`` reveals whether fresh data really landed. A native materialisation-freshness policy
+would miss exactly the failure this check exists to catch.
+
+Series we already know are dead — ``_KNOWN_DEAD_TIME_SERIES_IDS`` — are dropped from the check's
+*inputs* rather than from its output, so every count describes the series we are still watching, and
+the Sentry warning inherits the silencing without knowing it exists. The check keeps naming the
+silenced ids every hour, green or yellow, and turns yellow on its own if one of them reports again.
+
+``evaluate_power_freshness`` is a pure function so it is unit-testable without Dagster or Delta,
+and it is the hand-off point for routing per-series staleness to Sentry: the same
+``PowerFreshnessResult`` is fed to ``report_power_freshness`` (in
+``nged_substation_forecast._sentry``) rather than recomputed. The two mechanisms stay
+complementary — the
 [Sentry missed-check-in alarm](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
-fires on total silence from outside the deployment, while this check (and its Sentry warning)
-report per-series staleness from inside Dagster while the daemon is alive.
+fires on total silence from outside the deployment, while this check (and its Sentry warning) report
+per-series staleness from inside Dagster while the daemon is alive.
+
+``live_forecasts_are_healthy`` does the same job for the one asset NGED actually consumes. It
+answers two questions the asset's own success status cannot: did this 6-hourly slot really land
+valid forecast rows on disk, and how many daily NWP runs were missing when the forecast was made?
+Both are read back from disk after the write, so a run that "succeeded" while writing nothing —
+or writing null/non-finite forecasts, hindcast rows, or a short population — still shows up.
+Missed NWP runs are *counted as runs*, never measured in hours of age — healthy NWP is 12–30 hours
+old depending on the slot, so any absolute age threshold would fire on two slots in four every day.
+The full argument is in
+[Inherent Stability → Three audiences, three channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
+
+Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and nothing either one's *body*
+does can fail its own step: each sits under a catch-all which logs the traceback, reports the
+exception to Sentry (the run no longer fails, so the failure hook no longer fires) and returns an
+unhealthy result. Catching ``BaseException`` is what makes that absolute — a Rust panic in any of
+the pyo3 extensions these bodies read through arrives as a ``PanicException``, which does not
+derive from ``Exception``. Only cancellation is re-raised, which is what we want: a cancelled run
+should cancel. What remains outside the guard is Dagster's own machinery: resource init, and
+serialising the returned ``AssetCheckResult`` into an event. A warning path that could fail would
+turn fail-open into fail-closed at exactly the wrong moment (rule 7 of
+[The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+
+The design reasoning behind both checks is on the production-deployment page — [Warn on stale
+power data](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check)
+and [Read the live forecast back off
+disk](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check).
+
+The two differ in how much they salvage short of that catch-all. In ``live_forecasts_are_healthy``
+an absent ``power_forecasts`` or NWP table reads as empty, and an absent *or unreadable*
+promoted-model ``meta.json`` degrades to "population unknown", so the rest of the report survives;
+a read *error* on either table still costs the whole report. ``power_data_is_fresh`` salvages
+nothing below the catch-all on purpose: its only per-read fallback would be "roster unknown", and a
+fresh power table would then render an unreadable roster as a green tick.
 """
 
 import json

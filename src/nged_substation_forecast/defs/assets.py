@@ -462,10 +462,13 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         ) from exc
     context.log.info(f"Converted NWP data to Polars. Columns: {nwp.columns}")
 
-    # Three non-fatal per-run checks: nwp_has_no_unexpected_nulls (tolerated scattered nulls
-    # Nwp.validate deliberately let through), nwp_instantaneous_variables_have_no_nulls (the same
-    # raw grid, over variables that are never legitimately null), and nwp_run_is_complete (is the
-    # run whole). Computed before the write, not merely under a guard — rule 7 of
+    # Three non-fatal per-run checks. The first surfaces the tolerated scattered nulls (known
+    # upstream ECMWF ENS corruption) that Nwp.validate deliberately let through. The second counts
+    # the same raw grid over the variables that are never legitimately null, where the aggregation
+    # absorbs scattered corruption so completely that nothing downstream of it can see any. The
+    # third asks whether the run is *whole*; a short run is the upstream provider misbehaving, so we
+    # keep the rows that did arrive and WARN rather than discarding the run. Computed before the
+    # write, not merely under a guard — rule 7 of
     # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules
     try:
         quality = assess_nwp_quality(nwp)
