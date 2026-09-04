@@ -6,7 +6,10 @@ rounding — plus the write helpers that apply them. Dagster assets stay thin by
 this package rather than calling ``write_deltalake`` with ad-hoc settings.
 
 One module per table (currently ``power_forecasts`` and ``nwp``), plus the shared precision
-helper in ``precision``.
+helper in ``precision``. Each table's writer properties are chosen from measurements on real
+data, not assumed, and the two tables land on different choices — see
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed>
+for the comparison.
 """
 
 from delta_store.nwp import write_nwp

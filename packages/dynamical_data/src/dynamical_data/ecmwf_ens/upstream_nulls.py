@@ -3,7 +3,9 @@
 The H3 aggregation renormalises each cell over the grid points that supplied a value, so a corrupt
 grid point costs only its own share of its cell. That is what makes the stored cells robust, and it
 is also why counting null *cells* is a poor proxy for how corrupt the feed was. This module counts
-the nulls where they arrive.
+the nulls where they arrive, before that renormalisation absorbs most of them. The aggregation
+mechanics and the measurements behind that claim are in
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#spatial-aggregation-is-where-a-grid-points-null-is-resolved>.
 """
 
 from collections.abc import Collection

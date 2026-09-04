@@ -33,7 +33,26 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     ds: xr.Dataset,
     h3_grid: pt.DataFrame[H3GridWeights],
 ) -> pt.DataFrame[Nwp]:
-    """Vectorized processing of ECMWF dataset to H3 grid."""
+    """Convert one downloaded ECMWF ENS run into the validated `Nwp` frame.
+
+    Loops over every `(lead_time, ensemble_member)` pair in `ds`, aggregates that chunk's grid
+    points onto `h3_grid`'s H3 cells, derives wind speed and direction from the downloaded u/v
+    components, and returns the concatenated result validated against the `Nwp` contract.
+
+    Args:
+        ds: One downloaded ECMWF ENS run, as returned by
+            :func:`dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
+            `(lead_time, ensemble_member, latitude, longitude)`, with `init_time` a scalar
+            coordinate, and carrying the 13 downloaded ECMWF ENS variables.
+        h3_grid: The H3 grid weights to aggregate onto — one row per (H3 cell, NWP grid point)
+            pair that overlaps, with `proportion` the fraction of that cell's area the point
+            covers.
+
+    Returns:
+        One row per `(init_time, valid_time, ensemble_member, h3_index)`, validated against
+        `Nwp` — the wind components dropped in favour of the derived speed and direction, and
+        every other downloaded variable carried through under its `Nwp` field name.
+    """
     # Convention-sensitive to real ECMWF ENS data: the dim/coord order feeds the ravel + value-join,
     # and the physical units feed Nwp.validate. The offline tests share those assumptions, so after
     # changing this function run the network-gated test manually:
@@ -77,6 +96,12 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
             # bit 63 of every index as zero, so no H3 value reaches the bit a signed Int64 gives
             # up. See Nwp.h3_index in contracts.weather_schemas for the full argument.
             h3_index=pl.col("h3_index").cast(pl.Int64),
+            # Computed here, after the H3 aggregation above, which is the order that matters:
+            # wind_u_*/wind_v_* are aggregated as ordinary numeric variables first, and speed and
+            # direction are derived from the already-aggregated components. Averaging *direction*
+            # over grid points instead would hit the same 0/360 wrap defect that a naive time
+            # resample has — two points either side of North would average to due South. See
+            # <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>.
             wind_speed_10m=_calc_wind_speed(height="10m"),
             wind_speed_100m=_calc_wind_speed(height="100m"),
             wind_direction_10m=_calc_wind_direction(height="10m"),
@@ -95,12 +120,13 @@ def _calc_wind_speed(height: Literal["10m", "100m"]) -> pl.Expr:
 
 
 def _calc_wind_direction(height: Literal["10m", "100m"]) -> pl.Expr:
-    """Compute Wind Direction (Meteorological Convention)."""
+    """Compute wind direction (meteorological convention: the angle the wind is coming *from*)."""
     RAD_TO_DEG = 180 / np.pi
-    # The arctan2 order: In standard math, it's often atan2(y, x). In Polars, pl.arctan2("y", "x")
-    # follows this convention. By passing u as y and v as x, we align the 0° angle with the North
-    # (v) axis. The +180 offset: Since u and v describe where the wind is going, arctan2 gives you
-    # the direction of travel. Adding 180° flips the vector to show where the wind is coming *from*.
+    # The arctan2 order: standard math usually writes atan2(y, x), and Polars' pl.arctan2("y",
+    # "x") follows that convention. Passing u as y and v as x aligns the 0-degree angle with the
+    # North (v) axis. The +180 offset: u and v describe where the wind is going, so arctan2 gives
+    # the direction of travel; adding 180 degrees flips the vector to the direction the wind is
+    # coming from, which is the meteorological convention this function's name promises.
     return (pl.arctan2(f"wind_u_{height}", f"wind_v_{height}") * RAD_TO_DEG + 180) % 360
 
 
@@ -110,7 +136,25 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
     lat_grid: np.ndarray,
     lon_grid: np.ndarray,
 ) -> pl.DataFrame:
-    """Processes a single chunk of the ECMWF dataset."""
+    """Join one `(lead_time, ensemble_member)` slice's grid points onto `h3_grid` and aggregate.
+
+    Normalises NaN to null for every weather variable, left-joins the flattened grid onto
+    `h3_grid` by latitude/longitude, and hands the joined frame to
+    :func:`_aggregate_grid_points_to_h3_cells`.
+
+    Args:
+        ds: One `(lead_time, ensemble_member)` slice of the downloaded ECMWF ENS dataset —
+            dimensions `(latitude, longitude)` only.
+        h3_grid: The H3 grid weights to join onto, as in
+            :func:`convert_nwp_xarray_dataset_to_polars_dataframe`.
+        lat_grid: Raveled latitude values, one per flattened grid point, aligned with `lon_grid`.
+        lon_grid: Raveled longitude values, one per flattened grid point, aligned with `lat_grid`.
+
+    Returns:
+        One row per `h3_index`, as returned by :func:`_aggregate_grid_points_to_h3_cells` — this
+        slice's numeric variables as their area-weighted mean and its categorical variable as its
+        area-weighted mode.
+    """
     # Prepare data dictionary
     data_dict: dict[str, np.ndarray] = {"latitude": lat_grid, "longitude": lon_grid}
 
@@ -160,9 +204,9 @@ def _aggregate_grid_points_to_h3_cells(
     Each variable is renormalised over its *own* denominator, which is what keeps one variable's
     corruption from nulling the others. The cost a caller must know about: two variables in one
     cell can then be averaged over different sub-areas of the hexagon, so if `wind_u_*` and
-    `wind_v_*` ever have different null footprints, the vector `_calc_wind_speed` and
-    `_calc_wind_direction` derive from them mixes two sub-areas. Upstream corruption has always
-    been co-located across variables, so that is theoretical today.
+    `wind_v_*` ever have different null footprints, the wind vector that `_calc_wind_speed` and
+    `_calc_wind_direction` derive mixes two sub-areas. Upstream corruption has always been
+    co-located across variables, so that is theoretical today.
 
     Why it is done this way, with the measurements and the tie-break's dry bias:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#spatial-aggregation-is-where-a-grid-points-null-is-resolved>.

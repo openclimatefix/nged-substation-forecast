@@ -11,9 +11,16 @@ assets stay thin by writing through this package rather than calling `write_delt
 ad-hoc settings — and it becomes impossible to land rows in a table without its storage format
 applied.
 
-The flagship example is the internal `power_forecasts` table: ZSTD + `DELTA_BINARY_PACKED`
-timestamps + `BYTE_STREAM_SPLIT` floats + member-adjacent sorting + rounding `power_fcst` to a
-13-bit significand shrank the 403.6M-row development table from 6.33 GB to 0.73 GB.
+Every lever below is measured against real data rather than assumed — see [Storage formats:
+measured, not
+assumed](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed)
+for the comparison across both tables, and [design principle
+12](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#12-measure-do-not-assume)
+for why that discipline matters project-wide. The flagship example is the internal
+`power_forecasts` table: ZSTD + `DELTA_BINARY_PACKED` timestamps + `BYTE_STREAM_SPLIT` floats +
+member-adjacent sorting + rounding `power_fcst` to a 13-bit significand shrank the 403.6M-row
+development table from 6.33 GB to 0.73 GB. `delta_store.power_forecasts`'s module docstring, below
+on this page, breaks that figure down lever by lever.
 
 ## Contents
 
@@ -23,3 +30,6 @@ timestamps + `BYTE_STREAM_SPLIT` floats + member-adjacent sorting + rounding `po
   rigorously documented on the function.
 - `power_forecasts` — the `power_forecasts` table's writer properties, sort order, precision
   policy, and `write_power_forecasts()`.
+- `nwp` — the `nwp` table's writer properties, sort order, precision policy, and `write_nwp()`;
+  its writer properties are deliberately *different* from `power_forecasts`'s, because the same
+  encodings measured worse on NWP data.

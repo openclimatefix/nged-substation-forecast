@@ -15,8 +15,11 @@ encoding captures directly; ``BYTE_STREAM_SPLIT`` scatters that repetition acros
 byte planes and loses more than it gains. ``power_forecasts``'s target values have no such
 repetition (near-continuous ML output), so ``BYTE_STREAM_SPLIT`` wins there instead — the two
 tables need different writer properties. See
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/> for the measured
-GB/yr and read-latency numbers.
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed>
+for the measured GB/yr numbers, and
+<https://openclimatefix.github.io/nged-substation-forecast/api/dynamical_data/> for the
+member-early-sort read-speed benchmark (a single-member, 29-day, 9-cell collect: ~5x faster and
+~5x less peak memory for a ~2% storage cost).
 """
 
 from pathlib import Path
@@ -49,7 +52,9 @@ partition — provided that predicate reaches the Parquet scan unchanged, which 
 ``Nwp.scan_delta``'s cast to be a no-op (see the ``Nwp.ensemble_member`` field). The speed and
 storage cost of this ordering versus a ``valid_time``-first sort need re-measuring against real
 production data; the old figures predate a period where that cast was not a no-op and are not
-restored here."""
+restored here. See
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>
+for how the production read path relies on this ordering to prune Parquet row groups."""
 
 NWP_WRITER_PROPERTIES: Final[WriterProperties] = WriterProperties(
     compression="ZSTD", compression_level=3
@@ -72,16 +77,18 @@ def write_nwp(
     partition-pruning assumptions; the first write creates the table.
 
     The write **replaces** the ``(nwp_model_id, init_time)`` partition named by the frame's first
-    row, so re-materialising an ``ecmwf_ens`` partition leaves one copy of the run. delta-rs checks
-    every row against that predicate and rejects the whole write, table untouched, if any row falls
-    outside it (confirmed empirically against ``deltalake`` 1.6.2, locally and on S3, on a
-    partition column despite its percent-encoded Hive directory name). Two materialisations of the
-    *same* partition at once contend and the loser raises ``CommitFailedError``; disjoint
+    row, so re-materialising an ``ecmwf_ens`` partition leaves one copy of the run — this is the
+    atomic, idempotent, partition-confined write shape every table in this project uses; see
+    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition>.
+    delta-rs checks every row against that predicate and rejects the whole write, table untouched,
+    if any row falls outside it (confirmed empirically against ``deltalake`` 1.6.3, locally and on
+    S3, on a partition column despite its percent-encoded Hive directory name). Two materialisations
+    of the *same* partition at once contend and the loser raises ``CommitFailedError``; disjoint
     partitions do not.
 
     ``schema_mode="overwrite"`` is passed on every write, not just to migrate an old table. This
     safety claim holds only for a **widening** contract change, which is the only kind this
-    function has been used for so far: confirmed empirically (``deltalake`` 1.6.2) that widening
+    function has been used for so far: confirmed empirically (``deltalake`` 1.6.3) that widening
     updates only the table's *logical* schema (the ``_delta_log`` metadata) to match the incoming
     frame's dtypes, and leaves every other partition's physical Parquet bytes untouched — a later
     read at the new logical dtype is correct and lossless even for a partition still physically

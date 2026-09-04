@@ -40,9 +40,10 @@ def round_to_significand_bits(expr: pl.Expr, *, keep_bits: int) -> pl.Expr:
         c = RN(x * C)  # = RN(x*2^s + x)
         result = RN(c - RN(c - x))
 
-    Veltkamp's theorem (Veltkamp 1968; Dekker 1971, "A floating-point technique for extending
-    the available precision", *Numerische Mathematik* 18; Muller et al., *Handbook of
-    Floating-Point Arithmetic*, 2nd ed., §4.4, Algorithm 4.9 "Split") states that for
+    Veltkamp's theorem (Veltkamp 1968; [Dekker (1971)](https://doi.org/10.1007/BF01397083), "A
+    floating-point technique for extending the available precision", *Numerische Mathematik* 18;
+    [Muller et al. (2018)](https://doi.org/10.1007/978-3-319-76526-6), *Handbook of Floating-Point
+    Arithmetic*, 2nd ed., §4.4, Algorithm 4.9 "Split") states that for
     ``2 <= s <= p - 2`` and no overflow, both subtractions are **exact** and ``result`` is ``x``
     rounded to nearest onto ``p - s = keep_bits`` significand bits. The intuition: ``x*C``
     stacks a copy of ``x`` shifted ``s`` exponent positions above itself; rounding that sum to

@@ -1,4 +1,10 @@
-"""Reading NGED's telemetry JSON from S3 and writing power observations and metadata to storage."""
+"""Lists, downloads, and parses NGED's telemetry JSON from S3 into power observations and metadata.
+
+The metadata is upserted here, into a Parquet roster (see `upsert_metadata`). Power observations
+are not: this module never writes `PowerTimeSeries` rows to disk — they are returned to the
+caller, which appends them to the `power_time_series` Delta table. `time_series_coverage` and
+`select_new_rows` read that same Delta table, to find what is new, but neither writes to it.
+"""
 
 import logging
 from collections.abc import Sequence
@@ -38,14 +44,14 @@ class _ProcessedFileListing(pt.Model):
         dtype=UTC_DATETIME_DTYPE,
         description=(
             "The start of the time window recorded by the time series data in the JSON file,"
-            " according to the Unix epoch in the path"
+            " parsed from the millisecond Unix timestamp encoded in the path"
         ),
     )
     end_time: int = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
         description=(
             "The end of the time window recorded by the time series data in the JSON file,"
-            " according to the Unix epoch in the path"
+            " parsed from the millisecond Unix timestamp encoded in the path"
         ),
     )
 
@@ -55,8 +61,8 @@ def list_timeseries_json_files(
 ) -> pt.DataFrame[_ProcessedFileListing]:
     """List all the timeseries JSON files in NGED's S3 bucket.
 
-    The paths are assumed to be of the form:
-    timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+    Each path encodes `start_time`, `end_time`, and `time_series_id` — see `_process_file_listing`
+    for the path format and how those fields are parsed out of it.
     """
     raw_file_listing: list[_RawFileListItem] = []
     total_objects = 0
@@ -117,7 +123,7 @@ def remove_small_files_from_listing(
 ) -> pt.DataFrame[_ProcessedFileListing]:
     """Remove files too small to carry any readings.
 
-    This is used to skip NGED JSON files that have no `data` field, so `download_and_parse_files`
+    The filter skips NGED JSON files that have no `data` field, so `download_and_parse_files`
     never has to fetch and parse them only to discard the result. It is an optimisation, not a
     correctness requirement: `download_and_parse_files` already tolerates a null `data` field.
 
@@ -127,11 +133,13 @@ def remove_small_files_from_listing(
     larger — zero-reading examples measured between 4,405 and 20,148 bytes — so the WKT-less
     floor is the binding constraint on the threshold.
 
-    That 68-byte gap comes from V1's 33 series, and it is narrow enough that V2's ~2,500 series
-    want re-measuring before this default is trusted there. Two things would close it: a populated
-    `information` field, which `TimeSeriesMetadata` records as always null in the V1 trial area,
-    would push a zero-reading file above 520; and a substation name shorter than any in V1 would
-    pull a one-reading file below it. Re-run the measurement rather than assume the gap survives.
+    That 68-byte gap comes from V1's 32 series ([phased
+    rollout](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#phased-rollout)),
+    and it is narrow enough that V2's ~2,500 series want re-measuring before this default is
+    trusted there. Two things would close it: a populated `information` field, which
+    `TimeSeriesMetadata` records as always null in the V1 trial area, would push a zero-reading
+    file above 520; and a substation name shorter than any in V1 would pull a one-reading file
+    below it. Re-run the measurement rather than assume the gap survives.
     """
     n_files_before_filter = file_listing.height
     filtered = file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
@@ -142,7 +150,7 @@ def remove_small_files_from_listing(
 
 
 class NoNewData(Exception):
-    """Raised when a listing of NGED files yields no rows we have not already stored."""
+    """Raised by `download_and_parse_files` when none of its listed files yielded a power row."""
 
 
 class DownloadAndParseResult(NamedTuple):
@@ -161,11 +169,26 @@ class DownloadAndParseResult(NamedTuple):
 def download_and_parse_files(
     store: obstore.store.S3Store, paths_df: pt.DataFrame[_ProcessedFileListing]
 ) -> DownloadAndParseResult:
-    """Load data end_time by end_time, in order.
+    """Download and parse each listed file, grouped and processed end_time by end_time, in order.
 
-    Loading in order means more recent data overwrites older duplicates, if there are any.
+    Processing in `end_time` order means that where two files cover overlapping periods for the
+    same `time_series_id`, the more recent file's readings overwrite the older file's duplicate
+    rows in the `unique(..., keep="last")` dedupe below.
 
-    Raises NoNewData if there is no new data.
+    Args:
+        store: The NGED S3 bucket to download each file from.
+        paths_df: The file listing to process — typically already filtered by
+            `remove_small_files_from_listing` and `select_new_rows`.
+
+    Returns:
+        A `DownloadAndParseResult` bundling every file's parsed `TimeSeriesMetadata` and
+        `PowerTimeSeries` rows, deduplicated across files — see that NamedTuple's docstring for
+        what each field holds.
+
+    Raises:
+        NoNewData: if none of `paths_df`'s files yielded a single power-observation row — either
+            because `paths_df` was empty, or because every file's `data` field was null (NGED's
+            meter reported nothing for that period).
     """
     metadata_dfs = []
     power_time_series_dfs = []
@@ -230,7 +253,10 @@ class TimeSeriesCoverage(pt.Model):
     ``first_time``/``last_time`` are the earliest/latest observation ``time`` for each
     ``time_series_id``. A transient intermediate (never persisted): the freshness asset check
     reads ``last_time`` to detect staleness, ``select_new_rows`` reads ``last_time`` to find
-    genuinely-new rows, and CV fold-eligibility (``eligible_time_series_ids``) reads both.
+    genuinely-new rows, and CV fold-eligibility (``eligible_time_series_ids``) reads both. See
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>
+    for why the freshness check reads on-disk recency rather than the asset's materialisation
+    timestamp.
     """
 
     time_series_id: int = _get_time_series_id_dtype(unique=True)
@@ -315,10 +341,17 @@ def select_new_rows(
 ) -> pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing]:
     """Return rows in `time_series` newer than what our Delta table already holds.
 
-    The comparison is made on a time_series_id by time_series_id basis.
+    The comparison is made on a time_series_id by time_series_id basis. `time_series` is either
+    `PowerTimeSeries` rows, compared on their `time` column, or the `_ProcessedFileListing` a raw
+    S3 listing parses into, compared on `end_time` — the function tells the two apart by which of
+    those columns is present, and the two `@overload` declarations above tell a type checker which
+    input type produces which output type.
 
     `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
-    `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
+    `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`. Both
+    input kinds are compared against this same table: a file's `end_time` is the latest reading it
+    could possibly carry, so comparing it against `power_time_series`' on-disk `last_time` finds
+    files that cannot possibly hold anything new, before ever downloading them.
     """
     if not delta_table_exists(delta_path, storage_options):
         log.info(f"{delta_path=} does not exist yet.")
@@ -367,7 +400,13 @@ class UpsertMetadataStats(TypedDict, total=False):
     metadata_n_updated_TimeSeriesIDs: int
     metadata_updated_TimeSeriesIDs: Sequence[int]
     metadata_upsert_failed: str
-    """Set by the asset when the whole upsert raised, so the power write went ahead without it."""
+    """Set by the asset when the whole upsert raised, so the power write went ahead without it.
+
+    Read this field's presence as "the roster is stale, retry next hour", not as a power-ingest
+    failure — the power write is unaffected. See [Reading a failed roster
+    upsert](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled)
+    for the operational read of this field and what it costs while it persists.
+    """
 
 
 def upsert_metadata(
@@ -381,12 +420,13 @@ def upsert_metadata(
     explicit locking is required.
 
     If the Parquet file does not exist, it saves the new_metadata. If it exists, it merges the
-    new_metadata into it and rewrites the file only if something changed. The snapshot need not
-    carry the same columns, or the same column order, as the stored roster, and rows are matched
-    on ``time_series_id``. A series that ``new_metadata`` covers is replaced wholesale, so a field
-    the snapshot has stopped carrying is **cleared** for that series. A series that
-    ``new_metadata`` omits keeps its last stored values indefinitely. The roster therefore holds
-    every time series we have ever seen, not only the ones in the latest snapshot.
+    new_metadata into it and rewrites the file only if the incoming metadata differs from what is
+    stored. The snapshot need not carry the same columns, or the same column order, as the stored
+    roster, and rows are matched on ``time_series_id``. A series that ``new_metadata`` covers is
+    replaced wholesale, so a field the snapshot has stopped carrying is **cleared** for that
+    series. A series that ``new_metadata`` omits keeps its last stored values indefinitely. The
+    roster therefore holds every time series we have ever seen, not only the series in the latest
+    snapshot.
 
     Args:
         new_metadata: The new metadata DataFrame.
