@@ -52,9 +52,7 @@ partition — provided that predicate reaches the Parquet scan unchanged, which 
 ``Nwp.scan_delta``'s cast to be a no-op (see the ``Nwp.ensemble_member`` field). The speed and
 storage cost of this ordering versus a ``valid_time``-first sort need re-measuring against real
 production data; the old figures predate a period where that cast was not a no-op and are not
-restored here. See
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>
-for how the production read path relies on this ordering to prune Parquet row groups."""
+restored here."""
 
 NWP_WRITER_PROPERTIES: Final[WriterProperties] = WriterProperties(
     compression="ZSTD", compression_level=3
@@ -77,9 +75,7 @@ def write_nwp(
     partition-pruning assumptions; the first write creates the table.
 
     The write **replaces** the ``(nwp_model_id, init_time)`` partition named by the frame's first
-    row, so re-materialising an ``ecmwf_ens`` partition leaves one copy of the run — this is the
-    atomic, idempotent, partition-confined write shape every table in this project uses; see
-    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition>.
+    row, so re-materialising an ``ecmwf_ens`` partition leaves one copy of the run.
     delta-rs checks every row against that predicate and rejects the whole write, table untouched,
     if any row falls outside it (confirmed empirically against ``deltalake`` 1.6.3, locally and on
     S3, on a partition column despite its percent-encoded Hive directory name). Two materialisations

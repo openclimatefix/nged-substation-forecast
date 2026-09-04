@@ -7,11 +7,7 @@ impossible to land rows in the table without this format applied.
 
 Measured impact: rewriting the full 403.6M-row development table into this format shrank it from
 6.33 GB (delta-rs defaults: SNAPPY, dictionary encoding, unsorted, full precision) to 0.73 GB.
-See the ``POWER_FORECASTS_WRITER_PROPERTIES`` docstring for the per-lever breakdown, and
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed>
-for how this table's writer properties compare against ``delta_store.nwp``'s — the two tables
-share the significand-rounding lever but need different encodings, because each was measured
-rather than assumed.
+See the ``POWER_FORECASTS_WRITER_PROPERTIES`` docstring for the per-lever breakdown.
 """
 
 from pathlib import Path
@@ -97,9 +93,6 @@ def write_power_forecasts(
     The table is partitioned by ``(experiment_name, fold_id)``. A multi-chunk materialisation
     passes ``replace_partition`` on its first chunk — overwriting that partition so prior rows
     are always replaced, even when the first chunk is empty — and ``None`` (append) on the rest.
-    This gives a re-materialisation the atomic, idempotent, partition-confined shape every table
-    in this project writes with; see
-    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition>.
 
     Args:
         forecasts: Validated forecast rows. ``experiment_name`` / ``fold_id`` are ``String``

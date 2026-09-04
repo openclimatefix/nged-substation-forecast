@@ -19,8 +19,8 @@ for the comparison across both tables, and [design principle
 for why that discipline matters project-wide. The flagship example is the internal
 `power_forecasts` table: ZSTD + `DELTA_BINARY_PACKED` timestamps + `BYTE_STREAM_SPLIT` floats +
 member-adjacent sorting + rounding `power_fcst` to a 13-bit significand shrank the 403.6M-row
-development table from 6.33 GB to 0.73 GB. `delta_store.power_forecasts`'s module docstring, below
-on this page, breaks that figure down lever by lever.
+development table from 6.33 GB to 0.73 GB. `POWER_FORECASTS_WRITER_PROPERTIES`, below on this
+page, breaks that figure down lever by lever.
 
 ## Contents
 

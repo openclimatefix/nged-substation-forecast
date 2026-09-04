@@ -1,4 +1,4 @@
-"""Lists, downloads, and parses NGED's telemetry JSON from S3 into power observations and metadata.
+"""Listing, downloading, and parsing NGED's telemetry JSON from S3 into power and metadata.
 
 The metadata is upserted here, into a Parquet roster (see `upsert_metadata`). Power observations
 are not: this module never writes `PowerTimeSeries` rows to disk — they are returned to the
@@ -61,8 +61,13 @@ def list_timeseries_json_files(
 ) -> pt.DataFrame[_ProcessedFileListing]:
     """List all the timeseries JSON files in NGED's S3 bucket.
 
-    Each path encodes `start_time`, `end_time`, and `time_series_id` — see `_process_file_listing`
-    for the path format and how those fields are parsed out of it.
+    Each path encodes `start_time`, `end_time`, and `time_series_id`, and is assumed to be of the
+    form:
+
+        timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+
+    `_process_file_listing` parses those three fields back out, and its aligned comment traces the
+    regex against this same key.
     """
     raw_file_listing: list[_RawFileListItem] = []
     total_objects = 0
@@ -86,10 +91,9 @@ def _process_file_listing(
 ) -> pt.DataFrame[_ProcessedFileListing]:
     """Create DataFrame of paths.
 
-    Extracts the start_time, end_time, and time_series_id from the path string. The input paths
-    should be of the form:
-
-    timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+    Extracts `start_time`, `end_time`, and `time_series_id` from each path string, whose format
+    `list_timeseries_json_files` documents. The aligned comment below traces the regex against a
+    real key.
     """
     paths_df = (
         pl.DataFrame(raw_file_listing)
@@ -136,7 +140,7 @@ def remove_small_files_from_listing(
     That 68-byte gap comes from V1's 32 series ([phased
     rollout](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#phased-rollout)),
     and it is narrow enough that V2's ~2,500 series want re-measuring before this default is
-    trusted there. Two things would close it: a populated `information` field, which
+    trusted there. Two changes would close it: a populated `information` field, which
     `TimeSeriesMetadata` records as always null in the V1 trial area, would push a zero-reading
     file above 520; and a substation name shorter than any in V1 would pull a one-reading file
     below it. Re-run the measurement rather than assume the gap survives.
@@ -187,15 +191,16 @@ def download_and_parse_files(
 
     Returns:
         A `DownloadAndParseResult` bundling every file's parsed `TimeSeriesMetadata` and
-        `PowerTimeSeries` rows, deduplicated across files — see that NamedTuple's docstring for
-        what each field holds.
+        `PowerTimeSeries` rows, deduplicated across files — see `DownloadAndParseResult`'s
+        docstring for what each field holds.
 
     Raises:
         NoNewData: if `paths_df` was empty, or if every listed file's `data` field was null
             (NGED's meter reported nothing for the period each file covers). The guard counts
             the DataFrames collected rather than the rows in them, so a file whose `data` field
             is present but whose every row is dropped as implausible still counts, and does not
-            raise.
+            raise. The `power_time_series_and_metadata` asset catches `NoNewData` and reports an
+            empty ingest, so an empty listing degrades the run rather than failing it.
     """
     metadata_dfs = []
     power_time_series_dfs = []
@@ -362,7 +367,8 @@ def select_new_rows(
     `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`. Both
     input kinds are compared against this same table: a file's `end_time` is the latest reading it
     could possibly carry, so comparing it against `power_time_series`' on-disk `last_time` finds
-    files that cannot possibly hold anything new, before ever downloading them.
+    files that cannot hold a reading newer than what is already stored, before either is
+    downloaded.
     """
     if not delta_table_exists(delta_path, storage_options):
         log.info(f"{delta_path=} does not exist yet.")
@@ -414,8 +420,9 @@ class UpsertMetadataStats(TypedDict, total=False):
     """Set by the asset when the whole upsert raised, so the power write went ahead without it.
 
     Read this field's presence as "the roster is stale, retry next hour", not as a power-ingest
-    failure — the power write is unaffected. See [Reading a failed roster
-    upsert](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled)
+    failure — the power write is unaffected. See [Degraded input
+    data](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled),
+    under "Reading a failed roster upsert",
     for the operational read of this field and what it costs while it persists.
     """
 

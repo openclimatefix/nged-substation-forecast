@@ -189,8 +189,8 @@ def _calc_slice_for_lat_or_lng(
     at the catalog's native 0.25-degree grid spacing).
 
     Args:
-        coord_name: Which coordinate this slice is for — used only to name the two error cases
-            below.
+        coord_name: Which coordinate this slice is for. Names the coordinate read from `ds` to
+            establish its direction, and names the two error cases below.
         ds: The dataset `coord_name` is read from.
         min_coord: The lower bound of the region to slice to.
         max_coord: The upper bound of the region to slice to.
