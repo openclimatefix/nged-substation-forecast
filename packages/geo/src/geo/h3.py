@@ -35,7 +35,7 @@ def compute_h3_grid_weights_for_boundary(
 
     Returns:
         One row per (H3 cell, NWP grid point) pair that overlap within `boundary`, with
-        `weight` holding the fraction of that H3 cell's child cells falling inside the grid
+        `proportion` holding the fraction of that H3 cell's child cells falling inside the grid
         point's box — see `compute_h3_grid_weights`, which this delegates to once the
         boundary has been resolved to its covering `h3_index` list.
     """
@@ -73,9 +73,9 @@ def compute_h3_grid_weights(
             it defaults to that resolution + 2.
 
     Returns:
-        One row per (H3 cell, NWP grid point) pair that overlap, with `weight` holding the
-        fraction of that H3 cell's child cells falling inside the grid point's box. The weights
-        for any one `h3_index` sum to 1.
+        One row per (H3 cell, NWP grid point) pair that overlap, with `proportion` holding the
+        fraction of that H3 cell's child cells falling inside the grid point's box. The
+        `proportion` values for any one `h3_index` sum to 1.
     """
     # Reusable-package input validation, not a reachable production state: the only non-test caller
     # is `compute_h3_grid_weights_for_boundary` above, which has already raised on an empty cell

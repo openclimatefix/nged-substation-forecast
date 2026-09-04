@@ -359,7 +359,7 @@ def _apply_post_join_features(
         requested static feature, one column per requested lag (power lags via ``_apply_power_lag``,
         weather lags via ``_apply_weather_lag``), and one column per requested rolling mean. Any
         leaky lag or rolling-mean column is then nullified by ``_nullify_leaky_lags``. Still lazy;
-        the row count and order of ``raw_data`` are unchanged.
+        the row count of ``raw_data`` is unchanged, though the row order may not be.
     """
     engineered_lf = raw_data
 

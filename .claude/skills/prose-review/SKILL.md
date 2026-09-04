@@ -80,7 +80,7 @@ makes an oversized paragraph a structural defect rather than a stylistic one.** 
 this repo looks for it. Until this pass existed, a 479-word paragraph, a 525-word paragraph and a
 352-word paragraph all survived every review round the literature review had been given.
 
-Roughly 150 words or ten wrapped lines is the prompt to look, not the test. The test is whether the
+Roughly 150 words or 10 wrapped lines is the prompt to look, not the test. The test is whether the
 paragraph reaches more than one conclusion. A 180-word paragraph running one continuous argument to
 one conclusion stays whole; splitting it would cut a sentence away from the evidence it needs.
 
@@ -624,10 +624,10 @@ and are not repeated here.
 
 **Never delete prose in the same edit that adds a link.** Add the link beside the prose. Where
 prose genuinely has to go, that is a separate deletion, justified on its own and visible as such in
-the diff. The audit that produced this rule found ten passages whose reasoning had been *replaced*
+the diff. The audit that produced this rule found 10 passages whose reasoning had been *replaced*
 by a link mid-pull-request, six of which still had that reasoning on `main`.
 
-**One search shape finds one shape of fault.** A grep for `why X: <link>` found ten load-bearing
+**One search shape finds one shape of fault.** A grep for `why X: <link>` found 10 load-bearing
 links; a later pass reading the passages found four more that stated a claim and left its
 justification to the link, which no template would have matched. Budget a second sweep that reads
 rather than greps.
@@ -641,9 +641,9 @@ their READMEs should usually grow rather than shrink.
 **Verify which worktree you are in before reading a single file, and give sub-agents the absolute
 path.** This repo keeps a worktree per branch under `.claude/worktrees/`, and a session's primary
 directory is often a bridge worktree on `main` rather than the branch under review. The failure is
-silent and it *inverts* your conclusion: `main` legitimately contains the text the branch removed,
+silent and *inverts* your conclusion: `main` legitimately contains the text the branch removed,
 so a correct finding reads as false. Triaging one audit against the wrong worktree nearly rejected
-ten valid findings. Run `git rev-parse --abbrev-ref HEAD` first, and tell every sub-agent not to
+10 valid findings. Run `git rev-parse --abbrev-ref HEAD` first, and tell every sub-agent not to
 `cd` to the repository root.
 
 **Fix obviously-wrong prose you meet outside the nominal scope.** A prose sweep is the one time
