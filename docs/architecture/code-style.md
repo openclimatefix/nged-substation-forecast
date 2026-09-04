@@ -142,6 +142,15 @@ Three places where a positional argument is right:
   linter, type checker or test can tell. That drift is the cost being traded, and it is worth
   paying for a paragraph but not for a page. The rule cuts the other way too — rationale worth a
   paragraph does not belong *only* in a docstring, where no reader browsing the docs will find it.
+- **A worked example lives in exactly one place, whatever the rule above says.** A worked example
+  — a concrete partition key traced through to a concrete result, a named date, a sample row — is
+  the prose most likely to drift into being actively wrong, because it carries specific values that
+  a later change invalidates without touching the sentence around them. A second copy is a second
+  thing to update and the one nobody remembers. Keep it next to the behaviour it illustrates: where
+  two docstrings both want the same example, the one nearer the code that produces the result keeps
+  it, and the other names the example and links. This is the one case where the duplication bar is
+  low rather than high, and it holds between two docstrings in the same file as much as between
+  code and `docs/`.
 - **Link into the docs generously.** Every non-obvious claim in a docstring or comment is worth a
   rendered-site link to the page that develops it, and a docstring can carry several. The links
   cost a line each and are read by both people and coding agents, for whom they are the cheapest
