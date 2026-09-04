@@ -35,8 +35,16 @@ Sentry configuration:
 
 The ``environment`` tag (``Settings.sentry_environment``) separates deployments: ``production`` on
 the always-on box, ``<name>-laptop`` on each developer's machine. The alarm's alert rule is scoped
-to ``environment:production`` so intermittently-run laptops never page. See
-[Production Deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/).
+to ``environment:production`` so intermittently-run laptops never page.
+
+Further reading:
+
+- [Send telemetry to Sentry, and alarm on
+  absence](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+  — what each mechanism carries, what it means, and the tag an alert rule routes on.
+- [Separating laptop telemetry from
+  production](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#separating-laptop-telemetry-from-production)
+  — why the environment tag and a throwaway monitor slug are both needed.
 """
 
 import logging
@@ -69,7 +77,12 @@ LIVE_FORECAST_MONITOR_SLUG: Final[str] = "live-forecasts"
 """Slug of the Sentry cron monitor fed by ``live_forecasts``' success heartbeat.
 
 Laptop testing must use a *different*, throwaway slug (e.g. ``"live-forecasts-test"``) so an
-intermittently-run laptop never registers a stale environment on the production monitor."""
+intermittently-run laptop never registers a stale environment on the production monitor. The
+``environment`` tag alone is not enough: this slug is a constant here in the source, not a setting,
+so a laptop that merely switched ``Settings.sentry_monitor_forecasts`` on would check in to the
+shared ``"live-forecasts"`` monitor and then stop, leaving it expecting a 6-hourly heartbeat the
+laptop will never send. Fuller reasoning:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#separating-laptop-telemetry-from-production>"""
 
 LIVE_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {  # noqa: UP037
     # DUPLICATED SCHEDULE: this crontab must match live_forecast_partitions.cron_schedule in

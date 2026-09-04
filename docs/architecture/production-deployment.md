@@ -68,6 +68,11 @@ maximum `time` per `time_series_id` — rather than the asset's materialisation 
 when any series has no data within a 24-hour staleness threshold. A native materialisation-freshness
 policy would miss this exact failure, because the materialisation keeps succeeding.
 
+**The 24-hour threshold clears NGED's normal publishing jitter while still catching a genuine stall
+the same day.** NGED publishes at irregular intervals several hours apart, and the pipeline
+back-fills the gaps by itself once the feed recovers. A shorter threshold would fire on that
+ordinary jitter, while 24 hours still catches a multi-slot stall within the day.
+
 The check is attached to `power_time_series_and_metadata`, so the existing hourly schedule runs it
 every hour with no extra wiring. The check reports two kinds of lateness: a series that once
 reported but has now gone **stale**, and a roster series (present in the `TimeSeriesMetadata`
@@ -81,6 +86,11 @@ evaluation, against about 8 KB at 50 rows. The cap matches the Sentry event *con
 and there is one less threshold to keep in sync. The counts beside it are uncapped, and an
 `n_late_listed` field records how many rows the table actually holds, so a truncated table can never
 make a large stall look small.
+
+**The table lists never-reported series before stale ones, so the 50 rows are the head of that order
+rather than the 50 series in most trouble.** When never-reported series alone fill the cap, no stale
+series is listed at all, however stale it is. The counts `n_stale` and `n_never_reported` stay exact
+for the whole watched population, so read those two before reading the table.
 
 **Dagster's Checks view becomes the operator's at-a-glance status for whether the power data is
 healthy.** The view shows a green tick when every series is current and a yellow warning when the
@@ -131,7 +141,8 @@ a feed whose only late series are silenced sends no event.
 source code shipped read-only in the container image, so the check could not edit it. A check that
 writes anything is a warning path that can fail, which [rule
 7](../design-philosophy/inherent-stability.md#the-rules) forbids. The yellow is the prompt, and it
-clears when a human deletes the line.
+clears when a human deletes the line. The check also names every silenced id in its own output
+every hour it runs, so the silencing stays visible and cannot quietly be forgotten.
 
 **The list lives with the code because a dead series is a fact about the world, not about a
 deployment** — it is equally dead whether we run on a laptop or on AWS. The same fact is the
@@ -157,7 +168,9 @@ Two of those checks deserve a note. The **horizon** is checked because `live_for
 outside the selected NWP run's coverage, so a partly-ingested run delivers a much shorter forecast
 than NGED expect while every individual row stays perfectly well-formed — a fault nothing else would
 see. The floor is half the horizon we ask for, which is loose enough that a healthy slot (about
-13.75 of the 14 days, since the run it used is already 12–30 hours old) never trips it.
+13.75 of the 14 days, since the run it used is already 12–30 hours old) never trips it. A tighter
+floor would risk a false alarm, and would compete with the missed-run count for the same fault.
+Half the horizon catches only the case nothing else sees: NWP that is fresh but truncated.
 
 **The read is scoped to the promoted model's own `experiment_name`, because `write_power_forecasts`
 replaces one `(experiment_name, fold_id)` partition at a time.** Promoting a champion from a
@@ -176,9 +189,13 @@ deadline — how long after a run's `init_time` a healthy ingest should have lan
 from the publication time, because what matters is when the run reaches *our* disk. The deadline
 therefore has to clear `ecmwf_ens_schedule`'s 08:30 UTC start plus that asset's retry ladder — 8 retries
 at 30 minutes, plus a download on each attempt, for the failure mode that is only detectable
-after downloading — so it sits at 14 hours. The consequence is a one-run leniency at the 12:00 slot,
-where today's run has landed but is not yet *demanded*: a download that fails today is reported from
-the 18:00 slot onwards rather than six hours earlier. That one-run leniency is the right way round
+after downloading — so it sits at 14 hours. The retry delays alone put the last healthy landing at
+about 12:30 UTC, and paying a download and convert on every attempt moves that to about 12:40 UTC,
+which leaves 81 minutes of margin spread over 9 attempts. The deadline is therefore breached only if
+download-and-convert *averages* about 10 minutes across all 9 attempts, not if one attempt is slow:
+a single 645-second download costs only about 10 of those 81 minutes. The consequence is a one-run
+leniency at the 12:00 slot, where today's run has landed but is not yet *demanded*: a download that
+fails today is reported from the 18:00 slot onwards rather than six hours earlier. That one-run leniency is the right way round
 to be wrong. A tighter deadline would recover those six hours but trigger a false alarm on every
 morning the download merely ran slowly, which is the failure mode counting runs exists to avoid.
 
@@ -239,9 +256,12 @@ configured — so laptops and CI stay silent by default.
   deliberately disables (it passes a `LoggingIntegration` with `event_level=None`): Dagster logs a
   step failure without `exc_info`, so a purely log-based capture would yield a message-only event
   with no stack trace, and — left at its default `event_level=ERROR` — it would turn *every* `ERROR`
-  log in the process into a Sentry event, including Dagster's own startup and ad-hoc-run logs. The
-  hook is attached to the three *scheduled* asset jobs, so it covers the whole unattended production workload. Because log capture is off, failures in a manual UI materialisation, a replay backfill,
-  or an experiment job are watched by the operator at the Dagster UI, not routed to Sentry.
+  log in the process into a Sentry event, including Dagster's own startup and ad-hoc-run logs.
+  Breadcrumbs — the integration's default `level=INFO` — stay on, so log context still rides along
+  with the events the senders below do send. The hook is attached to the three *scheduled* asset
+  jobs, so it covers the whole unattended production workload. Because log capture is off, failures
+  in a manual UI materialisation, a replay backfill, or an experiment job are watched by the
+  operator at the Dagster UI, not routed to Sentry.
 
     One production fault the hook cannot see is an asset check that caught its own exception
     instead of failing the run — which, by design, is every one of them: the two standalone
@@ -251,6 +271,9 @@ configured — so laptops and CI stay silent by default.
     check's name, and `report_asset_degradation` does the same tagged `degraded_asset` for an *asset*
     that degrades rather than failing — today, `power_time_series_and_metadata`'s roster upsert. Since
     log capture is off, either handler's `ERROR` log alone would reach nobody.
+    `power_time_series_and_metadata_job` compounds that silence: it has no cron monitor of its own.
+    Absent `report_check_degradation`, a check that cannot read its own inputs would show up only as
+    a yellow tick in Dagster's Checks view, and nobody would be told.
 
     Those tags are what an alert rule routes on, and the failure hook is the one sender that would
     otherwise arrive with nothing to route on — so it tags `fault_category:run_failed`. That tag is
@@ -277,16 +300,25 @@ configured — so laptops and CI stay silent by default.
     Either way the hook receives a `RetryRequested` wrapper once the budget is exhausted, and
     Dagster unwraps only its own `RetryRequestedFromPolicy` — so the hook unwraps the plain class
     too, or every exhausted retry would group under `RetryRequested` rather than under its cause.
+    Unwrapping discards nothing: the whole exception chain is serialised either way, and what the
+    unwrap fixes is the event's title and how Sentry groups it.
 
 - **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
   `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron
   monitor; Sentry raises the alarm when no heartbeat lands within the margin (the 6-hourly schedule
-  plus ~2 h grace), regardless of cause. Evaluation must live outside the deployment because a dead
+  plus ~2 h grace), regardless of cause. Because the alarm only fires once the following slot's own
+  grace period has elapsed, a missed heartbeat is flagged roughly 8 hours after the last success —
+  one 6-hourly slot plus the ~2 h grace. Evaluation must live outside the deployment because a dead
   daemon cannot report itself — the reasoning for why this, not a Dagster sensor, is the mechanism
   is in [Alert on absence](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
-  Only *success* heartbeats are ever sent (never an `error` check-in), so the alarm keys purely off
-  absence: an in-band run error is the failure hook's job, and a manual `replay` backfill — which
-  reprocesses the past rather than proving the service is live now — deliberately does not check in.
+  Only *success* heartbeats are ever sent (never an `error` or `in_progress` check-in), so the alarm
+  keys purely off absence: an in-band run error is the failure hook's job, and a manual `replay`
+  backfill — which reprocesses the past rather than proving the service is live now — deliberately
+  does not check in. Sentry's `max_runtime` setting is deliberately left unset: it would time a
+  check-in against an `in_progress` counterpart, which the success-only heartbeat never sends, so
+  there is nothing for it to measure against. Sending the heartbeat never raises: `live_forecasts`
+  has already committed its Delta write by the time `send_forecast_checkin` runs, so a raise here
+  would report the run as failed while the rows it produced sit committed.
 
 - **Freshness warnings.** When the `power_data_is_fresh` asset check finds late series,
   `report_power_freshness` forwards that per-series staleness to Sentry as a `warning`-level event,

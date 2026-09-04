@@ -41,6 +41,27 @@ The complementary decision — the resolved config is stamped onto the MLflow ex
 registration and read back by the assets, never re-read from YAML — is explained in
 [Running an experiment end-to-end](../ml_experimentation/dagster-workflow.md).
 
+## Re-registering an experiment under a changed config is rejected
+
+**An experiment's identity is its config**, not its `experiment_name` alone, so a changed config is
+treated as a *new* experiment: `register_experiment_job` rejects a re-registration that would change
+it. Why an experiment carries one config, and what the operator should do instead, is in [An
+experiment's identity is its
+config](../ml_experimentation/dagster-workflow.md#an-experiments-identity-is-its-config).
+
+**The rejection compares two identity tags: the canonical JSON dump of the resolved config, and the
+forecaster's class target.** Both are compared against what MLflow already has stored for that
+`experiment_name`. A tag absent from the stored experiment does not count as a change, because an
+absent tag is what `get_or_create_experiment` leaves behind when its self-healing fallback creates
+an untagged experiment, and this registration is entitled to complete that experiment.
+
+**A rejected re-registration leaves the experiment exactly as it found it.** The comparison runs,
+and any rejection happens, before the registration writes a single MLflow param or tag.
+
+**The `description` tag is excluded from the comparison, so an experiment's prose stays freely
+editable by re-registering.** What an experiment is called and what it is for are not part of what
+makes an experiment that experiment — only the config and the forecaster class are.
+
 ## Model artifacts: one replaceable archive, no local cache
 
 Trained models live in MLflow's artifact store, wrapped by two concrete `BaseForecaster`

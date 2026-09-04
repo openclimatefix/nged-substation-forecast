@@ -106,9 +106,12 @@ Three places where a positional argument is right:
 
 ## Comments, docstrings and links
 
-- **Do not remove existing comments** unless they are misleading or out of date. Only add new
-  comments if you're doing something that isn't obvious from the code. Write self-documenting
-  code, and assume the reader is fluent in Python.
+- **Do not remove existing comments** unless they are misleading, out of date, or a second copy of
+  an argument a `docs/` page already makes. Only add new comments if you're doing something that
+  isn't obvious from the code. Write self-documenting code, and assume the reader is fluent in
+  Python. The third ground is the duplication rule below, applied in the direction of deletion:
+  where a docs page develops the same argument at comparable length, the comment keeps a short
+  version of it and carries the link. Shortening is not deleting — the reasoning stays.
 - **Comments and docs must reflect current state only** — never reference previous iterations of
   the code or deleted files. This is the same rule as "Write about the present, not the past" in
   `CLAUDE.md`, applied to code.
@@ -128,15 +131,64 @@ Three places where a positional argument is right:
   because the path resolves against the rendered site tree. And a URL survives the file being moved
   or renamed, which a path does not. Use it in `#` comments too: those are never rendered, so a
   path would do, but one spelling everywhere is one fewer thing to get right.
-- **One home per argument** — a design decision's *rationale* lives on one docs page, and the
-  docstring links to it. The docstring's own job is to say what the function guarantees and what a
-  caller must not assume. A sentence of "because" is fine; a paragraph of it means the paragraph
-  belongs on the page. Two copies of an argument drift. The drift is silent — a later change
-  updates the page, the docstring goes on asserting the superseded reasoning, and no linter, type
-  checker or test can tell. This is the same trade the durable-docs rule above makes: a link that
-  might rot is cheaper than a copy that rots invisibly. It cuts the other way too — rationale
-  worth a paragraph does not belong *only* in a docstring, where no reader browsing the docs will
-  find it.
+- **A little duplication beats a link the reader has to follow — cut only where the duplication is
+  excessive.** The full development of a design decision lives on one docs page, and the code links
+  to it. But keep the code's own account of *why*, even where that docs page says much the same: a
+  developer reading a function should not have to open a browser to learn what the code is doing
+  and what it is defending against. "Excessive" means the same argument developed at comparable
+  length in both places — a page restated as a page. A paragraph of "because" beside the code that
+  implements it is not excessive, and is worth keeping. Two copies do drift, silently: a later
+  change updates the page while the docstring goes on asserting the superseded reasoning, and no
+  linter, type checker or test can tell. That drift is the cost being traded, and it is worth
+  paying for a paragraph but not for a page. The rule cuts the other way too — rationale worth a
+  paragraph does not belong *only* in a docstring, where no reader browsing the docs will find it.
+- **A worked example lives in exactly one place, whatever the rule above says.** A worked example
+  — a concrete partition key traced through to a concrete result, a named date, a sample row — is
+  the prose most likely to drift into being actively wrong, because it carries specific values that
+  a later change invalidates without touching the sentence around them. A second copy is a second
+  thing to update and the one nobody remembers. Keep it next to the behaviour it illustrates: where
+  two docstrings both want the same example, the one nearer the code that produces the result keeps
+  it, and the other names the example and links. This is the one case where the duplication bar is
+  low rather than high, and it holds between two docstrings in the same file as much as between
+  code and `docs/`.
+- **Link into the docs generously, but never make a link load-bearing.** Where a docs page develops
+  an argument the code rests on, link to it, and a docstring can carry several such links. The links
+  cost a line each and are read by both people and coding agents, for whom they are the cheapest
+  route to context.
+
+    **A long explanation does not oblige you to create a docs page.** An argument that matters only
+    to the one piece of code it sits beside belongs in that docstring or comment, developed at
+    whatever length it needs, and gets no page and no link. `docs/` is for arguments a reader
+    outside this function needs — because they span several modules, because someone browsing the
+    docs would look for them, or because they outlive the code that prompted them. Adding a page
+    per long comment bloats `docs/` with material nobody browsing it wants, and leaves the code
+    poorer for having exported its own reasoning. A link is *additional context only*: a reader must be
+  able to understand the prose in the code without following any of them. Every link is a
+  nice-to-have, never a requirement.
+
+    The test is mechanical, and worth applying to each link as you add it: **delete the link, re-read
+    the passage, and check nothing needed is now missing.** If the passage no longer explains itself
+    — "see the design page for why", with the why nowhere in the code — the prose is what needs
+    fixing, not the link. Say the reason in a sentence, then link to the page that develops it at
+    length. Adding a link is never a licence to delete the prose beside it.
+- **A Dagster docstring is operator documentation, and is where even the duplication rule above
+  gives way.** Dagster renders the docstring of an asset, asset check, job, schedule and sensor in its
+  UI, and that docstring is often the only documentation an operator sees while running the
+  pipeline. Each docstring has to make sense read on its own, by someone who has not opened the
+  source file, and has to place the asset in the pipeline: what it consumes, what it produces, what
+  triggers it, and what a degraded run looks like. Link into `docs/` for the reasoning behind a
+  design, but keep the account of what the asset does and what it sits between in the docstring,
+  even where a docs page says the same — an operator reading the Dagster UI cannot follow a link
+  they never see. Text passed as `description=` to an `AssetCheckSpec`, a `define_asset_job` call
+  or a Dagster `Config` field renders in that same UI and carries the same duty; a check with no
+  `description` shows the operator a blank.
+
+    **Only a decorated definition has a docstring Dagster can read.** A schedule built by calling
+    `ScheduleDefinition(...)` or `build_schedule_from_partitioned_job(...)` is an assignment, and
+    the string literal underneath it is a module-level variable docstring that the UI never
+    renders — so its operator-facing summary has to be passed as `description=`. Keep the string
+    literal for the reasoning a developer reading the file wants, and let `description=` carry
+    what the operator needs.
 - **Say why a guard exists, when the reason is not "this state happens"** — validation that
   defends a reusable package's public API, rather than a state production can reach, says so in a
   clause: `# Reusable-package input validation, not a reachable production state: the ecmwf_ens

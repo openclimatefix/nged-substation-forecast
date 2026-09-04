@@ -176,7 +176,11 @@ IDENTITY_TAGS: Final[tuple[IdentityTagType, ...]] = ("config", "forecaster_targe
 """Runtime tuple — iterated when comparing a re-registration against the stored identity.
 
 The ``description`` tag is deliberately absent: prose about an experiment is not part of what
-makes it that experiment, so it stays freely editable by re-registering.
+makes an experiment that experiment, so it stays freely editable by re-registering. A tag absent
+from the *stored* experiment is likewise not a change — that is the untagged experiment
+``get_or_create_experiment`` leaves behind, and this registration is entitled to complete it.
+Fuller reasoning:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-an-experiment-under-a-changed-config-is-rejected>
 """
 
 IdentityTagsType = dict[IdentityTagType, str]
@@ -257,7 +261,8 @@ def _reject_changed_identity(
     back from the experiment tag (``load_experiment_forecaster``), so re-pointing that tag
     mid-flight would poison every comparison built on the experiment. A changed config is therefore
     a *new* experiment, and the only correct answer is to reject it — before anything has been
-    written.
+    written. Fuller reasoning:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-an-experiment-under-a-changed-config-is-rejected>
 
     Called with the experiment's stored tags before any write, so a rejection leaves MLflow exactly
     as it found it. A tag absent from ``stored_tags`` is not a change: that is the untagged
@@ -399,5 +404,27 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
 
 @job
 def register_experiment_job() -> None:
-    """Register a new experiment: create its MLflow records and CV partition keys."""
+    """Register a new experiment: create its MLflow records and CV partition keys.
+
+    Manually launched from the Dagster UI launchpad with a ``RegisterExperimentConfig`` —
+    ``experiment_name``, a ``base_model_config`` YAML path, optional ``config_overrides``, and a
+    ``run_mode``. Resolves the forecaster class and config from the YAML, creates the MLflow
+    experiment and its parent run if they do not already exist, and adds this experiment's CV fold
+    partition keys to the ``cv_experiment_folds`` dynamic partition set: ``run_mode="smoke_test"``
+    (the default) adds the non-leaderboard dev folds, and ``"full_cv"`` / ``"register_only"`` add
+    the leaderboard folds from ``conf/cv/default.yaml``. Materialises no assets itself.
+
+    Idempotent for the *same* config: re-running with the same ``experiment_name`` resolves the
+    existing experiment, parent run, and partition keys rather than duplicating them, and may
+    freely update the ``description`` and add the other run mode's folds on top. Re-running with a
+    **changed** config is rejected outright, before any MLflow write — an experiment's identity is
+    its config; see
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-an-experiment-under-a-changed-config-is-rejected>.
+    Register the changed config under a new ``experiment_name`` instead.
+
+    Next manual step: materialise ``trained_cv_model`` for the partition keys this run added, then
+    ``cv_power_forecasts``, then ``metrics`` to populate the leaderboard. See
+    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/#step-6-launch-register_experiment_job>
+    for the full walkthrough.
+    """
     register_experiment()

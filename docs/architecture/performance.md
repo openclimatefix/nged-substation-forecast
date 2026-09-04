@@ -91,6 +91,30 @@ What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 
 Prediction is bounded by chunking on **`init_time`** (`_PREDICT_INIT_CHUNK`, 14 days), *not* by cell. `init_time` is both the partition key and the axis that fans the output out across runs, so a chunk's forecast frame stays small while each partition is read exactly once and all series/cells/members are processed together (a per-*cell* loop instead OOMs on the busiest cell — 10 series × 51 members × the 10-month window ≈ 116M rows ≈ 25 GB). Measured end-to-end on the `mid_2025_to_mid_2026` fold: training peaks ~5 GB and the full 51-member validation prediction (~321M forecast rows) peaks ~9 GB — both well under a 24 GB laptop.
 
+### Scoring the metrics: batch the series, and stream every scan
+
+**Scoring a whole fold at once OOM-kills a 29 GB machine, so `_score_forecast_group` scores a batch
+of time series at a time.** `compute_metrics` is independent per series, which is what makes the
+batching sound. Measured on the `mid_2025_to_mid_2026` fold when it held 28 series of about 13M
+forecast rows each, a batch of 4 series completes in roughly 50 seconds at about 18 GB peak process
+resident set size. That fold has gained series since, so the figures below understate today's fold
+and the case for batching is only stronger. That peak is dominated by the streaming Delta scan
+rather than by the data: each batch re-scans the partition, while the materialised batch frame
+itself is a few GB. A batch of 2 measured only about 2 GB lower, so a smaller batch saves little
+memory — the scan overhead is roughly constant in the *fold* size, which is what keeps the approach
+workable as folds grow to V2 scale.
+
+**Every scan in the scoring path streams, because the eager equivalent materialises full-length rows
+before it reduces them.** Discovering which groups a fold holds projects just the two partition
+columns, `experiment_name` and `fold_id`, and takes their distinct values. Collected eagerly, those
+two columns are still materialised at full row length before the unique, which OOM-killed that fold
+at its then-size of 364M rows; the streaming collect peaks at 0.3 GB. The same rule applies to the
+`time_series_id` and `ensemble_member` values `cv_power_forecasts` accumulates from each chunk:
+taking the unique values gives a roughly 30-element Python list per chunk instead of a roughly
+14M-element one. Measured on a 14M-row `Int32` column, the full-length list cost 2.78 seconds and
+560 MB peak against 0.05 seconds and no measurable allocation — and that 560 MB landed inside the
+loop whose whole job is holding the frame at 2 to 3 GB.
+
 ## The other hard ceiling: Polars' 32-bit row index
 
 RAM is not the only bound a Polars query must respect. Default Polars builds use a 32-bit row
