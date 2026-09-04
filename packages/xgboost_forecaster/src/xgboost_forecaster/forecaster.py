@@ -111,8 +111,9 @@ class XGBoostForecaster(BaseForecaster):
         Float32 copy). Keeping this bounded is the *caller's* job — the NWP scan must be pruned at
         the inputs (control member, the relevant H3 cells, the window's ``init_time`` partitions),
         because filtering the engineered output cannot prune the upstream join/upsample. See
-        ``load_engineering_inputs`` and the "NWP scan pruning" notes in
-        <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
+        ``load_engineering_inputs`` and "Bounding feature-engineering memory: prune the inputs,
+        not the output" in
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
         Only the requested ``time_series_ids`` are trained; a requested series with no non-null
         ``power`` rows (e.g. none in the training window) simply does not appear and gets no
@@ -126,7 +127,7 @@ class XGBoostForecaster(BaseForecaster):
         # decode-then-filter within the surviving row groups. The streaming engine applies those
         # predicates per morsel, holding peak memory to a few GB where the in-memory engine would
         # materialise every surviving row first. See
-        # <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
+        # <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
         df = data.drop_nulls(subset=["power"]).collect(engine="streaming")
         for group_key, group in df.group_by(["time_series_id"]):
             ts_id = int(group_key[0])
@@ -151,9 +152,12 @@ class XGBoostForecaster(BaseForecaster):
         ``data`` is collected once and grouped in memory by ``time_series_id``. Rows for a
         ``time_series_id`` this model was not trained on are ignored (the model only scores its own
         trained population — see ``trained_time_series_ids``). Keeping the collect bounded is the
-        caller's job: at validation every NWP ensemble member is present, so the caller engineers
-        one H3 cell at a time (see ``cv_power_forecasts`` and
-        <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>).
+        caller's job: at validation every NWP ensemble member is present, so the caller predicts
+        one ``init_time`` chunk at a time. ``init_time`` is both the NWP partition key and the axis
+        that fans the output out across runs, so chunking on it bounds each iteration's forecast
+        frame while every partition is still read exactly once; looping per H3 cell instead runs
+        out of memory on the busiest cell. See ``cv_power_forecasts`` and
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
         ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
         supplies it). Defaults to the ``"live"`` production sentinel.
@@ -182,7 +186,9 @@ class XGBoostForecaster(BaseForecaster):
                 fold_id=pl.lit(fold_id),
             )
 
-        df = data.collect(engine="streaming")  # stream the NWP scan — see train() / overview.md
+        # Stream the NWP scan, for the reasons on ``train`` above. See
+        # <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
+        df = data.collect(engine="streaming")
         parts: list[pl.DataFrame] = []
         for group_key, group in df.group_by(["time_series_id"]):
             booster = self._models.get(int(group_key[0]))
