@@ -51,7 +51,8 @@ def load_engineering_inputs(
 
     The three levers:
 
-    - ``init_time``: the table is partitioned by ``init_time``, so bounding it to the runs that can
+    - ``init_time``: the table is partitioned by ``(nwp_model_id, init_time)``, so bounding
+      ``init_time`` to the runs that can
       cover the window (``[window_start - MAX_NWP_LEAD, window_end]``) is a true *partition* prune
       — Polars opens only those partition directories. Filtering ``valid_time`` alone does **not**
       prune partitions.
@@ -111,7 +112,8 @@ def load_engineering_inputs(
     cells = metadata["h3_res_5"].unique().to_list()
 
     nwp_scan = Nwp.scan_delta(settings.nwp_data_path, storage_options=storage_options).filter(
-        # init_time is the partition key — this prunes whole partitions, not just row groups.
+        # init_time is one of the two partition columns — this prunes whole partitions, not
+        # just row groups.
         pl.col("init_time") >= init_time_start,
         pl.col("init_time") <= init_time_end,
         pl.col("valid_time") >= window_start,
