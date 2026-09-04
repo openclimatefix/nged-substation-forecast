@@ -128,7 +128,10 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     directory is replaced, so the previous champion stays in place and keeps serving.
 
     Every such refusal reaches the operator as a failed materialisation: this asset catches
-    nothing, unlike the rest of ``defs/``. The reasoning is in
+    nothing, unlike the rest of ``defs/``. Degrading is what the production *serving* path does,
+    because a late or partial forecast beats none; promotion has no such fallback, since the
+    outgoing champion keeps serving whatever happens here. A promotion that half-succeeded quietly
+    would be strictly worse than one that stopped and said so. The rules this follows:
     <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 
     Promotion as a Dagster materialisation gives an audit trail and lineage for free, rather than

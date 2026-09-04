@@ -144,8 +144,12 @@ Delete an entry to start warning about that series again. How to edit the list, 
 description means:
 <https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled>
 
-Why it is a source constant rather than operator-editable state, and why the check keeps naming
-every listed id and turns yellow by itself if one reports data again:
+The list is source code rather than operator-editable state because it ships read-only in the
+container image, so the check could not edit it even if it wanted to: a check that writes anything
+is a warning path that can fail, which rule 7 forbids. The check names every listed id in its own
+output each hour, green or yellow, so the silencing stays visible and cannot quietly be forgotten,
+and it turns yellow by itself if a silenced series reports data again — the yellow is the prompt
+for a human to delete the line. Fuller reasoning:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#silence-the-series-we-already-know-are-dead>
 """
 
@@ -228,7 +232,7 @@ def evaluate_power_freshness(
     cutoff = now - threshold
 
     # Drop the silenced series from the *inputs* rather than the output, so every count below
-    # describes what we are watching without needing to know silencing exists. Why:
+    # describes what we are watching without needing to know silencing exists. Fuller reasoning:
     # <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#silence-the-series-we-already-know-are-dead>
     # A silenced id fresher than the cutoff is reported instead as resurrected: the fault we
     # silenced has evidently healed, and the complement of `stale`'s `<` is exactly the right

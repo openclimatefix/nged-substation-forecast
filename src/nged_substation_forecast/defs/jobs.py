@@ -175,8 +175,11 @@ IdentityTagType = Literal["config", "forecaster_target"]
 IDENTITY_TAGS: Final[tuple[IdentityTagType, ...]] = ("config", "forecaster_target")
 """Runtime tuple — iterated when comparing a re-registration against the stored identity.
 
-Why the ``description`` tag is absent, and what an absent tag means when the stored experiment
-lacks one:
+The ``description`` tag is deliberately absent: prose about an experiment is not part of what
+makes an experiment that experiment, so it stays freely editable by re-registering. A tag absent
+from the *stored* experiment is likewise not a change — that is the untagged experiment
+``get_or_create_experiment`` leaves behind, and this registration is entitled to complete it.
+Fuller reasoning:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-an-experiment-under-a-changed-config-is-rejected>
 """
 

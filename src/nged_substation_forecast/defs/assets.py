@@ -587,7 +587,10 @@ def _nwp_quality_check_result(
 ) -> AssetCheckResult:
     """Wrap the two null reports for one run into a WARN-severity Dagster check result.
 
-    ``passed`` follows the H3 cells alone, not the upstream rate. Why:
+    ``passed`` follows the H3 cells alone, not the upstream rate. The upstream rate is a trend
+    across runs rather than a verdict on this one, and the archive has no threshold that separates
+    a healthy feed from a degrading one, so it is published and plotted rather than gated. The two
+    populations and why they are counted separately:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#two-populations-counted-separately>.
     Escalating a badly-degraded run is
     <https://github.com/openclimatefix/nged-substation-forecast/issues/501>.

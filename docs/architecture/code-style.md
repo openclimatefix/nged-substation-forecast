@@ -151,11 +151,18 @@ Three places where a positional argument is right:
   it, and the other names the example and links. This is the one case where the duplication bar is
   low rather than high, and it holds between two docstrings in the same file as much as between
   code and `docs/`.
-- **Link into the docs generously.** Every non-obvious claim in a docstring or comment is worth a
-  rendered-site link to the page that develops it, and a docstring can carry several. The links
-  cost a line each and are read by both people and coding agents, for whom they are the cheapest
-  route to context. Adding a link is not a licence to delete the prose beside it: the link
-  supplements the explanation rather than replacing it.
+- **Link into the docs generously, but never make a link load-bearing.** Every non-obvious claim in
+  a docstring or comment is worth a rendered-site link to the page that develops it, and a docstring
+  can carry several. The links cost a line each and are read by both people and coding agents, for
+  whom they are the cheapest route to context. A link is *additional context only*: a reader must be
+  able to understand the prose in the code without following any of them. Every link is a
+  nice-to-have, never a requirement.
+
+    The test is mechanical, and worth applying to each link as you add it: **delete the link, re-read
+    the passage, and check nothing needed is now missing.** If the passage no longer explains itself
+    — "see the design page for why", with the why nowhere in the code — the prose is what needs
+    fixing, not the link. Say the reason in a sentence, then link to the page that develops it at
+    length. Adding a link is never a licence to delete the prose beside it.
 - **A Dagster docstring is operator documentation, and is where even the duplication rule above
   gives way.** Dagster renders the docstring of an asset, asset check, job, schedule and sensor in its
   UI, and that docstring is often the only documentation an operator sees while running the
