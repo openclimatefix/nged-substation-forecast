@@ -63,7 +63,8 @@ def compute_h3_grid_weights(
         h3_index: List of 64-bit H3 discrete spatial indices.
         nwp_grid_size_degrees: The size of the regular NWP lat/lng grid in degrees (e.g., 0.25).
         child_h3_res: The H3 resolution to use for the underlying points. Must be
-            strictly greater than the resolution of the input `h3_index` list.
+            strictly greater than the resolution of the input `h3_index` list. If None,
+            it defaults to that resolution + 2.
     """
     _LOG.info(
         f"Computing H3 grid weights for grid size {nwp_grid_size_degrees}"
@@ -125,11 +126,14 @@ def compute_h3_grid_weights(
         # rejects regardless -- so there is no silent-data-loss risk from the choice either way.)
         .explode("child_h3", empty_as_null=False)
         # nwp_lat takes cell_to_lat and nwp_lon takes cell_to_lng: swapping the two is the one
-        # orientation bug this expression can introduce, and it would survive every row-count and
-        # weight-sum assertion, because the output stays well-formed and only its geography is
-        # wrong. `test_grid_weights_preserve_geographic_orientation` in `geo/tests/test_h3.py`
-        # pins two well-separated GB landmarks to catch it, and was verified by mutation. The
-        # orientation-coverage table lists what each test in the pair proves:
+        # orientation bug this expression can introduce, and it survives the row-count and
+        # weight-sum assertions in `test_grid_weights_invariant`, because the output stays
+        # well-formed and only its geography is wrong. Two tests in `geo/tests/test_h3.py` do
+        # catch it, both verified by mutation: `test_grid_weights_snap_to_nearest_grid_centre`,
+        # whose oracle builds the expected points geographically, and
+        # `test_grid_weights_preserve_geographic_orientation`, which pins two well-separated GB
+        # landmarks. The orientation-coverage table lists the three tests guarding this mapping
+        # and the mutation each one catches:
         # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#nwp-grid-h3-orientation-coverage>
         .with_columns(
             nwp_lat=_snap_to_grid(plh3.cell_to_lat("child_h3")),

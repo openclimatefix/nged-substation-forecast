@@ -14,9 +14,9 @@ The `geo` package decouples generic geospatial operations from dataset-specific 
 spatial transformation — such as mapping a latitude/longitude grid to H3 hexagons — without
 depending on heavy or unrelated packages.
 
-`compute_h3_grid_weights_for_boundary` accepts any boundary geometry, not only the Great Britain
-shape this package ships. That generality is what lets a future region reuse the same H3 gridding
-rather than fork it, and it is
+`compute_h3_grid_weights_for_boundary` accepts any boundary polygon, not only the Great Britain
+shape this package ships. Keeping it general costs nothing here and means a new region plugs into
+the same H3 gridding rather than forking it, which is
 [design principle 5](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#5-everything-around-the-model-is-general-purpose)
 applied to this package.
 

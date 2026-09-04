@@ -21,9 +21,11 @@ run is ours from roughly 08:30 — 8.5 hours. Nine is the nearest whole hour at 
 
 ``select_analysis_proxy`` applies it for the optional ``available_at`` leakage cut; the feature
 pipeline uses it to derive ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode; and
-``select_nwp_init_time`` uses it to reconstruct availability for ``"replay"`` backfills. Only
-``"replay"`` needs the delay: a live run joins whatever is genuinely on disk, so reality already
-constrains it, whereas a replay of a past init time would otherwise join NWP runs that only landed
+``select_nwp_init_time`` uses it to reconstruct availability for ``"replay"`` backfills.
+
+Of ``select_nwp_init_time``'s two modes, only ``"replay"`` needs the delay. A live run joins
+whatever is genuinely on disk, so reality already constrains the NWP table to runs that were
+genuinely published. A replay of a past init time would otherwise join runs that only landed
 afterwards — lookahead bias rather than mere inaccuracy. The asymmetry in full:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#resolve-nwp-availability-asymmetrically-live-vs-replay>
 

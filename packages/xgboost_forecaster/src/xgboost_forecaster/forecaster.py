@@ -152,11 +152,12 @@ class XGBoostForecaster(BaseForecaster):
         ``data`` is collected once and grouped in memory by ``time_series_id``. Rows for a
         ``time_series_id`` this model was not trained on are ignored (the model only scores its own
         trained population — see ``trained_time_series_ids``). Keeping the collect bounded is the
-        caller's job: at validation every NWP ensemble member is present, so the caller predicts
-        one ``init_time`` chunk at a time. ``init_time`` is both the NWP partition key and the axis
-        that fans the output out across runs, so chunking on it bounds each iteration's forecast
-        frame while every partition is still read exactly once; looping per H3 cell instead runs
-        out of memory on the busiest cell. See ``cv_power_forecasts`` and
+        caller's job: at validation the full ~51-member NWP ensemble is present, so the caller
+        predicts one ``init_time`` chunk at a time, appending to Delta as it goes. ``init_time`` is
+        one of the NWP table's two partition columns and the axis that fans the output out across
+        runs, so chunking on it bounds each iteration's forecast frame while every partition is
+        still read exactly once; looping per H3 cell instead runs out of memory on the busiest
+        cell. See ``cv_power_forecasts`` and
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
         ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
