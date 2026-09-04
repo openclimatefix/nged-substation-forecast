@@ -51,8 +51,10 @@ roadmap items that apply them.
 
 The section above covers the pages under `docs/`. Docstrings and package READMEs are documentation
 too — mkdocstrings renders every module listed in `docs/api/<package>/index.md` onto the published
-site — so the same "one home per argument" question applies to them, and it is settled by asking
-what the reader already has in their hand when they arrive.
+site — so the same question of which home an argument belongs in applies to them, and it is
+settled by asking what the reader already has in their hand when they arrive. Deciding a home is
+not a licence to delete the other copies: the bar for cutting prose out of code is
+[excessive duplication](architecture/code-style.md#comments-docstrings-and-links), not duplication.
 
 **A docstring holds everything that dies when the symbol dies**: units, preconditions, invariants,
 failure modes, and the argument for this particular implementation. The test is whether the prose

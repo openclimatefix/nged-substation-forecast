@@ -109,8 +109,9 @@ Three places where a positional argument is right:
 - **Do not remove existing comments** unless they are misleading, out of date, or a second copy of
   an argument a `docs/` page already makes. Only add new comments if you're doing something that
   isn't obvious from the code. Write self-documenting code, and assume the reader is fluent in
-  Python. The third ground is the "One home per argument" rule below, applied in the direction of
-  deletion: where the page carries the argument, the comment carries the link.
+  Python. The third ground is the duplication rule below, applied in the direction of deletion:
+  where a docs page develops the same argument at comparable length, the comment keeps a short
+  version of it and carries the link. Shortening is not deleting — the reasoning stays.
 - **Comments and docs must reflect current state only** — never reference previous iterations of
   the code or deleted files. This is the same rule as "Write about the present, not the past" in
   `CLAUDE.md`, applied to code.
@@ -130,17 +131,24 @@ Three places where a positional argument is right:
   because the path resolves against the rendered site tree. And a URL survives the file being moved
   or renamed, which a path does not. Use it in `#` comments too: those are never rendered, so a
   path would do, but one spelling everywhere is one fewer thing to get right.
-- **One home per argument** — a design decision's *rationale* lives on one docs page, and the
-  docstring links to it. The docstring's own job is to say what the function guarantees and what a
-  caller must not assume. A sentence of "because" is fine; a paragraph of it means the paragraph
-  belongs on the page. Two copies of an argument drift. The drift is silent — a later change
-  updates the page, the docstring goes on asserting the superseded reasoning, and no linter, type
-  checker or test can tell. This is the same trade the durable-docs rule above makes: a link that
-  might rot is cheaper than a copy that rots invisibly. It cuts the other way too — rationale
-  worth a paragraph does not belong *only* in a docstring, where no reader browsing the docs will
-  find it.
-- **A Dagster docstring is operator documentation, and is where "one home per argument" gives
-  way.** Dagster renders the docstring of an asset, asset check, job, schedule and sensor in its
+- **A little duplication beats a link the reader has to follow — cut only where the duplication is
+  excessive.** The full development of a design decision lives on one docs page, and the code links
+  to it. But keep the code's own account of *why*, even where that docs page says much the same: a
+  developer reading a function should not have to open a browser to learn what the code is doing
+  and what it is defending against. "Excessive" means the same argument developed at comparable
+  length in both places — a page restated as a page. A paragraph of "because" beside the code that
+  implements it is not excessive, and is worth keeping. Two copies do drift, silently: a later
+  change updates the page while the docstring goes on asserting the superseded reasoning, and no
+  linter, type checker or test can tell. That drift is the cost being traded, and it is worth
+  paying for a paragraph but not for a page. The rule cuts the other way too — rationale worth a
+  paragraph does not belong *only* in a docstring, where no reader browsing the docs will find it.
+- **Link into the docs generously.** Every non-obvious claim in a docstring or comment is worth a
+  rendered-site link to the page that develops it, and a docstring can carry several. The links
+  cost a line each and are read by both people and coding agents, for whom they are the cheapest
+  route to context. Adding a link is not a licence to delete the prose beside it: the link
+  supplements the explanation rather than replacing it.
+- **A Dagster docstring is operator documentation, and is where even the duplication rule above
+  gives way.** Dagster renders the docstring of an asset, asset check, job, schedule and sensor in its
   UI, and that docstring is often the only documentation an operator sees while running the
   pipeline. Each docstring has to make sense read on its own, by someone who has not opened the
   source file, and has to place the asset in the pipeline: what it consumes, what it produces, what

@@ -40,11 +40,19 @@ power_time_series_and_metadata_schedule = ScheduleDefinition(
 """Fires at :55 past every hour — 5 minutes *before* the top of the hour — so this hour's pull
 has landed by the time ``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
 
-The two schedules are deliberately not ordered against each other: production jobs couple through
-data at rest, never through run status, so a missed or late pull here leaves ``live_forecasts``
-running on time against whatever telemetry is already on disk rather than suppressing the
-forecast. Telemetry staleness is not yet recorded on the forecast row itself — only
-``nwp_init_time`` is. See
+``live_forecasts`` declares ``power_time_series_and_metadata`` as a dep, but the two run as
+separate jobs on separate schedules and nothing enforces the ordering at runtime. That is
+deliberate, not a gap: the offset is an optimisation for freshness, and if it is missed —
+because this pull failed, or ran long — ``live_forecasts`` still runs on time against whatever
+telemetry is already on disk. Making the ordering a precondition would convert one failed
+ingest into a missing forecast, which is the failure mode the whole design exists to avoid.
+
+(The NWP run used is stamped on every forecast row as ``nwp_init_time``, and
+``live_forecasts_are_healthy`` reports how many daily NWP runs were missing at forecast time;
+telemetry staleness is not yet recorded on the forecast row itself.) Rule: "never make one
+production job's run status a precondition for another's" —
+<https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
+The principle in full, with the trade it makes:
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status>."""
 
 ecmwf_ens_job = define_asset_job(
