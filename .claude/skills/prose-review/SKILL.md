@@ -12,7 +12,10 @@ description: >-
   applying any, and how to check that a restructure lost no information, and the scripts that apply
   a batch of findings and prove the page kept its structure. Load whenever prose is to be reviewed,
   reordered or simplified — a docs/ page, a README, a SKILL.md, a docstring, a literature review —
-  and whenever a reviewer asked to check prose has reported little or nothing.
+  and whenever a reviewer asked to check prose has reported little or nothing. Sweeping the
+  docstrings and comments in Python files has its own section: the word-count rule reverses, the
+  README collides with the module docstrings on the API page, and there are three guards to run
+  that a docs/ page never needs.
 ---
 
 # Reviewing prose that already exists
@@ -599,6 +602,85 @@ Moving paragraphs can break a bolded lead that referred to "the previous section
 fact before its new position's prerequisites are met. Re-run Passes A to E after a restructure, not
 just once at the start, and re-run the balanced-bold count with them.
 
+## Sweeping the prose inside Python files
+
+**A sweep of docstrings and comments follows every pass above, plus the mechanics below, and one
+rule that reverses the instinct the rest of this skill trains.** The prose lives in files that
+`ruff`, `ty` and `pytest` all have opinions about, two-thirds of it renders into the API docs
+beside the READMEs, and a docstring can describe behaviour the code stopped having. None of that
+applies to a `docs/` page.
+
+**Aim for a net-neutral or higher word count, and cut only excessive duplication.** This is the
+opposite of the default instinct on a prose task, and it is not negotiable: two attempts to shorten
+this repo's code prose were rejected, the first cutting `src/` by 29% and never merging. Losing
+information from a docstring is worse than a little duplication with `docs/`. **Say this at the top
+of every sub-agent brief**, because a reviewer asked to improve prose will otherwise recommend
+tightening, and every one of those findings has to be thrown away. The rules themselves — the
+duplication bar, worked examples, load-bearing links, Dagster docstrings, the README collision —
+are on [the code-style page](https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/)
+and are not repeated here.
+
+**Never delete prose in the same edit that adds a link.** Add the link beside the prose. Where
+prose genuinely has to go, that is a separate deletion, justified on its own and visible as such in
+the diff. The audit that produced this rule found ten passages whose reasoning had been *replaced*
+by a link mid-pull-request, six of which still had that reasoning on `main`.
+
+**One search shape finds one shape of fault.** A grep for `why X: <link>` found ten load-bearing
+links; a later pass reading the passages found four more that stated a claim and left its
+justification to the link, which no template would have matched. Budget a second sweep that reads
+rather than greps.
+
+**Check which packages render their README beside their module docstrings.** `docs/api/<pkg>/`
+pages `{% include %}` the README and then emit `::: module` directives, so a reader meets both at
+once and a README that restates a module docstring is the one deletion the duplication rule
+sanctions. Only the packages with a page under `docs/api/` are affected; the others are not, and
+their READMEs should usually grow rather than shrink.
+
+**Verify which worktree you are in before reading a single file, and give sub-agents the absolute
+path.** This repo keeps a worktree per branch under `.claude/worktrees/`, and a session's primary
+directory is often a bridge worktree on `main` rather than the branch under review. The failure is
+silent and it *inverts* your conclusion: `main` legitimately contains the text the branch removed,
+so a correct finding reads as false. Triaging one audit against the wrong worktree nearly rejected
+ten valid findings. Run `git rev-parse --abbrev-ref HEAD` first, and tell every sub-agent not to
+`cd` to the repository root.
+
+**Fix obviously-wrong prose you meet outside the nominal scope.** A prose sweep is the one time
+anybody reads these files closely, so filing a defect for later wastes the pass that found it. When
+a claim is checkably wrong — six passages called `init_time` "the NWP partition key" when
+`delta_store` partitions on two columns — correct it, and say in the pull-request body why the
+change reaches outside its stated scope.
+
+### Guards to run on a code prose sweep
+
+Three checks, none of which a `docs/` sweep needs:
+
+- **The abstract-syntax-tree guard**, which proves a prose-only change really was prose-only: parse
+  each file before and after, blank every string constant, and compare `ast.dump()`. Anything that
+  survives is a behavioural change, and belongs in the pull-request body as a list a reviewer can
+  reject as a unit — or in its own pull request.
+- **`scripts/check_docstring_signatures.py`**, for docstrings that document a parameter the
+  function does not have. It runs as a pre-commit hook, so a sweep only has to read its output.
+- **Link resolution against the *built* site**, not a guessed slug: `uv run mkdocs build` and then
+  check each URL's page and `#anchor` against the generated HTML. `scripts/check_docs_links.py`
+  does this repo-wide and is also a hook.
+
+Then the ordinary green-before-push set — `ruff check`, `ruff format`, `ty check`, `pytest`,
+`pymarkdown scan`, `mkdocs build --strict`.
+
+### What to run, and when
+
+**Sweep a package when that package changes materially, not on a calendar.** A monthly pass over
+unchanged code re-reads what it read last month and finds almost nothing, while the drift that
+matters is caused by events: a refactor that changes public signatures, a docs restructure that
+moves anchors, a measurement that supersedes a number quoted in three places. Trigger on those.
+
+**Use sub-agents to author the findings and a different, fresh sub-agent to review the diff.** An
+authoring agent cannot adversarially review its own work. Two reviews caught a wrong claim the
+authoring pass had introduced *and* an overclaim written during triage; one of them ran a mutation
+to check a comment's assertion about which test catches a bug, and found the comment named the
+wrong test. Verify every finding against the code before applying it — a wrong "fix" to a docstring
+costs more than a missed one, because the next reader trusts it.
+
 ## See also
 
 `long-form-prose` runs the planning discipline before any prose exists, for drafting rather than
@@ -606,6 +688,9 @@ reviewing. For a rewrite that adds whole new sections to an existing page, run t
 existing text first, then switch to `long-form-prose` to outline the new sections against the
 result. Outlining new material against a page whose own structure hasn't been checked risks
 building the new sections on prerequisites the existing page never actually establishes.
+
+`code-style` holds the rules a code prose sweep is measured against, and is where a new rule
+belongs; this skill holds only the procedure for applying them.
 
 `literature-review` owns the accuracy round, which is a separate pass from this one. Reach for its
 `rsub` helper only for a single hand-edit; a batch of findings goes through
