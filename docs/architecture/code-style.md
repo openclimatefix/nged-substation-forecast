@@ -224,8 +224,10 @@ Three places where a positional argument is right:
   — on a function those three render as ordinary prose rather than as parameter documentation, so
   the parameters end up undocumented while looking documented. Ruff's `D417` catches only the case
   where an `Args:` section is present and incomplete; a block under the wrong heading, and an entry
-  naming a parameter a rename removed, both pass every rule this repo configures.
-  `scripts/check_docstring_signatures.py` catches those two as a pre-commit hook. Nothing catches a
+  naming a parameter a rename removed, both pass every rule this repo configures. `pydoclint`
+  catches those two, as a pre-commit hook and a CI step, and also requires a `Returns:` section on
+  every function that returns something. Which of its checks this repo wants, and why each of the
+  others is switched off, is in the `[tool.pydoclint]` block in `pyproject.toml`. Nothing catches a
   stale name in the *prose* around the parameter list, which is why `compute_h3_grid_weights`
   described "a DataFrame" for months after it began taking a list — check the description against
   the signature whenever you rename anything.

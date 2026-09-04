@@ -606,14 +606,16 @@ just once at the start, and re-run the balanced-bold count with them.
 
 **A sweep of docstrings and comments follows every pass above, plus the mechanics below, and one
 rule that reverses the instinct the rest of this skill trains.** The prose lives in files that
-`ruff`, `ty` and `pytest` all have opinions about, two-thirds of it renders into the API docs
+`ruff`, `ty`, and `pytest` all have opinions about, two-thirds of it renders into the API docs
 beside the READMEs, and a docstring can describe behaviour the code stopped having. None of that
 applies to a `docs/` page.
 
-**Aim for a net-neutral or higher word count, and cut only excessive duplication.** This is the
-opposite of the default instinct on a prose task, and it is not negotiable: two attempts to shorten
-this repo's code prose were rejected, the first cutting `src/` by 29% and never merging. Losing
-information from a docstring is worse than a little duplication with `docs/`. **Say this at the top
+**Aim for a net-neutral or higher word count, and cut only excessive duplication.** A net-neutral
+target is the opposite of the default instinct on a prose task, and it is not negotiable: both
+attempts to shorten this repo's code prose drew the same objection. The first cut `src/` by 29% and
+was closed unmerged; the second targeted duplication rather than word count, cut 6%, and still drew
+review comments asking for `main`'s fuller wording back. Losing information from a docstring is
+worse than a little duplication with `docs/`. **Say this at the top
 of every sub-agent brief**, because a reviewer asked to improve prose will otherwise recommend
 tightening, and every one of those findings has to be thrown away. The rules themselves — the
 duplication bar, worked examples, load-bearing links, Dagster docstrings, the README collision —
@@ -658,8 +660,10 @@ Three checks, none of which a `docs/` sweep needs:
   each file before and after, blank every string constant, and compare `ast.dump()`. Anything that
   survives is a behavioural change, and belongs in the pull-request body as a list a reviewer can
   reject as a unit — or in its own pull request.
-- **`scripts/check_docstring_signatures.py`**, for docstrings that document a parameter the
-  function does not have. It runs as a pre-commit hook, so a sweep only has to read its output.
+- **`pydoclint`**, for a docstring whose `Args:` or `Returns:` section disagrees with the
+  signature. Ruff's `D417` sees only an `Args:` section that is present and incomplete, so it is
+  silent on the two failures a rename actually produces. `pydoclint` runs as a pre-commit hook and
+  as a CI step, so a sweep only has to read its output.
 - **Link resolution against the *built* site**, not a guessed slug: `uv run mkdocs build` and then
   check each URL's page and `#anchor` against the generated HTML. `scripts/check_docs_links.py`
   does this repo-wide and is also a hook.
@@ -679,7 +683,7 @@ authoring agent cannot adversarially review its own work. Two reviews caught a w
 authoring pass had introduced *and* an overclaim written during triage; one of them ran a mutation
 to check a comment's assertion about which test catches a bug, and found the comment named the
 wrong test. Verify every finding against the code before applying it — a wrong "fix" to a docstring
-costs more than a missed one, because the next reader trusts it.
+costs more than a missed fix, because the next reader trusts the docstring.
 
 ## See also
 

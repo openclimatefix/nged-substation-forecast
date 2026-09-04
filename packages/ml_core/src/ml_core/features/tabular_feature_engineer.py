@@ -165,6 +165,17 @@ def _engineer_features(
             analysis-proxy's ``available_at`` cut.
         local_timezone: IANA zone the local-time features (time of day, day of week, UTC
             offset) are computed in. Defaults to ``DEFAULT_LOCAL_TIMEZONE``.
+
+    Returns:
+        A ``pt.LazyFrame[AllFeatures]``, still lazy. Bulk mode returns one row per
+        ``time_series_id``, ``nwp_init_time``, ``valid_time``, and ``ensemble_member`` (or, with no
+        NWP requested, one row per ``time_series_id`` and ``valid_time``, with ``nwp_init_time``
+        null and ``power_fcst_init_time`` equal to ``valid_time``), minus each NWP run's hindcast
+        rows. Single-run mode returns one row per ``time_series_id``, ``valid_time``, and (when NWP
+        was requested) ``ensemble_member``, all sharing the one stamped ``power_fcst_init_time`` and
+        ``nwp_init_time``. Every row carries the observed ``power`` for that ``valid_time`` where
+        available and one column per name in ``selected_features``, alongside the identifying
+        columns above.
     """
     if nwp_init_time is not None and power_fcst_init_time is None:
         raise ValueError(
@@ -341,6 +352,14 @@ def _apply_post_join_features(
         processed_nwp: The processed NWP frame, required for weather lag features.
         historical_weather: The freshest-run weather frame, required for weather lag features.
         local_timezone: IANA zone the local-time features are computed in, when requested.
+
+    Returns:
+        ``raw_data`` with the requested feature columns added: local time features when
+        ``parsed_features.time_features`` is set, ``STATIC_FEATURE_REGISTRY`` columns for each
+        requested static feature, one column per requested lag (power lags via ``_apply_power_lag``,
+        weather lags via ``_apply_weather_lag``), and one column per requested rolling mean. Any
+        leaky lag or rolling-mean column is then nullified by ``_nullify_leaky_lags``. Still lazy;
+        the row count and order of ``raw_data`` are unchanged.
     """
     engineered_lf = raw_data
 

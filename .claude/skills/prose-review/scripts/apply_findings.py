@@ -309,6 +309,11 @@ def trim_common_tail(*, quote: str, replacement: str) -> tuple[str, str]:
 def locate(*, raw: str, quote: str) -> tuple[tuple[int, int] | None, int]:
     """Find `quote` in the projection of `raw`.
 
+    Args:
+        raw: The file text to search, before projection.
+        quote: The text to find, matched after both it and `raw` have their runs of whitespace
+            collapsed, so a quote that was re-wrapped still matches.
+
     Returns:
         `((start, end), 1)` in projection coordinates when the quote occurs exactly once, and
         `(None, count)` otherwise, so the caller can tell a missing quote from an ambiguous one.

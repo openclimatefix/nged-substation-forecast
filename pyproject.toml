@@ -46,6 +46,7 @@ dev = [
     "dagster-dg-cli",
     "numpy>=1.24",
     "pre-commit>=4.5.1",
+    "pydoclint>=0.7.7",
     "pytest>=9.0.2",
     "ruff>=0.14.13",
     "ty>=0.0.16",
@@ -302,6 +303,35 @@ indent-style = "space"
 line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = 100
+
+# pydoclint checks a docstring's `Args:` and `Returns:` sections against the signature, which is
+# the half of docstring drift ruff leaves uncovered. Ruff's D417 fires only when an `Args:` section
+# is *present and incomplete*: parameters filed under `Attributes:` instead of `Args:`, and an
+# `Args:` entry naming a parameter a rename removed, both pass every rule selected above.
+# `packages/geo/src/geo/h3.py` carried one of each for months. Ruff does ship DOC102 for the second
+# case, but only in preview, and implements neither DOC101 nor DOC103 for the first.
+#
+# The options below switch off the checks this repo does not want, each for its own reason.
+[tool.pydoclint]
+style = "google"
+# Types belong in the signature, where `ANN` already requires them and `ty` checks them. Repeating
+# them in the docstring gives them a second place to drift, and mkdocstrings renders the
+# signature's annotations either way.
+arg-type-hints-in-docstring = false
+check-return-types = false
+check-yield-types = false
+# A `Raises:` section is not a house rule, so DOC501/502/503 would report 25 functions that
+# deliberately do not carry one. Ruff ships DOC501 and DOC502 for whoever wants to adopt the rule
+# later; this is not that decision.
+skip-checking-raises = true
+# `__init__` may carry its own docstring. The alternative — DOC301, which demands the text move up
+# into the class docstring — conflicts with how the Patito models here are written.
+allow-init-docstring = true
+# The marimo notebooks, identified by directory the same way `.pre-commit-config.yaml` and
+# `tests/test_marimo_notebooks.py` identify them. A notebook cell is a function whose parameters
+# are the names other cells export, so an `Args:` section on one would document a data dependency
+# rather than an argument anybody passes.
+exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 
 [tool.pytest.ini_options]
 # importlib mode lets test modules in different directories share a basename (e.g.

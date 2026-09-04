@@ -129,6 +129,12 @@ def assess_upstream_grid_point_nulls(
             there by design, so counting it would report every healthy run as corrupt. False for
             the instantaneous ones, where lead-0 is an ordinary step and a null in it means what a
             null in any other step means.
+
+    Returns:
+        An `UpstreamNullRate` whose `per_variable` frame holds one row per counted variable,
+        sorted by variable name, with that variable's null grid-point count (`n_null`), the
+        count of (ensemble_member, lead_time) slices holding at least one null
+        (`n_affected_slices`), and the total grid-point count counted (`n_total`).
     """
     # Selected per variable rather than once on `ds`: this runs inside `ecmwf_ens` while the
     # whole downloaded run is still held in memory, and slicing the whole dataset would copy all

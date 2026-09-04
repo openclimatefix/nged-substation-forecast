@@ -28,6 +28,12 @@ def _apply_power_lag(
             observations don't vary by ensemble member, so each forecast-instance row joins to
             the single observed value for its lagged time.
         lag_feature: The lag to apply (its ``hours`` and output column name).
+
+    Returns:
+        ``engineered_features_lf`` with one new column added, named ``lag_feature.string_repr``,
+        holding the observed power at ``valid_time - lag_hours`` for that row's ``time_series_id``,
+        null where no observation exists at that lagged time. Still lazy; the left join preserves
+        every row and the row order of ``engineered_features_lf``.
     """
     lf_with_target_time = engineered_features_lf.with_columns(
         target_time=pl.col("valid_time") - pl.duration(hours=lag_feature.hours)
@@ -69,6 +75,13 @@ def _apply_weather_lag(
             ``(time_series_id, nwp_init_time, ensemble_member, valid_time)``.
         lag_feature: The lag to apply (its ``hours`` and output column name).
         historical_weather_lf: The freshest-run weather frame used for past target times.
+
+    Returns:
+        ``engineered_features_lf`` with one new column added, named ``lag_feature.string_repr``,
+        holding the same-run NWP value for a target time in the forecast window (``target_time >=
+        power_fcst_init_time``), or the freshest-run value for a target time in the past, null where
+        neither join finds a match. Still lazy; the two left joins preserve every row and the row
+        order of ``engineered_features_lf``.
     """
     base_col = lag_feature.base_col
 

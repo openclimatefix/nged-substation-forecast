@@ -72,6 +72,12 @@ def _build_ens_dataset(
         init_time_as_dim: If True, keep ``init_time`` as a size-1 dimension (the shape
             ``open_ecmwf_ens_run`` expects from the catalog). If False, reduce it to a scalar
             coordinate (the post-``open`` shape ``convert`` consumes).
+
+    Returns:
+        A dataset with all 13 downloaded ECMWF ENS variables on dims
+        ``(lead_time, ensemble_member, latitude, longitude)`` — plus a leading ``init_time``
+        dimension when ``init_time_as_dim`` is True — and a ``valid_time`` coordinate equal
+        to ``init_time`` plus each lead time.
     """
     lats = np.asarray(latitudes, dtype=np.float32)
     lons = np.asarray(longitudes, dtype=np.float32)
