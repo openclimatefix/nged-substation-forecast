@@ -174,8 +174,12 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         {"n_implausible_power_rows_dropped": downloaded.n_implausible_power_rows_dropped}
     )
 
-    # Save TimeSeriesMetadata. A roster failure must not stop the power write below; what that costs
-    # is in https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
+    # Save TimeSeriesMetadata. A roster failure must not stop the power write below: the roster is
+    # data NGED re-delivers every run, and the power series is not, so a roster fault must never
+    # stall the hourly ingest. The only cost is this run's metadata change, lost until the next
+    # successful upsert — and `live_forecasts` reads the promoted model's own frozen roster copy,
+    # not this one, so inference is unaffected. What that costs in full:
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
     try:
         upsert_metadata_stats = upsert_metadata(
             new_metadata=new_metadata, metadata_path=metadata_path, storage_options=storage_options
@@ -259,10 +263,15 @@ its 00Z run has actually landed, matching Dynamical's publication lag; shared wi
 
 _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
 """Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≥ 4h of coverage past the 08:30 UTC schedule
-(``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time. Applies to
-``NwpRunNotYetAvailable`` and ``NwpVariableWhollyMissing``, the two ways an upstream run says "not
-ready yet"; a genuine bug fails immediately instead of retrying for hours. Why those two failures
-are retried rather than failed outright, and why 4h is enough:
+(``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time — and past the
+3h25m a measured republication took. Applies to ``NwpRunNotYetAvailable`` and
+``NwpVariableWhollyMissing``, the two ways an upstream run says "not ready yet"; a genuine bug
+fails immediately instead of retrying for hours.
+
+Waiting is the right response to those two because Dynamical.org publishes each 00Z run as roughly
+40 separate Icechunk commits between 08:05 and 08:20 UTC, one per worker. A run part-way through
+that window is genuinely readable and genuinely incomplete: a variable whose worker has not
+committed yet reads as null across every member and step. Fuller reasoning:
 https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright
 
 "≥" rather than "≈" because only ``NwpRunNotYetAvailable`` is raised before the download.
@@ -444,8 +453,10 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
 
     # Download and convert. Both retryable failures mean "the upstream run is not ready yet", they
     # just say it at different points: the run is absent from the catalog, or it is present but a
-    # weather variable is still wholesale empty. Every other error still fails immediately. Why
-    # these two are retried rather than failed outright: see _ECMWF_ENS_MAX_RETRIES above, or
+    # weather variable is still wholesale empty. Every other error still fails immediately. Both
+    # are worth waiting out because a run is published as ~40 separate commits, so it can be
+    # readable and incomplete at once; the ladder is on _ECMWF_ENS_MAX_RETRIES above, and the
+    # upstream behaviour is at
     # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright
     try:
         ds_lazy = open_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
@@ -468,7 +479,9 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     # absorbs scattered corruption so completely that nothing downstream of it can see any. The
     # third asks whether the run is *whole*; a short run is the upstream provider misbehaving, so we
     # keep the rows that did arrive and WARN rather than discarding the run. Computed before the
-    # write, not merely under a guard — rule 7 of
+    # write, not merely under a guard: the ordering is what matters, because a bug that raised
+    # after the write would leave rows committed on a run Dagster reports as failed, so the table
+    # and the run history would disagree about what landed. Rule 7 of
     # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules
     try:
         quality = assess_nwp_quality(nwp)

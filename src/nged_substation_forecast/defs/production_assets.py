@@ -224,8 +224,13 @@ class LiveForecastsConfig(Config):
             partition_mapping=TimeWindowPartitionMapping(start_offset=-16, end_offset=0),
         ),
         "power_time_series_and_metadata",
-        # `promoted_model` is deliberately NOT a dep: the model reaches
-        # `Settings.production_model_path` by filesystem, not by a Dagster data-flow edge. See
+        # `promoted_model` is deliberately NOT a dep. The model reaches
+        # `Settings.production_model_path` out-of-band, by a different mechanism per environment:
+        # the `promoted_model` asset (an MLflow fetch) when running on a laptop, and the Docker
+        # image it was baked into when running on the production box. Either way it is a filesystem
+        # input, not a Dagster data-flow edge. Declaring the edge would render a permanently
+        # un-materialised `promoted_model` parent on the box, which has no MLflow and never runs
+        # promotion. The principle in full:
         # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status
         # The docstring below records the coupling instead.
     ],

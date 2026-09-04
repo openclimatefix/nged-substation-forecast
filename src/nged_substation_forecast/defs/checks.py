@@ -130,8 +130,9 @@ row order in the late-series table (never-reported series listed before merely-s
 _POWER_DATA_STALENESS_THRESHOLD: Final[timedelta] = timedelta(hours=24)
 """A ``time_series_id`` is 'late' if its most recent observation is older than this.
 
-Why 24 hours clears NGED's normal publishing jitter while still catching a genuine stall the same
-day:
+NGED publishes at irregular, several-hours-apart intervals and our pipeline back-fills gaps
+automatically once the feed recovers, so 24 hours is comfortably past normal jitter while still
+catching a genuine multi-slot stall the same day. Fuller reasoning:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>
 """
 
@@ -483,8 +484,10 @@ _NWP_RUN_EXPECTED_ON_DISK_BY: Final[timedelta] = timedelta(hours=14)
 
 Derived from ``ecmwf_ens_schedule``'s 08:30 UTC start plus its retry ladder, with the worst-case
 retry paying a download and convert of its own — about 12:40 UTC, at the ~1 min/run measured in
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/>. Why 14
-hours specifically, and the margin behind it:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/>. That leaves
+81 minutes of margin to 14:00 UTC, spread over 9 attempts: the deadline is breached only if
+download-and-convert *averages* about 10 minutes across all of them, not if one attempt is slow.
+Fuller reasoning:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check>
 
 At 14 hours the 00:00, 06:00 and 12:00 slots expect yesterday's run and the 18:00 slot expects
@@ -514,8 +517,9 @@ truncated.
 ECMWF ENS covers about 15 days from its ``init_time``, so a *healthy* slot — 12 to 30 hours past
 that ``init_time`` — reaches roughly 13.75 of the 14 days asked for, well clear of half. The only
 ways to fall below half are a partially-ingested run or NWP about a week stale, and the latter is
-already reported as missed runs. Why half specifically, and why a tighter floor would risk a false
-alarm:
+already reported as missed runs. A tighter floor would start competing with the missed-run count
+for the same fault while risking false alarms; half catches the case nothing else sees, which is
+fresh-but-truncated NWP. Fuller reasoning:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check>
 """
 

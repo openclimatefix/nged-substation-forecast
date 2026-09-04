@@ -225,7 +225,10 @@ def _time_series_ids_missing_metadata(
     the metadata frame is already eager and already filtered to ``time_series_ids``.
 
     The CV assets raise on a non-empty answer; ``live_forecasts`` does not, and reports the
-    missing series through ``live_forecasts_are_healthy`` instead. See
+    missing series through ``live_forecasts_are_healthy`` instead. CV is R&D and fails fast, so a
+    silently-shrunk population can never poison a leaderboard comparison; ``live_forecasts`` is
+    production and must never raise on an absent input, so it degrades and reports the gap. The
+    split in full:
     <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
     """
     return sorted(set(time_series_ids) - set(metadata["time_series_id"].to_list()))

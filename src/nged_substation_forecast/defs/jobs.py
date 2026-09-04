@@ -255,11 +255,19 @@ def _reject_changed_identity(
 ) -> None:
     """Raise if re-registering ``experiment_name`` would change its identity.
 
-    An experiment's identity is its config, so a changed config is rejected as a new experiment
-    rather than accepted as an update — see
+    An experiment's identity **is** its config: every fold of an experiment must be trained and
+    scored under one config, or its leaderboard row silently mixes two different models. Folds
+    already materialised under the old config cannot be un-trained, and the assets read the config
+    back from the experiment tag (``load_experiment_forecaster``), so re-pointing that tag
+    mid-flight would poison every comparison built on the experiment. A changed config is therefore
+    a *new* experiment, and the only correct answer is to reject it — before anything has been
+    written. Fuller reasoning:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-an-experiment-under-a-changed-config-is-rejected>
-    for why. Called with the experiment's stored tags before any write, so a rejection leaves
-    MLflow exactly as it found it.
+
+    Called with the experiment's stored tags before any write, so a rejection leaves MLflow exactly
+    as it found it. A tag absent from ``stored_tags`` is not a change: that is the untagged
+    experiment ``get_or_create_experiment`` creates as its self-healing fallback, which this
+    registration is entitled to complete.
 
     The decision to reject *is* the list of differences to report, so the error can never claim a
     change it cannot then name.
