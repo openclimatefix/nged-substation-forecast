@@ -177,6 +177,17 @@ Three places where a positional argument is right:
     """
     ```
 
+- **A package README must never restate a module docstring, because both render on the same
+  page.** Each `docs/api/<package>/index.md` includes the package README and then the `:::`
+  directives that render the package's docstrings, so an overlap between the two reaches the
+  reader twice within one screen. On that page the README is the contents page and the docstrings
+  are the content: the README says what the package owns, what it deliberately does not own and
+  which neighbouring package does, and gives one line per module pointing down. Where a mechanism
+  needs explaining, the README names it and defers — `delta_store`'s "The trick and its
+  preconditions are rigorously documented on the function" is the shape to copy. Which of the
+  three homes a given paragraph belongs in is decided by the tests in [Documentation
+  Guide](../documentation-guide.md#docstrings-readmes-and-docs-hold-three-different-jobs).
+
 ## Data Handling
 
 - **Tabular Data**: Use **Polars** (`import polars as pl`) for dataframes. Pandas is strictly
