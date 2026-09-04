@@ -77,8 +77,11 @@ LIVE_FORECAST_MONITOR_SLUG: Final[str] = "live-forecasts"
 """Slug of the Sentry cron monitor fed by ``live_forecasts``' success heartbeat.
 
 Laptop testing must use a *different*, throwaway slug (e.g. ``"live-forecasts-test"``) so an
-intermittently-run laptop never registers a stale environment on the production monitor. Why the
-slug and the ``environment`` tag are both needed:
+intermittently-run laptop never registers a stale environment on the production monitor. The
+``environment`` tag alone is not enough: this slug is a constant here in the source, not a setting,
+so a laptop that merely switched ``Settings.sentry_monitor_forecasts`` on would check in to the
+shared ``"live-forecasts"`` monitor and then stop, leaving it expecting a 6-hourly heartbeat the
+laptop will never send. Fuller reasoning:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#separating-laptop-telemetry-from-production>"""
 
 LIVE_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {  # noqa: UP037

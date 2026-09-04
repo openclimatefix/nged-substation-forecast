@@ -92,7 +92,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     This asset is the entry point for NGED data into the pipeline. It fetches the latest available
     data from NGED's external S3 bucket, appends new readings to the local ``PowerTimeSeries`` Delta
     table, and upserts the latest substation metadata parquet. Nothing cleans this data further:
-    ``eligible_time_series``, ``effective_capacity``, ``trained_cv_model`` and
+    ``eligible_time_series``, ``effective_capacity``, ``trained_cv_model``, and
     ``cv_power_forecasts`` in ``defs/cv_assets.py``, and ``live_forecasts`` in
     ``defs/production_assets.py``, all read the Delta table this asset writes directly.
 
@@ -603,7 +603,10 @@ def _nwp_quality_check_result(
     ``passed`` follows the H3 cells alone, not the upstream rate. The upstream rate is a trend
     across runs rather than a verdict on this one, and the archive has no threshold that separates
     a healthy feed from a degrading one, so it is published and plotted rather than gated. The two
-    populations and why they are counted separately:
+    are not comparable as rates either: aggregation renormalises each cell over the grid points
+    that supplied a value, so a corrupt run can have null grid points and no null cell at all.
+    ``_NWP_QUALITY_CHECK_DESCRIPTION`` puts that in front of the operator; the measured archive
+    rates are at
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#two-populations-counted-separately>.
     Escalating a badly-degraded run is
     <https://github.com/openclimatefix/nged-substation-forecast/issues/501>.

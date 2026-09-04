@@ -59,7 +59,7 @@ def load_engineering_inputs(
       member-early sort (``delta_store.nwp.NWP_SORT_COLS``) additionally lets Parquet row-group
       stats skip most of each partition outright for this predicate, provided the predicate
       reaches the Parquet scan unchanged — which requires ``Nwp``'s declared ``ensemble_member``
-      dtype to match what's physically on disk. Why the dtype has to match, measured:
+      dtype to match what's physically on disk. Measured effect on pruning:
       <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
     - ``h3_index``: restricted to the cells the requested series sit in. There is a *many-to-one*
       relationship between ``time_series_id`` and ``h3_index`` (one NWP cell covers several series),

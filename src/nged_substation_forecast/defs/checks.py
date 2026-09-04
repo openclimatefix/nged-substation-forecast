@@ -487,7 +487,9 @@ retry paying a download and convert of its own — about 12:40 UTC, at the ~1 mi
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/>. That leaves
 81 minutes of margin to 14:00 UTC, spread over 9 attempts: the deadline is breached only if
 download-and-convert *averages* about 10 minutes across all of them, not if one attempt is slow.
-Fuller reasoning:
+The deadline is deliberately generous, because the two errors cost very different amounts: too
+tight and the check cries wolf on every morning the download merely ran slowly, too loose and a
+genuinely missed run is reported one 6-hourly slot later than it might have been. Fuller reasoning:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check>
 
 At 14 hours the 00:00, 06:00 and 12:00 slots expect yesterday's run and the 18:00 slot expects
