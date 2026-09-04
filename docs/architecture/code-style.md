@@ -151,10 +151,18 @@ Three places where a positional argument is right:
   it, and the other names the example and links. This is the one case where the duplication bar is
   low rather than high, and it holds between two docstrings in the same file as much as between
   code and `docs/`.
-- **Link into the docs generously, but never make a link load-bearing.** Every non-obvious claim in
-  a docstring or comment is worth a rendered-site link to the page that develops it, and a docstring
-  can carry several. The links cost a line each and are read by both people and coding agents, for
-  whom they are the cheapest route to context. A link is *additional context only*: a reader must be
+- **Link into the docs generously, but never make a link load-bearing.** Where a docs page develops
+  an argument the code rests on, link to it, and a docstring can carry several such links. The links
+  cost a line each and are read by both people and coding agents, for whom they are the cheapest
+  route to context.
+
+    **A long explanation does not oblige you to create a docs page.** An argument that matters only
+    to the one piece of code it sits beside belongs in that docstring or comment, developed at
+    whatever length it needs, and gets no page and no link. `docs/` is for arguments a reader
+    outside this function needs — because they span several modules, because someone browsing the
+    docs would look for them, or because they outlive the code that prompted them. Adding a page
+    per long comment bloats `docs/` with material nobody browsing it wants, and leaves the code
+    poorer for having exported its own reasoning. A link is *additional context only*: a reader must be
   able to understand the prose in the code without following any of them. Every link is a
   nice-to-have, never a requirement.
 

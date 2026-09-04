@@ -80,13 +80,15 @@ into `docs/` for rationale that spans the package. Pages under `docs/` link *dow
 for authoritative signatures and semantics, and do not restate them, because mkdocstrings has
 already published them.
 
-**A measurement lives where the decision it justifies is made, and is cited everywhere else.** The
-choice to round `power_fcst` to a 13-bit significand is made in `delta_store.power_forecasts`, so
-the measured effect of that choice belongs in that module's docstring;
-[Performance](architecture/performance.md) cites it as a system-level consequence rather than
-repeating the figures, and the README says the package makes the trade without giving the numbers a
-third time. A measurement no single symbol owns — peak memory across a cross-validation fold, say —
-belongs on the `docs/` page alone.
+**A measurement has one home — the place the decision it justifies is made — and that copy is the
+one kept up to date.** The choice to round `power_fcst` to a 13-bit significand is made in
+`delta_store.power_forecasts`, so the measured effect of that choice belongs in that module's
+docstring. Another page may restate the figure where its own reader needs it, as
+[Performance](architecture/performance.md) does, but should say where the decision lives so a later
+change knows what else to update. Restating a measurement is how it goes stale: a fold's row count
+appeared in three places, and when the fold gained series every copy became wrong at once. A
+measurement no single symbol owns — peak memory across a cross-validation fold, say — belongs on the
+`docs/` page alone.
 
 ### Which place do I use?
 
@@ -107,4 +109,4 @@ belongs on the `docs/` page alone.
 | Plan how to implement an issue, before writing code | `plans/<branch-name>.md` on that issue's branch (one file per branch, deleted on merge) |
 | Explain what a function guarantees, what a caller must not assume, or why *this* implementation | The symbol's **docstring** — everything that would die with the symbol. Rendered onto the API page by mkdocstrings |
 | Explain what a package is for, where its boundary against neighbouring packages falls, or what its modules are | The **package README** — the contents page for the docstrings rendered beneath it. Never restate a docstring here; both land on one page |
-| Record a measured number | Wherever the decision it justifies is made. Cite it from the other two homes rather than repeating the figures |
+| Record a measured number | Wherever the decision it justifies is made — that copy is the one kept up to date. Another page may restate the figure where its reader needs it, but should name where the decision lives |
