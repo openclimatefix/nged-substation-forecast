@@ -150,7 +150,12 @@ def remove_small_files_from_listing(
 
 
 class NoNewData(Exception):
-    """Raised by `download_and_parse_files` when none of its listed files yielded a power row."""
+    """Raised by `download_and_parse_files` when none of its listed files carried power data.
+
+    Raised when the file listing was empty, or when every listed file's ``data`` field was null.
+    A file whose ``data`` field is present contributes a DataFrame even when every row in it is
+    dropped as implausible, so a file that yields zero usable rows does not raise.
+    """
 
 
 class DownloadAndParseResult(NamedTuple):
@@ -186,9 +191,11 @@ def download_and_parse_files(
         what each field holds.
 
     Raises:
-        NoNewData: if none of `paths_df`'s files yielded a single power-observation row — either
-            because `paths_df` was empty, or because every file's `data` field was null (NGED's
-            meter reported nothing for that period).
+        NoNewData: if `paths_df` was empty, or if every listed file's `data` field was null
+            (NGED's meter reported nothing for the period each file covers). The guard counts
+            the DataFrames collected rather than the rows in them, so a file whose `data` field
+            is present but whose every row is dropped as implausible still counts, and does not
+            raise.
     """
     metadata_dfs = []
     power_time_series_dfs = []
@@ -253,10 +260,14 @@ class TimeSeriesCoverage(pt.Model):
     ``first_time``/``last_time`` are the earliest/latest observation ``time`` for each
     ``time_series_id``. A transient intermediate (never persisted): the freshness asset check
     reads ``last_time`` to detect staleness, ``select_new_rows`` reads ``last_time`` to find
-    genuinely-new rows, and CV fold-eligibility (``eligible_time_series_ids``) reads both. See
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>
-    for why the freshness check reads on-disk recency rather than the asset's materialisation
-    timestamp.
+    genuinely-new rows, and CV fold-eligibility (``eligible_time_series_ids``) reads both.
+
+    The freshness check reads this on-disk recency rather than the asset's materialisation
+    timestamp because a materialisation-freshness policy would miss the failure that matters: when
+    NGED's telemetry stalls, the ingest asset keeps materialising successfully on schedule, and
+    writes nothing. The materialisation looks fresh; the newest observation on disk does not. Full
+    reasoning:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>.
     """
 
     time_series_id: int = _get_time_series_id_dtype(unique=True)

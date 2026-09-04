@@ -21,7 +21,7 @@ list_timeseries_json_files`, etc.).
 - `nged_data.storage.download_and_parse_files(store, paths_df)` — downloads and parses each
   listed file, returning a `DownloadAndParseResult` of `metadata` (`TimeSeriesMetadata`),
   `power_time_series` (`PowerTimeSeries`), and `n_implausible_power_rows_dropped`. Raises
-  `NoNewData` if none of the listed files yielded a single power-observation row.
+  `NoNewData` if the listing was empty, or if every listed file's `data` field was null.
 - `nged_data.storage.select_new_rows(time_series, delta_path, storage_options=None)` — filters
   `time_series` down to rows newer than what the `power_time_series` Delta table at `delta_path`
   already holds, per `time_series_id`. Accepts either `PowerTimeSeries` rows, compared on `time`,
