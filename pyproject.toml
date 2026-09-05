@@ -46,7 +46,6 @@ dev = [
     "dagster-dg-cli",
     "numpy>=1.24",
     "pre-commit>=4.5.1",
-    "pydoclint>=0.7.7",
     "pytest>=9.0.2",
     "ruff>=0.14.13",
     "ty>=0.0.16",
@@ -310,6 +309,15 @@ docstring-code-line-length = 100
 # `Args:` entry naming a parameter a rename removed, both pass every rule selected above.
 # `packages/geo/src/geo/h3.py` carried one of each for months. Ruff does ship DOC102 for the second
 # case, but only in preview, and implements neither DOC101 nor DOC103 for the first.
+#
+# pydoclint is deliberately NOT a dependency of this workspace, and is run from an isolated
+# ephemeral environment instead. It requires `docstring-parser-fork` while Dagster requires
+# `docstring-parser`, and both distributions install a top-level `docstring_parser` module — so in
+# a shared virtual environment whichever is installed last wins the files, and pydoclint fails at
+# import with `cannot import name 'DocstringYields'`. Which one wins depends on install order, so
+# a `uv sync` can break the linter without anything in this file changing. `uv run --isolated
+# --no-project --with pydoclint` gives pydoclint an environment of its own; the config below is
+# still read, because pydoclint looks for pyproject.toml in the working directory.
 #
 # The options below switch off the checks this repo does not want, each for its own reason.
 [tool.pydoclint]

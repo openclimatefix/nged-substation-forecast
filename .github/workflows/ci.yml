@@ -46,7 +46,7 @@ jobs:
       # compares the whole of `Args:` and `Returns:` against the signature. See `[tool.pydoclint]`
       # in pyproject.toml.
       - name: Docstring lint (pydoclint)
-        run: uv run --no-sync pydoclint --quiet .
+        run: uv run --isolated --no-project --with pydoclint pydoclint --quiet .
 
       - name: Type-check (ty)
         run: uv run --no-sync ty check

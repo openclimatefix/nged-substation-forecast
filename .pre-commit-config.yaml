@@ -94,7 +94,7 @@ repos:
       # pyproject.toml says which of its checks this repo wants and why.
       - id: pydoclint
         name: pydoclint (docstrings match signatures)
-        entry: uv run pydoclint --quiet
+        entry: uv run --isolated --no-project --with pydoclint pydoclint --quiet
         language: system
         types: [python]
         exclude: *marimo_notebooks
