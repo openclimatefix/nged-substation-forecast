@@ -6,7 +6,10 @@ We convert the ECMWF ENS 0.25 degree data to these H3 resolution 5 hexagons:
 
 ![Map of Great Britain using H3 resolution 5 hexagons](../geo/assets/map-of-Great-Britain-H3-resolution-5.png)
 
-> **Note:** The generic geospatial logic for mapping latitude/longitude grids to H3 hexagons has been extracted to the `packages/geo` package. This package (`dynamical_data`) focuses specifically on the ingestion, processing, and storage of time-varying NWP datasets like ECMWF. The H3 grid weights are provided as a Dagster asset from the `geo` package, eliminating the need for precomputed static files.
+> **Note:** The generic geospatial logic for mapping latitude/longitude grids to H3 hexagons lives
+> in the `packages/geo` package. This package (`dynamical_data`) focuses specifically on the
+> ingestion, processing, and storage of time-varying NWP datasets like ECMWF. The H3 grid weights
+> arrive as a Dagster asset from the `geo` package, so no precomputed static file is needed.
 
 ## Data storage experiments
 
@@ -14,7 +17,11 @@ The storage format itself lives in `delta_store.nwp` (writer properties, sort or
 this section records the measurements behind it. Full before/after detail is in
 [PR #271](https://github.com/openclimatefix/nged-substation-forecast/pull/271); earlier
 experiments (UInt8/Int16 affine quantisation, codec and sort-order sweeps) are in this file's
-git history.
+git history. The same measure-before-you-optimise approach, and the NWP and `power_forecasts`
+storage numbers side by side, are summarised in [Performance and
+Scale](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed),
+which frames both tables' storage choices as an instance of [design principle 12, measure; do not
+assume](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#12-measure-do-not-assume).
 
 **Current scheme:** physical-unit `Float32`, every continuous variable rounded to a 13-bit
 significand (max relative error 2⁻¹³ ≈ 1.2×10⁻⁴ — measured ≤ 0.004 °C for temperature, ≤ 8 Pa
@@ -23,9 +30,9 @@ ZSTD level 3.
 
 **How much space does GB-wide ECMWF ENS take?** One daily run (1,671 H3 cells × 51 members ×
 85 lead times, up to ~7.24M rows) averages ~113 MB, so a year is **~41 GB**. The full local
-development table — 810 daily runs (Apr 2024 → Jun 2026, 1.57 billion rows) — is **86 GB**.
+development table — 810 daily runs (Apr 2024 → Jun 2026, ~5.9 billion rows) — is **86 GB**.
 
-**Storage** (9 real partitions spread across every season):
+**Storage** (nine real partitions spread across every season):
 
 | Config | avg MB/partition | extrapolated GB/yr |
 |---|---:|---:|
@@ -42,12 +49,12 @@ planes. Writer properties are data-dependent — measure per table.
 **Read path** — the member-early sort means each approx 1M-row parquet row group spans only a few
 ensemble members, so a single-member read (every training run reads just the control member)
 skips most row groups via min/max stats. Measured on a real 29-day, 9-cell, control-member
-collect: **~5× faster, ~5× less peak memory** (0.15 s / ~1 GB → 0.02–0.04 s / approx 205 MB), for a
+collect: **~5× faster, ~5× less peak memory** (0.15 s / ~1 GB → 0.02–0.04 s / ~205 MB), for a
 ~2% storage cost.
 
 **Per-variable keep_bits: considered and rejected (2026-07).** Since Dynamical's upstream
 precision caps the real information at 7–12 significand bits per variable, budgets matched to
-upstream would compress better than the uniform 13. Measured on 4 seasonal partitions through
+upstream would compress better than the uniform 13. Measured on four seasonal partitions through
 the exact production write path (error columns = error *added* on top of today's stored
 values; wind speed's power impact is ~3× its relative error because the speed-to-power curve
 is roughly cubic):

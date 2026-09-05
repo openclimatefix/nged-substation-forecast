@@ -1,7 +1,7 @@
 """Shared fixtures for the ``dynamical_data`` tests.
 
 These build in-memory ``xarray`` datasets that mimic the ECMWF ENS structure the code consumes,
-plus small :class:`H3GridWeights` frames, so every test runs fully offline (no Dynamical.org
+plus small `H3GridWeights` frames, so every test runs fully offline (no Dynamical.org
 network access).
 """
 
@@ -125,7 +125,7 @@ def _build_h3_grid(
     nwp_lon: Sequence[float],
     proportion: Sequence[float],
 ) -> pt.DataFrame[H3GridWeights]:
-    """Build a valid :class:`H3GridWeights` frame from column values."""
+    """Build a valid `H3GridWeights` frame from column values."""
     return (
         pt.DataFrame(
             {

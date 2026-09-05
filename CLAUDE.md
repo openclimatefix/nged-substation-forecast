@@ -471,7 +471,7 @@ in [`docs/design-philosophy/engineering-hypotheses.md`](docs/design-philosophy/e
 | `contracts` | Patito data schemas (the single source of truth for all data shapes) |
 | `delta_store` | Physical storage policy for Delta tables: parquet writer properties, sort orders, significand rounding, write helpers |
 | `ml_core` | Feature engineering and `BaseForecaster` abstract class |
-| `nged_data` | Reading NGED JSON files from S3 and writing to Delta Lake |
+| `nged_data` | Reading NGED JSON files from S3, and upserting the metadata roster to parquet. The power Delta write itself lives in `defs/assets.py` |
 | `dynamical_data` | Downloading ECMWF ensemble NWP from Dynamical.org |
 | `geo` | H3 spatial indexing utilities |
 | `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection, `NWP_PUBLICATION_DELAY_HOURS`) |

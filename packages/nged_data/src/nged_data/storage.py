@@ -1,4 +1,12 @@
-"""Reading NGED's telemetry JSON from S3 and writing power observations and metadata to storage."""
+"""Listing, downloading, and parsing NGED's telemetry JSON from S3.
+
+Each file yields `TimeSeriesMetadata` describing one series and `PowerTimeSeries` power
+observations from it. The metadata is upserted here, into a Parquet roster (see
+`upsert_metadata`). The power observations are not: this module never writes `PowerTimeSeries`
+rows to disk — they are returned to the caller, which appends them to the `power_time_series`
+Delta table. `time_series_coverage` and `select_new_rows` read that same Delta table, to find
+what is new, but neither writes to it.
+"""
 
 import logging
 from collections.abc import Sequence
@@ -38,14 +46,14 @@ class _ProcessedFileListing(pt.Model):
         dtype=UTC_DATETIME_DTYPE,
         description=(
             "The start of the time window recorded by the time series data in the JSON file,"
-            " according to the Unix epoch in the path"
+            " parsed from the millisecond Unix timestamp encoded in the path"
         ),
     )
     end_time: int = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
         description=(
             "The end of the time window recorded by the time series data in the JSON file,"
-            " according to the Unix epoch in the path"
+            " parsed from the millisecond Unix timestamp encoded in the path"
         ),
     )
 
@@ -55,8 +63,21 @@ def list_timeseries_json_files(
 ) -> pt.DataFrame[_ProcessedFileListing]:
     """List all the timeseries JSON files in NGED's S3 bucket.
 
-    The paths are assumed to be of the form:
-    timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+    Each path encodes `start_time`, `end_time`, and `time_series_id`, and is assumed to be of the
+    form:
+
+        timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+
+    `_process_file_listing` parses those three fields back out, and its aligned comment traces the
+    regex against this same key.
+
+    A key that does not match yields null captures and fails `_ProcessedFileListing.validate`,
+    which aborts the listing for the whole bucket rather than skipping the one object. That is
+    deliberately stricter than the null-`data` handling in `download_and_parse_files`, which logs
+    the offending file and carries on: a malformed reading is one of NGED's meters misbehaving,
+    but a key we cannot parse means NGED's naming convention has changed, so every `start_time`,
+    `end_time` and `time_series_id` this function returns is then suspect — including the ones
+    parsed from the keys that still match.
     """
     raw_file_listing: list[_RawFileListItem] = []
     total_objects = 0
@@ -80,10 +101,9 @@ def _process_file_listing(
 ) -> pt.DataFrame[_ProcessedFileListing]:
     """Create DataFrame of paths.
 
-    Extracts the start_time, end_time, and time_series_id from the path string. The input paths
-    should be of the form:
-
-    timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+    Extracts `start_time`, `end_time`, and `time_series_id` from each path string, whose format
+    `list_timeseries_json_files` documents. The aligned comment below traces the regex against a
+    real key.
     """
     paths_df = (
         pl.DataFrame(raw_file_listing)
@@ -117,7 +137,7 @@ def remove_small_files_from_listing(
 ) -> pt.DataFrame[_ProcessedFileListing]:
     """Remove files too small to carry any readings.
 
-    This is used to skip NGED JSON files that have no `data` field, so `download_and_parse_files`
+    The filter skips NGED JSON files that have no `data` field, so `download_and_parse_files`
     never has to fetch and parse them only to discard the result. It is an optimisation, not a
     correctness requirement: `download_and_parse_files` already tolerates a null `data` field.
 
@@ -127,11 +147,13 @@ def remove_small_files_from_listing(
     larger — zero-reading examples measured between 4,405 and 20,148 bytes — so the WKT-less
     floor is the binding constraint on the threshold.
 
-    That 68-byte gap comes from V1's 33 series, and it is narrow enough that V2's ~2,500 series
-    want re-measuring before this default is trusted there. Two things would close it: a populated
-    `information` field, which `TimeSeriesMetadata` records as always null in the V1 trial area,
-    would push a zero-reading file above 520; and a substation name shorter than any in V1 would
-    pull a one-reading file below it. Re-run the measurement rather than assume the gap survives.
+    That 68-byte gap comes from V1's 32 series ([phased
+    rollout](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#phased-rollout)),
+    and it is narrow enough that V2's ~2,500 series want re-measuring before this default is
+    trusted there. Two changes would close it: a populated `information` field, which
+    `TimeSeriesMetadata` records as always null in the V1 trial area, would push a zero-reading
+    file above 520; and a substation name shorter than any in V1 would pull a one-reading file
+    below it. Re-run the measurement rather than assume the gap survives.
     """
     n_files_before_filter = file_listing.height
     filtered = file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
@@ -142,7 +164,12 @@ def remove_small_files_from_listing(
 
 
 class NoNewData(Exception):
-    """Raised when a listing of NGED files yields no rows we have not already stored."""
+    """Raised by `download_and_parse_files` when none of its listed files carried power data.
+
+    Raised when the file listing was empty, or when every listed file's ``data`` field was null.
+    A file whose ``data`` field is present contributes a DataFrame even when every row in it is
+    dropped as implausible, so a file that yields zero usable rows does not raise.
+    """
 
 
 class DownloadAndParseResult(NamedTuple):
@@ -161,11 +188,29 @@ class DownloadAndParseResult(NamedTuple):
 def download_and_parse_files(
     store: obstore.store.S3Store, paths_df: pt.DataFrame[_ProcessedFileListing]
 ) -> DownloadAndParseResult:
-    """Load data end_time by end_time, in order.
+    """Download and parse each listed file, grouped and processed end_time by end_time, in order.
 
-    Loading in order means more recent data overwrites older duplicates, if there are any.
+    Processing in `end_time` order means that where two files cover overlapping periods for the
+    same `time_series_id`, the more recent file's readings overwrite the older file's duplicate
+    rows in the `unique(..., keep="last")` dedupe below.
 
-    Raises NoNewData if there is no new data.
+    Args:
+        store: The NGED S3 bucket to download each file from.
+        paths_df: The file listing to process — typically already filtered by
+            `remove_small_files_from_listing` and `select_new_rows`.
+
+    Returns:
+        A `DownloadAndParseResult` bundling every file's parsed `TimeSeriesMetadata` and
+        `PowerTimeSeries` rows, deduplicated across files — see `DownloadAndParseResult`'s
+        docstring for what each field holds.
+
+    Raises:
+        NoNewData: if `paths_df` was empty, or if every listed file's `data` field was null
+            (NGED's meter reported nothing for the period each file covers). The guard counts
+            the DataFrames collected rather than the rows in them, so a file whose `data` field
+            is present but whose every row is dropped as implausible still counts, and does not
+            raise. The `power_time_series_and_metadata` asset catches `NoNewData` and reports an
+            empty ingest, so an empty listing degrades the run rather than failing it.
     """
     metadata_dfs = []
     power_time_series_dfs = []
@@ -231,6 +276,13 @@ class TimeSeriesCoverage(pt.Model):
     ``time_series_id``. A transient intermediate (never persisted): the freshness asset check
     reads ``last_time`` to detect staleness, ``select_new_rows`` reads ``last_time`` to find
     genuinely-new rows, and CV fold-eligibility (``eligible_time_series_ids``) reads both.
+
+    The freshness check reads this on-disk recency rather than the asset's materialisation
+    timestamp because a materialisation-freshness policy would miss the failure that matters: when
+    NGED's telemetry stalls, the ingest asset keeps materialising successfully on schedule, and
+    writes nothing. The materialisation looks fresh; the newest observation on disk does not. Full
+    reasoning:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>.
     """
 
     time_series_id: int = _get_time_series_id_dtype(unique=True)
@@ -249,19 +301,23 @@ def time_series_coverage(
     the Polars 32-bit row-count wraparound even on a very large table (see
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/#data-handling>).
 
-    Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops
-    the ``power`` column, but a group-wise ``min``/``max`` cannot be answered from Parquet
-    row-group statistics (no engine on our stack does aggregate-from-statistics), so every
-    ``time``/``time_series_id`` value is read; computing both bounds instead of one is ~20%
-    more wall-clock and no extra memory (the shared scan dominates). The ``collect`` uses the
-    streaming engine to keep peak memory bounded — the freshness check runs hourly on a small
-    control-plane VM. Measured on a synthetic V2 table (2,500 series, half-hourly, partitioned
-    by ``time_series_id``) for a year of history (43.8M rows): streaming ~0.21 s / ~190 MB peak,
-    versus ~1.3 GB peak for the in-memory engine — same result, ~7x less memory. Cost scales
-    linearly with accumulated history. If the scan ever becomes a problem, both bounds can
+    Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops the
+    ``power`` column, but a group-wise ``min``/``max`` cannot be answered from Parquet row-group
+    statistics (no engine on our stack does aggregate-from-statistics), so every
+    ``time``/``time_series_id`` value is read; computing both bounds instead of one is ~20% more
+    wall-clock and no extra memory (the shared scan dominates). The ``collect`` uses the streaming
+    engine to keep peak memory bounded, because this scan runs hourly on a small control-plane VM
+    and runs two or three times per hour: once for the ``power_data_is_fresh`` asset check, once
+    inside the ``select_new_rows`` call ``power_time_series_and_metadata`` makes on the file
+    listing, and a third time inside the ``select_new_rows`` call it makes on the parsed rows —
+    which only happens in an hour that had new data to parse. Measured on a synthetic V2 table
+    (2,500 series, half-hourly, partitioned by ``time_series_id``) for a year of history (43.8M
+    rows): streaming ~0.21 s / ~190 MB peak, versus ~1.3 GB peak for the in-memory engine — same
+    result, ~7x less memory. Cost
+    scales linearly with accumulated history. If the scan ever becomes a problem, both bounds can
     instead be read from the Delta add-action ``min.time``/``max.time`` file statistics —
-    metadata-only, O(files): ~0.02 s / <100 MB at the same scale — the same Delta-log-metadata
-    trick used to count whole-table rows without scanning.
+    metadata-only, O(files): ~0.02 s / <100 MB at the same scale — the same Delta-log-metadata trick
+    used to count whole-table rows without scanning.
 
     `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
     `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
@@ -315,10 +371,28 @@ def select_new_rows(
 ) -> pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing]:
     """Return rows in `time_series` newer than what our Delta table already holds.
 
-    The comparison is made on a time_series_id by time_series_id basis.
+    The comparison is made on a time_series_id by time_series_id basis. `time_series` is either
+    `PowerTimeSeries` rows, compared on their `time` column, or the `_ProcessedFileListing` a raw
+    S3 listing parses into, compared on `end_time` — the function tells the two apart by which of
+    those columns is present, and the two `@overload` declarations above tell a type checker which
+    input type produces which output type.
 
     `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
-    `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
+    `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`. Both
+    input kinds are compared against this same table: a file's `end_time` is the latest reading it
+    could possibly carry, so comparing it against `power_time_series`' on-disk `last_time` finds
+    files that cannot hold a reading newer than what is already stored, and drops them before
+    they are downloaded. Passing `PowerTimeSeries` rows filters after the download instead, on
+    each row's own `time`.
+
+    Cost: each call against an existing table runs `time_series_coverage`, so it pays one full
+    two-column scan of `power_time_series` — see that function for the measured figures and for
+    why row-group statistics cannot answer it. The signature reads like an in-memory filter and
+    is not one. `power_time_series_and_metadata` calls this once on the file listing and then,
+    only if that listing turned up files worth downloading, again on the parsed rows: an hour in
+    which NGED published nothing new stops after the first call, because `download_and_parse_files`
+    raises `NoNewData` in between and the asset returns. A call against a Delta table that does
+    not exist yet returns its input unchanged and scans nothing.
     """
     if not delta_table_exists(delta_path, storage_options):
         log.info(f"{delta_path=} does not exist yet.")
@@ -367,7 +441,14 @@ class UpsertMetadataStats(TypedDict, total=False):
     metadata_n_updated_TimeSeriesIDs: int
     metadata_updated_TimeSeriesIDs: Sequence[int]
     metadata_upsert_failed: str
-    """Set by the asset when the whole upsert raised, so the power write went ahead without it."""
+    """Set by the asset when the whole upsert raised, so the power write went ahead without it.
+
+    Read this field's presence as "the roster is stale, retry next hour", not as a power-ingest
+    failure — the power write is unaffected. See [Degraded input
+    data](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#degraded-input-data-nwp-feed-down-or-telemetry-stalled),
+    under "Reading a failed roster upsert",
+    for the operational read of this field and what it costs while it persists.
+    """
 
 
 def upsert_metadata(
@@ -380,13 +461,34 @@ def upsert_metadata(
     This function assumes it is called by one thread at a time so no
     explicit locking is required.
 
+    The rewrite is not atomic either. `write_parquet` overwrites the roster in place, with no
+    write-to-temporary-file-and-rename, so the roster does not get the all-or-nothing commit that
+    Delta gives the tables around it — see [principle 10, every write is atomic and
+    idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
+    A crash or an out-of-memory kill part-way through a local write leaves a partial file, and it
+    is `pl.read_parquet` below that rejects that file on the next run — `ComputeError: parquet: File
+    out of specification: The file must end with PAR1` — before `TimeSeriesMetadata.validate`
+    ever sees it. `validate` is the guard for the other case: a roster that reads back cleanly but
+    is off-contract, from an older writer or a hand-edit. Either way the asset records
+    `metadata_upsert_failed` and the roster stays broken until someone acts, because a corrupt
+    file is not a missing one and the create branch below therefore never runs again by itself.
+
+    Deleting the file is not on its own a fix, because `power_time_series_and_metadata` extracts
+    metadata only from the files `select_new_rows` judged new, so the next hourly run would
+    rebuild the roster from whichever series happened to publish that hour rather than from all of
+    them. Nothing is permanently lost, and a rebuild is cheaper than re-reading the bucket: every
+    JSON file carries its own series' metadata in its top-level fields, and
+    `list_timeseries_json_files` returns a `time_series_id` per key, so the newest file per series
+    is enough — one download per time series rather than one per file NGED has ever published.
+
     If the Parquet file does not exist, it saves the new_metadata. If it exists, it merges the
-    new_metadata into it and rewrites the file only if something changed. The snapshot need not
-    carry the same columns, or the same column order, as the stored roster, and rows are matched
-    on ``time_series_id``. A series that ``new_metadata`` covers is replaced wholesale, so a field
-    the snapshot has stopped carrying is **cleared** for that series. A series that
-    ``new_metadata`` omits keeps its last stored values indefinitely. The roster therefore holds
-    every time series we have ever seen, not only the ones in the latest snapshot.
+    new_metadata into it and rewrites the file only if the incoming metadata differs from what is
+    stored. The snapshot need not carry the same columns, or the same column order, as the stored
+    roster, and rows are matched on ``time_series_id``. A series that ``new_metadata`` covers is
+    replaced wholesale, so a field the snapshot has stopped carrying is **cleared** for that
+    series. A series that ``new_metadata`` omits keeps its last stored values indefinitely. The
+    roster therefore holds every time series we have ever seen, not only the series in the latest
+    snapshot.
 
     Args:
         new_metadata: The new metadata DataFrame.
