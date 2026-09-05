@@ -47,7 +47,7 @@ def _find_project_root(start: Path) -> Path:
 PROJECT_ROOT: Final[Path] = _find_project_root(Path(__file__))
 """The repo root — anchor for the repo-relative defaults below (``conf/``, ``data/``, ``.env``).
 
-Resolved by :func:`_find_project_root`; see its docstring for the per-install-mode behaviour
+Resolved by `_find_project_root`; see its docstring for the per-install-mode behaviour
 and the caveat for wheels installed outside a workspace checkout.
 """
 

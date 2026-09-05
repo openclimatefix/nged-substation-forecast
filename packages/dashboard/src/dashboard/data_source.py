@@ -1,8 +1,8 @@
 """The dashboard apps' local/S3 data-source toggle.
 
 Both marimo apps (``map_and_timeseries.py``, ``view_forecasts.py``) show a "Data source" radio
-and re-instantiate :class:`contracts.settings.Settings` from the selected source via
-:func:`settings_for_source`, so production S3 data can be viewed without restarting marimo.
+and re-instantiate `contracts.settings.Settings` from the selected source via
+`settings_for_source`, so production S3 data can be viewed without restarting marimo.
 See the dashboard README for how to set up ``packages/dashboard/.env.s3``.
 """
 
@@ -33,7 +33,7 @@ def settings_for_source(source: DataSourceType) -> Settings:
     DATA_PATH_DELIVERY and the DATA_STORE_* credentials. It deliberately does not set
     LOCAL_ARTIFACTS_PATH, so the production model stays laptop-local in both modes. A
     missing .env.s3 is silently skipped by pydantic-settings, so "s3" then falls back to
-    the root .env's local paths (see :func:`source_status_message`).
+    the root .env's local paths (see `source_status_message`).
     """
     if source == "s3":
         # _env_file is a pydantic-settings builtin kwarg; the list layers .env.s3 over the

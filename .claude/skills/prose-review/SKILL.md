@@ -654,7 +654,7 @@ change reaches outside its stated scope.
 
 ### Guards to run on a code prose sweep
 
-Three checks, none of which a `docs/` sweep needs:
+Four checks, none of which a `docs/` sweep needs:
 
 - **The abstract-syntax-tree guard**, which proves a prose-only change really was prose-only: parse
   each file before and after, blank every string constant, and compare `ast.dump()`. Anything that
@@ -664,6 +664,12 @@ Three checks, none of which a `docs/` sweep needs:
   signature. Ruff's `D417` sees only an `Args:` section that is present and incomplete, so it is
   silent on the two failures a rename actually produces. `pydoclint` runs as a pre-commit hook and
   as a CI step, so a sweep only has to read its output.
+- **A grep for reStructuredText cross-reference roles**, which reach the API pages as literal
+  markup because nothing interprets them. A `pygrep` pre-commit hook rejects them now, so a sweep
+  inherits the guard rather than running the grep itself. The lesson generalises past the one hook:
+  **a sweep that changes how a docstring renders has to read the rendered page.** The same
+  blindness hides an empty section heading, a nested list that flattens, and prose in a private
+  function that mkdocstrings never renders at all.
 - **Link resolution against the *built* site**, not a guessed slug: `uv run mkdocs build` and then
   check each URL's page and `#anchor` against the generated HTML. `scripts/check_docs_links.py`
   does this repo-wide and is also a hook.

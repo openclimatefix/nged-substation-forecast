@@ -84,7 +84,7 @@ class TabularFeatureEngineer(FeatureEngineer):
     ) -> pt.LazyFrame[AllFeatures]:
         """Map each NWP cell to its nearest time series, then run the tabular feature pipeline.
 
-        See :meth:`FeatureEngineer.engineer` for the argument and operating-mode contract, and
+        See `FeatureEngineer.engineer` for the argument and operating-mode contract, and
         ``_engineer_features`` in this module for the pipeline itself — including
         ``local_timezone``, the IANA zone the local-time features are computed in.
         """

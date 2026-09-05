@@ -3,16 +3,16 @@
 Three independent mechanisms, all no-ops when Sentry is unconfigured, so laptops and CI need no
 Sentry configuration:
 
-- **Error telemetry** — :func:`init_sentry` initialises the SDK once per process (a no-op unless
-  ``Settings.sentry_dsn`` is set), and the :data:`sentry_capture_failure` Dagster failure hook
+- **Error telemetry** — `init_sentry` initialises the SDK once per process (a no-op unless
+  ``Settings.sentry_dsn`` is set), and the `sentry_capture_failure` Dagster failure hook
   reports the real exception (with traceback) from inside the run worker, tagged
-  :data:`FAULT_CATEGORY_TAG` so an alert rule can tell a failed run from the degradation events
+  `FAULT_CATEGORY_TAG` so an alert rule can tell a failed run from the degradation events
   below. It reports neither a cancelled run nor the bare ``RetryRequested`` wrapper around an
   exhausted in-band retry.
-  :func:`report_check_degradation` and :func:`report_asset_degradation` cover the production faults
+  `report_check_degradation` and `report_asset_degradation` cover the production faults
   the hook cannot see, because they never fail a run: a check, or an asset, that caught its own
   exception instead of raising. The hook is used
-  rather than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry`
+  rather than Sentry's ``LoggingIntegration`` log-to-event capture — which `init_sentry`
   explicitly disables — because Dagster logs a step failure without ``exc_info``, so the log-based
   path would yield a message-only event with no stack trace, *and* would fire for every ``ERROR``
   log anywhere in the process (Dagster's own startup/step logs, ad-hoc materialisations, even a
@@ -20,13 +20,13 @@ Sentry configuration:
   hook is attached to the *scheduled* asset jobs only, so it covers the unattended production
   workload; manual/backfill/experiment runs are watched by the operator at the Dagster UI, not
   Sentry.
-- **The missed-check-in alarm** — :func:`send_forecast_checkin` sends a *success-only* heartbeat to
+- **The missed-check-in alarm** — `send_forecast_checkin` sends a *success-only* heartbeat to
   a Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
   ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error testing
   never heartbeats the production monitor. Sentry fires the alarm on the *absence* of a heartbeat
   past the margin (a dead daemon cannot report itself); in-band run errors are handled by the
   failure hook above, never by this heartbeat.
-- **Freshness warnings** — :func:`report_power_freshness` forwards the ``power_data_is_fresh`` asset
+- **Freshness warnings** — `report_power_freshness` forwards the ``power_data_is_fresh`` asset
   check's per-series staleness to Sentry as a *warning*-level event when any series is late. Gated
   on the DSN like error telemetry (not the heartbeat flag), and fingerprinted per environment so
   each deployment gets its own ongoing issue. Because a warning event models only one direction of
@@ -125,10 +125,10 @@ def init_sentry(settings: Settings) -> None:
     ``event_level=None`` overrides the SDK's default integration (whose default ``event_level`` is
     ``ERROR``), so ``ERROR``-level log records no longer become Sentry events. Without this, every
     ``ERROR`` log anywhere in the process — Dagster's startup/step logs, ad-hoc materialisations,
-    even the swallowed telemetry error in :func:`report_power_freshness` — would be shipped as an
+    even the swallowed telemetry error in `report_power_freshness` — would be shipped as an
     event, defeating the design where *only* the four explicit senders reach Sentry: the failure
-    hook, the freshness ``capture_message``, :func:`report_check_degradation` and
-    :func:`report_asset_degradation`. Breadcrumbs (the integration's default ``level=INFO``) are
+    hook, the freshness ``capture_message``, `report_check_degradation` and
+    `report_asset_degradation`. Breadcrumbs (the integration's default ``level=INFO``) are
     kept, so log context still rides along with the events those senders do send.
 
     Args:
@@ -153,12 +153,12 @@ def init_sentry(settings: Settings) -> None:
 FAULT_CATEGORY_TAG: Final[str] = "fault_category"
 """Tag naming what kind of fault an event reports, so an alert rule can route by urgency.
 
-Only :data:`sentry_capture_failure` sets it — the other three senders already carry a mark of their
+Only `sentry_capture_failure` sets it — the other three senders already carry a mark of their
 own. The reasoning is on the design page linked from this module's docstring; the production alert
 rules key off this value, so treat it as a contract rather than a label."""
 
 RUN_FAILED_FAULT_CATEGORY: Final[str] = "run_failed"
-"""The one :data:`FAULT_CATEGORY_TAG` value: a scheduled production job failed, so that cycle did
+"""The one `FAULT_CATEGORY_TAG` value: a scheduled production job failed, so that cycle did
 not run."""
 
 
@@ -168,7 +168,7 @@ def sentry_capture_failure(context: HookContext) -> None:
 
     Runs in the run worker after a step raises, so ``context.op_exception`` is the live exception
     (traceback intact) rather than Dagster's serialized error info. Tagged
-    ``fault_category=run_failed`` (see :data:`FAULT_CATEGORY_TAG`). A no-op when Sentry is
+    ``fault_category=run_failed`` (see `FAULT_CATEGORY_TAG`). A no-op when Sentry is
     uninitialised (empty DSN), because ``capture_exception`` needs an active Sentry client.
 
     Two exceptions are treated specially, so that what reaches Sentry names the actual fault:
@@ -228,7 +228,7 @@ def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str)
 def report_asset_degradation(asset_name: str, exc: BaseException) -> None:
     """Report an asset that degraded rather than failing, as a Sentry error event.
 
-    Closes the same gap as :func:`report_check_degradation` below, for an asset:
+    Closes the same gap as `report_check_degradation` below, for an asset:
     ``power_time_series_and_metadata`` catches a failure of the ``TimeSeriesMetadata`` roster upsert
     so that the power write still happens (rule 1 of
     [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
@@ -253,7 +253,7 @@ def report_check_degradation(check_name: str, exc: BaseException) -> None:
 
     Every caller catches everything rather than raising (rule 7 of
     [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)),
-    so the run no longer fails and :data:`sentry_capture_failure` no longer fires. Without this,
+    so the run no longer fails and `sentry_capture_failure` no longer fires. Without this,
     a check that cannot read its own inputs would show up only as a yellow tick in Dagster's Checks
     view — and ``power_time_series_and_metadata_job`` has no cron monitor to notice the silence, so
     nobody would be told. Sending the same exception the failure hook used to send restores the
@@ -311,7 +311,7 @@ def send_forecast_checkin(
 POWER_DATA_STALE_FINGERPRINT: Final[str] = "nged-power-data-stale"
 """Stable fingerprint root for the power-data staleness warning.
 
-Combined with ``Settings.sentry_environment`` (see :func:`report_power_freshness`) so every
+Combined with ``Settings.sentry_environment`` (see `report_power_freshness`) so every
 deployment gets its *own* ongoing Sentry issue — Sentry's ``environment`` is a filter facet, not a
 grouping dimension, so without the environment in the fingerprint every deployment (production and
 each ``<name>-laptop``) would share one issue. A stable fingerprint also collapses the hourly
@@ -380,7 +380,7 @@ def _capture_power_freshness_warning(
 ) -> None:
     """Build and send the freshness warning event on an isolated Sentry scope.
 
-    Split from :func:`report_power_freshness` so the latter's ``try``/``except`` wraps the whole
+    Split from `report_power_freshness` so the latter's ``try``/``except`` wraps the whole
     payload build (iterating ``result.late``), not only the network send — a bug in the payload is
     the likelier raiser than ``capture_message`` itself.
     """
@@ -423,7 +423,7 @@ def _freshness_message(
     The message is a one-line summary (Sentry's issue title) followed by the leading late series
     and how late each one is.
 
-    The per-series lines are capped at :data:`MAX_LATE_SERIES_IN_MESSAGE`; if more series are late,
+    The per-series lines are capped at `MAX_LATE_SERIES_IN_MESSAGE`; if more series are late,
     a trailing ``…and N more`` line reports the remainder (with the fuller list in the event's
     ``power_freshness`` context). ``late_series`` is already ordered never-reported first, then
     most-stale first, so the message leads with the worst offenders.

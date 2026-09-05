@@ -573,7 +573,7 @@ def _or_na(value: datetime | None) -> str:
 
 
 def _nwp_completeness_check_result(report: NwpRunCompletenessReport) -> AssetCheckResult:
-    """Wrap an :class:`NwpRunCompletenessReport` into a WARN-severity Dagster check result."""
+    """Wrap an `NwpRunCompletenessReport` into a WARN-severity Dagster check result."""
     return AssetCheckResult(
         check_name=_NWP_COMPLETENESS_CHECK_NAME,
         # WARN, never fail: an incomplete run is absent input, not malformed input. See
