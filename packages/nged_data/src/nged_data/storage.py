@@ -73,10 +73,11 @@ def list_timeseries_json_files(
 
     A key that does not match yields null captures and fails `_ProcessedFileListing.validate`,
     which aborts the listing for the whole bucket rather than skipping the one object. That is
-    deliberately stricter than the null-`data` handling in `download_and_parse_files`, and it is
-    the one place in this package that fails closed: a malformed reading is NGED's meter
-    misbehaving, but a key we cannot parse means NGED's naming convention has changed, and every
-    `start_time`, `end_time` and `time_series_id` this function returns is then suspect.
+    deliberately stricter than the null-`data` handling in `download_and_parse_files`, which logs
+    the offending file and carries on: a malformed reading is one of NGED's meters misbehaving,
+    but a key we cannot parse means NGED's naming convention has changed, so every `start_time`,
+    `end_time` and `time_series_id` this function returns is then suspect — including the ones
+    parsed from the keys that still match.
     """
     raw_file_listing: list[_RawFileListItem] = []
     total_objects = 0
@@ -306,11 +307,13 @@ def time_series_coverage(
     ``time``/``time_series_id`` value is read; computing both bounds instead of one is ~20% more
     wall-clock and no extra memory (the shared scan dominates). The ``collect`` uses the streaming
     engine to keep peak memory bounded, because this scan runs hourly on a small control-plane VM
-    and runs three times per hour: once for the ``power_data_is_fresh`` asset check, and twice
-    inside ``select_new_rows``, which ``power_time_series_and_metadata`` calls on the file listing
-    and again on the parsed rows. Measured on a synthetic V2 table (2,500 series, half-hourly,
-    partitioned by ``time_series_id``) for a year of history (43.8M rows): streaming ~0.21 s / ~190
-    MB peak, versus ~1.3 GB peak for the in-memory engine — same result, ~7x less memory. Cost
+    and runs two or three times per hour: once for the ``power_data_is_fresh`` asset check, once
+    inside the ``select_new_rows`` call ``power_time_series_and_metadata`` makes on the file
+    listing, and a third time inside the ``select_new_rows`` call it makes on the parsed rows —
+    which only happens in an hour that had new data to parse. Measured on a synthetic V2 table
+    (2,500 series, half-hourly, partitioned by ``time_series_id``) for a year of history (43.8M
+    rows): streaming ~0.21 s / ~190 MB peak, versus ~1.3 GB peak for the in-memory engine — same
+    result, ~7x less memory. Cost
     scales linearly with accumulated history. If the scan ever becomes a problem, both bounds can
     instead be read from the Delta add-action ``min.time``/``max.time`` file statistics —
     metadata-only, O(files): ~0.02 s / <100 MB at the same scale — the same Delta-log-metadata trick
@@ -385,10 +388,11 @@ def select_new_rows(
     Cost: each call against an existing table runs `time_series_coverage`, so it pays one full
     two-column scan of `power_time_series` — see that function for the measured figures and for
     why row-group statistics cannot answer it. The signature reads like an in-memory filter and
-    is not one. `power_time_series_and_metadata` calls this twice per materialisation, once on
-    the file listing and once on the parsed rows, so an hourly ingest pays two scans on top of
-    the freshness check's third. A call against a Delta table that does not exist yet returns
-    its input unchanged and scans nothing.
+    is not one. `power_time_series_and_metadata` calls this once on the file listing and then,
+    only if that listing turned up files worth downloading, again on the parsed rows: an hour in
+    which NGED published nothing new stops after the first call, because `download_and_parse_files`
+    raises `NoNewData` in between and the asset returns. A call against a Delta table that does
+    not exist yet returns its input unchanged and scans nothing.
     """
     if not delta_table_exists(delta_path, storage_options):
         log.info(f"{delta_path=} does not exist yet.")
@@ -458,16 +462,24 @@ def upsert_metadata(
     explicit locking is required.
 
     The rewrite is not atomic either. `write_parquet` overwrites the roster in place, with no
-    write-to-temporary-file-and-rename, so a crash, an out-of-memory kill, or a truncated upload
-    part-way through leaves a partial file. The next run's `TimeSeriesMetadata.validate` on the
-    existing roster then rejects it, the asset records `metadata_upsert_failed`, and the roster
-    stays broken until someone acts: a corrupt file is not a missing one, so the create branch
-    below never runs again by itself. Deleting the file is not on its own a fix, because
-    `power_time_series_and_metadata` extracts metadata only from the files `select_new_rows`
-    judged new, so the next run would rebuild the roster from whichever series happened to
-    publish that hour rather than from all of them. Nothing is permanently lost — every JSON
-    file on NGED's bucket carries its series' metadata in its top-level fields — but a full
-    rebuild means re-reading the whole bucket rather than one hour of it.
+    write-to-temporary-file-and-rename, so the roster does not get the all-or-nothing commit that
+    Delta gives the tables around it — see [principle 10, every write is atomic and
+    idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
+    A crash or an out-of-memory kill part-way through a local write leaves a partial file, and it
+    is `pl.read_parquet` below that rejects that file on the next run — `ComputeError: parquet: File
+    out of specification: The file must end with PAR1` — before `TimeSeriesMetadata.validate`
+    ever sees it. `validate` is the guard for the other case: a roster that reads back cleanly but
+    is off-contract, from an older writer or a hand-edit. Either way the asset records
+    `metadata_upsert_failed` and the roster stays broken until someone acts, because a corrupt
+    file is not a missing one and the create branch below therefore never runs again by itself.
+
+    Deleting the file is not on its own a fix, because `power_time_series_and_metadata` extracts
+    metadata only from the files `select_new_rows` judged new, so the next hourly run would
+    rebuild the roster from whichever series happened to publish that hour rather than from all of
+    them. Nothing is permanently lost, and a rebuild is cheaper than re-reading the bucket: every
+    JSON file carries its own series' metadata in its top-level fields, and
+    `list_timeseries_json_files` returns a `time_series_id` per key, so the newest file per series
+    is enough — one download per time series rather than one per file NGED has ever published.
 
     If the Parquet file does not exist, it saves the new_metadata. If it exists, it merges the
     new_metadata into it and rewrites the file only if the incoming metadata differs from what is
