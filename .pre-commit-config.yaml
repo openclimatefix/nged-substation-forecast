@@ -94,21 +94,27 @@ repos:
       # pyproject.toml says which of its checks this repo wants and why.
       - id: pydoclint
         name: pydoclint (docstrings match signatures)
-        entry: uv run --isolated --no-project --with pydoclint pydoclint --quiet
+        entry: uv run --isolated --no-project --with pydoclint==0.9.1 pydoclint --quiet --style=google
         language: system
         types: [python]
         exclude: *marimo_notebooks
-      # Sphinx cross-reference roles render as literal text. mkdocstrings parses these docstrings
-      # as Markdown and nothing resolves the role, so `:func:` + backticked name reaches the
-      # published API page verbatim — a reader sees the markup instead of the name. Plain
-      # backticks are the house style and render correctly. 46 of these were live on the site
-      # before anyone looked at the built HTML, because every local check passes: ruff, pydoclint
-      # and `mkdocs build --strict` all read the docstring as prose and have no opinion about it.
+      # A Sphinx cross-reference role reaches the published page as literal markup, because
+      # mkdocstrings parses these docstrings as Markdown and no extension interprets the role.
+      # Write plain backticks instead; the reasoning is on the code-style page:
+      # https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/
+      #
+      # The pattern matches the *shape* of a role rather than a list of role names, because Sphinx
+      # has dozens and a name list silently misses whichever one the next author reaches for —
+      # `:const:` is a synonym for `:data:`, which was the second most common role here. Markdown
+      # is in scope because every `docs/api/*/index.md` includes its package README, so a role
+      # written in a README would render raw on exactly the pages this hook protects. code-style.md
+      # has to quote the forbidden form in order to forbid it, so it is the one file exempted.
       - id: no-sphinx-roles
         name: no Sphinx cross-reference roles (they render as raw text)
-        entry: ':(func|class|meth|mod|attr|data|obj|exc|ref):`'
+        entry: '(?<![\w:]):(?:py:)?[a-z]{2,10}:`'
         language: pygrep
-        types: [python]
+        types_or: [python, markdown]
+        exclude: ^docs/architecture/code-style\.md$
       - id: check-docs-links
         name: docs links (check_docs_links)
         entry: uv run python scripts/check_docs_links.py
