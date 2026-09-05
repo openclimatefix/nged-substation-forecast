@@ -30,7 +30,7 @@ ZSTD level 3.
 
 **How much space does GB-wide ECMWF ENS take?** One daily run (1,671 H3 cells × 51 members ×
 85 lead times, up to ~7.24M rows) averages ~113 MB, so a year is **~41 GB**. The full local
-development table — 810 daily runs (Apr 2024 → Jun 2026, 1.57 billion rows) — is **86 GB**.
+development table — 810 daily runs (Apr 2024 → Jun 2026, ~5.9 billion rows) — is **86 GB**.
 
 **Storage** (nine real partitions spread across every season):
 

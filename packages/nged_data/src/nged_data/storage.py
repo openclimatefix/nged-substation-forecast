@@ -1,9 +1,11 @@
-"""Listing, downloading, and parsing NGED's telemetry JSON from S3 into power and metadata.
+"""Listing, downloading, and parsing NGED's telemetry JSON from S3.
 
-The metadata is upserted here, into a Parquet roster (see `upsert_metadata`). Power observations
-are not: this module never writes `PowerTimeSeries` rows to disk — they are returned to the
-caller, which appends them to the `power_time_series` Delta table. `time_series_coverage` and
-`select_new_rows` read that same Delta table, to find what is new, but neither writes to it.
+Each file yields `TimeSeriesMetadata` describing one series and `PowerTimeSeries` power
+observations from it. The metadata is upserted here, into a Parquet roster (see
+`upsert_metadata`). The power observations are not: this module never writes `PowerTimeSeries`
+rows to disk — they are returned to the caller, which appends them to the `power_time_series`
+Delta table. `time_series_coverage` and `select_new_rows` read that same Delta table, to find
+what is new, but neither writes to it.
 """
 
 import logging
@@ -367,8 +369,9 @@ def select_new_rows(
     `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`. Both
     input kinds are compared against this same table: a file's `end_time` is the latest reading it
     could possibly carry, so comparing it against `power_time_series`' on-disk `last_time` finds
-    files that cannot hold a reading newer than what is already stored, before either is
-    downloaded.
+    files that cannot hold a reading newer than what is already stored, and drops them before
+    they are downloaded. Passing `PowerTimeSeries` rows filters after the download instead, on
+    each row's own `time`.
     """
     if not delta_table_exists(delta_path, storage_options):
         log.info(f"{delta_path=} does not exist yet.")

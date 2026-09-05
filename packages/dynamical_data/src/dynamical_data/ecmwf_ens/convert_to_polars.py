@@ -41,7 +41,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
 
     Args:
         ds: One downloaded ECMWF ENS run, as returned by
-            :func:`dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
+            `dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
             `(lead_time, ensemble_member, latitude, longitude)`, with `init_time` a scalar
             coordinate, and carrying the 13 downloaded ECMWF ENS variables.
         h3_grid: The H3 grid weights to aggregate onto — one row per (H3 cell, NWP grid point)
@@ -140,18 +140,18 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
 
     Normalises NaN to null for every weather variable, left-joins the flattened grid onto
     `h3_grid` by latitude/longitude, and hands the joined frame to
-    :func:`_aggregate_grid_points_to_h3_cells`.
+    `_aggregate_grid_points_to_h3_cells`.
 
     Args:
         ds: One `(lead_time, ensemble_member)` slice of the downloaded ECMWF ENS dataset —
             dimensions `(latitude, longitude)` only.
         h3_grid: The H3 grid weights to join onto, as in
-            :func:`convert_nwp_xarray_dataset_to_polars_dataframe`.
+            `convert_nwp_xarray_dataset_to_polars_dataframe`.
         lat_grid: Raveled latitude values, one per flattened grid point, aligned with `lon_grid`.
         lon_grid: Raveled longitude values, one per flattened grid point, aligned with `lat_grid`.
 
     Returns:
-        One row per `h3_index`, as returned by :func:`_aggregate_grid_points_to_h3_cells` — this
+        One row per `h3_index`, as returned by `_aggregate_grid_points_to_h3_cells` — this
         slice's numeric variables as their area-weighted mean and its categorical variable as its
         area-weighted mode.
     """

@@ -84,7 +84,7 @@ class UpstreamNullRate:
         """The counted variables carrying at least one null grid point.
 
         In ``per_variable``'s row order, which is sorted by variable name because
-        :func:`assess_upstream_grid_point_nulls` builds it that way — ``filter`` preserves row
+        `assess_upstream_grid_point_nulls` builds it that way — ``filter`` preserves row
         order rather than imposing one.
         """
         return tuple(self.per_variable.filter(pl.col("n_null") > 0)["variable"])
@@ -117,7 +117,7 @@ def assess_upstream_grid_point_nulls(
 
     Args:
         ds: One downloaded ECMWF ENS run, as returned by
-            :func:`dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
+            `dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
             ``(lead_time, ensemble_member, latitude, longitude)``, with ``init_time`` already
             reduced to a scalar coordinate.
         variables: The variables to count over, named as ``ds`` names them rather than as the

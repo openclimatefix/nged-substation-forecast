@@ -2,14 +2,16 @@
 
 Nearly every full-precision ``Float32`` value in a large forecast or weather table is distinct,
 so the low significand bits are incompressible noise — they defeat every general-purpose codec.
-Rounding each value to a small number of significand bits zeroes those low bits, after which
-``BYTE_STREAM_SPLIT`` + zstd compress the column dramatically (see
-``delta_store.power_forecasts`` for measured numbers), at the cost of a strictly bounded
-*relative* error.
+Rounding each value to a small number of significand bits zeroes those low bits, after which a
+general-purpose codec has repetition to find, at the cost of a strictly bounded *relative* error.
+Which codec then wins is table-dependent and measured per table: ``delta_store.power_forecasts``
+adds a ``BYTE_STREAM_SPLIT`` encoding on top of zstd (see it for measured numbers), while
+``delta_store.nwp`` measured ``BYTE_STREAM_SPLIT`` as *worse* on NWP data and uses zstd alone. The
+rounding is what both have in common.
 
 The rounding here is pure Polars arithmetic (no bit-twiddling, no numpy round-trip), which works
 because of a classical floating-point identity — Veltkamp splitting — documented in detail on
-:func:`round_to_significand_bits`.
+`round_to_significand_bits`.
 """
 
 from typing import Final
@@ -25,7 +27,7 @@ def round_to_significand_bits(expr: pl.Expr, *, keep_bits: int) -> pl.Expr:
 
     The result is exactly representable with a ``keep_bits``-bit significand, so the low
     ``24 - keep_bits`` explicit fraction bits of every finite output are zero — which is what
-    lets ``BYTE_STREAM_SPLIT`` + zstd compress the column — and the relative error is bounded by
+    gives the compression codec repetition to find — and the relative error is bounded by
     the unit roundoff of a ``keep_bits``-bit format:
 
         |result - x| <= 2**-keep_bits * |x|

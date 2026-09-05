@@ -2,7 +2,7 @@
 
 Owns everything about how ``PowerForecast`` rows are laid out on disk: the parquet writer
 properties (codec + per-column encodings), the compression-friendly row order, and the
-``power_fcst`` precision reduction. Callers write through :func:`write_power_forecasts` so it is
+``power_fcst`` precision reduction. Callers write through `write_power_forecasts` so it is
 impossible to land rows in the table without this format applied.
 
 Measured impact: rewriting the full 403.6M-row development table into this format shrank it from

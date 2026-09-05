@@ -39,13 +39,13 @@ ECMWF_ENS_INSTANTANEOUS_VARS: Final[frozenset[str]] = (
 """The downloaded variables describing conditions at one instant, under their *download* names.
 
 None of these is ever legitimately null, anywhere in a run, which is why
-:func:`dynamical_data.ecmwf_ens.upstream_nulls.assess_upstream_grid_point_nulls` counts them
+`dynamical_data.ecmwf_ens.upstream_nulls.assess_upstream_grid_point_nulls` counts them
 separately from the de-accumulated ones and the ``ecmwf_ens`` asset gates a check on that count
 being zero.
 
 Derived from the download list rather than from ``Nwp``'s fields, because the two namespaces differ:
 we download ``wind_u_10m``/``wind_v_10m`` (and the 100 m pair), and
-:func:`dynamical_data.ecmwf_ens.convert_to_polars.convert_nwp_xarray_dataset_to_polars_dataframe`
+`dynamical_data.ecmwf_ens.convert_to_polars.convert_nwp_xarray_dataset_to_polars_dataframe`
 derives ``wind_speed_*``/``wind_direction_*`` from them. A set taken from the contract would name
 four variables the downloaded dataset does not carry, and indexing it would raise ``KeyError``.
 """
@@ -58,7 +58,7 @@ def open_ecmwf_ens_run(
     """Lazily open the ECMWF ENS Icechunk store and slice it to the requested run and H3 grid.
 
     No data is downloaded: the returned dataset is still backed by lazy Dask/Zarr arrays.
-    Call :func:`download_ecmwf_ens_data` to actually fetch the data.
+    Call `download_ecmwf_ens_data` to actually fetch the data.
 
     Args:
         nwp_init_time: The initialisation time to open. Must be timezone aware.
@@ -133,7 +133,7 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
     """Download (compute) a lazily-opened, already-sliced ECMWF ENS dataset.
 
     Args:
-        ds_sliced: A lazy dataset as returned by :func:`open_ecmwf_ens_run`.
+        ds_sliced: A lazy dataset as returned by `open_ecmwf_ens_run`.
 
     Returns:
         The same variables and coordinates as `ds_sliced`, each variable now backed by an

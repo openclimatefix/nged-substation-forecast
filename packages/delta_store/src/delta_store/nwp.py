@@ -2,7 +2,7 @@
 
 Owns everything about how ``Nwp`` rows are laid out on disk: the parquet writer properties, the
 compression-friendly row order, and the significand-precision reduction of the continuous
-weather variables. Callers write through :func:`write_nwp` so it is impossible to land rows in
+weather variables. Callers write through `write_nwp` so it is impossible to land rows in
 the table without this format applied.
 
 Stores plain ``Float32`` + ``delta_store.precision.round_to_significand_bits`` — the technique
@@ -90,8 +90,8 @@ def write_nwp(
     read at the new logical dtype is correct and lossless even for a partition still physically
     stored at an older, narrower dtype. Since ``nwp``'s input is always an already-validated
     ``pt.DataFrame[Nwp]``, carrying the full column set at the *current* contract's dtypes, the
-    only way this can ever change the table's schema is a deliberate future ``Nwp`` dtype change
-    like this one — it cannot silently drop a column.
+    only way this can ever change the table's schema is a deliberate widening of an ``Nwp``
+    dtype — it cannot silently drop a column.
 
     A **narrowing** contract change is a different, worse failure mode, also confirmed
     empirically: the write that narrows a column succeeds silently — ``schema_mode="overwrite"``

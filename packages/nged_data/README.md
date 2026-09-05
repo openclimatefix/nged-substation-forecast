@@ -34,6 +34,10 @@ list_timeseries_json_files`, etc.).
   per `time_series_id` and rewriting the file only if the incoming metadata differs from what is
   stored.
 
+`nged_data.read_nged_json` parses one downloaded JSON file into the two schemas. Every function in
+it is private and called only by `download_and_parse_files`, so the module appears on the API page
+below carrying just its `ExtractedPowerTimeSeries` result type.
+
 ## Data quality
 
 `download_and_parse_files` drops rows whose `time` is malformed — outside the plausible
