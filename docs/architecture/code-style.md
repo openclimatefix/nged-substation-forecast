@@ -231,6 +231,14 @@ Three places where a positional argument is right:
   stale name in the *prose* around the parameter list, which is why `compute_h3_grid_weights`
   described "a DataFrame" for months after it began taking a list — check the description against
   the signature whenever you rename anything.
+- **Cross-reference another function with plain backticks, never a Sphinx role.** mkdocstrings
+  parses these docstrings as Markdown, and nothing resolves a reStructuredText role, so a role and
+  its backticked name reach the published API page verbatim — the reader sees the markup where the
+  name should be. Write `` `write_nwp` ``, not the role form. A `pygrep` pre-commit hook rejects
+  the role forms, which is the only thing that catches them: `ruff`, `pydoclint` and `mkdocs build
+  --strict` all read a docstring as prose and have no opinion about what is inside it, so 46 of
+  these were live on the published site before anyone read the built HTML. **When a docstring
+  change is about how something renders, read the generated page, not the source.**
 - **When a prose sweep meets an obviously wrong claim outside the change it set out to make, fix
   it.** A sweep is the one occasion anybody reads these files closely, so filing the defect for
   later spends the pass that found it and leaves the wrong version in front of readers meanwhile.

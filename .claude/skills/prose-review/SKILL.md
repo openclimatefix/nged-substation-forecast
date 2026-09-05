@@ -664,6 +664,13 @@ Three checks, none of which a `docs/` sweep needs:
   signature. Ruff's `D417` sees only an `Args:` section that is present and incomplete, so it is
   silent on the two failures a rename actually produces. `pydoclint` runs as a pre-commit hook and
   as a CI step, so a sweep only has to read its output.
+- **A grep for reStructuredText cross-reference roles**, which render as literal markup on the
+  API pages because nothing resolves them. A `pygrep` pre-commit hook rejects them now, so a sweep
+  only has to read its output — but the lesson generalises past the one hook: **a sweep that
+  changes how a docstring renders has to read the rendered page.** Every local check passed on all
+  46 of these while they were live on the site, and the same blindness hides an empty section
+  heading, a nested list that flattens, and prose in a private function that mkdocstrings never
+  renders at all.
 - **Link resolution against the *built* site**, not a guessed slug: `uv run mkdocs build` and then
   check each URL's page and `#anchor` against the generated HTML. `scripts/check_docs_links.py`
   does this repo-wide and is also a hook.

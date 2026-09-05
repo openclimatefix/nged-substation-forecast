@@ -98,6 +98,17 @@ repos:
         language: system
         types: [python]
         exclude: *marimo_notebooks
+      # Sphinx cross-reference roles render as literal text. mkdocstrings parses these docstrings
+      # as Markdown and nothing resolves the role, so `:func:` + backticked name reaches the
+      # published API page verbatim — a reader sees the markup instead of the name. Plain
+      # backticks are the house style and render correctly. 46 of these were live on the site
+      # before anyone looked at the built HTML, because every local check passes: ruff, pydoclint
+      # and `mkdocs build --strict` all read the docstring as prose and have no opinion about it.
+      - id: no-sphinx-roles
+        name: no Sphinx cross-reference roles (they render as raw text)
+        entry: ':(func|class|meth|mod|attr|data|obj|exc|ref):`'
+        language: pygrep
+        types: [python]
       - id: check-docs-links
         name: docs links (check_docs_links)
         entry: uv run python scripts/check_docs_links.py
