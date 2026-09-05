@@ -446,6 +446,12 @@ and what it remembers is sometimes not what the line says.
   not evidence the cut is right.** The third option is usually a rewrite.
 - **A cut that makes the document more self-serving is almost always wrong.** Material that limits
   the author's own claim is usually there on purpose.
+- **A claim checked by running something survives the next review; a claim checked by reading often
+  does not.** Four failure modes written up from one reviewer's findings went in unrun, and a later
+  review found three of the four wrong in part — each a plausible mechanism sitting next to a
+  correct outcome, which is the shape most likely to send a reader hunting in the wrong place.
+  Every claim in the same batch that had been settled by executing the library held exactly. Where
+  prose states what a library does, run it before writing the sentence.
 
 ## Applying and checking the edits
 
@@ -638,6 +644,20 @@ once and a README that restates a module docstring is the one deletion the dupli
 sanctions. Only the packages with a page under `docs/api/` are affected; the others are not, and
 their READMEs should usually grow rather than shrink.
 
+**mkdocstrings renders no private member, so prose in an underscore-prefixed function never reaches
+the published page.** A `docs/api/<pkg>/` page carries only what its `::: module` directives emit,
+and the default filters drop every name starting with an underscore; a package with no page under
+`docs/api/` publishes nothing at all. That settles where a worked example goes when the duplication
+rule says it may live in only one place: of the candidate homes, keep it in the one that renders.
+Moving an S3 key format out of `list_timeseries_json_files` and into the private
+`_process_file_listing` looked like the right deduplication, and took the path format off
+`api/nged_data/` entirely.
+
+**Say what a word is before quoting a word count.** A count nobody can reproduce cannot be compared
+against the next package's, and these sweeps run one package at a time over months. What the waves
+so far counted: for a Python file, the text of every docstring and every comment and nothing else;
+for a markdown file, the whole file. Report the before and the after on that definition.
+
 **Verify which worktree you are in before reading a single file, and give sub-agents the absolute
 path.** This repo keeps a worktree per branch under `.claude/worktrees/`, and a session's primary
 directory is often a bridge worktree on `main` rather than the branch under review. The failure is
@@ -690,6 +710,20 @@ authoring pass had introduced *and* an overclaim written during triage; one of t
 to check a comment's assertion about which test catches a bug, and found the comment named the
 wrong test. Verify every finding against the code before applying it — a wrong "fix" to a docstring
 costs more than a missed fix, because the next reader trusts the docstring.
+
+**A review told to read the diff finds faults in the diff; a review told to ignore the diff finds
+the rest.** Give one reviewer the packages and no diff at all, briefed as a first-time reader
+meeting the code. In wave 2 that reviewer found a row count wrong by a factor of 3.7 and a module
+docstring contradicting a constant 30 lines below it, both in prose no sweep had touched and both
+older than the branch. Gate its findings on the merge-base as above, then fix them anyway under the
+fix-obviously-wrong-prose rule, and say in the pull-request body why the change reaches outside its
+stated scope.
+
+**Review the commits written during triage, because nobody else has.** Everything applied after the
+first review is new prose that went in without a reviewer, written against a list and in a hurry.
+An audit of two such commits found two regressions in them: a claim that both input kinds are
+filtered before download when only the file listing is, and a module summary that had lost the one
+word naming what it summarised. Point a fresh sub-agent at the fix commits alone.
 
 ## See also
 
