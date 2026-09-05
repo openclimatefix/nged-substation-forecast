@@ -32,7 +32,7 @@ _PER_VARIABLE_SCHEMA: Final[pl.Schema] = pl.Schema(
         "n_total": pl.Int64,
     }
 )
-"""Columns of :attr:`UpstreamNullRate.per_variable`.
+"""Columns of `UpstreamNullRate.per_variable`.
 
 Declared rather than inferred for the empty-``variables`` case, which no caller in this repo reaches
 but a reusable package should survive: an inferred empty frame carries no columns at all, and the
@@ -47,7 +47,7 @@ class UpstreamNullRate:
     feed is degrading. It counts grid points on the 0.25° lat/lon box we downloaded, before any H3
     aggregation.
 
-    Read it alongside, never instead of, :class:`contracts.weather_schemas.NwpQualityReport`, which
+    Read it alongside, never instead of, `contracts.weather_schemas.NwpQualityReport`, which
     counts null H3 *cells* and answers the different question of how much the model lost. The two
     are not comparable as rates: different units over different populations.
 
@@ -122,7 +122,7 @@ def assess_upstream_grid_point_nulls(
             reduced to a scalar coordinate.
         variables: The variables to count over, named as ``ds`` names them rather than as the
             ``Nwp`` contract does — the two differ on wind, so
-            :data:`dynamical_data.ecmwf_ens.download.ECMWF_ENS_INSTANTANEOUS_VARS` exists to be
+            `dynamical_data.ecmwf_ens.download.ECMWF_ENS_INSTANTANEOUS_VARS` exists to be
             passed here. Their nulls must share one meaning, because a rate pooled over variables
             with opposite null semantics measures nothing: the asset passes the de-accumulated
             variables, whose nulls are known upstream corruption, and the instantaneous ones, whose
