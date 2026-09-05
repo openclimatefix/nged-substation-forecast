@@ -94,6 +94,23 @@ def write_power_forecasts(
     passes ``replace_partition`` on its first chunk — overwriting that partition so prior rows
     are always replaced, even when the first chunk is empty — and ``None`` (append) on the rest.
 
+    **Every row of ``forecasts`` must satisfy the predicate the overwrite path builds.** delta-rs
+    checks each row against it and rejects the whole write — ``DeltaError``, table untouched — if
+    any row falls outside, rather than writing the rows that do match. So a frame spanning two
+    ``(experiment_name, fold_id)`` pairs fails under a single ``replace_partition``, and a frame
+    spanning two ``power_fcst_init_time`` values fails under a narrowing
+    ``replace_predicate_extra``. Confirmed empirically against ``deltalake`` 1.6.3: a two-fold
+    frame written under a one-fold predicate raised ``Invalid data found: 2 rows failed validation
+    check`` and left the table at its previous row count. ``write_nwp`` documents the same
+    delta-rs behaviour, where the predicate is derived from the frame rather than supplied by the
+    caller, so it cannot disagree with the data the way this one can.
+
+    The append path takes no predicate and so has no such check. Re-running an interrupted
+    multi-chunk materialisation therefore duplicates every chunk that already landed — two
+    identical appends leave two copies, confirmed empirically — because nothing deduplicates on
+    ``PowerForecast.PRIMARY_KEY`` at write time. ``PowerForecast``'s uniqueness constraint is
+    checked by ``validate()``, on the way in, not by the table.
+
     Args:
         forecasts: Validated forecast rows. ``experiment_name`` / ``fold_id`` are ``String``
             (their ``PowerForecast`` dtype), which is exactly what delta-rs needs for Hive-style

@@ -70,6 +70,13 @@ def list_timeseries_json_files(
 
     `_process_file_listing` parses those three fields back out, and its aligned comment traces the
     regex against this same key.
+
+    A key that does not match yields null captures and fails `_ProcessedFileListing.validate`,
+    which aborts the listing for the whole bucket rather than skipping the one object. That is
+    deliberately stricter than the null-`data` handling in `download_and_parse_files`, and it is
+    the one place in this package that fails closed: a malformed reading is NGED's meter
+    misbehaving, but a key we cannot parse means NGED's naming convention has changed, and every
+    `start_time`, `end_time` and `time_series_id` this function returns is then suspect.
     """
     raw_file_listing: list[_RawFileListItem] = []
     total_objects = 0
@@ -293,19 +300,21 @@ def time_series_coverage(
     the Polars 32-bit row-count wraparound even on a very large table (see
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/#data-handling>).
 
-    Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops
-    the ``power`` column, but a group-wise ``min``/``max`` cannot be answered from Parquet
-    row-group statistics (no engine on our stack does aggregate-from-statistics), so every
-    ``time``/``time_series_id`` value is read; computing both bounds instead of one is ~20%
-    more wall-clock and no extra memory (the shared scan dominates). The ``collect`` uses the
-    streaming engine to keep peak memory bounded — the freshness check runs hourly on a small
-    control-plane VM. Measured on a synthetic V2 table (2,500 series, half-hourly, partitioned
-    by ``time_series_id``) for a year of history (43.8M rows): streaming ~0.21 s / ~190 MB peak,
-    versus ~1.3 GB peak for the in-memory engine — same result, ~7x less memory. Cost scales
-    linearly with accumulated history. If the scan ever becomes a problem, both bounds can
+    Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops the
+    ``power`` column, but a group-wise ``min``/``max`` cannot be answered from Parquet row-group
+    statistics (no engine on our stack does aggregate-from-statistics), so every
+    ``time``/``time_series_id`` value is read; computing both bounds instead of one is ~20% more
+    wall-clock and no extra memory (the shared scan dominates). The ``collect`` uses the streaming
+    engine to keep peak memory bounded, because this scan runs hourly on a small control-plane VM
+    and runs three times per hour: once for the ``power_data_is_fresh`` asset check, and twice
+    inside ``select_new_rows``, which ``power_time_series_and_metadata`` calls on the file listing
+    and again on the parsed rows. Measured on a synthetic V2 table (2,500 series, half-hourly,
+    partitioned by ``time_series_id``) for a year of history (43.8M rows): streaming ~0.21 s / ~190
+    MB peak, versus ~1.3 GB peak for the in-memory engine — same result, ~7x less memory. Cost
+    scales linearly with accumulated history. If the scan ever becomes a problem, both bounds can
     instead be read from the Delta add-action ``min.time``/``max.time`` file statistics —
-    metadata-only, O(files): ~0.02 s / <100 MB at the same scale — the same Delta-log-metadata
-    trick used to count whole-table rows without scanning.
+    metadata-only, O(files): ~0.02 s / <100 MB at the same scale — the same Delta-log-metadata trick
+    used to count whole-table rows without scanning.
 
     `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
     `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
@@ -372,6 +381,14 @@ def select_new_rows(
     files that cannot hold a reading newer than what is already stored, and drops them before
     they are downloaded. Passing `PowerTimeSeries` rows filters after the download instead, on
     each row's own `time`.
+
+    Cost: each call against an existing table runs `time_series_coverage`, so it pays one full
+    two-column scan of `power_time_series` — see that function for the measured figures and for
+    why row-group statistics cannot answer it. The signature reads like an in-memory filter and
+    is not one. `power_time_series_and_metadata` calls this twice per materialisation, once on
+    the file listing and once on the parsed rows, so an hourly ingest pays two scans on top of
+    the freshness check's third. A call against a Delta table that does not exist yet returns
+    its input unchanged and scans nothing.
     """
     if not delta_table_exists(delta_path, storage_options):
         log.info(f"{delta_path=} does not exist yet.")
@@ -439,6 +456,18 @@ def upsert_metadata(
 
     This function assumes it is called by one thread at a time so no
     explicit locking is required.
+
+    The rewrite is not atomic either. `write_parquet` overwrites the roster in place, with no
+    write-to-temporary-file-and-rename, so a crash, an out-of-memory kill, or a truncated upload
+    part-way through leaves a partial file. The next run's `TimeSeriesMetadata.validate` on the
+    existing roster then rejects it, the asset records `metadata_upsert_failed`, and the roster
+    stays broken until someone acts: a corrupt file is not a missing one, so the create branch
+    below never runs again by itself. Deleting the file is not on its own a fix, because
+    `power_time_series_and_metadata` extracts metadata only from the files `select_new_rows`
+    judged new, so the next run would rebuild the roster from whichever series happened to
+    publish that hour rather than from all of them. Nothing is permanently lost — every JSON
+    file on NGED's bucket carries its series' metadata in its top-level fields — but a full
+    rebuild means re-reading the whole bucket rather than one hour of it.
 
     If the Parquet file does not exist, it saves the new_metadata. If it exists, it merges the
     new_metadata into it and rewrites the file only if the incoming metadata differs from what is
