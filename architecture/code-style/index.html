@@ -1,0 +1,3206 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../why-dagster-not-airflow/">
+      
+      
+        <link rel="next" href="../testing/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Code style - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#code-style-guidelines" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Code style
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's incumbent forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#general-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General Principles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#formatting-linting-ruff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formatting &amp; Linting (Ruff)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#type-hints-and-signatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type hints and signatures
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calling-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calling functions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comments-docstrings-and-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comments, docstrings and links
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#polars-style" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Polars style
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gotchas-that-fail-silently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotchas that fail silently
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#machine-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Machine Learning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending training history with ERA5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#general-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General Principles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#formatting-linting-ruff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formatting &amp; Linting (Ruff)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#type-hints-and-signatures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Type hints and signatures
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calling-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calling functions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comments-docstrings-and-links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comments, docstrings and links
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#polars-style" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Polars style
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gotchas-that-fail-silently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gotchas that fail silently
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#machine-learning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Machine Learning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="code-style-guidelines">Code Style Guidelines</h1>
+<p>(This is mostly written for LLM coding agents!)</p>
+<p>This page is the <strong>single source of truth for code style in this repo</strong>. Nothing repeats it:
+<code>CLAUDE.md</code> and the <code>code-style</code> skill both route here, and the skill exists to make sure this page
+gets read before any Python is written or edited. Change a rule here and nowhere else.</p>
+<h2 id="general-principles">General Principles</h2>
+<ul>
+<li><strong>Python Version</strong>: Use Python 3.14+.</li>
+<li><strong>Type Hints</strong>: All function signatures <strong>must</strong> use expressive type hints for all arguments and
+  return types, including the return type. Use <code>typing</code> and <code>collections.abc</code> as needed. See
+  <a href="#type-hints-and-signatures">Type hints and signatures</a> for how expressive.</li>
+<li><strong>Modularity</strong>: Keep logic in small, focused packages under <code>packages/</code>. The main app in <code>src/</code>
+  should primarily handle orchestration.</li>
+<li><strong>Small functions</strong>: Prefer small function bodies that do one, well-defined thing. Extract
+  private helpers (<code>_name</code>) rather than letting a function body grow long, even if that means more
+  parameters — a well-named helper with a clear docstring beats a long inline block. Eight
+  parameters is acceptable when each is distinct and the division of labour is clear.</li>
+<li><strong>Minimalism</strong>: Re-use existing tools (Polars, Xarray, Dagster) instead of reinventing logic.</li>
+<li><strong>Tests</strong>: Unit tests should each be a short, simple function. For each function in the main
+  code, there should be at least one test function that tests the "happy path", and one test
+  function for each of the main "unhappy" paths. Never relax an existing test just to get it to
+  pass! See the <a href="../testing/">Testing</a> page for where tests live, how they are wired, mocking, and
+  the assertion house style.</li>
+</ul>
+<h2 id="formatting-linting-ruff">Formatting &amp; Linting (Ruff)</h2>
+<ul>
+<li><strong>Line Length</strong>: 100 characters, enforced by <code>ruff check</code> (<code>E501</code>) as well as by the formatter.
+  The formatter breaks code but not comments, docstrings, or long string literals, so those have
+  to be wrapped by hand.</li>
+<li><strong>Quotes</strong>: Use <strong>double quotes</strong> (<code>"</code>) for strings.</li>
+<li><strong>Docstrings</strong>: Use <strong>Google convention</strong>, enforced by the <code>D</code> rules. Every public module,
+  package, class, and function needs one; tests and marimo notebooks are exempt.</li>
+<li><strong>Type annotations</strong>: Enforced by the <code>ANN</code> rules on every signature. <code>typing.Any</code> is allowed
+  where no honest narrower type exists.</li>
+<li><strong>Imports</strong>: Sorted automatically by <code>ruff</code> (isort rules). <code>import pandas</code> is banned outright
+  (<code>TID251</code>), not merely discouraged.</li>
+<li><strong>Rule selection</strong>: <code>[tool.ruff.lint] select</code> in <code>pyproject.toml</code> names the enabled families
+  explicitly rather than inheriting ruff's defaults. Ruff's defaults are a curated menu with no
+  stability promise, so an inherited selection would let a <code>uv lock</code> refresh change which rules the
+  repo enforces. <code>select</code> names whole families; <code>ignore</code> names each family member
+  we decline, with the reason on the line above it. <strong>When a rule fires somewhere it should not,
+  add an <code>ignore</code> entry (or a <code>per-file-ignores</code> entry) with its justification — do not drop the
+  whole family.</strong> Ruff's defaults are not a superset of the old <code>E4</code>/<code>E7</code>/<code>E9</code>/<code>F</code> gate: of
+  pycodestyle-E they keep only <code>E722</code> and <code>E902</code>, which is why <code>E4</code>/<code>E7</code>/<code>E9</code> are listed
+  explicitly.</li>
+<li>
+<p><strong>Two traps when editing <code>[tool.ruff.lint.per-file-ignores]</code></strong>:</p>
+<ul>
+<li><strong><code>*</code> crosses <code>/</code>.</strong> A key of <code>packages/dashboard/*.py</code> also silences
+  <code>packages/dashboard/src/dashboard/*.py</code>. Name individual files when you mean "just the ones
+  in this directory"; <code>**/tests/**</code> is the right way to say "every tests directory, root
+  included".</li>
+<li><strong>A <code># noqa</code> cannot live inside a docstring</strong>, because it would become part of the string.
+  An over-long docstring line has to be reworded or re-wrapped, never suppressed.</li>
+</ul>
+</li>
+<li>
+<p><strong>Naming</strong>:</p>
+<ul>
+<li>Variables/Functions: <code>snake_case</code></li>
+<li>Classes: <code>PascalCase</code></li>
+<li>Constants: <code>UPPER_SNAKE_CASE</code></li>
+</ul>
+</li>
+</ul>
+<h2 id="type-hints-and-signatures">Type hints and signatures</h2>
+<p><strong>Prefer self-documenting type hints over bare containers — a signature is documentation.</strong> This
+repo prefers expressive signatures and is happy to spend a few extra lines of code to get them, as
+long as complexity stays low. Whenever you would write <code>dict[str, str]</code> (or a bare <code>str</code>
+for a value from a fixed set, or a tuple of positional values), stop and ask whether a more
+self-documenting type is practical. Reach for:</p>
+<ul>
+<li>a <code>Type</code>-suffixed <code>Literal</code> alias for a closed set of string values
+  (<code>StageType = Literal["register", "train", "predict", "metrics"]</code>);</li>
+<li>a named alias for a recurring shape (<code>MlflowTags = dict[str, str]</code>) so the intent is stated once
+  and reused;</li>
+<li>a <code>TypedDict</code> for a structured mapping with known keys (e.g. <code>ObjectStoreOptions</code>) — taking the
+  <code>TypedDict</code> in the signature and widening to a plain dict at the call boundary.</li>
+</ul>
+<p>Constraining <code>dict</code> <em>keys</em> to a <code>Literal</code> alias (<code>dict[TableNameType, str]</code>) is worthwhile for a
+closed vocabulary and works with bidirectional inference when callers pass dict literals.
+<code>packages/ml_core/src/ml_core/repro.py</code> is the worked example. Don't force it where no honest
+stricter type exists — a genuinely heterogeneous or open-ended dict stays <code>dict[str, str]</code>.</p>
+<p><strong>All constants must be marked with the maximally "constant" type</strong>, e.g.
+<code>CONST_SEQ: Final[tuple[str, ...]] = ("a", "b")</code> or <code>FOO: Final[str] = "bar"</code>.</p>
+<h2 id="calling-functions">Calling functions</h2>
+<p><strong>Pass arguments by keyword wherever the callee allows it.</strong> Write
+<code>write_nwp(nwp=nwp, table_uri=uri, storage_options=options)</code>, not
+<code>write_nwp(nwp, uri, options)</code>. The keyword names what each value is for, so the reader learns it
+from the call site instead of opening the callee; and if a parameter is later reordered, renamed or
+removed, the call fails loudly rather than binding the wrong value in silence. The payoff is
+biggest for bare strings, numbers, and booleans, whose meaning is invisible without the keyword.</p>
+<p>Three places where a positional argument is right:</p>
+<ul>
+<li><strong>Positional-only parameters</strong> — those before a <code>/</code> in the signature, and most of what C
+  implements: <code>len(df)</code>, <code>isinstance(value, str)</code>, <code>Path("data")</code>. A keyword is a <code>TypeError</code>
+  there.</li>
+<li><strong>A variadic <code>*args</code> position</strong> — <code>pl.col("power_mw", "power_mva")</code>, and the expressions in
+  <code>df.select(...)</code> and <code>df.with_columns(...)</code>.
+  Every keyword parameter that follows one still takes its name, as the
+  <a href="#polars-style">Polars style</a> rules below assume.</li>
+<li><strong>One argument whose role the function name already states</strong> — <code>forecaster.save(path)</code>,
+  <code>json.loads(text)</code>. There is nothing for it to be confused with.</li>
+</ul>
+<h2 id="comments-docstrings-and-links">Comments, docstrings and links</h2>
+<ul>
+<li><strong>Do not remove existing comments</strong> unless they are misleading, out of date, or a second copy of
+  an argument a <code>docs/</code> page already makes. Only add new comments if you're doing something that
+  isn't obvious from the code. Write self-documenting code, and assume the reader is fluent in
+  Python. The third ground is the duplication rule below, applied in the direction of deletion:
+  where a docs page develops the same argument at comparable length, the comment keeps a short
+  version of it and carries the link. Shortening is not deleting — the reasoning stays.</li>
+<li><strong>Comments and docs must reflect current state only</strong> — never reference previous iterations of
+  the code or deleted files. This is the same rule as "Write about the present, not the past" in
+  <code>CLAUDE.md</code>, applied to code.</li>
+<li><strong>Code links only to durable docs</strong> — <code>docs/design-philosophy/</code>, <code>docs/background/</code>,
+  <code>docs/techniques/</code>, <code>docs/architecture/</code>, <code>docs/ml_experimentation/</code>, <code>docs/live_service/</code>.
+  Never link from code <em>or</em> docs to <code>plans/</code> files, and never from code to <code>docs/roadmap/</code> pages
+  or to any "Implementation details (deleted when this ships)" section — all of those are deleted
+  when the work lands, so the reference rots. (Docs-to-docs links into <code>docs/roadmap/</code> are fine;
+  retargeting them is part of ship-time triage.) Linking from a docstring to a durable page — e.g.
+  <code>docs/architecture/</code> — is encouraged.</li>
+<li><strong>Spell a docs link as its rendered URL</strong>, never as a repo path. Write
+  <code>&lt;https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/&gt;</code>, not
+  <code>docs/architecture/overview.md</code> — the same URL <code>CLAUDE.md</code> already mandates for issue and PR
+  bodies. Two reasons, neither of which is that a bare path is currently broken. A public docstring
+  is rendered by mkdocstrings onto an API page, where a repo path is dead text to a reader who has
+  the site open and not the repo checked out, and where writing it as a markdown link <em>would</em> 404,
+  because the path resolves against the rendered site tree. And a URL survives the file being moved
+  or renamed, which a path does not. Use it in <code>#</code> comments too: those are never rendered, so a
+  path would do, but one spelling everywhere is one fewer thing to get right.</li>
+<li><strong>A little duplication beats a link the reader has to follow — cut only where the duplication is
+  excessive.</strong> The full development of a design decision lives on one docs page, and the code links
+  to it. But keep the code's own account of <em>why</em>, even where that docs page says much the same: a
+  developer reading a function should not have to open a browser to learn what the code is doing
+  and what it is defending against. "Excessive" means the same argument developed at comparable
+  length in both places — a page restated as a page. A paragraph of "because" beside the code that
+  implements it is not excessive, and is worth keeping. Two copies do drift, silently: a later
+  change updates the page while the docstring goes on asserting the superseded reasoning, and no
+  linter, type checker or test can tell. That drift is the cost being traded, and it is worth
+  paying for a paragraph but not for a page. The rule cuts the other way too — rationale worth a
+  paragraph does not belong <em>only</em> in a docstring, where no reader browsing the docs will find it.</li>
+<li><strong>A worked example lives in exactly one place, whatever the rule above says.</strong> A worked example
+  — a concrete partition key traced through to a concrete result, a named date, a sample row — is
+  the prose most likely to drift into being actively wrong, because it carries specific values that
+  a later change invalidates without touching the sentence around them. A second copy is a second
+  thing to update and the one nobody remembers. Keep it next to the behaviour it illustrates: where
+  two docstrings both want the same example, the one nearer the code that produces the result keeps
+  it, and the other names the example and links. This is the one case where the duplication bar is
+  low rather than high, and it holds between two docstrings in the same file as much as between
+  code and <code>docs/</code>.</li>
+<li>
+<p><strong>Link into the docs generously, but never make a link load-bearing.</strong> Where a docs page develops
+  an argument the code rests on, link to it, and a docstring can carry several such links. The links
+  cost a line each and are read by both people and coding agents, for whom they are the cheapest
+  route to context.</p>
+<p><strong>A long explanation does not oblige you to create a docs page.</strong> An argument that matters only
+to the one piece of code it sits beside belongs in that docstring or comment, developed at
+whatever length it needs, and gets no page and no link. <code>docs/</code> is for arguments a reader
+outside this function needs — because they span several modules, because someone browsing the
+docs would look for them, or because they outlive the code that prompted them. Adding a page
+per long comment bloats <code>docs/</code> with material nobody browsing it wants, and leaves the code
+poorer for having exported its own reasoning. A link is <em>additional context only</em>: a reader must be
+  able to understand the prose in the code without following any of them. Every link is a
+  nice-to-have, never a requirement.</p>
+<p>The test is mechanical, and worth applying to each link as you add it: <strong>delete the link, re-read
+the passage, and check nothing needed is now missing.</strong> If the passage no longer explains itself
+— "see the design page for why", with the why nowhere in the code — the prose is what needs
+fixing, not the link. Say the reason in a sentence, then link to the page that develops it at
+length. Adding a link is never a licence to delete the prose beside it.
+- <strong>A Dagster docstring is operator documentation, and is where even the duplication rule above
+  gives way.</strong> Dagster renders the docstring of an asset, asset check, job, schedule and sensor in its
+  UI, and that docstring is often the only documentation an operator sees while running the
+  pipeline. Each docstring has to make sense read on its own, by someone who has not opened the
+  source file, and has to place the asset in the pipeline: what it consumes, what it produces, what
+  triggers it, and what a degraded run looks like. Link into <code>docs/</code> for the reasoning behind a
+  design, but keep the account of what the asset does and what it sits between in the docstring,
+  even where a docs page says the same — an operator reading the Dagster UI cannot follow a link
+  they never see. Text passed as <code>description=</code> to an <code>AssetCheckSpec</code>, a <code>define_asset_job</code> call
+  or a Dagster <code>Config</code> field renders in that same UI and carries the same duty; a check with no
+  <code>description</code> shows the operator a blank.</p>
+<p><strong>Only a decorated definition has a docstring Dagster can read.</strong> A schedule built by calling
+<code>ScheduleDefinition(...)</code> or <code>build_schedule_from_partitioned_job(...)</code> is an assignment, and
+the string literal underneath it is a module-level variable docstring that the UI never
+renders — so its operator-facing summary has to be passed as <code>description=</code>. Keep the string
+literal for the reasoning a developer reading the file wants, and let <code>description=</code> carry
+what the operator needs.
+- <strong>Say why a guard exists, when the reason is not "this state happens"</strong> — validation that
+  defends a reusable package's public API, rather than a state production can reach, says so in a
+  clause: <code># Reusable-package input validation, not a reachable production state: the ecmwf_ens
+  asset always sources h3_grid from h3_grid_weights.</code> A defence that only makes sense on one
+  substrate names that substrate, since production data lives on S3 where a torn object write
+  cannot happen. Without the clause a reviewer traces the one production call path, finds the state
+  impossible, and proposes deleting the guard — correctly, on the evidence the code gave them.
+  Repeated validation needs the same treatment: say what each call catches that the one above it
+  did not.
+- <strong>MkDocs-compatible constant docs</strong> — document module-level constants with a string literal
+  immediately after the assignment, not with Sphinx-style <code>#:</code> comments. This is correct:</p>
+<div class="highlight"><pre><span></span><code><span class="n">MY_CONST</span><span class="p">:</span> <span class="n">Final</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"value"</span>
+<span class="sd">"""One-line summary.</span>
+
+<span class="sd">Optional further detail.</span>
+<span class="sd">"""</span>
+</code></pre></div>
+</li>
+<li>
+<p><strong>A package README must never restate a module docstring, because both render on the same
+  page.</strong> Each <code>docs/api/&lt;package&gt;/index.md</code> includes the package README and then the <code>:::</code>
+  directives that render the package's docstrings, so an overlap between the two reaches the
+  reader twice within one screen. On that page the README is the contents page and the docstrings
+  are the content: the README says what the package owns, what it deliberately does not own and
+  which neighbouring package does, and gives one line per module pointing down. Where a mechanism
+  needs explaining, the README names it and defers — <code>delta_store</code>'s "The trick and its
+  preconditions are rigorously documented on the function" is the shape to copy. Which of the
+  three homes a given paragraph belongs in is decided by the tests in <a href="../../documentation-guide/#docstrings-readmes-and-docs-hold-three-different-jobs">Documentation
+  Guide</a>.</p>
+</li>
+<li><strong>A docstring must describe the signature the function actually has, and a rename is where that
+  breaks.</strong> Parameters go under <code>Args:</code>, never under <code>Attributes:</code>, <code>Parameters:</code> or <code>Arguments:</code>
+  — on a function those three render as ordinary prose rather than as parameter documentation, so
+  the parameters end up undocumented while looking documented. Ruff's <code>D417</code> catches only the case
+  where an <code>Args:</code> section is present and incomplete; a block under the wrong heading, and an entry
+  naming a parameter a rename removed, both pass every rule this repo configures. <code>pydoclint</code>
+  catches those two, as a pre-commit hook and a CI step, and also requires a <code>Returns:</code> section on
+  every function that returns something. Which of its checks this repo wants, and why each of the
+  others is switched off, is in the <code>[tool.pydoclint]</code> block in <code>pyproject.toml</code>. Nothing catches a
+  stale name in the <em>prose</em> around the parameter list, which is why <code>compute_h3_grid_weights</code>
+  described "a DataFrame" for months after it began taking a list — check the description against
+  the signature whenever you rename anything.</li>
+<li><strong>Cross-reference another function with plain backticks, never a Sphinx role.</strong> Write
+  <code>`write_nwp`</code>, not <code>:func:`write_nwp`</code>. mkdocstrings parses these docstrings as Markdown
+  and no extension interprets a reStructuredText role, so the role and its backticked name reach
+  the published API page verbatim, and the reader meets the markup where the name should be.
+  Double backticks render identically to single ones, so the rule is about the role rather than the
+  number of backticks. A <code>pygrep</code> pre-commit hook is what catches a role, because <code>ruff</code>,
+  <code>pydoclint</code> and <code>mkdocs build --strict</code> all read a docstring as prose and have no opinion about
+  what is inside it: 46 roles across six role names accumulated in the source before anyone read
+  the built HTML, 13 of them rendering as visible markup on <code>api/contracts/</code> and <code>api/ml_core/</code> and
+  the rest sitting in modules that have no <code>docs/api/</code> page. <strong>When a docstring change is about how
+  something renders, read the generated page, not the source.</strong></li>
+<li><strong>When a prose sweep meets an obviously wrong claim outside the change it set out to make, fix
+  it.</strong> A sweep is the one occasion anybody reads these files closely, so filing the defect for
+  later spends the pass that found it and leaves the wrong version in front of readers meanwhile.
+  The bar is that the claim is checkably wrong against the code, not merely improvable — six
+  passages called <code>init_time</code> "the NWP partition key" when <code>delta_store.nwp</code> partitions on
+  <code>(nwp_model_id, init_time)</code>. Say in the pull-request body why the change reaches outside its
+  stated scope, so a reviewer expecting one thing is not surprised by another.</li>
+</ul>
+<h2 id="data-handling">Data Handling</h2>
+<ul>
+<li><strong>Tabular Data</strong>: Use <strong>Polars</strong> (<code>import polars as pl</code>) for dataframes. Pandas is strictly
+  forbidden. Use Polars for all tabular data.</li>
+<li><strong>Lazy evaluation</strong>: Use <code>pl.LazyFrame</code> throughout the pipeline. <strong>Do not call <code>.collect()</code>
+  before the model boundary.</strong> See <a href="../performance/#lazy-evaluation-strategy">Lazy evaluation strategy</a>
+  for the full contract.</li>
+<li><strong>Gridded/NWP Data</strong>: Use <strong>Xarray</strong> and <strong>Zarr</strong>.</li>
+<li><strong>Data Contracts</strong>: Use <strong>Patito</strong> for defining and validating data schemas. Use Patito type
+  annotations (<code>pt.DataFrame[MySchema]</code>, <code>pt.LazyFrame[MySchema]</code>) whenever a function consumes or
+  returns data that conforms to an existing schema — whether the function is public or private.
+  Don't invent a new schema just to annotate a private helper; if no existing schema fits, use
+  plain <code>pl.DataFrame</code> / <code>pl.LazyFrame</code>. <strong>A schema is the authoritative account of what the data
+  means, so when code and contract disagree the code is the first suspect</strong> — never widen a field
+  or relax a range just to make a failing <code>validate()</code> pass, and get any contract change agreed
+  before making it. The reasoning is in
+  <a href="../../api/contracts/">Contracts / Design Principles</a>.</li>
+<li><strong>Patito friction budget</strong>: the <code>polars-patito-gotchas</code> skill documents five Patito gotchas
+  (cross-model LazyFrame joins, dict-<code>.cast</code> on model-bearing frames, <code>ge</code>/<code>le</code> silently ignored
+  on a datetime field, <code>pt.LazyFrame</code> methods typed as plain <code>pl.LazyFrame</code>, and Delta
+  dictionary-encoded columns). Five workarounds is an acceptable price for schema validation — but
+  if a sixth becomes necessary, revisit the approach: either validate only at I/O boundaries (typed
+  annotations everywhere, <code>.validate()</code> only at persistence edges) or evaluate an alternative such
+  as <code>dataframely</code>.</li>
+<li><strong>Never row-count a table that can exceed 2³² rows with Polars.</strong> Default Polars builds use a
+  32-bit row index, so past ~4.29 billion rows <code>pl.len()</code> and <code>group_by(...).agg(pl.len())</code> wrap
+  modulo 2³² with <strong>no error</strong>. Use the Delta log instead — <code>DeltaTable(path).count()</code>, or sum
+  <code>num_records</code> over <code>get_add_actions(flatten=True)</code> — both metadata-only and exact. Value
+  aggregations (<code>sum</code>, <code>min</code>/<code>max</code>, quantiles) are unaffected, and so are filtered queries whose
+  <em>result</em> stays under the cap. NWP (~5.9B rows) is past it today; <code>power_forecasts</code> will pass it
+  at V2 scale. Full analysis:
+  <a href="../performance/#the-other-hard-ceiling-polars-32-bit-row-index">The other hard ceiling</a>.</li>
+<li><strong>Persistence</strong>: Prefer partitioned Parquet files for tabular data.</li>
+</ul>
+<h2 id="polars-style">Polars style</h2>
+<p>These rules are all about making Polars code easy to read.</p>
+<ul>
+<li>When casting, prefer using the <code>cast</code> method like this: <code>df.cast({"foo": pl.Int8})</code>, in favour of
+  using <code>df.with_columns(pl.col("foo").cast(pl.Int8))</code>. <strong>Caveat:</strong> this is only safe on a plain
+  Polars frame — passing a <code>{column: dtype}</code> mapping to a <em>model-bearing</em> Patito frame silently
+  does the wrong thing. See the <code>polars-patito-gotchas</code> skill.</li>
+<li>When using <code>.with_columns</code>, prefer specifying the destination column name as a key word argument
+  like this: <code>df.with_columns(bar=pl.col("foo").expression())</code> instead of using <code>alias</code> like this:
+  <code>df.with_columns(pl.col("foo").expression().alias("bar"))</code></li>
+<li>
+<p><strong><code>Literal</code> type aliases — use a <code>Type</code> suffix</strong> to distinguish them from the runtime tuples
+  that drive Polars <code>Enum</code> declarations. Example:</p>
+<div class="highlight"><pre><span></span><code><span class="n">EVALUATION_SCOPES</span><span class="p">:</span> <span class="n">Final</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"leaderboard"</span><span class="p">,</span> <span class="s2">"production_monitoring"</span><span class="p">,</span> <span class="s2">"ad_hoc"</span><span class="p">)</span>
+<span class="sd">"""Runtime tuple — used as pl.Enum(EVALUATION_SCOPES)."""</span>
+
+<span class="n">EvalScopeType</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"leaderboard"</span><span class="p">,</span> <span class="s2">"ad_hoc"</span><span class="p">]</span>
+<span class="sd">"""Type annotation — currently-implemented subset; update when adding a new scope."""</span>
+</code></pre></div>
+<p>The <code>Type</code>-suffixed alias is what goes in function signatures; the <code>UPPER_SNAKE_CASE</code> tuple is
+what goes into <code>pl.Enum(...)</code>. They serve different purposes and should both exist.</p>
+</li>
+</ul>
+<h2 id="gotchas-that-fail-silently">Gotchas that fail silently</h2>
+<p>Three groups of trap in this codebase produce <strong>no error at the point of the mistake</strong>, so each
+lives in a skill you are expected to load <em>before</em> writing the code rather than after the
+confusing failure:</p>
+<ul>
+<li><strong><code>polars-patito-gotchas</code></strong> — Patito's model machinery colliding with Polars and delta-rs: a
+  cross-model <code>.join()</code> that has to have its right-hand operand stripped, a <code>{column: dtype}</code>
+  <code>.cast</code> swallowed on a model-bearing frame, <code>ge</code>/<code>le</code> doing nothing on a datetime field,
+  <code>.filter()</code> dropping the Patito subclass, and a dictionary-encoded column blocking Delta
+  predicate pushdown so a partition-filtered query reads the whole table.</li>
+<li><strong><code>marimo-notebooks</code></strong> — leading underscores are cell-local, imports belong in <code>app.setup</code>, and
+  <code>ruff check --fix</code> must never be run over a notebook.</li>
+<li><strong><code>ty-workarounds</code></strong> — known upstream <code>ty</code> bugs on Altair and numpy, where the code is correct
+  and the checker is not.</li>
+</ul>
+<h2 id="machine-learning">Machine Learning</h2>
+<ul>
+<li><strong>Every forecasting model subclasses <code>BaseForecaster</code></strong> (<code>packages/ml_core</code>), which fixes
+  <code>train</code> / <code>predict</code> / <code>save</code> / <code>load</code> and carries a <code>feature_engineer</code> strategy object. A model
+  that needs a different view of the data supplies a different <code>FeatureEngineer</code> rather than
+  changing the shared feature pipeline. <code>XGBoostForecaster</code> is the only implementation so far.</li>
+<li><strong>Use MLflow for experiment tracking.</strong></li>
+<li><strong>Choosing an optimisation tool: convex estimation subproblems → CVXPY; learning shapes, or
+  anything needing posteriors → PyTorch.</strong> "Non-convex" comes in grades, and the grade decides the
+  tool — the full rule is
+  <a href="../../techniques/convex-optimisation/#where-pytorch-is-the-right-tool">Where PyTorch is the right tool</a>,
+  and the physics side is <a href="../../techniques/differentiable-physics/">Differentiable physics</a>.
+  PyTorch is not yet a dependency of the workspace; the first model to need it is the variational
+  capacity estimator in the
+  <a href="../../roadmap/capacity-estimation/">v0.7 capacity head-to-head</a>.</li>
+<li><strong>Research and production share one execution path.</strong> There is no research-only implementation of
+  a pipeline step — see
+  <a href="../../design-philosophy/design-principles/#3-one-execution-path-from-research-to-production">design principle 3</a>.
+  What legitimately differs between them is failure policy, not code: the CV, training, and
+  metrics assets fail fast, while the production service degrades (see <a href="../../design-philosophy/inherent-stability/">Inherent
+  stability</a>).</li>
+</ul>
+<h2 id="error-handling">Error Handling</h2>
+<ul>
+<li>Use specific exceptions.</li>
+<li><strong>Unparenthesised <code>except</code> tuples are valid.</strong> <code>except OSError, ValueError, TypeError:</code> looks
+  like the Python 2 syntax that Python 3 rejected for years, but
+  <a href="https://peps.python.org/pep-0758/">PEP 758</a> made it legal in Python 3.14. Parentheses are still
+  required to bind the exception to a name: <code>except (OSError, ValueError) as err:</code>.</li>
+<li>Leverage Sentry for observability in production-like code, and make each event name the fault:
+  the tag an alert rule routes on, and a message naming the series, the run or the asset that broke
+  rather than only the type of error. See <a href="../../design-philosophy/design-principles/#16-a-failure-names-its-own-cause-in-the-telemetry">design principle
+  16</a>.</li>
+<li>Validate data at boundaries using data contracts.</li>
+</ul>
+<p>Production code is bound by a stronger rule about <em>when</em> to raise at all, summarised in
+<code>CLAUDE.md</code> and set out in full on the
+<a href="../../design-philosophy/inherent-stability/">Inherent stability</a> page.</p>
+<h2 id="testing">Testing</h2>
+<p>Test wiring, fixtures, mocking, the network-test gate, and the Patito assertion house style now live
+on their own page: <strong><a href="../testing/">Testing</a></strong>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

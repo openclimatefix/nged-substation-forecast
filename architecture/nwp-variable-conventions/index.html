@@ -1,0 +1,3247 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../forecast-delivery/">
+      
+      
+        <link rel="next" href="../ecmwf-ens-known-issues/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>NWP variable conventions - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#nwp-variable-conventions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              NWP variable conventions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's incumbent forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-forecast-step-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The forecast step grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three axes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The three axes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#instantaneous-versus-period-ending" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instantaneous versus period-ending
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linear-versus-circular" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear versus circular
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numeric-versus-categorical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numeric versus categorical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#every-variable-and-how-to-read-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every variable, and how to read it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-half-hourly-resample-does-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the half-hourly resample does today
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What the half-hourly resample does today">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#wind-direction-is-interpolated-across-the-0360-wrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind direction is interpolated across the 0°/360° wrap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#period-ending-variables-are-interpolated-as-though-they-were-instantaneous" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Period-ending variables are interpolated as though they were instantaneous
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instantaneous-variables-lose-diurnal-amplitude" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instantaneous variables lose diurnal amplitude
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wind-is-stored-as-speed-and-direction-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind is stored as speed and direction, and why
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending training history with ERA5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-forecast-step-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The forecast step grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three axes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The three axes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#instantaneous-versus-period-ending" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instantaneous versus period-ending
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linear-versus-circular" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear versus circular
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numeric-versus-categorical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numeric versus categorical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#every-variable-and-how-to-read-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every variable, and how to read it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-half-hourly-resample-does-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the half-hourly resample does today
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What the half-hourly resample does today">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#wind-direction-is-interpolated-across-the-0360-wrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind direction is interpolated across the 0°/360° wrap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#period-ending-variables-are-interpolated-as-though-they-were-instantaneous" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Period-ending variables are interpolated as though they were instantaneous
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instantaneous-variables-lose-diurnal-amplitude" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instantaneous variables lose diurnal amplitude
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wind-is-stored-as-speed-and-direction-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind is stored as speed and direction, and why
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="nwp-variable-conventions">NWP variable conventions</h1>
+<p>This page says how to read a value out of the <code>nwp</code> Delta table, and what the feature pipeline does
+to it on the way to the model. Every ECMWF ENS variable we store is listed with the convention that
+governs it: some values describe an instant, some describe the 3 or 6 hours before that instant,
+and two are angles that wrap.</p>
+<p>Everything here is a choice this project made, so a defect described on this page is a reason to
+change our code. Damage the data arrives with is the separate subject of <a href="../ecmwf-ens-known-issues/">Known ECMWF ENS
+data-quality issues</a>, which sets out how the two pages divide the subject
+between them.</p>
+<h2 id="the-forecast-step-grid">The forecast step grid</h2>
+<p>ECMWF ENS is <strong>not evenly spaced over the horizon</strong>. Measured on the 2026-08-10 00Z run, and
+identical in every run in the archive:</p>
+<table>
+<thead>
+<tr>
+<th>step width</th>
+<th>lead times</th>
+<th>number of steps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>—</td>
+<td>0 h (analysis)</td>
+<td>1</td>
+</tr>
+<tr>
+<td>3 h</td>
+<td>3 h → 144 h</td>
+<td>48</td>
+</tr>
+<tr>
+<td>6 h</td>
+<td>150 h → 360 h</td>
+<td>36</td>
+</tr>
+</tbody>
+</table>
+<p>The change at <strong>144 h — 6 days</strong> matters most, because the primary user band is 3–10 days
+(<a href="../../roadmap/xgboost-improvements/">XGBoost improvements</a>), so days 6 to 10 of that band sit on
+the coarse half of the grid.</p>
+<h2 id="the-three-axes">The three axes</h2>
+<p>A variable takes one convention from each of the three axes below. Most are instantaneous, linear
+and numeric.</p>
+<h3 id="instantaneous-versus-period-ending">Instantaneous versus period-ending</h3>
+<p>An <strong>instantaneous</strong> variable describes conditions at <code>valid_time</code> itself.</p>
+<p>A <strong>period-ending</strong> variable is the <em>average rate over the interval that ends at <code>valid_time</code></em>.
+Dynamical.org de-accumulates these from ECMWF's cumulative source fields before we receive them.
+Three variables are period-ending: <code>downward_short_wave_radiation_flux_surface</code>,
+<code>downward_long_wave_radiation_flux_surface</code> and <code>precipitation_surface</code>. They are legitimately null
+at lead 0, because there is no preceding interval.</p>
+<p>Beyond 144 h the interval is <strong>6 hours long</strong>, so a 12:00 shortwave value is the mean over
+06:00–12:00. That window covers much of the morning ramp, so the value is far below the
+instantaneous irradiance at noon. What changes at day 6 is the averaging window, not the weather.</p>
+<p><code>PowerTimeSeries</code> uses the same convention — its <code>value</code> is the "average power over the preceding
+30-minute period" — so the two sides of the NWP-to-power join agree, and features derived from
+period-ending NWP should stay period-ending to match.</p>
+<h3 id="linear-versus-circular">Linear versus circular</h3>
+<p><code>wind_direction_10m</code> and <code>wind_direction_100m</code> are <strong>circular</strong>: 359° and 1° are two degrees apart
+in reality, and 358 degrees apart arithmetically. No arithmetic that assumes a number line —
+interpolation, mean, gradient, quantile, standardised anomaly — is valid on them without special
+handling. Every other numeric variable is linear.</p>
+<h3 id="numeric-versus-categorical">Numeric versus categorical</h3>
+<p><code>categorical_precipitation_type_surface</code> is a category code, not a quantity, so it is aggregated by
+area-weighted mode rather than averaged, and forward-filled rather than interpolated.</p>
+<p>It appears to be instantaneous. The three period-ending variables are 100 % null at lead 0, because
+there is no preceding interval for them to average; <code>categorical_precipitation_type_surface</code> is
+fully populated there. That is good evidence but not proof, since a period field could in principle
+be published at lead 0 anyway, so confirm against
+<a href="https://codes.ecmwf.int/grib/param-db/260015">ECMWF's parameter database entry</a> before relying on
+its timing. If it did describe the preceding interval, forward-filling it would attribute one
+interval's precipitation type to the following one.</p>
+<h2 id="every-variable-and-how-to-read-it">Every variable, and how to read it</h2>
+<p>The final column measures <strong>what the 3 h → 6 h step change costs</strong>: the error, at the held-out
+intermediate steps, from reconstructing the 3-hourly part of the horizon out of a 6-hourly version
+of itself the way the feature pipeline reconstructs half-hourly rows. <code>MAE/SD</code> normalises that error
+by the variable's own spread, so the column is comparable across variables. Measured on the
+2026-08-10 00Z run, scored over the 2,045,304 held-out steps within leads 3–144 h. For the
+period-ending variables the 6-hourly product is <em>exactly</em> reproducible by averaging consecutive
+pairs of 3-hourly means, so their figures are exact rather than an emulation. The two directions are
+scored by mean circular distance — <code>|((reconstructed − truth + 180) mod 360) − 180|</code> — since a plain
+subtraction of two angles is not a distance.</p>
+<table>
+<thead>
+<tr>
+<th>variable</th>
+<th>convention</th>
+<th>unit</th>
+<th>MAE at 6-hourly</th>
+<th>MAE/SD</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>downward_short_wave_radiation_flux_surface</code></td>
+<td>period-ending</td>
+<td>W m⁻²</td>
+<td>111</td>
+<td><strong>0.44</strong></td>
+</tr>
+<tr>
+<td><code>wind_direction_10m</code></td>
+<td>instantaneous, <strong>circular</strong></td>
+<td>°</td>
+<td>20.9</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>wind_direction_100m</code></td>
+<td>instantaneous, <strong>circular</strong></td>
+<td>°</td>
+<td>19.4</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>downward_long_wave_radiation_flux_surface</code></td>
+<td>period-ending</td>
+<td>W m⁻²</td>
+<td>6.5</td>
+<td>0.27</td>
+</tr>
+<tr>
+<td><code>wind_speed_100m</code></td>
+<td>instantaneous</td>
+<td>m s⁻¹</td>
+<td>0.75</td>
+<td>0.30</td>
+</tr>
+<tr>
+<td><code>wind_speed_10m</code></td>
+<td>instantaneous</td>
+<td>m s⁻¹</td>
+<td>0.57</td>
+<td>0.28</td>
+</tr>
+<tr>
+<td><code>precipitation_surface</code></td>
+<td>period-ending</td>
+<td>kg m⁻² s⁻¹</td>
+<td>9.6 × 10⁻⁶</td>
+<td>0.19</td>
+</tr>
+<tr>
+<td><code>dew_point_temperature_2m</code></td>
+<td>instantaneous</td>
+<td>°C</td>
+<td>0.49</td>
+<td>0.17</td>
+</tr>
+<tr>
+<td><code>temperature_2m</code></td>
+<td>instantaneous</td>
+<td>°C</td>
+<td>0.66</td>
+<td>0.15</td>
+</tr>
+<tr>
+<td><code>pressure_reduced_to_mean_sea_level</code></td>
+<td>instantaneous</td>
+<td>Pa</td>
+<td>29</td>
+<td>0.09</td>
+</tr>
+<tr>
+<td><code>geopotential_height_500hpa</code></td>
+<td>instantaneous</td>
+<td>m</td>
+<td>2.4</td>
+<td>0.03</td>
+</tr>
+<tr>
+<td><code>pressure_surface</code></td>
+<td>instantaneous</td>
+<td>Pa</td>
+<td>29</td>
+<td>0.02</td>
+</tr>
+<tr>
+<td><code>categorical_precipitation_type_surface</code></td>
+<td>categorical</td>
+<td>code</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>The synoptic variables are unharmed by the coarser grid (MAE/SD 0.02–0.09). Shortwave radiation is
+the worst affected numeric variable, at half again the next-worst (0.44 against <code>wind_speed_100m</code>'s
+0.30). The two directions carry no MAE/SD because a standard deviation of a circular quantity is not
+meaningful; their error is the mean circular distance instead.</p>
+<h2 id="what-the-half-hourly-resample-does-today">What the half-hourly resample does today</h2>
+<p><code>_upsample_nwp_to_half_hourly</code> builds a 30-minute grid per <code>(nwp_init_time, ensemble_member,
+time_series_id)</code> group, left-joins the native steps onto it, then <strong>linearly interpolates every
+column in <code>Nwp.continuous_var_names()</code></strong> and forward-fills the categorical one.</p>
+<p><code>continuous_var_names()</code> is defined as "every weather variable that is not categorical". That single
+definition is the root of two of the three defects below: it silently classifies a period-ending
+rate and a wrapped angle as things that may be linearly interpolated between their <code>valid_time</code>
+stamps.</p>
+<p>Repairing all three is scheduled as the first work in v0.5 — see
+<a href="../../roadmap/xgboost-improvements/#before-anything-else-fix-how-the-nwp-variables-are-interpreted">Before anything
+else</a>.
+Until that lands, the behaviour described below is what the pipeline does.</p>
+<h3 id="wind-direction-is-interpolated-across-the-0360-wrap">Wind direction is interpolated across the 0°/360° wrap</h3>
+<p>Interpolating 350° → 10° yields 180°: due south for a northerly wind. Measured on the 2026-08-10
+00Z run, over every consecutive native-step pair:</p>
+<table>
+<thead>
+<tr>
+<th>step width</th>
+<th>pairs straddling north (<code>_10m</code>)</th>
+<th>pairs straddling north (<code>_100m</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3 h</td>
+<td>3.73 %</td>
+<td>3.50 %</td>
+</tr>
+<tr>
+<td>6 h</td>
+<td>8.30 %</td>
+<td>8.03 %</td>
+</tr>
+</tbody>
+</table>
+<p>Inside a straddling interval the error grows linearly with distance from the first step: at fraction
+<span class="arithmatex">\(t\)</span> of the way across, the interpolated value is <span class="arithmatex">\(360t\)</span> degrees from the truth as a circular
+distance. A straddling
+3-hourly interval therefore holds five interpolated rows wrong by 60°, 120°, 180°, 120° and 60°.
+Only the midpoint is a full reversal; the mean error across the interval is <strong>108°</strong> at 3-hourly
+spacing and <strong>98°</strong> at 6-hourly.</p>
+<p>Across the whole horizon that affects <strong>6.57 %</strong> of interpolated <code>wind_direction_10m</code> rows and
+<strong>6.32 %</strong> of <code>wind_direction_100m</code> rows — 5.80 % and 5.58 % of all half-hourly rows, since the
+native steps themselves are correct. The error is not random: it always rotates the wind the long
+way round, so a northerly is recorded as coming from the west, the south or the east, depending on
+how far into the interval the row sits.</p>
+<p>Both columns are in <code>conf/model/xgboost.yaml</code>'s <code>selected_features</code>, so this reaches the model.</p>
+<h3 id="period-ending-variables-are-interpolated-as-though-they-were-instantaneous">Period-ending variables are interpolated as though they were instantaneous</h3>
+<p>The resample interpolates between <code>valid_time</code> stamps, which treats a backward-looking mean as an
+instantaneous reading at the <em>end</em> of its window. The reconstructed day is therefore both flattened
+and shifted late — by half the step width, so <strong>3 hours</strong> in the 6-hourly part of the horizon.
+Reconstructing a clear-sky day (Haurwitz clear-sky irradiance at 52.5° N, 1° W, 10 August):</p>
+<table>
+<thead>
+<tr>
+<th>step</th>
+<th>reconstruction</th>
+<th>peak W m⁻²</th>
+<th>peak at</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>—</td>
+<td>truth (instantaneous)</td>
+<td>816</td>
+<td>12:00</td>
+</tr>
+<tr>
+<td>3 h</td>
+<td>today's resample</td>
+<td>756</td>
+<td>15:00</td>
+</tr>
+<tr>
+<td>6 h</td>
+<td>today's resample</td>
+<td>590</td>
+<td>18:00</td>
+</tr>
+</tbody>
+</table>
+<p>Read the 6-hourly row carefully: the reconstruction is a near-flat plateau from 12:00 to 18:00, and
+the argmax lands at 18:00 only because the two knots differ by about 6%. The honest summary is that
+the modelled solar day is shifted about 3 hours late and its peak cut by a quarter, not that it
+peaks at 18:00. Daily <em>energy</em> is preserved (7.18 against 7.20 kWh m⁻²) — it is the shape and the
+timing that are wrong, which is what a PV site responds to.</p>
+<p>The archive confirms the period-ending reading. Forming the clear-sky index two ways over the
+2026-08-10 00Z run (1671 cells × 51 members, ~2.8 M rows after restricting to those where clear-sky
+irradiance exceeds 200 W m⁻², so the ratio is well conditioned) settles it. Cloud enhancement can
+lift irradiance a few tens of percent above the clear-sky value, so an index a little over 1 is real
+— but an index of 2 is not, least of all for a 6-hour mean over a whole H3 cell:</p>
+<table>
+<thead>
+<tr>
+<th>step</th>
+<th><code>GHI / CS(valid_time)</code> p99 / max</th>
+<th><code>GHI / CS(mean over preceding step)</code> p99 / max</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3 h</td>
+<td>2.0 / 2.2</td>
+<td>0.99 / <strong>1.02</strong></td>
+</tr>
+<tr>
+<td>6 h</td>
+<td>2.3 / 3.0</td>
+<td>0.96 / <strong>1.03</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The period-mean denominator sits at 1.0 to within the clear-sky model's own error in both halves of
+the horizon; the instantaneous one implies irradiance twice what the sky can deliver. The exact tail
+figures depend on the clear-sky model and the daylight cut-off, so treat the leading digit as the
+result.</p>
+<h3 id="instantaneous-variables-lose-diurnal-amplitude">Instantaneous variables lose diurnal amplitude</h3>
+<p>Linear interpolation between 6-hourly samples misses the daily temperature maximum, which falls at
+around 15:00, between the 12:00 and 18:00 samples. The loss is measured by emulation, which controls
+for lead time: comparing the native 3-hourly steps of days 1–6 against a 6-hourly subsample of those
+same steps, the mean daily temperature range falls from <strong>6.09 °C to 5.37 °C — an 11.9%
+compression</strong>.</p>
+<p>Unlike the other two defects this one has no exact fix. The diurnal cycle is not a pure sinusoid:
+its asymmetric afternoon peak needs the second and third harmonics, and four samples a day is
+already at the Nyquist limit for the second, so some amplitude is genuinely unrecoverable at
+6-hourly spacing. A shape-preserving interpolant would recover more of it than a linear one, though
+how much has not been measured. The compression feeds the effective-temperature, degree-day and
+<code>windchill</code> features.</p>
+<h2 id="wind-is-stored-as-speed-and-direction-and-why">Wind is stored as speed and direction, and why</h2>
+<p>The ingest computes wind speed and direction from ECMWF's native <code>u</code>/<code>v</code> components and discards the
+components (<a href="../../api/dynamical_data/"><code>convert_to_polars.py</code></a>). Two properties of that choice
+are worth knowing.</p>
+<p><strong>The conversion happens after the spatial aggregation, which is the right order.</strong> H3 cells are
+built from <code>wind_u_*</code>/<code>wind_v_*</code>, and speed and direction are derived from the already-aggregated
+components. Averaging <em>direction</em> over grid points would have the same wrap defect in space that the
+resample has in time, and it never happens.</p>
+<p><strong>The stored speed is therefore the magnitude of the cell's <em>vector</em> mean, not the mean of the grid
+points' scalar speeds.</strong> These differ — |E[<strong>v</strong>]| ≤ E[|<strong>v</strong>|] — and the gap grows wherever wind
+direction varies across a cell. The second quantity is the one a turbine power curve wants, because
+power responds to the speed at each point and the curve is strongly non-linear. The scalar mean
+cannot be recovered from the archive: it is a different spatial reduction, so obtaining it requires
+re-ingesting. The size of the gap has not been measured.</p>
+<p><strong>Storing the components instead would cost roughly 6 % of the table.</strong> The two forms carry the same
+information, so this is mostly a storage question. The one behavioural consequence is that speed
+becomes derived after interpolation, which changes its values slightly. Round-tripping speed and
+direction to components and back, with the components rounded to the <a href="../../api/delta_store/">13-bit
+significand</a> the table stores, costs at most
+6.8 × 10⁻³ ° of direction and 2.4 × 10⁻³ m s⁻¹ of speed over a full run — the same order as the
+rounding the table already applies, and far below anything a forecast responds to.</p>
+<p>Written through the production path (same significand rounding, sort order, and writer properties),
+the full column set both ways:</p>
+<table>
+<thead>
+<tr>
+<th>run</th>
+<th>speed + direction</th>
+<th>u + v</th>
+<th>change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-08-10 00Z</td>
+<td>142.6 MB</td>
+<td>151.6 MB</td>
+<td>+6.3 %</td>
+</tr>
+<tr>
+<td>2026-08-03 00Z</td>
+<td>144.6 MB</td>
+<td>152.8 MB</td>
+<td>+5.7 %</td>
+</tr>
+</tbody>
+</table>
+<p>A wrapped angle turns out to compress <em>better</em> than the components, not worse. Over the whole table
+— 1,726 Parquet files, 6.25 billion rows, 98.9 GB — each direction column costs 1.53 bytes per row
+and the two together are 19.3% of all bytes, making direction the most expensive weather column we
+store, ahead of temperature at 8.8%. Yet the components cost more still, because the significand
+rounding collapses values into repeats that Parquet's dictionary and RLE encoding capture, and
+<code>u</code>/<code>v</code>, being products of a speed and a trigonometric function, take about two and a half times as
+many distinct values after rounding. It is the same mechanism that makes <code>BYTE_STREAM_SPLIT</code> lose on
+this table.</p>
+<p>Whether to accept that 6 % in exchange for making the wrap defect structurally impossible is being
+decided in
+<a href="../../roadmap/xgboost-improvements/#store-wind-as-uv-components-rather-than-speed-and-direction">Store wind as u/v components</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
