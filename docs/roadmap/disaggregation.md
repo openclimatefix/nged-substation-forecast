@@ -356,32 +356,27 @@ by itself, a known approach. **Convex disaggregation** also has precedent: [Wyto
 contextually supervised source separation is the direct ancestor of
 [the dictionary baseline above](#the-convex-dictionary-baseline).
 
-**The nearest GB precedent we found is a sibling Open Climate Fix project on the same problem,
-which has not yet published a result** — see the [energy-forecasting
+**The nearest GB precedent we found is a sibling Open Climate Fix project on the same problem** —
+see the [energy-forecasting
 review](../background/energy-forecasting-review.md#8-disaggregating-unmetered-solar-and-wind-from-a-substations-net-flow)'s
-assessment of UK Power Networks' Power Flow to Solar Capacity, the project this engine's
-unmetered-PV work builds on. The review found no published benchmark of inferring capacity from
-the net flow at primary-substation aggregation. The nearest published method at a comparable
-scale, [Teng et al. (2023)](https://doi.org/10.1016/j.rser.2023.113662)'s DAZLS, splits unmetered
-wind and solar out of Dutch substation measurements but needs each site's installed capacity as
-an input — half of what this engine has to infer. The one result the review found that separated
-solar from demand at a real distribution substation without being told the installed capacity,
-[Kara et al. (2018)](https://doi.org/10.1016/j.segan.2017.11.001), needed the substation's own
-reactive power and a nearby solar plant's output standing in for irradiance, neither of which
+assessment of UK Power Networks' Power Flow to Solar Capacity. The review found no published
+benchmark of inferring capacity from the net flow at primary-substation aggregation. The nearest
+published method at a comparable scale, [Teng et al.
+(2023)](https://doi.org/10.1016/j.rser.2023.113662)'s DAZLS, splits unmetered wind and solar out of
+Dutch substation measurements but needs each site's installed capacity as an input — in contrast
+Flexpectation infers the capacity from the substation powerflow. The one result the review found
+that separated solar from demand at a real distribution substation without being told the installed
+capacity, [Kara et al. (2018)](https://doi.org/10.1016/j.segan.2017.11.001), needed the substation's
+own reactive power and a nearby solar plant's output standing in for irradiance, neither of which
 NGED's primary substations routinely supply.
 
-**Physics-informed neural networks for PV generation** are established. There is prior work on
-differentiable physics mapping weather to PV power, and at least one patent on unsupervised solar
-disaggregation using a physics-based irradiance-to-power model as the inversion constraint.
-
 **Switching state-space machinery** exists off the shelf. Recurrent switching linear dynamical
-systems (rSLDS; [Linderman et al.
-(2017)](https://proceedings.mlr.press/v54/linderman17a.html)) and explicit-duration variants (RED-SDS) are
-standard tools for unsupervised segmentation of multivariate time series into discrete latent modes.
-We considered this machinery for ARA handling but did **not** adopt it: it presumes a discrete,
-re-identifiable switching unit (a per-feeder "block") that NGED's meshed, radially-run network with
-movable cut points does not possess (see
-[switching-events.md, Part 4](switching-events.md)). Our chosen formulation is the
+systems (rSLDS; [Linderman et al. (2017)](https://proceedings.mlr.press/v54/linderman17a.html)) and
+explicit-duration variants (RED-SDS) are standard tools for unsupervised segmentation of
+multivariate time series into discrete latent modes. We considered this machinery for ARA handling
+but do **not** plan to adopt it: it presumes a discrete, re-identifiable switching unit (a
+per-feeder "block") that NGED's meshed, radially-run network with movable cut points does not
+possess (see [switching-events.md, Part 4](switching-events.md)). Our chosen formulation is the
 continuous neighbourhood mixture described there.
 
 **Topology and switch-state identification** has been studied, but overwhelmingly using voltage

@@ -33,19 +33,18 @@ phenomena *implicitly*. That said, explicit estimates are genuinely wanted where
 them:
 
 * Track the **effective capacity** of metered generators over time (turbine failures, inverter
-  faults, PV panel degradation), ignoring NGED-imposed Active Network Management curtailment —
-  including detecting misbehaving generators. Curtailment is excluded here because a curtailed
-  generator is being held down rather than broken. The point of a better forecast is to
-  curtail it less often.
-* Detect and compensate for **switching events** — where power is diverted from one substation
-  to another due to maintenance, changing the local demand signature. (Whether this ships as a
-  discrete event table or as continuous switching-state signals is an open question — see
-  [the decision point](../roadmap/switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).)
-* Automatically detect and flag **faulty metering** (stuck values, physically impossible
-  values, missing data).
-* An optional **"prevailing conditions" forecast** assembled from the delivered building
-  blocks — explicitly lower priority than the NRA forecast. See
-  [forecast building blocks](../roadmap/forecast-building-blocks.md).
+  faults, PV panel degradation), including detecting misbehaving generators. The "effective
+  capacity" ignores NGED-imposed Active Network Management (ANM) curtailment because a curtailed
+  generator is being held down rather than broken.
+* Detect and compensate for **switching events** — where power is diverted from one substation to
+  another due to maintenance, changing the local demand signature. (Whether this ships as a discrete
+  event table or as continuous switching-state signals is an open question — see [the decision
+  point](../roadmap/switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).)
+* Automatically detect and flag **faulty metering** (stuck values, physically impossible values,
+  missing data).
+* An optional **"prevailing conditions" forecast** assembled from the delivered building blocks —
+  explicitly lower priority than the NRA forecast. See [forecast building
+  blocks](../roadmap/forecast-building-blocks.md).
 
 The five [delivery tables](../roadmap/delivery-tables.md) were specified in our most recent
 formal report to NGED, so a change of shape there (such as replacing the discrete
@@ -54,22 +53,21 @@ decide unilaterally.
 
 ### The worst case matters most: forecasting threshold exceedance
 
-NGED put two costs on these forecasts and rate them at least equally. The first is
-**flexibility procurement**: deciding, days ahead, whether to pay flexible customers to reduce
-their demand when a substation risks running beyond its capability. The second is **generator
-curtailment**: holding embedded generation down through Active Network Management when export
-risks running beyond a limit. That limit is usually not the substation's own: a generation
-constraint typically binds above the primary, driven by the aggregated flow across several
-substations rather than by any single meter in isolation. The forecasts that matter for
-curtailment are therefore the forecasts that net and sum correctly up the hierarchy — which is
-why [curtailment scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets
-at one primary before summing up the substation hierarchy. The money is counted differently
-too — curtailment today is priced as a whole-system cost rather than as NGED's own spend. But
-NGED rate the saving as highly, so the forecast requirement is unchanged. So the question
-users ask of a forecast is rarely "what is the most likely load?" and usually "**how likely is
-net demand to cross this limit?**" — NGED's [incumbent forecasting
-tool](nged-incumbent-forecast.md#the-operators-view) literally plots demand as headroom below
-a constraint line.
+Flexpectation aims to save money for end users in two specific ways. The first is **flexibility
+procurement**: deciding, days ahead, whether to pay flexible customers to reduce their demand when a
+substation risks running beyond its capability. The second is **generator curtailment**: holding
+embedded generation down when export risks running beyond a limit. That limit is usually not the
+substation's own: a generation constraint typically binds above the primary, driven by the
+aggregated flow across several substations rather than by any single meter in isolation. The
+forecasts that matter for curtailment are therefore the forecasts that net and sum correctly up the
+hierarchy — which is why [curtailment
+scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at one primary before
+summing up the substation hierarchy. The money is counted differently too — curtailment today is
+priced as a whole-system cost rather than as NGED's own spend. But NGED rate the saving as highly,
+so the forecast requirement is unchanged. So the question users ask of a forecast is rarely "what is
+the most likely load?" and usually "**how likely is net demand to cross this limit?**" — NGED's
+[incumbent forecasting tool](nged-incumbent-forecast.md#the-operators-view) literally plots demand
+as headroom below a constraint line.
 
 The project's value therefore concentrates in **both tails** of each forecast distribution: A
 model that is excellent on typical half-hours but unreliable in the handful of near-limit

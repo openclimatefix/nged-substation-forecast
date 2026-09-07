@@ -39,24 +39,22 @@ series that names its change dates doubles as a real-time health and availabilit
 
 ## Several estimators, one winner
 
-There is more than one credible way to estimate effective capacity. The candidates occupy
-genuinely different corners of the tooling space. Rather than pick on paper, **v0.7 races the
-candidates head-to-head on the same data and the same judging criteria, and the winner ships in
-v1.** The losers do not disappear: they stay on the leaderboard as permanent baselines and
-honesty checks.
+There is more than one credible way to estimate effective capacity. The candidates occupy genuinely
+different corners of the tooling space. **v0.7 aims to compare several candidates head-to-head on
+the same data and the same judging criteria, and the winner ships in v1.** The losers do not
+disappear: they stay on the leaderboard as permanent baselines and honesty checks.
 
-**No published method we found already solves this across a mixed fleet, which is why the contest
-starts from a head-to-head rather than adopting one paper's method.** The [energy-forecasting
+**No published method we found already solves this across a mixed fleet, which is why we cannot
+simply adopt one paper's method.** The [energy-forecasting
 review](../background/energy-forecasting-review.md#3-estimating-the-effective-capacity-of-metered-generators)
 found a method for each generation technology separately. But none run across a mixed fleet of
 individually metered generators at a distribution network operator — which is NGED's position, with
 solar, wind, a battery, a gas generator, and a biofuel plant behind one set of primaries.
 
-The contest has a second, deliberate purpose beyond picking the best estimator: **building
-hands-on experience with convex optimisation (CVXPY) during v1**, so that its fit for the v2
-problems — and our advice to NGED about tooling — rests on first-hand evidence rather than
-paper argument. The
-[Convex Optimisation](../techniques/convex-optimisation.md) page makes a strong prior case;
+The contest has a second, deliberate purpose beyond picking the best estimator: **building hands-on
+experience with convex optimisation (CVXPY) during v1**, so that its fit for the v2 problems — and
+our advice to NGED about tooling — rests on first-hand evidence rather than paper argument. The
+[Convex Optimisation](../techniques/convex-optimisation.md) page makes a strong theoretical case;
 v0.7 is where that case meets NGED data.
 
 The candidates:
@@ -64,10 +62,12 @@ The candidates:
 - **[Candidate A — the convex estimator](#candidate-a-the-convex-estimator-cvxpy)**: a censored
   quantile-envelope fit with fused-lasso changepoints, solved exactly by CVXPY, with panel
   orientation found by grid search.
-- **[Candidate B — the differentiable-physics estimator](#candidate-b-the-differentiable-physics-estimator)**:
-  the variational PyTorch model, fitting orientation and capacities as posteriors.
+- **[Candidate B — the differentiable-physics
+  estimator](#candidate-b-the-differentiable-physics-estimator)**: the variational PyTorch model,
+  fitting orientation and capacities as posteriors.
 - **[Cheap baselines](#cheap-baselines-to-beat)**: a rolling quantile of clear-sky-normalised
-  output, and SLAC's off-the-shelf convex capacity-change detection.
+  output, and SLAC's off-the-shelf convex capacity-change detection. Most simply, we may start with
+  a simple rolling p99.
 
 Despite coming from different toolchains, the two serious candidates are the *same kind of
 method*: both are **inverse modelling** — write down a forward model mapping unknown parameters

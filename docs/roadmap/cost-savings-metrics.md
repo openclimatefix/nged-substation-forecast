@@ -7,19 +7,19 @@
 > by anyone numerate. Everything attributed to NGED below comes from a meeting in July 2026 and is
 > flagged for them to confirm. See the [roadmap index](index.md) for status conventions.
 
-## Read this first: these pounds rank models, they do not cost anything
+## Read this first: these metrics only exist to rank ML models; they are too simplistic to be used for anything more
 
 These metrics put a **£** figure against every model we train. That figure rests on an invented
 network limit and a couple of average prices, so it is a **rough proxy**: not a cost analysis, not a
 business case, and not quotable as either. Its one job is to rank forecasts on the axis NGED care
 about, turning "this model has a lower threshold-weighted continuous ranked probability score" into
-"this model would have spent less to keep the network within limits". We use pounds rather than a
-unitless score because the parameters genuinely are prices, and because pounds are what the
-decisions these forecasts feed are actually made in. Forecast developers do not usually tune on
-money: [Gürses-Tran and Monti (2022)](https://doi.org/10.3390/forecast4020028) observe that
-forecast developers "predominantly assess residuals and error statistics when tuning the targeted
-model's quality". As a result, "eventual cost or rewards of the underlying business application are
-typically not considered in the model development phase".
+"this model would have reduced costs". We use pounds rather than a unitless score because the
+parameters genuinely are prices, and because pounds are what the decisions these forecasts feed are
+actually made in. Forecast developers do not usually tune on money: [Gürses-Tran and Monti
+(2022)](https://doi.org/10.3390/forecast4020028) observe that forecast developers "predominantly
+assess residuals and error statistics when tuning the targeted model's quality". As a result,
+"eventual cost or rewards of the underlying business application are typically not considered in the
+model development phase".
 
 ## Two savings, measured separately
 

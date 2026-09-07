@@ -112,16 +112,17 @@ prose longer than a few paragraphs.
 
 **When reviewing prose against these rules, load `prose-review` before starting.** A reviewer asked
 to check everything at once finds the loudest fault in each paragraph and moves on, so the quieter
-faults survive. A combined sweep of one section of the literature review reported nothing, and a
-one-rule-at-a-time sweep of the same text found thirty. The `prose-review` skill owns the procedure
-— the order to sweep in, what is deliberately not a finding, how to chunk a long file across
-sub-agents, which model to use, and how to triage findings before applying any of them.
+faults survive. In an experiment we ran, a combined sweep of one section of the literature review
+reported nothing, and a one-rule-at-a-time sweep of the same text found thirty rules violations. The
+`prose-review` skill owns the procedure — the order to sweep in, what is deliberately not a finding,
+how to chunk a long file across sub-agents, which model to use, and how to triage findings before
+applying any of them.
 
 **This is technical writing, not poetry: precision first, concision second, elegance last.** Every
-page here is a reference document, read by someone who is about to act on it. A sentence that can
-be read two ways will eventually be read the wrong way and built on. Precision wins every contest
-it enters: repeat the noun, restate the qualifier, name the units, and accept a sentence flatter
-than a writer would like. Concision comes next, and comes from cutting whole sentences rather than
+page here is a reference document, read by someone who is about to act on it. A sentence that can be
+read two ways will eventually be read the wrong way. Precision wins every contest it enters: repeat
+the noun, restate the qualifier, name the units, and accept a sentence flatter than a writer would
+like. Concision comes next, and comes mostly from cutting whole sentences or paragraphs rather than
 from clipping words out of a sentence that needs them. Most of the rules below are that order of
 priorities applied to one recurring case.
 
@@ -132,30 +133,30 @@ flattens the argument into items of equal weight; a bolded lead says which claim
 sentences under it say why.
 
 **Bullets are right where the items really are of equal weight and each one is simple.** The
-preference for prose above is about an argument, not about every list: where a passage is a
-parallel set of simple, independent facts — the options a setting takes, what a table holds, a run
-of short design notes — flattening costs nothing and the bullets read faster than the prose would.
-The test is whether a reader meeting the material for the first time needs the connective tissue
-between the sentences. **Never condense a passage that introduces a complex new concept**, because
-the connective tissue is what makes a new concept followable, and a bulleted argument reads as a
-set of assertions nobody joined up. Judge it per passage rather than per page, in both directions:
-a bulleted item carrying several sentences and a citation is a paragraph wearing a hyphen, and a
-paragraph listing five simple settings is a list wearing prose.
+preference for prose above is about an argument, not about every list: where a passage is a parallel
+set of simple, independent facts — the options a setting takes, what a table holds, a run of short
+design notes — flattening costs nothing and the bullets read faster than the prose would. The test
+is whether a reader meeting the material for the first time needs the connective tissue between the
+sentences. **Never condense a passage that introduces a complex new concept**, because the
+connective tissue is what makes a new concept followable, and a bulleted argument reads as a set of
+assertions nobody joined up. Judge it per passage rather than per page, in both directions: a
+bulleted item carrying several sentences is a candidate for changing to a paragraph; a paragraph
+listing five simple settings is a candidate for being changed to a list.
 
 **Prefer a heading that states the section's conclusion, but fall back to a plain descriptor the
 moment that conclusion needs explaining.** A heading is read cold, by someone who has not read the
 section and is deciding whether to, so it has no room to define its own terms. Two tests: can a
-first-time reader parse every word, and can that reader tell why the claim would matter to them?
-"More detailed weather data has not always improved the forecast" passes both tests. Every word is
-ordinary, and a reader knows at once whether that finding is their problem. "Energy forecasting has
-platform descriptions and no retraining cadence" fails both tests, because "platform" and
-"retraining cadence" only acquire their meaning inside the section. Where the conclusion cannot be
-stated without a term the section itself has to introduce, name the subject instead — "MLOps in
-energy forecasting". Leave the conclusion to the bolded lead, which has a whole sentence in which
-to land it. Helping a reader find the section they want is the heading's job; summarising the
-section is what a heading earns when every word survives being read cold. Renaming a heading
-changes its anchor slug, so grep for inbound links to the old slug first and update every one in
-the same commit.
+first-time reader parse every word, and can that reader tell why the claim would matter to them? For
+example, "More detailed weather data has not always improved the forecast" passes both tests. Every
+word is ordinary, and a reader knows at once whether that finding is their problem. In contrast,
+"Energy forecasting has platform descriptions and no retraining cadence" fails both tests, because
+"platform" and "retraining cadence" only acquire their meaning inside the section. Where the
+conclusion cannot be stated without a term the section itself has to introduce, name the subject
+instead — "MLOps in energy forecasting". Leave the conclusion to the bolded lead, which has a whole
+sentence in which to land it. Helping a reader find the section they want is the heading's job;
+summarising the section is what a heading earns when every word survives being read cold. Renaming a
+heading changes its anchor slug, so grep for inbound links to the old slug first and update every
+one in the same commit.
 
 **Be concrete and plain; write for a skim-reader.** Assume the reader is skimming and wants the
 meaning to jump off the page, not to spend effort decoding a clever, abstract or metaphorical
@@ -263,18 +264,17 @@ closing paragraph that repeats the opening. Delete those outright, and leave the
 sentences intact — buying brevity by clipping words out of a sentence that needs them is the
 mistake the next rule forbids.
 
-**Delete a clause the sentence does not need.** This is the one case where cutting inside a
-sentence is right, because a clause the sentence does not need is not a clause that needs its
-words. The usual offenders are a contrast nobody asked for, a restatement of the first half in
+**Delete a clause the sentence does not need.** This is the one case where cutting inside a sentence
+is right. The usual offenders are a contrast nobody asked for, a restatement of the first half in
 different words, and an aside naming what the passage is *not* about. Each tends to survive from
-whatever prompted the writing — a brief, a review comment, a question someone asked in a meeting —
-and answers a question the reader never had. `"Baseline" here means a fitted model of expected
-power whose residual every approach consumes, not a naive benchmark model` is a definition
-followed by a contrast the definition has already settled, and the sentence reads better ending at
-"consumes". The test is mechanical: delete the clause, re-read the sentence, and keep the deletion
-unless something the reader needed went with it. Keep the contrast only where a reader would
-otherwise land on the wrong meaning of a genuinely ambiguous term, and check that the wrong meaning
-is one the reader might reach rather than one the author happened to be thinking about.
+whatever prompted the writing and answers a question the reader never had. `"Baseline" here means a
+fitted model of expected power whose residual every approach consumes, not a naive benchmark model`
+is a definition followed by a contrast the definition has already settled, and the sentence reads
+better ending at "consumes". The test is mechanical: delete the clause, re-read the sentence, and
+keep the deletion unless something the reader needed went with it. Keep the contrast only where a
+reader would otherwise land on the wrong meaning of a genuinely ambiguous term, and check that the
+wrong meaning is one the reader might reach rather than one the author happened to be thinking
+about.
 
 **Prefer short sentences. Where a sentence carries two claims, split it into two sentences.** A
 joined sentence makes the reader hold the first claim in mind while parsing the second, and the
