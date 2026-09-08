@@ -21,21 +21,20 @@ we reviewed provides no conclusive evidence that a more sophisticated model fami
 dependable improvement over a gradient-boosted tree at substation level. NGED's own Electricity
 Flexibility and Forecasting System reached the same choice independently in 2019.
 
-**In terms of machine learning research, Flexpectation is ambitious: nine of our research ideas have
-no precedent in the literature we reviewed.** We found no paper driving a probabilistic substation
-forecast from a weather ensemble across a 14-day horizon; none modelling the tails of the
-distribution explicitly at substation level; none reading a substation forecast off a pre-trained
-weather encoder; none aggregating building thermal physics up to a substation and putting that
-physics inside a probabilistic forecast; no capacity estimator run across a mixed fleet of
-individually metered generators at one distribution network; no method that detects a switching
-event by checking that the power leaving one substation arrives at its neighbours; none turning a
-substation's switching-contaminated history into a useful input rather than deleting that history,
-rewriting that history, or absorbing the accuracy loss of leaving that history in; no published
-model that recovers a latent normal-running-arrangement demand for a distribution substation; and
-none putting unmetered generation inside a probabilistic substation forecast over a multi-day
-horizon. Most striking of all, almost every study we reviewed that touches more than one of the nine
-challenges solves the challenges as a pipeline. Each stage's output is frozen before the next stage
-sees it. As a result, a mistake made early can never be put right by what a later stage learns.
+**In terms of machine learning research, Flexpectation is ambitious: several of our research ideas
+have no precedent in the literature we reviewed.** For example, we found no paper that detects a
+switching event by checking that the power leaving one substation arrives at its neighbours; none
+turning a substation's switching-contaminated history into a useful input rather than deleting that
+history, rewriting that history, or absorbing the accuracy loss of leaving that history in; no
+published model that recovers a latent normal-running-arrangement demand for a distribution
+substation; none driving a probabilistic substation forecast from a weather ensemble across a 14-day
+horizon; none reading a substation forecast off a pre-trained weather encoder; none aggregating
+building thermal physics up to a substation and putting that physics inside a probabilistic
+forecast; no capacity estimator run across a mixed fleet of individually metered generators at one
+distribution network; and none putting unmetered generation inside a probabilistic substation
+forecast over a multi-day horizon. Most striking of all, almost every study we reviewed that touches
+more than one of these challenges solves the challenges as a pipeline. Each stage's output is
+frozen before the next stage sees it.
 
 **Every research idea is planned research rather than a result, and research fails.** Each absence
 above says that we did not find prior work, not that the approach will succeed. Some of these ideas

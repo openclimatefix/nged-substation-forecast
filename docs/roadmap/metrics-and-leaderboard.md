@@ -451,13 +451,10 @@ set leaks a little information about it back to the experimenter. The margin-plu
 how much a single query can leak.
 
 **The persistence and climatology baselines are rerun, unchanged, on every leaderboard epoch's
-evaluation window, so growth in the data is never mistaken for improvement in the method.** A new
-epoch can widen the leaderboard's telemetry archive or its NWP archive. That widening moves every
-metric on the leaderboard, including the baselines' own. Rerunning the same frozen baseline code on
-the same epoch's window is what lets a widening gap between a model and a baseline be read as a
-project result rather than as the dataset simply growing. The precedent is CAMEO, a
-structure-prediction benchmark that keeps its baseline pipelines frozen while the protein-structure
-databases behind them keep updating ([Robin et al. (2021)](https://doi.org/10.1002/prot.26213)).
+evaluation window, so growth in the data is never mistaken for improvement in the method.**  The
+precedent is CAMEO, a structure-prediction benchmark that keeps its baseline pipelines frozen while
+the protein-structure databases behind them keep updating ([Robin et al.
+(2021)](https://doi.org/10.1002/prot.26213)).
 
 Until the structural fix lands: leaderboard metrics are selection metrics; differences smaller than
 fold-level noise should not drive decisions; and the number of experiments per epoch is itself a
@@ -474,12 +471,11 @@ already builds the single fold around. That fold is read through the Ladder guar
 already stated in this section.
 
 **Measuring a promoted model's performance on live data is a separate question from deciding which
-model to promote, and this page keeps the two apart.** Every model running in production is also
-scored against live data as it runs ([production
-monitoring](live-service.md#production-monitoring)), which answers "is the promoted model still
-performing", continuously and after the fact. The fold above answers "which candidate should we
-promote", once and ahead of the fact, and the two answers must not be blurred into a single answer.
-TS-Arena avoids reusing any fixed evaluation window at all ([Meyer et al.
+model to promote.** Every model running in production is also scored against live data as it runs
+([production monitoring](live-service.md#production-monitoring)), which answers "is the promoted
+model still performing", continuously and after the fact. The fold above answers "which candidate
+should we promote", once and ahead of the fact, and the two answers must not be blurred into a
+single answer. TS-Arena avoids reusing any fixed evaluation window at all ([Meyer et al.
 (2026)](https://arxiv.org/abs/2512.20761)); Flexpectation's promotion decision cannot work that way,
 for the reason just given, and it is the live-monitoring check where our practice matches the
 TS-Arena pattern instead.
@@ -491,11 +487,14 @@ TS-Arena pattern instead.
 step that can be taken now.
 
 **2. Reserve a final-test window once a second, independent year of data exists — not by shrinking
-the fold that decides promotion.** That waits on Dynamical.org's backfill, which is also what turns
-the single fold into a genuine multi-fold epoch, so the `final_test` fold and the further
-leaderboard folds are founded in one new epoch in `conf/cv/default.yaml` rather than over two. The
-`final_test` fold needs a per-fold flag that keeps it out of every run mode, so no experiment trains
-or scores on it in the normal flow: extend `CvConfig` / the fold schema in
+the fold that decides promotion.** (Jack's note: I'm not convinced we should do this yet. Even when
+we have several years of data, may still want to train on as much data as possible, and not to hold
+out a separate "test" year. When we have multiple folds, I think a better test of "honest
+performance" is average performance across all folds.). That waits on Dynamical.org's backfill,
+which is also what turns the single fold into a genuine multi-fold epoch, so the `final_test` fold
+and the further leaderboard folds are founded in one new epoch in `conf/cv/default.yaml` rather than
+over two. The `final_test` fold needs a per-fold flag that keeps it out of every run mode, so no
+experiment trains or scores on it in the normal flow: extend `CvConfig` / the fold schema in
 `packages/contracts/src/contracts/config_schemas.py`, and make sure `_fold_ids_for_run_mode` in
 `defs/jobs.py` includes the fold in no run mode at all. Scoring against it is then a deliberate,
 rare act — champion candidates immediately before promotion only — through the `metrics` asset's
