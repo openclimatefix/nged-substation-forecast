@@ -22,28 +22,27 @@ and closes the translation gap:
 
 1. **Throughput.** The grunt work of an experiment — assembling features, training,
    cross-validating, recording results — is automated, so a small team can run hundreds of
-   experiments per month instead of one or two. Humans still decide what to try; the
-   infrastructure runs those experiments. (See [Running an ML experiment
-   end-to-end](dagster-workflow.md).) That the throughput produces a better forecast is a bet
-   this project is making rather than a result the literature has settled. The
-   energy-forecasting review found [no study measuring what adopting
+   experiments per month instead of one or two. Humans still decide what to try; the infrastructure
+   runs those experiments. (See [Running an ML experiment end-to-end](dagster-workflow.md).) That
+   the throughput produces a better forecast is a bet this project is making rather than a result
+   the literature has settled. The energy-forecasting review found [no study measuring what adopting
    machine-learning-operations practice
    delivers](../background/energy-forecasting-review.md#mlops-research-describes-good-practice-but-does-not-measure-what-the-practice-improves),
    and the case for [fast, comparable
    iteration](../background/energy-forecasting-review.md#fast-comparable-iteration-is-argued-for-not-measured)
    rests on a structural argument and on practitioner testimony instead.
-2. **No translation gap.** The artifact we experimented on *is* the artifact we deploy.
-   There is no "now rewrite the research code for production" step, because every experiment
-   runs on the exact same code as the production pipeline from the start. The gap is closed by
-   raising research to the production standard, not by lowering production to accept a research
-   notebook: an idea can be explored anywhere, but it only becomes a runnable experiment once
-   it lives in the pipeline's own code. The debt this avoids has a name: [Sculley et al.
-   (2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems)
-   call the code written to bridge research and production *glue code*, and the tangle that
-   glue code grows into *pipeline jungles*. Sculley et al.'s list of debts also constrains
-   how the gap is allowed to close, because *dead experimental codepaths* is what accrues
-   when experiments run as conditional branches inside production code: an experiment here
-   selects a different [configuration](model-configuration.md) and runs the same code path,
+2. **No translation gap.** The artifact we experimented on *is* the artifact we deploy. There is no
+   "now rewrite the research code for production" step, because every experiment runs on the exact
+   same code as the production pipeline from the start. The gap is closed by raising research to the
+   production standard, not by lowering production to accept a research notebook: an idea can be
+   explored anywhere, but it only becomes a runnable experiment once it lives in the pipeline's own
+   code. The debt this avoids has a name: [Sculley et al.
+   (2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems) call
+   the code written to bridge research and production *glue code*, and the tangle that glue code
+   grows into *pipeline jungles*. Sculley et al.'s list of debts also constrains how the gap is
+   allowed to close, because *dead experimental codepaths* is what accrues when experiments run as
+   conditional branches inside production code. In contrast, an ML experiment in a modern MLOps
+   pipeline selects a different [configuration](model-configuration.md) and runs the same code path,
    rather than adding a branch the production pipeline then has to carry.
 
 ### An analogy
