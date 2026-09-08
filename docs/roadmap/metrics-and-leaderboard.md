@@ -15,7 +15,8 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > probabilistic evaluation [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225) ·
 > tail & exceedance metrics [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254) ·
 > tricky-days filter [#255](https://github.com/openclimatefix/nged-substation-forecast/issues/255) ·
-> fold hygiene [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226).
+> fold hygiene [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226) ·
+> calibrated incumbent [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715).
 
 ---
 
@@ -120,8 +121,9 @@ approximation.
 ### A faithful replica and a "simple upgrades" variant
 
 **Most of the benefit may come from a few simple upgrades to what NGED already do, not from heavy ML
-— the message the pair of baselines is built to test.** We implement two closely-related incumbent
-baselines:
+— the message this family of baselines is built to test.** We implement two closely-related
+incumbent baselines here — the faithful replica, and a variant that changes which analogues are
+selected — and a third in the next section, which corrects the analogues once selected:
 
 - `nged_incumbent` — the faithful replica above. No holiday handling; warts and all. Pure lag
   features.
@@ -132,6 +134,87 @@ baselines:
   the analogue offset is conditional on the calendar — so it needs a bespoke picker plus a GB
   bank-holiday calendar (the pure-Python `holidays` package), and ships as an immediate follow-up
   PR.
+
+### Calibrating the incumbent aims at the 95th percentile NGED operate on
+
+Issue: [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)
+
+**A third variant, `nged_incumbent_calibrated`, keeps the same 13 analogues and fits a statistical
+correction to them on past errors.** The standard form of that correction is Ensemble Model Output
+Statistics (EMOS), which [Gneiting et al. (2005)](https://doi.org/10.1175/MWR2904.1) introduced for
+weather ensembles: fit a predictive distribution whose mean is an affine function of the ensemble
+mean and whose variance is an affine function of the ensemble variance, choosing the coefficients by
+minimising CRPS over a training window. Nothing in EMOS requires the ensemble to come from a weather
+model, so the 13 analogues `nged_incumbent` already synthesises are a valid input.
+
+**The faithful replica stays the headline bar, because the correction is our work rather than
+NGED's.** The question the leaderboard exists to answer is whether we beat what NGED do today, and
+NGED do no post-processing at all. So `nged_incumbent_calibrated` is a row of our own, sitting
+beside `nged_incumbent_holiday_aligned` in the simple-upgrades family and testing the same claim
+from the other side: `nged_incumbent_holiday_aligned` changes which analogues are selected, and
+`nged_incumbent_calibrated` changes what happens to the analogues once selected.
+
+**Fitting the mean picks up the load growth the incumbent has no scaling for.** The affine term on
+the analogue mean absorbs a systematic offset between the analogues and the target half-hour —
+demand growth over the year separating the annual group from today, and the residual offset on a day
+type the analogue selection matches imperfectly. Neither offset needs weather to correct, so the
+calibrated incumbent stays naive in the sense that matters for a baseline: the calibrated incumbent
+still knows nothing the substation's own history does not contain. That also sets the expectation
+for the result — a correction that adds no information should move CRPS and the exceedance rate,
+and a large NMAE gain would be a surprise worth investigating.
+
+**The 95th percentile of 13 analogues is exceeded far more than 5% of the time even when the
+analogues are perfectly calibrated.** Empirical quantiles from a finite ensemble sit inside the true
+quantiles, and at 13 members the effect is large: for uniform draws the empirical p95 of 13
+equiprobable members is exceeded about 11% of the time, by the same arithmetic behind [PICP's
+calibrated reference table](../techniques/evaluation-metrics.md#picp-prediction-interval-coverage-probability).
+An operator reading that percentile as "the level demand should stay under, 19 times out of 20" is
+reading a level crossed more than twice as often as they think. Better analogue selection cannot
+close the gap, because the gap comes from having 13 members rather than from which 13 they are. A
+fitted predictive distribution has no such floor, and the [exceedance rate of the upper delivery
+quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles) is
+the metric that says whether the fitted percentile is honest.
+
+**An analogue ensemble may be miscalibrated in the opposite direction to a weather ensemble, so
+measure before building.** The incumbent's members are observed powers rather than perturbed model
+runs, and the analogue spread does not narrow at short lead the way an NWP ensemble's does, because
+the freshest analogue is already a week old. Week-to-week variation at the same weekday and time of
+day could easily exceed the real forecast uncertainty, leaving the incumbent over-dispersed where a
+weather ensemble is under-dispersed. In that case the 95th percentile is crossed less often than the
+finite-ensemble arithmetic above implies, and the correction narrows the band rather than widening
+it.
+
+**Two cheap diagnostics settle the direction once `nged_incumbent` ships.** The first is the rank
+histogram of the observation among the 13 analogues per horizon slice, the same instrument [Phase
+C](#phase-c-low-effort-calibration-after-b-proves-the-diagnosis) uses on the weather ensemble. The
+second is the correlation between the analogue spread and the absolute error of the analogue mean. A
+flat histogram with no spread-error correlation would leave the variance half of EMOS nothing to
+fit, reducing the work to a mean correction with a fixed-width band. The precedent to read
+alongside the diagnostics is the analogue-ensemble literature — [Delle Monache et al.
+(2013)](https://doi.org/10.1175/MWR-D-12-00281.1) — rather than the NWP post-processing EMOS was
+built for.
+
+**A normal predictive distribution puts the modelling assumption where the product is most
+sensitive, so measure a non-parametric fit beside EMOS.** Minimum-CRPS estimation is dominated by
+the bulk of the distribution, while flexibility procurement and curtailment read the tails, and the
+incumbent's residuals have no particular reason to be Gaussian out there. [Henzi et al.
+(2021)](https://doi.org/10.1111/rssb.12450)'s isotonic distributional regression fits a conditional
+distribution non-parametrically and has no tuning parameters, which also makes a baseline harder to
+accuse of having been tuned into a bar we can clear. Which fit wins is a leaderboard question,
+settled on the same folds as everything else.
+
+**The correction is fitted, so it rides the cross-validation protocol like any other model.**
+Coefficients are fitted on each fold's training window and applied to that fold's validation window,
+exactly as [Phase C](#phase-c-low-effort-calibration-after-b-proves-the-diagnosis) specifies for the
+weather ensemble. That is the line between a baseline and a model that has seen the data it is
+scored on, and a handful of coefficients crosses it as easily as a large model does.
+
+**One calibration wrapper should serve every row that needs one.** Phase C's spread inflation of the
+weather ensemble, this baseline, and the later [degradation-conditional conformal
+calibration](https://github.com/openclimatefix/nged-substation-forecast/issues/443) are three
+instances of one shape: take an ensemble, adjust it with coefficients fitted on held-out data, emit
+an ensemble. A single wrapper around any `BaseForecaster` serves all three, and keeps every
+calibrated row on the identical asset chain and metric path as every uncalibrated one.
 
 ### Persistence and climatology — diagnostic bookends
 
@@ -189,6 +272,10 @@ Five PRs, in order. PRs 1–2 are shared-framework groundwork (no baseline yet);
 baseline each. The `nged_incumbent_holiday_aligned` variant (described under [A faithful replica and
 a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a later sixth
 PR, out of scope for this arc but given its own tracked issue so it is not lost when #147 closes.
+`nged_incumbent_calibrated`
+([#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) is a seventh, on the
+same footing: out of scope here, tracked separately, and buildable as soon as `nged_incumbent`
+itself ships.
 
 **Guiding principle — no special path.** New workspace package `packages/baseline_forecasters/`
 mirroring the `xgboost_forecaster` layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`),
@@ -1004,10 +1091,15 @@ observations among the 51 members, computed ad hoc per horizon slice: a U-shape 
 underdispersion (a single multiplicative inflation can fix it), whereas a sloped or asymmetric
 histogram means bias or shape error, which a symmetric inflation cannot repair and which would push
 toward a rank-dependent correction instead. **Post-hoc spread inflation** (a cut-down Ensemble Model
-Output Statistics, or EMOS): per horizon slice, fit a scalar `s` on the *training* window so that
-inflating members around the ensemble mean (`mean + s·(member − mean)`) makes spread match error.
-Zero schema change, zero new model — implementable as an optional step in `predict` or as a wrapper
-forecaster. Fit on train, apply on validation (no tuning on the fold being scored).
+Output Statistics, or EMOS, after [Gneiting et al. (2005)](https://doi.org/10.1175/MWR2904.1)): per
+horizon slice, fit a scalar `s` on the *training* window so that inflating members around the
+ensemble mean (`mean + s·(member − mean)`) makes spread match error. Zero schema change, zero new
+model. Fit on train, apply on validation (no tuning on the fold being scored). Build the inflation
+as a wrapper forecaster rather than as a step inside `predict`, so that the [calibrated
+incumbent](#calibrating-the-incumbent-aims-at-the-95th-percentile-nged-operate-on) and the later
+[degradation-conditional conformal
+calibration](https://github.com/openclimatefix/nged-substation-forecast/issues/443) share one
+implementation and one metric path.
 
 Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
 forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn the effort of
