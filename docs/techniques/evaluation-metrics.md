@@ -426,8 +426,8 @@ rates with absurdly wide quantiles; pinball loss and twCRPS punish that); it is 
 check for the delivered tail quantiles.
 
 As with PICP, empirical quantiles from a finite ensemble sit slightly inside the true
-quantiles, so even a perfectly calibrated ensemble exceeds its p95 slightly *more* than 5% of
-the time. The exact calibrated reference per quantile and ensemble size will be derived and
+quantiles, so even a perfectly calibrated ensemble exceeds its p95 *more* than 5% of the time —
+slightly at 51 members, and by a wide margin at the 13 members `nged_incumbent` carries. The exact calibrated reference per quantile and ensemble size will be derived and
 verified by Monte Carlo at implementation time, mirroring [PICP's reference
 table](#picp-prediction-interval-coverage-probability).
 
