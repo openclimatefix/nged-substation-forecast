@@ -493,8 +493,9 @@ The beam/diffuse decomposition the physics needs (for either candidate — pvlib
 wants the same inputs as
 [the differentiable model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant))
 is covered by the weather ingests: the **CAMS Radiation Service** as the primary input, accumulated
-over the half-hourly metering interval, and ERA5's near-real-time ERA5T stream for the capacity
-estimate's freshness — see [Data sources → Weather data](data-sources.md#weather-data) for both
+over the same 30-minute window the meter averages over, and ERA5's near-real-time ERA5T stream for
+the capacity estimate's freshness — see [Data sources → Weather data](data-sources.md#weather-data)
+for both
 specs, why CAMS is preferred to CM SAF SARAH-3, and why ERA5 beats CERRA here. The live **ECMWF
 ENS** feed carries only GHI — fine for v0.7, but v2 physics *forecasting* of PV needs a
 differentiable GHI → DNI/DHI decomposition model (or `fdir` added to the upstream dataset).
