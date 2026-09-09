@@ -116,7 +116,7 @@ breakdown.
 
 ## Weather data
 
-Issues: [#142](https://github.com/openclimatefix/nged-substation-forecast/issues/142) (CM SAF),
+Issues: [#142](https://github.com/openclimatefix/nged-substation-forecast/issues/142) (CAMS solar radiation),
 [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143) (reanalysis ingestion — ERA5)
 
 | Source | Status | Description |

@@ -30,7 +30,7 @@ guarantee.
   metrics (flexibility procurement and curtailment), the equal-risk method that avoids needing a
   price for a network breach, their limitations, and the open questions for NGED.
 - [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
-  weather datasets (ECMWF ENS, ERA5, CM SAF).
+  weather datasets (ECMWF ENS, ERA5, CAMS).
 - [Live service](live-service.md) — the AWS deployment: the `live_forecasts` inference
   asset, the champion-model container, the costed AWS architecture options, and production
   monitoring.
