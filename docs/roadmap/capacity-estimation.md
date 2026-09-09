@@ -292,10 +292,22 @@ is where the formulation is weakest; see [the caveats](#honest-caveats-of-the-co
   derating accumulate, so it is cheap to fall below the registered value and expensive to exceed
   it. For an *unmetered fleet behind a substation* — the v2 quantity — the register is close to a
   lower bound instead, because the domestic installations missing from it add capacity on top of
-  what it lists, so the penalty should lean the other way. Pin down which field the register
-  supplies before either lean is applied: an export limit constrains $c^{\text{ac}}$, while a
-  panel rating constrains $c^{\text{dc}}$, and solar farms are routinely built with more
-  direct-current capacity than their alternating-current limit.
+  what it lists, so the penalty should lean the other way.
+- **The register constrains $c^{\text{ac}}$ only — it carries no direct-current rating.** Every
+  capacity column in
+  [NGED's Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register)
+  is MW or MVA. Checking the August 2026 release (7,211 rows, 5,236 of them solar): use
+  `energy_source_&_conversion_tech_1_reg_capacity_mw`, the only capacity field populated for every
+  solar row, rather than `already_connected_registered_capacity(mw)` at 78% or
+  `connected_maximum_export_capacity(mw)` at 73%. The MW and MVA pair is one number rather than
+  two, because MW is MVA × 0.95 for 99% of rows — an assumed power factor, not a measurement. The
+  registered capacity equals the export MVA for 62% of solar rows and exceeds it for the rest,
+  which is genuine export limitation. So $c^{\text{dc}}$ has to come from the fit or from the
+  assumed direct-to-alternating-current ratio; the register cannot supply it.
+- **The register also cannot see domestic rooftop PV, which is why it is a lower bound for a
+  substation's fleet.** In the same release only 1.2% of solar entries sit below 50 kW and 64% fall
+  between 50 and 250 kW, so the 3–5 kW domestic installations that make up the unmetered fleet are
+  absent by design.
 
 ### Wind: same structure, simpler
 
