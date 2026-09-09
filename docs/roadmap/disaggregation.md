@@ -467,9 +467,13 @@ PV is [the DER we have the best chance of disaggregating well](#der-tractability
 
 **If we publish any of this irradiance-correction work, publish a dataset with an evaluation report, not a method.** Merging a network of ground weather stations into a satellite irradiance field at national scale was done for Belgium by [Journée and Bertrand (2010)](https://doi.org/10.1016/j.rse.2010.06.010), and site adaptation is routine in the solar-resource literature we read, so a novelty claim would not survive review. Validation would have to be leave-one-region-out rather than leave-one-station-out, hold Camborne and Lerwick out entirely, and beat a per-station monthly scale factor. The end-to-end test is held-out metered PV, because the disaggregation's own residual fits by construction.
 
-## A published map of installed DER capacity (post-Flexpectation)
+## Ideas for after Flexpectation
 
-**A substation-level map of installed DER capacity is the most valuable thing this work could publish, and PV is the right place to start.** No public source records where unmetered distributed PV sits at substation granularity: the Embedded Capacity Register covers registered connections, MCS covers certified installations at postcode-district resolution, and Sheffield Solar's PV Live estimates *output* at grid-supply-point level rather than *capacity* at substation level. NESO, the network operators, Ofgem, DESNZ, and local authorities planning heat and EV rollout each substitute a proxy for a number that drives connection decisions, flexibility procurement, and reverse-power-flow risk.
+**Two ideas outlive Flexpectation, and the capacity map is the more valuable.** Recovering irradiance from the calibrated fleet is mostly a check on the capacity estimates rather than a second product — with one exception, [an irradiance nowcast](#an-irradiance-nowcast-would-be-a-more-useful-product), which would stand on its own.
+
+### Publish a map of installed DER capacity across GB
+
+**A substation-level map of installed DER capacity is the more valuable of the two, and PV is the right place to start.** No public source records where unmetered distributed PV sits at substation granularity: the Embedded Capacity Register covers registered connections, MCS covers certified installations at postcode-district resolution, and Sheffield Solar's PV Live estimates *output* at grid-supply-point level rather than *capacity* at substation level. NESO, the network operators, Ofgem, DESNZ, and local authorities planning heat and EV rollout each substitute a proxy for a number that drives connection decisions, flexibility procurement, and reverse-power-flow risk.
 
 Three constraints would shape what could actually be published:
 
@@ -477,13 +481,11 @@ Three constraints would shape what could actually be published:
 - **Validation deserves at least as much effort as the disaggregation itself.** MCS installation counts aggregated to catchments, and the Embedded Capacity Register for large sites, are the available references, and both are imperfect. The catchment boundaries are themselves uncertain, because which property sits on which low-voltage feeder is not public.
 - **A monthly time series beats a snapshot.** The fleet grows fast enough that one release dates quickly, and a monthly series answers the question network planning actually asks — *where* capacity is being added, not just where it now sits. Publishing monthly is a standing commitment and should be costed as one.
 
-**The irradiance work below serves this map rather than competing with it.** Recovering irradiance from the calibrated fleet is a check on the capacity estimates rather than a second product — with one exception, [an irradiance nowcast](#an-irradiance-nowcast-would-be-a-different-product), which would stand on its own.
-
-## Long-term vision: GB-wide inverse irradiance mapping
+### GB-wide inverse irradiance mapping
 
 Once the architecture has calibrated, parameter-verified "virtual sensors" across the metered fleet, we can run the inversion trick at scale. Freezing the calibrated asset parameters and running gradient descent *backward* through the physics modules — from measured generation to the weather inputs — recovers a surface-irradiance estimate (and, for wind, a wind-speed estimate) **at each metered site**. These point estimates are sparse virtual observations; a spatial interpolation step (e.g. graph-based or geostatistical) then fills in a denser field across Great Britain. The result would be a half-hourly, physics-validated weather product, independent of the NWP, useful as a cross-check for real-time grid balancing. This is a research aspiration well beyond v2, and the density of the recovered field is fundamentally limited by the spatial coverage of the metered fleet.
 
-### Is a published irradiance dataset worth it?
+#### Is a published irradiance dataset worth it?
 
 **Publish the recovered irradiance field as an artefact of the work that produced it, rather than making the field a goal in itself.** Three arguments against targeting it:
 
@@ -493,7 +495,7 @@ Once the architecture has calibrated, parameter-verified "virtual sensors" acros
 
 **The inversion earns its place as a diagnostic instead.** A calibrated fleet implying an irradiance field that disagrees with CAMS systematically — in one region, or one season — is evidence of a fault either in the capacity estimates or in CAMS. That is the cheapest independent check available, and a strong figure in a paper.
 
-### An irradiance nowcast would be a different product
+#### An irradiance nowcast would be a more useful product
 
 **Latency is the one route by which a published irradiance field would stand on its own.** Both archive products are far too slow to nowcast: the CAMS point service runs to yesterday, and the SARAH-3 Interim Climate Data Record lands 2 to 5 days behind. Going direct to EUMETSAT does not close the gap either, because [Meteosat Third Generation](https://www.eumetsat.int/meteosat-third-generation-imaging-services)'s Flexible Combined Imager scans the full disc every 10 minutes, with a 2.5-minute rapid scan over Europe, against Meteosat Second Generation's 15 minutes — and a retrieval still has to run on top. Live PV telemetry arrives in minutes and is denser over Great Britain than any satellite retrieval, so an irradiance nowcast inverted from the fleet would occupy a niche the archives do not compete for. That is a different product from the historical field described above, and worth testing cheaply before committing to either.
 
