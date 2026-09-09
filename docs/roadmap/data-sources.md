@@ -19,25 +19,29 @@ data.
 | **Time-series JSON files** | ✅ | Half-hourly power flow + metadata per substation / customer meter in the trial area. Ingested by OCF to produce operational forecasts. Each reading is a **period-ending mean** — power averaged over the preceding 30 minutes, with `time` marking the end of that window, as `PowerTimeSeries` in `packages/contracts/src/contracts/power_schemas.py` records. The irradiance ingest is chosen to match, so [Weather data](#weather-data) prefers a source that accumulates over the interval to a source that samples an instant. |
 | **Curtailment (ANM set points)** | 🚧 | NGED-imposed curtailment. Crucial for distinguishing deliberate ANM ramp-downs from genuine faults / capacity loss. |
 
-**NGED hope to offer 15-minute power data. We deliberately stay on half-hourly until v2.** There
-is no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat the offer as a
-v2 item.
+**NGED hope to offer 15-minute power data. We deliberately stay on half-hourly until v2.** There is
+no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat the offer as a v2
+item.
 
-**Feeding 15-minute data to today's pipeline would silently discard half of it rather than fail.**
-`PowerTimeSeries.drop_implausible_rows` keeps only readings aligned to `:00` and `:30`, logging a
-count and no error, after which `validate` passes because the survivors are a well-formed
-half-hourly series. Two more places hard-wire the step: `_upsample_nwp_to_half_hourly` builds the
-training grid at `30m`, and `production_helpers` builds the inference spine the same way. Feature
-*names* are the one part that is already step-agnostic — lags and rolling windows are expressed as
-durations in whole hours (`power_lag_24h`, `temperature_2m_rolling_mean_6h`) rather than as row
-counts — but the grammar accepts whole hours only, so a finer step buys no new expressible feature.
+**Power forecasts stay half-hourly regardless, so the change is confined to the ingest.** Averaging
+each pair of 15-minute readings into the half-hour ending at `:00` or `:30` leaves the training
+grid, the metrics, and the leaderboard exactly as they are, because two period-ending 15-minute
+means average to the period-ending 30-minute mean the contract already specifies. Everything
+downstream stays correct on that basis — `_upsample_nwp_to_half_hourly`, the inference spine in
+`production_helpers`, and the row-wise forecast metrics all assume a fixed half-hourly step and
+would keep getting one. The milestone that actually wants a finer step is v2 disaggregation, which
+can read it from a separate table rather than by widening `PowerTimeSeries`.
 
-**The harder problem is the seam, because a mixed-step history re-weights every metric.** Forecast
-metrics are unweighted means over rows, and `effective_capacity` is a P99 over rows, so a history
-that is half-hourly before the switch and 15-minute after would silently give the later period
-double weight — moving the NMAE denominator and making folds either side of the switch
-incomparable. Changing `PowerTimeSeries` is a data-contract change, so it needs sign-off under the
-rule in `packages/contracts/README.md`.
+**Do that averaging explicitly, because today's ingest would silently keep the wrong half of each
+half-hour.** `PowerTimeSeries.drop_implausible_rows` filters to readings aligned to `:00` and `:30`,
+logging a count and raising nothing. Fed a 15-minute series it would discard every `:15` and `:45`
+reading and keep the `:00`/`:30` ones — each of which covers only the *preceding* 15 minutes. The
+result is the second quarter-hour of every half-hour wearing a half-hourly label. `validate` then
+passes, because the survivors are a well-formed half-hourly series, and the Dagster asset
+materialises green, because the drop count only warns. Around sunrise and sunset, where irradiance
+ramps inside the half-hour, that bias is systematic rather than noise. Changing `PowerTimeSeries` is
+a data-contract change, so it needs sign-off under the rule in `packages/contracts/README.md`, and
+the averaging rule needs to say what happens when one reading of a pair is missing.
 
 ### Provided on SharePoint (mostly static reference / historical)
 
