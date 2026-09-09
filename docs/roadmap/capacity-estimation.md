@@ -492,12 +492,33 @@ deliverable of the contest, feeding the v2 tooling choice and our advice to NGED
 The beam/diffuse decomposition the physics needs (for either candidate — pvlib's transposition
 wants the same inputs as
 [the differentiable model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant))
-is covered by the weather ingests: CM SAF SARAH-3 as the primary input, matching the half-hourly
-metering, and ERA5's near-real-time ERA5T stream for the capacity estimate's freshness — see
-[Data sources → Weather data](data-sources.md#weather-data) for both specs and why ERA5 beats
-CERRA here. The live **ECMWF ENS** feed carries only GHI — fine for v0.7, but v2 physics
-*forecasting* of PV needs a differentiable GHI → DNI/DHI decomposition model (or `fdir` added to
-the upstream dataset).
+is covered by the weather ingests: the **CAMS Radiation Service** as the primary input, with two of
+its 15-minute values summed to the 30-minute window the meter averages over, and ERA5's
+near-real-time ERA5T stream for the capacity estimate's freshness — see
+[Data sources → Weather data](data-sources.md#weather-data) for both
+specs, why CAMS is preferred to CM SAF SARAH-3, and why ERA5 beats CERRA here. The live **ECMWF
+ENS** feed carries only GHI — fine for v0.7, but v2 physics *forecasting* of PV needs a
+differentiable GHI → DNI/DHI decomposition model (or `fdir` added to the upstream dataset).
+
+**The shared irradiance-bias term has an expected sign, which gives it a prior.** The CAMS
+Radiation Service reads high in clear conditions and low in cloudy ones
+([Lezaca Galeano et al. (2025)](https://doi.org/10.1002/solr.202500568), from an inspection run at
+two continental stations, and attributed more broadly to the Radiation Service's own validation
+reports). Capacity is identified mostly from clear periods, so an irradiance input reading high
+there pushes the fitted capacity down. That sign gives
+[the regional bias term](#keeping-weather-bias-out-of-capacity) a prior direction rather than only
+a functional form. It is a weak test rather than a clean one: soiling and unmodelled shading push
+the fit the same way, as the [caveats below](#honest-caveats-of-the-convex-route) note, so only an
+opposite-sign result is informative.
+
+**Fit capacity on clear periods, not on the whole record.** A metered solar farm is small enough to
+behave like a point, while the irradiance estimate represents an area of several km², so every
+reading compares the two. That mismatch is smallest under clear skies, because a clear-sky
+irradiance field varies little over such an area, and clear periods are also where capacity is most
+identifiable. Restricting the fit also suits
+[the plug-in pre-estimate](#honest-caveats-of-the-convex-route), whose fleet-median residual is
+already clear-sky-normalised. Correcting the irradiance itself is
+[v2 work on satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain).
 
 > **Design caveat — should ERA5 stay offline?** Feeding ERA5 into the *live* system adds a new
 > near-real-time data dependency: another external feed to ingest on a daily-ish cadence, monitor,

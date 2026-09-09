@@ -900,8 +900,8 @@ Two rungs, in increasing order of "cheating":
 - **Observations.** Closer to truth at the site, and worth the second rung precisely because ERA5's
   remaining error is not small. The UK Met Office's MIDAS Open (via CEDA, the Centre for
   Environmental Data Analysis) supplies hourly land-surface temperature, wind, and pressure from GB
-  stations — spatially sparse, so nearest-station matched. [CM SAF](data-sources.md#weather-data)
-  SARAH-3 is the equivalent rung for solar, at 0.05°, and is already planned for v0.7.
+  stations — spatially sparse, so nearest-station matched. [CAMS](data-sources.md#weather-data)
+  solar radiation is the equivalent rung for solar, and is already planned for v0.7.
 
 Three conditions on reading the result.
 
