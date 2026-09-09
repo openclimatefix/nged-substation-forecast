@@ -309,6 +309,39 @@ is where the formulation is weakest; see [the caveats](#honest-caveats-of-the-co
   between 50 and 250 kW, so the 3–5 kW domestic installations that make up the unmetered fleet are
   absent by design.
 
+**Where a DC:AC ratio would have to come from, and why we should measure ours rather than borrow
+one.** Great Britain's registers split across the two units, so which source a capacity came from
+determines what it means:
+
+| Source | Capacity reported |
+|---|---|
+| [NGED's Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register) | AC only |
+| [Sheffield Solar's capacity report](https://api.solar.sheffield.ac.uk/pvlive/capacity) | DC only, by size band |
+| Microgeneration Certification Scheme | both, per installation |
+
+The Microgeneration Certification Scheme is therefore the one source that could yield a Great
+Britain DC:AC ratio broken down by size and by installation year, because it records both numbers
+for the same installation. Two cautions before trusting such a calculation. The Department for
+Energy Security and Net Zero
+[report](https://assets.publishing.service.gov.uk/media/62446340e90e075f07426e6d/Review_of_solar_PV_capacity_publications.pdf)
+that the scheme's DC field — which they call total installed capacity, against declared net
+capacity for AC — was often left empty in the early years of the Feed-in Tariff, so the DC side is
+sparsest over 2010 to 2014, exactly the period any time trend leans on. And the same department
+notes only that the gap between the two is widening for commercial solar farms; they publish no
+ratio.
+
+**The published ratios are rules of thumb, not measurements, and none of them is British.** Solar
+consultancies and inverter vendors quote roughly 1.25 to 1.50 for utility-scale plants and 1.1 to
+1.25 for domestic and small commercial ([SLR](https://www.slrconsulting.com/insights/solar-pv-repowering/),
+[Solargis](https://kb.solargis.com/docs/dcac-ratio-in-pv-systems),
+[RatedPower](https://ratedpower.com/blog/dc-ac-ratio/)). The one well-documented trend comes from
+Lawrence Berkeley National Laboratory's Utility-Scale Solar series, which puts the American
+inverter loading ratio near 1.2 in 2010 and above 1.3 by 2017. Borrowing that trend for Great
+Britain would understate it if anything: lower irradiance means a given ratio clips away less
+energy, so oversizing is cheaper here than in the United States and the economics point to higher
+ratios rather than lower ones. Treat every figure in this paragraph as a sanity check on a fitted
+value, never as a prior.
+
 ### Wind: same structure, simpler
 
 A turbine has no separate inverter limit, but its power curve's **rated plateau** plays the

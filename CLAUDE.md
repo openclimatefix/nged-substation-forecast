@@ -226,6 +226,15 @@ the model. Where a sentence would otherwise pile up the qualifier, name the spec
 "a model trained on the feeders' own history" beats "a model given a network's whole history". Any
 other word this project uses for two different meanings gets the same treatment.
 
+**Use the internationally recognised engineering term, not a national policy coinage.** Where a UK
+body has invented a name for a quantity engineering already names, use the engineering name.
+Write "DC capacity" and "AC capacity", not the Department for Energy Security and Net Zero's
+"total installed capacity" and "declared net capacity". Gloss the local label once, at the point a
+reader has to recognise it in a dataset's column headings, and then drop it. The reader is an
+engineer who may not be British, and a term whose meaning is confined to one country's policy
+documents costs them a lookup for nothing. The same goes in the other direction: keep a term that
+is standard in the field even where a UK body has renamed it.
+
 **Describe performance in performance terms, not in money metaphors.** A forecast does not "pay",
 an input does not "buy" accuracy, and a modelling choice does not "cost" anything unless real money
 changes hands. Write what actually moved: "the inputs that improve skill at short range", "adding
