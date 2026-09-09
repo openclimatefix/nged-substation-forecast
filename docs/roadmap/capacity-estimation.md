@@ -284,9 +284,70 @@ is where the formulation is weakest; see [the caveats](#honest-caveats-of-the-co
 - **Priors, where records exist.** A registered capacity, a previous year's fit, or a connection
   record enters as one more convex penalty
   ([priors as penalties](../techniques/convex-optimisation.md#priors-as-convex-penalties-and-the-uncertainty-you-dont-get)) —
-  including **asymmetric** priors (cheap to sit below the registered value, expensive to exceed
-  it, since registers overstate more than they understate) and **timing** priors (a known March
-  expansion makes jumps cheap at that date, expensive elsewhere).
+  including **asymmetric** priors and **timing** priors (a known March expansion makes jumps cheap
+  at that date, expensive elsewhere).
+- **Which way an asymmetric prior leans depends on which capacity is being estimated, and it flips
+  between milestones.** For a *metered generator* — the v0.7 quantity — the register names an asset
+  we can see, and effective capacity sits below that nameplate as soiling, degradation, shading and
+  derating accumulate, so it is cheap to fall below the registered value and expensive to exceed
+  it. For an *unmetered fleet behind a substation* — the v2 quantity — the register is close to a
+  lower bound instead, because the domestic installations missing from it add capacity on top of
+  what it lists, so the penalty should lean the other way.
+- **The register constrains $c^{\text{ac}}$ only — it carries no direct-current rating.** Every
+  capacity column in
+  [NGED's Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register)
+  is MW or MVA. Checking the August 2026 release (7,211 rows, 5,236 of them solar): use
+  `energy_source_&_conversion_tech_1_reg_capacity_mw`, the only capacity field populated for every
+  solar row, rather than `already_connected_registered_capacity(mw)` at 78% or
+  `connected_maximum_export_capacity(mw)` at 73%. The MW and MVA pair is one number rather than
+  two, because MW is MVA × 0.95 for 99% of rows — an assumed power factor, not a measurement. The
+  registered capacity equals the export MVA for 62% of solar rows and exceeds it for the rest,
+  which is genuine export limitation. So $c^{\text{dc}}$ has to come from the fit or from the
+  assumed direct-to-alternating-current ratio; the register cannot supply it.
+- **The register also cannot see domestic rooftop PV, which is why it is a lower bound for a
+  substation's fleet.** In the same release only 1.2% of solar entries sit below 50 kW and 64% fall
+  between 50 and 250 kW, so the 3–5 kW domestic installations that make up the unmetered fleet are
+  absent by design.
+
+**Where a DC:AC ratio would have to come from, and why we should measure ours rather than borrow
+one.** Great Britain's registers split across the two units, so which source a capacity came from
+determines what it means:
+
+| Source | Capacity reported |
+|---|---|
+| [NGED's Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register) | AC only |
+| [Sheffield Solar's capacity report](https://api.solar.sheffield.ac.uk/pvlive/capacity) | DC only, by size band |
+| Microgeneration Certification Scheme | both, per installation |
+
+The Microgeneration Certification Scheme is therefore the one source that could yield a Great
+Britain DC:AC ratio broken down by size and by installation year, because it records both numbers
+for the same installation. **That calculation needs record-level access we do not have.** The
+scheme's [data dashboard](https://datadashboard.mcscertified.com/) is free but serves only
+aggregates — counts and capacity by month, location, and technology — and a ratio needs both
+numbers on the same installation, so it would take a
+[data request](https://mcscertified.com/low-carbon-landscapes/mcs-data-requests/) with terms we
+have not seen. Treat asking as a task worth trying rather than a source we can plan on, alongside
+[asking for the CAMS uncertainty look-up table](disaggregation.md#correcting-satellite-irradiance-over-great-britain).
+Two further cautions before trusting such a calculation. The Department for
+Energy Security and Net Zero
+[report](https://assets.publishing.service.gov.uk/media/62446340e90e075f07426e6d/Review_of_solar_PV_capacity_publications.pdf)
+that the scheme's DC field — which they call total installed capacity, against declared net
+capacity for AC — was often left empty in the early years of the Feed-in Tariff, so the DC side is
+sparsest over 2010 to 2014, exactly the period any time trend leans on. And the same department
+notes only that the gap between the two is widening for commercial solar farms; they publish no
+ratio.
+
+**The published ratios are rules of thumb, not measurements, and none of them is British.** Solar
+consultancies and inverter vendors quote roughly 1.25 to 1.50 for utility-scale plants and 1.1 to
+1.25 for domestic and small commercial ([SLR](https://www.slrconsulting.com/insights/solar-pv-repowering/),
+[Solargis](https://kb.solargis.com/docs/dcac-ratio-in-pv-systems),
+[RatedPower](https://ratedpower.com/blog/dc-ac-ratio/)). The one well-documented trend comes from
+Lawrence Berkeley National Laboratory's Utility-Scale Solar series, which puts the American
+inverter loading ratio near 1.2 in 2010 and above 1.3 by 2017. Borrowing that trend for Great
+Britain would understate it if anything: lower irradiance means a given ratio clips away less
+energy, so oversizing is cheaper here than in the United States and the economics point to higher
+ratios rather than lower ones. Treat every figure in this paragraph as a sanity check on a fitted
+value, never as a prior.
 
 ### Wind: same structure, simpler
 
