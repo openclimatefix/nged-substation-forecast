@@ -284,9 +284,18 @@ is where the formulation is weakest; see [the caveats](#honest-caveats-of-the-co
 - **Priors, where records exist.** A registered capacity, a previous year's fit, or a connection
   record enters as one more convex penalty
   ([priors as penalties](../techniques/convex-optimisation.md#priors-as-convex-penalties-and-the-uncertainty-you-dont-get)) —
-  including **asymmetric** priors (cheap to sit below the registered value, expensive to exceed
-  it, since registers overstate more than they understate) and **timing** priors (a known March
-  expansion makes jumps cheap at that date, expensive elsewhere).
+  including **asymmetric** priors and **timing** priors (a known March expansion makes jumps cheap
+  at that date, expensive elsewhere).
+- **Which way an asymmetric prior leans depends on which capacity is being estimated, and it flips
+  between milestones.** For a *metered generator* — the v0.7 quantity — the register names an asset
+  we can see, and effective capacity sits below that nameplate as soiling, degradation, shading and
+  derating accumulate, so it is cheap to fall below the registered value and expensive to exceed
+  it. For an *unmetered fleet behind a substation* — the v2 quantity — the register is close to a
+  lower bound instead, because the domestic installations missing from it add capacity on top of
+  what it lists, so the penalty should lean the other way. Pin down which field the register
+  supplies before either lean is applied: an export limit constrains $c^{\text{ac}}$, while a
+  panel rating constrains $c^{\text{dc}}$, and solar farms are routinely built with more
+  direct-current capacity than their alternating-current limit.
 
 ### Wind: same structure, simpler
 

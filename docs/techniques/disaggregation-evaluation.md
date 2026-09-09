@@ -75,12 +75,23 @@ mapping).
 trying to find, so exact agreement is not expected. Gross disagreement in the wrong direction
 (estimate < registered) is a detectable error. Weak but real-world triangulation.
 
-**Caveat**: this spoke stops being evidence for any series whose fit used the register. The
-capacity work plans to feed registered capacity in as a
-[convex prior](../roadmap/capacity-estimation.md#loss-and-penalties), and once a
-register is in the objective, agreement with that register is partly the optimiser doing what it
-was told. Use the register as a prior or as validation, not both on the same series. Where it is a
-prior, the independent checks are Spoke 1 and Spoke 7, which do not read the register at all.
+**Caveat**: this spoke stops being evidence for any fit that used the register. The capacity work
+plans to feed registered capacity in as a
+[convex prior](../roadmap/capacity-estimation.md#loss-and-penalties), and once a register is in the
+objective, agreement with that register is partly the optimiser doing what it was told.
+
+**The fix is an ablation, not a ban.** Fit once *without* the register prior and score that fit
+against the register; ship the fit *with* the prior. The delivered estimate then uses every source
+available, while the validation number comes from a fit that never saw the register. Report both,
+and keep the no-prior fit as a standing leaderboard column rather than a one-off, or it rots.
+
+**Score the ablation on pattern, not on level.** What the disaggregation recovers is registered
+*plus* unregistered capacity, so the estimate should exceed the register and an estimate below it
+is a detectable failure. The informative signals are the rank correlation across substations —
+does the estimate order catchments the way the register does? — and level agreement restricted to
+the subset where the register is near-complete, such as large registered ground-mount, where
+little unregistered capacity can hide. Spoke 1 and Spoke 7 read no register at all and stay
+independent either way.
 
 ---
 
