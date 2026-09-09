@@ -75,6 +75,13 @@ mapping).
 trying to find, so exact agreement is not expected. Gross disagreement in the wrong direction
 (estimate < registered) is a detectable error. Weak but real-world triangulation.
 
+**Caveat**: this spoke stops being evidence for any series whose fit used the register. The
+capacity work plans to feed registered capacity in as a
+[convex prior](../roadmap/capacity-estimation.md#loss-and-penalties), and once a
+register is in the objective, agreement with that register is partly the optimiser doing what it
+was told. Use the register as a prior or as validation, not both on the same series. Where it is a
+prior, the independent checks are Spoke 1 and Spoke 7, which do not read the register at all.
+
 ---
 
 ## Spoke 5: Second-order forecast improvement
@@ -98,9 +105,26 @@ metered, used purely as validation. One such site anchors the whole evaluation.
 
 ---
 
+## Spoke 7: Manual capacity survey from aerial imagery (direct, small-sample)
+
+Count rooftop PV by hand from aerial or high-resolution satellite imagery across a few primary
+substations' catchments, and compare the total against the estimated unmetered capacity. This is
+the only spoke that measures installed capacity directly, and the only one that is independent of
+both the meters and the registers — which is what makes it the check to reach for when the
+registers have been used as priors. Rooftop-PV detection from imagery is a well-developed computer
+vision task, so a hand-counted pilot can be scaled later if it proves worth it.
+
+**Caveat**: imagery gives panel area, not kilowatts, so the comparison carries an assumed
+watts-per-square-metre and misses panels hidden by shading, flat-roof mounting angles, or tree
+cover. The imagery's capture date rarely matches the estimate's period. Counting is expensive per
+catchment, so the sample is small and chosen rather than random, which makes it a check on
+magnitude rather than a statistic.
+
+---
+
 ## The structural conclusion
 
-A good method scores well across all six spokes despite their differing biases. A method that
+A good method scores well across all seven spokes despite their differing biases. A method that
 scores well on synthetic aggregation (Spoke 1) but fails physical-consistency checks (Spoke 3) on
 real data has overfit to the easy case. The leaderboard columns for disaggregation are not "the
 metric" — they are these spokes. Because labels are weak, the protocol must be more carefully
