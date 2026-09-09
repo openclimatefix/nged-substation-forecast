@@ -321,7 +321,14 @@ determines what it means:
 
 The Microgeneration Certification Scheme is therefore the one source that could yield a Great
 Britain DC:AC ratio broken down by size and by installation year, because it records both numbers
-for the same installation. Two cautions before trusting such a calculation. The Department for
+for the same installation. **That calculation needs record-level access we do not have.** The
+scheme's [data dashboard](https://datadashboard.mcscertified.com/) is free but serves only
+aggregates — counts and capacity by month, location, and technology — and a ratio needs both
+numbers on the same installation, so it would take a
+[data request](https://mcscertified.com/low-carbon-landscapes/mcs-data-requests/) with terms we
+have not seen. Treat asking as a task worth trying rather than a source we can plan on, alongside
+[asking for the CAMS uncertainty look-up table](disaggregation.md#correcting-satellite-irradiance-over-great-britain).
+Two further cautions before trusting such a calculation. The Department for
 Energy Security and Net Zero
 [report](https://assets.publishing.service.gov.uk/media/62446340e90e075f07426e6d/Review_of_solar_PV_capacity_publications.pdf)
 that the scheme's DC field — which they call total installed capacity, against declared net
