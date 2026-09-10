@@ -20,12 +20,12 @@ flowing from it.
 
 **Audience note:** today these runbooks are written for OCF (Python-literate researchers). The
 working assumption is that, after the Network Innovation Allowance (NIA) project, NGED runs the
-service on its own AWS account, and the day-to-day operator is one of the NGED staff who did not
-develop the code, working from these runbooks. Every routine
-operator action must therefore eventually reduce to a dashboard check, a button in the Dagster
-UI, or a runbook that someone who does not write Python can follow; before handover, these pages get an editing
-pass with that operator as the audience, plus a top-level "operator contract" page indexing
-them. See [Handover to NGED](../roadmap/handover.md).
+service on its own AWS account. The day-to-day operator is therefore one of the NGED staff who
+did not develop the code, working from these runbooks. Every routine operator action must
+therefore eventually reduce to a dashboard check, a button in the Dagster UI, or a runbook that
+someone who does not write Python can follow; before handover, these pages get an editing pass
+with that operator as the audience, plus a top-level "operator contract" page indexing them.
+See [Handover to NGED](../roadmap/handover.md).
 
 ## Documents
 

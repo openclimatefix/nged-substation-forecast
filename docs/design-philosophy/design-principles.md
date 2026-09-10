@@ -614,8 +614,8 @@ opening a shell on the box. This is load-bearing rather than good manners for tw
 [Principle 1 ("*the power forecast never stops*")](#1-the-power-forecast-never-stops) makes failure
 quiet by design, so the telemetry is often the only channel that speaks at all; and the working
 assumption is that, after the Network Innovation Allowance (NIA) project, NGED runs the service on
-its own AWS account, so the reader of the alert is one of the NGED staff who did not develop the
-code, working from the runbooks alone.
+its own AWS account. The reader of the alert is therefore one of the NGED staff who did not develop
+the code, working from the runbooks alone.
 
 *Without it:* the alert says a run failed. The operator opens Dagster, finds the run, reads the
 step's logs, and works out from a stack trace which time series, which weather run or which of our

@@ -60,12 +60,13 @@ aggregated flow across several substations rather than by any single meter in is
 forecasts that matter for curtailment are therefore the forecasts that net and sum correctly up the
 hierarchy — which is why [curtailment
 scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at one primary before
-summing up the substation hierarchy. Curtailment savings accrue to the whole system rather than
-to NGED's own spend, but curtailment is in scope alongside flexibility procurement, so the forecast
-requirement is the same for both decisions. So the question users ask of a forecast is
-rarely "what is the most likely load?" and usually "**how likely is net demand to cross this
-limit?**" — a [mock-up of the operator view](manual-heuristic-forecast.md#the-operators-view)
-plots demand as headroom below a constraint line.
+summing up the substation hierarchy. Curtailment savings accrue to the whole system rather
+than to NGED's own spend. Curtailment is nonetheless in scope alongside flexibility
+procurement, so the forecast requirement is the same for both decisions. So the question users
+ask of a forecast is rarely "what is the most likely load?" and usually "**how likely is net
+demand to cross this limit?**" — a [mock-up of the operator
+view](manual-heuristic-forecast.md#the-operators-view) plots demand as headroom below a
+constraint line.
 
 The project's value therefore concentrates in **both tails** of each forecast distribution: A
 model that is excellent on typical half-hours but unreliable in the handful of near-limit
@@ -202,7 +203,7 @@ produced only once every 6 hours, and NGED reads published forecasts directly fr
 than from any OCF-run service. So the gap between one forecast run and the next is a regular,
 roughly 6-hour window in which OCF can stop, patch, upgrade, or even rebuild its compute (most
 notably the always-on control-plane VM) without interrupting the forecasts NGED reads. Routine
-maintenance therefore needs no separate downtime window, and even a maintenance overrun causes
+maintenance therefore needs no separate downtime window. Even a maintenance overrun causes
 only a missed slot, recovered by the replay-mode backfill above.
 
 This requirement shapes the architecture: it is why a single always-on control-plane VM is an

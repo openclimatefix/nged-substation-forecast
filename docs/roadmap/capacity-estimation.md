@@ -106,8 +106,8 @@ periods.
 
 **The ANM feed is imperfect, in both directions.** Like any operational log, the ANM feed is an
 imperfect label: curtailment can happen with no matching log entry (for example, a generator's
-economic self-curtailment), and a logged event may differ from the generator's actual output. So
-the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
+economic self-curtailment). A logged event may also differ from the generator's actual output.
+So the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
 
 - **Unlogged curtailment** (including **economic self-curtailment** during negative-price
   periods, which never appears in the ANM feed) would read as capacity loss to any estimator

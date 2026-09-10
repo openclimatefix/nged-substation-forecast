@@ -45,10 +45,10 @@ priced in engineer-hours.
 
 The textbook way to price a forecast charges it for what goes wrong: £X per action taken, £Y per
 limit breach nobody saw coming. We cannot follow that route, because £Y — the cost of a breach —
-has no single figure a leaderboard can use: pricing a breach is a business judgement rather than a
-property of a forecast. And in the literature that does price a forecast this
-way, we found no case of it being done on a real distribution network at a money-denominated cost.
-The [energy-forecasting
+has no single figure a leaderboard can use. Pricing a breach is a business judgement rather than a
+property of a forecast. And in the literature that does price a forecast this way, we found no case
+of it being done on a real distribution network at a money-denominated cost. The
+[energy-forecasting
 review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
 reports [Richardson (2000)](https://doi.org/10.1002/qj.49712656313)'s cost-loss framing, [Bernecker
 et al. (2025)](https://doi.org/10.1016/j.ijepes.2025.110713)'s 97% synthetic-network saving, and
@@ -218,8 +218,8 @@ price alongside the whole-system one.
 **A published annual curtailment-saving figure may use a capacity-based method, in which case the
 published figure is not directly comparable with this metric.** This metric prices MWh curtailed,
 whereas a capacity-based method starts from MW of capacity and scales it for export volume. A
-comparison between the two needs either a separate replication of the capacity-based method or a
-label saying the comparison is order-of-magnitude only.
+comparison between the two figures needs either a separate replication of the capacity-based
+method or a label saying the comparison is order-of-magnitude only.
 
 ### Which direction is the constraint on?
 
@@ -246,7 +246,7 @@ half-hours:
 - **Manual heuristic** — the 13-analogue ensemble, summarised at one percentile if a single number
   is needed ([the manual heuristic forecast](../background/manual-heuristic-forecast.md)). That
   percentile is an upper percentile chosen to match the company's risk appetite; our scoring uses
-  the 95th percentile, and [the residual-risk level the operating point is set to is still an open
+  the 95th percentile. [The residual-risk level the operating point is set to is still an open
   question](#questions-for-nged). The manual heuristic is scored at that **actual operating point,
   not calibrated to the common risk target**, because the point is to measure the manual heuristic
   as it is operated. Its realised unmet fraction is therefore an output — the number saying what

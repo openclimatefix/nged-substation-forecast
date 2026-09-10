@@ -411,9 +411,8 @@ project (see [Requirements → Operating model &
 handover](../background/requirements.md#operating-model-handover)). The working assumption is that
 NGED runs the service on its own AWS account, operated day to day by NGED
 staff who did not develop the code, working from the runbooks. For that operator there is no
-tracking server on the hot path to break. The model simply freezes between model updates, and for
-an operator who runs the service without developing the model, a frozen model is a feature, not a
-limitation.
+tracking server on the hot path to break. The model simply freezes between model updates, and a
+frozen model is a feature, not a limitation.
 
 Baking the model in is deliberately simpler than depending on `BaseForecaster.load_from_mlflow` at
 runtime (the mechanism the CV pipeline already uses — see [ML orchestration: model
@@ -666,9 +665,9 @@ several-hours-apart intervals, spends most of its ticks discovering there is not
 
 4. **One execution path.** With everything on Fargate, every run has the same image, the same
    log destination (CloudWatch), the same IAM (Identity and Access Management) story (the
-   task role), and the same debugging experience. Two execution environments means two sets
-   of failure modes for the operator — after the NIA project, NGED staff who did not develop the
-   code, working from the runbooks.
+   task role), and the same debugging experience. Two execution environments mean two sets of
+   failure modes for the operator. After the NIA project, the operators are NGED staff who did not
+   develop the code, working from the runbooks.
 
 5. **V2 scaling.** At ~2,500 time series the ingest workload grows roughly 78×. On Fargate
    that is a task-size change; on the box it is another round of resizing the component that
@@ -718,8 +717,7 @@ under the operating model for after the NIA project (see [Requirements → Opera
 handover](../background/requirements.md#operating-model-handover)). The working assumption is that
 NGED runs the service on its own AWS account. With the model baked in, NGED
 never has to run — or depend on — an MLflow tracking server at all. The model simply freezes until a
-new image arrives: a new model reaches production only as a new container image, so the production
-runtime never needs MLflow.
+new image arrives: a new model reaches production only as a new container image.
 
 Rejecting this design says nothing against MLflow itself — MLflow remains the backbone of ML
 experimentation: training runs log their models, configs, and metrics to it. The champion is

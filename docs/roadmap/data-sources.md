@@ -53,7 +53,7 @@ the averaging rule needs to say what happens when one reading of a pair is missi
 | **Substations.csv** | 🚧 | For each substation, bulk supply point (BSP) and grid supply point (GSP): which BSP & GSP it connects to (names + IDs). | All trial-area substations valid. |
 | **Switching Logs.xlsx** | 🚧 | History of every normally-open switching point between primaries, labelled by time-series ID. Primaries outside the trial area are labelled "Unknown". | **Extremely valuable** as the gold-standard *test set* for [switching-event detection](switching-events.md) — lets us validate the unsupervised method on the trial area (labels do **not** exist at scale). Some edges "collapse" into `[substation ID] – unknown`. Two edges present in Interconnections.csv are missing: 900016 (ID 10) ↔ 900019 (ID 13), and 900022 (ID 16) ↔ unknown (910026). Logs go back to ≥ 2019. |
 | **MPAN to Substation Number.csv** | 🚧 | Associates each Embedded Capacity Register (ECR) generator to the substation it connects to. | All trial-area generators present, each with two Meter Point Administration Numbers (MPANs, import + export). Three primaries appear with one MPAN each, to be confirmed with NGED. |
-| **Peak Loads.xlsx** | 🚧 | Manually selected peak demand per trial-area substation, from 2024/25 (most recent survey). | Covers all 16 trial primaries. 12 primaries have 2024/25 readings above the recorded peak. Even at the 99th percentile of observed power, 3 primaries (IDs 8, 13, and 25) show 2–4× the recorded peak. One other primary has a recorded peak above 14 MVA, but its telemetry has never exceeded 6.8 MVA. Given these discrepancies, we use the **99th percentile of observed power** as the substation "capacity" proxy, at least initially. |
+| **Peak Loads.xlsx** | 🚧 | Manually selected peak demand per trial-area substation, from 2024/25 (most recent survey). | Covers all 16 trial primaries. Of these, 12 have 2024/25 readings above the recorded peak. Even at the 99th percentile of observed power, 3 primaries (IDs 8, 13, and 25) show 2–4× the recorded peak. One other primary has a recorded peak above 14 MVA, but its telemetry has never exceeded 6.8 MVA. Given these discrepancies, we use the **99th percentile of observed power** as the substation "capacity" proxy, at least initially. |
 
 ---
 
@@ -73,13 +73,13 @@ historical data (full detail + plots in the Milestone 1 report, Appendices A & B
   "analogue suspect"), which ingestion does not yet act on.
 - **False zeros**: substation telemetry has occasional drop-outs to zero, visible as an excess of
   exact zeros in the distribution vs. near-zero values.
-- **Not-on assets**: one trial-area generator (ID 19) has not been operating since mid-2024 — motivating
-  the [building-blocks](forecast-building-blocks.md) delivery approach.
+- **Not-on assets**: one trial-area generator (ID 19) has not been operating since mid-2024 —
+  motivating the [building-blocks](forecast-building-blocks.md) delivery approach.
 - **MVA / reverse flow**: primary data is disaggregated from metered generation where possible, but
-  not always: the primary with ID 26 has two solar meters that are not reporting, so their
-  generation cannot be subtracted. Combined with MVA metering (which reports absolute value),
-  midday solar export "bounces" off zero and looks like extra load.
-  See also the [MVA discussion in Net-demand disaggregation](disaggregation.md#apparent-power-mva-metering).
+  not always. The primary with ID 26, for example, has two solar meters that are not reporting, so
+  their generation cannot be subtracted. Combined with MVA metering (which reports absolute value),
+  midday solar export "bounces" off zero and looks like extra load. See also the [MVA discussion in
+  Net-demand disaggregation](disaggregation.md#apparent-power-mva-metering).
 
 These data oddities are detected and reported back to NGED as warnings (see
 [delivery tables, Table 2](delivery-tables.md#table-2-power_forecast_warnings)).

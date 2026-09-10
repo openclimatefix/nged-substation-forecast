@@ -260,12 +260,13 @@ codifying and reproducing — see the open Terraform-vs-CDK question in
 [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure).
 
 **Handover caveat:** all three stages are designed for the phase in which *OCF* runs the service
-on OCF's AWS account. The working assumption is that, after the NIA project, NGED runs the
-service on its own AWS account (see [Handover to NGED](handover.md)). OCF's access design will
-need to fit NGED's cloud and security standards, so OCF needs to confirm those standards with
-NGED early. Because the network layer is the authentication layer here, if NGED's standards rule
-out Tailscale, the whole access design needs an NGED-compatible replacement, not just a component
-swap. The size of that replacement is a reason to [confirm NGED's cloud and security standards
+on OCF's AWS account. The working assumption is that, after the Network Innovation Allowance
+(NIA) project, NGED runs the service on its own AWS account (see [Handover to
+NGED](handover.md)). OCF's access design will need to fit NGED's cloud and security standards,
+so OCF needs to confirm those standards with NGED early. Here the private-network layer
+(Tailscale) is also the authentication layer. If NGED's standards rule out Tailscale, the whole
+access design therefore needs an NGED-compatible replacement. The size of that replacement is a
+reason to [confirm NGED's cloud and security standards
 early](handover.md#5-confirm-ngeds-cloud-and-security-standards-early) — not a reason to change
 Stages 1–3, which remain correct for the OCF-run phase.
 

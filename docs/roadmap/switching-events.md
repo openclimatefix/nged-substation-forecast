@@ -753,10 +753,9 @@ explicit switching record is still genuinely wanted, further down the continuum:
 [`substation_switching` table](delivery-tables.md#table-5-substation_switching) was specified in our
 most recent formal report to NGED (so changing its shape is a decision to agree with NGED, not to
 make unilaterally — an [open question for NGED](#open-items-dependencies)). Switching records are
-held in operational systems not designed for bulk export, so a switching log inferred from the time
-series adds value. That
-prioritisation opens a genuine alternative mainline in which the detector's discrete layer is
-deferred behind forecast skill rather than built up front:
+held in operational systems not designed for bulk export. A switching log inferred from the time
+series is therefore still useful. That prioritisation opens a genuine alternative mainline in which
+the detector's discrete layer is deferred behind forecast skill rather than built up front:
 
 - **The NRA forecast** is the stage-1 model itself, generalised from hindcast to forward
   forecast: the weather/calendar forecaster, trained with switching-event periods excluded from
@@ -1414,7 +1413,7 @@ The obvious further stage models the **actual switchable physical units (feeders
   (c) Would continuous per-substation switching-state signals — the engineered features — meet
   NGED's needs in place of a discrete event table? (Table 5's shape was specified in our formal
   report, so this change needs NGED's agreement. And since switching records are held in
-  operational systems not designed for bulk export, an inferred discrete log adds value even if
-  the continuous signals suffice.) (d) Can NGED supply the who-can-exchange-load **adjacency at fleet
-  scale** (~1,161 primaries)? The trial-area adjacency is already a dependency above; the pooled
-  neighbour features' V2 story additionally stands on a fleet-wide adjacency list.
+  operational systems not designed for bulk export, an inferred discrete log is still useful even if
+  the continuous signals suffice.) (d) Can NGED supply the who-can-exchange-load **adjacency at
+  fleet scale** (~1,161 primaries)? The trial-area adjacency is already a dependency above; the
+  pooled neighbour features' V2 story additionally stands on a fleet-wide adjacency list.

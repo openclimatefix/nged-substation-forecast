@@ -421,11 +421,11 @@ $$
 The exceedance rate is the one-sided companion to
 [PICP](#picp-prediction-interval-coverage-probability): PICP checks symmetric bands
 (p10–p90, etc.), whereas the manual heuristic's conservative operating point is one-sided — an operator reads an upper
-percentile, chosen to match the company's risk appetite (the 95th percentile in our scoring), as
-"the level demand should stay under" — so its honesty deserves its own
-directly-readable number. It is *not* a ranking metric (a model can hit perfect exceedance
-rates with absurdly wide quantiles; pinball loss and twCRPS punish that); it is the trust
-check for the delivered tail quantiles.
+percentile, chosen to match the company's risk appetite (the 95th percentile in our scoring),
+as "the level demand should stay under". The honesty of that one-sided operating point
+therefore deserves its own directly-readable number. It is *not* a ranking metric (a model can
+hit perfect exceedance rates with absurdly wide quantiles; pinball loss and twCRPS punish
+that); it is the trust check for the delivered tail quantiles.
 
 As with PICP, empirical quantiles from a finite ensemble sit slightly inside the true
 quantiles, so even a perfectly calibrated ensemble exceeds its p95 slightly *more* than 5% of

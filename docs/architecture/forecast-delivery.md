@@ -66,9 +66,9 @@ NGED Flexpectation turns out to look quite different on each of those axes:
 
 ## Evolving requirements
 
-The delivery schemas are being co-designed with NGED, and which views of the data prove most
-useful will emerge from use. We need headroom to iterate table schemas rapidly while that
-co-design continues. Delta Lake supports schema evolution directly (new columns land without breaking
+The delivery schemas are being co-designed with NGED. Which views of the data prove most useful
+will emerge from use. We need headroom to iterate table schemas rapidly while that co-design
+continues. Delta Lake supports schema evolution directly (new columns land without breaking
 existing readers); a REST API would add a versioning-and-deprecation cycle on top of every schema
 change.
 
@@ -424,9 +424,10 @@ is identical in these two regions — so matching regions only pays off if NGED 
 AWS-hosted compute** (e.g. Athena, Glue, an EC2/Lambda job) in `eu-west-2`, not if they read via
 a desktop client like Power BI over the public internet, where the region choice makes
 no difference to the bill. That AWS-native path is the one v2 scale points towards anyway. A
-desktop spreadsheet caps out at 1,048,576 rows, so once `power_forecasts` reaches the trillion-row
-range, bulk reads need a query engine (for example Athena) rather than a desktop client. Running
-that query engine in `eu-west-2` is what turns those reads free instead of £0.015–0.067/GB.
+desktop spreadsheet caps out at 1,048,576 rows. Once `power_forecasts` reaches the trillion-row
+range, bulk reads therefore need a query engine (for example Athena) rather than a desktop client.
+Running that query engine in `eu-west-2` is what turns those reads free instead of
+£0.015–0.067/GB.
 
 Ireland is the cheaper region on everything else, and the premium is small enough not to outweigh
 that. AWS Price List API data (2026-07-03) shows `eu-west-1` consistently cheaper than `eu-west-2` —

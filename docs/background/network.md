@@ -32,10 +32,10 @@ hydro-dominated.
 
 ## Data quality in the trial area
 
-**Distribution-level telemetry, at NGED as is typical of distribution networks, carries more
-gaps and measurement artefacts than transmission-level telemetry.** The
-sections below are the issues observed in the trial area, each a distinct phenomenon rather than
-one fault seen several ways. See the ["Data sources" section of our Milestone 1
+**As is typical of distribution networks, NGED's distribution-level telemetry carries more gaps
+and measurement artefacts than transmission-level telemetry.** The sections below are the
+issues observed in the trial area, each a distinct phenomenon rather than one fault seen
+several ways. See the ["Data sources" section of our Milestone 1
 report](https://docs.google.com/document/d/1UF-mjfSdQfQxefAunDqEOr_GyYTjSlGk4EeuiNoXAxk/edit?tab=t.0#heading=h.etqoj9ahy92h)
 for a more detailed discussion, and plenty of graphs.
 
@@ -65,7 +65,7 @@ Gaps range from a few half-hours to months. Solar farms frequently have no data 
 
 ### Apparent power (MVA) metering
 
-Some substations only have MVA meters, which report the *absolute value* of power flow — they cannot detect direction. When generation exceeds demand and power flows "backwards", the MVA reading increases rather than going negative. This "bouncing off zero" behaviour looks like a demand increase but is actually reverse power flow. In the trial area, 10 sites are metered in apparent power, and one, and possibly two more, have shown reverse flow on sunny days. The following figure shows power flow for Stickney primary (time series 14) and a nearby solar site (time series 22); note the absence of peaks at Stickney primary on 3 and 4 May, when the solar site generated less: ![Power flow for Stickney primary (time series 14) and a nearby solar site (time series 22)](assets/MVA_metering_bounce_at_Stickney_primary.png)
+Some substations only have MVA meters, which report the *absolute value* of power flow — they cannot detect direction. When generation exceeds demand and power flows "backwards", the MVA reading increases rather than going negative. This "bouncing off zero" behaviour looks like a demand increase but is actually reverse power flow. In the trial area, 10 sites are metered in apparent power. Of those 10 sites, one site, and possibly two more, have shown reverse flow on sunny days. The following figure shows power flow for Stickney primary (time series 14) and a nearby solar site (time series 22); note the absence of peaks at Stickney primary on 3 and 4 May, when the solar site generated less: ![Power flow for Stickney primary (time series 14) and a nearby solar site (time series 22)](assets/MVA_metering_bounce_at_Stickney_primary.png)
 
 ### Switching events
 

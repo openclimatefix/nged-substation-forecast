@@ -380,8 +380,8 @@ possess (see [switching-events.md, Part 4](switching-events.md)). Our chosen for
 continuous neighbourhood mixture described there.
 
 **Topology and switch-state identification** has been studied, but overwhelmingly using voltage
-measurements. Voltage at primary substations is not part of this project's data feed, and at
-half-hourly resolution tap-changer movements would blur any topology signal in voltage anyway.
+measurements. Voltage at primary substations is not part of this project's data feed. At
+half-hourly resolution, tap-changer movements would blur any topology signal in voltage anyway.
 Tap-changer movements _could_ themselves reveal topology, but only in data sampled at around 1 Hz.
 
 ## Where this work is novel
@@ -427,7 +427,7 @@ work we reviewed shows.
 **6. Real-power-only inference — the "no-voltage" constraint as a novelty claim, not just a
 limitation.** As [the prior art review](#what-already-exists-prior-art) notes, existing topology and switch-state identification work relies
 overwhelmingly on voltage measurements. Voltage at primary substations is not part of this
-project's data feed, and at half-hourly resolution tap-changer movements would blur any topology
+project's data feed. At half-hourly resolution, tap-changer movements would blur any topology
 signal in voltage anyway. This work therefore demonstrates that the switching inference problem is
 solvable from real-power balance alone. Framing real-power-only inference as a deliberate design
 choice inverts the standard assumption and is itself a publishable contribution.

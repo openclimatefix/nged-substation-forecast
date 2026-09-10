@@ -159,9 +159,9 @@ precedent means for Flexpectation. The sections that follow give the evidence be
 version 1 forecasts the 20 substations among the 32 series in NGED's trial area — 16 primary
 substations, 2 grid supply points, and 2 bulk supply points. Version 2 extends that to net demand at
 every grid supply point, bulk supply point, and primary substation in NGED's licence areas. Our
-forecasts will be half-hourly, 14 days ahead, updated every 6 hours, and probabilistic. Users mostly
-act on the forecast 1 to 10 days ahead. The question NGED asks of the forecast is "how likely is net
-demand to run outside the substation's firm capacity?" rather than "what is the most likely net
+forecasts will be half-hourly, 14 days ahead, updated every 6 hours, and probabilistic. NGED mostly
+acts on the forecast 1 to 10 days ahead. The question NGED asks of the forecast is "how likely is
+net demand to run outside the substation's firm capacity?" rather than "what is the most likely net
 demand?". A substation's *firm capacity* is the load it can carry safely with its largest
 transformer out of service.
 
@@ -1396,10 +1396,10 @@ Time Series Data Quality project to tackle exactly this problem. The project sea
 for gaps, and found metering defects common rather than exceptional in Western Power Distribution's
 data at the time. In 2017, 13.8% of analogues in the South West licence area recorded only zeros,
 and 20.7% company-wide — with the caveat that "many of these may be valid open circuit values,
-however some will reflect incorrect values". In 2017, between 1% of the network control system's
-data points in the South West and 36% in the Midlands were unavailable to planners, and 63% of new
-solar sites' analogues had not been commissioned correctly. A fault detector for distribution
-telemetry therefore must not assume that faults are rare.
+however some will reflect incorrect values". In 2017, between 1% of the distribution network's
+control-system data points in the South West and 36% in the Midlands were unavailable to planners.
+In the same year, 63% of new solar sites' analogues had not been commissioned correctly. A fault
+detector for distribution telemetry therefore must not assume that faults are rare.
 
 **None of the three GB projects reports how often its checks are right.** Electricity North West's
 [ATLAS](https://smarter.energynetworks.org/projects/nia_enwl008/), UK Power Networks'

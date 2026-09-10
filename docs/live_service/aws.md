@@ -335,11 +335,11 @@ mis-wired secret in the deploy pipeline, where the blast radius is the deploy ra
 forecast.
 
 The three NGED credentials are also the only credentials in this deployment that can't come from an
-IAM role: NGED's bucket lives in NGED's AWS account, so the pipeline reads it with credentials
-issued by NGED. Don't paste them into the task definition as plain-text environment values — anyone with ECS
-describe access could read them there. Store them in **SSM Parameter Store** (SSM is AWS Systems
-Manager; Parameter Store is its encrypted key-value configuration service) as SecureStrings and let
-ECS inject them at container start:
+IAM role: NGED's bucket lives in NGED's AWS account, so the pipeline reads the bucket with
+credentials issued by NGED. Don't paste them into the task definition as plain-text environment
+values — anyone with ECS describe access could read them there. Store them in **SSM Parameter
+Store** (SSM is AWS Systems Manager; Parameter Store is its encrypted key-value configuration
+service) as SecureStrings and let ECS inject them at container start:
 
 In the AWS console → [**Systems
 Manager**](https://eu-west-2.console.aws.amazon.com/systems-manager/home?region=eu-west-2) →
@@ -1289,8 +1289,8 @@ Once the service is live, shipping a better model is a repeat of a slice of this
 
 ## Granting NGED read access
 
-**Current proposal, to be agreed with NGED: a single dedicated IAM user.** Check that the
-mechanism has been agreed before creating anything. [Forecast Delivery: Securing
+**Current proposal, to be agreed with NGED: a single dedicated IAM user.** Check that the mechanism
+has been agreed before creating the IAM user. [Forecast Delivery: Securing
 it](../architecture/forecast-delivery.md#securing-it) assumes a single authenticated AWS user for
 NGED, with no per-user entitlement matrix, because NGED is the only consumer. A single consumer
 points at a dedicated IAM user rather than a cross-account role. The desktop analytics tools named

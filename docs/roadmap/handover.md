@@ -16,11 +16,12 @@ handover](../background/requirements.md#operating-model-handover) for the planne
 What changes is a **standing design constraint** on everything we build from now on:
 
 **NGED staff who did not develop the code must be able to run the service day to day, working
-from the runbooks.** The day-to-day skill the service calls for is operations, not Python: if the
+from the runbooks.** The day-to-day skill the service calls for is operations, not Python. If the
 service is designed well, the day-to-day operator never needs to touch Python at all. Every
 routine action must reduce to "look at a dashboard, click a button in the Dagster UI, or follow a
-runbook". During the NIA project, any action that can't be reduced to those three is OCF's job,
-done on a scheduled cadence (e.g. quarterly maintenance windows) rather than reactively.
+runbook". During the NIA project, any action that can't be reduced to those three actions is
+OCF's job, done on a scheduled cadence (e.g. quarterly maintenance windows) rather than
+reactively.
 
 Several decisions already made serve this constraint well, and this page makes that connection
 explicit so we don't accidentally undo them:
@@ -37,8 +38,8 @@ explicit so we don't accidentally undo them:
   registry for an operator to mis-drive.
 - **No static AWS keys for OCF's own resources** (IAM roles throughout) removes a whole class
   of credential-expiry incidents. The two static credentials that remain sit at the boundary with
-  NGED — the NGED read-access user and the source-bucket credentials — and
-  [workstream 5](#5-confirm-ngeds-cloud-and-security-standards-early) checks whether NGED's
+  NGED — the NGED read-access user and the source-bucket credentials.
+  [Workstream 5](#5-confirm-ngeds-cloud-and-security-standards-early) checks whether NGED's
   standards permit them.
 - **The pipeline runs end-to-end on a laptop** — the live schedules were dress-rehearsed
   locally under `dg dev` before any AWS compute existed. And the standing preference is
@@ -163,14 +164,14 @@ same IaC is OCF's own.
 
 **OCF's access design will need to fit NGED's cloud and security standards, so OCF needs to
 confirm those standards with NGED early** — well before the final months of the project.
-Corporate cloud environments commonly impose service control policies, mandatory patching and
-security agents, restricted egress, and bans on long-lived credentials. The access design
-is the part of the service those standards bear on most, because in the current design [the
-network layer *is* the authentication layer](live-service.md#access-phasing): none of the web UIs
-(Dagster, MLflow, and Marimo) has built-in authentication, and Tailscale is what restricts who can
-reach them. If NGED's standards call for a different network layer, the access design needs an
-NGED-compatible replacement as a whole (e.g. NGED's virtual private network plus private subnets,
-or a proxy fronted by single sign-on), not a component swap.
+Corporate cloud environments commonly impose service control policies, mandatory patching,
+mandatory security agents, restricted egress, and bans on long-lived credentials. The access
+design is the part of the service those standards bear on most, because in the current
+design [the network layer *is* the authentication layer](live-service.md#access-phasing).
+None of the web UIs (Dagster, MLflow, and Marimo) has built-in authentication, and Tailscale
+is what restricts who can reach them. If NGED's standards call for a different network
+layer, the access design needs an NGED-compatible replacement as a whole (e.g. NGED's
+virtual private network plus private subnets, or a proxy fronted by single sign-on).
 
 Concrete steps:
 
@@ -183,8 +184,7 @@ Concrete steps:
   system, and the AWS account. That split changes what the runbooks need to cover, and whom the
   game days train.
 - Stand up a **staging copy in NGED's account well before handover**, so that any mismatch
-  between our networking approach and NGED's standards surfaces early rather than in the final
-  months of the project.
+  between our networking approach and NGED's standards surfaces early.
 
 ### 6. Game days and in-person training
 
@@ -214,7 +214,7 @@ are not engineering workstreams, but the handover depends on them, so they are r
 alongside the technical work:
 
 - A **named service owner at NGED** with allocated time to operate the service.
-- **Funding for running costs and support**: the AWS spend, and whatever support the written
+- **Funding for running costs and support**: the AWS spend and whatever support the written
   agreement below covers.
 - A **written support agreement** setting out who does scheduled maintenance, emergency fixes,
   and model updates after the NIA project.
@@ -223,9 +223,9 @@ alongside the technical work:
 
 - **The planned phasing is recorded in [Requirements → Operating model &
   handover](../background/requirements.md#operating-model-handover)**: OCF running the service
-  through the NIA project, a scale gate at v2, and progressive handover in the final months,
-  under the working assumption that NGED runs the service on its own AWS account after the NIA
-  project. Workstream 5 (confirming NGED's cloud and security standards) is the one workstream that
-  should start well before that final-months handover; the rest land alongside the v1/v2
-  milestones they depend on.
+  through the NIA project, a scale gate at v2, and progressive handover in the final months.
+  The phasing rests on the working assumption that NGED runs the service on its own AWS
+  account after the NIA project. Workstream 5 (confirming NGED's cloud and security
+  standards) is the one workstream that should start well before that final-months handover.
+  The rest land alongside the v1/v2 milestones they depend on.
 - **The operating model after the NIA project remains NGED's decision.**

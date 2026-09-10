@@ -75,11 +75,12 @@ with no weather model and no ML. In brief (full description and the operator's-e
 background page): for each target half-hour it takes the observed power at the **same weekday &
 time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13 analogues**. An
 operator reads the plotted analogues by eye. If a single number is needed, the operator picks the
-percentile that matches the company's risk appetite; we score the conservative 95th percentile.
-Reproducing the manual heuristic matters because it is *the bar we have to clear to justify the
-project* — "XGBoost beats persistence" is the least we must do; "XGBoost beats the manual
-heuristic" is the deliverable. It is the first baseline we implement; if we implement only one, it
-is this one.
+percentile that matches the company's risk appetite. We score the conservative 95th percentile.
+
+**Reproducing the manual heuristic matters because the manual heuristic is *the bar we have to
+clear to justify the project*.** "XGBoost beats persistence" is the least we must do; "XGBoost
+beats the manual heuristic" is the deliverable. `manual_heuristic` is the first baseline we
+implement, and the one we would keep if we could implement only one.
 
 `manual_heuristic` fits our existing machinery, because every one of its 13 members is just a **power
 lag**:
@@ -112,13 +113,13 @@ member rows) rather than consuming an NWP ensemble; it runs with `weather_source
 **Deterministic collapse is a property of the metrics layer, not the manual heuristic.** The manual
 heuristic emits its 13 members and nothing else; the [metric-matched collapse
 decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast) then scores its MAE on
-the members' median (apples-to-apples with every other model's central forecast) and reports a
-conservative operator operating point — the **95th percentile** — as a labelled secondary number
+the members' median (apples-to-apples with every other model's central forecast) and reports the
+operator's conservative operating point — the **95th percentile** — as a labelled secondary number
 (`mae`/`mbe` at `metric_param="p95"`). Being deliberately conservative, the P95 carries a large
 *positive* MBE **by design** (a peak-safety choice, not a forecasting error), so it belongs *beside*
 the central metric. Either way the analogue method weights the analogues equally, with no further
-processing, so equiprobable members — and the probabilistic metrics (CRPS etc.) computed over them
-— are faithful, not an approximation.
+processing, so equiprobable members — and the probabilistic metrics (CRPS etc.) computed over them —
+are faithful, not an approximation.
 
 ### A faithful replica and a "simple upgrades" variant
 
@@ -126,8 +127,8 @@ processing, so equiprobable members — and the probabilistic metrics (CRPS etc.
 — the message the pair of baselines is built to test.** We implement two closely-related
 baselines built on the manual heuristic:
 
-- `manual_heuristic` — the faithful replica above, which reproduces the recipe exactly, treating
-  bank holidays as ordinary days. Pure lag features.
+- `manual_heuristic` — the faithful replica above, treating bank holidays as ordinary days. Pure
+  lag features.
 - `manual_heuristic_holiday_aligned` — the same skeleton, but analogue *selection* becomes
   calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type (a
   bank-holiday Monday behaves like a Sunday). Moveable feasts align holiday-to-holiday

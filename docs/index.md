@@ -38,7 +38,7 @@ This interest in information means a negative result can be just as valuable as 
 For example, if we try hard to detect [switching events](background/switching-events.md)
 unsupervised and conclude that detection isn't reliably possible from power readings alone, that
 conclusion is a useful finding in its own right. That finding tells NGED whether extracting
-switching-event labels from operational systems would add value.
+switching-event labels from operational systems would help.
 
 The same logic applies to the engineering: our claims about it are written down as falsifiable
 [engineering hypotheses](design-philosophy/engineering-hypotheses.md) with thresholds attached, and
