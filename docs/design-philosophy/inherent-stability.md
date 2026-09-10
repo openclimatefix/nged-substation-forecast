@@ -79,13 +79,13 @@ That self-correcting stability is what we want from the forecasting service. Whe
 it, sensible behaviour under disturbance should fall out of how the system is built, rather than
 being watched for and corrected by machinery bolted on around it.
 
-## NGED's incumbent forecast is the floor
+## The incumbent forecast is the floor
 
 Even in the worst case, when we have _no_ fresh data, we hope to still be able to provide a better
-power forecast than NGED's incumbent forecast, with appropriate confidence bands. This is what
-allows us to claim that we should _always_ be able to produce a power forecast, even when "blind".
+power forecast than the incumbent forecast, with appropriate confidence bands. This is what allows
+us to claim that we should _always_ be able to produce a power forecast, even when "blind".
 
-[NGED's incumbent forecast](../background/nged-incumbent-forecast.md) assembles 13 historical
+[The incumbent forecast](../background/nged-incumbent-forecast.md) assembles 13 historical
 analogues at the same time-of-day on the same weekday — 6 from the last 6 weeks, 7 from 49–55 weeks
 back — and reads them as an ensemble. No weather, no ML, no holiday alignment, no load-growth
 scaling.

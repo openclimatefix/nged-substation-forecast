@@ -241,15 +241,15 @@ would silently score £0 for every generator meter in the trial area.
 Every model's cost is reported beside two reference points, computed on the same series and
 half-hours:
 
-- **Manual review** — the incumbent method: the 13-analogue ensemble, summarised at the 95th
-  percentile if a single number is needed ([the incumbent
-  forecast](../background/nged-incumbent-forecast.md); we have not confirmed that the 95th
-  percentile is what they use, and [this is still an open question](#questions-for-nged)). It is
-  scored at that
-  **actual operating point, not calibrated to the common risk target**, because the point is to
-  measure what NGED do today. Its realised unmet fraction is therefore an output — the number
-  saying what risk level they currently work to — and the saving against it mixes a change in spend
-  with a change in risk. Both are reported; neither means much alone.
+- **Manual review** — the incumbent method: the 13-analogue ensemble, summarised at one percentile
+  if a single number is needed ([the incumbent forecast](../background/nged-incumbent-forecast.md)).
+  The operator picks that percentile to match the company's risk appetite. We score the 95th
+  percentile, and [which percentile manual review works from is still an open
+  question](#questions-for-nged). Manual review is scored at that **actual operating point, not
+  calibrated to the common risk target**, because the point is to measure the incumbent method as
+  it is operated. Its realised unmet fraction is therefore an output — the number saying what risk
+  level manual review works to — and the saving against it mixes a change in spend with a change in
+  risk. Both are reported; neither means much alone.
 - **Perfect forecast** — the least that can be spent while leaving no more than the target fraction
   $u$ unmet. Truth is not a distribution, so there is no quantile to calibrate: the floor is the
   cost of procuring exactly $(1-u)N_{i,t}$ in every half-hour, put straight through the same price

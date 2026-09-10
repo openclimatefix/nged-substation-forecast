@@ -65,7 +65,7 @@ scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at o
 summing up the substation hierarchy. The money is counted differently too — curtailment today is
 priced as a whole-system cost rather than as NGED's own spend. But NGED rate the saving as highly,
 so the forecast requirement is unchanged. So the question users ask of a forecast is rarely "what is
-the most likely load?" and usually "**how likely is net demand to cross this limit?**" — NGED's
+the most likely load?" and usually "**how likely is net demand to cross this limit?**" — the
 [incumbent forecasting tool](nged-incumbent-forecast.md#the-operators-view) literally plots demand
 as headroom below a constraint line.
 
