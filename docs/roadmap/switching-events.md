@@ -1,6 +1,6 @@
 # Switching events — Approach & Implementation Roadmap
 
-**Scope.** How to make each NGED primary substation's forecast robust to switching events — and, further out, how to reconstruct its *latent demand under the normal running arrangement (NRA)* (the demand that would be metered if the electricity network were never reconfigured) — given that the electricity network is in fact reconfigured roughly 10% of the time by switching events. The nearest-term approach is a switching-robust forecaster; the latent-demand reconstruction is later research. Background on what switching events are and why they are hard is at [**Switching Events**](../background/switching-events.md). This document defines the ordered set of approaches, from the v0.6 forecaster and detector to the later v2-scale mixture models.
+**Scope.** How to make each NGED primary substation's forecast robust to switching events — and, further out, how to reconstruct its *latent demand under the normal running arrangement (NRA)* (the demand that would be metered if the electricity network were never reconfigured) — given that the electricity network is in fact reconfigured from time to time by switching events. The nearest-term approach is a switching-robust forecaster; the latent-demand reconstruction is later research. Background on what switching events are and why they are hard is at [**Switching Events**](../background/switching-events.md). This document defines the ordered set of approaches, from the v0.6 forecaster and detector to the later v2-scale mixture models.
 
 > **Status: 🔬 Research / 🚧 Planned.** Epic:
 > [#151](https://github.com/openclimatefix/nged-substation-forecast/issues/151) (the v0.6
@@ -190,7 +190,7 @@ own training history.**
 - *Fit robustly, because the training history itself contains switching events.* Fitted
   straight, the baseline is biased toward the contaminated periods. Fit with a **robust loss**
   (quantile or Huber), or iteratively: fit → flag large residuals as candidate events → refit
-  excluding them. Because events occupy only ~10% of the time, a robust fit recovers the
+  excluding them. Because events occupy only a small fraction of the time, a robust fit recovers the
   NRA relationship and the events fall out as residuals. That robust-fit recovery closes a virtuous
   loop with the detector itself — detected events feed
   back to clean the baseline's training data.
@@ -220,7 +220,7 @@ own training history.**
   Planned switching is not uniform through the year. A flexible time-of-year covariate fitted on
   contaminated history can therefore absorb systematic ARA effects into "seasonality", and the
   robust loss does *not* fix that absorption, because the contamination is locally dense within
-  the season even though it is only ~10% overall. So prefer multiple years of history, and make
+  the season even though it is only a small fraction overall. So prefer multiple years of history, and make
   sure the fit → flag → refit loop removes flagged periods from the seasonal fit too.
 
 #### Approach 1 — the two-stage forecaster
@@ -302,8 +302,8 @@ flag, event age, attributed magnitude) are themselves natural features for this 
   question (each series has its own neighbour set, of varying size) is answered by the pooled
   design below — a fixed handful of permutation-invariant pooled columns, never one column per
   neighbour.
-- **Data volume.** Learning multi-donor conservation implicitly from 32 series with ~10% event
-  occupancy asks a lot of a tabular learner. Expect the model to learn "persist my own offset"
+- **Data volume.** Learning multi-donor conservation implicitly from 32 series, in which switching
+  events occupy a small fraction of the time, asks a lot of a tabular learner. Expect the model to learn "persist my own offset"
   easily and neighbour attribution only weakly. The closed-form detector exploits that structure
   directly, which is another reason the two-stage forecaster complements the detector rather
   than replacing it.
@@ -639,7 +639,7 @@ completes. Treat unpaired onsets as open intervals (event still in force at the 
 rather than discarding them.
 
 **Filter fleet-wide artifacts before attribution.** Telemetry re-basing, unit changes, or other
-data-pipeline shifts on NGED's side produce coincident steps across *many* series at once. Any step
+upstream data-pipeline changes produce coincident steps across *many* series at once. Any step
 time shared by a large fraction of the fleet is a data artifact, not a switching event, and must be
 excluded before the subset search runs. An unexcluded artifact manufactures spurious
 multi-substation "events".
@@ -690,7 +690,7 @@ pitfall noted for stage 1, applied to composition rather than magnitude.)
 
 ##### Validation, injection, and what the detector delivers
 
-**Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**. The floor is not a single MW number: it is a frontier in **transferred magnitude × event duration**, reported per series relative to that series' residual noise. The duration axis exists because changepoint segmentation has a minimum detectable event length at half-hourly sampling (an event lasting minutes to a few hours appears as a spike or one odd interval, not a step), just as residual noise sets a minimum magnitude. Pair the frontier with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.* One caveat to carry into the scoring: measured **precision is a lower bound** — if the control-room logs are incomplete (worth asking NGED how complete they believe them to be), some "false positives" will be real, unlogged events.
+**Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**. The floor is not a single MW number: it is a frontier in **transferred magnitude × event duration**, reported per series relative to that series' residual noise. The duration axis exists because changepoint segmentation has a minimum detectable event length at half-hourly sampling (an event lasting minutes to a few hours appears as a spike or one odd interval, not a step), just as residual noise sets a minimum magnitude. Pair the frontier with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.* One caveat to carry into the scoring: measured **precision is a lower bound** — if the control-room logs are incomplete (their completeness is an [open question](#open-items-dependencies)), some "false positives" will be real, unlogged events.
 
 **Report an F1 score per event-duration band, so the detector can be set beside the one published
 measurement we found.** [Bouman et al. (2024)](https://arxiv.org/abs/2405.16164) is the one
@@ -722,7 +722,7 @@ model](#approach-4-the-magnitude-only-mixture-model-the-workhorse) is for.
 **The same subtraction turns the ARA mask into an optional patch, keeping switching-affected
 training rows instead of discarding them.** The subtraction version is still useful in its own
 right: it turns the ARA *mask* into an optional *patch* — keep switching-affected periods in the
-forecast training data with corrected values rather than discarding ~10% of the record. Whether the
+forecast training data with corrected values rather than discarding the event periods from the record. Whether the
 patch beats the hole is quick to measure on the synthetic-injection harness.
 
 **What this approach misses / cons.**
@@ -752,9 +752,9 @@ it improves those forecasts — an *implicit* handling inside the forecaster is 
 explicit switching record is still genuinely wanted, further down the continuum: the
 [`substation_switching` table](delivery-tables.md#table-5-substation_switching) was specified in our
 most recent formal report to NGED (so changing its shape is a decision to agree with NGED, not to
-make unilaterally — an [open question for NGED](#open-items-dependencies)). Although NGED's internal
-systems do record switching, getting data *out* of those systems is surprisingly hard, so a
-switching log inferred from the time series is a deliverable NGED would likely welcome. That
+make unilaterally — an [open question for NGED](#open-items-dependencies)). Switching records are
+held in operational systems not designed for bulk export, so a switching log inferred from the time
+series adds value. That
 prioritisation opens a genuine alternative mainline in which the detector's discrete layer is
 deferred behind forecast skill rather than built up front:
 
@@ -1217,7 +1217,7 @@ $$ \text{observed}_i(t) = \alpha_{ii}(t)\, d_i(t) + \sum_{j \,\in\, \text{neighb
 - Under NRA: $\alpha_{ii} \approx 1$, $\alpha_{ij} \approx 0$.
 - During an ARA: weight shifts from a source onto **one or more** neighbours. Multiple $\alpha_{ij}(t)$ may be active at once for a single source.
 - **Conservation = node-level flow balance:** weight leaving $i$ is distributed across a subset of neighbours and must sum to the weight lost at $i$ (approximately mass-preserving over the affected neighbourhood). **Do not** implement this as independent pairwise equal-and-opposite constraints — that is wrong given confirmed 2–3-way fan-out.
-- **Priors / regularisation:** $\alpha(t)$ strongly regularised toward the identity (NRA) and **piecewise-constant in time**, because switching events are rare (~10% of the time) and abrupt. A useful by-product: jumps in $\alpha$ are directly interpretable as detected switching events.
+- **Priors / regularisation:** $\alpha(t)$ strongly regularised toward the identity (NRA) and **piecewise-constant in time**, because switching events occupy a small fraction of the time and are abrupt. A useful by-product: jumps in $\alpha$ are directly interpretable as detected switching events.
 - **$d_i(t)$ must itself be modelled, not left free.** If the latent demand were an unconstrained
   value per timestep the model would be hopelessly underdetermined — any observation can be
   explained by moving $d$ instead of $\alpha$. $d_i(t)$ is a weather/calendar-driven model plus a
@@ -1394,18 +1394,17 @@ The obvious further stage models the **actual switchable physical units (feeders
 
 ## Open items / dependencies
 
-- **Switching logs for the 32-series trial** (held; e.g. the DINDER example). Used as the gold-standard validation set for v0.6 and beyond. **Not** available at full scale — this asymmetry drives the whole design.
+- **Switching logs for the 32-series trial** (held; e.g. the [fault example on the background page](../background/switching-events.md#worked-example)). Used as the gold-standard validation set for v0.6 and beyond. **Not** available at full scale — this asymmetry drives the whole design.
 - **Unsupervised at production scale; the labels are for using in v1.** [Background: the labels
   asymmetry](../background/switching-events.md#the-labels-asymmetry) is why: the switching logs
   exist for the 32-series trial only, so no fleet-scale production path may *require* them.
   Within v1, though, use them freely — plot them against every engineered feature, and run
   label-consuming training variants (label-excluded baselines and the like) deliberately. The
-  measured value of the labels is itself a deliverable. That measurement quantifies for NGED
-  what fleet-wide switching logs would be worth, and informs NGED's case for investing in
-  extracting logs from their operational systems.
+  measured value of the labels is itself a deliverable. That measurement quantifies how much
+  fleet-wide switching logs would improve the forecast.
 - **Do not fit pilot-only parameters and rely on them at scale.** Any parameter learned only on the 16 labelled primary substations that cannot be set for the other ~1,145 primary substations is forbidden as a *production* dependency. The *method* generalises; a pilot lookup does not.
 - **Neighbour/adjacency structure** for the trial substations — which substations can exchange load (needed to define graph edges and the attribution search). Even approximate adjacency helps; note that because cut points move, "adjacency" means "can be electrically connected by some switching," not a fixed feeder map.
-- **Confirmed by NGED:** (a) multi-recipient transfer (2–3 donors) is the norm; (b) partial transfers (some, not all, of a substation's load) are the common and harder case; (c) no stable "feeder" unit exists; (d) switching labels exist only for the trial area, not at scale.
+- **Project assumptions:** (a) multi-recipient transfer (2–3 donors) is the norm; (b) partial transfers (some, not all, of a substation's load) are the common and harder case; (c) no stable "feeder" unit exists; (d) switching labels exist only for the trial area, not at scale.
 - **To ask NGED:** (a) how complete are the control-room switching logs for the trial area?
   (Determines whether measured detection precision is a tight bound or a loose lower bound.)
   (b) How completely do NGED's own logs cover the **full fleet**? (Determines whether
@@ -1414,8 +1413,8 @@ The obvious further stage models the **actual switchable physical units (feeders
   [the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).)
   (c) Would continuous per-substation switching-state signals — the engineered features — meet
   NGED's needs in place of a discrete event table? (Table 5's shape was specified in our formal
-  report, so this change needs NGED's agreement. And since NGED's own switching records are hard
-  to extract data from, an inferred discrete log remains a valued nice-to-have even if the
-  continuous signals suffice.) (d) Can NGED supply the who-can-exchange-load **adjacency at fleet
+  report, so this change needs NGED's agreement. And since switching records are held in
+  operational systems not designed for bulk export, an inferred discrete log adds value even if
+  the continuous signals suffice.) (d) Can NGED supply the who-can-exchange-load **adjacency at fleet
   scale** (~1,161 primaries)? The trial-area adjacency is already a dependency above; the pooled
   neighbour features' V2 story additionally stands on a fleet-wide adjacency list.

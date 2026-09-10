@@ -39,7 +39,7 @@ than against it, and it is only evidence if somebody wrote it down.
 
 "Runbook?" is not bookkeeping. A gap in [operations.md](operations.md) is itself a finding: the
 [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-claims a non-expert can run this service from the runbooks alone, and every `no` is a point against
+claims that staff who did not develop the code can run this service from the runbooks alone, and every `no` is a point against
 that claim.
 
 ## Cause taxonomy

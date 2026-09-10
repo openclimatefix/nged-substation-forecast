@@ -259,14 +259,15 @@ IAM roles, security groups, and multiple processes start accumulating enough to 
 codifying and reproducing — see the open Terraform-vs-CDK question in
 [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure).
 
-**Handover caveat (added 2026-07-14):** all three stages are designed for the phase in which
-*OCF* runs the service on OCF's AWS account. Once the service moves to NGED's own AWS account
-(the preferred post-NIA operating model — see [Handover to NGED](handover.md)), Tailscale
-specifically may not survive NGED's security review, and because the network layer is the auth
-layer here, that would require an NGED-compatible replacement for the whole access design, not
-just a component swap. That risk is a reason to [probe NGED's landing-zone constraints
-early](handover.md#5-probe-ngeds-aws-landing-zone-early) — not a reason to change Stages 1–3,
-which remain correct for the OCF-run phase.
+**Handover caveat:** all three stages are designed for the phase in which *OCF* runs the service
+on OCF's AWS account. The working assumption is that, after the NIA project, NGED runs the
+service on its own AWS account (see [Handover to NGED](handover.md)). OCF's access design will
+need to fit NGED's cloud and security standards, so those standards need agreeing with NGED
+early. Because the network layer is the auth layer here, a different network layer would need an
+NGED-compatible replacement for the whole access design, not just a component swap. The size of
+that replacement is a reason to [agree NGED's cloud and security standards
+early](handover.md#5-agree-ngeds-cloud-and-security-standards-early) — not a reason to change
+Stages 1–3, which remain correct for the OCF-run phase.
 
 ## Production monitoring
 
@@ -353,7 +354,7 @@ today, so at handover the alert routing (and possibly the account itself) moves 
 
 Every alert must link to a runbook that ends in either a specific operator action or
 "escalate" — a requirement that matters doubly under the post-NIA operating model, where the
-day-to-day operator is a non-expert at NGED (see
+day-to-day operators are NGED staff who did not develop the code, working from the runbooks (see
 [Handover to NGED](handover.md#2-alert-on-absence-not-just-failure)).
 
 ### The `retire_experiment_job`
@@ -431,13 +432,13 @@ Still 🚧 after v0.1:
   (Python)**. The case for CDK is specific to this project: it's single-cloud (AWS-only), so
   there's no cross-cloud benefit from HCL, and CDK lets the infra be written in Python rather
   than learning a new language for it. Terraform vs CDK is a call for whoever starts Stage 2
-  work; this page does not pick one. The post-NIA operating model (NGED runs the service on
-  NGED's AWS — see
+  work; this page does not pick one. The working assumption for after the NIA project (NGED runs
+  the service on its own AWS account — see
   [Handover to NGED](handover.md#4-infrastructure-as-code-portable-to-ngeds-account)) adds two
   inputs to that call: the infra-as-code must be **account-portable** (no OCF-specific names or
-  network assumptions baked in), and what NGED's infrastructure teams already know and are
-  allowed to run matters as much as what suits OCF — worth asking them before deciding. By
-  handover time, infra-as-code is mandatory, not optional.
+  network assumptions baked in), and the tools NGED's engineers already use, and the tools NGED's
+  standards permit, matter as much as what suits OCF. Agree the choice with NGED before making
+  it. By handover time, infra-as-code is mandatory, not optional.
 
 ### Related GitHub issues
 

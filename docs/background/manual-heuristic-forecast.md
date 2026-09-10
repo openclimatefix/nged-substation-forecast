@@ -20,13 +20,14 @@ For a given substation and target half-hour, the analogue ensemble is the observ
 
 That is **13 analogues** in total.
 
-There is no weighting, no holiday alignment, no anomaly rejection, and no load-growth scaling.
+The 13 analogues are used as observed and weighted equally. Adjusting for holidays, anomalies,
+and load growth is left to the operator's judgement.
 
 The output is **the plot itself** — an operator looks at the 13 traces and their spread and forms a
-judgement. If a single deterministic number is needed, the operator would pick the percentile that
-aligned to the company's risk appetite. A high percentile such as the 95th is a deliberately
-**conservative** operating point: the tool's job is to warn when demand might approach the network's flex/firm
-capacity limit, so erring high is the safe direction.
+judgement. If a single deterministic number is needed, the operator reads off an upper percentile
+chosen to match the company's risk appetite; our scoring uses the 95th percentile. An upper
+percentile is a deliberately **conservative** operating point: the tool's job is to warn when
+demand might approach the network's flex/firm capacity limit, so erring high is the safe direction.
 
 ## The operator's view
 
@@ -49,8 +50,9 @@ same-weekday analogue selection is built to capture.
 
 ## Why it matters for us
 
-Because the manual heuristic uses no weather and no ML, beating it is the project's core
-deliverable — and because it does no further processing at all, several cheap upgrades (e.g.
-aligning bank holidays and moveable feasts) are genuinely useful work rather than reimplementations.
-Both the faithful replica and the "cheap upgrades" variant are specified in [Metrics & leaderboard →
+Because the manual heuristic uses no weather and no ML, beating the manual heuristic is the
+project's core deliverable. Because the recipe leaves the holiday, anomaly, and load-growth
+adjustments to the operator, automating those adjustments (for example, aligning bank holidays and
+moveable feasts) is useful work in its own right. Both the faithful replica and the variant that
+automates those adjustments are specified in [Metrics & leaderboard →
 Baseline forecasters](../roadmap/metrics-and-leaderboard.md#baseline-forecasters).

@@ -126,8 +126,8 @@ processing, so equiprobable members — and the probabilistic metrics (CRPS etc.
 — the message the pair of baselines is built to test.** We implement two closely-related
 baselines built on the manual heuristic:
 
-- `manual_heuristic` — the faithful replica above. No holiday handling; warts and all. Pure lag
-  features.
+- `manual_heuristic` — the faithful replica above, reproduced exactly as operated, treating bank
+  holidays as ordinary days. Pure lag features.
 - `manual_heuristic_holiday_aligned` — the same skeleton, but analogue *selection* becomes
   calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type (a
   bank-holiday Monday behaves like a Sunday). Moveable feasts align holiday-to-holiday
@@ -175,7 +175,7 @@ or over climatology alone, flatters a forecast that a combined reference would j
 headline bar, not for building a fourth baseline.** The manual heuristic already blends recency with
 seasonality — the last 6 weeks of same-weekday, same-time-of-day analogues alongside the
 49-to-55-weeks-back group — so it plays on substation load the role the combined reference plays on
-irradiance. The manual heuristic is also the bar that decides whether the project is worth its money.
+irradiance. The manual heuristic is also the bar the project must clear.
 Persistence and climatology stay as diagnostic bookends, read as the loose end of the range rather
 than as the benchmark a win should be claimed against.
 
@@ -399,8 +399,8 @@ forecast](../background/manual-heuristic-forecast.md); the implementation spec:
   appetite; we score the conservative **95th percentile** of all 13 analogue values, reported
   alongside the metric-matched **median** headline (PR 1).
 - **No further processing:** no weighting, no holiday handling, no anomaly rejection, no
-  load-growth scaling. (This is precisely why the holiday-aligned variant is a genuine, un-done
-  upgrade — not a reimplementation of a step the analogue method already takes.)
+  load-growth scaling. (So the holiday-aligned variant measures how much calendar awareness adds,
+  rather than reimplementing a step the analogue method already takes.)
 
 **Cross-cutting.** (1) **Issue hygiene:** create one tracked sub-issue per PR under epic
 [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) / #147 following the
@@ -727,8 +727,8 @@ All three fit the existing `Metrics` shape — `metric_param` carries the thresh
 
 **Thresholds: static, per-series, quantile-derived.** Each series gets one static threshold — the
 P99 of its full observation history, in the series type's constraint-side direction (high load for
-demand; reverse power flow for generation) — the same rung NGED described setting capacity at when
-we discussed this in July 2026, and the same rung the [cost-savings
+demand; reverse power flow for generation) — a percentile-of-history convention of the kind
+commonly used in capacity setting, and the same rung the [cost-savings
 metrics](cost-savings-metrics.md#choosing-the-limit) use, so the leaderboard carries one threshold
 concept rather than several. Physical firm/flex ratings, where NGED supplies them, feed ad-hoc case
 studies and dashboard overlays instead. The full rationale — why a full-history quantile threshold
@@ -795,11 +795,10 @@ every forecaster knew in advance, so it does not fall into the [forecaster's-dil
 trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
 Because it is purely calendar-driven it **shares its calendar module with
 `manual_heuristic_holiday_aligned`** — the same GB bank-holiday calendar (the pure-Python `holidays`
-package) plus the two DST dates feed both the holiday-aligned baseline and this metric filter. And
-the two reinforce each other: `manual_heuristic` (no holiday logic) should be *visibly* worst on
-tricky days, and `manual_heuristic_holiday_aligned` should recover most of the gap — turning "we added
-holiday alignment" into a *measurable* number, exactly the simple-upgrades story we want to show
-NGED.
+package) plus the two DST dates feed both the holiday-aligned baseline and this metric filter. The
+two reinforce each other: scoring `manual_heuristic` (no holiday logic) and
+`manual_heuristic_holiday_aligned` on the tricky-day slice measures how much calendar awareness adds
+on tricky days.
 
 **Flag the day _and_ its analogue-relevant neighbours, not just the day itself.** The disruption
 spills onto surrounding timesteps:
@@ -944,8 +943,8 @@ lead time:
 **Coverage is broken down by season, by how heavily loaded the substation was, and by the lead-time
 slices above, not reported as one annual figure** — see [Publishing results that others can compare
 against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
-for why an averaged 90% can hide 70% coverage at the winter peaks, the only periods NGED buys
-flexibility for.
+for why an averaged 90% can hide 70% coverage at the winter peaks, the periods when most
+flexibility is procured.
 
 ### Measuring performance during switching events 🚧
 

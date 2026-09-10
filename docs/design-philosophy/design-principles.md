@@ -501,7 +501,7 @@ Dagster, MLflow, Marimo, and Sentry, each for a stated reason recorded at the ti
 [Hypothesis 4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money),
 [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
 — specifically
-[T1.4, operability by a non-expert](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+[T1.4, operability from the runbooks alone](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 *Detail:*
 [An established industry pattern](../architecture/forecast-delivery.md#an-established-industry-pattern),
@@ -612,9 +612,10 @@ its tags decide whether an alert rule can route it, its fingerprint decides whet
 recurring hourly is one issue or 24, and its message decides whether the operator can act without
 opening a shell on the box. This is load-bearing rather than good manners for two reasons.
 [Principle 1 ("*the power forecast never stops*")](#1-the-power-forecast-never-stops) makes failure
-quiet by design, so the telemetry is often the only channel that speaks at all; and under the
-operating model preferred once this project's funding ends, the reader of the alert is a non-expert
-at NGED holding the runbooks and nothing else.
+quiet by design, so the telemetry is often the only channel that speaks at all; and the working
+assumption is that, after the Network Innovation Allowance (NIA) project, NGED runs the service on
+its own AWS account, so the reader of the alert is one of the NGED staff who did not develop the
+code, working from the runbooks alone.
 
 *Without it:* the alert says a run failed. The operator opens Dagster, finds the run, reads the
 step's logs, and works out from a stack trace which time series, which weather run or which of our
@@ -628,7 +629,7 @@ the routing rules and the mechanisms that keep those tags trustworthy.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — specifically
-[T1.4, operability by a non-expert](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
+[T1.4, operability from the runbooks alone](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
 and [T1.1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)'s cause taxonomy, which is
 only as good as what the telemetry says caused the failure.
 

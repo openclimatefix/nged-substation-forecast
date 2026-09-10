@@ -20,10 +20,10 @@ Each forecast is:
 
 **Version 2** (future): Scale to approximately 2,500 time series covering all 1,161 of NGED's primary substations, NGED's bulk supply points and grid supply points, and most customer meters.
 
-**After the NIA project**: NGED's stated preference, pending sign-off from their internal teams,
-is to run the service themselves on NGED's own AWS infrastructure. As a result, the service is
-being built to be operable day to day by a non-expert. See [Requirements → Operating model &
-handover](background/requirements.md#operating-model-handover) and the [Handover to
+**After the NIA project**: the working assumption is that, after the NIA project, NGED runs the
+service on its own AWS account. The service is therefore being built to be operable day to day by
+NGED staff who did not develop the code, working from the runbooks. See [Requirements → Operating
+model & handover](background/requirements.md#operating-model-handover) and the [Handover to
 NGED](roadmap/handover.md) design page.
 
 ## More than a forecast
@@ -37,9 +37,8 @@ underlying issues involved in forecasting their electricity network.
 This interest in information means a negative result can be just as valuable as a positive result.
 For example, if we try hard to detect [switching events](background/switching-events.md)
 unsupervised and conclude that detection isn't reliably possible from power readings alone, that
-conclusion is a useful finding in its own right. NGED can use that finding as evidence to justify
-investing in extracting switching-event labels from their own operational systems, rather than us
-silently working around the gap.
+conclusion is a useful finding in its own right. That finding tells NGED whether extracting
+switching-event labels from operational systems would add value.
 
 The same logic applies to the engineering: our claims about it are written down as falsifiable
 [engineering hypotheses](design-philosophy/engineering-hypotheses.md) with thresholds attached, and

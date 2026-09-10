@@ -104,10 +104,10 @@ generator's output (see
 reappears at scale); in the convex formulation it amounts to masking or down-weighting flagged
 periods.
 
-**The ANM feed is imperfect, in both directions.** NGED have told us plainly: there will be
-periods when generators are curtailed with nothing in the ANM logs, and logged events that do
-not match reality. So the feed is a *noisy label*, not ground truth — use it, but do not lean on
-it:
+**The ANM feed is imperfect, in both directions.** Like any operational log, the ANM feed is an
+imperfect label: curtailment can happen with no matching log entry (for example, a generator's
+economic self-curtailment), and a logged event may differ from the generator's actual output. So
+the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
 
 - **Unlogged curtailment** (including **economic self-curtailment** during negative-price
   periods, which never appears in the ANM feed) would read as capacity loss to any estimator

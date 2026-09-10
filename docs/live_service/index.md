@@ -18,13 +18,12 @@ area covers training and backtesting candidate models against historical data; t
 picking one of those candidates as the running production model and keeping live forecasts
 flowing from it.
 
-**Audience note:** today these runbooks are written for OCF (Python-literate researchers), but
-after the Network Innovation Allowance (NIA) project the day-to-day
-operator is expected to be a non-expert at NGED — NGED's
-stated preference (2026-07-14, pending their internal sign-off) is to run the service
-themselves, on their own AWS account. Every routine
+**Audience note:** today these runbooks are written for OCF (Python-literate researchers). The
+working assumption is that, after the Network Innovation Allowance (NIA) project, NGED runs the
+service on its own AWS account, and the day-to-day operator is one of the NGED staff who did not
+develop the code, working from these runbooks. Every routine
 operator action must therefore eventually reduce to a dashboard check, a button in the Dagster
-UI, or a runbook a non-Python-expert can follow; before handover, these pages get an editing
+UI, or a runbook that someone who does not write Python can follow; before handover, these pages get an editing
 pass with that operator as the audience, plus a top-level "operator contract" page indexing
 them. See [Handover to NGED](../roadmap/handover.md).
 

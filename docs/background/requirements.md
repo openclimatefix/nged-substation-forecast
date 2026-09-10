@@ -11,9 +11,8 @@
 This is a research project, and our NGED partners treat it as a research project: the single
 hard requirement is that the project gives NGED **new information about forecasting for their
 assets**. Even a negative result carries value — if we try our hardest and cannot, say, detect
-switching events from power data alone, that is evidence NGED can take to their senior
-leadership to argue for investing in technology to extract switching labels from their
-operational systems. The objectives below therefore sit on a **priority continuum**, not a
+switching events from power data alone, a well-evidenced negative result would inform future
+decisions about extracting switching records from operational systems. The objectives below therefore sit on a **priority continuum**, not a
 must-have/nice-to-have split.
 
 **Highest priority — probabilistic power forecasts under the normal running arrangement
@@ -22,8 +21,8 @@ must-have/nice-to-have split.
 * Probabilistic, half-hourly, 14-day horizon forecasts updated every 6 hours. Within that
   horizon, users mostly act on forecasts roughly **1 to 10 days ahead**, so skill in that band
   matters most.
-    * For the day-ahead forecast: NGED want to look at the forecast at 11am to see the forecast from midnight to
-    23:59 on the next day.
+    * The day-ahead forecast must be available by 11:00 and must cover midnight to 23:59 on the
+      next day.
 * Cover substations (primary, BSP, GSP), metered generators (solar PV, wind, BESS, etc.), and customer meters.
 
 **Everything else exists primarily to improve those forecasts.** Switching-event handling,
@@ -34,7 +33,7 @@ them:
 
 * Track the **effective capacity** of metered generators over time (turbine failures, inverter
   faults, PV panel degradation), including detecting misbehaving generators. The "effective
-  capacity" ignores NGED-imposed Active Network Management (ANM) curtailment because a curtailed
+  capacity" ignores Active Network Management (ANM) curtailment because a curtailed
   generator is being held down rather than broken.
 * Detect and compensate for **switching events** — where power is diverted from one substation to
   another due to maintenance, changing the local demand signature. (Whether this ships as a discrete
@@ -46,10 +45,9 @@ them:
   explicitly lower priority than the NRA forecast. See [forecast building
   blocks](../roadmap/forecast-building-blocks.md).
 
-The five [delivery tables](../roadmap/delivery-tables.md) were specified in our most recent
-formal report to NGED, so a change of shape there (such as replacing the discrete
-`substation_switching` table with continuous signals) is something to agree with NGED, not to
-decide unilaterally.
+The shapes of the five [delivery tables](../roadmap/delivery-tables.md) were agreed with NGED,
+so changing a shape (such as replacing the discrete `substation_switching` table with continuous
+signals) needs NGED's agreement.
 
 ### The worst case matters most: forecasting threshold exceedance
 
@@ -62,12 +60,11 @@ aggregated flow across several substations rather than by any single meter in is
 forecasts that matter for curtailment are therefore the forecasts that net and sum correctly up the
 hierarchy — which is why [curtailment
 scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at one primary before
-summing up the substation hierarchy. The money is counted differently too — curtailment today is
-priced as a whole-system cost rather than as NGED's own spend. But NGED rate the saving as highly,
-so the forecast requirement is unchanged. So the question users ask of a forecast is rarely "what is
-the most likely load?" and usually "**how likely is net demand to cross this limit?**" — the
-[manual heuristic's forecasting tool](manual-heuristic-forecast.md#the-operators-view) literally plots demand
-as headroom below a constraint line.
+summing up the substation hierarchy. Curtailment savings accrue to the whole system, and the
+forecast requirement is the same for both decisions. So the question users ask of a forecast is
+rarely "what is the most likely load?" and usually "**how likely is net demand to cross this
+limit?**" — a [mock-up of the operator view](manual-heuristic-forecast.md#the-operators-view)
+plots demand as headroom below a constraint line.
 
 The project's value therefore concentrates in **both tails** of each forecast distribution: A
 model that is excellent on typical half-hours but unreliable in the handful of near-limit
@@ -133,14 +130,13 @@ in choosing Dagster over Airflow (see
 
 ## Operating model & handover
 
-NGED confirmed (2026-07-14) that their preference for running Flexpectation business-as-usual
-*after* the Network Innovation Allowance (NIA) project is for **NGED to run our code themselves, on NGED's own AWS
-infrastructure**. This is a statement of preference, not yet a commitment: NGED still need to
-check with their DSO, Cyber, and IT&D teams before giving a concrete answer. Even so, it sets
-a standing design requirement for everything we build:
+The working assumption is that, after the Network Innovation Allowance (NIA) project, **NGED
+runs the service on its own AWS account**. That working assumption sets a standing design
+requirement for everything we build:
 
-* **The service must be operable day to day by a non-expert at NGED** — every routine action
-  reduced to a dashboard check, a button in the Dagster UI, or a runbook. See
+* **The service must be operable day to day by NGED staff who did not develop the code, working
+  from the runbooks** — every routine action reduced to a dashboard check, a button in the
+  Dagster UI, or a runbook step. See
   [Handover to NGED](../roadmap/handover.md) for the engineering consequences and the handover
   workstreams.
 * **Uptime requirements are deliberately lenient** — recovery is "next business day, via
@@ -152,24 +148,23 @@ The phasing:
 1. For the duration of the NIA project, OCF develops **and runs** Flexpectation on OCF's own
    AWS account (unchanged from the existing plan).
 2. We will not know whether the service is truly hand-over-able until OCF has run the full v2
-   service (~2,500 time series) for a few months. NGED has accepted this.
+   service (~2,500 time series) for a few months. This is the working assumption.
 3. In the last few months of the NIA project, NGED progressively takes control of the service,
    with OCF support. NGED then decides whether to run it themselves.
 4. Post-NIA, OCF is no longer on call; NGED handles day-to-day issues. OCF may continue
-   developing the software and models, possibly under a retainer — details TBD.
+   developing the software and models.
 
 A **hybrid model** may prove beneficial: NGED runs the production service while OCF continues
 to develop the code and ML models, and perhaps runs a second service instance of its own (e.g.
-adapted for other DNOs, or feeding OCF's substation forecasts into a commercial demand-forecast
-product). This makes account-portable infrastructure doubly valuable — see
+adapted for other DNOs). A hybrid model makes account-portable infrastructure doubly valuable — see
 [Handover to NGED](../roadmap/handover.md#4-infrastructure-as-code-portable-to-ngeds-account).
 
 ## Uptime: lenient by design
 
 Flexpectation carries **no hard availability target**. We aim for a highly robust service, but
 the requirement when something breaks is recovery "next business day, via runbook" — never a
-2am page, and no on-call rota. This leniency is a property of how NGED consumes the forecasts,
-not an aspiration. Three factors bound the damage of an outage:
+2am page, and no on-call rota. The lenient uptime requirement follows from the forecasts' 14-day
+horizon, not from aspiration. Three factors bound the damage of an outage:
 
 1. **Every forecast extends 14 days ahead**, refreshed every 6 hours, and users mostly act on
    the forecast roughly 1 to 10 days ahead (see [Core Objectives](#core-objectives)). If the
@@ -180,8 +175,8 @@ not an aspiration. Three factors bound the damage of an outage:
    [Forecast Delivery](#forecast-delivery) below), so every previously published forecast stays
    readable even while all of OCF's compute is down — the read path never touches our
    infrastructure.
-3. **A legacy fallback exists.** In the worst case, NGED can temporarily fall back to their
-   legacy forecasting approach while Flexpectation is fixed.
+3. **NGED's existing forecasting tools remain available** if Flexpectation is temporarily
+   unavailable.
 
 **One case these three arguments do not cover.** All three assume the outage is *our compute
 stopping*. An extended NWP outage is different in kind: compute keeps running, but the
@@ -205,9 +200,9 @@ The same properties give the service **built-in maintenance windows**. New forec
 produced only once every 6 hours, and NGED reads published forecasts directly from S3 rather
 than from any OCF-run service. So the gap between one forecast run and the next is a regular,
 roughly 6-hour window in which OCF can stop, patch, upgrade, or even rebuild its compute (most
-notably the always-on control-plane VM) without NGED noticing. No downtime needs to be
-negotiated or announced, and even a maintenance overrun causes only a missed slot, recovered
-by the replay-mode backfill above.
+notably the always-on control-plane VM) without interrupting the forecasts NGED reads. Routine
+maintenance therefore needs no separate downtime window, and even a maintenance overrun causes
+only a missed slot, recovered by the replay-mode backfill above.
 
 This requirement shapes the architecture: it is why a single always-on control-plane VM is an
 acceptable single point of failure (see

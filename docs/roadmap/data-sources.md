@@ -19,9 +19,9 @@ data.
 | **Time-series JSON files** | ✅ | Half-hourly power flow + metadata per substation / customer meter in the trial area. Ingested by OCF to produce operational forecasts. Each reading is a **period-ending mean** — power averaged over the preceding 30 minutes, with `time` marking the end of that window, as `PowerTimeSeries` in `packages/contracts/src/contracts/power_schemas.py` records. The irradiance ingest is chosen to match, so [Weather data](#weather-data) prefers a source that accumulates over the interval to a source that samples an instant. |
 | **Curtailment (ANM set points)** | 🚧 | NGED-imposed curtailment. Crucial for distinguishing deliberate ANM ramp-downs from genuine faults / capacity loss. |
 
-**NGED hope to offer 15-minute power data. We deliberately stay on half-hourly until v2.** There is
-no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat the offer as a v2
-item.
+**15-minute power data may become available. We deliberately stay on half-hourly until v2.** There
+is no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat 15-minute data
+as a v2 item.
 
 **Power forecasts stay half-hourly regardless, so the change is confined to the ingest.** Averaging
 each pair of 15-minute readings into the half-hour ending at `:00` or `:30` leaves the training
@@ -43,17 +43,17 @@ ramps inside the half-hour, that bias is systematic rather than noise. Changing 
 a data-contract change, so it needs sign-off under the rule in `packages/contracts/README.md`, and
 the averaging rule needs to say what happens when one reading of a pair is missing.
 
-### Provided on SharePoint (mostly static reference / historical)
+### Provided as reference files (mostly static reference / historical)
 
 | File | Status | Description | Known issues |
 |---|---|---|---|
 | Historical time-series JSON | ✅ | Historical outputs of substations and customer meters. | See [data quality](#data-quality-availability). |
-| **Monitor Direction.csv** | 🚧 | Metadata for all substations: meter (analogue) type and power-flow direction. | Lincoln Farm Solar Park (ID 30) has a different substation number vs. its metadata; other sources agree, so low risk. |
+| **Monitor Direction.csv** | 🚧 | Metadata for all substations: meter (analogue) type and power-flow direction. | Lincoln Farm Solar Park (ID 30) has a different substation number vs. its metadata, to be confirmed with NGED; other sources agree, so low risk. |
 | **Primary Substation Interconnections.csv** | 🚧 | List of possible connections between primary substations (not all are in the trial area). | All trial-area substations have ≥ 1 connection; topology appears complete. |
 | **Substations.csv** | 🚧 | For each substation, bulk supply point (BSP) and grid supply point (GSP): which BSP & GSP it connects to (names + IDs). | All trial-area substations valid. |
 | **Switching Logs.xlsx** | 🚧 | History of every normally-open switching point between primaries, labelled by time-series ID. Primaries outside the trial area are labelled "Unknown". | **Extremely valuable** as the gold-standard *test set* for [switching-event detection](switching-events.md) — lets us validate the unsupervised method on the trial area (labels do **not** exist at scale). Some edges "collapse" into `[substation ID] – unknown`. Two edges present in Interconnections.csv are missing: 900016 (ID 10) ↔ 900019 (ID 13), and 900022 (ID 16) ↔ unknown (910026). Logs go back to ≥ 2019. |
-| **MPAN to Substation Number.csv** | 🚧 | Associates each Embedded Capacity Register (ECR) generator to the substation it connects to. | All trial-area generators present, each with two Meter Point Administration Numbers (MPANs, import + export). Three primaries appear with one MPAN each — looks like a data error. |
-| **Peak Loads.xlsx** | 🚧 | Manually selected peak demand per trial-area substation, from 2024/25 (most recent survey). | Covers all 16 trial primaries. 12 have 2024/25 datapoints exceeding the reported peak. Even at the 99th quantile, 3 (IDs 8, 13, 25: Horncastle, Wrangle T2, Warth Lane Skegness) show 2–4× the reported peak, while Stickney (ID 14) reports > 14 MVA peak but maxes at 6.8 MVA historically. Given the discrepancies, we use the **99th quantile of observed power** as the substation "capacity" proxy, at least initially. |
+| **MPAN to Substation Number.csv** | 🚧 | Associates each Embedded Capacity Register (ECR) generator to the substation it connects to. | All trial-area generators present, each with two Meter Point Administration Numbers (MPANs, import + export). Three primaries appear with one MPAN each, to be confirmed with NGED. |
+| **Peak Loads.xlsx** | 🚧 | Manually selected peak demand per trial-area substation, from 2024/25 (most recent survey). | Covers all 16 trial primaries. At several primaries the recorded peak differs from the telemetry maximum, probably because the two measure different quantities (a survey-period peak against an all-history maximum that includes abnormal running arrangements), so we use the **99th percentile of observed power** as the substation "capacity" proxy, at least initially. |
 
 ---
 
@@ -69,13 +69,15 @@ historical data (full detail + plots in the Milestone 1 report, Appendices A & B
 - **Gaps**: a couple of missing points every few weeks, especially recently for generators. Solar
   generators legitimately don't report overnight, but not all gaps are nighttime; gaps can last
   hours to months.
-- **Unreliable meters**: some arrived labelled "analogue not working" or "analogue suspect".
-- **False zeros**: substation data is prone to one-off drops to zero (telemetry faults), visible as
-  an excess of exact zeros in the distribution vs. near-zero values.
-- **Not-on assets**: Boston Biomass Generation (ID 19) has been pure noise since ~mid-2024 (not
-  operational) — motivating the [building-blocks](forecast-building-blocks.md) delivery approach.
+- **Meter quality flags**: some meters carry NGED's own quality flags ("analogue not working" or
+  "analogue suspect"), which we honour.
+- **False zeros**: substation telemetry has occasional drop-outs to zero, visible as an excess of
+  exact zeros in the distribution vs. near-zero values.
+- **Not-on assets**: one trial-area generator has not been operating since mid-2024 — motivating
+  the [building-blocks](forecast-building-blocks.md) delivery approach.
 - **MVA / reverse flow**: primary data is disaggregated from metered generation where possible, but
-  not always (e.g. Marsh Lane, ID 26, has two non-working solar meters). Combined with MVA metering
+  not always (one trial-area primary has solar generation whose metering is not available for
+  disaggregation). Combined with MVA metering
   (which reports absolute value), midday solar export "bounces" off zero and looks like extra load.
   See also the [MVA discussion in Net-demand disaggregation](disaggregation.md#apparent-power-mva-metering).
 
