@@ -151,14 +151,14 @@ correction to them on past errors.** One standard form of that correction is Ens
 Statistics (EMOS), which [Gneiting et al. (2005)](https://doi.org/10.1175/MWR2904.1) introduced for
 weather ensembles: fit a predictive distribution whose mean is an affine function of the member
 forecasts — one coefficient each, collapsing to a single coefficient on the ensemble mean where the
-members are exchangeable, as the manual heuristic's equally-weighted analogues are — and whose
-variance is an affine function of the ensemble variance, choosing the coefficients by minimising
-CRPS over a training window. Nothing in EMOS requires the ensemble to come from a weather model, so
+members are exchangeable, as the manual heuristic's equally-weighted analogues are. Its variance is
+an affine function of the ensemble variance, with the coefficients chosen by minimising CRPS over a
+training window. Nothing in EMOS requires the ensemble to come from a weather model, so
 the analogues `manual_heuristic` already synthesises are a valid input.
 
 **The faithful replica stays the headline bar, because the correction is our work rather than the
 manual heuristic's.** The manual heuristic forecast itself does not adjust for holidays, switching
-events, load growth, or any statistical correction of the analogues — the question the leaderboard
+events, load growth, or any statistical correction of the analogues. The question the leaderboard
 exists to answer is whether we beat that unadjusted baseline. So `manual_heuristic_calibrated` is a
 row of our own, sitting beside `manual_heuristic_holiday_aligned` as a second cheap upgrade to the
 manual heuristic, and testing the same claim that most of the benefit comes from simple upgrades
@@ -172,26 +172,30 @@ calibrated reference table](../techniques/evaluation-metrics.md#picp-prediction-
 The floor tightens as members shed: `_nullify_leaky_lags` drops the 168-hour analogue past 7 days of
 lead and the 336-hour analogue past 14, giving 11.9% at 12 members and 12.5% at 11.
 
-**No choice of analogues removes that penalty, and a fitted distribution does.** An operator reading
-the percentile as "the level demand should stay under, 19 times out of 20" would, if the analogues
-were calibrated, be reading a level crossed more than twice as often as they think. Selecting the
-analogues differently cannot remove the penalty while the analogues stay calibrated, because the
-penalty comes from the number of members rather than from which analogues are chosen — a
-wider-than-truthful ensemble can only mask it. A fitted predictive distribution has no member-count
-floor, provided the members it emits sit at equiprobable quantile levels `(i − 0.5)/m` as the
-climatology baseline's do, and are numerous enough that the empirical p95 the metrics layer reads
-still tracks the fitted one. The [exceedance rate of the upper delivery
+**No choice of analogues removes that penalty.** An operator reading the percentile as "the level
+demand should stay under, 19 times out of 20" would, if the analogues were calibrated, be reading a
+level crossed more than twice as often as they think. Selecting the analogues differently cannot
+remove the penalty while the analogues stay calibrated, because the penalty comes from the number of
+members rather than from which analogues are chosen — a wider-than-truthful ensemble can only mask
+it.
+
+**A fitted predictive distribution has no member-count floor.** Its members need only sit at
+equiprobable quantile levels `(i − 0.5)/m` as the climatology baseline's do, and be numerous enough
+that the empirical p95 the metrics layer reads still tracks the fitted percentile. The [exceedance
+rate of the upper delivery
 quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles) is
 the calibration check for the fitted percentile.
 
 **Fitting the mean also picks up the load growth the manual heuristic has no scaling for.** The
 affine term on the analogue mean absorbs a systematic offset between the analogues and the target
-half-hour — load growth over the year separating the annual group from today and the residual
-offset on a day type that the analogue selection matches only imperfectly. Neither offset needs
-weather to correct, so the calibrated variant stays naive in the sense that matters for a baseline,
-knowing nothing the substation's own history does not contain. The two halves of the
-fit should therefore show up in different metrics — the mean correction improving NMAE wherever the
-analogues carry a stale level, and the variance correction moving CRPS and the exceedance rate.
+half-hour — load growth over the year separating the annual group from today and the residual offset
+on a day type that the analogue selection matches only imperfectly. Neither offset needs weather to
+correct. The calibrated variant therefore stays naive in the sense that matters for a baseline,
+knowing nothing the substation's own history does not contain.
+
+**The two halves of the fit show up in different metrics.** The mean correction improves NMAE
+wherever the analogues carry a stale level, and the variance correction moves CRPS and the exceedance
+rate.
 
 **An analogue ensemble may be miscalibrated in the opposite direction to a weather ensemble, so
 measure before building.** The manual heuristic's members are observed powers rather than perturbed
@@ -199,7 +203,7 @@ model runs. The analogue spread does not narrow at short lead the way an NWP ens
 because the freshest analogue is already a week old. Week-to-week variation at the same weekday and
 time of day could easily exceed the real forecast uncertainty, leaving the manual heuristic
 over-dispersed where a weather ensemble is under-dispersed. The 95th percentile would then be
-crossed less often than the finite-ensemble arithmetic above implies, and the correction would
+crossed less often than the finite-ensemble arithmetic above implies. The correction would
 narrow the band rather than widen it.
 
 **Two cheap diagnostics point to the direction once `manual_heuristic` ships.** The first diagnostic
@@ -225,11 +229,11 @@ into a bar we can clear.
 **The correction is fitted, so it rides the cross-validation protocol like any other model.**
 Coefficients are fitted on each fold's training window and applied to that fold's validation window,
 exactly as [Phase C](#phase-c-low-effort-calibration-after-b-proves-the-diagnosis) specifies for the
-weather ensemble, and per horizon slice, because the surviving analogue mix changes as members shed
-with lead time. Fitting on the training window alone is the line between a baseline and a model that
-has seen the data it is scored on. A handful of coefficients crosses that line as easily as a large
-model does. The calibration itself belongs in the shared wrapper forecaster Phase C specifies,
-rather than inside the manual heuristic.
+weather ensemble. The fit also runs per horizon slice, because the surviving analogue mix changes as
+members shed with lead time. Fitting on the training window alone is the line between a baseline and
+a model that has seen the data it is scored on. A handful of coefficients crosses that line as
+easily as a large model does. The calibration itself belongs in the shared wrapper forecaster Phase C
+specifies, rather than inside the manual heuristic.
 
 ### Persistence and climatology — diagnostic bookends
 
