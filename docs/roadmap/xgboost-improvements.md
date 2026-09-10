@@ -488,8 +488,8 @@ PV, turbine features for wind, holidays for demand).
 ### Training-data hygiene, the low-effort version
 
 Full data cleaning is roadmap v0.4, but training on stuck meters and false zeros actively teaches
-the model wrong targets *today* (quality issues are a material share of some series). Low-effort interim: drop
-training rows whose target sits inside a detected stuck window (rolling std ≈ 0) or an isolated
+the model wrong targets *today* (quality issues affect roughly 10% or more of some series).
+Low-effort interim: drop training rows whose target sits inside a detected stuck window (rolling std ≈ 0) or an isolated
 exact-zero run. Cleaning only the *training* target is much lower-risk than cleaning delivered data,
 and it protects every subsequent experiment from learning artefacts.
 
