@@ -1,6 +1,6 @@
 # NGED Flexpectation
 
-**NGED Flexpectation** is an [NIA-funded project](https://smarter.energynetworks.org/projects/nged_nia_085/) (Network Innovation Allowance project reference NGED_NIA_085) by [Open Climate Fix](https://openclimatefix.org/) to deliver state-of-the-art, probabilistic power forecasts for National Grid Electricity Distribution (NGED). The forecasts help NGED optimise flexibility procurement and manage electricity network congestion.
+**NGED Flexpectation** is an [NIA-funded project](https://smarter.energynetworks.org/projects/nged_nia_085/) (Network Innovation Allowance project reference NGED_NIA_085) by [Open Climate Fix](https://openclimatefix.org/) to deliver state-of-the-art, probabilistic power forecasts for National Grid Electricity Distribution (NGED). The forecasts help NGED optimise flexibility procurement and manage electricity network congestion. NGED describe the project on [their Flexpectation project page](https://commercial.nationalgrid.co.uk/innovation/projects/flexpectation).
 
 ![Example power forecast](example_power_forecast.svg)
 
@@ -18,7 +18,7 @@ Each forecast is:
 
 **Version 1** (current focus): 32 time series in NGED's trial area — 16 primary substations, 6 solar PV farms, 3 wind farms, 2 grid supply points (GSPs), 2 bulk supply points (BSPs), 1 biofuel generator, 1 battery energy storage system (BESS), and 1 reciprocating gas generator.
 
-**Version 2** (future): Scale to approximately 2,500 time series covering all of NGED's primary substations and most customer meters.
+**Version 2** (future): Scale to approximately 2,500 time series covering all 1,161 of NGED's primary substations, NGED's bulk supply points and grid supply points, and most customer meters.
 
 **After the NIA project**: NGED's stated preference, pending sign-off from their internal teams,
 is to run the service themselves on NGED's own AWS infrastructure. As a result, the service is
