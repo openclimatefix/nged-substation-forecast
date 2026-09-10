@@ -56,7 +56,7 @@ Pre-v1.0 periods are recorded in the
 not score.
 
 **T1.2 — Graceful degradation.** Run the failure-scenario suite across every time series and check
-two things: that a forecast is emitted at all, and that it still beats `nged_incumbent` at rungs 0–2
+two things: that a forecast is emitted at all, and that it still beats `manual_heuristic` at rungs 0–2
 of the [degradation ladder](inherent-stability.md#the-degradation-ladder). Blocked on
 [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147), which builds the
 baseline to compare against.
@@ -230,7 +230,7 @@ restructured asset graph does.
 | | Test | Threshold | Resolvable |
 |---|---|---|---|
 | T1.1 | Operability | ≥90% of interventions caused by an upstream format change; zero out-of-hours | ~2 quarters of v1.0 |
-| T1.2 | Graceful degradation | Every series emits a forecast; beats `nged_incumbent` at rungs 0–2 | v0.3, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) |
+| T1.2 | Graceful degradation | Every series emits a forecast; beats `manual_heuristic` at rungs 0–2 | v0.3, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) |
 | T1.3 | Faithful uncertainty | PICP within ±5 percentage points of nominal in every degradation regime (tolerance provisional until [#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)) | v0.5 |
 | T1.4 | Operability by a non-expert | Every game-day exercise recovered from the runbooks alone | Handover phase |
 | T2.1 | Experiment throughput | ≥100 registered experiments per person, in a peak month | v0.5 |

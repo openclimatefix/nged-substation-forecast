@@ -106,7 +106,7 @@ pay 51× inference cost. A recurring caveat: of everything below, **only CRPS is
 ensemble sizes** — PICP, pinball loss, interval width, and (residually) the spread-skill ratio
 all shift with the member count $m$, because empirical quantiles from few members are
 systematically too narrow. When comparing models with different ensemble sizes (e.g. the
-51-member ML models against `nged_incumbent`'s 13 historical analogues), lean on CRPS.
+51-member ML models against `manual_heuristic`'s 13 historical analogues), lean on CRPS.
 
 ### CRPS (continuous ranked probability score)
 
@@ -312,9 +312,9 @@ Interval width uses the same six bands as PICP.
 ### Why the tails need their own metrics
 
 NGED's need for these forecasts is [threshold exceedance](../background/requirements.md#the-worst-case-matters-most-forecasting-threshold-exceedance):
-"will load cross this substation's limit?". Their own operator tool plots demand as headroom
-below a constraint line — the y-axis is literally "MW Exceedance of Constraint" (see
-[NGED's incumbent forecast](../background/nged-incumbent-forecast.md#the-operators-view)). So
+"will load cross this substation's limit?". The manual heuristic's operator tool plots demand as
+headroom below a constraint line — the y-axis is literally "MW Exceedance of Constraint" (see
+[the manual heuristic forecast](../background/manual-heuristic-forecast.md#the-operators-view)). So
 the most valuable forecast skill lives in a specific *region of power values*: the region near
 each substation's limit.
 
@@ -394,7 +394,7 @@ $$
 $$
 
 Because it reuses the fair form, twCRPS inherits CRPS's one crucial comparability property:
-it is unbiased across ensemble sizes, so the 13-member `nged_incumbent` and the 51-member ML
+it is unbiased across ensemble sizes, so the 13-member `manual_heuristic` and the 51-member ML
 models can be compared on it directly. It is computed against the [per-series
 threshold](#choosing-the-thresholds-static-per-series-quantile-derived), with `metric_param`
 carrying the threshold label.
@@ -419,7 +419,7 @@ $$
 
 The exceedance rate is the one-sided companion to
 [PICP](#picp-prediction-interval-coverage-probability): PICP checks symmetric bands
-(p10–p90, etc.), whereas the incumbent's conservative operating point is one-sided — an operator reads the p95 as
+(p10–p90, etc.), whereas the manual heuristic's conservative operating point is one-sided — an operator reads the p95 as
 "the level demand should stay under, 19 times out of 20" — so its honesty deserves its own
 directly-readable number. It is *not* a ranking metric (a model can hit perfect exceedance
 rates with absurdly wide quantiles; pinball loss and twCRPS punish that); it is the trust

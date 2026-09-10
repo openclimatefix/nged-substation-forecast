@@ -141,7 +141,7 @@ quality, reproducibility, and observability hardening. **✅ Shipped 13 August 2
       see [Scoring under failure scenarios](metrics-and-leaderboard.md#scoring-under-failure-scenarios)
     - Degradation smoke-tests in CI
       ([#436](https://github.com/openclimatefix/nged-substation-forecast/issues/436))
-    - Score every leaderboard experiment under each scenario, against `nged_incumbent`
+    - Score every leaderboard experiment under each scenario, against `manual_heuristic`
       ([#438](https://github.com/openclimatefix/nged-substation-forecast/issues/438))
 - One-command rollback for `promoted_model`
   ([#440](https://github.com/openclimatefix/nged-substation-forecast/issues/440)), plus the runbooks
@@ -201,7 +201,7 @@ quantile pipeline:
   widen honestly when the inputs degrade rather than staying over-confident
 - The weather-blind guarantee: outage-shaped training augmentation
   ([#445](https://github.com/openclimatefix/nged-substation-forecast/issues/445)), which is what
-  makes "never worse than the incumbent" true rather than hopeful
+  makes "never worse than the manual heuristic" true rather than hopeful
 - Clear-sky as the zero-data **floor**
   ([#444](https://github.com/openclimatefix/nged-substation-forecast/issues/444)), extending
   [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168)

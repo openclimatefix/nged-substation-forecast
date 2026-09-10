@@ -11,7 +11,7 @@ describes what is built to solve it.
   values, and missing-data gaps in the trial-area telemetry.
 - [Requirements](requirements.md) — the phased rollout from 32 time series to roughly 2,500, and
   the objectives NGED prioritises.
-- [NGED's incumbent forecast](nged-incumbent-forecast.md) — the historical-analogue method that,
+- [The manual heuristic forecast](manual-heuristic-forecast.md) — the historical-analogue method that,
   until recently, was the normal approach among distribution network operators, with no weather
   model and no machine learning, and the baseline our own forecasts are measured against.
 - [Switching events](switching-events.md) — why NGED's meshed network is operated as a radial

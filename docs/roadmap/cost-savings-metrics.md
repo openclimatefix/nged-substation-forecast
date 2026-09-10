@@ -241,12 +241,12 @@ would silently score £0 for every generator meter in the trial area.
 Every model's cost is reported beside two reference points, computed on the same series and
 half-hours:
 
-- **Manual review** — the incumbent method: the 13-analogue ensemble, summarised at one percentile
-  if a single number is needed ([the incumbent forecast](../background/nged-incumbent-forecast.md)).
+- **Manual review** — the manual heuristic: the 13-analogue ensemble, summarised at one percentile
+  if a single number is needed ([the manual heuristic forecast](../background/manual-heuristic-forecast.md)).
   The operator picks that percentile to match the company's risk appetite. We score the 95th
   percentile, and [which percentile manual review works from is still an open
   question](#questions-for-nged). Manual review is scored at that **actual operating point, not
-  calibrated to the common risk target**, because the point is to measure the incumbent method as
+  calibrated to the common risk target**, because the point is to measure the manual heuristic as
   it is operated. Its realised unmet fraction is therefore an output — the number saying what risk
   level manual review works to — and the saving against it mixes a change in spend with a change in
   risk. Both are reported; neither means much alone.
