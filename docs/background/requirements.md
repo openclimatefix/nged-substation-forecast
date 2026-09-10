@@ -66,7 +66,7 @@ summing up the substation hierarchy. The money is counted differently too — cu
 priced as a whole-system cost rather than as NGED's own spend. But NGED rate the saving as highly,
 so the forecast requirement is unchanged. So the question users ask of a forecast is rarely "what is
 the most likely load?" and usually "**how likely is net demand to cross this limit?**" — the
-[incumbent forecasting tool](nged-incumbent-forecast.md#the-operators-view) literally plots demand
+[manual heuristic's forecasting tool](manual-heuristic-forecast.md#the-operators-view) literally plots demand
 as headroom below a constraint line.
 
 The project's value therefore concentrates in **both tails** of each forecast distribution: A

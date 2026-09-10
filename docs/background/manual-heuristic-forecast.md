@@ -1,13 +1,13 @@
-# NGED's Incumbent Forecast
+# The Manual Heuristic Forecast
 
 NGED has been investing in a suite of different forecasting tools for use cases stretching from
 multi-year planning forecasts through to day-ahead dispatch of flexibility services. However, until
 recently, the normal approach to forecasting among distribution network operators relied more
 heavily on the operator. It used no weather model and no machine learning: for each substation it assembled a small
 ensemble of **historical analogues** from that substation's own past, plotted them, and let a human
-operator read a forecast off the spread. This is the **incumbent** — the method our models will be
-compared against — so we reproduce it faithfully as the `nged_incumbent` [baseline
-forecaster](../roadmap/metrics-and-leaderboard.md#the-headline-baseline-nged_incumbent).
+operator read a forecast off the spread. This is the **manual heuristic** — the method our models will be
+compared against — so we reproduce it faithfully as the `manual_heuristic` [baseline
+forecaster](../roadmap/metrics-and-leaderboard.md#the-headline-baseline-manual_heuristic).
 
 ## The recipe
 
@@ -31,7 +31,7 @@ capacity limit, so erring high is the safe direction.
 ## The operator's view
 
 ![Mock-up of an analogue-ensemble forecasting
-tool](assets/plot_of_NGEDs_incumbent_forecasting_method.png)
+tool](assets/manual_heuristic_forecast_mock_up.png)
 
 The image above is a mock-up of what an operator might see for one feeder over a week. Demand is
 plotted as **headroom against the constraint** — the y-axis is "MW Exceedance of Constraint", where
@@ -49,7 +49,7 @@ same-weekday analogue selection is built to capture.
 
 ## Why it matters for us
 
-Because the incumbent approach uses no weather and no ML, beating it is the project's core
+Because the manual heuristic uses no weather and no ML, beating it is the project's core
 deliverable — and because it does no further processing at all, several cheap upgrades (e.g.
 aligning bank holidays and moveable feasts) are genuinely useful work rather than reimplementations.
 Both the faithful replica and the "cheap upgrades" variant are specified in [Metrics & leaderboard →

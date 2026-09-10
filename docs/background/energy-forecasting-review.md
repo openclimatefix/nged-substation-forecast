@@ -2492,8 +2492,8 @@ for a new method to beat, which "should be close to the state of the art". Doubl
 recommend carrying both kinds of baseline, so that a new method can be positioned between the two
 baselines rather than declared better than a single baseline. Flexpectation's leaderboards carry
 both kinds of baseline: persistence (tomorrow resembles a comparable recent day) and climatology
-(tomorrow resembles the historical average for the time of year) as the naive yardstick, and NGED's
-incumbent method as the point on the yardstick a new model has to reach.
+(tomorrow resembles the historical average for the time of year) as the naive yardstick, and the
+manual heuristic as the point on the yardstick a new model has to reach.
 
 **Flexpectation's leaderboard today reuses one fold for both model selection and the published
 result, so the winner's reported skill is optimistically biased.** The fold that Flexpectation
@@ -3026,8 +3026,8 @@ case, which "remains appropriate, subject to further validation".
 **Artificial Forecasting is independent evidence that short-term substation forecasting is
 operationally useful**, that a network operator will change its procurement process around a
 half-hourly probabilistic substation forecast, and that a benefits case has been made and accepted.
-Because Artificial Forecasting is public, operational, and benchmarked against a real incumbent
-method, Artificial Forecasting is also the clearest example we found of what "working" looks like.
+Because Artificial Forecasting is public, operational, and benchmarked against the method its
+network operator already used, Artificial Forecasting is also the clearest example we found of what "working" looks like.
 Artificial Forecasting's core intellectual property is to be made available royalty-free to other GB
 distribution network operators.
 
