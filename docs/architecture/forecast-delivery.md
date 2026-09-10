@@ -185,8 +185,9 @@ tools read it directly, and the "server" role is played by object storage. In ne
 application code manage the files by hand.
 
 And Delta Lake is thoroughly mainstream technology. Databricks built its entire platform on Delta
-Lake. Adobe, Comcast, Salesforce, and Apple all run Delta Lake at massive scale.
-More broadly, the open-table-format family it
+Lake. Adobe, Comcast, Salesforce, and Apple all run Delta Lake at massive scale, and — closest to
+home — our colleagues at [NESO](https://www.neso.energy/) tell us NESO uses Delta Lake internally
+too. More broadly, the open-table-format family it
 belongs to (Delta Lake; [Apache Iceberg](https://iceberg.apache.org/), created at Netflix; [Apache
 Hudi](https://hudi.apache.org/), created at Uber) is now the standard way large companies store and
 share analytical data. Delta Lake is therefore the conventional, low-risk choice.
