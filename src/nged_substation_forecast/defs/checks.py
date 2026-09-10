@@ -137,9 +137,9 @@ catching a genuine multi-slot stall the same day. Fuller reasoning:
 """
 
 _KNOWN_DEAD_TIME_SERIES_IDS: Final[tuple[int, ...]] = (33,)
-"""Series ``power_data_is_fresh`` stops warning about, because we already know they are dead.
+"""Series ``power_data_is_fresh`` stops warning about, because we know they are out of service.
 
-33: the site monitor is broken (reported by James at NGED); no data since 2026-01-26.
+33: no readings since 2026-01-26; NGED reported the meter out of service.
 
 Delete an entry to start warning about that series again. How to edit the list, and what each
 description means:

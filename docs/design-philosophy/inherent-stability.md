@@ -79,34 +79,34 @@ That self-correcting stability is what we want from the forecasting service. Whe
 it, sensible behaviour under disturbance should fall out of how the system is built, rather than
 being watched for and corrected by machinery bolted on around it.
 
-## NGED's incumbent forecast is the floor
+## The manual heuristic is the floor
 
 Even in the worst case, when we have _no_ fresh data, we hope to still be able to provide a better
-power forecast than NGED's incumbent forecast, with appropriate confidence bands. This is what
-allows us to claim that we should _always_ be able to produce a power forecast, even when "blind".
+power forecast than the manual heuristic, with appropriate confidence bands. This is what allows
+us to claim that we should _always_ be able to produce a power forecast, even when "blind".
 
-[NGED's incumbent forecast](../background/nged-incumbent-forecast.md) assembles 13 historical
+[The manual heuristic](../background/manual-heuristic-forecast.md) assembles 13 historical
 analogues at the same time-of-day on the same weekday — 6 from the last 6 weeks, 7 from 49–55 weeks
-back — and reads them as an ensemble. No weather, no ML, no holiday alignment, no load-growth
-scaling.
+back — and reads them as an ensemble.
 
 Two of its properties set our floor. It **consumes no numerical weather prediction (NWP) data**, so
 an NWP outage does not degrade it at all — which makes an NWP outage the hard test for us. And it
 **survives a power-data outage**, because the 49–55-week-old analogues are indifferent to recent
-staleness. The incumbent already
+staleness. The manual heuristic already
 embodies this philosophy, which is why it is the right baseline to measure ourselves against, and it
 gives a far better failure criterion than any arbitrary staleness threshold:
 
-> **We should only fail when we can no longer beat the incumbent.**
+> **We should only fail when we can no longer beat the manual heuristic.**
 
 The consequence, once verified, is the strongest claim on this page:
 
-> **At our worst we degrade to roughly the incumbent. At our best we beat it substantially. There is
-> no state in which NGED is worse off than they are today.**
+> **At our worst we degrade to roughly the manual heuristic. At our best we beat it substantially.
+> There is no degradation state in which the forecast is meant to be less skilful than the manual
+> heuristic.**
 
 That claim is currently an *intention*, not a measured fact. Making it measurable needs the
-`nged_incumbent` baseline
-([Metrics & Leaderboard → The headline baseline](../roadmap/metrics-and-leaderboard.md#the-headline-baseline-nged_incumbent),
+`manual_heuristic` baseline
+([Metrics & Leaderboard → The headline baseline](../roadmap/metrics-and-leaderboard.md#the-headline-baseline-manual_heuristic),
 [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147)) and a failure-scenario
 suite to score against it. Until both exist, treat the claim as what we are trying to earn.
 
@@ -116,8 +116,8 @@ suite to score against it. Until both exist, treat the claim as what we are tryi
 |---|---|---|
 | 0 | Everything fresh | Best skill; narrowest bands |
 | 1 | One or two daily NWP runs missed | Slightly worse; bands widen slightly |
-| 2 | No NWP for days or weeks | Weather-blind: lags, calendar, per-series structure. **Should still beat the incumbent** |
-| 3 | No NWP *and* no recent power | Calendar + climatology + year-old history. Converges toward *being* the incumbent |
+| 2 | No NWP for days or weeks | Weather-blind: lags, calendar, per-series structure. **Should still beat the manual heuristic** |
+| 3 | No NWP *and* no recent power | Calendar + climatology + year-old history. Converges toward *being* the manual heuristic |
 | 4 | Nothing at all | Physical envelope (clear-sky) + climatology. Very wide bands, still bounded and still true |
 
 Rung 4 matters because it demonstrates that there is no input state in which we have nothing true
@@ -295,10 +295,12 @@ depend on retraining staying cheap and promotion staying one command.
   always-output path.
 
 A stuck meter reporting 2.1 MW for 52 hours is not missing data; it is actively misleading, and a
-lag-feature model will propagate it happily. The incumbent has the identical vulnerability.
-[NGED's network and its data](../background/network.md#data-quality-in-the-trial-area) documents
-both classes empirically — false zeros, stuck values, and genuinely missing data as separate
-phenomena — and is the evidence base for this distinction.
+lag-feature model will propagate it happily. The manual heuristic has the identical vulnerability.
+Stuck values and false zeros are measurement faults typical of telemetry feeds, documented for the
+trial area in [Data quality in the trial
+area](../background/network.md#data-quality-in-the-trial-area). That page records both classes
+empirically — false zeros, stuck values, and genuinely missing data as separate phenomena — and is
+the evidence base for this distinction.
 
 ### Default directions, and their limit
 

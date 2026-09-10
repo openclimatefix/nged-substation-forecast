@@ -46,8 +46,9 @@ datetime range, null, or not aligned to the top or bottom of the hour — via
 `n_implausible_power_rows_dropped`. Degrading rather than raising on a malformed reading follows
 [inherent
 stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/):
-a malformed `time` is NGED's feed misbehaving, not a bug in our own pipeline, so ingestion keeps
-the rest of the batch rather than aborting it. No other cleaning happens during ingestion.
+a malformed `time` originates upstream of our pipeline, at the meter or in the telemetry export,
+not in our own code. Ingestion therefore keeps the rest of the batch rather than aborting it. No
+other cleaning happens during ingestion.
 
 ## Usage
 

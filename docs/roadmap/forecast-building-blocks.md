@@ -98,16 +98,16 @@ reduced to 4 MW):
 | Normal Operation | Assumes capacity is still **5 MW**. |
 | Prevailing Conditions | Assumes the inverter stays broken; uses **4 MW** for the next 14 days. |
 
-**A 12 MW bioenergy generator that ran perfectly 2020–2023, then broke in 2024 and is still
-broken**:
+**A 12 MW bioenergy generator that ran at full capacity 2020–2023, then stopped operating in 2024
+and has not restarted**:
 
 | Forecast | Behaviour |
 |---|---|
 | Scaled [−1, +1] | Predicts +1 for the next 14 days. |
 | Normal Operation | Assumes 12 MW capacity → forecasts **12 MW** every timestep. |
-| Prevailing Conditions | Assumes it stays broken → predicts **0 MW** every timestep. |
+| Prevailing Conditions | Assumes the generator stays offline → predicts **0 MW** every timestep. |
 
-> **Why this matters for "not-on" assets.** One trial-area time series (Boston Biomass Generation,
-> ID 19) has not been operational since ~mid-2024 and is now essentially noise. The building-blocks
-> approach lets the scaled forecast stay well-behaved while the *prevailing conditions* forecast
-> correctly reports ~0 MW.
+> **Why this matters for "not-on" assets.** One trial-area generator has not been operating since
+> mid-2024, so its time series carries no generation signal. The building-blocks approach lets the
+> scaled forecast stay well-behaved while the *prevailing conditions* forecast correctly reports
+> ~0 MW.

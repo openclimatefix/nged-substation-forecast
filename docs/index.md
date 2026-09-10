@@ -1,6 +1,6 @@
 # NGED Flexpectation
 
-**NGED Flexpectation** is an [NIA-funded project](https://smarter.energynetworks.org/projects/nged_nia_085/) (Network Innovation Allowance project reference NGED_NIA_085) by [Open Climate Fix](https://openclimatefix.org/) to deliver state-of-the-art, probabilistic power forecasts for National Grid Electricity Distribution (NGED). The forecasts help NGED optimise flexibility procurement and manage electricity network congestion.
+**NGED Flexpectation** is an [NIA-funded project](https://smarter.energynetworks.org/projects/nged_nia_085/) (Network Innovation Allowance project reference NGED_NIA_085) by [Open Climate Fix](https://openclimatefix.org/) to deliver state-of-the-art, probabilistic power forecasts for National Grid Electricity Distribution (NGED). The forecasts help NGED optimise flexibility procurement and manage electricity network congestion. NGED describe the project on [their Flexpectation project page](https://commercial.nationalgrid.co.uk/innovation/projects/flexpectation).
 
 ![Example power forecast](example_power_forecast.svg)
 
@@ -18,12 +18,12 @@ Each forecast is:
 
 **Version 1** (current focus): 32 time series in NGED's trial area — 16 primary substations, 6 solar PV farms, 3 wind farms, 2 grid supply points (GSPs), 2 bulk supply points (BSPs), 1 biofuel generator, 1 battery energy storage system (BESS), and 1 reciprocating gas generator.
 
-**Version 2** (future): Scale to approximately 2,500 time series covering all of NGED's primary substations and most customer meters.
+**Version 2** (future): Scale to approximately 2,500 time series covering all 1,161 of NGED's primary substations, NGED's bulk supply points and grid supply points, and most customer meters.
 
-**After the NIA project**: NGED's stated preference, pending sign-off from their internal teams,
-is to run the service themselves on NGED's own AWS infrastructure. As a result, the service is
-being built to be operable day to day by a non-expert. See [Requirements → Operating model &
-handover](background/requirements.md#operating-model-handover) and the [Handover to
+**After the NIA project**: the working assumption is that NGED runs the
+service on its own AWS account. The service is therefore being built to be operable day to day by
+NGED staff who did not develop the code, working from the runbooks. See [Requirements → Operating
+model & handover](background/requirements.md#operating-model-handover) and the [Handover to
 NGED](roadmap/handover.md) design page.
 
 ## More than a forecast
@@ -37,9 +37,8 @@ underlying issues involved in forecasting their electricity network.
 This interest in information means a negative result can be just as valuable as a positive result.
 For example, if we try hard to detect [switching events](background/switching-events.md)
 unsupervised and conclude that detection isn't reliably possible from power readings alone, that
-conclusion is a useful finding in its own right. NGED can use that finding as evidence to justify
-investing in extracting switching-event labels from their own operational systems, rather than us
-silently working around the gap.
+conclusion is a useful finding in its own right. That finding tells NGED whether extracting
+switching-event labels from operational systems would help.
 
 The same logic applies to the engineering: our claims about it are written down as falsifiable
 [engineering hypotheses](design-philosophy/engineering-hypotheses.md) with thresholds attached, and
