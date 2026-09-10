@@ -332,7 +332,7 @@ above](#the-graph-structured-engine)). Two points matter for consistency with th
 document:
 
 - The graph is a **data structure** — who can exchange load with whom.
-- Conservation is a **node-level flow balance** across a 2–3-way fan-out (a source's loss
+- Conservation is a **node-level flow balance** across the 2–3-way fan-out observed in the trial area (a source's loss
   absorbed by a subset of neighbours whose pickups sum to it), *not* a pairwise
   equal-and-opposite transfer.
 
@@ -380,12 +380,9 @@ possess (see [switching-events.md, Part 4](switching-events.md)). Our chosen for
 continuous neighbourhood mixture described there.
 
 **Topology and switch-state identification** has been studied, but overwhelmingly using voltage
-measurements. NGED does not currently provide us with voltage at primary substation level. And, we
-have discussed the idea of using voltage with NGED, and there are two deal-breakers for using
-voltage for topology identification: 1. Voltage often changes as a result of tap-changes on
-transformers and, more importantly, 2. Those voltage changes as a result of tap-changes _could_ be
-used to infer topology but ONLY IF we had high-temporal resolution data (on the order of 1 Hz). But
-we only have half-hourly data, which blurs that info.
+measurements. Voltage at primary substations is not part of this project's data feed. At
+half-hourly resolution, tap-changer movements would blur any topology signal in voltage anyway.
+Tap-changer movements _could_ themselves reveal topology, but only in data sampled at around 1 Hz.
 
 ## Where this work is novel
 
@@ -429,12 +426,11 @@ work we reviewed shows.
 
 **6. Real-power-only inference — the "no-voltage" constraint as a novelty claim, not just a
 limitation.** As [the prior art review](#what-already-exists-prior-art) notes, existing topology and switch-state identification work relies
-overwhelmingly on voltage measurements, which NGED does not provide at primary substation level
-(many primaries lack voltage metering; tap-changers shift voltage independently of load; and
-half-hourly data smooths over voltage transients). This work therefore demonstrates that the
-switching inference problem is solvable from real-power balance alone. Framing this as a
-contrarian design choice — not a regrettable data gap — inverts the standard assumption and is
-itself a publishable contribution.
+overwhelmingly on voltage measurements. Voltage at primary substations is not part of this
+project's data feed. At half-hourly resolution, tap-changer movements would blur any topology
+signal in voltage anyway. This work therefore demonstrates that the switching inference problem is
+solvable from real-power balance alone. Framing real-power-only inference as a deliberate design
+choice inverts the standard assumption and is itself a publishable contribution.
 
 ## Technical architecture summary
 

@@ -312,8 +312,9 @@ Interval width uses the same six bands as PICP.
 ### Why the tails need their own metrics
 
 NGED's need for these forecasts is [threshold exceedance](../background/requirements.md#the-worst-case-matters-most-forecasting-threshold-exceedance):
-"will load cross this substation's limit?". The manual heuristic's operator tool plots demand as
-headroom below a constraint line — the y-axis is literally "MW Exceedance of Constraint" (see
+"will load cross this substation's limit?". The mock-up of the manual heuristic's operator view
+plots demand as headroom below a constraint line, on a y-axis labelled "MW Exceedance of
+Constraint" (see
 [the manual heuristic forecast](../background/manual-heuristic-forecast.md#the-operators-view)). So
 the most valuable forecast skill lives in a specific *region of power values*: the region near
 each substation's limit.
@@ -419,11 +420,12 @@ $$
 
 The exceedance rate is the one-sided companion to
 [PICP](#picp-prediction-interval-coverage-probability): PICP checks symmetric bands
-(p10–p90, etc.), whereas the manual heuristic's conservative operating point is one-sided — an operator reads the p95 as
-"the level demand should stay under, 19 times out of 20" — so its honesty deserves its own
-directly-readable number. It is *not* a ranking metric (a model can hit perfect exceedance
-rates with absurdly wide quantiles; pinball loss and twCRPS punish that); it is the trust
-check for the delivered tail quantiles.
+(p10–p90, etc.), whereas the manual heuristic's conservative operating point is one-sided — an operator reads an upper
+percentile, chosen to match the company's risk appetite (the 95th percentile in our scoring),
+as "the level demand should stay under". The honesty of that one-sided operating point
+therefore deserves its own directly-readable number. It is *not* a ranking metric (a model can
+hit perfect exceedance rates with absurdly wide quantiles; pinball loss and twCRPS punish
+that); it is the trust check for the delivered tail quantiles.
 
 As with PICP, empirical quantiles from a finite ensemble sit slightly inside the true
 quantiles, so even a perfectly calibrated ensemble exceeds its p95 slightly *more* than 5% of
@@ -466,15 +468,16 @@ The metrics above need a threshold $r$ per series, and here honesty matters: **a
 true limit is not a single number.** Thermal ratings vary with ambient temperature, with the
 wind carrying heat away, and so with season. Transformers tolerate being overloaded for short
 periods because of their thermal mass, so the *duration* of an exceedance matters (cyclic
-ratings). And switching changes what a feeder carries. NGED's own operator tool draws the
-limit as a time-varying "Flex Profile", not a constant. We do not attempt to model any of that
+ratings). And switching changes what a feeder carries. The mock-up of the operator view draws
+the limit as a time-varying flex profile, not a constant. We do not attempt to model any of that
 for scoring. Instead we pick **static, per-series thresholds chosen for their scoring
 properties**, and state plainly that they are a proxy — these metrics measure "skill near a
 fixed line standing where the limit typically lives", not operational breach prediction:
 
 - **The threshold: the P99 of each series' full observation history** (of power in the
-  constraint-side direction — see below), the rung NGED described when we discussed this in
-  July 2026. Its label in `metric_param` is `historical_p99`, deliberately distinct from the
+  constraint-side direction — see below). The P99 sits high enough to fall in the near-limit
+  region these metrics target, and low enough to leave every series about 1% of half-hours above
+  the threshold to score. Its label in `metric_param` is `historical_p99`, deliberately distinct from the
   forecast-quantile label `p99`: one names a fixed power level derived from history, the other
   a level of the forecast distribution. The prefix is spelled out rather than shortened to
   `hist_`, which reads as "histogram".
@@ -540,7 +543,7 @@ Anything not in MLflow is still one Polars filter away in Delta.
 - **Cost-loss economic value curves** — the fully decision-theoretic summary of exceedance
   skill: for each ratio of "cost of acting on a warning" to "loss if an unwarned exceedance
   occurs", how much of a perfect forecast's value does this model capture? We do not compute
-  these, because the loss term is a number NGED do not hold in usable form; the
+  these, because the loss from an unwarned exceedance has no single agreed monetary value; the
   [cost-savings metrics](../roadmap/cost-savings-metrics.md) reach the same comparison by holding
   every model to equal risk and comparing what each spends. The curves remain a useful ad-hoc
   analysis if that loss figure ever firms up.

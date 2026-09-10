@@ -1,8 +1,9 @@
 # Background
 
 **This section is the context every other page assumes: NGED's electricity network, what NGED
-has asked for, how NGED forecasts today, and the two limits — messy data and a fragmented
-literature — that shape the rest of the design.** [Design philosophy](../design-philosophy/index.md)
+has asked for, how distribution network operators have traditionally forecast, and the two limits —
+measurement artefacts in the telemetry and a fragmented literature — that shape the rest of the
+design.** [Design philosophy](../design-philosophy/index.md)
 states the principles that answer to this problem; [architecture](../architecture/overview.md)
 describes what is built to solve it.
 

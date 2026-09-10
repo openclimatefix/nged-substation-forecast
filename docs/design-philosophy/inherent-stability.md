@@ -87,8 +87,7 @@ us to claim that we should _always_ be able to produce a power forecast, even wh
 
 [The manual heuristic](../background/manual-heuristic-forecast.md) assembles 13 historical
 analogues at the same time-of-day on the same weekday — 6 from the last 6 weeks, 7 from 49–55 weeks
-back — and reads them as an ensemble. No weather, no ML, no holiday alignment, no load-growth
-scaling.
+back — and reads them as an ensemble.
 
 Two of its properties set our floor. It **consumes no numerical weather prediction (NWP) data**, so
 an NWP outage does not degrade it at all — which makes an NWP outage the hard test for us. And it
@@ -102,7 +101,8 @@ gives a far better failure criterion than any arbitrary staleness threshold:
 The consequence, once verified, is the strongest claim on this page:
 
 > **At our worst we degrade to roughly the manual heuristic. At our best we beat it substantially.
-> There is no state in which NGED is worse off than they are today.**
+> There is no degradation state in which the forecast is meant to be less skilful than the manual
+> heuristic.**
 
 That claim is currently an *intention*, not a measured fact. Making it measurable needs the
 `manual_heuristic` baseline
@@ -296,9 +296,11 @@ depend on retraining staying cheap and promotion staying one command.
 
 A stuck meter reporting 2.1 MW for 52 hours is not missing data; it is actively misleading, and a
 lag-feature model will propagate it happily. The manual heuristic has the identical vulnerability.
-[NGED's network and its data](../background/network.md#data-quality-in-the-trial-area) documents
-both classes empirically — false zeros, stuck values, and genuinely missing data as separate
-phenomena — and is the evidence base for this distinction.
+Stuck values and false zeros are measurement faults typical of telemetry feeds, documented for the
+trial area in [Data quality in the trial
+area](../background/network.md#data-quality-in-the-trial-area). That page records both classes
+empirically — false zeros, stuck values, and genuinely missing data as separate phenomena — and is
+the evidence base for this distinction.
 
 ### Default directions, and their limit
 

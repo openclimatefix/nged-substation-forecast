@@ -21,8 +21,8 @@ them.
 ## H1 — a service that mostly runs itself
 
 > Manual attention is needed only when an upstream input format changes. The service degrades
-> gracefully and legibly, it propagates uncertainty faithfully, and a non-expert can run it day to
-> day from the runbooks alone.
+> gracefully and legibly, it propagates uncertainty faithfully, and staff who did not develop the
+> code can run it day to day from the runbooks alone.
 
 The design that is meant to deliver this is [Inherent Stability](inherent-stability.md).
 The background argument for *why* leniency is affordable is
@@ -69,8 +69,8 @@ achieve 85–95% coverage in every regime);
 [#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443) may tighten it before
 the first scoring, but any change must be recorded here.
 
-**T1.4 — Operability by a non-expert.** Day-to-day operation by an NGED operator, from the runbooks
-alone, is largely a consequence of the rest of H1 rather than a separate property: a service that
+**T1.4 — Operability from the runbooks alone.** Day-to-day operation by an NGED operator, from
+the runbooks alone, is largely a consequence of the rest of H1 rather than a separate property: a service that
 needs attention only when an upstream format changes is most of the way there already, because the
 set of situations the operator must ever handle is small enough to enumerate. That enumeration
 exists as the **operator contract** in
@@ -232,7 +232,7 @@ restructured asset graph does.
 | T1.1 | Operability | ≥90% of interventions caused by an upstream format change; zero out-of-hours | ~2 quarters of v1.0 |
 | T1.2 | Graceful degradation | Every series emits a forecast; beats `manual_heuristic` at rungs 0–2 | v0.3, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) |
 | T1.3 | Faithful uncertainty | PICP within ±5 percentage points of nominal in every degradation regime (tolerance provisional until [#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)) | v0.5 |
-| T1.4 | Operability by a non-expert | Every game-day exercise recovered from the runbooks alone | Handover phase |
+| T1.4 | Operability from the runbooks alone | Every game-day exercise recovered from the runbooks alone | Handover phase |
 | T2.1 | Experiment throughput | ≥100 registered experiments per person, in a peak month | v0.5 |
 | T3.1 | Promotion effort | ≤1 command | v0.3 |
 | T3.2 | Rollback effort | ≤1 command | v0.3 |

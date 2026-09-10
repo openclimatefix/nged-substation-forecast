@@ -62,7 +62,7 @@ designs](#considered-but-rejected-designs).
 
 `power_time_series_and_metadata_job` runs hourly and succeeds even when NGED has published nothing
 new. A job that merely *ran* therefore tells the operator nothing about whether fresh data actually
-arrived. If NGED's feed stalls, the Delta table silently goes stale. The `power_data_is_fresh` asset
+arrived. If the telemetry feed stalls, the Delta table silently goes stale. The `power_data_is_fresh` asset
 check closes that gap: it reads the `power_time_series` Delta table's *actual* data recency — the
 maximum `time` per `time_series_id` — rather than the asset's materialisation timestamp, and warns
 when any series has no data within a 24-hour staleness threshold. A native materialisation-freshness
@@ -95,7 +95,7 @@ for the whole watched population, so read those two before reading the table.
 **Dagster's Checks view becomes the operator's at-a-glance status for whether the power data is
 healthy.** The view shows a green tick when every series is current and a yellow warning when the
 feed has stalled — or when a series we had written off starts reporting again. The severity is a
-warning rather than a failure: a stalled feed is expected to self-heal once NGED recovers (the
+warning rather than a failure: a stalled feed is expected to self-heal once the feed recovers (the
 pipeline back-fills the gap automatically), so the check must not block downstream assets.
 
 Nothing the check's **body** does can fail its own step. It runs as a step of the hooked
@@ -406,12 +406,13 @@ roster that is unreadable, or has lost rows, cannot fail a slot or silently drop
 (The rejected alternative — fetching the model from MLflow at container startup — is covered in
 [Considered but rejected designs](#fetching-the-champion-model-from-mlflow-at-container-startup).)
 
-This design also serves the preferred operating model once this Network Innovation Allowance
-(NIA) project ends, in which a non-expert at NGED
-operates the service day to day (see [Requirements → Operating model &
-handover](../background/requirements.md#operating-model-handover)): there is no tracking server on
-the hot path to break. The model simply freezes between OCF's scheduled expert interventions — under
-a vendor-develops / operator-runs split, that is a feature, not a limitation.
+This design also serves the operating model for after this Network Innovation Allowance (NIA)
+project (see [Requirements → Operating model &
+handover](../background/requirements.md#operating-model-handover)). The working assumption is that
+NGED runs the service on its own AWS account, operated day to day by NGED
+staff who did not develop the code, working from the runbooks. For that operator there is no
+tracking server on the hot path to break. The model simply freezes between model updates, and a
+frozen model is a feature, not a limitation.
 
 Baking the model in is deliberately simpler than depending on `BaseForecaster.load_from_mlflow` at
 runtime (the mechanism the CV pipeline already uses — see [ML orchestration: model
@@ -619,7 +620,8 @@ maintains the hosts), so the one piece of self-maintained OS in the deployment w
    the built-in 6-hourly maintenance windows
    ([above](#run-the-dagster-control-plane-continuously-on-one-small-vm)), and is slated for a
    tested rebuild-from-scratch script (see
-   [Handover: de-pet the control-plane box](../roadmap/handover.md#3-de-pet-the-control-plane-box))
+   [Handover: make the control-plane box rebuildable from
+   scratch](../roadmap/handover.md#3-make-the-control-plane-box-rebuildable-from-scratch))
    so that the answer to a sick box is *destroy and recreate*, never *diagnose*.
 
 ### Running the data-ingest runs on the control-plane VM
@@ -664,8 +666,9 @@ several-hours-apart intervals, spends most of its ticks discovering there is not
 
 4. **One execution path.** With everything on Fargate, every run has the same image, the same
    log destination (CloudWatch), the same IAM (Identity and Access Management) story (the
-   task role), and the same debugging experience. Two execution environments means two sets
-   of failure modes for an operator who is, post-NIA, a non-expert at NGED.
+   task role), and the same debugging experience. Two execution environments mean two sets of
+   failure modes for the operator. After the NIA project, the operators are NGED staff who did not
+   develop the code, working from the runbooks.
 
 5. **V2 scaling.** At ~2,500 time series the ingest workload grows roughly 78×. On Fargate
    that is a task-size change; on the box it is another round of resizing the component that
@@ -711,13 +714,11 @@ image](#bake-the-model-into-the-image-at-build-time).
 
 **Why we rejected it.** It adds runtime moving parts, needs tracking-store access from production,
 and slows cold starts. Baking the model in has none of those drawbacks. The rejection gets stronger
-under the preferred post-NIA operating model, in which NGED run this code themselves (see
-[Requirements → Operating model &
-handover](../background/requirements.md#operating-model-handover)): With the model baked in, NGED
+under the operating model for after the NIA project (see [Requirements → Operating model &
+handover](../background/requirements.md#operating-model-handover)). The working assumption is that
+NGED runs the service on its own AWS account. With the model baked in, NGED
 never has to run — or depend on — an MLflow tracking server at all. The model simply freezes until a
-new image arrives. (OCF may well continue developing the model post-NIA and release new container
-images for NGED to test, but that arrangement is TBD — and either way it only changes which *image*
-NGED runs, never whether their production runtime needs MLflow.)
+new image arrives: a new model reaches production only as a new container image.
 
 Rejecting this design says nothing against MLflow itself — MLflow remains the backbone of ML
 experimentation: training runs log their models, configs, and metrics to it. The champion is
@@ -767,10 +768,11 @@ are now written up in the runbook — [Setting up the live service on AWS: Steps
   roles (no static keys); a standard Dagster-OSS-on-AWS deployment.
 - **Cons:** one pet server (patching, disk, daemon liveness — mitigate with systemd restart
   policies + the monitoring plan's "no fresh forecast" alarm); dagster.yaml/run-launcher
-  config work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans). The pet-server
-  risk grows once a non-expert operates the service — the full mitigation list (auto-recovery
-  alarms, disk hygiene, a tested rebuild-from-scratch script) is
-  [Handover workstream 3](../roadmap/handover.md#3-de-pet-the-control-plane-box).
+  config work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans). The risk of a
+  long-lived, hand-maintained server grows once the service is operated by staff who did not
+  develop the code — the full mitigation list (auto-recovery alarms, disk hygiene, a tested
+  rebuild-from-scratch script) is
+  [Handover workstream 3](../roadmap/handover.md#3-make-the-control-plane-box-rebuildable-from-scratch).
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
   £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
 

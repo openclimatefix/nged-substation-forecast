@@ -43,7 +43,7 @@ data, for the subset where metering happens to exist.
 of the unmetered fleet.
 
 **Concrete example in the NGED dataset**: Stickney primary's midday peaks correlate with the
-separately-metered nearby Leverton solar farm — a ready-made held-out label test.
+separately-metered solar farm nearby — a ready-made held-out label test.
 
 ---
 

@@ -4,8 +4,8 @@
 > [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6); issue:
 > [#606](https://github.com/openclimatefix/nged-substation-forecast/issues/606). This page is the
 > plan for two leaderboard metrics that express forecast skill in pounds. It is written to be read
-> by anyone numerate. Everything attributed to NGED below comes from a meeting in July 2026 and is
-> flagged for them to confirm. See the [roadmap index](index.md) for status conventions.
+> by anyone numerate. Assumptions marked as open are awaiting confirmation from NGED. See the
+> [roadmap index](index.md) for status conventions.
 
 ## Read this first: these metrics only exist to rank ML models; they are too simplistic to be used for anything more
 
@@ -28,25 +28,27 @@ different beneficiaries. We compute them as **two metrics, reported as two numbe
 them up:
 
 1. **Flexibility procurement.** NGED pay flexible customers to reduce demand when a site risks
-   running beyond its limit. Procurement today is deliberately conservative, so a sharper forecast
-   buys less flexibility for the same security. Flexibility procurement is money NGED spend.
+   running beyond its limit. NGED procures flexibility conservatively as a safeguard against
+   forecast uncertainty, so a sharper forecast needs less flexibility for the same security.
+   Metric 1 measures NGED's own spend on flexibility.
 2. **Curtailment of generation.** Generators are curtailed to keep exports within network limits.
    Curtailment avoided is generation sold, priced as a whole-system cost rather than a saving to
    NGED or the connected generator specifically — see [curtailment price
    basis](#curtailment-price-basis).
 
-A third saving — the engineer-hours freed by replacing a manual review of time-series plots with an
-automated forecast — is real, but it is **not a leaderboard metric**: it is identical for every
+A third saving — the engineer-hours freed by replacing the manual heuristic with an automated
+forecast — is real, but it is **not a leaderboard metric**: it is identical for every
 model we train, so it cannot rank them. This third saving belongs in the project's final report,
 priced in engineer-hours.
 
 ## The shared idea: same risk, then compare the spend
 
 The textbook way to price a forecast charges it for what goes wrong: £X per action taken, £Y per
-limit breach nobody saw coming. We cannot follow that route, because £Y — the cost of a breach — is
-not a figure NGED hold in a form we can use. And in the literature that does price a forecast this
-way, we found no case of it being done on a real distribution network at a money-denominated cost.
-The [energy-forecasting
+limit breach nobody saw coming. We cannot follow that route, because £Y — the cost of a breach —
+has no single figure a leaderboard can use. Pricing a breach is a business judgement rather than a
+property of a forecast. And in the literature that does price a forecast this way, we found no case
+of it being done on a real distribution network at a money-denominated cost. The
+[energy-forecasting
 review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
 reports [Richardson (2000)](https://doi.org/10.1002/qj.49712656313)'s cost-loss framing, [Bernecker
 et al. (2025)](https://doi.org/10.1016/j.ijepes.2025.110713)'s 97% synthetic-network saving, and
@@ -136,11 +138,12 @@ $p_{\text{util}} \min(V_{i,t}, N_{i,t})$ is charged.
 
 **Worked example.** A substation whose limit sits at 30 MW, on one winter evening half-hour, with
 short-term availability at £75/MWh and utilisation at £750/MWh (both placeholders, pending real
-volume-weighted prices). Manual review forecasts 33 MW, so it procures $(33 - 30) \times 0.5 = 1.5$
-MWh. Demand turns out to be 30.6 MW, so 0.3 MWh was needed. It pays £112.50 availability and £225
-utilisation. A model forecasting 31.0 MW procures 0.5 MWh, pays £37.50 and the same £225 — saving
-£75. If the same half-hour were instead covered by a long-term contract, both models pay only the
-utilisation term (£225 each) and the forecast saves nothing on that half-hour. The metric sums this
+volume-weighted prices). Forecast A (more conservative) says 33 MW, so it procures
+$(33 - 30) \times 0.5 = 1.5$ MWh. Demand turns out to be 30.6 MW, so 0.3 MWh was needed. Forecast A
+pays £112.50 availability and £225 utilisation. Forecast B says 31.0 MW, so it procures 0.5 MWh and
+pays £37.50 availability and the same £225 utilisation — £75 less than Forecast A. If the same
+half-hour were instead covered by a long-term contract, both forecasts pay only the utilisation
+term (£225 each) and Forecast B saves nothing on that half-hour. The metric sums this
 over every half-hour and every series, split by which contract type covered each half-hour.
 
 ## Metric 2 — curtailment cost
@@ -212,12 +215,11 @@ It may change: the network operator could in future need to pay a flexibility co
 to curtail generators directly, at which point curtailment would carry a network-operator-borne
 price alongside the whole-system one.
 
-**A published annual curtailment-saving total is not automatically comparable to this metric.** A
-headline £-per-year figure NGED report elsewhere may be computed on a different basis — capacity or
-MW-based, with a scaling factor applied for export volume — rather than the MWh-curtailed
-calculation this metric uses. Comparing the two numbers directly without either replicating that
-other method separately, or explicitly labelling the comparison as order-of-magnitude only, would
-overstate how precisely they agree.
+**A published annual curtailment-saving figure may use a capacity-based method, in which case the
+published figure is not directly comparable with this metric.** This metric prices MWh curtailed,
+whereas a capacity-based method starts from MW of capacity and scales it for export volume. A
+comparison between the two figures needs either a separate replication of the capacity-based
+method or a label saying the comparison is order-of-magnitude only.
 
 ### Which direction is the constraint on?
 
@@ -228,7 +230,7 @@ area contains both,
 plus battery sites that both charge and discharge. Constraint-side direction is therefore resolved
 **per `time_series_type`**, reusing the mapping the [tail and exceedance
 metrics](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
-already need, with the ambiguous types confirmed by NGED.
+already need, with the ambiguous types to be confirmed with NGED.
 
 A series constrained in both directions gets **a limit in each**, so the threshold is one scalar
 per `(time_series_id, direction)` rather than per series alone. Each metric is computed only where
@@ -241,22 +243,22 @@ would silently score £0 for every generator meter in the trial area.
 Every model's cost is reported beside two reference points, computed on the same series and
 half-hours:
 
-- **Manual review** — the manual heuristic: the 13-analogue ensemble, summarised at one percentile
-  if a single number is needed ([the manual heuristic forecast](../background/manual-heuristic-forecast.md)).
-  The operator picks that percentile to match the company's risk appetite. We score the 95th
-  percentile, and [which percentile manual review works from is still an open
-  question](#questions-for-nged). Manual review is scored at that **actual operating point, not
-  calibrated to the common risk target**, because the point is to measure the manual heuristic as
-  it is operated. Its realised unmet fraction is therefore an output — the number saying what risk
-  level manual review works to — and the saving against it mixes a change in spend with a change in
-  risk. Both are reported; neither means much alone.
+- **Manual heuristic** — the 13-analogue ensemble, summarised at one percentile if a single number
+  is needed ([the manual heuristic forecast](../background/manual-heuristic-forecast.md)). That
+  percentile is an upper percentile chosen to match the company's risk appetite; our scoring uses
+  the 95th percentile. [The residual-risk level the operating point is set to is still an open
+  question](#questions-for-nged). The manual heuristic is scored at that **actual operating point,
+  not calibrated to the common risk target**, because the point is to measure the manual heuristic
+  as it is operated. Its realised unmet fraction is therefore an output — the number saying what
+  risk level the manual heuristic works to — and the saving against it mixes a change in spend with
+  a change in risk. Both are reported; neither means much alone.
 - **Perfect forecast** — the least that can be spent while leaving no more than the target fraction
   $u$ unmet. Truth is not a distribution, so there is no quantile to calibrate: the floor is the
   cost of procuring exactly $(1-u)N_{i,t}$ in every half-hour, put straight through the same price
   formula. Setting it at zero unmet instead would put it *above* a model calibrated to 5%, and
   models would routinely score over 100% of the available saving.
 
-The headline is *"£X less than manual review, which is Y% of the £Z a perfect forecast would
+The headline is *"£X less than the manual heuristic, which is Y% of the £Z a perfect forecast would
 save"*, always alongside the realised unmet fractions. Note that a model whose realised unmet
 fraction overshoots the target can still exceed 100%; that is a signal to read the risk column, not
 a bug.
@@ -293,7 +295,8 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
 ## Case studies
 
 - **Flexibility procurement (Metric 1) — Tavistock Primary, `CMZ_T9A_SWE_0050`, South West.**
-  Buildable now. Tavistock has genuine winter exceedances, a seasonal transformer rating (13 MVA in
+  Buildable now. Tavistock has winter demand that reaches the level at which the zone procures
+  flexibility, a seasonal transformer rating (13 MVA in
   winter, 10 MVA in the intermediate-cool, intermediate-warm, and summer periods — treated as MW,
   assuming negligible reactive power at this transformer), and real procurement history, all from
   public sources. "Winter" here is whatever calendar period NGED's own rating table uses, not a
@@ -331,8 +334,8 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
 - **Procurement is not per-half-hour.** NGED tender flexibility ahead, in blocks and windows. Our
   arithmetic assumes perfectly granular buying, which flatters every model equally but overstates
   the achievable saving.
-- **Ensemble size limits how finely $\tau$ can be tuned.** Manual review has 13 analogues, so its
-  quantiles come in coarse steps; a 51-member ensemble is far finer. Models of different ensemble
+- **Ensemble size limits how finely $\tau$ can be tuned.** The manual heuristic has 13 analogues,
+  so its quantiles come in coarse steps; a 51-member ensemble is far finer. Models of different ensemble
   size cannot be landed on exactly the same risk.
 - **Costs are per fold, and folds are seasonal.** The limit concentrates exceedances at winter peak,
   so annualising a fold that does not span a whole year is meaningless, and a fold with no
@@ -342,13 +345,13 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
   Tier 3 exists.
 - **Asset failure and outage costs are excluded.** Outage quantification is valuable but harder,
   and is not in this design.
-- **Over-procurement has a deliberate component.** Some over-procurement is understood to be
-  deliberate policy — supporting flexibility-market development and the capital programme — rather
-  than forecast error, and a better forecast should not be credited with removing it.
+- **Some procurement does not depend on the forecast.** Procurement that serves wider aims, such as
+  developing the flexibility market and supporting the capital programme, does not depend on the
+  forecast. A better forecast should not be credited with removing that procurement.
 
 ## Questions for NGED
 
-**Resolved**, by the July and August 2026 meetings and the public procurement data found since:
+**Resolved:**
 
 - **Flexibility prices, split by contract type** — rather than asking NGED for a single availability
   and utilisation rate, we compute volume-weighted average prices separately for long-term and
@@ -365,10 +368,8 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
 
 **Still open:**
 
-1. **Is the 95th percentile of the 13 analogues the operating point** manual review actually works
-   from, and what reliability does NGED target — how much genuinely-needed flexibility may go
-   unbought? This was not settled by the prior round of answers and needs a direct follow-up
-   question.
+1. **Is the 95th percentile of the 13 analogues the operating point** the manual heuristic is
+   operated at? What residual-risk level is the operating point set to?
 
 ## Cost-benefit analysis in the final work package
 
@@ -380,13 +381,9 @@ choice of method is theirs.** The final work package is tracked as
 [Richardson (2000)](https://doi.org/10.1002/qj.49712656313), computed per substation, across the
 range of ratios between the cost of acting on a forecast and the loss avoided by acting.** [The
 shared idea](#the-shared-idea-same-risk-then-compare-the-spend) above explains why this page took
-a different route: £Y, the loss avoided by a breach, is not a figure NGED hold in a form the
-leaderboard metrics can use. NGED's own final work package is better placed to supply that figure,
-because pricing a breach is a judgement about NGED's business, not a property of a forecast.
-
-**NGED's cost-benefit analysis is not expected to start until late 2027, close to WP7's February
-2028 deadline.** This page records the recommendation now, well ahead of that date, so that the
-recommendation is not forgotten in the meantime.
+a different route: £Y, the loss avoided by a breach, has no single figure the leaderboard metrics
+can use. NGED's own final work package is better placed to supply that figure, because pricing a
+breach is a business judgement rather than a property of a forecast.
 
 ## Implementation details (deleted when this ships)
 

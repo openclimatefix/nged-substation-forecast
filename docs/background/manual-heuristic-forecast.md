@@ -3,10 +3,11 @@
 NGED has been investing in a suite of different forecasting tools for use cases stretching from
 multi-year planning forecasts through to day-ahead dispatch of flexibility services. However, until
 recently, the normal approach to forecasting among distribution network operators relied more
-heavily on the operator. It used no weather model and no machine learning: for each substation it assembled a small
-ensemble of **historical analogues** from that substation's own past, plotted them, and let a human
-operator read a forecast off the spread. This is the **manual heuristic** — the method our models will be
-compared against — so we reproduce it faithfully as the `manual_heuristic` [baseline
+heavily on the operator. That approach used no weather model and no machine learning: for each
+substation it assembled a small ensemble of **historical analogues** from that substation's own
+past, plotted them, and let a human operator read a forecast off the spread. That analogue method
+is the **manual heuristic** — the method our models will be compared against — so we reproduce it
+faithfully as the `manual_heuristic` [baseline
 forecaster](../roadmap/metrics-and-leaderboard.md#the-headline-baseline-manual_heuristic).
 
 ## The recipe
@@ -20,13 +21,15 @@ For a given substation and target half-hour, the analogue ensemble is the observ
 
 That is **13 analogues** in total.
 
-There is no weighting, no holiday alignment, no anomaly rejection, and no load-growth scaling.
+**The 13 analogues are used as observed and weighted equally.** The manual heuristic forecast
+itself does not adjust for holidays, switching events, or load growth.
 
-The output is **the plot itself** — an operator looks at the 13 traces and their spread and forms a
-judgement. If a single deterministic number is needed, the operator would pick the percentile that
-aligned to the company's risk appetite. A high percentile such as the 95th is a deliberately
-**conservative** operating point: the tool's job is to warn when demand might approach the network's flex/firm
-capacity limit, so erring high is the safe direction.
+**The output is the plot itself.** An operator looks at the 13 traces and their spread and forms a
+judgement. If a single deterministic number is needed, the operator reads off an upper percentile
+chosen to match the company's risk appetite. Our scoring uses the 95th percentile. An upper
+percentile is a deliberately **conservative** operating point: the tool's job is to warn when
+demand might approach the distribution network's flex/firm capacity limit, so erring high is the
+safe direction.
 
 ## The operator's view
 
@@ -43,14 +46,18 @@ Reading the overlays:
 - **Purple dashed line** — a smooth recent-trend line (a quadratic fit) the tool overlays as a
   sense-check.
 - **Yellow band** — a 5% warning zone.
+- **Black cross** — missing data.
 
 The strong twice-daily peaks and the weekday/weekend difference are exactly the structure the
 same-weekday analogue selection is built to capture.
 
 ## Why it matters for us
 
-Because the manual heuristic uses no weather and no ML, beating it is the project's core
-deliverable — and because it does no further processing at all, several cheap upgrades (e.g.
-aligning bank holidays and moveable feasts) are genuinely useful work rather than reimplementations.
-Both the faithful replica and the "cheap upgrades" variant are specified in [Metrics & leaderboard →
+**Because the manual heuristic uses no weather and no ML, beating the manual heuristic is the
+project's core deliverable.**
+
+**Because the manual heuristic forecast does not adjust for holidays, switching events, or load
+growth, automating those adjustments is useful work in its own right** — for example, aligning bank
+holidays and moveable feasts. Both the faithful replica and the variant that automates those
+adjustments are specified in [Metrics & leaderboard →
 Baseline forecasters](../roadmap/metrics-and-leaderboard.md#baseline-forecasters).
