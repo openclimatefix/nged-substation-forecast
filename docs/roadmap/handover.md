@@ -63,8 +63,8 @@ at those boundaries.
 
 ### 1. The operator contract
 
-Write an explicit, short **operator contract**: an enumeration of every action the NGED operator is
-ever expected to take.
+**Write a short, explicit operator contract that lists every action the NGED operator is ever
+expected to take.**
 
 - Acknowledge an alert.
 - Backfill a missed slot via replay mode.
@@ -102,10 +102,11 @@ handover they need an editing pass with the NGED operator as the audience, plus 
 
 ### 2. Alert on absence, not just failure
 
-Per-task failure alerts miss whole classes of silent failure: a hung daemon, a full disk, an expired
-credential, a schedule that simply stopped firing. The fix is a **missed-check-in alarm** (Sentry's
-cron-monitoring terminology): an alarm that fires when *no successful forecast has landed in N
-hours* (e.g. 8 hours, i.e. one missed 6-hourly slot plus margin), regardless of why. That alarm is
+**Per-task failure alerts miss whole classes of silent failure, so the service also needs a
+missed-check-in alarm.** A hung daemon, a full disk, an expired credential, or a schedule that
+simply stopped firing raises no per-task alert. A missed-check-in alarm (Sentry's cron-monitoring
+terminology) fires when *no successful forecast has landed in N hours* (e.g. 8 hours, i.e. one
+missed 6-hourly slot plus margin), regardless of why. That alarm is
 built and running on **Sentry cron monitoring**: each successful `live_forecasts` run checks in with
 Sentry, and Sentry alerts on a missed check-in — Sentry sits outside the service being watched (a
 dead daemon simply stops checking in), and check-in pings are plain portable code. The as-built
@@ -123,12 +124,13 @@ Every alert — missed-check-in and per-task alike — must link directly to a r
 either a specific operator action or "escalate to OCF". An alert without a runbook is a bug in the
 operator contract.
 
-### 3. De-pet the control-plane box
+### 3. Make the control-plane box rebuildable from scratch
 
-The always-on EC2 control-plane box ([the accepted option](live-service.md#aws-architecture)) is
+**The always-on EC2 control-plane box ([the accepted option](live-service.md#aws-architecture)) is
 the riskiest element when the operator works from the runbooks rather than from knowledge of the
-box's internals: an unattended pet VM accumulates entropy — disks fill, instances get retirement
-notices, OS patches drift. Mitigations, roughly in build order:
+box's internals.** An unattended, long-lived virtual machine accumulates faults: disks fill,
+instances get retirement notices, and operating-system patches drift. Mitigations, roughly in
+build order:
 
 - EC2 auto-recovery alarm and instance status-check alarm (some of this is already sketched in
   the accepted-option plan).
@@ -188,8 +190,8 @@ Concrete steps:
 
 ### 6. Game days and in-person training
 
-Before handover, run deliberate failure exercises with the NGED staff who will operate the
-service, using only the runbooks.
+**Before handover, run deliberate failure exercises with the NGED staff who will operate the
+service, using only the runbooks.**
 
 - Break the NWP feed.
 - Fill the disk.

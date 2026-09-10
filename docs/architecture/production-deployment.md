@@ -620,7 +620,8 @@ maintains the hosts), so the one piece of self-maintained OS in the deployment w
    the built-in 6-hourly maintenance windows
    ([above](#run-the-dagster-control-plane-continuously-on-one-small-vm)), and is slated for a
    tested rebuild-from-scratch script (see
-   [Handover: de-pet the control-plane box](../roadmap/handover.md#3-de-pet-the-control-plane-box))
+   [Handover: make the control-plane box rebuildable from
+   scratch](../roadmap/handover.md#3-make-the-control-plane-box-rebuildable-from-scratch))
    so that the answer to a sick box is *destroy and recreate*, never *diagnose*.
 
 ### Running the data-ingest runs on the control-plane VM
@@ -767,10 +768,11 @@ are now written up in the runbook — [Setting up the live service on AWS: Steps
   roles (no static keys); a standard Dagster-OSS-on-AWS deployment.
 - **Cons:** one pet server (patching, disk, daemon liveness — mitigate with systemd restart
   policies + the monitoring plan's "no fresh forecast" alarm); dagster.yaml/run-launcher
-  config work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans). The pet-server
-  risk grows once the service is operated by staff who did not develop the code — the full mitigation list (auto-recovery
-  alarms, disk hygiene, a tested rebuild-from-scratch script) is
-  [Handover workstream 3](../roadmap/handover.md#3-de-pet-the-control-plane-box).
+  config work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans). The risk of a
+  long-lived, hand-maintained server grows once the service is operated by staff who did not
+  develop the code — the full mitigation list (auto-recovery alarms, disk hygiene, a tested
+  rebuild-from-scratch script) is
+  [Handover workstream 3](../roadmap/handover.md#3-make-the-control-plane-box-rebuildable-from-scratch).
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
   £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
 

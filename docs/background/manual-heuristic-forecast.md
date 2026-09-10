@@ -46,6 +46,7 @@ Reading the overlays:
 - **Purple dashed line** — a smooth recent-trend line (a quadratic fit) the tool overlays as a
   sense-check.
 - **Yellow band** — a 5% warning zone.
+- **Black cross** — missing data.
 
 The strong twice-daily peaks and the weekday/weekend difference are exactly the structure the
 same-weekday analogue selection is built to capture.
