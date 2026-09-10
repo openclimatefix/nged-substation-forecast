@@ -59,7 +59,7 @@ Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/
 No naive baseline exists anywhere in the codebase (only docstring mentions, e.g.
 `contracts/power_schemas.py:242`). Until the leaderboard carries naive rows, XGBoost's NMAE numbers
 aren't interpretable — and, more to the point, we can't answer the question this project exists to
-answer: **do we beat what NGED does today?**
+answer: **do we beat the incumbent historical-analogue forecast?**
 
 **Every comparison against a baseline publishes the fraction of series that beat it alongside the
 average error, never the average alone** — see [Publishing results that others can compare
@@ -68,14 +68,17 @@ for why an average can hide a model getting worse at a substantial minority of s
 
 ### The headline baseline — `nged_incumbent`
 
-`nged_incumbent` is a faithful reproduction of [NGED's incumbent
-forecast](../background/nged-incumbent-forecast.md) — the analogue-ensemble method they use today,
+`nged_incumbent` is a faithful reproduction of the [incumbent
+forecast](../background/nged-incumbent-forecast.md) — the analogue-ensemble method that, until
+recently, was the normal approach to substation forecasting among distribution network operators,
 with no weather model and no ML. In brief (full description and the operator's-eye view are in the
 background page): for each target half-hour it takes the observed power at the **same weekday &
-time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13 analogues**. NGED plot
-and read the analogues by eye, taking the 95th percentile if they need a single number. Reproducing
-it matters because it is *the bar we have to clear to justify the project* — "XGBoost beats
-persistence" is the least we must do; "XGBoost beats the incumbent" is the deliverable. It is the
+time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13 analogues**. An
+operator reads the plotted analogues by eye. If a single number is needed, the operator picks the
+percentile that matches the company's risk appetite; we score the conservative 95th percentile.
+Reproducing the incumbent matters because it is *the bar we have to clear to justify the project*
+— "XGBoost beats persistence" is the least we must do; "XGBoost beats the incumbent" is the
+deliverable. It is the
 first baseline we implement; if we implement only one, it is this one.
 
 `nged_incumbent` fits our existing machinery, because every one of its 13 members is just a **power
@@ -89,9 +92,9 @@ So it rides the same audited, no-lookahead pipeline as `PersistenceForecaster` (
 time-series logic. `_nullify_leaky_lags` already sheds the shortest members as lead time grows (past
 7 days the 168 h member nullifies, past 14 days the 336 h, and so on). That shedding leaves the
 annual members to carry the full 14-day horizon. Because the shortest member is a week old, the
-incumbent has *no* short-horizon skill from recent power — realistic, since that is exactly what
-NGED do today, and a reason to keep the pure `PersistenceForecaster` as a contrast rather than to
-sneak a recent-power member in.
+incumbent has *no* short-horizon skill from recent power. That gap is faithful to the analogue
+method, and a reason to keep the pure `PersistenceForecaster` as a contrast rather than to sneak a
+recent-power member in.
 
 **`nged_incumbent` is also our first _probabilistic_ baseline — and this is the faithful
 representation, not a bonus.** The plotted spread *is* the incumbent's output — an operator reads it
@@ -109,17 +112,17 @@ member rows) rather than consuming an NWP ensemble; it runs with `weather_source
 **Deterministic collapse is a property of the metrics layer, not the incumbent.** The incumbent
 emits its 13 members and nothing else; the [metric-matched collapse
 decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast) then scores its MAE on
-the members' median (apples-to-apples with every other model's central forecast) and reports NGED's
-*actual* operating point — the **95th percentile** — as a labelled secondary number (`mae`/`mbe` at
-`metric_param="p95"`). Being deliberately conservative, the P95 carries a large *positive* MBE **by
-design** (a peak-safety choice, not a forecasting error), so it belongs *beside* the central metric.
-Either way NGED weight the analogues equally ("no further processing at all"), so equiprobable
-members — and the probabilistic metrics (CRPS etc.) computed over them — are faithful, not an
-approximation.
+the members' median (apples-to-apples with every other model's central forecast) and reports a
+conservative operator operating point — the **95th percentile** — as a labelled secondary number
+(`mae`/`mbe` at `metric_param="p95"`). Being deliberately conservative, the P95 carries a large
+*positive* MBE **by design** (a peak-safety choice, not a forecasting error), so it belongs *beside*
+the central metric. Either way the analogue method weights the analogues equally, with no further
+processing, so equiprobable members — and the probabilistic metrics (CRPS etc.) computed over them
+— are faithful, not an approximation.
 
 ### A faithful replica and a "simple upgrades" variant
 
-**Most of the benefit may come from a few simple upgrades to what NGED already do, not from heavy ML
+**Most of the benefit may come from a few simple upgrades to the analogue method, not from heavy ML
 — the message the pair of baselines is built to test.** We implement two closely-related incumbent
 baselines:
 
@@ -217,7 +220,7 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
   exactly `.median()`), and keep `q_p95`.
 - Score `mae`/`nmae` on the median error; `rmse`/`mbe` on the mean error; the spread-skill
   denominator stays the mean-error RMSE (its Fortin "1.0 = calibrated" target is defined against the
-  mean). Add extra labelled rows: `mae`/`mbe` at `metric_param="p95"` (NGED's operating point) and
+  mean). Add extra labelled rows: `mae`/`mbe` at `metric_param="p95"` (the conservative operating point) and
   `mbe` at `metric_param="p50"` (bias of the delivered median). `METRIC_PARAMS` already contains
   `"p95"` and `"p50"` (both are in `DELIVERY_QUANTILES`), so **no `Metrics` schema change** — and
   the primary key includes `metric_param`, so the new rows do not collide with the `metric_param="all"`
@@ -387,16 +390,17 @@ only skill floor the NWP ensemble must clear at long horizons.
   details — baselines" section (summary → PR body), close #147, and update the status banner plus the
   milestone section in [`docs/roadmap/index.md`](index.md) if the arc changed.
 
-**Recipe confirmed by NGED (July 2026).** No open questions remain. Full write-up in [NGED's
-incumbent forecast](../background/nged-incumbent-forecast.md); the implementation spec:
+**The recipe.** No open questions remain. Full write-up in [NGED's incumbent
+forecast](../background/nged-incumbent-forecast.md); the implementation spec:
 
 - **Weekly analogues:** the last **6** weeks, same weekday & time-of-day.
 - **Annual analogues:** the **7** weeks spanning **49–55 weeks back**, same weekday & time.
-- **Deterministic value:** NGED's own operating point is the **95th percentile** of all 13 analogue
-  values ("more of a vibe") — reported alongside the metric-matched **median** headline (PR 1).
+- **Deterministic value:** the operator picks the percentile that matches the company's risk
+  appetite; we score the conservative **95th percentile** of all 13 analogue values, reported
+  alongside the metric-matched **median** headline (PR 1).
 - **No further processing:** no weighting, no holiday handling, no anomaly rejection, no
   load-growth scaling. (This is precisely why the holiday-aligned variant is a genuine, un-done
-  upgrade — not a reimplementation of a method NGED already uses.)
+  upgrade — not a reimplementation of a step the analogue method already takes.)
 
 **Cross-cutting.** (1) **Issue hygiene:** create one tracked sub-issue per PR under epic
 [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) / #147 following the
@@ -587,7 +591,7 @@ analogues for `nged_incumbent`; a quantile sample for `climatology`). The metric
 collapse each ensemble to one number. `compute_metrics` today collapses every ensemble to its
 **mean** (`packages/ml_core/src/ml_core/metrics.py`), and the risk we were guarding against was that
 different models would be scored on *different* collapses — e.g. the ML models on their mean and
-`nged_incumbent` on the median that NGED effectively reads off its analogue spread. Mean and median
+`nged_incumbent` on the median that an operator effectively reads off its analogue spread. Mean and median
 diverge for skewed or underdispersed ensembles, so scoring some models on one and some on the other
 is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
 
@@ -607,7 +611,7 @@ practice.
 The **median** is the point forecast that minimises **absolute error** — so MAE and NMAE are
 *consistent* with the median. It is robust to the skew that is real in this problem (holiday weeks,
 solar clipping) and to the ensemble underdispersion the [probabilistic
-section](#delivering-the-probabilistic-metrics) documents, it is the faithful reading of NGED's
+section](#delivering-the-probabilistic-metrics) documents, it is the faithful reading of the incumbent's
 equally-weighted analogue spread, and it is coherent with the quantile columns already on the
 leaderboard: median MAE is exactly `2 × pinball_loss@p50`, so a median headline makes the
 deterministic and probabilistic columns tell one story.
@@ -631,7 +635,7 @@ every model**:
   (RMSE of the ensemble mean = `√((m+1)/m) ×` RMS spread, so "1.0 = calibrated") is *defined*
   against the mean; switching its internal collapse would silently break that reading.
 
-Everything else is an **extra, labelled** row, never a headline: NGED's **P95** operating point
+Everything else is an **extra, labelled** row, never a headline: the incumbent's conservative **P95** operating point
 (`mae`/`mbe` at `metric_param="p95"` — conservative by design, so a large positive MBE that belongs
 *beside* the central number), and the **median's own bias** (`mbe` at `metric_param="p50"`, so the
 delivered central forecast has an honest bias number distinct from the mean's energy-balance bias).

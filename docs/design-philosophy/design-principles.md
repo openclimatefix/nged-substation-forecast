@@ -43,7 +43,7 @@ a machine-learning (ML) model that can, at least partially, handle missing input
 through fallback logic wrapped around a model that assumes complete data. (Note that this decision
 to "never stop" will not be appropriate for energy-forecasting systems where an uncertain forecast
 might be more harmful than *no* forecast. But, in Flexpectation, there are strong arguments that
-our forecast will *always* be better than NGED's incumbent baseline, even when we have no live
+our forecast will *always* be better than the incumbent baseline, even when we have no live
 data.)
 
 Degrading is only half the principle: **we must be notified that the forecast degraded.** Three
@@ -793,7 +793,7 @@ model.
 [Principle 1 ("*the power forecast never stops*")](#1-the-power-forecast-never-stops) is the
 contingent one: it is downstream of the fact
 that [an outage is cheap here](../background/requirements.md#uptime-lenient-by-design) and that
-[the incumbent forecast is a floor beneath us](inherent-stability.md#ngeds-incumbent-forecast-is-the-floor);
+[the incumbent forecast is a floor beneath us](inherent-stability.md#the-incumbent-forecast-is-the-floor);
 a
 system where a wrong-but-confident forecast costs real money — a trading desk, a control-room feed —
 should invert it and fail closed. And the push-work-to-the-engine and new-technology principles are

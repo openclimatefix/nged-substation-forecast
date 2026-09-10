@@ -419,7 +419,7 @@ $$
 
 The exceedance rate is the one-sided companion to
 [PICP](#picp-prediction-interval-coverage-probability): PICP checks symmetric bands
-(p10–p90, etc.), whereas NGED's operating point is one-sided — an operator reads the p95 as
+(p10–p90, etc.), whereas the incumbent's conservative operating point is one-sided — an operator reads the p95 as
 "the level demand should stay under, 19 times out of 20" — so its honesty deserves its own
 directly-readable number. It is *not* a ranking metric (a model can hit perfect exceedance
 rates with absurdly wide quantiles; pinball loss and twCRPS punish that); it is the trust
