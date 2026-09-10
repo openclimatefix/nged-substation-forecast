@@ -42,9 +42,7 @@ Reading the overlays:
 - **Green line** and **green band** — the mean of the analogues and the spread around it.
 - **Purple dashed line** — a smooth recent-trend line (a quadratic fit) the tool overlays as a
   sense-check.
-- **Yellow band** just below the Flex Profile — a warning zone, which is an operational threshold
-  rather than part of the forecast.
-- **Black cross** — a missing reading.
+- **Yellow band** — a 5% warning zone.
 
 The strong twice-daily peaks and the weekday/weekend difference are exactly the structure the
 same-weekday analogue selection is built to capture.
