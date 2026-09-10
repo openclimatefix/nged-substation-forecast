@@ -469,7 +469,7 @@ PV is [the DER we have the best chance of disaggregating well](#der-tractability
 
 ## Ideas for after Flexpectation
 
-**Two ideas outlive Flexpectation, and the capacity map is the more valuable.** Recovering irradiance from the calibrated fleet is mostly a check on the capacity estimates rather than a second product — with one exception, [an irradiance nowcast](#an-irradiance-nowcast-would-be-a-more-useful-product), which would stand on its own.
+**Two ideas outlive Flexpectation, and the capacity map is the more valuable.** Recovering irradiance from the calibrated fleet is mostly a check on the capacity estimates rather than a second product — with one exception, [an irradiance nowcast](#an-irradiance-nowcast-would-be-a-more-useful-product), which would stand on its own. The two ideas also combine into an estimate of live PV generation, which [belongs with PV Live rather than in competition with PV Live](#improve-pv-live-rather-than-publish-a-rival-estimate-of-live-pv-generation).
 
 ### Publish a map of installed DER capacity across GB
 
@@ -498,6 +498,16 @@ Once the architecture has calibrated, parameter-verified "virtual sensors" acros
 #### An irradiance nowcast would be a more useful product
 
 **Latency is the one route by which a published irradiance field would stand on its own.** Both archive products are far too slow to nowcast: the CAMS point service runs to yesterday, and the SARAH-3 Interim Climate Data Record lands 2 to 5 days behind. Going direct to EUMETSAT does not close the gap either, because [Meteosat Third Generation](https://www.eumetsat.int/meteosat-third-generation-imaging-services)'s Flexible Combined Imager scans the full disc every 10 minutes, with a 2.5-minute rapid scan over Europe, against Meteosat Second Generation's 15 minutes — and a retrieval still has to run on top. Live PV telemetry arrives in minutes and is denser over Great Britain than any satellite retrieval, so an irradiance nowcast inverted from the fleet would occupy a niche the archives do not compete for. That is a different product from the historical field described above, and worth testing cheaply before committing to either.
+
+### Improve PV Live rather than publish a rival estimate of live PV generation
+
+**Installed capacity and irradiance are the two inputs an estimate of live PV generation needs, so the two ideas above combine.** Capacity per substation, multiplied by a modelled yield per kilowatt of capacity driven by irradiance, gives PV output now, wherever the map reaches. [An irradiance nowcast](#an-irradiance-nowcast-would-be-a-more-useful-product) carries the same estimate a few hours forward. The construction repeats for any DER whose output follows a weather variable the calibrated fleet can recover — wind speed for wind, temperature for heat pumps — with the accuracy the [tractability ranking](#der-tractability-ranking) predicts for each.
+
+**Sheffield Solar's PV Live already publishes that estimate for Great Britain, so the useful move is to improve PV Live rather than to publish a second estimate beside it.** PV Live, run with NESO, upscales the output of a sample of live-metered reference PV systems, using an estimate of installed capacity to scale that sample up to each grid supply point and to the nation. A second national estimate that disagreed with PV Live would leave every user to arbitrate between the two, and would duplicate a service the system operator already depends on.
+
+**Capacity, not yield, is where PV Live's error sits.** [Huxley et al. (2022)](https://doi.org/10.1016/j.rser.2021.112000) decompose the error in the GB estimate and put the capacity error at ±5%, against a yield-calculation error below ±1%, for ±5.1% overall. Huxley et al. conclude that national PV measurement is limited by the state of the capacity registers, and name estimating capacity from power flows on the electricity network, from satellite imagery, or from a combination of datasets as the way past that limit. Estimating capacity from power flows on the electricity network is what [the disaggregation engine](#the-graph-structured-engine) does.
+
+**Of the two inputs, the capacity map is the one PV Live does not already have.** Recovering irradiance from the metered fleet and using that irradiance to estimate unmetered generation is the upscaling PV Live already performs, with a calibrated physics model where PV Live has a scaling factor. Whether the physics beats the scaling factor is an open question, and a question to settle before offering the irradiance rather than after. The capacity map faces no equivalent question, because [the public sources we checked record no unmetered PV capacity at substation granularity](#publish-a-map-of-installed-der-capacity-across-gb). An NGED-only map reaches only the grid supply points inside NGED's licence areas, so a first collaboration would be regional rather than national.
 
 ## Evaluating disaggregation
 
