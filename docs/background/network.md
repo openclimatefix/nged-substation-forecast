@@ -59,11 +59,13 @@ Some time series go "stuck" for hours or days (standard deviation near zero over
 
 ### Missing data
 
-Gaps range from a few half-hours to months. Solar farms frequently have no data overnight (expected), but also have unexplained daytime gaps. ![Examples of missing data in streams from two solar farms in the trial area, solar farm A and solar farm B. Solar farm B has a known analogue metering issue.](assets/missing_data.png)
+Gaps range from a few half-hours to months. Solar farms frequently have no data overnight (expected), but also have unexplained daytime gaps. ![Examples of missing data from two solar sites in the trial area, time series 23 and 29](assets/missing_data.png)
+
+*Examples of missing data from two solar sites in the trial area, time series 23 and 29. Time series 29 has a known analogue metering issue.*
 
 ### Apparent power (MVA) metering
 
-Some substations only have MVA meters, which report the *absolute value* of power flow — they cannot detect direction. When generation exceeds demand and power flows "backwards", the MVA reading increases rather than going negative. This "bouncing off zero" behaviour looks like a demand increase but is actually reverse power flow. In the trial area, 10 sites are metered in apparent power, and one, and possibly two more, have shown reverse flow on sunny days. The following figure shows power flow for Stickney primary and Leverton Solar Park; note the absence of peaks at Stickney primary on May 3rd and 4th when Leverton experienced lower generation: ![Power flow for Stickney primary and Leverton Solar Park; note the absence of peaks at Stickney on May 3rd and 4th, when Leverton experienced lower generation](assets/MVA_metering_bounce_at_Stickney_primary.png)
+Some substations only have MVA meters, which report the *absolute value* of power flow — they cannot detect direction. When generation exceeds demand and power flows "backwards", the MVA reading increases rather than going negative. This "bouncing off zero" behaviour looks like a demand increase but is actually reverse power flow. In the trial area, 10 sites are metered in apparent power, and one, and possibly two more, have shown reverse flow on sunny days. The following figure shows power flow for Stickney primary (time series 14) and a nearby solar site (time series 22); note the absence of peaks at Stickney primary on 3 and 4 May, when the solar site generated less: ![Power flow for Stickney primary (time series 14) and a nearby solar site (time series 22)](assets/MVA_metering_bounce_at_Stickney_primary.png)
 
 ### Switching events
 
