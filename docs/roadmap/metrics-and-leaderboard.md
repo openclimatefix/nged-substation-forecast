@@ -126,8 +126,8 @@ processing, so equiprobable members — and the probabilistic metrics (CRPS etc.
 — the message the pair of baselines is built to test.** We implement two closely-related
 baselines built on the manual heuristic:
 
-- `manual_heuristic` — the faithful replica above, reproduced exactly as operated, treating bank
-  holidays as ordinary days. Pure lag features.
+- `manual_heuristic` — the faithful replica above, which reproduces the recipe exactly, treating
+  bank holidays as ordinary days. Pure lag features.
 - `manual_heuristic_holiday_aligned` — the same skeleton, but analogue *selection* becomes
   calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type (a
   bank-holiday Monday behaves like a Sunday). Moveable feasts align holiday-to-holiday
@@ -791,14 +791,14 @@ on tricky days" — is that Christmas, or a switching event?).
 Mechanically it is another population filter (the same mechanism the peak-events diagnostic slice
 uses): a boolean flag per timestep, derived from `valid_time` alone. Unlike that observed-peak
 slice, this filter *is* a legitimate ranking column: the flag depends only on the calendar, which
-every forecaster knew in advance, so it does not fall into the [forecaster's-dilemma
-trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
+every forecaster knew in advance, so it does not fall into the
+[forecaster's-dilemma trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
 Because it is purely calendar-driven it **shares its calendar module with
 `manual_heuristic_holiday_aligned`** — the same GB bank-holiday calendar (the pure-Python `holidays`
 package) plus the two DST dates feed both the holiday-aligned baseline and this metric filter. The
-two reinforce each other: scoring `manual_heuristic` (no holiday logic) and
-`manual_heuristic_holiday_aligned` on the tricky-day slice measures how much calendar awareness adds
-on tricky days.
+two reinforce each other: `manual_heuristic` (no holiday logic) should score worse on tricky days
+than overall, and `manual_heuristic_holiday_aligned` should recover most of that gap. The size of
+the recovered gap measures how much calendar awareness adds.
 
 **Flag the day _and_ its analogue-relevant neighbours, not just the day itself.** The disruption
 spills onto surrounding timesteps:

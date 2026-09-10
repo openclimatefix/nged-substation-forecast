@@ -45,8 +45,8 @@ them:
   explicitly lower priority than the NRA forecast. See [forecast building
   blocks](../roadmap/forecast-building-blocks.md).
 
-The shapes of the five [delivery tables](../roadmap/delivery-tables.md) were agreed with NGED,
-so changing a shape (such as replacing the discrete `substation_switching` table with continuous
+The shapes of the five [delivery tables](../roadmap/delivery-tables.md) were specified in a
+formal report to NGED, so changing a shape (such as replacing the discrete `substation_switching` table with continuous
 signals) needs NGED's agreement.
 
 ### The worst case matters most: forecasting threshold exceedance
@@ -60,8 +60,9 @@ aggregated flow across several substations rather than by any single meter in is
 forecasts that matter for curtailment are therefore the forecasts that net and sum correctly up the
 hierarchy — which is why [curtailment
 scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at one primary before
-summing up the substation hierarchy. Curtailment savings accrue to the whole system, and the
-forecast requirement is the same for both decisions. So the question users ask of a forecast is
+summing up the substation hierarchy. Curtailment savings accrue to the whole system rather than
+to NGED's own spend, but curtailment is in scope alongside flexibility procurement, so the forecast
+requirement is the same for both decisions. So the question users ask of a forecast is
 rarely "what is the most likely load?" and usually "**how likely is net demand to cross this
 limit?**" — a [mock-up of the operator view](manual-heuristic-forecast.md#the-operators-view)
 plots demand as headroom below a constraint line.
@@ -148,7 +149,7 @@ The phasing:
 1. For the duration of the NIA project, OCF develops **and runs** Flexpectation on OCF's own
    AWS account (unchanged from the existing plan).
 2. We will not know whether the service is truly hand-over-able until OCF has run the full v2
-   service (~2,500 time series) for a few months. This is the working assumption.
+   service (~2,500 time series) for a few months. The v2 gate is part of the working assumption.
 3. In the last few months of the NIA project, NGED progressively takes control of the service,
    with OCF support. NGED then decides whether to run it themselves.
 4. Post-NIA, OCF is no longer on call; NGED handles day-to-day issues. OCF may continue
@@ -163,8 +164,8 @@ adapted for other DNOs). A hybrid model makes account-portable infrastructure do
 
 Flexpectation carries **no hard availability target**. We aim for a highly robust service, but
 the requirement when something breaks is recovery "next business day, via runbook" — never a
-2am page, and no on-call rota. The lenient uptime requirement follows from the forecasts' 14-day
-horizon, not from aspiration. Three factors bound the damage of an outage:
+2am page, and no on-call rota. The lenient uptime requirement follows from how the forecasts are
+consumed, not from aspiration. Three factors bound the damage of an outage:
 
 1. **Every forecast extends 14 days ahead**, refreshed every 6 hours, and users mostly act on
    the forecast roughly 1 to 10 days ahead (see [Core Objectives](#core-objectives)). If the

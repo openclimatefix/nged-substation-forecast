@@ -48,12 +48,12 @@ the averaging rule needs to say what happens when one reading of a pair is missi
 | File | Status | Description | Known issues |
 |---|---|---|---|
 | Historical time-series JSON | ✅ | Historical outputs of substations and customer meters. | See [data quality](#data-quality-availability). |
-| **Monitor Direction.csv** | 🚧 | Metadata for all substations: meter (analogue) type and power-flow direction. | Lincoln Farm Solar Park (ID 30) has a different substation number vs. its metadata, to be confirmed with NGED; other sources agree, so low risk. |
+| **Monitor Direction.csv** | 🚧 | Metadata for all substations: meter (analogue) type and power-flow direction. | One solar park's substation number differs from its metadata, to be confirmed with NGED; other sources agree, so low risk. |
 | **Primary Substation Interconnections.csv** | 🚧 | List of possible connections between primary substations (not all are in the trial area). | All trial-area substations have ≥ 1 connection; topology appears complete. |
 | **Substations.csv** | 🚧 | For each substation, bulk supply point (BSP) and grid supply point (GSP): which BSP & GSP it connects to (names + IDs). | All trial-area substations valid. |
 | **Switching Logs.xlsx** | 🚧 | History of every normally-open switching point between primaries, labelled by time-series ID. Primaries outside the trial area are labelled "Unknown". | **Extremely valuable** as the gold-standard *test set* for [switching-event detection](switching-events.md) — lets us validate the unsupervised method on the trial area (labels do **not** exist at scale). Some edges "collapse" into `[substation ID] – unknown`. Two edges present in Interconnections.csv are missing: 900016 (ID 10) ↔ 900019 (ID 13), and 900022 (ID 16) ↔ unknown (910026). Logs go back to ≥ 2019. |
 | **MPAN to Substation Number.csv** | 🚧 | Associates each Embedded Capacity Register (ECR) generator to the substation it connects to. | All trial-area generators present, each with two Meter Point Administration Numbers (MPANs, import + export). Three primaries appear with one MPAN each, to be confirmed with NGED. |
-| **Peak Loads.xlsx** | 🚧 | Manually selected peak demand per trial-area substation, from 2024/25 (most recent survey). | Covers all 16 trial primaries. At several primaries the recorded peak differs from the telemetry maximum, probably because the two measure different quantities (a survey-period peak against an all-history maximum that includes abnormal running arrangements), so we use the **99th percentile of observed power** as the substation "capacity" proxy, at least initially. |
+| **Peak Loads.xlsx** | 🚧 | Manually selected peak demand per trial-area substation, from 2024/25 (most recent survey). | Covers all 16 trial primaries. 12 primaries have 2024/25 readings above the recorded peak. Even at the 99th percentile of observed power, 3 primaries show 2–4× the recorded peak, and at one primary the recorded peak is about twice the telemetry maximum. Given these discrepancies, we use the **99th percentile of observed power** as the substation "capacity" proxy, at least initially. |
 
 ---
 
@@ -70,7 +70,7 @@ historical data (full detail + plots in the Milestone 1 report, Appendices A & B
   generators legitimately don't report overnight, but not all gaps are nighttime; gaps can last
   hours to months.
 - **Meter quality flags**: some meters carry NGED's own quality flags ("analogue not working" or
-  "analogue suspect"), which we honour.
+  "analogue suspect"), which ingestion does not yet act on.
 - **False zeros**: substation telemetry has occasional drop-outs to zero, visible as an excess of
   exact zeros in the distribution vs. near-zero values.
 - **Not-on assets**: one trial-area generator has not been operating since mid-2024 — motivating

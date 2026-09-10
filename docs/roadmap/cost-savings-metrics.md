@@ -30,6 +30,7 @@ them up:
 1. **Flexibility procurement.** NGED pay flexible customers to reduce demand when a site risks
    running beyond its limit. NGED procures flexibility conservatively as a safeguard against
    forecast uncertainty, so a sharper forecast needs less flexibility for the same security.
+   Metric 1 measures NGED's own spend on flexibility.
 2. **Curtailment of generation.** Generators are curtailed to keep exports within network limits.
    Curtailment avoided is generation sold, priced as a whole-system cost rather than a saving to
    NGED or the connected generator specifically — see [curtailment price
@@ -214,11 +215,11 @@ It may change: the network operator could in future need to pay a flexibility co
 to curtail generators directly, at which point curtailment would carry a network-operator-borne
 price alongside the whole-system one.
 
-**Published annual curtailment figures use a capacity-based method, so they are not directly
-comparable with this metric.** This metric prices MWh curtailed, whereas a capacity-based method
-starts from MW of capacity and scales it for export volume. A comparison between the two needs
-either a separate replication of the capacity-based method or a label saying the comparison is
-order-of-magnitude only.
+**A published annual curtailment-saving figure may use a capacity-based method, in which case the
+published figure is not directly comparable with this metric.** This metric prices MWh curtailed,
+whereas a capacity-based method starts from MW of capacity and scales it for export volume. A
+comparison between the two needs either a separate replication of the capacity-based method or a
+label saying the comparison is order-of-magnitude only.
 
 ### Which direction is the constraint on?
 
@@ -344,9 +345,9 @@ of each series' distribution, so they cannot carry the cross-series leaderboard.
   Tier 3 exists.
 - **Asset failure and outage costs are excluded.** Outage quantification is valuable but harder,
   and is not in this design.
-- **Some procurement does not depend on the forecast.** Some procurement serves wider aims, such as
-  developing the flexibility market, and does not depend on the forecast, so a better forecast
-  should not be credited with removing it.
+- **Some procurement does not depend on the forecast.** Procurement that serves wider aims, such as
+  developing the flexibility market and supporting the capital programme, does not depend on the
+  forecast. A better forecast should not be credited with removing that procurement.
 
 ## Questions for NGED
 

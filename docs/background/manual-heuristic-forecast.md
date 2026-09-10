@@ -20,8 +20,8 @@ For a given substation and target half-hour, the analogue ensemble is the observ
 
 That is **13 analogues** in total.
 
-The 13 analogues are used as observed and weighted equally. Adjusting for holidays, anomalies,
-and load growth is left to the operator's judgement.
+The 13 analogues are used as observed and weighted equally. The recipe itself makes no holiday,
+anomaly, or load-growth adjustment.
 
 The output is **the plot itself** — an operator looks at the 13 traces and their spread and forms a
 judgement. If a single deterministic number is needed, the operator reads off an upper percentile
@@ -51,8 +51,8 @@ same-weekday analogue selection is built to capture.
 ## Why it matters for us
 
 Because the manual heuristic uses no weather and no ML, beating the manual heuristic is the
-project's core deliverable. Because the recipe leaves the holiday, anomaly, and load-growth
-adjustments to the operator, automating those adjustments (for example, aligning bank holidays and
-moveable feasts) is useful work in its own right. Both the faithful replica and the variant that
-automates those adjustments are specified in [Metrics & leaderboard →
+project's core deliverable. Because the recipe makes no holiday, anomaly, or load-growth
+adjustment, automating those adjustments (for example, aligning bank holidays and moveable
+feasts) is useful work in its own right. Both the faithful replica and the variant that automates
+those adjustments are specified in [Metrics & leaderboard →
 Baseline forecasters](../roadmap/metrics-and-leaderboard.md#baseline-forecasters).

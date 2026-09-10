@@ -408,8 +408,8 @@ roster that is unreadable, or has lost rows, cannot fail a slot or silently drop
 
 This design also serves the operating model for after this Network Innovation Allowance (NIA)
 project (see [Requirements → Operating model &
-handover](../background/requirements.md#operating-model-handover)). The working assumption is that,
-after the NIA project, NGED runs the service on its own AWS account, operated day to day by NGED
+handover](../background/requirements.md#operating-model-handover)). The working assumption is that
+NGED runs the service on its own AWS account, operated day to day by NGED
 staff who did not develop the code, working from the runbooks. For that operator there is no
 tracking server on the hot path to break. The model simply freezes between model updates, and for
 an operator who runs the service without developing the model, a frozen model is a feature, not a
@@ -715,8 +715,8 @@ image](#bake-the-model-into-the-image-at-build-time).
 **Why we rejected it.** It adds runtime moving parts, needs tracking-store access from production,
 and slows cold starts. Baking the model in has none of those drawbacks. The rejection gets stronger
 under the operating model for after the NIA project (see [Requirements → Operating model &
-handover](../background/requirements.md#operating-model-handover)). The working assumption is that,
-after the NIA project, NGED runs the service on its own AWS account. With the model baked in, NGED
+handover](../background/requirements.md#operating-model-handover)). The working assumption is that
+NGED runs the service on its own AWS account. With the model baked in, NGED
 never has to run — or depend on — an MLflow tracking server at all. The model simply freezes until a
 new image arrives: a new model reaches production only as a new container image, so the production
 runtime never needs MLflow.

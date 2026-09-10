@@ -185,7 +185,7 @@ tools read it directly, and the "server" role is played by object storage. In ne
 application code manage the files by hand.
 
 And Delta Lake is thoroughly mainstream technology. Databricks built its entire platform on Delta
-Lake; and Adobe, Comcast, Salesforce, and Apple all run it at massive scale.
+Lake. Adobe, Comcast, Salesforce, and Apple all run Delta Lake at massive scale.
 More broadly, the open-table-format family it
 belongs to (Delta Lake; [Apache Iceberg](https://iceberg.apache.org/), created at Netflix; [Apache
 Hudi](https://hudi.apache.org/), created at Uber) is now the standard way large companies store and
@@ -423,10 +423,10 @@ Same-region AWS-to-AWS transfer is free even across accounts, but internet-egres
 is identical in these two regions — so matching regions only pays off if NGED reads via **their own
 AWS-hosted compute** (e.g. Athena, Glue, an EC2/Lambda job) in `eu-west-2`, not if they read via
 a desktop client like Power BI over the public internet, where the region choice makes
-no difference to the bill. That AWS-native path is the one v2 scale points towards anyway:
-once `power_forecasts` reaches the trillion-row range, bulk reads need a query engine (for example
-Athena) rather than a desktop client, and running that engine in `eu-west-2` is what turns those
-reads free instead of £0.015–0.067/GB.
+no difference to the bill. That AWS-native path is the one v2 scale points towards anyway. A
+desktop spreadsheet caps out at 1,048,576 rows, so once `power_forecasts` reaches the trillion-row
+range, bulk reads need a query engine (for example Athena) rather than a desktop client. Running
+that query engine in `eu-west-2` is what turns those reads free instead of £0.015–0.067/GB.
 
 Ireland is the cheaper region on everything else, and the premium is small enough not to outweigh
 that. AWS Price List API data (2026-07-03) shows `eu-west-1` consistently cheaper than `eu-west-2` —

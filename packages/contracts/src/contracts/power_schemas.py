@@ -261,7 +261,6 @@ class TimeSeriesMetadata(pt.Model):
         # Maps to the nested Area.WKT field in the JSON data.
         description=(
             "WKT polygon for the asset’s area. In the trial, only Primary substations have this."
-            " Customer sites carry no polygon in the V1 trial data."
             " For customer sites, where present, refers to the area covered by the generator"
             " itself."
         ),

@@ -332,7 +332,7 @@ above](#the-graph-structured-engine)). Two points matter for consistency with th
 document:
 
 - The graph is a **data structure** — who can exchange load with whom.
-- Conservation is a **node-level flow balance** across a 2–3-way fan-out (a source's loss
+- Conservation is a **node-level flow balance** across the 2–3-way fan-out observed in the trial area (a source's loss
   absorbed by a subset of neighbours whose pickups sum to it), *not* a pairwise
   equal-and-opposite transfer.
 

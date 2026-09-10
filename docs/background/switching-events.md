@@ -1,6 +1,6 @@
 # Switching Events
 
-NGED's primary substations are fed by a meshed high-voltage (HV) network that is **operated radially** — at any instant a set of switches is held open to break parallel paths so power flows in a tree. When operators reconfigure that tree (a "switching event"), load that was metered at one substation is, afterwards, metered at one or more neighbouring substations. For a material fraction of the time, varying by substation, a given substation is in an **abnormal running arrangement (ARA)**, and its meter reading does not reflect its *latent demand under the normal running arrangement (NRA)*. See [Switching Events & Latent Demand](../roadmap/switching-events.md) for the modelling plan to detect and reconstruct NRA demand (from the v0.6 forecaster and detector to the later v2-scale mixture models).
+NGED's primary substations are fed by a meshed high-voltage (HV) network that is **operated radially** — at any instant a set of switches is held open to break parallel paths so power flows in a tree. When operators reconfigure that tree (a "switching event"), load that was metered at one substation is, afterwards, metered at one or more neighbouring substations. Roughly 10% of the time a given substation is in an **abnormal running arrangement (ARA)**, and its meter reading does not reflect its *latent demand under the normal running arrangement (NRA)*. See [Switching Events & Latent Demand](../roadmap/switching-events.md) for the modelling plan to detect and reconstruct NRA demand (from the v0.6 forecaster and detector to the later v2-scale mixture models).
 
 The figure below shows an example of a real switching event, where power is temporarily diverted
 from one substation (in red) to a neighbouring substation (in blue). This switching event is an
@@ -15,7 +15,7 @@ NGED's 11 kV / 6.6 kV high-voltage (HV) distribution network is **physically mes
 This matters enormously, and the bullets below all follow from it:
 
 - **Almost any switch can be opened or closed.** The electricity network can be reconfigured into an enormous number of valid radial trees by opening or closing switches. The configuration is not fixed.
-- **There is no stable, re-identifiable "feeder."** Intuitively one might imagine a substation's load is divided into a handful of fixed "feeders," each a chunk that moves as a unit. In a meshed network run radially, a substation's load is *not* divided into fixed feeders: because a switch can be opened essentially anywhere along a meshed path, the cut points themselves move instead. There is no persistent sub-unit with a stable identity or a stable composition.
+- **There is no stable, re-identifiable "feeder."** Intuitively one might imagine a substation's load is divided into a handful of fixed "feeders," each a chunk that moves as a unit. In NGED's meshed HV network run radially, a substation's load is *not* divided into fixed feeders: because a switch can be opened essentially anywhere along a meshed path, the cut points themselves move instead. There is no persistent sub-unit with a stable identity or a stable composition.
 - **Load is a near-continuous distribution along the electricity network itself.** Demand is spread along the HV circuits and can be split at (almost) any point. When operators reconfigure, the amount of load that moves is "whatever happened to sit between the old cut point and the new one" — an unknown, continuously variable quantity.
 
 The picture below contrasts the *physical* mesh (all paths exist) with the *operated* radial state (some switches held open, marked `/`, so power flows in a tree). `[A]`–`[D]` are primary substations; `===` is an energised circuit; `/` is a normally-open switch; `·` marks the load tapped along each circuit.
@@ -33,8 +33,8 @@ The picture below contrasts the *physical* mesh (all paths exist) with the *oper
 
 Both pictures are the *same wires*. Operators choose which switches are open, so the radial tree on the right is just one of many valid configurations of the mesh on the left. A switching event moves the `/` marks. Because the tapped load `·` is spread continuously along every circuit, moving a switch transfers *the whole slice of load* that sat between the old and new cut points.
 
-Switching events can last from minutes to months. Each substation spends a material fraction of
-its time in a switching event, and the fraction varies by substation. One "saving grace" is that, the smaller a switching event, the less we care
+Switching events can last from minutes to months. Each substation is in a switching event for
+roughly 10% of the time. One "saving grace" is that, the smaller a switching event, the less we care
 about it (because a small switching event won't harm our forecast much).
 
 ## What actually happens during a switching event
@@ -48,15 +48,15 @@ The **observable effect at the substation meters** is a sustained, roughly step-
 
 ## Worked example
 
-In one real fault, an 11 kV breaker tripped at a primary substation. Over the following ~90 seconds, automatic restoration closed switches that picked the tripped primary's whole load up from **two neighbouring primaries**, through several separate switching operations: one onto the first neighbour and three onto the second.
+In one real fault, an 11 kV breaker tripped at a primary substation. Over the following ~90 seconds, restoration closed switches that picked the tripped primary's whole load up from **at least two distinct primaries**, through several separate switching operations: one onto the first neighbour and three onto the second.
 
-So a single source substation's load fanned out to **two distinct primaries**. Triggered by a fault, the event is a *whole-primary* transfer.
+Triggered by a fault, the event is a *whole-primary* transfer.
 
 ## The two facts that make this hard
 
 Issue: [#181](https://github.com/openclimatefix/nged-substation-forecast/issues/181)
 
-Two properties of a meshed network run radially shape the entire problem:
+Two properties observed in the trial area shape the entire problem:
 
 1. **Multi-recipient is the norm.** When load is diverted, it typically fans out to **2–3 neighbouring substations**, not one. Conservation must be reasoned about as a **node-level flow balance**: one source's lost power is absorbed by a *subset* of neighbours whose individual pickups sum to the source's loss.
 

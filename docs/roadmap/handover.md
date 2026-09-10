@@ -12,15 +12,15 @@
 
 For the remainder of the NIA project, nothing about the milestone arc changes — see
 [the roadmap](index.md#milestones) for the v1/v2 plan and [Requirements → Operating model &
-handover](../background/requirements.md#operating-model-handover) for the agreed phasing.
+handover](../background/requirements.md#operating-model-handover) for the planned phasing.
 What changes is a **standing design constraint** on everything we build from now on:
 
 **NGED staff who did not develop the code must be able to run the service day to day, working
 from the runbooks.** The day-to-day skill the service calls for is operations, not Python: if the
 service is designed well, the day-to-day operator never needs to touch Python at all. Every
 routine action must reduce to "look at a dashboard, click a button in the Dagster UI, or follow a
-runbook". Anything that can't be reduced to that is, by definition, OCF's job, done on a scheduled
-cadence (e.g. quarterly maintenance windows) rather than reactively.
+runbook". During the NIA project, any action that can't be reduced to those three is OCF's job,
+done on a scheduled cadence (e.g. quarterly maintenance windows) rather than reactively.
 
 Several decisions already made serve this constraint well, and this page makes that connection
 explicit so we don't accidentally undo them:
@@ -29,14 +29,17 @@ explicit so we don't accidentally undo them:
   server) on the production hot path — see
   [Production Deployment — Design](../architecture/production-deployment.md). Under the
   handover model this is a feature twice over: there are fewer runtime moving parts to break,
-  and the model simply *freezes* between OCF's scheduled interventions.
+  and the model simply *freezes* between model updates.
 - **Replay mode** means a missed slot is recovered by a one-click UI backfill, not by an
   engineer reconstructing state — see
   [Operating the live service](../live_service/operations.md).
 - **Promotion is rebuild + redeploy**, auditable via image tags — no live mutable model
   registry for an operator to mis-drive.
-- **No static AWS keys** (IAM roles throughout) removes a whole class of credential-expiry
-  incidents, and matches the constraints corporate AWS environments typically impose anyway.
+- **No static AWS keys for OCF's own resources** (IAM roles throughout) removes a whole class
+  of credential-expiry incidents. The two static credentials that remain sit at the boundary with
+  NGED — the NGED read-access user and the source-bucket credentials — and
+  [workstream 5](#5-confirm-ngeds-cloud-and-security-standards-early) checks whether NGED's
+  standards permit them.
 - **The pipeline runs end-to-end on a laptop** — the live schedules were dress-rehearsed
   locally under `dg dev` before any AWS compute existed. And the standing preference is
   portable application logic over cloud-native glue (e.g. no EventBridge rules) wherever a
@@ -72,23 +75,22 @@ Keep the contract to roughly **ten items or fewer**, each one a documented butto
 command with a runbook page in [`docs/live_service/`](../live_service/index.md).
 
 Everything *not* on that list — model promotion, dependency upgrades, schema changes, infrastructure
-changes — is OCF's job by definition, handled on a scheduled maintenance cadence (and, post-NIA,
-under whatever support arrangement is agreed). Model re-training sits in this category too: the
-re-training pipeline is automated end-to-end, so "re-training" means triggering and reviewing an
-automated run on a regular cadence. Who triggers and reviews those runs after the NIA project is
-for the support agreement to set.
+changes — is OCF's job during the NIA project, handled on a scheduled maintenance cadence. After
+the NIA project, the [written support agreement](#7-organisational-prerequisites) sets who does
+that work. Model re-training sits in this category too: the re-training pipeline is automated
+end-to-end, so "re-training" means triggering and reviewing an automated run on a regular cadence.
 
 One **optional tier** sits between "follow a runbook" and "escalate to OCF", for the more
 mysterious bugs that fall outside the contract but that NGED may want to try fixing themselves:
 
 1. Reproduce the issue locally — the pipeline runs end-to-end on a laptop, precisely to make
    this possible.
-2. Propose a fix, with AI coding tools (e.g. Claude Code) if NGED's policies allow them.
-3. Run the full test suite, then put the fix through NGED's change-control process. OCF reviews
-   the fix before it reaches production.
+2. Propose a fix — using AI coding tools (e.g. Claude Code) where NGED's policies allow them.
+3. Run the full test suite, then put the fix through NGED's change-control process. Where the
+   support agreement covers code review, OCF reviews the fix before it reaches production.
 4. If any of that fails, escalate to OCF.
 
-This tier is optional — "escalate to OCF" is always an acceptable answer. It is, however, where
+"Escalate to OCF" is always an acceptable answer. The bug-fixing tier is nonetheless where
 most of the in-person handover training (workstream 6) is expected to focus, because routine
 operation should need very little training if the operator contract is doing its job.
 
@@ -153,14 +155,16 @@ What the handover requirement adds:
 
 The possible **hybrid model** (see
 [Requirements](../background/requirements.md#operating-model-handover)) — NGED running the
-production instance while OCF runs a second instance for development, other DNOs, or
-commercial products — makes account-portability doubly valuable: the second deployment of the
+production instance while OCF runs a second instance for development or other distribution
+network operators — makes account-portability doubly valuable: the second deployment of the
 same IaC is OCF's own.
 
-### 5. Agree NGED's cloud and security standards early
+### 5. Confirm NGED's cloud and security standards early
 
-**OCF's access design will need to fit NGED's cloud and security standards, so those standards
-need agreeing with NGED early** — well before the final months of the project. The access design
+**OCF's access design will need to fit NGED's cloud and security standards, so OCF needs to
+confirm those standards with NGED early** — well before the final months of the project.
+Corporate cloud environments commonly impose service control policies, mandatory patching and
+security agents, restricted egress, and bans on long-lived credentials. The access design
 is the part of the service those standards bear on most, because in the current design [the
 network layer *is* the authentication layer](live-service.md#access-phasing): none of the web UIs
 (Dagster, MLflow, and Marimo) has built-in authentication, and Tailscale is what restricts who can
@@ -170,8 +174,11 @@ or a proxy fronted by single sign-on), not a component swap.
 
 Concrete steps:
 
-- Agree with NGED what can run in NGED's AWS account, which network ingress and egress are
+- Confirm with NGED what can run in NGED's AWS account, which network ingress and egress are
   permitted, and how NGED staff authenticate to internal web UIs.
+- Confirm whether NGED's standards permit long-lived access keys, because the NGED read-access
+  user and the source-bucket credentials both depend on them (see
+  [Setting up the live service on AWS](../live_service/aws.md)).
 - Agree with NGED which teams own which parts of operation: the Dagster level, the operating
   system, and the AWS account. That split changes what the runbooks need to cover, and whom the
   game days train.
@@ -214,11 +221,11 @@ alongside the technical work:
 
 ## Timing and decision gates
 
-- **The agreed phasing is recorded in [Requirements → Operating model &
+- **The planned phasing is recorded in [Requirements → Operating model &
   handover](../background/requirements.md#operating-model-handover)**: OCF running the service
   through the NIA project, a scale gate at v2, and progressive handover in the final months,
   under the working assumption that NGED runs the service on its own AWS account after the NIA
-  project. Workstream 5 (agreeing NGED's cloud and security standards) is the one workstream that
+  project. Workstream 5 (confirming NGED's cloud and security standards) is the one workstream that
   should start well before that final-months handover; the rest land alongside the v1/v2
   milestones they depend on.
 - **The operating model after the NIA project remains NGED's decision.**

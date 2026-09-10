@@ -159,8 +159,8 @@ precedent means for Flexpectation. The sections that follow give the evidence be
 version 1 forecasts the 20 substations among the 32 series in NGED's trial area — 16 primary
 substations, 2 grid supply points, and 2 bulk supply points. Version 2 extends that to net demand at
 every grid supply point, bulk supply point, and primary substation in NGED's licence areas. Our
-forecasts will be half-hourly, 14 days ahead, updated every 6 hours, and probabilistic. The forecast
-is designed for use 1 to 10 days ahead. The question NGED asks of the forecast is "how likely is net
+forecasts will be half-hourly, 14 days ahead, updated every 6 hours, and probabilistic. Users mostly
+act on the forecast 1 to 10 days ahead. The question NGED asks of the forecast is "how likely is net
 demand to run outside the substation's firm capacity?" rather than "what is the most likely net
 demand?". A substation's *firm capacity* is the load it can carry safely with its largest
 transformer out of service.
@@ -935,9 +935,13 @@ register and no outage messages. Dantas and Browell did use one data source Flex
 have in the same form: they excluded curtailed half-hours using published bid-acceptance volumes.
 Those volumes exist for transmission-connected wind farms and not for NGED's embedded generators.
 NGED's active network management system records curtailment for each of NGED's generator customers.
-NGED's active network management records are not in the same form as a bid-acceptance volume, so the
-two records cannot be substituted directly. The general shape of that capacity-estimation rule is a
-running maximum of production, which ratchets upwards and never comes back down. In contrast,
+Like any operational log, the active network management record is a noisy label: curtailment can
+happen with no matching log entry, and a logged event may differ from the generator's actual output.
+The active network management record therefore cannot simply be dropped in where Dantas and Browell
+used bid-acceptance volumes (see
+[effective-capacity estimation](../roadmap/capacity-estimation.md#what-effective-capacity-must-exclude)).
+The general shape of that capacity-estimation rule is a running maximum of production, which
+ratchets upwards and never comes back down. In contrast,
 [Viotti et al. (2026)](https://doi.org/10.1002/we.70136) fit the most likely capacity time series
 instead, by quadratic optimisation against a capacity factor simulated from reanalysis weather and a
 power curve. Viotti et al. publish a monotonic variant alongside a non-monotonic variant. The
@@ -1062,9 +1066,10 @@ to another, the load the first substation meters steps down. Each substation tha
 that transferred load records a rise, with no change in the underlying demand. The pick-up is
 usually shared across two or three neighbouring substations. Usually only part of a substation's
 load moves — a continuous fraction, with no minimum size — rather than a whole subgrid. NGED's
-substations spend roughly a tenth of their operating time in an abnormal running arrangement.
-Switching records have been extracted into labels only for the Flexpectation trial area. Any method
-meant to scale beyond the trial area therefore has to work from power measurements alone.
+substations spend roughly a tenth of their operating time in an abnormal
+running arrangement. Switching records have been extracted into labels only for the Flexpectation
+trial area. Any method meant to scale beyond the trial area therefore has to work from power
+measurements alone.
 
 #### What the literature says
 
@@ -3023,10 +3028,10 @@ building bigger transformers and cables — in the current price-control period,
 next, and from a 25% improvement in the cost-effectiveness of contracted flexibility. Curtailment is
 not included in Artificial Forecasting's four benefit categories. The forecast covers customer
 export at primary substations. But the one published value case in this review puts no money on
-curtailment. The Artificial Forecasting project pairs those figures with a direct caveat: Artificial
-Forecasting reports early Beta evidence, from one winter procurement cycle, supporting the
-performance assumptions behind the value case, which "remains appropriate, subject to further
-validation".
+curtailment, which is in Flexpectation's scope alongside flexibility procurement. The Artificial
+Forecasting project pairs those figures with a direct caveat: Artificial Forecasting reports early
+Beta evidence, from one winter procurement cycle, supporting the performance assumptions behind the
+value case, which "remains appropriate, subject to further validation".
 
 **Artificial Forecasting is independent evidence that short-term substation forecasting is
 operationally useful**, that a network operator will change its procurement process around a
@@ -3067,8 +3072,8 @@ appears 123 times but never as an effective or derated capacity. And the five oc
 "switch" stem are generators switching on or off, switchgear asset types, and switching over a data
 feed. Heat pumps and electric vehicles do appear, as drivers of demand growth and as model features
 rather than as quantities separated out of a net flow. Flexpectation also delivers 1st and 99th
-percentiles where Artificial Forecasting's published bands run from the 5th to the 95th. Curtailment
-decisions turn on those outer percentiles.
+percentiles where Artificial Forecasting's published bands run from the 5th to the 95th. The
+curtailment decisions in Flexpectation's scope turn on those outer percentiles.
 
 ## Why we think this ambitious plan can be done
 

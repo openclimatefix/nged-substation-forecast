@@ -20,7 +20,7 @@ Each forecast is:
 
 **Version 2** (future): Scale to approximately 2,500 time series covering all 1,161 of NGED's primary substations, NGED's bulk supply points and grid supply points, and most customer meters.
 
-**After the NIA project**: the working assumption is that, after the NIA project, NGED runs the
+**After the NIA project**: the working assumption is that NGED runs the
 service on its own AWS account. The service is therefore being built to be operable day to day by
 NGED staff who did not develop the code, working from the runbooks. See [Requirements → Operating
 model & handover](background/requirements.md#operating-model-handover) and the [Handover to

@@ -32,7 +32,7 @@ hydro-dominated.
 
 ## Data quality in the trial area
 
-**Distribution-level telemetry, at NGED as at every distribution network operator, carries more
+**Distribution-level telemetry, at NGED as is typical of distribution networks, carries more
 gaps and measurement artefacts than transmission-level telemetry.** The
 sections below are the issues observed in the trial area, each a distinct phenomenon rather than
 one fault seen several ways. See the ["Data sources" section of our Milestone 1
@@ -63,11 +63,11 @@ Gaps range from a few half-hours to months. Solar farms frequently have no data 
 
 ### Apparent power (MVA) metering
 
-Some substations only have MVA meters, which report the *absolute value* of power flow — they cannot detect direction. When generation exceeds demand and power flows "backwards", the MVA reading increases rather than going negative. This "bouncing off zero" behaviour looks like a demand increase but is actually reverse power flow. In the trial area, 10 sites are metered in apparent power, and at least one has shown reverse flow on sunny days. The following figure shows power flow for Stickney primary and Leverton Solar Park; note the absence of peaks at Stickney primary on May 3rd and 4th when Leverton experienced lower generation: ![Power flow for Stickney primary and Leverton Solar Park; note the absence of peaks at Stickney on May 3rd and 4th, when Leverton experienced lower generation](assets/MVA_metering_bounce_at_Stickney_primary.png)
+Some substations only have MVA meters, which report the *absolute value* of power flow — they cannot detect direction. When generation exceeds demand and power flows "backwards", the MVA reading increases rather than going negative. This "bouncing off zero" behaviour looks like a demand increase but is actually reverse power flow. In the trial area, 10 sites are metered in apparent power, and one, and possibly two more, have shown reverse flow on sunny days. The following figure shows power flow for Stickney primary and Leverton Solar Park; note the absence of peaks at Stickney primary on May 3rd and 4th when Leverton experienced lower generation: ![Power flow for Stickney primary and Leverton Solar Park; note the absence of peaks at Stickney on May 3rd and 4th, when Leverton experienced lower generation](assets/MVA_metering_bounce_at_Stickney_primary.png)
 
 ### Switching events
 
-Power is periodically diverted from one substation to another during maintenance or in response to faults ("abnormal running arrangement"). Each substation spends a material fraction of its operating time in an abnormal arrangement, and the fraction varies by substation. Switching events severely bias lagged-power features (the single most informative feature for demand forecasting) if not detected and handled. Recovering the demand that *would* have been metered under the normal running arrangement is described in [Switching Events](switching-events.md); the staged solution plan is in the [roadmap](../roadmap/switching-events.md) (v0.6 detector → v2 mixture models).
+Power is periodically diverted from one substation to another during maintenance or in response to faults ("abnormal running arrangement"). Each substation spends roughly 10% of its operating time in an abnormal arrangement. Switching events severely bias lagged-power features (the single most informative feature for demand forecasting) if not detected and handled. Recovering the demand that *would* have been metered under the normal running arrangement is described in [Switching Events](switching-events.md); the staged solution plan is in the [roadmap](../roadmap/switching-events.md) (v0.6 detector → v2 mixture models).
 
 ## Behavioural calendar effects on demand
 

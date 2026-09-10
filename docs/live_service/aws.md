@@ -1289,9 +1289,20 @@ Once the service is live, shipping a better model is a repeat of a slice of this
 
 ## Granting NGED read access
 
-The mechanism for NGED's read access is to be agreed. [Forecast Delivery: Securing
-it](../architecture/forecast-delivery.md#securing-it) sets out the constraints the mechanism has to
-meet.
+**Current proposal, to be agreed with NGED: a single dedicated IAM user.** Check that the
+mechanism has been agreed before creating anything. [Forecast Delivery: Securing
+it](../architecture/forecast-delivery.md#securing-it) assumes a single authenticated AWS user for
+NGED, with no per-user entitlement matrix, because NGED is the only consumer. A single consumer
+points at a dedicated IAM user rather than a cross-account role. The desktop analytics tools named
+on that same page, such as Power BI, don't support AWS role-assumption: they need a plain access key
+and secret, the same shape of credential an IAM user provides.
+
+The proposed shape is **one** IAM user (not one per bucket — the stability signal comes from the
+bucket split itself, not from access segmentation), with a read-only policy across both bucket ARNs,
+`nged-forecast-delivery` and `nged-forecast-internal` (`s3:GetObject`, `s3:ListBucket` — no
+`PutObject`/`DeleteObject`). The access key would be provided to NGED the same way
+[Step 2](#step-2-grant-data-access-with-iam)'s dashboard credentials are configured, and rotated
+periodically once the access is live.
 
 ## See also
 

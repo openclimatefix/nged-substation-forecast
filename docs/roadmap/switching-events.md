@@ -1,6 +1,6 @@
 # Switching events — Approach & Implementation Roadmap
 
-**Scope.** How to make each NGED primary substation's forecast robust to switching events — and, further out, how to reconstruct its *latent demand under the normal running arrangement (NRA)* (the demand that would be metered if the electricity network were never reconfigured) — given that the electricity network is in fact reconfigured from time to time by switching events. The nearest-term approach is a switching-robust forecaster; the latent-demand reconstruction is later research. Background on what switching events are and why they are hard is at [**Switching Events**](../background/switching-events.md). This document defines the ordered set of approaches, from the v0.6 forecaster and detector to the later v2-scale mixture models.
+**Scope.** How to make each NGED primary substation's forecast robust to switching events — and, further out, how to reconstruct its *latent demand under the normal running arrangement (NRA)* (the demand that would be metered if the electricity network were never reconfigured) — given that the electricity network is in fact reconfigured roughly 10% of the time by switching events. The nearest-term approach is a switching-robust forecaster; the latent-demand reconstruction is later research. Background on what switching events are and why they are hard is at [**Switching Events**](../background/switching-events.md). This document defines the ordered set of approaches, from the v0.6 forecaster and detector to the later v2-scale mixture models.
 
 > **Status: 🔬 Research / 🚧 Planned.** Epic:
 > [#151](https://github.com/openclimatefix/nged-substation-forecast/issues/151) (the v0.6
@@ -190,7 +190,7 @@ own training history.**
 - *Fit robustly, because the training history itself contains switching events.* Fitted
   straight, the baseline is biased toward the contaminated periods. Fit with a **robust loss**
   (quantile or Huber), or iteratively: fit → flag large residuals as candidate events → refit
-  excluding them. Because events occupy only a small fraction of the time, a robust fit recovers the
+  excluding them. Because events occupy only ~10% of the time, a robust fit recovers the
   NRA relationship and the events fall out as residuals. That robust-fit recovery closes a virtuous
   loop with the detector itself — detected events feed
   back to clean the baseline's training data.
@@ -220,7 +220,7 @@ own training history.**
   Planned switching is not uniform through the year. A flexible time-of-year covariate fitted on
   contaminated history can therefore absorb systematic ARA effects into "seasonality", and the
   robust loss does *not* fix that absorption, because the contamination is locally dense within
-  the season even though it is only a small fraction overall. So prefer multiple years of history, and make
+  the season even though it is only ~10% overall. So prefer multiple years of history, and make
   sure the fit → flag → refit loop removes flagged periods from the seasonal fit too.
 
 #### Approach 1 — the two-stage forecaster
@@ -302,8 +302,8 @@ flag, event age, attributed magnitude) are themselves natural features for this 
   question (each series has its own neighbour set, of varying size) is answered by the pooled
   design below — a fixed handful of permutation-invariant pooled columns, never one column per
   neighbour.
-- **Data volume.** Learning multi-donor conservation implicitly from 32 series, in which switching
-  events occupy a small fraction of the time, asks a lot of a tabular learner. Expect the model to learn "persist my own offset"
+- **Data volume.** Learning multi-donor conservation implicitly from 32 series with ~10% event
+  occupancy asks a lot of a tabular learner. Expect the model to learn "persist my own offset"
   easily and neighbour attribution only weakly. The closed-form detector exploits that structure
   directly, which is another reason the two-stage forecaster complements the detector rather
   than replacing it.
@@ -722,7 +722,7 @@ model](#approach-4-the-magnitude-only-mixture-model-the-workhorse) is for.
 **The same subtraction turns the ARA mask into an optional patch, keeping switching-affected
 training rows instead of discarding them.** The subtraction version is still useful in its own
 right: it turns the ARA *mask* into an optional *patch* — keep switching-affected periods in the
-forecast training data with corrected values rather than discarding the event periods from the record. Whether the
+forecast training data with corrected values rather than discarding ~10% of the record. Whether the
 patch beats the hole is quick to measure on the synthetic-injection harness.
 
 **What this approach misses / cons.**
@@ -1216,8 +1216,8 @@ $$ \text{observed}_i(t) = \alpha_{ii}(t)\, d_i(t) + \sum_{j \,\in\, \text{neighb
 - **The neighbourhood is the graph:** $\text{neighbours}(i)$ is exactly $i$'s neighbour set in the electricity-network graph, so the edges act as a *sparsity pattern* on the mixing matrix — most $\alpha_{ij}$ are structurally fixed at zero, and only the handful corresponding to real edges are free parameters. The sparsity pattern is what makes the model identifiable and tractable rather than an $N \times N$ free-for-all.
 - Under NRA: $\alpha_{ii} \approx 1$, $\alpha_{ij} \approx 0$.
 - During an ARA: weight shifts from a source onto **one or more** neighbours. Multiple $\alpha_{ij}(t)$ may be active at once for a single source.
-- **Conservation = node-level flow balance:** weight leaving $i$ is distributed across a subset of neighbours and must sum to the weight lost at $i$ (approximately mass-preserving over the affected neighbourhood). **Do not** implement this as independent pairwise equal-and-opposite constraints — that is wrong given confirmed 2–3-way fan-out.
-- **Priors / regularisation:** $\alpha(t)$ strongly regularised toward the identity (NRA) and **piecewise-constant in time**, because switching events occupy a small fraction of the time and are abrupt. A useful by-product: jumps in $\alpha$ are directly interpretable as detected switching events.
+- **Conservation = node-level flow balance:** weight leaving $i$ is distributed across a subset of neighbours and must sum to the weight lost at $i$ (approximately mass-preserving over the affected neighbourhood). **Do not** implement this as independent pairwise equal-and-opposite constraints — that is wrong given the observed 2–3-way fan-out.
+- **Priors / regularisation:** $\alpha(t)$ strongly regularised toward the identity (NRA) and **piecewise-constant in time**, because switching events are rare (~10% of the time) and abrupt. A useful by-product: jumps in $\alpha$ are directly interpretable as detected switching events.
 - **$d_i(t)$ must itself be modelled, not left free.** If the latent demand were an unconstrained
   value per timestep the model would be hopelessly underdetermined — any observation can be
   explained by moving $d$ instead of $\alpha$. $d_i(t)$ is a weather/calendar-driven model plus a
@@ -1404,7 +1404,7 @@ The obvious further stage models the **actual switchable physical units (feeders
   fleet-wide switching logs would improve the forecast.
 - **Do not fit pilot-only parameters and rely on them at scale.** Any parameter learned only on the 16 labelled primary substations that cannot be set for the other ~1,145 primary substations is forbidden as a *production* dependency. The *method* generalises; a pilot lookup does not.
 - **Neighbour/adjacency structure** for the trial substations — which substations can exchange load (needed to define graph edges and the attribution search). Even approximate adjacency helps; note that because cut points move, "adjacency" means "can be electrically connected by some switching," not a fixed feeder map.
-- **Project assumptions:** (a) multi-recipient transfer (2–3 donors) is the norm; (b) partial transfers (some, not all, of a substation's load) are the common and harder case; (c) no stable "feeder" unit exists; (d) switching labels exist only for the trial area, not at scale.
+- **Observed in the trial area:** (a) multi-recipient transfer (2–3 donors) is the norm; (b) partial transfers (some, not all, of a substation's load) are the common and harder case; (c) no stable "feeder" unit exists; (d) switching labels exist only for the trial area, not at scale.
 - **To ask NGED:** (a) how complete are the control-room switching logs for the trial area?
   (Determines whether measured detection precision is a tight bound or a loose lower bound.)
   (b) How completely do NGED's own logs cover the **full fleet**? (Determines whether

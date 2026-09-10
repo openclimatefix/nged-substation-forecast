@@ -37,7 +37,7 @@ guarantee.
 - [Handover to NGED](handover.md) — the operating model after the Network Innovation Allowance
   (NIA) project ends (the working assumption is that NGED runs the service on its own AWS
   account): the operator-contract design constraint, and the handover workstreams (runbooks,
-  alert-on-absence, infra-as-code, agreeing NGED's cloud and security standards, and game days).
+  alert-on-absence, infra-as-code, confirming NGED's cloud and security standards, and game days).
 - [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort
   tiers, ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
 - [Extending the training history](training-history.md) — using ERA5 to train on the power data
@@ -441,8 +441,8 @@ handover](../background/requirements.md#operating-model-handover)). This handove
 single late milestone: it sets a standing design constraint from today (NGED staff who did not
 develop the code must be able to run the service day to day, working from the runbooks — the
 [operator contract](handover.md#1-the-operator-contract)), one workstream that must start early
-([agreeing NGED's cloud and security
-standards](handover.md#5-agree-ngeds-cloud-and-security-standards-early), because the
+([confirming NGED's cloud and security
+standards](handover.md#5-confirm-ngeds-cloud-and-security-standards-early), because the
 Tailscale-based access design has to fit those standards), and a cluster of late-project work
 (runbook hardening, game days, and progressive transfer of control). The gate: OCF runs the full
 v2 service for a few months before NGED decides on the operating model after the NIA project.
