@@ -60,6 +60,7 @@ dev = [
     # dependency purely so `uv sync` installs it and `uv run pytest` can collect its tests.
     "dashboard",
     "pytest-xdist>=3.6.1",
+    "mkdocs-redirects>=1.2.3",
 ]
 
 [project.urls]

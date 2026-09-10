@@ -74,10 +74,11 @@ def list_timeseries_json_files(
     A key that does not match yields null captures and fails `_ProcessedFileListing.validate`,
     which aborts the listing for the whole bucket rather than skipping the one object. That is
     deliberately stricter than the null-`data` handling in `download_and_parse_files`, which logs
-    the offending file and carries on: a malformed reading is one of NGED's meters misbehaving,
-    but a key we cannot parse means NGED's naming convention has changed, so every `start_time`,
-    `end_time` and `time_series_id` this function returns is then suspect — including the ones
-    parsed from the keys that still match.
+    the offending file and carries on. The difference is where the fault lies: a malformed reading
+    originates upstream of our pipeline, at the meter or in the telemetry export, whereas a key we
+    cannot parse means NGED's naming convention has changed. Every `start_time`, `end_time`, and
+    `time_series_id` this function returns is then suspect — including the ones parsed from the
+    keys that still match.
     """
     raw_file_listing: list[_RawFileListItem] = []
     total_objects = 0

@@ -3,8 +3,8 @@
 NGED's primary substations are fed by a meshed high-voltage (HV) network that is **operated radially** — at any instant a set of switches is held open to break parallel paths so power flows in a tree. When operators reconfigure that tree (a "switching event"), load that was metered at one substation is, afterwards, metered at one or more neighbouring substations. Roughly 10% of the time a given substation is in an **abnormal running arrangement (ARA)**, and its meter reading does not reflect its *latent demand under the normal running arrangement (NRA)*. See [Switching Events & Latent Demand](../roadmap/switching-events.md) for the modelling plan to detect and reconstruct NRA demand (from the v0.6 forecaster and detector to the later v2-scale mixture models).
 
 The figure below shows an example of a real switching event, where power is temporarily diverted
-from on substation (in red) to a neighbouring substation (in blue). Note that this is an unusually
-_clear_ example of a switching events - most events are buried in much more noise!
+from one substation (in red) to a neighbouring substation (in blue). This switching event is an
+unusually _clear_ example: most switching events are buried in much more noise.
 
 ![Switching event](assets/switching_event.png)
 
@@ -15,7 +15,7 @@ NGED's 11 kV / 6.6 kV high-voltage (HV) distribution network is **physically mes
 This matters enormously, and the bullets below all follow from it:
 
 - **Almost any switch can be opened or closed.** The electricity network can be reconfigured into an enormous number of valid radial trees by opening or closing switches. The configuration is not fixed.
-- **There is no stable, re-identifiable "feeder."** Intuitively one might imagine a substation's load is divided into a handful of fixed "feeders," each a chunk that moves as a unit. NGED have been explicit that a substation's load is *not* divided into fixed feeders: because a switch can be opened essentially anywhere along a meshed path, the cut points themselves move instead. There is no persistent sub-unit with a stable identity or a stable composition.
+- **There is no stable, re-identifiable "feeder."** Intuitively one might imagine a substation's load is divided into a handful of fixed "feeders," each a chunk that moves as a unit. In NGED's meshed HV network run radially, a substation's load is *not* divided into fixed feeders: because a switch can be opened essentially anywhere along a meshed path, the cut points themselves move instead. There is no persistent sub-unit with a stable identity or a stable composition.
 - **Load is a near-continuous distribution along the electricity network itself.** Demand is spread along the HV circuits and can be split at (almost) any point. When operators reconfigure, the amount of load that moves is "whatever happened to sit between the old cut point and the new one" — an unknown, continuously variable quantity.
 
 The picture below contrasts the *physical* mesh (all paths exist) with the *operated* radial state (some switches held open, marked `/`, so power flows in a tree). `[A]`–`[D]` are primary substations; `===` is an energised circuit; `/` is a normally-open switch; `·` marks the load tapped along each circuit.
@@ -48,18 +48,15 @@ The **observable effect at the substation meters** is a sustained, roughly step-
 
 ## Worked example
 
-NGED supplied a real fault example. At 12:01:38 on 25/05/2026 the **DINDER** primary tripped on a fault (an 11 kV breaker tripped). Over the following ~90 seconds, the control system restored supply by closing switches that picked DINDER's load up from **multiple primaries**:
+In one real fault, an 11 kV breaker tripped at a primary substation. Over the following ~90 seconds, restoration closed switches that picked the tripped primary's whole load up from **at least two distinct primaries**, through several separate switching operations: one onto the first neighbour and three onto the second.
 
-- **Cathedral Park** (= **Wells** primary)
-- **16TD11**, **Cowl Street**, **16MW2** (all = **Shepton Mallet** primary)
-
-So a single source substation's load fanned out to **at least two distinct primaries** (Wells and Shepton Mallet), via several separate switching operations. Triggered by a fault, the DINDER event is a *whole-primary* transfer.
+Triggered by a fault, the event is a *whole-primary* transfer.
 
 ## The two facts that make this hard
 
 Issue: [#181](https://github.com/openclimatefix/nged-substation-forecast/issues/181)
 
-NGED have confirmed two facts that shape the entire problem:
+Two properties observed in the trial area shape the entire problem:
 
 1. **Multi-recipient is the norm.** When load is diverted, it typically fans out to **2–3 neighbouring substations**, not one. Conservation must be reasoned about as a **node-level flow balance**: one source's lost power is absorbed by a *subset* of neighbours whose individual pickups sum to the source's loss.
 
@@ -87,11 +84,11 @@ The diagram shows why "how much moved?" has no clean answer. The load `·` is sp
 
 ## The labels asymmetry
 
-We have **switching labels (control-room logs) only for the 32-series trial area** (16 primaries plus associated generation, grid supply point (GSP), and bulk supply point (BSP) series). When the system expands to the full ~1,161 primary substations, **we will have no switching labels.**
+Switching records (control-room logs) **have been extracted into labels only for the 32-series trial area** (16 primaries plus associated generation, grid supply point (GSP), and bulk supply point (BSP) series). When the system expands to the full ~1,161 primary substations, **the model cannot rely on switching labels as a runtime input.**
 
-The single most important architectural constraint is having no switching labels at full scale. It means:
+The single most important architectural constraint is that the model cannot rely on switching labels at full scale. That constraint means:
 
-- **The production model must run fully unsupervised, on power time series alone.** Switching logs cannot be a runtime input, because at scale they do not exist.
+- **The production model must run fully unsupervised, on power time series alone.** Switching logs cannot be a runtime input, because outside the trial area they have not been extracted into labels.
 - **The 32-series logs are a one-time gold-standard *test set*, not a crutch.** We use them to *validate* the unsupervised method (measure detection precision/recall, recipient-set accuracy, magnitude error), then throw the method — not the labels — at the full electricity network.
 - **Nothing may be learned only where labels exist and relied upon at scale.** Any per-substation or per-boundary parameter fitted only on the labelled 16 primaries is a parameter we cannot set for the other ~1,145. The 16 labelled primaries are a *yardstick*, not a representative seed. The thing that must generalise is the *method*, not a lookup table fitted to the pilot.
 
@@ -104,11 +101,10 @@ NGED's stated requirement is to forecast each substation **as if it were always 
 ## Why power alone — there is no voltage to lean on
 
 Classical topology- and switch-state identification leans almost entirely on **voltage**
-measurements. We cannot. NGED does not meter voltage at primary-substation level. Even where it
-might, two facts defeat the approach: transformer **tap-changes** move voltage independently of
+measurements. We cannot. Voltage is not among the data available to this project. Even where
+voltage measurements exist, two facts defeat the approach: transformer **tap-changes** move voltage independently of
 load, and our **half-hourly** sampling blurs the sub-second transients that voltage-based methods
 need. So switching must be inferred from **real-power balance alone** — the conservation
-fingerprint that the [staged approaches](../roadmap/switching-events.md) are built on. Far from a
-regrettable data gap, inferring switching from real-power balance alone is a deliberate design
-choice: a method that works from power alone is the only method that can run at scale, where
-neither voltage nor switching labels exist.
+fingerprint that the [staged approaches](../roadmap/switching-events.md) are built on. Inferring
+switching from real-power balance alone is a deliberate design choice: a method that works from power alone is the only method that can run at scale, where
+neither voltage nor switching labels are available.

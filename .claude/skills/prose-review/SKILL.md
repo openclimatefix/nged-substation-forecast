@@ -188,7 +188,7 @@ scheduled for deletion has to be promoted to a permanent page before that page g
 **A cross-reference must carry a few words saying what is on the other end.** A bare `H2`, a bare
 "see the design principles", or a link whose visible text is only a label leaves the reader unable
 to tell whether they need to follow it, so they either break off and read the other page or skip a
-claim they should have checked. Write "the model must beat the incumbent forecast at day-ahead
+claim they should have checked. Write "the model must beat the manual heuristic at day-ahead
 (H2)" with the link on the words, not "see H2". A label is an address, not a description, and a
 link whose text is only the address is as opaque as no link at all.
 

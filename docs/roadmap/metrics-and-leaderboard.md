@@ -16,7 +16,7 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > tail & exceedance metrics [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254) ·
 > tricky-days filter [#255](https://github.com/openclimatefix/nged-substation-forecast/issues/255) ·
 > fold hygiene [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226) ·
-> calibrated incumbent [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715).
+> calibrated manual heuristic [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715).
 
 ---
 
@@ -60,26 +60,30 @@ Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/
 No naive baseline exists anywhere in the codebase (only docstring mentions, e.g.
 `contracts/power_schemas.py:242`). Until the leaderboard carries naive rows, XGBoost's NMAE numbers
 aren't interpretable — and, more to the point, we can't answer the question this project exists to
-answer: **do we beat what NGED does today?**
+answer: **do we beat the manual heuristic?**
 
 **Every comparison against a baseline publishes the fraction of series that beat it alongside the
 average error, never the average alone** — see [Publishing results that others can compare
 against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
 for why an average can hide a model getting worse at a substantial minority of series.
 
-### The headline baseline — `nged_incumbent`
+### The headline baseline — `manual_heuristic`
 
-`nged_incumbent` is a faithful reproduction of [NGED's incumbent
-forecast](../background/nged-incumbent-forecast.md) — the analogue-ensemble method they use today,
+`manual_heuristic` is a faithful reproduction of the [manual heuristic
+forecast](../background/manual-heuristic-forecast.md) — the analogue-ensemble method that, until
+recently, was the normal approach to substation forecasting among distribution network operators,
 with no weather model and no ML. In brief (full description and the operator's-eye view are in the
 background page): for each target half-hour it takes the observed power at the **same weekday &
-time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13 analogues**. NGED plot
-and read the analogues by eye, taking the 95th percentile if they need a single number. Reproducing
-it matters because it is *the bar we have to clear to justify the project* — "XGBoost beats
-persistence" is the least we must do; "XGBoost beats the incumbent" is the deliverable. It is the
-first baseline we implement; if we implement only one, it is this one.
+time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13 analogues**. An
+operator reads the plotted analogues by eye. If a single number is needed, the operator picks the
+percentile that matches the company's risk appetite. We score the conservative 95th percentile.
 
-`nged_incumbent` fits our existing machinery, because every one of its 13 members is just a **power
+**Reproducing the manual heuristic matters because the manual heuristic is *the bar we have to
+clear to justify the project*.** "XGBoost beats persistence" is the least we must do; "XGBoost
+beats the manual heuristic" is the deliverable. `manual_heuristic` is the first baseline we
+implement, and the one we would keep if we could implement only one.
+
+`manual_heuristic` fits our existing machinery, because every one of its 13 members is just a **power
 lag**:
 
 - Weekly group (last 6 weeks, same weekday & time): `power_lag_168h, 336h, 504h, 672h, 840h, 1008h`
@@ -90,43 +94,43 @@ So it rides the same audited, no-lookahead pipeline as `PersistenceForecaster` (
 time-series logic. `_nullify_leaky_lags` already sheds the shortest members as lead time grows (past
 7 days the 168 h member nullifies, past 14 days the 336 h, and so on). That shedding leaves the
 annual members to carry the full 14-day horizon. Because the shortest member is a week old, the
-incumbent has *no* short-horizon skill from recent power — realistic, since that is exactly what
-NGED do today, and a reason to keep the pure `PersistenceForecaster` as a contrast rather than to
-sneak a recent-power member in.
+manual heuristic has *no* short-horizon skill from recent power. That gap is faithful to the analogue
+method, and a reason to keep the pure `PersistenceForecaster` as a contrast rather than to sneak a
+recent-power member in.
 
-**`nged_incumbent` is also our first _probabilistic_ baseline — and this is the faithful
-representation, not a bonus.** The plotted spread *is* the incumbent's output — an operator reads it
+**`manual_heuristic` is also our first _probabilistic_ baseline — and this is the faithful
+representation, not a bonus.** The plotted spread *is* the manual heuristic's output — an operator reads it
 by eye. We emit the 13 analogues as 13 `ensemble_member` rows and let the [probabilistic
 metrics](#phase-b-probabilistic-metrics-from-the-existing-ensemble) score them with no extra
 implementation work — scoring the spread is the closest automatable proxy for the plot a human
 actually reads. Two consequences follow.
 
 **`ensemble_member` is overloaded here.** For NWP models that column indexes an NWP ensemble member;
-for `nged_incumbent` it indexes a *historical analogue*. Same column, different meaning. We document
+for `manual_heuristic` it indexes a *historical analogue*. Same column, different meaning. We document
 this on the `PowerForecast` / `AllFeatures` schema so nobody assumes `ensemble_member ⇒ NWP`. The
-incumbent *synthesises* its ensemble inside `predict()` (by unpivoting its analogue-lag columns into
+manual heuristic *synthesises* its ensemble inside `predict()` (by unpivoting its analogue-lag columns into
 member rows) rather than consuming an NWP ensemble; it runs with `weather_source: "none"`.
 
-**Deterministic collapse is a property of the metrics layer, not the incumbent.** The incumbent
-emits its 13 members and nothing else; the [metric-matched collapse
+**Deterministic collapse is a property of the metrics layer, not the manual heuristic.** The manual
+heuristic emits its 13 members and nothing else; the [metric-matched collapse
 decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast) then scores its MAE on
-the members' median (apples-to-apples with every other model's central forecast) and reports NGED's
-*actual* operating point — the **95th percentile** — as a labelled secondary number (`mae`/`mbe` at
-`metric_param="p95"`). Being deliberately conservative, the P95 carries a large *positive* MBE **by
-design** (a peak-safety choice, not a forecasting error), so it belongs *beside* the central metric.
-Either way NGED weight the analogues equally ("no further processing at all"), so equiprobable
-members — and the probabilistic metrics (CRPS etc.) computed over them — are faithful, not an
-approximation.
+the members' median (apples-to-apples with every other model's central forecast) and reports the
+operator's conservative operating point — the **95th percentile** — as a labelled secondary number
+(`mae`/`mbe` at `metric_param="p95"`). Being deliberately conservative, the P95 carries a large
+*positive* MBE **by design** (a peak-safety choice, not a forecasting error), so it belongs *beside*
+the central metric. Either way the analogue method weights the analogues equally, with no further
+processing, so equiprobable members — and the probabilistic metrics (CRPS etc.) computed over them —
+are faithful, not an approximation.
 
 ### A faithful replica and a "simple upgrades" variant
 
-**Most of the benefit may come from a few simple upgrades to what NGED already do, not from heavy ML
-— the message this family of baselines is built to test.** We implement two closely-related
-incumbent baselines:
+**Most of the benefit may come from a few simple upgrades to the analogue method, not from heavy ML
+— the message the pair of baselines is built to test.** We implement two closely-related
+baselines built on the manual heuristic:
 
-- `nged_incumbent` — the faithful replica above. No holiday handling; warts and all. Pure lag
-  features.
-- `nged_incumbent_holiday_aligned` — the same skeleton, but analogue *selection* becomes
+- `manual_heuristic` — the faithful replica above, treating bank holidays as ordinary days. Pure
+  lag features.
+- `manual_heuristic_holiday_aligned` — the same skeleton, but analogue *selection* becomes
   calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type (a
   bank-holiday Monday behaves like a Sunday). Moveable feasts align holiday-to-holiday
   (Easter→Easter) rather than by fixed week offset. This no longer rides the pure lag machinery —
@@ -134,30 +138,31 @@ incumbent baselines:
   bank-holiday calendar (the pure-Python `holidays` package), and ships as an immediate follow-up
   PR.
 
-A third variant, `nged_incumbent_calibrated`, corrects the analogues after selection rather than
+A third variant, `manual_heuristic_calibrated`, corrects the analogues after selection rather than
 changing which analogues are selected, and has [its own section
-below](#calibrating-the-incumbent-aims-at-the-95th-percentile).
+below](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile).
 
-### Calibrating the incumbent aims at the 95th percentile
+### Calibrating the manual heuristic aims at the 95th percentile
 
 Issue: [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)
 
-**A third variant, `nged_incumbent_calibrated`, keeps the same analogues and fits a statistical
+**A third variant, `manual_heuristic_calibrated`, keeps the same analogues and fits a statistical
 correction to them on past errors.** One standard form of that correction is Ensemble Model Output
 Statistics (EMOS), which [Gneiting et al. (2005)](https://doi.org/10.1175/MWR2904.1) introduced for
 weather ensembles: fit a predictive distribution whose mean is an affine function of the member
 forecasts — one coefficient each, collapsing to a single coefficient on the ensemble mean where the
-members are exchangeable, as the incumbent's equally-weighted analogues are — and whose variance is
-an affine function of the ensemble variance, choosing the coefficients by minimising CRPS over a
-training window. Nothing in EMOS requires the ensemble to come from a weather model, so the
-analogues `nged_incumbent` already synthesises are a valid input.
+members are exchangeable, as the manual heuristic's equally-weighted analogues are — and whose
+variance is an affine function of the ensemble variance, choosing the coefficients by minimising
+CRPS over a training window. Nothing in EMOS requires the ensemble to come from a weather model, so
+the analogues `manual_heuristic` already synthesises are a valid input.
 
-**The faithful replica stays the headline bar, because the correction is our work rather than
-NGED's.** The question the leaderboard exists to answer is whether we beat what NGED do today, and
-NGED apply no statistical correction to the analogues. So `nged_incumbent_calibrated` is a row of
-our own, sitting beside `nged_incumbent_holiday_aligned` as a second cheap upgrade to what NGED
-already do, and testing the same claim that most of the benefit comes from simple upgrades rather
-than from heavy ML.
+**The faithful replica stays the headline bar, because the correction is our work rather than the
+manual heuristic's.** The manual heuristic forecast itself does not adjust for holidays, switching
+events, load growth, or any statistical correction of the analogues — the question the leaderboard
+exists to answer is whether we beat that unadjusted baseline. So `manual_heuristic_calibrated` is a
+row of our own, sitting beside `manual_heuristic_holiday_aligned` as a second cheap upgrade to the
+manual heuristic, and testing the same claim that most of the benefit comes from simple upgrades
+rather than from heavy ML.
 
 **The 95th percentile of 13 analogues is exceeded far more than 5% of the time even when the
 analogues are perfectly calibrated.** Empirical quantiles from a finite ensemble sit inside the true
@@ -179,25 +184,25 @@ still tracks the fitted one. The [exceedance rate of the upper delivery
 quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles) is
 the calibration check for the fitted percentile.
 
-**Fitting the mean also picks up the load growth the incumbent has no scaling for.** The affine term
-on the analogue mean absorbs a systematic offset between the analogues and the target half-hour —
-load growth over the year separating the annual group from today and the residual offset on a day
-type that the analogue selection matches only imperfectly. Neither offset needs weather to correct,
-so the calibrated incumbent stays naive in the sense that matters for a baseline, knowing nothing
-the substation's own history does not contain. The two halves of the
+**Fitting the mean also picks up the load growth the manual heuristic has no scaling for.** The
+affine term on the analogue mean absorbs a systematic offset between the analogues and the target
+half-hour — load growth over the year separating the annual group from today and the residual
+offset on a day type that the analogue selection matches only imperfectly. Neither offset needs
+weather to correct, so the calibrated variant stays naive in the sense that matters for a baseline,
+knowing nothing the substation's own history does not contain. The two halves of the
 fit should therefore show up in different metrics — the mean correction improving NMAE wherever the
 analogues carry a stale level, and the variance correction moving CRPS and the exceedance rate.
 
 **An analogue ensemble may be miscalibrated in the opposite direction to a weather ensemble, so
-measure before building.** The incumbent's members are observed powers rather than perturbed model
-runs. The analogue spread does not narrow at short lead the way an NWP ensemble's spread does,
+measure before building.** The manual heuristic's members are observed powers rather than perturbed
+model runs. The analogue spread does not narrow at short lead the way an NWP ensemble's spread does,
 because the freshest analogue is already a week old. Week-to-week variation at the same weekday and
-time of day could easily exceed the real forecast uncertainty, leaving the incumbent over-dispersed
-where a weather ensemble is under-dispersed. The 95th percentile would then be crossed less often
-than the finite-ensemble arithmetic above implies, and the correction would narrow the band rather
-than widen it.
+time of day could easily exceed the real forecast uncertainty, leaving the manual heuristic
+over-dispersed where a weather ensemble is under-dispersed. The 95th percentile would then be
+crossed less often than the finite-ensemble arithmetic above implies, and the correction would
+narrow the band rather than widen it.
 
-**Two cheap diagnostics point to the direction once `nged_incumbent` ships.** The first diagnostic
+**Two cheap diagnostics point to the direction once `manual_heuristic` ships.** The first diagnostic
 is the rank histogram of the observation among the analogues per horizon slice, the same instrument
 [Phase C](#phase-c-low-effort-calibration-after-b-proves-the-diagnosis) uses on the weather
 ensemble. The second diagnostic is the correlation between the analogue spread and the absolute
@@ -211,7 +216,7 @@ calendar.
 **A Gaussian predictive distribution puts the modelling assumption where the product is most
 sensitive, so measure a non-parametric fit beside EMOS.** Minimum-CRPS estimation is dominated by
 the bulk of the distribution, while flexibility procurement and curtailment read the tails. The
-incumbent's residuals have no particular reason to be Gaussian out there. [Henzi et al.
+manual heuristic's residuals have no particular reason to be Gaussian out there. [Henzi et al.
 (2021)](https://doi.org/10.1111/rssb.12450)'s isotonic distributional regression fits a conditional
 distribution non-parametrically and needs no tuning beyond the choice of a partial order on the
 covariates. A baseline with almost nothing to tune is also harder to accuse of having been tuned
@@ -224,11 +229,11 @@ weather ensemble, and per horizon slice, because the surviving analogue mix chan
 with lead time. Fitting on the training window alone is the line between a baseline and a model that
 has seen the data it is scored on. A handful of coefficients crosses that line as easily as a large
 model does. The calibration itself belongs in the shared wrapper forecaster Phase C specifies,
-rather than inside the incumbent.
+rather than inside the manual heuristic.
 
 ### Persistence and climatology — diagnostic bookends
 
-The incumbent is really a *hybrid* — its weekly group is persistence-like recency, its annual group
+The manual heuristic is really a *hybrid* — its weekly group is persistence-like recency, its annual group
 is climatology-like seasonality — so the two pure forms are still worth having: they isolate
 short-horizon from long-horizon naive skill. Persistence is famously hard to beat at 0 to 6 hours.
 
@@ -261,11 +266,11 @@ than the rows described here, and their sample is deterministic solar forecastin
 probabilistic substation net demand. The direction survives both — a margin over persistence alone,
 or over climatology alone, flatters a forecast that a combined reference would judge more harshly.
 
-**This sensitivity to the choice of reference is an argument for keeping `nged_incumbent` as the
-headline bar, not for building a fourth baseline.** The incumbent already blends recency with
+**This sensitivity to the choice of reference is an argument for keeping `manual_heuristic` as the
+headline bar, not for building a fourth baseline.** The manual heuristic already blends recency with
 seasonality — the last 6 weeks of same-weekday, same-time-of-day analogues alongside the
 49-to-55-weeks-back group — so it plays on substation load the role the combined reference plays on
-irradiance. The incumbent is also the bar that decides whether the project is worth its money.
+irradiance. The manual heuristic is also the bar the project must clear.
 Persistence and climatology stay as diagnostic bookends, read as the loose end of the range rather
 than as the benchmark a win should be claimed against.
 
@@ -274,18 +279,18 @@ than as the benchmark a win should be claimed against.
 results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results) for
 [Doubleday et al. (2020)](https://doi.org/10.1016/j.solener.2020.05.051)'s case for carrying a
 yardstick benchmark and a point on the yardstick together. Persistence and climatology are the
-yardstick here; `nged_incumbent` is the point on it.
+yardstick here; `manual_heuristic` is the point on it.
 
 ### Implementation details — baselines (deleted when they ship)
 
 Five PRs, in order. PRs 1–2 are shared-framework groundwork (no baseline yet); PRs 3–5 add one
-baseline each. The `nged_incumbent_holiday_aligned` variant (described under [A faithful replica and
+baseline each. The `manual_heuristic_holiday_aligned` variant (described under [A faithful replica and
 a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a later sixth
 PR, out of scope for this arc but given its own tracked issue so it is not lost when #147 closes.
-`nged_incumbent_calibrated` (described under [Calibrating the
-incumbent](#calibrating-the-incumbent-aims-at-the-95th-percentile), and tracked in
+`manual_heuristic_calibrated` (described under [Calibrating the manual
+heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile), and tracked in
 [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) is a seventh PR, on
-the same footing: out of scope here, tracked separately, and buildable as soon as `nged_incumbent`
+the same footing: out of scope here, tracked separately, and buildable as soon as `manual_heuristic`
 itself ships.
 
 **Guiding principle — no special path.** New workspace package `packages/baseline_forecasters/`
@@ -315,7 +320,7 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
   exactly `.median()`), and keep `q_p95`.
 - Score `mae`/`nmae` on the median error; `rmse`/`mbe` on the mean error; the spread-skill
   denominator stays the mean-error RMSE (its Fortin "1.0 = calibrated" target is defined against the
-  mean). Add extra labelled rows: `mae`/`mbe` at `metric_param="p95"` (NGED's operating point) and
+  mean). Add extra labelled rows: `mae`/`mbe` at `metric_param="p95"` (the conservative operating point) and
   `mbe` at `metric_param="p50"` (bias of the delivered median). `METRIC_PARAMS` already contains
   `"p95"` and `"p50"` (both are in `DELIVERY_QUANTILES`), so **no `Metrics` schema change** — and
   the primary key includes `metric_param`, so the new rows do not collide with the `metric_param="all"`
@@ -342,7 +347,7 @@ docs.** Three changes to the shared rails, none baseline-specific.
   `ensemble_members=[0]` to `load_engineering_inputs` when a class sets it `False`. Semantics to
   document: `True` → the forecaster consumes the NWP member axis (output members = NWP members);
   `False` → the forecaster does **not fan out across NWP members** — it either passes member 0
-  through (persistence) or synthesises its own member axis (`nged_incumbent`: 13 analogues;
+  through (persistence) or synthesises its own member axis (`manual_heuristic`: 13 analogues;
   `climatology`: quantile-derived members). This is model-family identity, like `MODEL_NAME`, so a
   `ClassVar` is correct. The class is resolved from the experiment's `forecaster_target` MLflow tag
   *before* inputs are loaded, so the flag is available in time. Document alongside it that
@@ -352,12 +357,12 @@ docs.** Three changes to the shared rails, none baseline-specific.
 - **Power-lag lookback at feature-engineering load time.** Today `load_engineering_inputs` filters
   power to `[window_start, window_end]`, and `_apply_power_lag` reads lags from that same frame — so
   any lag longer than the elapsed window is null. This is a real existing gap: XGBoost's 336 h lag is
-  null for the first fortnight of every validation window, and the incumbent's 49–55-week lags would
+  null for the first fortnight of every validation window, and the manual heuristic's 49–55-week lags would
   be null for all but roughly the last 3 weeks of the fold (lag targets only re-enter the window from
   `val_start + 49 weeks`). Fix: a `power_lookback: timedelta` parameter that widens **only the power
   scan's** lower bound (`window_start − power_lookback`); callers derive it from the experiment's
   `selected_features` via `ParsedFeatures` (max power-lag hours), so it is automatic per-experiment
-  (~2 weeks for XGBoost, ~55 weeks for the incumbent). Safe because the bulk-mode spine is
+  (~2 weeks for XGBoost, ~55 weeks for the manual heuristic). Safe because the bulk-mode spine is
   NWP-centric (`_join_nwp_bulk_mode` left-joins power *onto* NWP rows), so the extra early power rows
   feed only the lag lookup and add no spine rows and no label rows (labels live on spine rows,
   bounded by the NWP `valid_time` filter); and `_nullify_leaky_lags` (which nulls any lag with `lead
@@ -367,7 +372,7 @@ docs.** Three changes to the shared rails, none baseline-specific.
   parameter so a future long-lag live model is not silently starved. Add a comment where
   `cv_power_forecasts` re-scans the widened power window per `init_time` chunk (fast next to NWP, but worth flagging so nobody blames the wrong step when profiling).
 - **Document the `ensemble_member` overload** on `PowerForecast` and `AllFeatures`: an NWP-member
-  index for NWP-consuming models, a historical-analogue index for `nged_incumbent`, a
+  index for NWP-consuming models, a historical-analogue index for `manual_heuristic`, a
   quantile-sample index for `climatology`. Nobody may assume `ensemble_member ⇒ NWP`.
 - Tests: a dummy `uses_nwp_ensemble = False` forecaster exercising the member-0 path; a feature-
   engineer test that a 336 h lag at the window edge is non-null *with* lookback while the spine row
@@ -410,10 +415,10 @@ probe).** Ships the package and proves the PR-2 framework on the simplest model.
   CRPS is size-comparable so nothing is *wrong*, but state the caveat where the sanity numbers are
   read, backed by the per-series coverage counts in asset metadata.
 
-**PR 4 — `NGEDIncumbentForecaster` (`nged_incumbent`; the deliverable).** The faithful replica,
+**PR 4 — `ManualHeuristicForecaster` (`manual_heuristic`; the deliverable).** The faithful replica,
 landing on a now-proven rail.
 
-- `MODEL_NAME = "nged_incumbent"`, `MODEL_VERSION = 1`, `uses_nwp_ensemble = False`,
+- `MODEL_NAME = "manual_heuristic"`, `MODEL_VERSION = 1`, `uses_nwp_ensemble = False`,
   `weather_source: "none"`. Config `n_weekly_analogues = 6` and `annual_week_span = (49, 55)` drive
   the 13 analogue lags (weekly `168h × {1..6}`; annual `168h × {49..55}` = 8232…9240 h — all within
   the feature parser's 17 520 h cap), with `selected_features` derived from them so a variant needs only one override.
@@ -436,8 +441,8 @@ landing on a now-proven rail.
   Sanity-check: the median is a roughly unbiased central estimate while `mbe@p95` shows a clear
   positive bias (the conservative operating point — **not** a bug); no short-horizon skill (the
   shortest member is a week old, which is realistic).
-- Ship-time triage: delete this item's details (summary → PR body); cross-link the [NGED's incumbent
-  forecast](../background/nged-incumbent-forecast.md) background page.
+- Ship-time triage: delete this item's details (summary → PR body); cross-link the [manual heuristic
+  forecast](../background/manual-heuristic-forecast.md) background page.
 
 **PR 5 — `ClimatologyForecaster` (`climatology`; the pure probabilistic reference).** The calendar-
 only skill floor the NWP ensemble must clear at long horizons.
@@ -485,21 +490,22 @@ only skill floor the NWP ensemble must clear at long horizons.
   details — baselines" section (summary → PR body), close #147, and update the status banner plus the
   milestone section in [`docs/roadmap/index.md`](index.md) if the arc changed.
 
-**Recipe confirmed by NGED (July 2026).** No open questions remain. Full write-up in [NGED's
-incumbent forecast](../background/nged-incumbent-forecast.md); the implementation spec:
+**The recipe.** No open questions remain. Full write-up in [the manual heuristic
+forecast](../background/manual-heuristic-forecast.md); the implementation spec:
 
 - **Weekly analogues:** the last **6** weeks, same weekday & time-of-day.
 - **Annual analogues:** the **7** weeks spanning **49–55 weeks back**, same weekday & time.
-- **Deterministic value:** NGED's own operating point is the **95th percentile** of all 13 analogue
-  values ("more of a vibe") — reported alongside the metric-matched **median** headline (PR 1).
+- **Deterministic value:** the operator picks the percentile that matches the company's risk
+  appetite; we score the conservative **95th percentile** of all 13 analogue values, reported
+  alongside the metric-matched **median** headline (PR 1).
 - **No further processing:** no weighting, no holiday handling, no anomaly rejection, no
-  load-growth scaling. (This is precisely why the holiday-aligned variant is a genuine, un-done
-  upgrade — not a reimplementation of a method NGED already uses.)
+  load-growth scaling. (So the holiday-aligned variant measures how much calendar awareness adds,
+  rather than reimplementing a step the analogue method already takes.)
 
 **Cross-cutting.** (1) **Issue hygiene:** create one tracked sub-issue per PR under epic
 [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) / #147 following the
 `github-issue-pr-workflow` skill's issue-creation rules (labels, Type, OCF project fields, sub-issue
-ordering), *including* one for `nged_incumbent_holiday_aligned` so it survives #147 closing. (2)
+ordering), *including* one for `manual_heuristic_holiday_aligned` so it survives #147 closing. (2)
 
 **Re-run recipe:** add a short "Re-running CV for an experiment" subsection to
 `docs/ml_experimentation/dagster-workflow.md` describing the `trained_cv_model++` backfill, written
@@ -681,11 +687,11 @@ reference](../techniques/evaluation-metrics.md) when that PR ships.
 
 The deterministic metrics (MAE, NMAE, RMSE, MBE) score a **single point forecast**, but every model
 on the leaderboard is really an *ensemble* (51 NWP members for the ML models; 13 historical
-analogues for `nged_incumbent`; a quantile sample for `climatology`). The metrics layer has to
+analogues for `manual_heuristic`; a quantile sample for `climatology`). The metrics layer has to
 collapse each ensemble to one number. `compute_metrics` today collapses every ensemble to its
 **mean** (`packages/ml_core/src/ml_core/metrics.py`), and the risk we were guarding against was that
 different models would be scored on *different* collapses — e.g. the ML models on their mean and
-`nged_incumbent` on the median that NGED effectively reads off its analogue spread. Mean and median
+`manual_heuristic` on the median that an operator effectively reads off its analogue spread. Mean and median
 diverge for skewed or underdispersed ensembles, so scoring some models on one and some on the other
 is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
 
@@ -705,7 +711,7 @@ practice.
 The **median** is the point forecast that minimises **absolute error** — so MAE and NMAE are
 *consistent* with the median. It is robust to the skew that is real in this problem (holiday weeks,
 solar clipping) and to the ensemble underdispersion the [probabilistic
-section](#delivering-the-probabilistic-metrics) documents, it is the faithful reading of NGED's
+section](#delivering-the-probabilistic-metrics) documents, it is the faithful reading of the manual heuristic's
 equally-weighted analogue spread, and it is coherent with the quantile columns already on the
 leaderboard: median MAE is exactly `2 × pinball_loss@p50`, so a median headline makes the
 deterministic and probabilistic columns tell one story.
@@ -729,7 +735,7 @@ every model**:
   (RMSE of the ensemble mean = `√((m+1)/m) ×` RMS spread, so "1.0 = calibrated") is *defined*
   against the mean; switching its internal collapse would silently break that reading.
 
-Everything else is an **extra, labelled** row, never a headline: NGED's **P95** operating point
+Everything else is an **extra, labelled** row, never a headline: the manual heuristic's conservative **P95** operating point
 (`mae`/`mbe` at `metric_param="p95"` — conservative by design, so a large positive MBE that belongs
 *beside* the central number), and the **median's own bias** (`mbe` at `metric_param="p50"`, so the
 delivered central forecast has an honest bias number distinct from the mean's energy-balance bias).
@@ -821,8 +827,8 @@ All three fit the existing `Metrics` shape — `metric_param` carries the thresh
 
 **Thresholds: static, per-series, quantile-derived.** Each series gets one static threshold — the
 P99 of its full observation history, in the series type's constraint-side direction (high load for
-demand; reverse power flow for generation) — the same rung NGED described setting capacity at when
-we discussed this in July 2026, and the same rung the [cost-savings
+demand; reverse power flow for generation) — a percentile-of-history convention of the kind
+commonly used in capacity setting, and the same rung the [cost-savings
 metrics](cost-savings-metrics.md#choosing-the-limit) use, so the leaderboard carries one threshold
 concept rather than several. Physical firm/flex ratings, where NGED supplies them, feed ad-hoc case
 studies and dashboard overlays instead. The full rationale — why a full-history quantile threshold
@@ -864,7 +870,7 @@ before/after instruments for Phases C and D.
 - **Verification:** hand-computed toy-ensemble values for all three metrics; cross-check
   twCRPS against the `scoringrules` reference implementation; Monte-Carlo the finite-ensemble
   one-sided exceedance references (mirroring the PICP reference-table verification); on a
-  smoke fold, confirm `nged_incumbent`'s P95 operating point scores well on the p95 exceedance
+  smoke fold, confirm `manual_heuristic`'s P95 operating point scores well on the p95 exceedance
   rate while its conservatism reduces its sharpness on Brier/twCRPS.
 
 ### Tricky days — a calendar-deterministic metric filter 🚧
@@ -885,15 +891,14 @@ on tricky days" — is that Christmas, or a switching event?).
 Mechanically it is another population filter (the same mechanism the peak-events diagnostic slice
 uses): a boolean flag per timestep, derived from `valid_time` alone. Unlike that observed-peak
 slice, this filter *is* a legitimate ranking column: the flag depends only on the calendar, which
-every forecaster knew in advance, so it does not fall into the [forecaster's-dilemma
-trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
+every forecaster knew in advance, so it does not fall into the
+[forecaster's-dilemma trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
 Because it is purely calendar-driven it **shares its calendar module with
-`nged_incumbent_holiday_aligned`** — the same GB bank-holiday calendar (the pure-Python `holidays`
-package) plus the two DST dates feed both the holiday-aligned baseline and this metric filter. And
-the two reinforce each other: `nged_incumbent` (no holiday logic) should be *visibly* worst on
-tricky days, and `nged_incumbent_holiday_aligned` should recover most of the gap — turning "we added
-holiday alignment" into a *measurable* number, exactly the simple-upgrades story we want to show
-NGED.
+`manual_heuristic_holiday_aligned`** — the same GB bank-holiday calendar (the pure-Python `holidays`
+package) plus the two DST dates feed both the holiday-aligned baseline and this metric filter. The
+two reinforce each other: `manual_heuristic` (no holiday logic) should score worse on tricky days
+than overall, and `manual_heuristic_holiday_aligned` should recover most of that gap. The size of
+the recovered gap measures how much calendar awareness adds.
 
 **Flag the day _and_ its analogue-relevant neighbours, not just the day itself.** The disruption
 spills onto surrounding timesteps:
@@ -915,7 +920,7 @@ leaderboard.
 
 #### Implementation details — tricky days (deleted when this ships)
 
-- A small calendar module (shared with baseline 2, `nged_incumbent_holiday_aligned`) answers, for
+- A small calendar module (shared with baseline 2, `manual_heuristic_holiday_aligned`) answers, for
   any `valid_time`, whether it falls inside a tricky-days window. Back it with the `holidays` GB
   calendar plus the two annual DST dates; expose the per-event window widths as config.
 - Represent the tricky-days slice the same way the peak-events diagnostic slice is represented —
@@ -923,7 +928,7 @@ leaderboard.
   so the leaderboard gains a **Tricky days** column with no `Metrics` schema change.
 - Verification: unit-test the flag on known dates (a Christmas week, an Easter, both DST
   switchovers, and a plain week that must be *excluded*); on a smoke-test fold, confirm
-  `nged_incumbent` scores worse on the tricky-days slice than overall.
+  `manual_heuristic` scores worse on the tricky-days slice than overall.
 
 ---
 
@@ -933,7 +938,7 @@ leaderboard.
 > v0.5 champion would be picked on clean-data skill alone.
 
 The [inherent-stability principle](../design-philosophy/inherent-stability.md) claims that the
-service keeps beating NGED's incumbent forecast as its inputs degrade. That claim is only worth
+service keeps beating the manual heuristic as its inputs degrade. That claim is only worth
 anything if it is *scored*, so degradation becomes a dimension of the leaderboard rather than an
 aspiration in a design document.
 
@@ -953,11 +958,11 @@ on the `power_forecasts` rows the metrics are computed from) rather than a new e
 degradation behaviour is a first-class property of every experiment instead of a separate study
 somebody has to remember to run.
 
-**The acceptance criterion is `nged_incumbent`, not a fixed error threshold.** The incumbent
+**The acceptance criterion is `manual_heuristic`, not a fixed error threshold.** The manual heuristic
 consumes no NWP and is indifferent to recent telemetry staleness, so it barely degrades — which
 makes it the honest bar to clear, and a far better failure criterion than any arbitrary staleness
 threshold. Concretely: at rungs 0–2 of the degradation ladder, every time series should still emit a
-forecast, and that forecast should still beat `nged_incumbent`. That is [T1.2, graceful
+forecast, and that forecast should still beat `manual_heuristic`. That is [T1.2, graceful
 degradation](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself);
 the interval-calibration counterpart, PICP within tolerance in every regime, is [T1.3, faithful
 uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
@@ -1038,8 +1043,8 @@ lead time:
 **Coverage is broken down by season, by how heavily loaded the substation was, and by the lead-time
 slices above, not reported as one annual figure** — see [Publishing results that others can compare
 against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
-for why an averaged 90% can hide 70% coverage at the winter peaks, the only periods NGED buys
-flexibility for.
+for why an averaged 90% can hide 70% coverage at the winter peaks, the periods when most
+flexibility is procured.
 
 ### Measuring performance during switching events 🚧
 
@@ -1107,8 +1112,8 @@ horizon slice, fit a scalar `s` on the *training* window so that inflating membe
 ensemble mean (`mean + s·(member − mean)`) makes spread match error. Zero schema change, and no new
 learned model — the wrapper holds a handful of fitted coefficients, not a trained estimator. Fit on
 train, apply on validation (no tuning on the fold being scored). Build the inflation as a wrapper
-forecaster rather than as a step inside `predict`, so that the [calibrated
-incumbent](#calibrating-the-incumbent-aims-at-the-95th-percentile) and the later
+forecaster rather than as a step inside `predict`, so that the [calibrated manual
+heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile) and the later
 [degradation-conditional conformal
 calibration](https://github.com/openclimatefix/nged-substation-forecast/issues/443) share one
 implementation and one metric path — once we settle how a wrapper derives its class-level
@@ -1160,7 +1165,7 @@ NWP?"). Example tags:
 | Tag | Example values |
 |---|---|
 | `time_series_type` | PV, Wind, disaggregated demand (primaries) |
-| `model_family` | nged_incumbent, baseline_persistence, xgboost, pytorch_mlp, pytorch_graph_dp |
+| `model_family` | manual_heuristic, baseline_persistence, xgboost, pytorch_mlp, pytorch_graph_dp |
 | `weather_source` | none, ecmwf_control, full_ecmwf_ensemble, era5 |
 | `input_features` | datetime, power_lag_24h, power_lag_7d, temperature |
 | `training_strategy` | direct_multistep, horizon_as_feature, end_to_end |

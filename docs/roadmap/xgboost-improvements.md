@@ -54,7 +54,7 @@ optimistic end of the range.
 **A limit worth knowing before you rely on NaN handling.** XGBoost's NaN routing only covers the
 missingness patterns present in the training data. Two consequences for the wins below: a model
 trained with NWP features does **not** behave like a weather-blind model when NWP vanishes (beating
-the incumbent during an outage needs outage-shaped training data, not NaN routing), and the nulls
+the manual heuristic during an outage needs outage-shaped training data, not NaN routing), and the nulls
 the de-accumulated ECMWF variables carry are the one case the guarantee genuinely covers. Full
 argument: [Inherent Stability → Default directions, and their
 limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
@@ -488,8 +488,8 @@ PV, turbine features for wind, holidays for demand).
 ### Training-data hygiene, the low-effort version
 
 Full data cleaning is roadmap v0.4, but training on stuck meters and false zeros actively teaches
-the model wrong targets *today* (quality issues are ~10%+ of some series). Low-effort interim: drop
-training rows whose target sits inside a detected stuck window (rolling std ≈ 0) or an isolated
+the model wrong targets *today* (quality issues affect roughly 10% or more of some series).
+Low-effort interim: drop training rows whose target sits inside a detected stuck window (rolling std ≈ 0) or an isolated
 exact-zero run. Cleaning only the *training* target is much lower-risk than cleaning delivered data,
 and it protects every subsequent experiment from learning artefacts.
 
