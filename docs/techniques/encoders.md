@@ -95,11 +95,17 @@ pool](probabilistic-forecasting.md#the-fix-formally-a-mixture-of-conditional-dis
 the fair [continuous ranked probability score
 (CRPS)](evaluation-metrics.md#crps-continuous-ranked-probability-score) apply unchanged.
 
-**A weighted mixture of the 51 ECMWF ENS members and the 51 AIFS-ENS members is the weaker
-alternative.** The mixture is a valid forecast, but the mixture discards the pairing, which is a
-direct, if noisy, signal of model error. The mixture also changes the member count, and the
-spread-skill ratio and the prediction interval coverage probability (PICP) [shift with the member
-count](evaluation-metrics.md#probabilistic-metrics).
+**Blending the sources' distributions and then rebuilding members with ensemble copula coupling is
+the operational alternative, and the encoder has to beat that alternative.** The Met Office's
+IMPROVER system converts each source, ensemble or deterministic, into exceedance probabilities and
+blends the probabilities across lead times, as [Evans et al.
+(2026)](https://doi.org/10.5194/ems2026-482) describe. IMPROVER then rebuilds a fixed number of
+members by reordering samples from the blend to follow the ranks of template members taken from the
+raw ensembles. That reordering is ensemble copula coupling ([Schefzik, Thorarinsdottir and Gneiting
+(2013)](https://doi.org/10.1214/13-STS443)), and it restores the members' structure across time
+and space by construction, which the encoder does not guarantee. What the encoder adds is the
+disagreement between paired members as a signal of when to trust each source. Weights that vary
+only with lead time cannot use that signal.
 
 **The encoder infers the weather situation from its inputs, with no hand-labelled weather
 regimes.** We expect ensemble spread and the disagreement between sources to be the strongest

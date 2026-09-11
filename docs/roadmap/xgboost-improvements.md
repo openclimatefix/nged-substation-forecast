@@ -1202,7 +1202,8 @@ randomly blanked, so that a failed feed degrades the forecast rather than breaki
 slice, with a block-bootstrap confidence interval that excludes zero:**
 
 1. ECMWF ENS alone.
-2. The paired multi-source features, which must also beat a blend weighting each source by its
+2. The paired multi-source features, which must also beat two blends of the per-source forecast
+   distributions: one weighting each source by lead time, and one weighting each source by its
    inverse error over the last 30 days.
 3. Step 2 plus weather-situation features: pressure gradient, ensemble spread, and the
    disagreement between sources. Step 2 must already include lead time and time of day, so step 3
@@ -1214,6 +1215,17 @@ abstract, apply the blend to the ECMWF and ACCESS models over Australia, for sur
 dewpoint, and wind. The authors attribute part of their gain to opposing biases in the two models
 cancelling. The booster corrects each source's bias directly, so that part of the gain may not
 carry over.
+
+**Both blends give one distribution per half-hour, so ensemble copula coupling has to rebuild the
+members afterwards.** Ensemble copula coupling reorders samples from each half-hour's blended
+distribution to follow the ranks of template members ([Schefzik, Thorarinsdottir and Gneiting
+(2013)](https://doi.org/10.1214/13-STS443)). The Met Office's IMPROVER system runs this pipeline in
+production: IMPROVER blends ensemble and deterministic sources as exceedance probabilities and
+draws its templates from the raw ensembles ([Evans et al.
+(2026)](https://doi.org/10.5194/ems2026-482)). Here the paired ECMWF ENS and AIFS-ENS members make
+the natural templates. The same step would restore the dependence across half-hours and across
+series that the pooled percentiles lose today
+([#730](https://github.com/openclimatefix/nged-substation-forecast/issues/730)).
 
 **Step 3 is unlikely to clear step 2 on the history available by v2.1.** The AIFS-ENS archive
 starts in July 2025 and ICON-EU's in early 2026. One source's forecast errors are shared by every
