@@ -501,6 +501,6 @@ REST APIs have their place, and there are futures in which this project grows on
 The reassuring part is that adding a REST API later is **purely additive**: a thin, stateless
 service that reads from the same Delta tables and serves slices of them over HTTP. Nothing would
 have to be re-written. Nothing about the Delta-first design forecloses a REST API — which is why a
-REST API sits comfortably as a [v2 stretch goal](../roadmap/index.md#v20-scale-up-future-research)
+REST API sits comfortably as a [v2 stretch goal](../roadmap/index.md#v20-scale-up)
 rather than a v1 requirement. The Delta tables remain the system of record either way; the API would
 be a convenience layer on top, added if and when a consumer appears whose needs it fits.

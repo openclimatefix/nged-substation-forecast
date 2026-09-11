@@ -354,8 +354,8 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   win: a global MLP against a global XGBoost on the *identical* feature frame, run once that
   win's prerequisites (per-series target normalisation, static per-series features, and
   init-time-anchored features) exist, so the comparison isolates the model family. A negative
-  result de-risks the neural approaches on the [v2.0](#v20-scale-up-future-research) research
-  list before we spend research time on the fancier ones. The spike must also **state and test how
+  result de-risks the neural approaches on the
+  [post-v2 research list](#after-v21-research-advanced-ml) before we spend research time on the fancier ones. The spike must also **state and test how
   it handles missing inputs**: XGBoost gets NaN routing for free and an MLP does not, so a
   zero-filled MLP would lose the comparison for a reason that has nothing to do with model family
   (zero is a real physical value — see
@@ -364,8 +364,8 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
 - **Additional NWP source, e.g. ICON-EU**
   ([#363](https://github.com/openclimatefix/nged-substation-forecast/issues/363)): explore
   whether adding ICON-EU from Dynamical.org improves forecast skill over ECMWF ENS alone — the
-  v1 nice-to-have version of the broader "further NWP sources" idea on the
-  [v2.0 research list](#v20-scale-up-future-research). **Sized by the v0.5
+  v1 nice-to-have version of the broader
+  [v2.1 multi-source item](#v21-xgboost-improvements-at-full-scale). **Sized by the v0.5
   [perfect-weather ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates)**:
   a low ceiling means there is little forecast-error headroom to chase and this drops down the
   list — though not off it, because ICON-EU's ~6.5 km grid could still beat 31 km ERA5 on
@@ -400,7 +400,7 @@ Target: **January 2027**
 
 ---
 
-## v2.0 — Scale-Up (Future Research)
+## v2.0 — Scale-Up
 
 *Epic: [#156](https://github.com/openclimatefix/nged-substation-forecast/issues/156) (WP5:
 delivery of the v2 live service)*
@@ -411,22 +411,35 @@ delivery of the v2 live service)*
 - Estimate the installed capacity of *unmetered* solar PV and wind on each primary substation (by [disaggregating net primary substation power flows](disaggregation.md))
 - Compare top-down forecasts vs. bottom-up forecasts for BSPs and GSPs
 
-**Research (advanced ML)**:
-
-- **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing. (See [Net-demand disaggregation](disaggregation.md) — the canonical page for this arc, including the [convex dictionary baseline](disaggregation.md#the-convex-dictionary-baseline) it must beat — and [the switching-events approaches](switching-events.md#the-approaches).)
-- **Latent-demand recovery under switching**: reconstruct the demand each substation would have metered under the *normal running arrangement*, using a time-varying neighbourhood mixture (optionally type-resolved into demand / PV / wind) over the network graph. This neighbourhood-mixture approach reconstructs the topology-normalised demand NGED requires, and goes beyond the v0.6 statistical detector — which only flags and masks switching periods. See [Switching events & latent demand](switching-events.md).
-- **Pre-trained neural network [encoders](../techniques/encoders.md)**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
-- **Multi-sequence alignment** with axial attention: find "similar" historical days and feed them as additional context to the forecasting model
-- **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
-- **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the graph-structured disaggregation engine
-- **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (see [the graph-structured engine](disaggregation.md#the-graph-structured-engine) and [MVA metering](disaggregation.md#apparent-power-mva-metering))
-- **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. The v0.5 [perfect-weather ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates) sizes the forecast-error headroom a further source could recover; the separate case for a *finer-resolution* source survives a low ceiling, because that ceiling is measured on a 31 km reanalysis. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history. The ICON-EU trial specifically is also pulled forward as a [v0.9 nice-to-have](#v09-nice-to-haves-if-we-have-time); this v2.0 item is the wider question of further sources beyond it
-
 **Stretch goals**:
 
 - Forecast *unmetered* solar and wind power at each primary substation
 - Disaggregate additional DERs (price-sensitive assets like batteries) from substation power flow
 - Build a REST API on top of the Delta Lake delivery mechanism (purely additive — see [when a REST API would earn its keep](../architecture/forecast-delivery.md#when-would-a-rest-api-earn-its-keep))
+
+---
+
+## v2.1 — XGBoost Improvements at Full Scale
+
+**v2.1 is about a month of XGBoost work, once the v2 live service runs for all 2,500 time
+series.** v2.1 picks up whatever [XGBoost improvements](xgboost-improvements.md) v0.5 left
+undone, and adds
+[further NWP sources as features](xgboost-improvements.md#several-nwp-sources-as-features-v21).
+
+---
+
+## After v2.1 — Research (Advanced ML)
+
+**The research items run roughly in the order listed.** The weather encoder trains through the
+differentiable-physics modules, so the encoder comes after the physics and disaggregation work.
+
+- **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (see [the graph-structured engine](disaggregation.md#the-graph-structured-engine) and [MVA metering](disaggregation.md#apparent-power-mva-metering))
+- **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing. (See [Net-demand disaggregation](disaggregation.md) — the canonical page for this arc, including the [convex dictionary baseline](disaggregation.md#the-convex-dictionary-baseline) it must beat — and [the switching-events approaches](switching-events.md#the-approaches).)
+- **Latent-demand recovery under switching**: reconstruct the demand each substation would have metered under the *normal running arrangement*, using a time-varying neighbourhood mixture (optionally type-resolved into demand / PV / wind) over the network graph. This neighbourhood-mixture approach reconstructs the topology-normalised demand NGED requires, and goes beyond the v0.6 statistical detector — which only flags and masks switching periods. See [Switching events & latent demand](switching-events.md).
+- **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the graph-structured disaggregation engine
+- **Pre-trained neural network [encoders](../techniques/encoders.md)**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
+- **Multi-sequence alignment** with axial attention: find "similar" historical days and feed them as additional context to the forecasting model
+- **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
 
 ---
 
