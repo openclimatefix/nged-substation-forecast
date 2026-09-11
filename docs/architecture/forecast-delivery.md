@@ -66,9 +66,9 @@ NGED Flexpectation turns out to look quite different on each of those axes:
 
 ## Evolving requirements
 
-NGED are refreshingly open that they don't yet know exactly which views of the data they will find
-most useful. We need headroom to iterate table schemas rapidly while they are still being designed
-with NGED. Delta Lake supports schema evolution directly (new columns land without breaking
+The delivery schemas are being co-designed with NGED. Which views of the data prove most useful
+will emerge from use. We need headroom to iterate table schemas rapidly while that co-design
+continues. Delta Lake supports schema evolution directly (new columns land without breaking
 existing readers); a REST API would add a versioning-and-deprecation cycle on top of every schema
 change.
 
@@ -99,7 +99,7 @@ couple of hundred gigabytes at the measured bytes-per-row (using Delta Lake), an
 What would it look like to send that data over a REST API? Serialised as uncompressed JSON (measured
 on real forecast rows: ~356 bytes each), the same year of history would be roughly **45 terabytes on
 the wire — about 200× the Delta footprint**. Gzip narrows the gap to roughly 20×, but that still
-leaves ~4.5 terabytes per year of data. NGED wants routine access to all of it!
+leaves ~4.5 terabytes per year of data, and NGED needs routine access to all of that history.
 
 Multiply that per-year figure out across multiple years of history and multiple ML models and it
 keeps climbing: 4 years of history across 2 concurrently-run models already reaches **a trillion
@@ -185,9 +185,9 @@ tools read it directly, and the "server" role is played by object storage. In ne
 application code manage the files by hand.
 
 And Delta Lake is thoroughly mainstream technology. Databricks built its entire platform on Delta
-Lake; Adobe, Comcast, Salesforce, and Apple all run it at massive scale; and — closest to home —
-our colleagues at [NESO](https://www.neso.energy/) tell us NESO uses Delta Lake internally too.
-More broadly, the open-table-format family it
+Lake. Adobe, Comcast, Salesforce, and Apple all run Delta Lake at massive scale, and — closest to
+home — our colleagues at [NESO](https://www.neso.energy/) tell us NESO uses Delta Lake internally
+too. More broadly, the open-table-format family it
 belongs to (Delta Lake; [Apache Iceberg](https://iceberg.apache.org/), created at Netflix; [Apache
 Hudi](https://hudi.apache.org/), created at Uber) is now the standard way large companies store and
 share analytical data. Delta Lake is therefore the conventional, low-risk choice.
@@ -389,9 +389,8 @@ to spend on the forecasts themselves instead.
 
 Both buckets hold data about NGED's customers, so neither is public: both are protected with
 standard S3/IAM authentication. With a single consumer this is straightforward — one
-authenticated principal, no entitlement matrix — and it mirrors exactly how NGED protect their
-own time-series JSON bucket, which we read the same way. Every tool named above supports
-authenticated S3 access natively. That "single authenticated principal" is a dedicated IAM
+authenticated principal, no entitlement matrix. Every tool named above supports
+authenticated S3 access natively. That "single authenticated principal" would be a dedicated IAM
 **user**, not a cross-account role: many desktop analytics tools — including the connectors that
 give BI tools such as Power BI access to S3 — have no support for AWS role-assumption; they need
 a plain access key and secret, which only an IAM user (not a role) provides.
@@ -404,7 +403,7 @@ contract: their schemas may change shape at any time, with no deprecation cycle,
 nothing external is supposed to depend on them staying stable. Splitting them into a second,
 separately-named S3 bucket makes that distinction impossible to miss — a bucket name in a URI
 survives being pasted into a script or a Slack message even out of context, where a path prefix
-within one bucket is easier to skim past. The same single IAM user reads both buckets; the
+within one bucket is easier to skim past. The same single IAM user would read both buckets; the
 split is a naming/documentation signal, not an access-control boundary. See [Setting up the live
 service on AWS](../live_service/aws.md#step-1-create-the-s3-buckets)
 for the concrete bucket/IAM setup and [Delivery tables](../roadmap/delivery-tables.md) for
@@ -425,11 +424,11 @@ Same-region AWS-to-AWS transfer is free even across accounts, but internet-egres
 is identical in these two regions — so matching regions only pays off if NGED reads via **their own
 AWS-hosted compute** (e.g. Athena, Glue, an EC2/Lambda job) in `eu-west-2`, not if they read via
 a desktop client like Power BI over the public internet, where the region choice makes
-no difference to the bill. That AWS-native path is the one v2 scale points towards anyway:
-a spreadsheet caps out at ~1,048,576 rows, so once `power_forecasts` reaches the trillion-row range,
-NGED pulling "a sizeable chunk" of it stops being a task a spreadsheet can handle at all — they
-would need their own query engine against our bucket, and running that in `eu-west-2` is what
-turns those reads free instead of £0.015–0.067/GB.
+no difference to the bill. That AWS-native path is the one v2 scale points towards anyway. A
+desktop spreadsheet caps out at 1,048,576 rows. Once `power_forecasts` reaches the trillion-row
+range, bulk reads therefore need a query engine (for example Athena) rather than a desktop client.
+Running that query engine in `eu-west-2` is what turns those reads free instead of
+£0.015–0.067/GB.
 
 Ireland is the cheaper region on everything else, and the premium is small enough not to outweigh
 that. AWS Price List API data (2026-07-03) shows `eu-west-1` consistently cheaper than `eu-west-2` —
@@ -452,9 +451,7 @@ reach on the order of a **trillion rows** (see [How big is Flexpectation's power
 data?](#how-big-is-flexpectations-power-forecast-data), above) — at that volume, a per-GB
 storage premium compounds into real money rather than staying a rounding error.
 
-The eu-west-2 choice is still provisional: NGED haven't yet confirmed whether a GB-resident region
-is a hard requirement for this data, and we're waiting on their reply before treating the region
-choice as final.
+The region choice is provisional until the data-residency requirement for this data is settled.
 
 ## Strict data contracts (machine-verifiable)
 
@@ -504,6 +501,6 @@ REST APIs have their place, and there are futures in which this project grows on
 The reassuring part is that adding a REST API later is **purely additive**: a thin, stateless
 service that reads from the same Delta tables and serves slices of them over HTTP. Nothing would
 have to be re-written. Nothing about the Delta-first design forecloses a REST API — which is why a
-REST API sits comfortably as a [v2 stretch goal](../roadmap/index.md#v20-scale-up-future-research)
+REST API sits comfortably as a [v2 stretch goal](../roadmap/index.md#v20-scale-up)
 rather than a v1 requirement. The Delta tables remain the system of record either way; the API would
 be a convenience layer on top, added if and when a consumer appears whose needs it fits.

@@ -32,9 +32,10 @@ hydro-dominated.
 
 ## Data quality in the trial area
 
-**NGED's distribution-level data is considerably messier than transmission-level data.** The
-sections below are the issues observed in the trial area, each a distinct phenomenon rather than
-one fault seen several ways. See the ["Data sources" section of our Milestone 1
+**As is typical of distribution networks, NGED's distribution-level telemetry carries more gaps
+and measurement artefacts than transmission-level telemetry.** The sections below are the
+issues observed in the trial area, each a distinct phenomenon rather than one fault seen
+several ways. See the ["Data sources" section of our Milestone 1
 report](https://docs.google.com/document/d/1UF-mjfSdQfQxefAunDqEOr_GyYTjSlGk4EeuiNoXAxk/edit?tab=t.0#heading=h.etqoj9ahy92h)
 for a more detailed discussion, and plenty of graphs.
 
@@ -50,7 +51,7 @@ The first couple of months after a meter is installed tend to have poor data qua
 
 ### False zeros
 
-Substation time series occasionally report zero when the true value is non-zero. These are identifiable because they are isolated amongst non-zero values. ![Example plot of a time series (Boston BSP) having some one-off falls to zero](assets/false_zeros_in_Boston_BSP.png). ![Distributions for Boston BSP and Sleaford primary showing abnormal amount of zeros, especially when Sleaford doesn’t experience any near-zero values](assets/histograms_showing_false_zeros.png)
+Substation time series occasionally report zero when the true value is non-zero. These are identifiable because they are isolated amongst non-zero values. ![Example plot of a BSP time series in the trial area having some one-off falls to zero](assets/false_zeros_in_Boston_BSP.png). ![Distributions for a BSP and a primary in the trial area showing an excess of zeros, even though the primary otherwise has no near-zero values](assets/histograms_showing_false_zeros.png)
 
 ### Stuck values
 
@@ -58,11 +59,13 @@ Some time series go "stuck" for hours or days (standard deviation near zero over
 
 ### Missing data
 
-Gaps range from a few half-hours to months. Solar farms frequently have no data overnight (expected), but also have unexplained daytime gaps. ![Examples of missing data in streams from solar farms: Manor Farm and Canopus Solar Farm. Canopus has a known analogue issue.](assets/missing_data.png)
+Gaps range from a few half-hours to months. Solar farms frequently have no data overnight (expected), but also have unexplained daytime gaps. ![Examples of missing data from two solar sites in the trial area, time series 23 and 29](assets/missing_data.png)
+
+*Examples of missing data from two solar sites in the trial area, time series 23 and 29. Time series 29 has a known analogue metering issue.*
 
 ### Apparent power (MVA) metering
 
-Some substations only have MVA meters, which report the *absolute value* of power flow — they cannot detect direction. When generation exceeds demand and power flows "backwards", the MVA reading increases rather than going negative. This "bouncing off zero" behaviour looks like a demand increase but is actually reverse power flow. NGED report that 10 sites in the trial area are non-directional, of which one (and potentially two others) has shown reverse power flow in the past, from studying sunny days. The following figure shows power flow for Stickney primary and Leverton Solar Park; note the absence of peaks at Stickney primary on May 3rd and 4th when Leverton experienced lower generation: ![Power flow for Stickney primary and Leverton Solar Park; note the absence of peaks at Stickney on May 3rd and 4th, when Leverton experienced lower generation](assets/MVA_metering_bounce_at_Stickney_primary.png)
+Some substations only have MVA meters, which report the *absolute value* of power flow — they cannot detect direction. When generation exceeds demand and power flows "backwards", the MVA reading increases rather than going negative. This "bouncing off zero" behaviour looks like a demand increase but is actually reverse power flow. In the trial area, 10 sites are metered in apparent power. Of those 10 sites, one site, and possibly two more, have shown reverse flow on sunny days. The following figure shows power flow for Stickney primary (time series 14) and a nearby solar site (time series 22); note the absence of peaks at Stickney primary on 3 and 4 May, when the solar site generated less: ![Power flow for Stickney primary (time series 14) and a nearby solar site (time series 22)](assets/MVA_metering_bounce_at_Stickney_primary.png)
 
 ### Switching events
 

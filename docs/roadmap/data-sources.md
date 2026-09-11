@@ -19,9 +19,9 @@ data.
 | **Time-series JSON files** | ✅ | Half-hourly power flow + metadata per substation / customer meter in the trial area. Ingested by OCF to produce operational forecasts. Each reading is a **period-ending mean** — power averaged over the preceding 30 minutes, with `time` marking the end of that window, as `PowerTimeSeries` in `packages/contracts/src/contracts/power_schemas.py` records. The irradiance ingest is chosen to match, so [Weather data](#weather-data) prefers a source that accumulates over the interval to a source that samples an instant. |
 | **Curtailment (ANM set points)** | 🚧 | NGED-imposed curtailment. Crucial for distinguishing deliberate ANM ramp-downs from genuine faults / capacity loss. |
 
-**NGED hope to offer 15-minute power data. We deliberately stay on half-hourly until v2.** There is
-no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat the offer as a v2
-item.
+**15-minute power data may become available. We deliberately stay on half-hourly until v2.** There
+is no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat 15-minute data
+as a v2 item.
 
 **Power forecasts stay half-hourly regardless, so the change is confined to the ingest.** Averaging
 each pair of 15-minute readings into the half-hour ending at `:00` or `:30` leaves the training
@@ -43,17 +43,17 @@ ramps inside the half-hour, that bias is systematic rather than noise. Changing 
 a data-contract change, so it needs sign-off under the rule in `packages/contracts/README.md`, and
 the averaging rule needs to say what happens when one reading of a pair is missing.
 
-### Provided on SharePoint (mostly static reference / historical)
+### Provided as reference files (mostly static reference / historical)
 
 | File | Status | Description | Known issues |
 |---|---|---|---|
 | Historical time-series JSON | ✅ | Historical outputs of substations and customer meters. | See [data quality](#data-quality-availability). |
-| **Monitor Direction.csv** | 🚧 | Metadata for all substations: meter (analogue) type and power-flow direction. | Lincoln Farm Solar Park (ID 30) has a different substation number vs. its metadata; other sources agree, so low risk. |
+| **Monitor Direction.csv** | 🚧 | Metadata for all substations: meter (analogue) type and power-flow direction. | One solar park's (ID 30) substation number differs from its metadata, to be confirmed with NGED; other sources agree, so low risk. |
 | **Primary Substation Interconnections.csv** | 🚧 | List of possible connections between primary substations (not all are in the trial area). | All trial-area substations have ≥ 1 connection; topology appears complete. |
 | **Substations.csv** | 🚧 | For each substation, bulk supply point (BSP) and grid supply point (GSP): which BSP & GSP it connects to (names + IDs). | All trial-area substations valid. |
 | **Switching Logs.xlsx** | 🚧 | History of every normally-open switching point between primaries, labelled by time-series ID. Primaries outside the trial area are labelled "Unknown". | **Extremely valuable** as the gold-standard *test set* for [switching-event detection](switching-events.md) — lets us validate the unsupervised method on the trial area (labels do **not** exist at scale). Some edges "collapse" into `[substation ID] – unknown`. Two edges present in Interconnections.csv are missing: 900016 (ID 10) ↔ 900019 (ID 13), and 900022 (ID 16) ↔ unknown (910026). Logs go back to ≥ 2019. |
-| **MPAN to Substation Number.csv** | 🚧 | Associates each Embedded Capacity Register (ECR) generator to the substation it connects to. | All trial-area generators present, each with two Meter Point Administration Numbers (MPANs, import + export). Three primaries appear with one MPAN each — looks like a data error. |
-| **Peak Loads.xlsx** | 🚧 | Manually selected peak demand per trial-area substation, from 2024/25 (most recent survey). | Covers all 16 trial primaries. 12 have 2024/25 datapoints exceeding the reported peak. Even at the 99th quantile, 3 (IDs 8, 13, 25: Horncastle, Wrangle T2, Warth Lane Skegness) show 2–4× the reported peak, while Stickney (ID 14) reports > 14 MVA peak but maxes at 6.8 MVA historically. Given the discrepancies, we use the **99th quantile of observed power** as the substation "capacity" proxy, at least initially. |
+| **MPAN to Substation Number.csv** | 🚧 | Associates each Embedded Capacity Register (ECR) generator to the substation it connects to. | All trial-area generators present, each with two Meter Point Administration Numbers (MPANs, import + export). Three primaries appear with one MPAN each, to be confirmed with NGED. |
+| **Peak Loads.xlsx** | 🚧 | Manually selected peak demand per trial-area substation, from 2024/25 (most recent survey). | Covers all 16 trial primaries. Of these, 12 have 2024/25 readings above the recorded peak. Even at the 99th percentile of observed power, 3 primaries (IDs 8, 13, and 25) show 2–4× the recorded peak. One other primary has a recorded peak above 14 MVA, but its telemetry has never exceeded 6.8 MVA. Given these discrepancies, we use the **99th percentile of observed power** as the substation "capacity" proxy, at least initially. |
 
 ---
 
@@ -69,15 +69,17 @@ historical data (full detail + plots in the Milestone 1 report, Appendices A & B
 - **Gaps**: a couple of missing points every few weeks, especially recently for generators. Solar
   generators legitimately don't report overnight, but not all gaps are nighttime; gaps can last
   hours to months.
-- **Unreliable meters**: some arrived labelled "analogue not working" or "analogue suspect".
-- **False zeros**: substation data is prone to one-off drops to zero (telemetry faults), visible as
-  an excess of exact zeros in the distribution vs. near-zero values.
-- **Not-on assets**: Boston Biomass Generation (ID 19) has been pure noise since ~mid-2024 (not
-  operational) — motivating the [building-blocks](forecast-building-blocks.md) delivery approach.
+- **Meter quality flags**: some meters carry NGED's own quality flags ("analogue not working" or
+  "analogue suspect"), which ingestion does not yet act on.
+- **False zeros**: substation telemetry has occasional drop-outs to zero, visible as an excess of
+  exact zeros in the distribution vs. near-zero values.
+- **Not-on assets**: one trial-area generator (ID 19) has not been operating since mid-2024 —
+  motivating the [building-blocks](forecast-building-blocks.md) delivery approach.
 - **MVA / reverse flow**: primary data is disaggregated from metered generation where possible, but
-  not always (e.g. Marsh Lane, ID 26, has two non-working solar meters). Combined with MVA metering
-  (which reports absolute value), midday solar export "bounces" off zero and looks like extra load.
-  See also the [MVA discussion in Net-demand disaggregation](disaggregation.md#apparent-power-mva-metering).
+  not always. The primary with ID 26, for example, has two solar meters that are not reporting, so
+  their generation cannot be subtracted. Combined with MVA metering (which reports absolute value),
+  midday solar export "bounces" off zero and looks like extra load. See also the [MVA discussion in
+  Net-demand disaggregation](disaggregation.md#apparent-power-mva-metering).
 
 These data oddities are detected and reported back to NGED as warnings (see
 [delivery tables, Table 2](delivery-tables.md#table-2-power_forecast_warnings)).
@@ -130,8 +132,8 @@ Issues: [#142](https://github.com/openclimatefix/nged-substation-forecast/issues
 | **CERRA** (Copernicus regional reanalysis for Europe) | 🔬 (deprioritised) | Higher-resolution (5.5 km) European reanalysis. Per the [Copernicus CDS](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels), it now runs from **September 1984 to the present** — monthly updates, but **~3.5 months behind real time**. **Superseded by ERA5** for the active plan: that ~3.5-month latency rules it out for near-real-time capacity estimation, ERA5 reaches further back for pre-training, and we prefer to ingest a single reanalysis. Kept here because its 5.5 km resolution could still earn a place for fine-scale work (e.g. wind over complex terrain) if that ever proves decisive. Radiation: global plus time-integrated **direct** short-wave (diffuse by subtraction); accumulated fluxes from 3-hourly forecast cycles, so temporally coarser than SARAH-3. |
 | **CM SAF** (Satellite Application Facility on Climate Monitoring) | 🔬 (v2 comparison) | SARAH-3 provides global (SIS), **direct (SID) and direct-normal (DNI)** irradiance on a 0.05° grid at 30 minutes from 1983 (diffuse = SIS − SID). Two reasons SARAH-3 is not the first ingest. Its climate data record ends 2020-12-31 and the Interim Climate Data Record extends that record, putting a version seam inside the 2019-onward history we train on. And its 30-minute values are **instantaneous snapshots**, whereas CAMS accumulates over the step, which is what a period-ending meter reading measures — under broken cloud an instantaneous sample and a 30-minute mean can differ a lot. Its gridded delivery would suit the H3 pipeline better than CAMS point requests, and comparing the two resolutions is not straightforward, because the CAMS point service interpolates to the requested location rather than publishing a grid. Latency is 2–5 days ([Pfeifroth et al. (2024)](https://doi.org/10.5194/essd-16-5243-2024)), immaterial offline. Worth a genuine head-to-head against CAMS in v2 — see [Correcting satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain). |
 | **CAMS solar radiation** (Copernicus Atmosphere Monitoring Service) | 🚧 (v0.7) | The satellite-derived irradiance we ingest, used to estimate **solar PV** capacity. Used **offline only** — capacity estimation runs over history, and the production serving path takes no dependency on it. The CAMS Radiation Service carries **global, direct, diffuse, and direct-normal** irradiance under both clear sky and observed cloud, from 2004-02, under CC-BY-4.0, at steps of 1 minute, 15 minutes, 1 hour, 1 day, or 1 month — the beam/diffuse split the [DP solar model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant) needs. Cloud information comes from Meteosat Second Generation; aerosol, ozone, and water vapour come from the CAMS global forecasting system, so aerosol optical depth is a 3-hourly analysis rather than SARAH-3's monthly climatology. Values are interpolated to the requested location rather than served on a grid. Chosen over SARAH-3 on **delivery and record continuity, not on measured accuracy over Great Britain** — see [CAMS: use the point API, not the gridded product](#cams-use-the-point-api-not-the-gridded-product) for the route and its traps, and [Correcting satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain) for what is known about this source's error and what v2 might do about it. |
-| **ICON-EU** (Dynamical.org) | 🔬 (v2, uncertain) | Possible additional NWP source to test whether it improves skill over ECMWF ENS. Starts early 2026, so it can't enter the canonical CV folds directly — assessed via ad-hoc ablation first. |
-| **AIFS-ENS** (ECMWF) | 🔬 (v2, uncertain) | ECMWF's machine-learned ensemble, now operational with the same 51 members, 6-hourly steps and 15-day horizon as the physics ensemble, and more accurate than it on the majority of variables and lead times ([Lang et al. (2026)](https://doi.org/10.1038/s44387-026-00073-7)). Whether that translates into a better substation-load forecast is an open question, and the swap is cheap to test because the two ensembles share a shape. Same folds problem as ICON-EU: the archive starts mid-2025, so it is an ad-hoc ablation before it is a canonical source. |
+| **ICON-EU** (Dynamical.org) | 🔬 (v0.9, uncertain) | Possible additional NWP source to test whether it improves skill over ECMWF ENS: a deterministic run from DWD, Germany's national weather service, on a ~6.5 km grid, 4 runs a day out to 5 days. Starts early 2026, so it can't enter the canonical CV folds directly — assessed via ad-hoc ablation first. |
+| **AIFS-ENS** (ECMWF) | 🔬 (v2.1, uncertain) | ECMWF's machine-learned ensemble, now operational with the same 51 members, 6-hourly steps and 15-day horizon as the physics ensemble, and more accurate than it on the majority of variables and lead times ([Lang et al. (2026)](https://doi.org/10.1038/s44387-026-00073-7)). Whether that translates into a better substation-load forecast is an open question. AIFS-ENS member *n* starts from the [same initial conditions](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1) as ECMWF ENS member *n*, so the two can be fed [side by side](xgboost-improvements.md#several-nwp-sources-as-features-v21) rather than swapped. Same folds problem as ICON-EU: the archive starts mid-2025, so it is an ad-hoc ablation before it is a canonical source. |
 
 **ERA6 is a future upgrade, not a current option.** ECMWF began ERA6 production in March 2026, but
 the phased release runs from late 2027 (first 20 years) into 2028, so it is out of scope for the

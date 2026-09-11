@@ -14,6 +14,10 @@ from the 2026-07 codebase review, grouped into **effort tiers** and ordered by e
 unit effort *within* each tier — so an item late in the list can still be high value; it just costs
 more to land.
 
+**v0.5 lands the low-effort items on this page and stops, so that it does not delay v1.** Whatever
+v0.5 leaves undone moves to [v2.1](index.md#v21-xgboost-improvements-at-full-scale), a round of
+XGBoost work once the live service runs for all 2,500 time series.
+
 **Horizon focus: days 3–10.** The product delivers a 14-day horizon, and users mostly act on
 forecasts roughly 1 to 10 days ahead
 ([requirements](../background/requirements.md#core-objectives)). Days 0 to 2 are already well served
@@ -54,7 +58,7 @@ optimistic end of the range.
 **A limit worth knowing before you rely on NaN handling.** XGBoost's NaN routing only covers the
 missingness patterns present in the training data. Two consequences for the wins below: a model
 trained with NWP features does **not** behave like a weather-blind model when NWP vanishes (beating
-the incumbent during an outage needs outage-shaped training data, not NaN routing), and the nulls
+the manual heuristic during an outage needs outage-shaped training data, not NaN routing), and the nulls
 the de-accumulated ECMWF variables carry are the one case the guarantee genuinely covers. Full
 argument: [Inherent Stability → Default directions, and their
 limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
@@ -488,8 +492,8 @@ PV, turbine features for wind, holidays for demand).
 ### Training-data hygiene, the low-effort version
 
 Full data cleaning is roadmap v0.4, but training on stuck meters and false zeros actively teaches
-the model wrong targets *today* (quality issues are ~10%+ of some series). Low-effort interim: drop
-training rows whose target sits inside a detected stuck window (rolling std ≈ 0) or an isolated
+the model wrong targets *today* (quality issues affect roughly 10% or more of some series).
+Low-effort interim: drop training rows whose target sits inside a detected stuck window (rolling std ≈ 0) or an isolated
 exact-zero run. Cleaning only the *training* target is much lower-risk than cleaning delivered data,
 and it protects every subsequent experiment from learning artefacts.
 
@@ -1182,6 +1186,61 @@ metrics](../techniques/evaluation-metrics.md#probabilistic-metrics) — spread-s
 (prediction interval coverage probability) — because what is being traded away is uncertainty
 structure, which NMAE cannot see. A result where quantile features match on NMAE and lose on
 spread-skill is the outcome that tells you the decomposition was doing real work.
+
+### Several NWP sources as features (v2.1)
+
+**Add AIFS-ENS and ICON-EU alongside ECMWF ENS, rather than swapping one source for another, so the
+booster learns when to trust each source.** AIFS-ENS member *n* starts from the [same initial
+conditions](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1) as ECMWF ENS
+member *n*, so the two members share one row. Before relying on the pairing, check that
+Dynamical.org keeps ECMWF's member numbering in both datasets. ICON-EU is a single deterministic
+run, so its values
+repeat on every member's row and are absent beyond its 120-hour horizon. Train with whole sources
+randomly blanked, so that a failed feed degrades the forecast rather than breaking it.
+
+**Each step of the experiment has to beat the step before on out-of-sample CRPS per horizon
+slice, with a block-bootstrap confidence interval that excludes zero:**
+
+1. ECMWF ENS alone.
+2. The paired multi-source features, which must also beat two blends of the per-source forecast
+   distributions: one weighting each source by lead time, and one weighting each source by its
+   inverse error over the last 30 days.
+3. Step 2 plus weather-situation features: pressure gradient, ensemble spread, and the
+   disagreement between sources. Step 2 must already include lead time and time of day, so step 3
+   isolates the weather situation.
+
+**The 30-day blend is a cheap baseline, but part of its reported gain may not carry over to the
+booster.** [Abellan and Johnson (2026)](https://doi.org/10.5194/ems2026-258), a conference
+abstract, apply the blend to the ECMWF and ACCESS models over Australia, for surface temperature,
+dewpoint, and wind. The authors attribute part of their gain to opposing biases in the two models
+cancelling. The booster corrects each source's bias directly, so that part of the gain may not
+carry over.
+
+**Both blends give one distribution per half-hour, so ensemble copula coupling has to rebuild the
+members afterwards.** Ensemble copula coupling reorders samples from each half-hour's blended
+distribution to follow the ranks of template members ([Schefzik, Thorarinsdottir and Gneiting
+(2013)](https://doi.org/10.1214/13-STS443)). The Met Office's IMPROVER system runs this pipeline in
+production: IMPROVER blends ensemble and deterministic sources as exceedance probabilities and
+draws its templates from the raw ensembles ([Evans et al.
+(2026)](https://doi.org/10.5194/ems2026-482)). Here the paired ECMWF ENS and AIFS-ENS members make
+the natural templates. The same step would restore the dependence across half-hours and across
+series that the pooled percentiles lose today
+([#730](https://github.com/openclimatefix/nged-substation-forecast/issues/730)).
+
+**Step 3 is unlikely to clear step 2 on the history available by v2.1.** The AIFS-ENS archive
+starts in July 2025 and ICON-EU's in early 2026. One source's forecast errors are shared by every
+substation under the same weather system, so hundreds of substations during one storm give roughly
+one storm's worth of evidence. A few years of history therefore hold few independent examples of
+each kind of weather.
+
+**A cheaper first signal needs only ECMWF ENS: check whether its calibration varies with the
+weather situation once lead time is accounted for.** For a single ensemble, [Allen et al.
+(2020)](https://doi.org/10.1002/qj.3806) found that making ensemble model output statistics (EMOS)
+regime-dependent improved the calibration of wind-speed forecasts, and [Allen et al.
+(2021)](https://doi.org/10.1002/qj.3983) found a similar gain from adding the state of the North
+Atlantic Oscillation as a predictor. A dependence would show that the weather situation matters to
+forecast quality. The ECMWF ENS test cannot show how the sources compare in each situation, which
+only step 3 tests.
 
 ### Global model per `time_series_type`
 

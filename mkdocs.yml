@@ -40,6 +40,10 @@ plugins:
             inherited_members: true
             members_order: source
   - include-markdown
+  # Keeps URLs that have been shared outside the docs working after a page is renamed.
+  - redirects:
+      redirect_maps:
+        background/nged-incumbent-forecast.md: background/manual-heuristic-forecast.md
 
 nav:
   - Home: index.md
@@ -49,7 +53,7 @@ nav:
       - Overview: background/index.md
       - NGED's network and its data: background/network.md
       - Requirements: background/requirements.md
-      - NGED's incumbent forecast: background/nged-incumbent-forecast.md
+      - The manual heuristic forecast: background/manual-heuristic-forecast.md
       - Switching events: background/switching-events.md
       - The state of the art in energy forecasting: background/energy-forecasting-review.md
   - Design philosophy:

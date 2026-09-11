@@ -46,8 +46,8 @@ In the AWS console → **S3** → **Create bucket**, twice:
 - **Region** `eu-west-2` (London) for both — keep every resource in one region so S3 ↔ compute
   transfer stays free. It isn't the cheapest region available (`eu-west-1` runs meaningfully
   cheaper for Fargate); see [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
-  for the price comparison and why `eu-west-2` is picked anyway, provisionally, pending NGED
-  confirmation.
+  for the price comparison and why `eu-west-2` is picked anyway. The region choice is
+  provisional until the data-residency requirement is settled.
 - **Names**: `nged-forecast-delivery` (the five NGED-facing tables) and
   `nged-forecast-internal` (NWP, raw power telemetry, forecast metrics, and everything else
   OCF's pipeline needs but hasn't promised to keep stable). Bucket names are globally unique;
@@ -334,12 +334,12 @@ and in the [Configuration reference](setup.md#the-env-file-and-nged-source-crede
 mis-wired secret in the deploy pipeline, where the blast radius is the deploy rather than the
 forecast.
 
-The three NGED credentials are also the one credential in this deployment that can't come from an
-IAM role: NGED's bucket lives in NGED's AWS account, so these are unavoidably static third-party
-keys. Don't paste them into the task definition as plain-text environment values — anyone with ECS
-describe access could read them there. Store them in **SSM Parameter Store** (SSM is AWS Systems
-Manager; Parameter Store is its encrypted key-value configuration service) as SecureStrings and let
-ECS inject them at container start:
+The three NGED credentials are also the only credentials in this deployment that can't come from an
+IAM role: NGED's bucket lives in NGED's AWS account, so the pipeline reads the bucket with
+credentials issued by NGED. Don't paste them into the task definition as plain-text environment
+values — anyone with ECS describe access could read them there. Store them in **SSM Parameter
+Store** (SSM is AWS Systems Manager; Parameter Store is its encrypted key-value configuration
+service) as SecureStrings and let ECS inject them at container start:
 
 In the AWS console → [**Systems
 Manager**](https://eu-west-2.console.aws.amazon.com/systems-manager/home?region=eu-west-2) →
@@ -400,8 +400,8 @@ task definition, the ECS console, or CloudWatch.
 
 Parameter Store is picked over Secrets Manager deliberately: Standard parameters are free (Secrets
 Manager is $0.40/secret/month). These credentials don't need Secrets Manager's flagship feature,
-automatic rotation — NGED's keys rotate on NGED's schedule, not on OCF's. When NGED does rotate
-them, just update the parameter values (and your local `.env`). Running tasks keep the old values
+automatic rotation, because NGED issues them and this deployment never generates replacements. When
+NGED issues new values, update the parameter values (and your local `.env`). Running tasks keep the old values
 until they next start, since injection happens once per container launch.
 
 ## Step 9 — Create the ECS cluster and Fargate task definition
@@ -1287,23 +1287,22 @@ Once the service is live, shipping a better model is a repeat of a slice of this
    tag ([Step 13](#step-13-install-docker-and-pull-the-image)), update `IMAGE` in
    `~/nged-forecast/.env`, and `docker compose up -d`.
 
-## Granting NGED read access (recommended; confirm before doing this)
+## Granting NGED read access
 
-> This step hasn't been agreed as final yet — recorded here as the current recommendation so it
-> isn't lost, but check before actually creating anything.
+**Current proposal, to be agreed with NGED: a single dedicated IAM user.** Check that the mechanism
+has been agreed before creating the IAM user. [Forecast Delivery: Securing
+it](../architecture/forecast-delivery.md#securing-it) assumes a single authenticated AWS user for
+NGED, with no per-user entitlement matrix, because NGED is the only consumer. A single consumer
+points at a dedicated IAM user rather than a cross-account role. The desktop analytics tools named
+on that same page, such as Power BI, don't support AWS role-assumption: they need a plain access key
+and secret, the same shape of credential an IAM user provides.
 
-[Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it) already assumes
-**a single authenticated AWS user** for NGED, with no per-user entitlement matrix needed — NGED is
-the only consumer. A single consumer points at a dedicated **IAM user** (not a cross-account role):
-Excel and Power BI are named as expected client tools in that same page, and neither supports AWS
-role-assumption — they need a plain access key and secret, the same shape of credential an IAM user
-provides.
-
-Recommended shape: **one** IAM user (not one per bucket — the stability signal comes from the bucket
-split itself, not from access segmentation), with a read-only policy across both bucket ARNs
-(`s3:GetObject`, `s3:ListBucket` — no `PutObject`/`DeleteObject`), and an access key handed to NGED
-the same way [Step 2](#step-2-grant-data-access-with-iam)'s dashboard credentials are configured.
-Rotate the key periodically once this is live.
+The proposed shape is **one** IAM user (not one per bucket — the stability signal comes from the
+bucket split itself, not from access segmentation), with a read-only policy across both bucket ARNs,
+`nged-forecast-delivery` and `nged-forecast-internal` (`s3:GetObject`, `s3:ListBucket` — no
+`PutObject`/`DeleteObject`). The access key would be provided to NGED the same way
+[Step 2](#step-2-grant-data-access-with-iam)'s dashboard credentials are configured, and rotated
+periodically once the access is live.
 
 ## See also
 

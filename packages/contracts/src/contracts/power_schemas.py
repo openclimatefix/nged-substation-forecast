@@ -208,7 +208,7 @@ class TimeSeriesMetadata(pt.Model):
 
     licence_area: str = pt.Field(
         dtype=pl.Enum(["EMids"]),
-        description="NGED licence area (for the trail area, this is always ‘EMids’).",
+        description="NGED licence area (for the trial area, this is always ‘EMids’).",
     )
 
     substation_number: int = pt.Field(
@@ -216,7 +216,7 @@ class TimeSeriesMetadata(pt.Model):
         gt=0,
         lt=1_000_000,
         description=(
-            "Perhaps surprisingly, each customer meter in the NGED trial area has its own "
+            "Each customer meter in the NGED trial area has its own "
             "substation_number (not one per physical substation)."
         ),
     )
@@ -261,9 +261,8 @@ class TimeSeriesMetadata(pt.Model):
         # Maps to the nested Area.WKT field in the JSON data.
         description=(
             "WKT polygon for the asset’s area. In the trial, only Primary substations have this."
-            " NGED don’t have polygons for customer sites (though they hope to add that in future)."
-            " For customer sites, where present, refers to the area covered by the generator"
-            " itself."
+            " No customer site has a polygon yet. Where a customer site does have a polygon, the"
+            " polygon refers to the area covered by the generator itself."
         ),
     )
 

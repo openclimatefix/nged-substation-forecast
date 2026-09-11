@@ -34,10 +34,10 @@ guarantee.
 - [Live service](live-service.md) — the AWS deployment: the `live_forecasts` inference
   asset, the champion-model container, the costed AWS architecture options, and production
   monitoring.
-- [Handover to NGED](handover.md) — the preferred operating model after the Network Innovation Allowance (NIA) project ends (NGED runs the
-  service themselves, on NGED's AWS — their stated preference as of 2026-07-14, pending NGED
-  internal sign-off): the operator-contract design constraint, and the handover workstreams
-  (runbooks, alert-on-absence, infra-as-code, NGED landing-zone probing, game days).
+- [Handover to NGED](handover.md) — the operating model after the Network Innovation Allowance
+  (NIA) project ends (the working assumption is that NGED runs the service on its own AWS
+  account): the operator-contract design constraint, and the handover workstreams (runbooks,
+  alert-on-absence, infra-as-code, confirming NGED's cloud and security standards, and game days).
 - [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort
   tiers, ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
 - [Extending the training history](training-history.md) — using ERA5 to train on the power data
@@ -141,7 +141,7 @@ quality, reproducibility, and observability hardening. **✅ Shipped 13 August 2
       see [Scoring under failure scenarios](metrics-and-leaderboard.md#scoring-under-failure-scenarios)
     - Degradation smoke-tests in CI
       ([#436](https://github.com/openclimatefix/nged-substation-forecast/issues/436))
-    - Score every leaderboard experiment under each scenario, against `nged_incumbent`
+    - Score every leaderboard experiment under each scenario, against `manual_heuristic`
       ([#438](https://github.com/openclimatefix/nged-substation-forecast/issues/438))
 - One-command rollback for `promoted_model`
   ([#440](https://github.com/openclimatefix/nged-substation-forecast/issues/440)), plus the runbooks
@@ -155,7 +155,7 @@ quality, reproducibility, and observability hardening. **✅ Shipped 13 August 2
 *Epic: [#150](https://github.com/openclimatefix/nged-substation-forecast/issues/150)*
 
 - Automatic cleaning of NGED's power data. Versions 0.1 to 0.3 do none: the models train on,
-  and the live service forecasts from, raw NGED telemetry
+  and the live service forecasts from, uncleaned telemetry
 - `power_forecast_warnings` **Phase 1** — `STALE NWP` and `STALE POWER`, with `warning_source`
   ([#439](https://github.com/openclimatefix/nged-substation-forecast/issues/439))
 - `power_forecast_warnings` **Phase 2** — the meter-error warning types, which are this milestone's
@@ -201,7 +201,7 @@ quantile pipeline:
   widen honestly when the inputs degrade rather than staying over-confident
 - The weather-blind guarantee: outage-shaped training augmentation
   ([#445](https://github.com/openclimatefix/nged-substation-forecast/issues/445)), which is what
-  makes "never worse than the incumbent" true rather than hopeful
+  makes "never worse than the manual heuristic" true rather than hopeful
 - Clear-sky as the zero-data **floor**
   ([#444](https://github.com/openclimatefix/nged-substation-forecast/issues/444)), extending
   [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168)
@@ -354,8 +354,8 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   win: a global MLP against a global XGBoost on the *identical* feature frame, run once that
   win's prerequisites (per-series target normalisation, static per-series features, and
   init-time-anchored features) exist, so the comparison isolates the model family. A negative
-  result de-risks the neural approaches on the [v2.0](#v20-scale-up-future-research) research
-  list before we spend research time on the fancier ones. The spike must also **state and test how
+  result de-risks the neural approaches on the
+  [post-v2 research list](#after-v21-research-advanced-ml) before we spend research time on the fancier ones. The spike must also **state and test how
   it handles missing inputs**: XGBoost gets NaN routing for free and an MLP does not, so a
   zero-filled MLP would lose the comparison for a reason that has nothing to do with model family
   (zero is a real physical value — see
@@ -364,8 +364,8 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
 - **Additional NWP source, e.g. ICON-EU**
   ([#363](https://github.com/openclimatefix/nged-substation-forecast/issues/363)): explore
   whether adding ICON-EU from Dynamical.org improves forecast skill over ECMWF ENS alone — the
-  v1 nice-to-have version of the broader "further NWP sources" idea on the
-  [v2.0 research list](#v20-scale-up-future-research). **Sized by the v0.5
+  v1 nice-to-have version of the broader
+  [v2.1 multi-source item](#v21-xgboost-improvements-at-full-scale). **Sized by the v0.5
   [perfect-weather ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates)**:
   a low ceiling means there is little forecast-error headroom to chase and this drops down the
   list — though not off it, because ICON-EU's ~6.5 km grid could still beat 31 km ERA5 on
@@ -400,7 +400,7 @@ Target: **January 2027**
 
 ---
 
-## v2.0 — Scale-Up (Future Research)
+## v2.0 — Scale-Up
 
 *Epic: [#156](https://github.com/openclimatefix/nged-substation-forecast/issues/156) (WP5:
 delivery of the v2 live service)*
@@ -411,18 +411,6 @@ delivery of the v2 live service)*
 - Estimate the installed capacity of *unmetered* solar PV and wind on each primary substation (by [disaggregating net primary substation power flows](disaggregation.md))
 - Compare top-down forecasts vs. bottom-up forecasts for BSPs and GSPs
 
-**Research (advanced ML)**:
-
-- **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing. (See [Net-demand disaggregation](disaggregation.md) — the canonical page for this arc, including the [convex dictionary baseline](disaggregation.md#the-convex-dictionary-baseline) it must beat — and [the switching-events approaches](switching-events.md#the-approaches).)
-- **Latent-demand recovery under switching**: reconstruct the demand each substation would have metered under the *normal running arrangement*, using a time-varying neighbourhood mixture (optionally type-resolved into demand / PV / wind) over the network graph. This neighbourhood-mixture approach reconstructs the topology-normalised demand NGED requires, and goes beyond the v0.6 statistical detector — which only flags and masks switching periods. See [Switching events & latent demand](switching-events.md).
-- **Synthetic telemetry from fitted models, for the problems whose labels are missing**: three of this project's problems are scored against labels that are incomplete or absent — disaggregating unmetered distributed energy resources (DERs), detecting switching events, and estimating the effective capacity of metered generators. Fitting the per-site generation modules ([differentiable physics](../techniques/differentiable-physics.md)) and the shared demand-profile basis ([the `BasisLoadNode`](disaggregation.md#node-definitions)), then running them forward on real weather and summing the sites, produces a simulated substation whose generation, demand, and capacity are all written down by construction. Editing the simulated sum writes the labels the other two problems need: reassigning a site from one substation's sum to a named neighbour over a known window labels a switching event, and stepping a site's capacity down on a known date labels a capacity change. Both edits are exact in simulation, where the real-data harnesses can only approximate them by scaling a fraction of net power. The hazard is circularity: an estimator scored on data generated by its own model family measures whether the parameters are identifiable, not whether that model family matches reality. Two consequences follow. Parameters must be drawn afresh rather than frozen at their fitted values wherever the fitted value is the quantity under test — a capacity estimator scored against its own earlier answer measures only that the fit reproduces, and simulating with the same biased irradiance hides the [weather-bias aliasing](capacity-estimation.md#keeping-weather-bias-out-of-capacity) that page names as the dominant systematic error. And a passing score never stands alone, because the simulated telemetry carries none of the meter noise the switching detector's thresholds are normalised against. The simulator therefore supplements the real-data harnesses rather than replacing them: [injection into real telemetry](switching-events.md#validation-injection-and-what-the-detector-delivers) stays the primary evidence for switching detection, and the [other disaggregation spokes](../techniques/disaggregation-evaluation.md) stay the primary evidence for disaggregation.
-- **Pre-trained neural network [encoders](../techniques/encoders.md)**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
-- **Multi-sequence alignment** with axial attention: find "similar" historical days and feed them as additional context to the forecasting model
-- **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
-- **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the graph-structured disaggregation engine
-- **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (see [the graph-structured engine](disaggregation.md#the-graph-structured-engine) and [MVA metering](disaggregation.md#apparent-power-mva-metering))
-- **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. The v0.5 [perfect-weather ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates) sizes the forecast-error headroom a further source could recover; the separate case for a *finer-resolution* source survives a low ceiling, because that ceiling is measured on a 31 km reanalysis. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history. The ICON-EU trial specifically is also pulled forward as a [v0.9 nice-to-have](#v09-nice-to-haves-if-we-have-time); this v2.0 item is the wider question of further sources beyond it
-
 **Stretch goals**:
 
 - Forecast *unmetered* solar and wind power at each primary substation
@@ -431,19 +419,44 @@ delivery of the v2 live service)*
 
 ---
 
+## v2.1 — XGBoost Improvements at Full Scale
+
+**v2.1 is about a month of XGBoost work, once the v2 live service runs for all 2,500 time
+series.** v2.1 picks up whatever [XGBoost improvements](xgboost-improvements.md) v0.5 left
+undone, and adds
+[further NWP sources as features](xgboost-improvements.md#several-nwp-sources-as-features-v21).
+
+---
+
+## After v2.1 — Research (Advanced ML)
+
+**The research items run roughly in the order listed.** The weather encoder trains through the
+differentiable-physics modules, so the encoder comes after the physics and disaggregation work.
+
+- **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (see [the graph-structured engine](disaggregation.md#the-graph-structured-engine) and [MVA metering](disaggregation.md#apparent-power-mva-metering))
+- **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing. (See [Net-demand disaggregation](disaggregation.md) — the canonical page for this arc, including the [convex dictionary baseline](disaggregation.md#the-convex-dictionary-baseline) it must beat — and [the switching-events approaches](switching-events.md#the-approaches).)
+- **Latent-demand recovery under switching**: reconstruct the demand each substation would have metered under the *normal running arrangement*, using a time-varying neighbourhood mixture (optionally type-resolved into demand / PV / wind) over the network graph. This neighbourhood-mixture approach reconstructs the topology-normalised demand NGED requires, and goes beyond the v0.6 statistical detector — which only flags and masks switching periods. See [Switching events & latent demand](switching-events.md).
+- **Synthetic telemetry from fitted models, for the problems whose labels are missing**: three of this project's problems are scored against labels that are incomplete or absent — disaggregating unmetered distributed energy resources (DERs), detecting switching events, and estimating the effective capacity of metered generators. Fitting the per-site generation modules ([differentiable physics](../techniques/differentiable-physics.md)) and the shared demand-profile basis ([the `BasisLoadNode`](disaggregation.md#node-definitions)), then running them forward on real weather and summing the sites, produces a simulated substation whose generation, demand, and capacity are all written down by construction. Editing the simulated sum writes the labels the other two problems need: reassigning a site from one substation's sum to a named neighbour over a known window labels a switching event, and stepping a site's capacity down on a known date labels a capacity change. Both edits are exact in simulation, where the real-data harnesses can only approximate them by scaling a fraction of net power. The hazard is circularity: an estimator scored on data generated by its own model family measures whether the parameters are identifiable, not whether that model family matches reality. Two consequences follow. Parameters must be drawn afresh rather than frozen at their fitted values wherever the fitted value is the quantity under test — a capacity estimator scored against its own earlier answer measures only that the fit reproduces, and simulating with the same biased irradiance hides the [weather-bias aliasing](capacity-estimation.md#keeping-weather-bias-out-of-capacity) that page names as the dominant systematic error. And a passing score never stands alone, because the simulated telemetry carries none of the meter noise the switching detector's thresholds are normalised against. The simulator therefore supplements the real-data harnesses rather than replacing them: [injection into real telemetry](switching-events.md#validation-injection-and-what-the-detector-delivers) stays the primary evidence for switching detection, and the [other disaggregation spokes](../techniques/disaggregation-evaluation.md) stay the primary evidence for disaggregation.
+- **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the graph-structured disaggregation engine
+- **Pre-trained neural network [encoders](../techniques/encoders.md)**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
+- **Multi-sequence alignment** with axial attention: find "similar" historical days and feed them as additional context to the forecasting model
+- **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
+
+---
+
 ## Handover to NGED (post-NIA operating model)
 
 *Epic: [#309](https://github.com/openclimatefix/nged-substation-forecast/issues/309) — see
 [Handover to NGED](handover.md) for the design.*
 
-NGED confirmed (2026-07-14) that their *preference* is to **run Flexpectation themselves, on
-NGED's own AWS infrastructure** after the NIA project — not yet a commitment; NGED's DSO,
-Cyber, and IT&D teams still need to sign off (see [Requirements → Operating model &
+The working assumption is that, after the NIA project, NGED **runs the Flexpectation service on
+its own AWS account** (see [Requirements → Operating model &
 handover](../background/requirements.md#operating-model-handover)). This handover is not a
-single late milestone: it sets a standing design constraint from today (the service must be
-operable day to day by a non-expert — the [operator
-contract](handover.md#1-the-operator-contract)), one workstream that must start early ([probing
-NGED's AWS landing zone](handover.md#5-probe-ngeds-aws-landing-zone-early), since it could
-invalidate the Tailscale-based access design), and a cluster of late-project work (runbook
-hardening, game days, progressive transfer of control). The gate: OCF runs the full v2 service
-for a few months before NGED decides.
+single late milestone: it sets a standing design constraint from today (NGED staff who did not
+develop the code must be able to run the service day to day, working from the runbooks — the
+[operator contract](handover.md#1-the-operator-contract)), one workstream that must start early
+([confirming NGED's cloud and security
+standards](handover.md#5-confirm-ngeds-cloud-and-security-standards-early), because the
+Tailscale-based access design has to fit those standards), and a cluster of late-project work
+(runbook hardening, game days, and progressive transfer of control). The gate: OCF runs the full
+v2 service for a few months before NGED decides on the operating model after the NIA project.
