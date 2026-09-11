@@ -11,7 +11,7 @@ How OCF delivers forecasts and supporting data to NGED.
 
 For v1 of the live service, OCF delivers live forecasts (and the supporting tables below) as
 **Delta Lake** tables in an AWS S3 bucket. We are **not** building a REST API for v1 (a REST API is a v2
-[stretch goal](index.md#v20-scale-up-future-research)); an API may be added later if it brings
+[stretch goal](index.md#v20-scale-up)); an API may be added later if it brings
 additional benefit.
 
 - **Why Delta Lake?** It is just Parquet files plus a transaction log, giving ACID guarantees on
