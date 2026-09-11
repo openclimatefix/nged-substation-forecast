@@ -9,8 +9,9 @@
 > sibling v2 arc — abnormal running arrangements and latent-demand recovery under switching — has
 > its own canonical doc, [Switching events & latent demand](switching-events.md). How progress is
 > measured lives in
-> [Evaluating disaggregation](../techniques/disaggregation-evaluation.md). This work is
-> [roadmap v2.0](index.md#v20-scale-up-future-research); it builds on the metered-generator
+> [Evaluating disaggregation](../techniques/disaggregation-evaluation.md). Estimating unmetered
+> capacity is [roadmap v2.0](index.md#v20-scale-up), and the graph-structured engine is
+> [post-v2 research](index.md#after-v21-research-advanced-ml); both build on the metered-generator
 > capacity estimates from [v0.7](capacity-estimation.md). The Python in this document is
 > illustrative sketch code, not the implementation. See the [roadmap index](index.md) for status
 > conventions.
@@ -96,7 +97,7 @@ Each right-hand-side term is modelled explicitly:
 - **`wind_generation(t)`** — estimated from wind speed via a differentiable power curve.
 - **`battery_net(t)`** — handled via a state-space component with charge/discharge dynamics.
   *(A later / stretch component — battery disaggregation is a v2 stretch goal in the
-  [roadmap](index.md#v20-scale-up-future-research).)*
+  [roadmap](index.md#v20-scale-up).)*
 - **`losses(t)`** — approximated as a smooth function of load level. *(Also a later refinement.)*
 
 ### Metered vs. unmetered DERs

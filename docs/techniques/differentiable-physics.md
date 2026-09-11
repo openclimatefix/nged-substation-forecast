@@ -8,7 +8,7 @@
 > for metered-generator effective capacity
 > ([v0.7](../roadmap/index.md#v07-dynamic-generator-capacity)), and the engine behind the
 > [graph-structured disaggregation of net substation power](../roadmap/disaggregation.md)
-> ([v2 research](../roadmap/index.md#v20-scale-up-future-research)). The tooling counterpart to
+> ([post-v2 research](../roadmap/index.md#after-v21-research-advanced-ml)). The tooling counterpart to
 > this page — which estimation problems belong in convex optimisation (CVXPY) rather than
 > PyTorch, and the `cvxpylayers` bridge between the two — is
 > [Convex Optimisation](convex-optimisation.md). The Python in this document is illustrative
@@ -464,7 +464,7 @@ component; treat those sketches as the prototype it grows from.
   the single-site model, with orientation and capacity as variational posteriors, is
   [Candidate B](../roadmap/capacity-estimation.md#candidate-b-the-differentiable-physics-estimator)
   in the capacity-estimation head-to-head.
-- **Net-demand disaggregation ([v2 research](../roadmap/index.md#v20-scale-up-future-research))** —
+- **Net-demand disaggregation ([post-v2 research](../roadmap/index.md#after-v21-research-advanced-ml))** —
   the fleet node and its wind/demand/heat-pump siblings become node types in the
   [graph-structured engine](../roadmap/disaggregation.md#the-graph-structured-engine); the fuller
   forecasting architecture combining DP with
