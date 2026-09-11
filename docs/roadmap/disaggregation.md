@@ -9,8 +9,9 @@
 > sibling v2 arc — abnormal running arrangements and latent-demand recovery under switching — has
 > its own canonical doc, [Switching events & latent demand](switching-events.md). How progress is
 > measured lives in
-> [Evaluating disaggregation](../techniques/disaggregation-evaluation.md). This work is
-> [roadmap v2.0](index.md#v20-scale-up); it builds on the metered-generator
+> [Evaluating disaggregation](../techniques/disaggregation-evaluation.md). Estimating unmetered
+> capacity is [roadmap v2.0](index.md#v20-scale-up), and the graph-structured engine is
+> [post-v2 research](index.md#after-v21-research-advanced-ml); both build on the metered-generator
 > capacity estimates from [v0.7](capacity-estimation.md). The Python in this document is
 > illustrative sketch code, not the implementation. See the [roadmap index](index.md) for status
 > conventions.

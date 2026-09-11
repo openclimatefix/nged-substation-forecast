@@ -421,8 +421,9 @@ delivery of the v2 live service)*
 
 ## v2.1 — XGBoost Improvements at Full Scale
 
-**About a month of XGBoost work, once the v2 live service runs for all 2,500 time series.** It picks
-up whatever [XGBoost improvements](xgboost-improvements.md) v0.5 left undone, and adds
+**v2.1 is about a month of XGBoost work, once the v2 live service runs for all 2,500 time
+series.** v2.1 picks up whatever [XGBoost improvements](xgboost-improvements.md) v0.5 left
+undone, and adds
 [further NWP sources as features](xgboost-improvements.md#several-nwp-sources-as-features-v21).
 
 ---

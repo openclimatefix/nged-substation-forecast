@@ -1192,7 +1192,9 @@ spread-skill is the outcome that tells you the decomposition was doing real work
 **Add AIFS-ENS and ICON-EU alongside ECMWF ENS, rather than swapping one source for another, so the
 booster learns when to trust each source.** AIFS-ENS member *n* starts from the [same initial
 conditions](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1) as ECMWF ENS
-member *n*, so the two members share one row. ICON-EU is a single deterministic run, so its values
+member *n*, so the two members share one row. Before relying on the pairing, check that
+Dynamical.org keeps ECMWF's member numbering in both datasets. ICON-EU is a single deterministic
+run, so its values
 repeat on every member's row and are absent beyond its 120-hour horizon. Train with whole sources
 randomly blanked, so that a failed feed degrades the forecast rather than breaking it.
 
@@ -1200,14 +1202,18 @@ randomly blanked, so that a failed feed degrades the forecast rather than breaki
 slice, with a block-bootstrap confidence interval that excludes zero:**
 
 1. ECMWF ENS alone.
-2. The paired multi-source features. This step must also beat a blend that weights each source by
-   its inverse error over the last 30 days, the method [Abellan and Johnson
-   (2026)](https://doi.org/10.5194/ems2026-258) apply to surface temperature, dewpoint, and wind.
-   They attribute part of their gain to opposing biases in the two models cancelling. The booster
-   corrects each source's bias directly, so that part of the gain may not carry over.
+2. The paired multi-source features, which must also beat a blend weighting each source by its
+   inverse error over the last 30 days.
 3. Step 2 plus weather-situation features: pressure gradient, ensemble spread, and the
-   disagreement between sources. The booster already sees lead time and time of day, so step 3
+   disagreement between sources. Step 2 must already include lead time and time of day, so step 3
    isolates the weather situation.
+
+**The 30-day blend is a cheap baseline, but part of its reported gain may not carry over to the
+booster.** [Abellan and Johnson (2026)](https://doi.org/10.5194/ems2026-258), a conference
+abstract, apply the blend to the ECMWF and ACCESS models over Australia, for surface temperature,
+dewpoint, and wind. The authors attribute part of their gain to opposing biases in the two models
+cancelling. The booster corrects each source's bias directly, so that part of the gain may not
+carry over.
 
 **Step 3 is unlikely to clear step 2 on the history available by v2.1.** The AIFS-ENS archive
 starts in July 2025 and ICON-EU's in early 2026. One source's forecast errors are shared by every
@@ -1215,13 +1221,14 @@ substation under the same weather system, so hundreds of substations during one 
 one storm's worth of evidence. A few years of history therefore hold few independent examples of
 each kind of weather.
 
-**A cheaper test needs only ECMWF ENS: check whether its calibration varies with the weather
-situation once lead time is accounted for.** For a single ensemble, [Allen et al.
+**A cheaper first signal needs only ECMWF ENS: check whether its calibration varies with the
+weather situation once lead time is accounted for.** For a single ensemble, [Allen et al.
 (2020)](https://doi.org/10.1002/qj.3806) found that making ensemble model output statistics (EMOS)
 regime-dependent improved the calibration of wind-speed forecasts, and [Allen et al.
 (2021)](https://doi.org/10.1002/qj.3983) found a similar gain from adding the state of the North
-Atlantic Oscillation as a predictor. If ECMWF ENS calibration does not vary with the weather
-situation, conditioning trust in each source on the situation is unlikely to help.
+Atlantic Oscillation as a predictor. A dependence would show that the weather situation matters to
+forecast quality. The ECMWF ENS test cannot show how the sources compare in each situation, which
+only step 3 tests.
 
 ### Global model per `time_series_type`
 

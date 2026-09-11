@@ -59,13 +59,15 @@ the frozen representation, though on further weather variables rather than power
 #### Blending several NWP sources
 
 **The WeatherEncoder can take several NWP sources at once and learn when to trust each source.**
-The candidate sources are ECMWF ENS, ECMWF's machine-learned AIFS-ENS, and DWD's deterministic
-ICON-EU. Each source enters as tokens carrying a source-identity embedding, so a missing source
-simply [drops out](#handling-missing-inputs-remove-the-token-dont-zero-fill).
+The candidate sources are ECMWF ENS, ECMWF's machine-learned AIFS-ENS, and the deterministic
+ICON-EU from DWD, Germany's national weather service. Each input value enters the encoder as a
+token, under the [token scheme](#handling-missing-inputs-remove-the-token-dont-zero-fill) set out
+below. A token also carries a source-identity embedding, so a missing source simply drops out.
 
 **Feed the encoder ensemble members, not statistics summarising the ensemble, because the
 differentiable-physics layer is nonlinear.** Wind power rises with the cube of wind speed between
-cut-in and rated speed, inverters clip PV output, and PV output depends on the sun's position. So
+cut-in and rated speed. Inverters clip photovoltaic (PV) output, and PV output depends on the sun's
+position. So
 the power computed from the ensemble-mean weather is not the mean of the power computed from each
 member. Pushing weather quantiles through the physics layer works for one weather variable at one
 generator, whose power curve is monotone below cut-out. A substation, though, sums many generators
@@ -80,19 +82,24 @@ members start from the same initial conditions.** ECMWF starts AIFS-ENS member *
 [initial conditions of ECMWF ENS member
 *n*](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1). The pair is
 therefore one perturbed starting state run through two models, and the difference between the two
-members measures model error with initial-condition error held fixed. A forward pass that sees
+members measures model error, plus the noise AIFS-ENS injects inside its own model, with
+initial-condition error held fixed. A forward pass that sees
 only one source can learn to correct that source's biases, but cannot learn how far to trust that
 source, because trust is relative to the alternatives. ICON-EU is a single deterministic run, so
 the same ICON-EU tokens enter all 51 forward passes. Where training finds ICON-EU reliable, the
 ICON-EU tokens pull every member towards the ICON-EU solution, without adding spread of their own.
-The output stays 51 equiprobable members, so the [linear
+Pulling every member towards one run narrows the spread, so the per-horizon spread-skill ratio has
+to confirm that the pooled forecast is not under-dispersed. The output stays 51 equiprobable
+members, so the [linear
 pool](probabilistic-forecasting.md#the-fix-formally-a-mixture-of-conditional-distributions) and
-the [fair CRPS](evaluation-metrics.md#crps-continuous-ranked-probability-score) apply unchanged.
+the fair [continuous ranked probability score
+(CRPS)](evaluation-metrics.md#crps-continuous-ranked-probability-score) apply unchanged.
 
 **A weighted mixture of the 51 ECMWF ENS members and the 51 AIFS-ENS members is the weaker
-alternative.** The mixture is a valid forecast, but the mixture discards the pairing, which is the
-most direct signal of model error. The mixture also changes the member count, and the spread-skill
-ratio and PICP [shift with the member count](evaluation-metrics.md#probabilistic-metrics).
+alternative.** The mixture is a valid forecast, but the mixture discards the pairing, which is a
+direct, if noisy, signal of model error. The mixture also changes the member count, and the
+spread-skill ratio and the prediction interval coverage probability (PICP) [shift with the member
+count](evaluation-metrics.md#probabilistic-metrics).
 
 **The encoder infers the weather situation from its inputs, with no hand-labelled weather
 regimes.** We expect ensemble spread and the disagreement between sources to be the strongest
