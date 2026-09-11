@@ -2891,7 +2891,7 @@ change to how the experiments are run helped.
 that account is the part of his argument this project has to answer rather than quote selectively.**
 Donoho predicts that fields with "inhibitions against data sharing, for example, because of
 confidentiality restrictions" will not make the transition he describes and "will be noticeably
-lagging behind in rate of progress". The substation telemetry this project uses is not published.
+lagging behind in rate of progress". The substation telemetry this project uses is not (yet) published.
 Donoho also names the arrangement a field with data-sharing restrictions can still reach, which he
 calls a bring-your-own-data challenge: a shared task and shared code over data that "is private and
 only a few credentialed researchers ever get to see", as happens in clinical research. The
