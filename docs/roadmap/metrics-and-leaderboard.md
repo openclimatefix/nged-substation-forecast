@@ -15,7 +15,8 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > probabilistic evaluation [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225) ·
 > tail & exceedance metrics [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254) ·
 > tricky-days filter [#255](https://github.com/openclimatefix/nged-substation-forecast/issues/255) ·
-> fold hygiene [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226).
+> fold hygiene [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226) ·
+> calibrated manual heuristic [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715).
 
 ---
 
@@ -137,6 +138,103 @@ baselines built on the manual heuristic:
   bank-holiday calendar (the pure-Python `holidays` package), and ships as an immediate follow-up
   PR.
 
+A third variant, `manual_heuristic_calibrated`, corrects the analogues after selection rather than
+changing which analogues are selected, and has [its own section
+below](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile).
+
+### Calibrating the manual heuristic aims at the 95th percentile
+
+Issue: [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)
+
+**A third variant, `manual_heuristic_calibrated`, keeps the same analogues and fits a statistical
+correction to them on past errors.** One standard form of that correction is Ensemble Model Output
+Statistics (EMOS), which [Gneiting et al. (2005)](https://doi.org/10.1175/MWR2904.1) introduced for
+weather ensembles: fit a predictive distribution whose mean is an affine function of the member
+forecasts — one coefficient each, collapsing to a single coefficient on the ensemble mean where the
+members are exchangeable, as the manual heuristic's equally-weighted analogues are. Its variance is
+an affine function of the ensemble variance, with the coefficients chosen by minimising CRPS over a
+training window. Nothing in EMOS requires the ensemble to come from a weather model, so
+the analogues `manual_heuristic` already synthesises are a valid input.
+
+**The faithful replica stays the headline bar, because the correction is our work rather than the
+manual heuristic's.** The manual heuristic forecast itself does not adjust for holidays, switching
+events, load growth, or any statistical correction of the analogues. The question the leaderboard
+exists to answer is whether we beat that unadjusted baseline. So `manual_heuristic_calibrated` is a
+row of our own, sitting beside `manual_heuristic_holiday_aligned` as a second cheap upgrade to the
+manual heuristic, and testing the same claim that most of the benefit comes from simple upgrades
+rather than from heavy ML.
+
+**The 95th percentile of 13 analogues is exceeded far more than 5% of the time even when the
+analogues are perfectly calibrated.** Empirical quantiles from a finite ensemble sit inside the true
+quantiles, and at 13 members the effect is large. For uniform draws the empirical p95 of 13
+equiprobable members is exceeded about 11.4% of the time, by the same arithmetic behind [PICP's
+calibrated reference table](../techniques/evaluation-metrics.md#picp-prediction-interval-coverage-probability).
+The floor tightens as members shed: `_nullify_leaky_lags` drops the 168-hour analogue past 7 days of
+lead and the 336-hour analogue past 14, giving 11.9% at 12 members and 12.5% at 11.
+
+**No choice of analogues removes that penalty.** An operator reading the percentile as "the level
+demand should stay under, 19 times out of 20" would, if the analogues were calibrated, be reading a
+level crossed more than twice as often as they think. Selecting the analogues differently cannot
+remove the penalty while the analogues stay calibrated, because the penalty comes from the number of
+members rather than from which analogues are chosen — a wider-than-truthful ensemble can only mask
+it.
+
+**A fitted predictive distribution has no member-count floor.** Its members need only sit at
+equiprobable quantile levels `(i − 0.5)/m` as the climatology baseline's do, and be numerous enough
+that the empirical p95 the metrics layer reads still tracks the fitted percentile. The [exceedance
+rate of the upper delivery
+quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles) is
+the calibration check for the fitted percentile.
+
+**Fitting the mean also picks up the load growth the manual heuristic has no scaling for.** The
+affine term on the analogue mean absorbs a systematic offset between the analogues and the target
+half-hour — load growth over the year separating the annual group from today and the residual offset
+on a day type that the analogue selection matches only imperfectly. Neither offset needs weather to
+correct. The calibrated variant therefore stays naive in the sense that matters for a baseline,
+knowing nothing the substation's own history does not contain.
+
+**The two halves of the fit show up in different metrics.** The mean correction improves NMAE
+wherever the analogues carry a stale level, and the variance correction moves CRPS and the exceedance
+rate.
+
+**An analogue ensemble may be miscalibrated in the opposite direction to a weather ensemble, so
+measure before building.** The manual heuristic's members are observed powers rather than perturbed
+model runs. The analogue spread does not narrow at short lead the way an NWP ensemble's spread does,
+because the freshest analogue is already a week old. Week-to-week variation at the same weekday and
+time of day could easily exceed the real forecast uncertainty, leaving the manual heuristic
+over-dispersed where a weather ensemble is under-dispersed. The 95th percentile would then be
+crossed less often than the finite-ensemble arithmetic above implies. The correction would
+narrow the band rather than widen it.
+
+**Two cheap diagnostics point to the direction once `manual_heuristic` ships.** The first diagnostic
+is the rank histogram of the observation among the analogues per horizon slice, the same instrument
+[Phase C](#phase-c-low-effort-calibration-after-b-proves-the-diagnosis) uses on the weather
+ensemble. The second diagnostic is the correlation between the analogue spread and the absolute
+error of the analogue mean. A flat histogram with no spread-error correlation would leave the
+variance half of EMOS nothing to fit, reducing the work to a mean correction with a fixed-width
+band. One published analogy worth reading alongside the diagnostics is the analogue-ensemble
+literature — [Delle Monache et al. (2013)](https://doi.org/10.1175/MWR-D-12-00281.1) — which builds
+its members the same way, though it selects analogues on a weather forecast rather than on the
+calendar.
+
+**A Gaussian predictive distribution puts the modelling assumption where the product is most
+sensitive, so measure a non-parametric fit beside EMOS.** Minimum-CRPS estimation is dominated by
+the bulk of the distribution, while flexibility procurement and curtailment read the tails. The
+manual heuristic's residuals have no particular reason to be Gaussian out there. [Henzi et al.
+(2021)](https://doi.org/10.1111/rssb.12450)'s isotonic distributional regression fits a conditional
+distribution non-parametrically and needs no tuning beyond the choice of a partial order on the
+covariates. A baseline with almost nothing to tune is also harder to accuse of having been tuned
+into a bar we can clear.
+
+**The correction is fitted, so it rides the cross-validation protocol like any other model.**
+Coefficients are fitted on each fold's training window and applied to that fold's validation window,
+exactly as [Phase C](#phase-c-low-effort-calibration-after-b-proves-the-diagnosis) specifies for the
+weather ensemble. The fit also runs per horizon slice, because the surviving analogue mix changes as
+members shed with lead time. Fitting on the training window alone is the line between a baseline and
+a model that has seen the data it is scored on. A handful of coefficients crosses that line as
+easily as a large model does. The calibration itself belongs in the shared wrapper forecaster Phase C
+specifies, rather than inside the manual heuristic.
+
 ### Persistence and climatology — diagnostic bookends
 
 The manual heuristic is really a *hybrid* — its weekly group is persistence-like recency, its annual group
@@ -193,6 +291,11 @@ Five PRs, in order. PRs 1–2 are shared-framework groundwork (no baseline yet);
 baseline each. The `manual_heuristic_holiday_aligned` variant (described under [A faithful replica and
 a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a later sixth
 PR, out of scope for this arc but given its own tracked issue so it is not lost when #147 closes.
+`manual_heuristic_calibrated` (described under [Calibrating the manual
+heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile), and tracked in
+[#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) is a seventh PR, on
+the same footing: out of scope here, tracked separately, and buildable as soon as `manual_heuristic`
+itself ships.
 
 **Guiding principle — no special path.** New workspace package `packages/baseline_forecasters/`
 mirroring the `xgboost_forecaster` layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`),
@@ -1008,10 +1111,17 @@ observations among the 51 members, computed ad hoc per horizon slice: a U-shape 
 underdispersion (a single multiplicative inflation can fix it), whereas a sloped or asymmetric
 histogram means bias or shape error, which a symmetric inflation cannot repair and which would push
 toward a rank-dependent correction instead. **Post-hoc spread inflation** (a cut-down Ensemble Model
-Output Statistics, or EMOS): per horizon slice, fit a scalar `s` on the *training* window so that
-inflating members around the ensemble mean (`mean + s·(member − mean)`) makes spread match error.
-Zero schema change, zero new model — implementable as an optional step in `predict` or as a wrapper
-forecaster. Fit on train, apply on validation (no tuning on the fold being scored).
+Output Statistics, or EMOS, after [Gneiting et al. (2005)](https://doi.org/10.1175/MWR2904.1)): per
+horizon slice, fit a scalar `s` on the *training* window so that inflating members around the
+ensemble mean (`mean + s·(member − mean)`) makes spread match error. Zero schema change, and no new
+learned model — the wrapper holds a handful of fitted coefficients, not a trained estimator. Fit on
+train, apply on validation (no tuning on the fold being scored). Build the inflation as a wrapper
+forecaster rather than as a step inside `predict`, so that the [calibrated manual
+heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile) and the later
+[degradation-conditional conformal
+calibration](https://github.com/openclimatefix/nged-substation-forecast/issues/443) share one
+implementation and one metric path — once we settle how a wrapper derives its class-level
+`MODEL_NAME` from the model it wraps.
 
 Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
 forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn the effort of
