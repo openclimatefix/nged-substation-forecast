@@ -1,0 +1,108 @@
+/* OCF brand colours for the MkDocs Material theme.
+ *
+ * The hex values below are copied from `packages/plotting/src/plotting/ocf_theme.py`, which is
+ * the single source of truth for the OCF brand palette. Keep the two in step: CSS cannot import
+ * the Python constants, so a change to the palette has to be made in both places.
+ */
+
+:root {
+  --ocf-orange-red: #ff4901;
+  --ocf-blue: #306bff;
+  --ocf-brown: #bf4f04;
+  --ocf-background: #fffbf5;
+  --ocf-grid: #eaeaea;
+  --ocf-text: #292b2b;
+}
+
+[data-md-color-scheme="default"] {
+  /* Header and search bar. BLUE rather than ORANGE_RED: a full-width orange-red bar reads as a
+   * warning banner. The --light and --dark tints are not palette colours; Material needs them
+   * for the header shadow and the mobile browser chrome, so they are tints of BLUE.
+   */
+  --md-primary-fg-color: var(--ocf-blue);
+  --md-primary-fg-color--light: #6d94ff;
+  --md-primary-fg-color--dark: #1f4bc4;
+  --md-primary-bg-color: var(--ocf-background);
+  --md-primary-bg-color--light: #fffbf5b3;
+
+  /* Hover and focus states. */
+  --md-accent-fg-color: var(--ocf-orange-red);
+  --md-accent-fg-color--transparent: #ff49011a;
+  --md-accent-bg-color: var(--ocf-background);
+  --md-accent-bg-color--light: #fffbf5b3;
+
+  /* Page background and body text. The background matches the chart background exactly, so an
+   * exported Altair SVG sits on the page with no visible panel edge.
+   */
+  --md-default-bg-color: var(--ocf-background);
+  --md-default-bg-color--light: #fffbf5b3;
+  --md-default-bg-color--lighter: #fffbf54d;
+  --md-default-bg-color--lightest: #fffbf51f;
+  --md-default-fg-color: #292b2bde;
+  --md-default-fg-color--light: #292b2b8a;
+  --md-default-fg-color--lighter: #292b2b52;
+  --md-default-fg-color--lightest: #292b2b12;
+  --md-typeset-color: var(--ocf-text);
+
+  /* ORANGE_RED reaches only 3.4:1 against the cream background, below the 4.5:1 needed for body
+   * text, so links use the header's darker BLUE tint instead (7.1:1 contrast). Visited links keep
+   * this same colour (set explicitly below, since otherwise the browser's default reddish-brown
+   * shows through) — no separate "already read" colour, by choice. Hover/focus also keep this
+   * colour and gain an underline instead (set separately below), rather than switching to
+   * ORANGE_RED/--md-accent-fg-color: that variable also drives nav highlighting, buttons and
+   * search match highlighting, so overriding it to fix link hover would change all of those too.
+   */
+  --md-typeset-a-color: var(--md-primary-fg-color--dark);
+
+  /* Warm the code blocks and table rules so they read as a tint of the page, not grey on cream. */
+  --md-code-fg-color: var(--ocf-text);
+  --md-code-bg-color: #f5efe5;
+  --md-code-bg-color--light: #f5efe5b3;
+  --md-code-bg-color--lighter: #f5efe54d;
+  --md-code-hl-color: var(--ocf-blue);
+  --md-code-hl-color--light: #306bff1a;
+  --md-typeset-table-color: var(--ocf-grid);
+  --md-typeset-table-color--light: #eaeaea59;
+  --md-typeset-kbd-color: #f5efe5;
+  --md-typeset-kbd-accent-color: var(--ocf-background);
+  --md-typeset-kbd-border-color: #d8cfc2;
+
+  --md-footer-fg-color: var(--ocf-background);
+  --md-footer-fg-color--light: #fffbf5b3;
+  --md-footer-fg-color--lighter: #fffbf573;
+  --md-footer-bg-color: var(--ocf-text);
+  --md-footer-bg-color--dark: #1c1e1e;
+}
+
+.md-typeset a:visited {
+  color: var(--md-typeset-a-color);
+}
+
+/* Material's own rule sets color:var(--md-accent-fg-color) on hover/focus, so it has to be
+ * cancelled back to each state's own colour here, or ORANGE_RED would still show through. */
+.md-typeset a:hover,
+.md-typeset a:focus {
+  color: var(--md-typeset-a-color);
+  text-decoration: underline;
+}
+
+/* The sidebar nav and the page's own table of contents use `.md-nav__link`, a separate component
+ * from `.md-typeset a` above with its own hover rule that also switches to ORANGE_RED. The
+ * current-page nav item is coloured BLUE (var(--md-typeset-a-color)) even when not hovered; every
+ * other nav item has no explicit colour and inherits the page's default text colour. Both keep
+ * their own colour and just underline on hover/focus, matching the body-link treatment above.
+ */
+.md-nav__link[for]:hover,
+.md-nav__link[for]:focus,
+.md-nav__link[href]:hover,
+.md-nav__link[href]:focus {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* Matches the exact selectors above ([href]/[for] plus this active-item variant) so specificity
+ * ties break on source order rather than losing to Material's rule earlier in the cascade. */
+.md-nav--primary .md-nav__item--active > .md-nav__link:hover,
+.md-nav__item--active > .md-nav__link:focus {
+  color: var(--md-typeset-a-color);
+}
