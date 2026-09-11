@@ -56,6 +56,65 @@ into calibrated station-level temperature; [Mitra and Ramavajjala
 (2023)](https://arxiv.org/abs/2312.00290) freeze a weather autoencoder and train small models on
 the frozen representation, though on further weather variables rather than power.
 
+#### Blending several NWP sources
+
+**The WeatherEncoder can take several NWP sources at once and learn when to trust each source.**
+The candidate sources are ECMWF ENS, ECMWF's machine-learned AIFS-ENS, and DWD's deterministic
+ICON-EU. Each source enters as tokens carrying a source-identity embedding, so a missing source
+simply [drops out](#handling-missing-inputs-remove-the-token-dont-zero-fill).
+
+**Feed the encoder ensemble members, not statistics summarising the ensemble, because the
+differentiable-physics layer is nonlinear.** Wind power rises with the cube of wind speed between
+cut-in and rated speed, inverters clip PV output, and PV output depends on the sun's position. So
+the power computed from the ensemble-mean weather is not the mean of the power computed from each
+member. Pushing weather quantiles through the physics layer works for one weather variable at one
+generator, whose power curve is monotone below cut-out. A substation, though, sums many generators
+and a demand driven by several correlated weather variables. Each member carries that joint
+structure across variables and sites, and a summary statistic discards the joint structure. The
+gradient-boosted tree has no physics layer, which is why [ensemble statistics as
+features](../roadmap/xgboost-improvements.md#ensemble-statistics-as-features-instead-of-member-by-member-rows)
+remains a fair experiment for the tree.
+
+**Feed ECMWF ENS member *n* and AIFS-ENS member *n* into the same forward pass, because the two
+members start from the same initial conditions.** ECMWF starts AIFS-ENS member *n* from the
+[initial conditions of ECMWF ENS member
+*n*](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1). The pair is
+therefore one perturbed starting state run through two models, and the difference between the two
+members measures model error with initial-condition error held fixed. A forward pass that sees
+only one source can learn to correct that source's biases, but cannot learn how far to trust that
+source, because trust is relative to the alternatives. ICON-EU is a single deterministic run, so
+the same ICON-EU tokens enter all 51 forward passes. Where training finds ICON-EU reliable, the
+ICON-EU tokens pull every member towards the ICON-EU solution, without adding spread of their own.
+The output stays 51 equiprobable members, so the [linear
+pool](probabilistic-forecasting.md#the-fix-formally-a-mixture-of-conditional-distributions) and
+the [fair CRPS](evaluation-metrics.md#crps-continuous-ranked-probability-score) apply unchanged.
+
+**A weighted mixture of the 51 ECMWF ENS members and the 51 AIFS-ENS members is the weaker
+alternative.** The mixture is a valid forecast, but the mixture discards the pairing, which is the
+most direct signal of model error. The mixture also changes the member count, and the spread-skill
+ratio and PICP [shift with the member count](evaluation-metrics.md#probabilistic-metrics).
+
+**The encoder infers the weather situation from its inputs, with no hand-labelled weather
+regimes.** We expect ensemble spread and the disagreement between sources to be the strongest
+indicators of which source to trust, and both are already inputs. Checking what the encoder has
+learned needs no labels either: group the results by pressure gradient, ensemble spread, or
+disagreement between sources, or cluster the encoder's embeddings after training. The bar is the
+gradient-boosted tree given the same sources, and the [multi-source XGBoost
+experiment](../roadmap/xgboost-improvements.md#several-nwp-sources-as-features-v21) also tests,
+more cheaply, whether trust should depend on the weather situation at all.
+
+**An irradiance field recovered by inverting the metered DER fleet would be a different kind of
+input from an NWP source.** The [GB-wide
+inversion](../roadmap/disaggregation.md#gb-wide-inverse-irradiance-mapping) estimates the
+irradiance at the present time, not a forecast. At the same time step, the encoder would be
+reconstructing the very fleet power the field was inverted from, so the field could enter only as
+a lagged observation. Whether interpolating the fleet's point estimates into a field adds
+information beyond the points themselves is an open question: interpolating irradiance between
+[ground stations stops helping beyond roughly 20 to 34
+km](../roadmap/disaggregation.md#correcting-satellite-irradiance-over-great-britain), and the
+disaggregation page does not yet check the metered fleet's spacing against that distance. Until that question is
+settled, the point estimates can enter as tokens at their own locations.
+
 ### TimeEncoder
 
 Maps a timestamp to an embedding capturing periodic structure: time-of-day, day-of-week, month, bank

@@ -14,6 +14,10 @@ from the 2026-07 codebase review, grouped into **effort tiers** and ordered by e
 unit effort *within* each tier — so an item late in the list can still be high value; it just costs
 more to land.
 
+**v0.5 lands the low-effort items on this page and stops, so that it does not delay v1.** Whatever
+v0.5 leaves undone moves to [v2.1](index.md#v21-xgboost-improvements-at-full-scale), a round of
+XGBoost work once the live service runs for all 2,500 time series.
+
 **Horizon focus: days 3–10.** The product delivers a 14-day horizon, and users mostly act on
 forecasts roughly 1 to 10 days ahead
 ([requirements](../background/requirements.md#core-objectives)). Days 0 to 2 are already well served
@@ -1182,6 +1186,42 @@ metrics](../techniques/evaluation-metrics.md#probabilistic-metrics) — spread-s
 (prediction interval coverage probability) — because what is being traded away is uncertainty
 structure, which NMAE cannot see. A result where quantile features match on NMAE and lose on
 spread-skill is the outcome that tells you the decomposition was doing real work.
+
+### Several NWP sources as features (v2.1)
+
+**Add AIFS-ENS and ICON-EU alongside ECMWF ENS, rather than swapping one source for another, so the
+booster learns when to trust each source.** AIFS-ENS member *n* starts from the [same initial
+conditions](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1) as ECMWF ENS
+member *n*, so the two members share one row. ICON-EU is a single deterministic run, so its values
+repeat on every member's row and are absent beyond its 120-hour horizon. Train with whole sources
+randomly blanked, so that a failed feed degrades the forecast rather than breaking it.
+
+**Each step of the experiment has to beat the step before on out-of-sample CRPS per horizon
+slice, with a block-bootstrap confidence interval that excludes zero:**
+
+1. ECMWF ENS alone.
+2. The paired multi-source features. This step must also beat a blend that weights each source by
+   its inverse error over the last 30 days, the method [Abellan and Johnson
+   (2026)](https://doi.org/10.5194/ems2026-258) apply to surface temperature, dewpoint, and wind.
+   They attribute part of their gain to opposing biases in the two models cancelling. The booster
+   corrects each source's bias directly, so that part of the gain may not carry over.
+3. Step 2 plus weather-situation features: pressure gradient, ensemble spread, and the
+   disagreement between sources. The booster already sees lead time and time of day, so step 3
+   isolates the weather situation.
+
+**Step 3 is unlikely to clear step 2 on the history available by v2.1.** The AIFS-ENS archive
+starts in July 2025 and ICON-EU's in early 2026. One source's forecast errors are shared by every
+substation under the same weather system, so hundreds of substations during one storm give roughly
+one storm's worth of evidence. A few years of history therefore hold few independent examples of
+each kind of weather.
+
+**A cheaper test needs only ECMWF ENS: check whether its calibration varies with the weather
+situation once lead time is accounted for.** For a single ensemble, [Allen et al.
+(2020)](https://doi.org/10.1002/qj.3806) found that making ensemble model output statistics (EMOS)
+regime-dependent improved the calibration of wind-speed forecasts, and [Allen et al.
+(2021)](https://doi.org/10.1002/qj.3983) found a similar gain from adding the state of the North
+Atlantic Oscillation as a predictor. If ECMWF ENS calibration does not vary with the weather
+situation, conditioning trust in each source on the situation is unlikely to help.
 
 ### Global model per `time_series_type`
 
