@@ -116,8 +116,6 @@ metered, used purely as validation. One such site anchors the whole evaluation.
 
 ---
 
----
-
 ## Spoke 7: Manual capacity survey from aerial imagery (direct, small-sample)
 
 Count rooftop PV by hand from aerial or high-resolution satellite imagery across a few primary
