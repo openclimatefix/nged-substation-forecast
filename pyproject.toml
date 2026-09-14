@@ -60,7 +60,9 @@ dev = [
     # dependency purely so `uv sync` installs it and `uv run pytest` can collect its tests.
     "dashboard",
     "pytest-xdist>=3.6.1",
-    "mkdocs-redirects>=1.2.3",
+    # Pinned below 1.2.3: that release and later pull in `properdocs` as a transitive dependency,
+    # which prints an unsolicited warning urging a switch away from MkDocs on every build.
+    "mkdocs-redirects>=1.1.0,<1.2.3",
 ]
 
 [project.urls]
