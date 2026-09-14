@@ -80,3 +80,9 @@ site/
 
 # Coverage artifacts (pytest-cov)
 .coverage
+
+#######################
+# Downloaded literature (papers, third-party project deliverables).
+# Copyrighted third-party material: never commit.
+literature/
+temp/

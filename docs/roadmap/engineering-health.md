@@ -1,20 +1,10 @@
 # Engineering health
 
-> **Status: 🚧 Planned.** Tooling, reproducibility, and rigour improvements from the 2026-07
-> codebase review that don't change forecast behaviour. Each section is an independent,
-> roughly one-PR piece of work; sections are deleted as they ship. The v0.2 epic
-> [#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138) has shipped in
-> full, including the NWP ingestion checks
-> [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) — as-built in
-> [Known ECMWF ENS data-quality issues](../architecture/ecmwf-ens-known-issues.md#an-incomplete-run-tolerated-and-reported)
-> — and the Hydra removal
-> [#228](https://github.com/openclimatefix/nged-substation-forecast/issues/228), as-built in
-> [Model configuration](../ml_experimentation/model-configuration.md). The one section still on
-> this page, the scientific-rigor tests
-> [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229), now belongs to
-> the v0.3 epic
-> [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6).
-> Task ordering lives in the GitHub Project board.
+> **Status: 🚧 Planned.** Tooling, reproducibility, and rigour improvements that do not change
+> forecast behaviour. One section is outstanding — the scientific-rigor tests,
+> [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229), in the v0.3 epic
+> [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) — and this page is
+> deleted when that section ships. Task ordering lives in the GitHub Project board.
 
 ## Scientific-rigor tests and cleanup
 
@@ -22,7 +12,7 @@ Issue: [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 *Runs after the [live service and monitoring](live-service.md) land.* The feature-level
 no-lookahead tests, cross-mode equivalence test, idempotency tests, and the full-stack
-cross-process MLflow test all exist. Three "not cheating" guardrail tests from the original
+cross-process MLflow test all exist. Four "not cheating" guardrail tests from the original
 testing strategy remain unwritten, plus general cleanup.
 
 ### Implementation details — rigor tests (deleted when they ship)
@@ -31,16 +21,16 @@ testing strategy remain unwritten, plus general cleanup.
 
 - **CV-windowing no-lookahead** (complements the feature-level tests, which cover lag leakage
   but not window construction): assert no *training* row has `valid_time >= val_start` for its
-  fold — i.e. the training window built by `training_window(fold)` and applied in
-  `trained_cv_model` never bleeds into validation.
+  fold — i.e. the training window `trained_cv_model` builds from `fold.train_start` and
+  `fold.train_end` never bleeds into validation.
 - **Leaderboard fairness**: two different experiments over the same fold are scored on the
   **identical** `(time_series_id, fold)` population — a regression guard on the
   experiment-independence of `eligible_time_series`.
 - **Determinism**: training a fold twice with a fixed `random_seed` yields identical
-  predictions. This underpins idempotent retries and a stable leaderboard.
+  predictions. Determinism underpins idempotent retries and a stable leaderboard.
   `test_random_seed_makes_training_deterministic` exists and evidences this at the forecaster
-  level — it trains an `XGBoostForecaster` twice directly on an in-memory frame — but never goes
-  through `trained_cv_model` or fold-window loading, so the fold-level claim above is not
+  level — it trains an `XGBoostForecaster` twice directly on an in-memory frame. But it never
+  goes through `trained_cv_model` or fold-window loading, so the fold-level claim above is not
   evidenced by it and remains one of the guardrail tests below that are still unwritten.
 - **Degradation smoke-tests**: ablate whole input groups — NWP absent, telemetry absent, a single
   weather variable nulled — and assert that a forecast is still produced for every time series, that
@@ -55,15 +45,16 @@ testing strategy remain unwritten, plus general cleanup.
 **Part 2 — cleanup:**
 
 - Remove any remaining dead code/imports from the phased build-out.
-- **Split `defs/cv_assets.py`** (898 lines — the complexity hotspot flagged in the 2026-07
-  codebase review) into `cv_assets.py` / `production_assets.py` / `metric_assets.py`. The
+- **Split `defs/cv_assets.py`** (the largest module in `defs/`, and the complexity hotspot
+  flagged in the 2026-07 codebase review) into `cv_assets.py` / `production_assets.py` /
+  `metric_assets.py`. The
   [`live_forecasts` work](live-service.md#the-live_forecasts-asset) already starts
   `production_assets.py`; move the `metrics` asset and its helpers into `metric_assets.py`
   here. Pure logic stays in `ml_core.cv_helpers`.
 
 **Part 3 — docs freshness pass.** The permanent-docs migration from the old `dagster_plan.md`
 is already done (July 2026): `docs/architecture/ml-orchestration.md` and
-`docs/ml_experimentation/evaluating-new-data-sources.md` capture its important ideas. What
+`docs/ml_experimentation/cross-validation-folds.md` capture its important ideas. What
 remains:
 
 - Check `docs/` against the code after the live service and monitoring land — in particular

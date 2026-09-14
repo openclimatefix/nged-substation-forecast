@@ -45,9 +45,14 @@
   --md-typeset-color: var(--ocf-text);
 
   /* ORANGE_RED reaches only 3.4:1 against the cream background, below the 4.5:1 needed for body
-   * text, so links use the palette's darker BROWN (4.7:1) and brighten to ORANGE_RED on hover.
+   * text, so links use the header's darker BLUE tint instead (7.1:1 contrast). Visited links keep
+   * this same colour (set explicitly below, since otherwise the browser's default reddish-brown
+   * shows through) — no separate "already read" colour, by choice. Hover/focus also keep this
+   * colour and gain an underline instead (set separately below), rather than switching to
+   * ORANGE_RED/--md-accent-fg-color: that variable also drives nav highlighting, buttons and
+   * search match highlighting, so overriding it to fix link hover would change all of those too.
    */
-  --md-typeset-a-color: var(--ocf-brown);
+  --md-typeset-a-color: var(--md-primary-fg-color--dark);
 
   /* Warm the code blocks and table rules so they read as a tint of the page, not grey on cream. */
   --md-code-fg-color: var(--ocf-text);
@@ -67,4 +72,37 @@
   --md-footer-fg-color--lighter: #fffbf573;
   --md-footer-bg-color: var(--ocf-text);
   --md-footer-bg-color--dark: #1c1e1e;
+}
+
+.md-typeset a:visited {
+  color: var(--md-typeset-a-color);
+}
+
+/* Material's own rule sets color:var(--md-accent-fg-color) on hover/focus, so it has to be
+ * cancelled back to each state's own colour here, or ORANGE_RED would still show through. */
+.md-typeset a:hover,
+.md-typeset a:focus {
+  color: var(--md-typeset-a-color);
+  text-decoration: underline;
+}
+
+/* The sidebar nav and the page's own table of contents use `.md-nav__link`, a separate component
+ * from `.md-typeset a` above with its own hover rule that also switches to ORANGE_RED. The
+ * current-page nav item is coloured BLUE (var(--md-typeset-a-color)) even when not hovered; every
+ * other nav item has no explicit colour and inherits the page's default text colour. Both keep
+ * their own colour and just underline on hover/focus, matching the body-link treatment above.
+ */
+.md-nav__link[for]:hover,
+.md-nav__link[for]:focus,
+.md-nav__link[href]:hover,
+.md-nav__link[href]:focus {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* Matches the exact selectors above ([href]/[for] plus this active-item variant) so specificity
+ * ties break on source order rather than losing to Material's rule earlier in the cascade. */
+.md-nav--primary .md-nav__item--active > .md-nav__link:hover,
+.md-nav__item--active > .md-nav__link:focus {
+  color: var(--md-typeset-a-color);
 }

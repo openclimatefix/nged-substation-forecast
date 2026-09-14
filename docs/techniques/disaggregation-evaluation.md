@@ -13,17 +13,18 @@ approach is a **basket of complementary partial evaluations**, each with differe
 agreement across them is the real signal.
 
 The evaluation protocol is not a detail — it is arguably the hardest and most publishable
-contribution of the v2 work. The same structural challenge arose in domestic NILM (where individual
-appliance ground truth is similarly hard to obtain), and building a credible multi-pronged protocol
-is a natural continuation of that prior work.
+contribution of the v2 work. The same structural challenge arose in domestic Non-Intrusive Load
+Monitoring (NILM), where individual appliance ground truth is similarly hard to obtain. Building a
+credible multi-pronged protocol is a natural continuation of that prior work.
 
 ---
 
 ## Spoke 1: Synthetic aggregation ("the Neural NILM move")
 
-Take individually metered sources (customer-metered PV/wind, the metered BESS, etc.), sum them into
-a synthetic "substation," disaggregate, score against the held-out components. This gives an exact
-ground truth because you constructed the aggregate.
+Take individually metered sources (customer-metered solar photovoltaic (PV) and wind, the metered
+battery energy storage system (BESS), etc.), sum them into a synthetic "substation," disaggregate,
+score against the held-out components. This gives an exact ground truth because you constructed the
+aggregate.
 
 **Caveat**: a synthetic clean sum lacks [switching events](../roadmap/switching-events.md), MVA bounce, false
 zeros, unmetered load, and correctly-scaled correlated co-movement. It systematically flatters
@@ -42,7 +43,7 @@ data, for the subset where metering happens to exist.
 of the unmetered fleet.
 
 **Concrete example in the NGED dataset**: Stickney primary's midday peaks correlate with the
-separately-metered nearby Leverton solar farm — a ready-made held-out label test.
+separately-metered solar farm nearby — a ready-made held-out label test.
 
 ---
 
@@ -55,19 +56,42 @@ irradiance; estimated unmetered-PV capacity is physically plausible given the su
 geographic footprint.
 
 Violations are detectable errors without any ground truth — a rigorous "wrongness floor" that
-discriminates between methods. This spoke is underused in the disaggregation literature.
+discriminates between methods. This spoke is underused in the disaggregation literature: the
+[energy-forecasting review](../background/energy-forecasting-review.md) found that using physical
+consistency to *score* an estimate, rather than to *shape* the method that produces it, is close to
+absent from the papers it read.
 
 ---
 
 ## Spoke 4: Cross-source corroboration (label-free, indirect)
 
 Where an independent dataset should predict your disaggregated quantity, agreement is evidence. The
-main example: estimated unmetered-PV capacity per primary vs. registered PV in the ECR / MCS for
-that substation's geographic catchment (recoverable via the MPAN→substation mapping).
+main example: estimated unmetered-PV capacity per primary vs. registered PV in the Embedded
+Capacity Register (ECR) / Microgeneration Certification Scheme (MCS) for that substation's
+geographic catchment (recoverable via the Meter Point Administration Number (MPAN)→substation
+mapping).
 
 **Caveat**: the gap between the estimate and the register is partly the unregistered fleet you are
 trying to find, so exact agreement is not expected. Gross disagreement in the wrong direction
 (estimate < registered) is a detectable error. Weak but real-world triangulation.
+
+**Caveat**: this spoke stops being evidence for any fit that used the register. The capacity work
+plans to feed registered capacity in as a
+[convex prior](../roadmap/capacity-estimation.md#loss-and-penalties), and once a register is in the
+objective, agreement with that register is partly the optimiser doing what it was told.
+
+**The fix is an ablation, not a ban.** Fit once *without* the register prior and score that fit
+against the register; ship the fit *with* the prior. The delivered estimate then uses every source
+available, while the validation number comes from a fit that never saw the register. Report both,
+and keep the no-prior fit as a standing leaderboard column rather than a one-off, or it rots.
+
+**Score the ablation on pattern, not on level.** What the disaggregation recovers is registered
+*plus* unregistered capacity, so the estimate should exceed the register and an estimate below it
+is a detectable failure. The informative signals are the rank correlation across substations —
+does the estimate order catchments the way the register does? — and level agreement restricted to
+the subset where the register is near-complete, such as large registered ground-mount, where
+little unregistered capacity can hide. Spoke 1 and Spoke 7 read no register at all and stay
+independent either way.
 
 ---
 
@@ -88,16 +112,56 @@ for NGED, because their goal is better forecasts for flexibility procurement.
 ## Spoke 6: Recovery on a fully-instrumented holdout (strongest)
 
 A single substation, even briefly, where every feeder and embedded generator is individually
-metered, used purely as validation. One such site anchors the whole evaluation. Worth asking NGED
-and UKPN whether one exists or could be temporarily instrumented during a maintenance window.
+metered, used purely as validation. One such site anchors the whole evaluation.
+
+---
+
+## Spoke 7: Manual capacity survey from aerial imagery (direct, small-sample)
+
+Count rooftop PV by hand from aerial or high-resolution satellite imagery across a few primary
+substations' catchments, and compare the total against the estimated unmetered capacity. This is
+the only spoke that measures installed capacity directly, and the only one that is independent of
+both the meters and the registers — which is what makes it the check to reach for when the
+registers have been used as priors. Rooftop-PV detection from imagery is a well-developed computer
+vision task, so a hand-counted pilot can be scaled later if it proves worth it.
+
+**Caveat**: imagery gives panel area, not kilowatts, so the comparison carries an assumed
+watts-per-square-metre and misses panels hidden by shading, flat-roof mounting angles, or tree
+cover. The imagery's capture date rarely matches the estimate's period. Counting is expensive per
+catchment, so the sample is small and chosen rather than random, which makes it a check on
+magnitude rather than a statistic.
+
+---
+
+## Spoke 8: Simulated substations from fitted models
+
+Fit the per-site generation modules ([differentiable physics](differentiable-physics.md)) and the
+shared demand-profile basis ([the `BasisLoadNode`](../roadmap/disaggregation.md#node-definitions))
+on real telemetry, freeze their parameters, run them forward on real weather, and sum the sites
+into a simulated substation. Every quantity the disaggregator must recover — each site's
+generation, the residual demand, and each fitted capacity — is written down by construction, and a
+whole fleet of simulated substations costs no metering. Unlike Spoke 1, the simulated sum covers
+the unmetered fleet and the demand as well as the metered sites.
+
+**Caveat**: this spoke is circular in a way the other seven spokes are not. An estimator scored on
+data generated by its own model family measures whether the parameters are identifiable, not
+whether that model family matches reality, so a disaggregator drawn from the same family recovers
+the components it was built to produce. The simulated telemetry is also missing the artefacts
+listed under Spoke 1, plus meter noise; a simulator can reproduce the MVA magnitude, but not the
+reactive-power floor that lifts it at the bounce. Where an edit can be applied to real telemetry
+instead — injection adds to a real series rather than replacing it — prefer the edit to real
+telemetry, and reserve the simulated substation for the labels no edit to real data can produce,
+such as removing the unmetered fleet entirely. The same construction serves the switching and
+capacity problems too; that
+[wider v2 idea](../roadmap/index.md#after-v21-research-advanced-ml) is on the roadmap.
 
 ---
 
 ## The structural conclusion
 
-A good method scores well across all six spokes despite their differing biases. A method that
+A good method scores well across all eight spokes despite their differing biases. A method that
 scores well on synthetic aggregation (Spoke 1) but fails physical-consistency checks (Spoke 3) on
-real data is telling you something — it has overfit to the easy case. The leaderboard columns for
-disaggregation are not "the metric" — they are these spokes. Because labels are weak, the protocol
-must be more carefully reasoned and transparently caveated than a standard forecasting evaluation:
-"no clean ground truth" must not slide into "any evaluation will do."
+real data has overfit to the easy case. The leaderboard columns for disaggregation are not "the
+metric" — they are these spokes. Because labels are weak, the protocol must be more carefully
+reasoned and transparently caveated than a standard forecasting evaluation: "no clean ground
+truth" must not slide into "any evaluation will do."

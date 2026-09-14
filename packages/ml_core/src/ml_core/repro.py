@@ -81,6 +81,11 @@ def get_git_info(cwd: Path | None = None) -> MlflowTags:
         cwd: Directory the ``git`` commands run from. Defaults to this module's directory
             (``_GIT_CWD``) — inside the repo for an editable/workspace install, so the SHA is
             captured regardless of the process's working directory. Overridable for testing.
+
+    Returns:
+        ``{"git_sha": sha, "git_dirty": dirty}``, both plain strings — ``sha`` the 40-character
+        commit hash and ``dirty`` either ``"true"`` or ``"false"`` — or ``UNKNOWN`` in place of
+        either value, per the degradation described above.
     """
     run_from = cwd if cwd is not None else _GIT_CWD
 
