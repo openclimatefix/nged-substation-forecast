@@ -58,9 +58,9 @@ on it and on the retrain question.
 ## Verdict, size and departures
 
 **Verdict: worth fixing, roughly as described, but not by the mechanism the issue suggests.** The
-issue's premise is factually correct — verified against `cv_assets.py:334-341` (`trained_cv_model`)
-and `:486-494` (`cv_power_forecasts`): neither passes any look-back margin, unlike
-`live_forecasts` (`production_assets.py:299-307`).
+issue's premise is factually correct — verified against `cv_assets.py:347-354` (`trained_cv_model`)
+and `:500-508` (`cv_power_forecasts`): neither passes any look-back margin, unlike
+`live_forecasts` (`production_assets.py:308-316`).
 
 **Size: Medium.** Not Simple — there is real design work (a new parameter, deriving it from
 `selected_features`, and a non-obvious correctness argument for *why* it must be a separate
@@ -86,7 +86,7 @@ choice, if applied to the CV callers:**
 - `live_forecasts` gets away with this because it always passes an explicit
   `init_time_start=init_time_end=nwp_init` (a single run), which overrides the NWP init-partition
   default, and because it filters out the resulting early rows explicitly afterwards
-  (`production_assets.py:326-329`, "History rows... are join artefacts, not genuine forecasts").
+  (`production_assets.py:333-338`, "History rows... are join artefacts, not genuine forecasts").
 - `trained_cv_model` and `cv_power_forecasts` do neither. `trained_cv_model` does not override
   `init_time_start`, so widening `window_start` would also pull in up to two extra weeks of NWP
   partitions never needed. Worse: in bulk mode, `_join_nwp_bulk_mode`
@@ -96,21 +96,30 @@ choice, if applied to the CV callers:**
   `train_start`/`val_start` — with no equivalent post-hoc filter to drop them, unlike
   `live_forecasts`.
 - A `power_lookback` parameter dedicated to the power scan avoids all three problems: `_apply_power_lag`
-  (`_lags.py:14-47`) is a left join keyed on `target_time`, so extra early power rows only fill in
+  (`_lags.py:14-53`) is a left join keyed on `target_time`, so extra early power rows only fill in
   lag *values* for rows already in the (unchanged) spine — they add no new spine rows. Verified by
   reading `_join_nwp_bulk_mode`'s join direction and `_apply_power_lag`'s join keys.
 
 - Sizing the margin from a single global constant (as `LIVE_POWER_HISTORY` does) is also rejected:
   the issue itself asks for something "sized to the longest lag/rolling feature any experiment
   config might use, not just the current champion's" — but the roadmap's planned
-  `nged_incumbent` baseline uses 49–55-week lags (`docs/roadmap/metrics-and-leaderboard.md:200`),
-  so a global constant sized for that would force every experiment's CV load to scan a year of
-  power history it does not use. Deriving it per experiment from `config.selected_features` costs
-  nothing extra for `conf/model/xgboost.yaml` (whose longest lag today is 336h) and scales
-  correctly to whatever the next experiment declares.
+  `manual_heuristic` baseline uses 49–55-week lags
+  (`docs/roadmap/metrics-and-leaderboard.md:364`), which PR 2 already commits to supporting, so a
+  global constant sized for the current champion alone would leave that baseline's annual lags
+  all-null and would have to be widened again the moment it lands; sizing it for the worst case
+  instead would force every smaller experiment's CV load to scan a year of power history it does
+  not use. (The NWP Delta table dominates CV's I/O at ~86 GB —
+  `docs/architecture/performance.md:66` — so the power scan's own cost is secondary; the real
+  reason for per-experiment sizing is that no single constant serves both a 336 h and a 55-week
+  experiment well.) Deriving it per experiment from `config.selected_features` costs nothing extra
+  for `conf/model/xgboost.yaml` (whose longest lag today is 336h) and scales correctly to whatever
+  the next experiment declares.
 
-"Rolling" in the issue title is not separately affected: `RollingFeature` on `power` is already
-forbidden (`_parsed_features.py`'s `RollingFeature` docstring), and weather lag/rolling features
+"Rolling" in the issue title is not separately affected: `RollingFeature` on `power` is
+structurally impossible, not just documented as forbidden — `RollingFeature.base_col` is typed
+`WeatherFeature` (`_parsed_features.py:44`), without the `| Literal["power"]` widening `LagFeature`
+adds at line 77, so pydantic rejects a `"power"` rolling feature at parse time. Weather lag/rolling
+features
 read from the NWP frame, not the power frame (`_apply_weather_lag`, `_apply_rolling_mean_feature`),
 so they are bounded by NWP's own `init_time`/`MAX_NWP_LEAD` window, which this plan does not touch.
 Only power *lag* features are affected by the bug, and only power lags are the target of this fix.
@@ -125,24 +134,33 @@ Only power *lag* features are affected by the bug, and only power lags are the t
   predicates are untouched.
 - Extend the docstring: document `power_lookback` in the Args section, and add one sentence to the
   "Memory" preamble or the `window_start` entry clarifying that `power_lookback` widens the power
-  scan only, so the reader does not have to re-derive the NWP-safety argument above.
+  scan only, so the reader does not have to re-derive the NWP-safety argument above. Update the
+  summary sentence ("Both are filtered to the inclusive `[window_start, window_end]` window...",
+  currently `:42-43`) to say power is filtered to `[window_start - power_lookback, window_end]`
+  while NWP stays bounded to `[window_start, window_end]`. State that a caller needing power history
+  before `window_start` must either widen `window_start` itself (as `live_forecasts` does) or pass
+  `power_lookback` — the default does neither. Note that `power_lookback == max_power_lag_hours()`
+  is exactly sufficient with no margin needed (the scan predicate is inclusive and the earliest lag
+  target is exactly `window_start - max_lag`), unlike `LIVE_POWER_HISTORY`'s deliberate margin over
+  its longest lag — so a reader does not "fix" an apparent off-by-one later.
 
 **`packages/ml_core/src/ml_core/features/_parsed_features.py`**
-- Add `ParsedFeatures.max_power_lag_hours() -> int`, alongside the existing `get_leaky_features`:
-  `max((lag.hours for lag in self.lags if lag.base_col == "power"), default=0)`.
+- Add `ParsedFeatures.max_power_lag()  -> timedelta`, alongside the existing `get_leaky_features`:
+  `timedelta(hours=max((lag.hours for lag in self.lags if lag.base_col == "power"), default=0))`.
+  Returning `timedelta` (not `int` hours) puts the unit conversion in one place instead of repeating
+  `timedelta(hours=...)` at both `cv_assets.py` call sites.
 
 **`src/nged_substation_forecast/defs/cv_assets.py`**
 - Import `ParsedFeatures` from `ml_core.features._parsed_features` (matching
   `production_helpers.py`'s existing import).
 - `trained_cv_model`: after `forecaster_cls, config = load_experiment_forecaster(experiment_name)`,
-  compute `power_lookback = timedelta(hours=ParsedFeatures.from_strings(config.selected_features)
-  .max_power_lag_hours())` and pass `power_lookback=power_lookback` into the existing
-  `load_engineering_inputs` call.
+  compute `power_lookback = ParsedFeatures.from_strings(config.selected_features).max_power_lag()`
+  and pass `power_lookback=power_lookback` into the existing `load_engineering_inputs` call.
 - `cv_power_forecasts`: same derivation, passed into the `load_engineering_inputs` call inside the
-  `while chunk_start <= val_end` loop. Add a one-line comment noting the (already-lazy) power scan
-  is cheaply re-issued per `init_time` chunk — this is existing behaviour (the scan is already
-  re-issued each iteration today), not a new cost `power_lookback` introduces, but worth naming so
-  a future profiler does not misattribute it.
+  `while chunk_start <= val_end` loop. Add a one-line comment stating the power scan is lazy and
+  re-issued per `init_time` chunk, and is small next to the NWP scan — present-tense, describing
+  the code as it now stands rather than narrating what `power_lookback` did or didn't add (CLAUDE.md,
+  "Write about the present, not the past").
 
 **`src/nged_substation_forecast/defs/production_assets.py`**
 - No behaviour change. Add one sentence to `LIVE_POWER_HISTORY`'s docstring cross-referencing the
@@ -152,13 +170,19 @@ Only power *lag* features are affected by the bug, and only power lags are the t
 
 **`docs/roadmap/metrics-and-leaderboard.md`**
 - PR 2's bullet list currently reads "CV predict-path framework: `uses_nwp_ensemble`, power-lag
-  lookback, `ensemble_member` docs" and includes the "Power-lag lookback at feature-engineering
-  load time" bullet plus its dedicated test sub-bullet. Remove that bullet and its test sub-bullet
-  (this plan implements it) and retitle the PR to name only the two items still outstanding
-  (`uses_nwp_ensemble`, `ensemble_member` docs). Leave the "After PRs 1 + 2 land back-to-back, run
-  one `trained_cv_model++` backfill..." paragraph in place — it still describes a real future
-  trigger for the remaining items, and is independent of whether this fix's own retrain happens
-  now or later (see Risks, below).
+  lookback, `ensemble_member` docs". Remove the "Power-lag lookback at feature-engineering load
+  time" bullet (`:361-377`, this plan implements it) and retitle the PR to name only the two items
+  still outstanding (`uses_nwp_ensemble`, `ensemble_member` docs). The `Tests:` bullet (`:381-384`)
+  is one bullet covering all three PR-2 items — there is no separate lookback test sub-bullet to
+  remove; instead, edit that bullet to drop only its lookback clause ("a feature-engineer test that
+  a 336 h lag at the window edge is non-null *with* lookback while the spine row count is
+  unchanged"), keeping the `uses_nwp_ensemble` and leak-test clauses. `:435`, under the
+  `manual_heuristic` baseline, reads "Depends on PR 2's lookback (the 55-week annual lags are
+  all-null without it)" — repoint that to say the lookback already landed (issue #638), not that it
+  depends on PR 2. Leave the "After PRs 1 + 2 land back-to-back, run one `trained_cv_model++`
+  backfill..." paragraph in place — it still describes a real future trigger for the remaining
+  items, and is independent of whether this fix's own retrain happens now or later (see Risks,
+  below).
 
 ## Plan review 1: simplicity (ran)
 
@@ -222,6 +246,42 @@ No other defects found; every other claim in the plan — the current-behaviour 
 join-direction safety argument, the nullification-is-unaffected argument, the caller/doc
 inventory — was independently verified against the code.
 
+## Plan review 3: Opus adversarial review (ran)
+
+A third fresh sub-agent (Opus 5), run after both plan reviews above and after the `origin/main`
+merge, independently re-derived the core correctness argument (the NWP-centric join, why naively
+widening `window_start` is a bug for both CV callers, not one) directly against the code, and
+re-ran the simplicity and correctness attacks from scratch. **Verdict: the design is right; no
+simplification survived.** Six findings were accepted and are folded into the sections above:
+
+- **One real defect**: `docs/ml_experimentation/cross-validation-folds.md:148-152` states power is
+  bounded to `[window_start, window_end]`, which this fix makes false — added to "Docs to update".
+- The roadmap edit instructions were imprecise: no dedicated test sub-bullet exists to remove, and
+  the `manual_heuristic` baseline's "Depends on PR 2's lookback" note needed repointing — both fixed
+  in "What changes, file by file".
+- The `_engineering_inputs.py` docstring edits missed the summary sentence that goes stale, and
+  should state the "no margin needed" property and that a caller must opt in explicitly — added.
+- Test 3 has a fixture trap: the target row's NWP `init_time` must be early enough that its lead
+  time stays under the lag length even with the lookback applied, or the assertion fails for an
+  unrelated reason — named explicitly against the existing `_EARLY_INIT_TIME` fixture.
+- The prescribed `cv_power_forecasts` comment narrated what the diff *didn't* change, which CLAUDE.md's
+  "write about the present" rule forbids for comments — reworded.
+- `max_power_lag_hours() -> int` was changed to `max_power_lag() -> timedelta`, so the unit
+  conversion lives in one place instead of being repeated at both `cv_assets.py` call sites.
+
+Findings verified and **not** acted on: the join-direction/no-lookahead argument (re-confirmed,
+already correct); an alternative of making `load_engineering_inputs` feature-aware by passing
+`selected_features` directly (rejected — makes a purely geometric loader feature-aware for a
+smaller call-site saving, and removes callers' ability to request a lookback for other reasons);
+folding `LIVE_POWER_HISTORY` into `power_lookback` as a future follow-up (noted as not cheap —
+`LIVE_POWER_HISTORY` also sizes `build_live_power_frame`'s dense spine, so unifying would mean
+reworking that too — recorded so it isn't proposed again at diff-review time); the "sized to the
+worst case" justification was reframed (see the `power_lookback` sizing paragraph above) rather than
+dropped, since the reviewer's point was about which argument is strongest, not whether per-experiment
+sizing is right; the issue's "power lag **and rolling**" premise being wrong for rolling — already
+correctly overruled by this plan and independently re-confirmed, now with the structural (pydantic)
+reason cited rather than only the docstring.
+
 ## Design-philosophy check
 
 Both touched assets (`trained_cv_model`, `cv_power_forecasts`) carry the `research` layer tag —
@@ -248,12 +308,12 @@ tested). Tests 2 and 3 go in `tests/test_trained_cv_model.py`, which already hol
 `load_engineering_inputs` lives in the root Dagster app and packages have no dependency on it (see
 test 3 below and Plan review 2).
 
-1. **`ParsedFeatures.max_power_lag_hours()`** (`test_features.py`, near
+1. **`ParsedFeatures.max_power_lag()`** (`test_features.py`, near
    `test_parsed_features_from_selected_features`): `ParsedFeatures.from_strings({"power_lag_336h",
-   "power_lag_24h", "temperature_2m_lag_48h"}).max_power_lag_hours() == 336` (mixes in a
+   "power_lag_24h", "temperature_2m_lag_48h"}).max_power_lag() == timedelta(hours=336)` (mixes in a
    non-power lag to prove the filter, not just the max), and
-   `ParsedFeatures.from_strings(set()).max_power_lag_hours() == 0`. **Fails on `main`** — the method
-   does not exist (`AttributeError`).
+   `ParsedFeatures.from_strings(set()).max_power_lag() == timedelta(0)`. **Fails on `main`** — the
+   method does not exist (`AttributeError`).
 
 2. **`load_engineering_inputs` widens only the power scan** (`tests/test_trained_cv_model.py`, next
    to `test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window`): build a power
@@ -284,6 +344,13 @@ test 3 below and Plan review 2).
    the same reason as (2) — `power_lookback` does not exist yet, so the "non-null with lookback"
    branch cannot be expressed.
 
+   **Fixture trap:** `_nullify_leaky_lags` nulls a lag whenever the row's lead time is `>=` the lag
+   length, regardless of where the lag value came from, so the target row's NWP `init_time` must be
+   early enough that its lead time at `power_lag_336h` stays below 336 h even with the lookback
+   applied — otherwise the assertion fails for a reason unrelated to this fix. Reuse the existing
+   `_EARLY_INIT_TIME` fixture (`train_start - timedelta(days=10)`): a row at `train_start + 3h` has
+   a 234 h lead there, safely under 336 h.
+
 No new leakage/nullification test is needed: `power_lookback` only ever adds power rows *before*
 `window_start`, which is always in the past relative to any `valid_time` in
 `[window_start, window_end]`, and `_nullify_leaky_lags` (unmodified by this change) already covers
@@ -294,9 +361,17 @@ the boundary cases (`test_nullify_leaky_lags`,
 
 - `docs/roadmap/metrics-and-leaderboard.md` — see "What changes" above.
 - `_engineering_inputs.py` and `production_assets.py` docstrings — see "What changes" above.
-- No page in `docs/ml_experimentation/` or `docs/architecture/` describes the current (buggy)
-  window-truncation behaviour explicitly (checked `dagster-workflow.md`, `ml-orchestration.md`,
-  `model-configuration.md`, `cross-validation-folds.md`), so nothing else needs a "now fixed" edit.
+- `docs/ml_experimentation/cross-validation-folds.md:148-152` ("Overlapping forecasts do not
+  contaminate the test set") states that `load_engineering_inputs` bounds *both* power and NWP to
+  `[window_start, window_end]` — that becomes false for power once this fix lands. Restate the
+  argument: the fold boundary is enforced by the NWP `valid_time` filter, which bounds the spine
+  and therefore the labels; power lag lookups deliberately reach backwards past `window_start`
+  (exactly as the live service already does), and remain leak-free because `_nullify_leaky_lags`
+  nulls any lag shorter than the lead time regardless of where the value came from. The conclusion
+  ("no observation appears on both sides of a fold boundary") stays true; only the mechanism
+  changes.
+- `dagster-workflow.md`, `ml-orchestration.md` and `model-configuration.md` do not describe the
+  window-truncation behaviour and need no edit (checked).
 
 ## Verification commands
 
@@ -312,7 +387,12 @@ uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 ## Risks and open questions
 
 1. **Should this PR also trigger a retrain of every existing CV fold and experiment?** This is the
-   question issue #638 says is the real point. Recommendation: **no, not as part of this PR.**
+   question issue #638 says is the real point. **Sizing the current bias**, for the leaderboard's
+   single fold (`conf/cv/default.yaml`: train 2024-04-01→2025-06-30, val 2025-07-01→2026-06-30) and
+   the champion's longest lag (336 h, `conf/model/xgboost.yaml`): the affected span is the first 14
+   days of each window, roughly 3% of training rows and 3.8% of scored validation rows, with the
+   feature null rather than wrong (XGBoost handles nulls natively) — a real but small bias.
+   Recommendation: **no, not as part of this PR.**
    Reasoning: (a) landing the loader fix costs nothing extra now, and every future retrain —
    whenever next triggered, including the `uses_nwp_ensemble`/PR-1 backfill the roadmap already
    plans — picks up the corrected loader for free; (b) *not* retraining immediately does not make
@@ -325,13 +405,11 @@ uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
    rather than deferred, say so and it becomes a follow-up step (`trained_cv_model++` backfill,
    per the mechanism `docs/roadmap/metrics-and-leaderboard.md` already describes), run only after
    this PR merges and by explicit request — never automatically.
-2. **Should the `power_lookback` derivation also cover a future power-*rolling* feature, given
-   `RollingFeature` on `power` is only "currently forbidden" (docstring), not structurally
-   impossible?** Recommendation: no — out of scope for #638, and premature: nothing today can
-   request a power rolling feature (`ParsedFeatures.from_strings` never produces one), so there is
-   no caller to size for. If that restriction is later lifted, `max_power_lag_hours()` is the
-   obvious place to extend (rename/broaden it) — flagging here rather than speculatively building
-   it now.
+2. **Should the `power_lookback` derivation also cover a future power-*rolling* feature?**
+   Recommendation: no — out of scope for #638, and premature: `RollingFeature` on `power` is
+   structurally impossible today (see above), so there is no caller to size for. If that pydantic
+   restriction is ever lifted, `max_power_lag()` is the obvious place to extend (rename/broaden it)
+   — flagging here rather than speculatively building it now.
 3. **Does the per-experiment `power_lookback` derivation belong on `ParsedFeatures` itself, or as a
    free function in `cv_assets.py`?** Went with a `ParsedFeatures` method because the equivalent
    concept (`get_leaky_features`) already lives there, and both `trained_cv_model` and
