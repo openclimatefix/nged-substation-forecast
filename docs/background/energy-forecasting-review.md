@@ -117,8 +117,8 @@ results, etc.
 to check against the downloaded PDFs (rather than half-remembering information embedded in the large
 language model's weights), and because we ran on the order of 100 rounds of agentic adversarial
 review and hundreds of manual fact checks.** (The "literature review" process we developed is
-written up as a Claude Code "skill", viewable
-[here](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.claude/skills/literature-review/SKILL.md)).
+written up as the
+[`literature-review` Claude Code skill](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.claude/skills/literature-review/SKILL.md)).
 
 **But — to our tastes — Claude struggles to write readable prose, so the text has been heavily
 re-written and cut down by hand.**

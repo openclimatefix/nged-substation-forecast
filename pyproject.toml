@@ -425,3 +425,16 @@ plugins.pml101.indent = 4
 # Without this, pymarkdown misreads the frontmatter as document content (e.g. "---" as a setext
 # heading underline), producing spurious heading-style/blank-line errors.
 extensions.front-matter.enabled = true
+# Link fragments: pymarkdownlnt 0.9.40 (the first release to implement this rule) doesn't
+# reproduce Python-Markdown's slug algorithm for a heading containing an em dash, so it flags
+# every anchor link to a heading like "### 10 — Every write is atomic..." as broken even though
+# the anchor is exactly what MkDocs generates and renders correctly — confirmed against
+# scripts/check_docs_links.py, which parses MkDocs' actual output and passes on the same links.
+plugins.md051.enabled = false
+# Emphasis style: pymarkdownlnt 0.9.40 also newly implements this rule, and it doesn't know that
+# an underscore inside `$...$`/`$$...$$` math is a LaTeX subscript, not markdown emphasis — e.g.
+# `\hat{q}_t(\tau_{\mathrm{lo}})` in docs/techniques/evaluation-metrics.md gets misread as an
+# emphasis span and flagged. That's mixed in the same rule output with genuine underscore-vs-
+# asterisk inconsistencies in prose, so the finding list can't be trusted without a per-instance
+# check the math would make risky to automate. Revisit once upstream is math-aware.
+plugins.md049.enabled = false
