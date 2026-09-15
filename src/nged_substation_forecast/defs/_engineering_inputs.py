@@ -34,13 +34,29 @@ def load_engineering_inputs(
     ensemble_members: list[int] | None = None,
     init_time_start: datetime | None = None,
     init_time_end: datetime | None = None,
+    power_lookback: timedelta = timedelta(0),
 ) -> tuple[pt.LazyFrame[PowerTimeSeries], pt.LazyFrame[Nwp]]:
     """Load observed power and NWP for a window and time-series population.
 
     Called by ``trained_cv_model`` (training window + eligible population), ``cv_power_forecasts``
     (validation window + trained population) and ``live_forecasts`` (the live window + the promoted
-    model's population). Both are filtered to the inclusive ``[window_start, window_end]`` window
-    and to ``time_series_ids``.
+    model's population). Power is filtered to the inclusive ``[window_start - power_lookback,
+    window_end]`` window; NWP stays bounded to ``[window_start, window_end]``. Both are filtered to
+    ``time_series_ids``.
+
+    A caller that needs power history from before ``window_start`` — to compute a lag or rolling
+    feature whose target time falls earlier than the window — must either widen ``window_start``
+    itself (as ``live_forecasts`` does, which also widens the NWP bound and needs an explicit
+    ``init_time_start``/``init_time_end`` plus a post-hoc filter to stay correct) or pass
+    ``power_lookback`` (which widens only the power scan). The default widens neither. Passing
+    ``power_lookback == the longest lag or rolling window a caller's features need`` is exactly
+    sufficient, with no margin required: the scan predicate below is inclusive, and the earliest
+    target time any lag can read is exactly ``window_start - power_lookback``.
+
+    The "widening the power scan adds no spine rows" guarantee this relies on assumes the
+    NWP-centric bulk-mode join (power is left-joined *onto* the NWP-derived spine) — it does not
+    hold when NWP is absent, where the spine is the power frame itself. Every current caller of
+    ``power_lookback`` always passes NWP, so that branch is unreachable here.
 
     **Memory: prune the NWP scan at the source.** The NWP Delta is large (tens of GB: every
     ``init_time`` × every H3 cell × ~51 ensemble members × the 30-min forecast horizon). Every
@@ -89,6 +105,11 @@ def load_engineering_inputs(
             ``cv_power_forecasts`` pass a narrower sub-range and process the validation window in
             ``init_time`` chunks, so the full-ensemble forecast frame for one chunk stays in RAM
             while the rest streams from the partition-pruned scan.
+        power_lookback: How far before ``window_start`` to widen the power scan's lower bound, so
+            lag/rolling features near the start of the window have real history to read instead of
+            silently nulling. Widens the power scan only — the NWP bounds are untouched. Defaults to
+            ``timedelta(0)`` (today's behaviour: power bounded to ``[window_start, window_end]``,
+            same as NWP).
 
     Returns:
         ``(power_time_series, nwp)`` — a lazy power frame and a lazy NWP frame, both filtered to
@@ -103,7 +124,7 @@ def load_engineering_inputs(
         settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
     ).filter(
         pl.col("time_series_id").is_in(time_series_ids),
-        pl.col("time") >= window_start,
+        pl.col("time") >= window_start - power_lookback,
         pl.col("time") <= window_end,
     )
     power_ts = pt.LazyFrame.from_existing(power_lf).set_model(PowerTimeSeries)

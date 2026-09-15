@@ -344,8 +344,8 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
   identity. Recompute existing expected values — never relax a test to absorb the shift.
 - No standalone re-score needed: the one backfill after PR 2 (below) covers it.
 
-**PR 2 — CV predict-path framework: `uses_nwp_ensemble`, power-lag lookback, `ensemble_member`
-docs.** Three changes to the shared rails, none baseline-specific.
+**PR 2 — CV predict-path framework: `uses_nwp_ensemble`, `ensemble_member` docs.** Two changes to
+the shared rails, none baseline-specific.
 
 - **`uses_nwp_ensemble: ClassVar[bool] = True` on `BaseForecaster`.** `cv_power_forecasts` passes
   `ensemble_members=[0]` to `load_engineering_inputs` when a class sets it `False`. Semantics to
@@ -358,30 +358,11 @@ docs.** Three changes to the shared rails, none baseline-specific.
   `weather_source: "none"` does **not** mean "no NWP input": in bulk mode the control-member NWP scan
   defines the shared `(init_time, valid_time)` forecast-run grid, which is what keeps every
   leaderboard row — baseline or ML — scored on the identical grid.
-- **Power-lag lookback at feature-engineering load time.** Today `load_engineering_inputs` filters
-  power to `[window_start, window_end]`, and `_apply_power_lag` reads lags from that same frame — so
-  any lag longer than the elapsed window is null. This is a real existing gap: XGBoost's 336 h lag is
-  null for the first fortnight of every validation window, and the manual heuristic's 49–55-week lags would
-  be null for all but roughly the last 3 weeks of the fold (lag targets only re-enter the window from
-  `val_start + 49 weeks`). Fix: a `power_lookback: timedelta` parameter that widens **only the power
-  scan's** lower bound (`window_start − power_lookback`); callers derive it from the experiment's
-  `selected_features` via `ParsedFeatures` (max power-lag hours), so it is automatic per-experiment
-  (~2 weeks for XGBoost, ~55 weeks for the manual heuristic). Safe because the bulk-mode spine is
-  NWP-centric (`_join_nwp_bulk_mode` left-joins power *onto* NWP rows), so the extra early power rows
-  feed only the lag lookup and add no spine rows and no label rows (labels live on spine rows,
-  bounded by the NWP `valid_time` filter); and `_nullify_leaky_lags` (which nulls any lag with `lead
-  ≥ lag_hours`) still guards leakage, so a longer lookback cannot leak. Apply to both
-  `trained_cv_model` and `cv_power_forecasts`. `LIVE_POWER_HISTORY` in `production_assets.py` is a
-  hard-coded 15-day equivalent for the live path — leave it, but cross-reference it from the new
-  parameter so a future long-lag live model is not silently starved. Add a comment where
-  `cv_power_forecasts` re-scans the widened power window per `init_time` chunk (fast next to NWP, but worth flagging so nobody blames the wrong step when profiling).
 - **Document the `ensemble_member` overload** on `PowerForecast` and `AllFeatures`: an NWP-member
   index for NWP-consuming models, a historical-analogue index for `manual_heuristic`, a
   quantile-sample index for `climatology`. Nobody may assume `ensemble_member ⇒ NWP`.
-- Tests: a dummy `uses_nwp_ensemble = False` forecaster exercising the member-0 path; a feature-
-  engineer test that a 336 h lag at the window edge is non-null *with* lookback while the spine row
-  count is unchanged; the leak test unchanged; the single-run (live) path unaffected by
-  `power_lookback`.
+- Tests: a dummy `uses_nwp_ensemble = False` forecaster exercising the member-0 path; the leak test
+  unchanged.
 - **After PRs 1 + 2 land back-to-back, run one `trained_cv_model++` backfill over every existing
   experiment partition** — retrain, re-predict, and re-score everything under the fixed lag lookback
   and the new collapse. This is deliberately the exact "re-run everything after a pipeline fix"
@@ -432,7 +413,8 @@ landing on a now-proven rail.
   are null are dropped with the count logged and per-series surviving-member counts recorded in asset
   metadata. No point forecast is emitted — PR 1's metrics layer produces the median headline and the
   p95 / p50 labelled rows.
-- Depends on PR 2's lookback (the 55-week annual lags are all-null without it).
+- The 55-week annual lags need `load_engineering_inputs`'s `power_lookback` parameter to be
+  non-null — already landed (issue #638), not part of PR 2.
 - **Data check before interpreting results:** `val_start − 55 weeks` ≈ mid-2024. Confirm which
   eligible series actually have observations that far back — eligibility requires only
   `min_training_months` of history, so a series can qualify yet have too little for the annual

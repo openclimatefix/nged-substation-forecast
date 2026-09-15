@@ -399,6 +399,15 @@ def test_parsed_features_from_selected_features():
     assert leaky_features[0].hours == 24
 
 
+def test_parsed_features_max_power_lag():
+    parsed = ParsedFeatures.from_strings(
+        {"power_lag_336h", "power_lag_24h", "temperature_2m_lag_48h"}
+    )
+    assert parsed.max_power_lag() == timedelta(hours=336)
+
+    assert ParsedFeatures.from_strings(set()).max_power_lag() == timedelta(0)
+
+
 @pytest.mark.parametrize(
     ("bad_feature", "expected_exc", "match"),
     [
