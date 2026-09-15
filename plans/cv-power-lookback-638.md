@@ -118,11 +118,25 @@ choice, if applied to the CV callers:**
 "Rolling" in the issue title is not separately affected: `RollingFeature` on `power` is
 structurally impossible, not just documented as forbidden — `RollingFeature.base_col` is typed
 `WeatherFeature` (`_parsed_features.py:44`), without the `| Literal["power"]` widening `LagFeature`
-adds at line 77, so pydantic rejects a `"power"` rolling feature at parse time. Weather lag/rolling
-features
-read from the NWP frame, not the power frame (`_apply_weather_lag`, `_apply_rolling_mean_feature`),
-so they are bounded by NWP's own `init_time`/`MAX_NWP_LEAD` window, which this plan does not touch.
-Only power *lag* features are affected by the bug, and only power lags are the target of this fix.
+adds at line 77, so pydantic rejects a `"power"` rolling feature at parse time.
+
+Weather lags are **not** structurally exempt from this bug, and this plan does not fix them —
+correcting a claim in an earlier draft. `_apply_weather_lag`'s freshest-run join reads
+`historical_weather`, which `TabularFeatureEngineer` builds from the same NWP scan
+`load_engineering_inputs` bounds at `valid_time >= window_start` (`_engineering_inputs.py:119`); a
+weather lag whose target time falls before `window_start` misses that join and comes out null —
+the identical silent truncation this issue describes, on the weather side.
+`_apply_rolling_mean_feature`'s `closed="right"` rolling mean over a group truncated at
+`window_start` has a quieter variant of the same bug: a mean over fewer points rather than a null.
+Neither bites today, because `conf/model/xgboost.yaml` requests no weather lag and no rolling mean
+(only raw weather variables and the row-wise static `windchill`), and fixing it would mean widening
+the NWP `valid_time` lower bound itself — which the "Departure from the issue" section above shows
+has spine consequences a power-only `power_lookback` avoids. Out of scope for #638: reported here,
+not fixed, per CLAUDE.md's "report unrelated design mistakes rather than fixing them" — worth its
+own issue if a future experiment requests a weather lag or rolling mean.
+
+Only power *lag* features are affected by the bug this plan fixes, and only power lags are the
+target of this fix.
 
 ## What changes, file by file
 
@@ -142,7 +156,10 @@ Only power *lag* features are affected by the bug, and only power lags are the t
   `power_lookback` — the default does neither. Note that `power_lookback == max_power_lag_hours()`
   is exactly sufficient with no margin needed (the scan predicate is inclusive and the earliest lag
   target is exactly `window_start - max_lag`), unlike `LIVE_POWER_HISTORY`'s deliberate margin over
-  its longest lag — so a reader does not "fix" an apparent off-by-one later.
+  its longest lag — so a reader does not "fix" an apparent off-by-one later. Note that the
+  "widening the power scan adds no spine rows" guarantee assumes the NWP-centric bulk-mode join —
+  it does not hold in the no-NWP branch, where the spine *is* the power frame — but both CV callers
+  always pass NWP, so that branch is unreachable from `power_lookback`'s only callers.
 
 **`packages/ml_core/src/ml_core/features/_parsed_features.py`**
 - Add `ParsedFeatures.max_power_lag()  -> timedelta`, alongside the existing `get_leaky_features`:
@@ -282,6 +299,46 @@ sizing is right; the issue's "power lag **and rolling**" premise being wrong for
 correctly overruled by this plan and independently re-confirmed, now with the structural (pydantic)
 reason cited rather than only the docstring.
 
+## Plan review 4: Opus scientific-validity / train-val leakage review (ran)
+
+A fourth fresh sub-agent (Opus 5), asked specifically and skeptically whether this change lets
+validation-fold data leak into training or otherwise lets the model "see the answer" it is scored
+on — the concern behind the human reviewer's request for this pass. **Verdict: no leak, high
+confidence.** Independently re-derived, from the code rather than from this plan's account of it:
+`power_lookback` only ever moves the power scan's *lower* bound; `window_end` (and therefore the
+NWP `valid_time` upper bound and the label window) is untouched on every path, so no training row
+can ever read a power value at or after `val_start`, and the per-row `_nullify_leaky_lags` /
+hindcast-filter chain (independently re-traced through `_lags.py` and
+`tabular_feature_engineer.py`) guarantees every surviving lag's target time is strictly before that
+row's own forecast-issue time, regardless of which rows the widened scan makes available. The one
+genuine behaviour change it surfaced — a training-window power observation can now be read as a
+*validation-fold lag feature* — is not leakage (no observation is used as a **label** on both sides
+of a fold boundary; only lag inputs reach back, exactly as the live service already does), but the
+plan's phrasing of the affected docs page overstated the "nothing changes" case; fixed above (see
+"Docs to update"). Four further findings were accepted and are folded into the sections above:
+
+- The retrain/promotion sequence the human reviewer chose for Risk 1 could not, as originally
+  worded, distinguish "the fix is correct" from "the fix silently broke something", because
+  retraining changes both the training data and the validation features at once, and a correct
+  fix's expected effect on the metric is itself mildly favourable. Added a diff-based correctness
+  check (bit-identical forecast rows beyond the champion's longest lag, run before any retraining)
+  ahead of the metrics comparison, a pre-registered move-size threshold, and a note that the
+  6-hourly live run is a serving smoke test that does not exercise this diff at all
+  (`LIVE_POWER_HISTORY` already exceeds the champion's longest lag).
+- The plan's claim that the `cross-validation-folds.md` conclusion "stays true" was wrong as
+  stated — narrowed to the claim that is actually true (no observation is used as a *label* on both
+  sides of a boundary, not that no observation appears on both sides at all).
+- **Factual error corrected**: weather lag and rolling-mean features are not structurally exempt
+  from this bug — `_apply_weather_lag`'s freshest-run join and `_apply_rolling_mean_feature` both
+  read from the same `window_start`-bounded NWP scan, so a weather lag or rolling mean near a fold's
+  start would truncate the same way. Neither bites today (no registered experiment requests one);
+  reported per CLAUDE.md's "flag, don't fix" rule for out-of-scope mistakes rather than actioned
+  here.
+- Noted that the "widening the power scan adds no spine rows" guarantee is conditional on the
+  NWP-centric join and does not hold in the no-NWP bulk branch — unreachable from either CV caller
+  today, so not a leak, but worth one docstring sentence given the roadmap's `manual_heuristic`
+  baseline is the kind of caller that might one day travel that branch.
+
 ## Design-philosophy check
 
 Both touched assets (`trained_cv_model`, `cv_power_forecasts`) carry the `research` layer tag —
@@ -364,12 +421,20 @@ the boundary cases (`test_nullify_leaky_lags`,
 - `docs/ml_experimentation/cross-validation-folds.md:148-152` ("Overlapping forecasts do not
   contaminate the test set") states that `load_engineering_inputs` bounds *both* power and NWP to
   `[window_start, window_end]` — that becomes false for power once this fix lands. Restate the
-  argument: the fold boundary is enforced by the NWP `valid_time` filter, which bounds the spine
-  and therefore the labels; power lag lookups deliberately reach backwards past `window_start`
-  (exactly as the live service already does), and remain leak-free because `_nullify_leaky_lags`
-  nulls any lag shorter than the lead time regardless of where the value came from. The conclusion
-  ("no observation appears on both sides of a fold boundary") stays true; only the mechanism
-  changes.
+  argument, precisely: after the fix, the fold boundary is enforced by the NWP `valid_time` filter
+  alone, which bounds the spine and therefore the labels — that is now the load-bearing mechanism,
+  not one of two. Power lag features deliberately reach back across the boundary, exactly as the
+  live service already does, and stay causally safe because `_nullify_leaky_lags` keeps a lag only
+  when its target time is strictly before the row's own `power_fcst_init_time` — a per-row
+  guarantee computed from `valid_time`, `power_fcst_init_time` and the lag length alone, independent
+  of which rows the widened scan happens to make available. **Narrow the conclusion, do not keep it
+  as written**: it is not true that "no observation appears on both sides of a fold boundary" — a
+  training-window power observation can now appear on the validation side, as a lag feature. What
+  stays true, and is the sentence to state instead, is that **no observation is used as a label on
+  both sides of a fold boundary**; a power value that was a training label can be read as a
+  validation-fold lag feature, which is intrinsic to autoregressive forecasting (yesterday's actual
+  load is always both a past training target and today's input) and is exactly what a deployed model
+  does, not a leak about the row being scored.
 - `dagster-workflow.md`, `ml-orchestration.md` and `model-configuration.md` do not describe the
   window-truncation behaviour and need no edit (checked).
 
@@ -416,6 +481,35 @@ uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
    step, not a design change to the fix itself — `implement-issue` still opens the PR once the code
    and tests are green; the retrain, comparison, promotion and schedule start happen after that PR
    is reviewed and merged, not as part of the diff.
+
+   **A plain metrics comparison cannot actually distinguish "the fix is correct" from "the fix
+   introduced a bug"**, because retraining changes both the training data and the validation feature
+   matrix at once, and — per the mechanism above — the expected effect of a *correct* fix is itself
+   mildly favourable (previously-null lags near each fold's start become real values). A metric
+   improving is therefore consistent with both a correct fix and a broken one; "looks sane, so
+   promote" does not tell them apart. Do this instead, as a correctness check *before* treating the
+   retrain as a smoke test:
+   - Before retraining anything, re-run `cv_power_forecasts` under the **new** loader using the
+     **existing, already-trained** champion booster, and diff the resulting forecast rows against
+     what is already in the `power_forecasts` Delta table for that fold. Rows with `valid_time >=
+     val_start + 336h` (outside the champion's longest lag) must come out bit-identical — the fix is
+     invisible there by construction, so any difference is a bug in the diff, not a data effect. Row
+     count must also be identical across the whole validation window (the spine-is-unchanged
+     argument above, checked against real data rather than a fixture).
+   - Only once that passes is the subsequent retrain-and-compare a genuine leaderboard refresh
+     rather than a correctness gamble, and the old-vs-new *model* comparison is most informative
+     restricted to `valid_time >= val_start + 336h`, where the validation features are identical
+     between the two runs and the only difference left is the training data.
+   - Pre-register roughly how big a metric move is expected before running it, rather than judging
+     "sane" after seeing the number: with ~3% of training rows and ~3.8% of validation rows affected,
+     and XGBoost handling nulls natively rather than crashing on them, an aggregate MAE move of more
+     than a couple of percent is a signal to investigate, not a green light.
+   - **The 6-hourly live run is a serving smoke test, not a test of this fix.** `LIVE_POWER_HISTORY`
+     is already 15 days (360h), wider than the champion's 336h longest lag, and `live_forecasts`
+     never calls `load_engineering_inputs` with `power_lookback` — the live path does not exercise
+     the code this plan changes at all. Running the promoted model live confirms the retrained
+     artifact loads and serves correctly, which is worth doing, but it validates nothing about
+     `power_lookback` itself; the diff-based check above is what does that.
 2. **Should the `power_lookback` derivation also cover a future power-*rolling* feature?**
    Recommendation: no — out of scope for #638, and premature: `RollingFeature` on `power` is
    structurally impossible today (see above), so there is no caller to size for. If that pydantic
