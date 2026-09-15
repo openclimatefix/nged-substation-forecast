@@ -42,14 +42,15 @@ glance, inspired by the [WeirdML leaderboard](https://htihle.github.io/weirdml.h
 baseline is run from its authors' own repository at its authors' recommended defaults, with no
 domain-specific tuning, because a team that runs every entry on its own leaderboard risks reporting
 its own implementation quality as a methodological result — the rule TS-Arena applies, set out with
-its evidence under [Leaderboards of machine learning
-results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results). The
-leaderboard is published with the material needed to check it — the telemetry, the evaluation
-protocol, the metric definitions, and the code that computes them — so someone outside the project
-can reproduce a row rather than take it on trust. And negative results get a row, because a
-leaderboard carrying only the approaches that worked hides how much of the search space was tried;
-both commitments are argued under [Publishing results that others can compare
-against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
+its evidence under
+[Leaderboards of machine learning results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results).
+The leaderboard is published with the material needed to check it — the evaluation protocol, the
+metric definitions, the code that computes them, and the telemetry where NGED's data policy allows —
+so someone outside the project can reproduce a row rather than take it on trust. And negative
+results get a row, because a leaderboard carrying only the approaches that worked hides how much of
+the search space was tried; both commitments are argued under
+[Publishing results that others can compare against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
+A metered generator's time series and results are never published with the generator's name or ID.
 
 ---
 

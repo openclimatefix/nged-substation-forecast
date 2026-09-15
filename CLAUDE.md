@@ -422,6 +422,13 @@ fault. Widening a field to `| None` or relaxing a range to make a failing `valid
 the defect in the one place the rest of the system trusts. Reasoning and the rest of the rule:
 [`packages/contracts/README.md`](packages/contracts/README.md).
 
+**Never publish a metered generator's time series with the generator's name or ID.** A single
+site's output can be commercially sensitive, so NGED has asked that generator data leaves the
+project only anonymised. The rule covers everything outside the private data store: charts and
+examples in `docs/`, leaderboard rows, dashboards, reports, papers, and issue or PR bodies.
+Substations are not covered by this rule, and a generator's name may still appear in a lookup table
+that carries no time series.
+
 **Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an
 adversarial pass by the time a human opens it, so that human review is the last line of defence
 rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by the
