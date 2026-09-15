@@ -206,6 +206,15 @@ power-flow integration work that sits outside this project.
 
 Tier 3 is also where a **real curtailment case study** becomes possible. Tiers 1 and 2 can each be computed and can rank models without Tier 3. What they cannot yet do is be validated against a real curtailment event, because no existing site maps a curtailment case to a specific series or a single hierarchy node — see [case studies](#case-studies) below.
 
+**NGED derives upstream limits by combining substation forecasts in a power-flow model, so the
+forecasts must stay consistent across substations.** Percentiles cannot be added across substations:
+the sum of each substation's 95th percentile is generally not the 95th percentile of the combined
+flow. An ensemble member describes one weather outcome at every substation at once, so ensemble
+members can be fed through a power-flow model member by member. The power-flow model is therefore a
+reason to keep delivering the
+[ensemble of deterministic forecasts](delivery-tables.md#representation-1-ensemble-of-deterministic-forecasts)
+alongside the percentile representations.
+
 ### Curtailment price basis
 
 £100/MWh is a **whole-system cost**: the cost to all electricity users from re-dispatching

@@ -36,7 +36,7 @@ forecast over a multi-day horizon. Most striking of all, almost every study we r
 more than one of these challenges solves the challenges as a pipeline. Each stage's output is
 frozen before the next stage sees it.
 
-**Every research idea is planned research rather than a result, and research fails.** Each absence
+**At least some of Flexpectation's ambitious research is likely to fail.** Each absence
 above says that we did not find prior work, not that the approach will succeed. Some of these ideas
 will turn out to be worse than the gradient-boosted tree Flexpectation version 1 starts from. A
 negative result, published clearly, is a real outcome of the project rather than a failure of it.
@@ -60,16 +60,20 @@ has to be wide.
 **The value NGED gets from the forecast sits in both tails of the distribution**: the upper tail,
 where flexibility procurement holds demand under a limit, and the lower tail, where curtailment
 holds export under that same limit. Yet, most energy forecasting research is focused on the *middle*
-of the distribution.
+of the distribution. The limit is not always the rating of the substation itself. NGED also derives
+upstream limits, at bulk supply points and grid supply points, by combining several substation
+forecasts in a power-flow model.
 
 **Standard accuracy measures can reward the wrong forecast and hide badly calibrated uncertainty, so
 measuring a power forecast well takes more than one score.** Mean absolute error rewards flat
 forecasts that are of little use for either flexibility or curtailment decisions: a peak predicted
-an hour late is penalised twice, once for the peak that did not happen and once for the peak that was missed. An overly smooth forecast avoids both penalties. Ranking well on one measure also
-says little about other measures. Across 200 German low-voltage feeders, the two models that came
-first and second on consumer peaks in the quantile version of an overload-decision metric stated
-their own uncertainty badly. Their 90% ranges contained the true value less than half the time at
-those consumer peaks.
+an hour late is penalised twice, once for the peak that did not happen and once for the peak that
+was missed. An overly smooth forecast avoids both penalties. Ranking well on one measure also says
+little about other measures. Across 200 German low-voltage feeders
+([Kaas et al. (2026)](https://arxiv.org/abs/2607.01966)), the two models that came first and second
+on consumer peaks in the quantile version of an overload-decision metric stated their own
+uncertainty badly. Their 90% ranges contained the true value less than half the time at those
+consumer peaks.
 
 **Three published results point against parts of Flexpectation's plan, and we intend to test all
 three rather than avoid them.** More detailed weather data has not always improved performance;
@@ -1339,7 +1343,7 @@ substitutes a different set of customers and can read either side of the normal-
 Searching the same three indexes for latent-demand, censored-demand, counterfactual,
 synthetic-control, differentiable-physics, and physics-informed formulations applied to substation
 demand, we found no published model that recovers a latent normal-running-arrangement demand for a
-distribution substation.
+primary substation.
 
 ### 6. Detecting faulty metering
 
@@ -1589,7 +1593,7 @@ synthetic photovoltaic profiles, and that "observed net-load profiles are assemb
 validation scenarios". So whether the mixture being separated is a mixture a meter recorded is a
 question the page leaves open.
 
-**The one result we found that separated solar from demand at a real distribution substation,
+**The one result we found that separated solar from demand at a real primary substation,
 without being told the installed capacity, used that substation's own reactive power.** [Kara et al.
 (2018)](https://doi.org/10.1016/j.segan.2017.11.001) estimate the solar generation downstream of a
 substation in Riverside, California, from the substation's active and reactive power, and report a
@@ -2271,7 +2275,9 @@ lead time are nullified, so a forecast can never see the load it is predicting.
 **None of the papers we read addresses the leakage a frequently reissued forecast creates, and
 Flexpectation reissues its forecast often enough for the leakage to matter.** When a forecast
 covering 14 days is reissued every 6 hours, every target half-hour is covered by 56 separate
-forecasts. The literature describes two traps. If we were to count the 56 forecasts as independent,
+forecasts. For example, with runs at midnight, 06:00, noon, and 18:00 each day, the half-hour from
+10:30 to 11:00 on 15 September is covered by every run from noon on 1 September to 06:00 on 15
+September. The literature describes two traps. If we were to count the 56 forecasts as independent,
 a significance test would report a confidence the data does not support. If we were to let a target
 half-hour fall on both sides of a train-test boundary, the test set would be contaminated outright.
 
@@ -2374,12 +2380,13 @@ is setting itself.
 **Flexpectation is building a leaderboard, not a public ML competition, and the distinction changes
 which published lessons apply.** Our leaderboards carry our own experiments, one per class of time
 series. For example, solar farms, wind farms, batteries, and the demand at primary substations each
-get their own leaderboard. The leaderboards are public to view and reproducible, but we are not
-inviting other teams to submit entries. Anyone who wants to benchmark against us can rerun the setup
-for themselves. Not inviting outside entries means the literature's lessons about attracting
-entrants, prize pots, and qualifying rounds do not apply to us. The lessons about protocol —
-what makes a comparison trustworthy — apply with more force, because rival entrants give a
-competition some of its integrity by wanting to catch each other out.
+get their own leaderboard. Results for individual generators are published without the generator's
+name or ID. The leaderboards are public to view and reproducible, but we are not inviting other
+teams to submit entries. Anyone who wants to benchmark against us can rerun the setup for
+themselves. Not inviting outside entries means the literature's lessons about attracting entrants,
+prize pots, and qualifying rounds do not apply to us. The lessons about protocol — what makes a
+comparison trustworthy — apply with more force, because rival entrants give a competition some of
+its integrity by wanting to catch each other out.
 
 **Energy forecasting has run competitions on common data for over a decade, and only the second
 track of the Global Energy Forecasting Competition 2017 (GEFCom2017) forecast at anything like the
@@ -2400,17 +2407,20 @@ leaderboard is still open.
 | Predico ([Elia Group](https://innovation.eliagroup.eu/en/projects/predico-collaborative-forecasting-platform)) | Quarter-hourly probabilistic generation: Belgian solar out to 10 days ahead, and the German wind and solar markets that 50Hertz runs day-ahead | National generation totals of two transmission networks | Forecasters join by application; the number taking part is not published | Standing |
 | **Flexpectation's leaderboards** | Net demand at substations, and output at metered generators | One board per class of time series | Public to view and reproducible; outside entries not invited | Standing |
 
-**We found no example of a standing leaderboard for substation forecasting** — a leaderboard that
-keeps accepting entries after its competition closes. Two of the three competitions NGED funded sat
-at exactly the levels NGED forecasts. The gap is therefore scoped to forecasting rather than to the
-voltage level. [McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541) draw
-the same conclusion this review does, writing that "many solutions are only tested on private data
-using a single method only compared (if at all) to simple, non-competitive benchmarks", which
-"limits the reproducibility and usefulness of the outputs", and pairing their own results with the
-caveat that those results came "despite the necessary reduction in realism" of a curated competition
-dataset. What they recommend keeping open is the unranked practice phase, "as it allows teams to
-continue experimenting within the platform". Flexpectation's leaderboards are meant to fill that
-gap, though we would be glad to be pointed at a counter-example.
+**No leaderboard in the table combines the three properties of Flexpectation's leaderboards: they
+keep running rather than closing after a fixed period, they forecast at substation level, and they
+score methods on NGED's own data.** We found no example of a standing leaderboard for substation
+forecasting — a leaderboard that keeps accepting entries after its competition closes. Two of the
+three competitions NGED funded sat at exactly the levels NGED forecasts. The gap is therefore scoped
+to forecasting rather than to the voltage level.
+[McSweeney et al. (2023)](https://doi.org/10.1109/ISGTEUROPE56780.2023.10407541) draw the same
+conclusion this review does, writing that "many solutions are only tested on private data using a
+single method only compared (if at all) to simple, non-competitive benchmarks", which "limits the
+reproducibility and usefulness of the outputs", and pairing their own results with the caveat that
+those results came "despite the necessary reduction in realism" of a curated competition dataset.
+What they recommend keeping open is the unranked practice phase, "as it allows teams to continue
+experimenting within the platform". Flexpectation's leaderboards are meant to fill that gap, though
+we would be glad to be pointed at a counter-example.
 
 **WindAI is the closest of these competitions to challenge 3's problem of a generator whose capacity
 keeps changing, because robustness to that change was a scored criterion rather than an
@@ -2591,8 +2601,9 @@ the individual methods going into the combination ([Hyndman
 method.
 
 **What our leaderboard can do is narrower and still worth having:** show which approaches beat a
-stated baseline on NGED's own data, under one protocol, with the forecasts, the metric definitions,
-and the code published so that anyone can check the arithmetic or rerun the comparison themselves.
+stated baseline on NGED's own data, under one protocol, with the metric definitions, the code, and
+the forecasts published — anonymised for individual generators — so that anyone can check the
+arithmetic or rerun the comparison themselves.
 
 **A single-team leaderboard cannot take its credibility from rivals, so it has to earn credibility
 by declaring its own gaps, and Flexpectation's gap is known in advance:** the leaderboard runs on
@@ -2612,7 +2623,8 @@ cited authors in the field, concludes that "most papers can never be replicated,
 have never been published". Flexpectation publishes the evaluation protocol, the metric definitions,
 and the code that computes the metrics, so that someone outside the project can check how the
 results were produced rather than take the results on trust. The telemetry itself is shared only
-where NGED's data policy allows.
+where NGED's data policy allows. A metered generator's time series is never published with the
+generator's name or ID, because a single site's output can be commercially sensitive.
 
 **Flexpectation commits to nine practices, from correcting for ensemble size to publishing negative
 results, that let an outsider check its published numbers rather than take them on trust.** Two of
