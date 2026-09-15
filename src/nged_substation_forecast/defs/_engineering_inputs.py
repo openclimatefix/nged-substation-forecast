@@ -44,14 +44,14 @@ def load_engineering_inputs(
     window_end]`` window; NWP stays bounded to ``[window_start, window_end]``. Both are filtered to
     ``time_series_ids``.
 
-    A caller that needs power history from before ``window_start`` — to compute a lag or rolling
+    A caller that needs power history from before ``window_start`` — to compute a power lag
     feature whose target time falls earlier than the window — must either widen ``window_start``
     itself (as ``live_forecasts`` does, which also widens the NWP bound and needs an explicit
     ``init_time_start``/``init_time_end`` plus a post-hoc filter to stay correct) or pass
     ``power_lookback`` (which widens only the power scan). The default widens neither. Passing
-    ``power_lookback == the longest lag or rolling window a caller's features need`` is exactly
-    sufficient, with no margin required: the scan predicate below is inclusive, and the earliest
-    target time any lag can read is exactly ``window_start - power_lookback``.
+    ``power_lookback == the longest power lag a caller's features need`` is exactly sufficient,
+    with no margin required: the scan predicate below is inclusive, and the earliest target time
+    any lag can read is exactly ``window_start - power_lookback``.
 
     The "widening the power scan adds no spine rows" guarantee this relies on assumes the
     NWP-centric bulk-mode join (power is left-joined *onto* the NWP-derived spine) — it does not
@@ -106,7 +106,7 @@ def load_engineering_inputs(
             ``init_time`` chunks, so the full-ensemble forecast frame for one chunk stays in RAM
             while the rest streams from the partition-pruned scan.
         power_lookback: How far before ``window_start`` to widen the power scan's lower bound, so
-            lag/rolling features near the start of the window have real history to read instead of
+            power lag features near the start of the window have real history to read instead of
             silently nulling. Widens the power scan only — the NWP bounds are untouched. Defaults to
             ``timedelta(0)`` (today's behaviour: power bounded to ``[window_start, window_end]``,
             same as NWP).
