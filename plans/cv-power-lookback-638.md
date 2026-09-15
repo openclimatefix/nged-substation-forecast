@@ -405,13 +405,26 @@ uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
    rather than deferred, say so and it becomes a follow-up step (`trained_cv_model++` backfill,
    per the mechanism `docs/roadmap/metrics-and-leaderboard.md` already describes), run only after
    this PR merges and by explicit request — never automatically.
+
+   **Human decision (2026-09-15): retrain, as a final test, immediately before merge.** Not the
+   deferred path recommended above. Retrain the champion (and every other actively-compared
+   experiment covered by the leaderboard's single fold) with the corrected loader, compare the new
+   metrics against the previously trained model's, and treat the comparison itself as the last check
+   that this change hasn't broken anything by accident — not only a leaderboard refresh. If the
+   comparison looks sane, promote the retrained model and start it running on the usual 6-hourly
+   schedule on this workstation, as a further live smoke test. This is a post-merge operational
+   step, not a design change to the fix itself — `implement-issue` still opens the PR once the code
+   and tests are green; the retrain, comparison, promotion and schedule start happen after that PR
+   is reviewed and merged, not as part of the diff.
 2. **Should the `power_lookback` derivation also cover a future power-*rolling* feature?**
    Recommendation: no — out of scope for #638, and premature: `RollingFeature` on `power` is
    structurally impossible today (see above), so there is no caller to size for. If that pydantic
    restriction is ever lifted, `max_power_lag()` is the obvious place to extend (rename/broaden it)
-   — flagging here rather than speculatively building it now.
+   — flagging here rather than speculatively building it now. **Human decision (2026-09-15):
+   accepted as recommended.**
 3. **Does the per-experiment `power_lookback` derivation belong on `ParsedFeatures` itself, or as a
    free function in `cv_assets.py`?** Went with a `ParsedFeatures` method because the equivalent
    concept (`get_leaky_features`) already lives there, and both `trained_cv_model` and
    `cv_power_forecasts` need it — a named, tested method avoids duplicating the same filter+max
    logic twice. Flagging for the simplicity reviewer in case a plainer free function is preferred.
+   **Human decision (2026-09-15): accepted as recommended.**
