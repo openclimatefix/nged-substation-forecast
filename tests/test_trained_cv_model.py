@@ -11,12 +11,15 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import mlflow
+import patito as pt
 import polars as pl
 import pytest
 from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
-from dagster import DagsterInstance, materialize
+from contracts.weather_schemas import Nwp
+from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
 from ml_core.base_forecaster import load_trained_metadata
 from ml_core.features._parsed_features import ParsedFeatures
@@ -28,6 +31,7 @@ from xgboost_forecaster.forecaster import XGBoostForecaster
 
 from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
 from nged_substation_forecast.defs.cv_assets import _load_roster, trained_cv_model
+from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
 pytestmark = pytest.mark.integration
 
@@ -383,6 +387,75 @@ def _fold_run(client: MlflowClient) -> Run:
     )
     assert len(fold_runs) == 1
     return fold_runs[0]
+
+
+def test_trained_cv_model_derives_power_lookback_from_selected_features(
+    env: None, dagster_instance: DagsterInstance, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``trained_cv_model`` derives ``power_lookback`` from the experiment's own
+    ``selected_features`` and passes it through to ``load_engineering_inputs``.
+
+    The two tests above prove ``load_engineering_inputs`` and
+    ``ParsedFeatures.max_power_lag()`` are each correct in isolation; this proves the asset's own
+    wiring — computing ``power_lookback`` and passing it to the loader — is correct too. The
+    shared ``register_experiment`` fixture used by every other test in this module never requests
+    a power lag feature, so it cannot catch a hardcoded ``power_lookback=timedelta(0)`` or a
+    derivation from the wrong config field at this call site.
+    """
+    result = register_experiment_job.execute_in_process(
+        run_config=RunConfig(
+            ops={
+                "register_experiment": RegisterExperimentConfig(
+                    experiment_name=EXPERIMENT_NAME,
+                    base_model_config="conf/model/xgboost.yaml",
+                    config_overrides={
+                        "selected_features": ["temperature_2m", "power_lag_24h"],
+                        "n_estimators": 5,
+                    },
+                    run_mode="full_cv",
+                )
+            }
+        ),
+        instance=dagster_instance,
+    )
+    assert result.success
+
+    calls: list[timedelta] = []
+
+    def spy_load_engineering_inputs(
+        settings: Settings,
+        time_series_ids: list[int],
+        metadata: pt.DataFrame[TimeSeriesMetadata],
+        window_start: datetime,
+        window_end: datetime,
+        ensemble_members: list[int] | None = None,
+        init_time_start: datetime | None = None,
+        init_time_end: datetime | None = None,
+        power_lookback: timedelta = timedelta(0),
+    ) -> tuple[pt.LazyFrame[PowerTimeSeries], pt.LazyFrame[Nwp]]:
+        calls.append(power_lookback)
+        return load_engineering_inputs(
+            settings,
+            time_series_ids,
+            metadata,
+            window_start,
+            window_end,
+            ensemble_members=ensemble_members,
+            init_time_start=init_time_start,
+            init_time_end=init_time_end,
+            power_lookback=power_lookback,
+        )
+
+    monkeypatch.setattr(
+        "nged_substation_forecast.defs.cv_assets.load_engineering_inputs",
+        spy_load_engineering_inputs,
+    )
+
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+
+    assert calls == [timedelta(hours=24)]
 
 
 def test_trained_cv_model_trains_and_saves_to_mlflow(
