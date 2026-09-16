@@ -424,6 +424,12 @@ before any code moves:
   plan reviews and between zero and two of the diff reviews, running the earlier of each pair
   first and erring towards running one more when the call is close.
 
+**State a size as an answer to every complex trigger, never as the one trigger that fired.** The
+triggers are what gets stored, the production serving path, a degradation rule, more than one
+defensible design, and code whose callers you could not name without searching. A size naming only
+the trigger you noticed hides the ones you did not consider, and reads as a complete judgement
+either way. The full rule, and the incident behind it, are in step 3 of `plan-issue`.
+
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
 **Ask before changing a Patito data contract.** The schemas in `packages/contracts/` are the

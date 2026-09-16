@@ -67,7 +67,9 @@ front — a report back after step 1 is not finished work.
     The body says **how the issue was sized and which adversarial reviews it is getting** — and
     where that is none, says so outright. A PR that no sub-agent has attacked is one where human
     review is the first line of defence rather than the last, and the reviewer has to know that
-    before reading the diff.
+    before reading the diff. Give the size as the five trigger answers `plan-issue` step 3 asks
+    for, not as the one trigger that decided it, so a reviewer can see which triggers were
+    considered rather than only which one fired.
 
 5. **First adversarial review: correctness, and cutting the change down.** Run this if the sizing
    called for it. Spawn a *new*, independent sub-agent and give it only the PR number, not the
