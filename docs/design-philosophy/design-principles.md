@@ -748,7 +748,9 @@ re-training "triggering and reviewing an automated run on a regular cadence", wi
 maintenance windows" offered nearby as an example cadence for OCF's scheduled work in general. The
 [production-monitoring design](../roadmap/live-service.md#production-monitoring) — not yet
 built — would chart trailing-window performance over time once it lands, but nothing in that design
-acts on the chart. Standard MLOps practice ties retraining to a stated cadence, a
+acts on the chart. The Energy Systems Catapult [DNO Forecasting
+Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/)'s good-practice principle 17,
+"Monitor performance and retrain models," calls for exactly this: a stated cadence, a
 performance-drift trigger, or both. We have neither yet. Adding a trigger meets the same open
 question as [input drift detection](#input-drift-detection) above: a stated cadence is easy to
 add, but a trigger risks reacting to a legitimate distribution shift — a hot, dry summer, a wave
@@ -759,9 +761,12 @@ of new solar connections — as if it were model decay.
 NGED's use of the delivered forecasts is observed anecdotally rather than measured:
 [Evolving requirements](../architecture/forecast-delivery.md#evolving-requirements) records that
 NGED are "already finding uses for our 'firehose of data' that we had never considered", not which
-of the five delivery tables, or which columns within them, NGED actually read. Standard practice
-for a delivered data product tracks read patterns — for example S3 server-access logs or
-CloudTrail data events on the delivery bucket — to learn which tables carry weight and which sit
+of the five delivery tables, or which columns within them, NGED actually read. The Energy Systems
+Catapult [DNO Forecasting Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/)'s
+good-practice principle 8, "Monitoring use of forecasts," calls for exactly this kind of tracking.
+Standard practice for a delivered data product tracks read patterns — for example S3
+server-access logs or CloudTrail data events on the delivery bucket — to learn which tables carry
+weight and which sit
 unread. We have not built read-pattern tracking for the delivery tables, and building it would
 raise its own question of how much read-pattern instrumentation is proportionate for a
 single-consumer delivery mechanism.
