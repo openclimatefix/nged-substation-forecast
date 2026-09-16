@@ -4,8 +4,9 @@ The feature vocabulary, the joined `AllFeatures` frame handed to models, the eli
 population, and the metrics schema.
 """
 
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Final, Literal
+from typing import ClassVar, Final, Literal, Self
 
 import patito as pt
 import polars as pl
@@ -255,9 +256,8 @@ Every time_series_type plus the sentinel `"all"` for the across-everything aggre
 class Metrics(pt.Model):
     """Evaluation metrics for power forecasts — tall format.
 
-    One row per `(time_series_id, power_fcst_model_name, fold_id, horizon_slice, metric_name,
-    metric_param)`. `metric_param` encodes the extra parameter dimension for metrics that have
-    one, or `"all"` for scalar metrics with no extra dimension. Examples:
+    `metric_param` encodes the extra parameter dimension for metrics that have one, or `"all"`
+    for scalar metrics with no extra dimension. Examples:
 
     | time_series_id | fold_id | horizon_slice | metric_name       | metric_param | metric_value |
     |----------------|---------|---------------|-------------------|--------------|--------------|
@@ -268,8 +268,11 @@ class Metrics(pt.Model):
     | 1              | 1       | day_ahead     | mean_pinball_loss | all          | 2.4          |
     | 1              | 1       | day_ahead     | picp              | p10_p90      | 0.78         |
 
-    Primary key: `(time_series_id, power_fcst_model_name, fold_id, horizon_slice, metric_name,
-    metric_param)`.
+    Primary key: `(time_series_id, power_fcst_model_name, experiment_name, fold_id,
+    evaluation_scope, horizon_slice, metric_name, metric_param, window_start, window_end)`. At
+    most one metric value per series, model, experiment, fold, evaluation scope, horizon slice,
+    metric, parameter and window — recomputing an existing key replaces that row rather than
+    duplicating it.
     """
 
     time_series_id: int = _get_time_series_id_dtype()
@@ -364,8 +367,10 @@ class Metrics(pt.Model):
         dtype=UTC_DATETIME_DTYPE,
         allow_missing=True,
         description=(
-            "When this metric row was written (provenance; orders the append-only "
-            "monitoring series and distinguishes recomputations)."
+            "When this metric row was last computed. computed_at is pure provenance: PRIMARY_KEY "
+            "(below), not computed_at, decides whether a write is a new row or a recomputation of "
+            "an existing one. A recomputation replaces the existing row rather than being told "
+            "apart from it by computed_at."
         ),
     )
 
@@ -387,6 +392,67 @@ class Metrics(pt.Model):
             "allow_missing so compute_metrics() itself need not produce it."
         ),
     )
+
+    PRIMARY_KEY: ClassVar[tuple[str, ...]] = (
+        "time_series_id",
+        "power_fcst_model_name",
+        "experiment_name",
+        "fold_id",
+        "evaluation_scope",
+        "horizon_slice",
+        "metric_name",
+        "metric_param",
+        "window_start",
+        "window_end",
+    )
+    """See the class docstring's "Primary key" paragraph."""
+
+    @classmethod
+    def validate(  # ty: ignore[invalid-method-override]
+        cls,
+        dataframe: pl.DataFrame,
+        columns: Sequence[str] | None = None,
+        allow_missing_columns: bool = False,
+        allow_superfluous_columns: bool = False,
+        drop_superfluous_columns: bool = False,
+    ) -> pt.DataFrame[Self]:
+        """Validate the given dataframe, ensuring the primary key is unique where it is present.
+
+        A duplicated primary key means either a join fanned out on the way here or the same rows
+        were written twice, and both corrupt the leaderboard or monitoring chart built from them.
+        It is our own bug rather than the outside world misbehaving, so this raises rather than
+        degrading — see
+        <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
+
+        Unlike `PowerForecast`, four `PRIMARY_KEY` columns (`experiment_name`,
+        `evaluation_scope`, `window_start`, `window_end`) are `allow_missing`: `compute_metrics()`
+        validates its output before the `metrics` Dagster asset's `enrich_metrics_rows()` adds
+        them. The uniqueness check below is skipped, not run against a partial key, whenever any
+        of those columns is absent — the check that matters runs inside `enrich_metrics_rows()`,
+        on the fully-enriched frame that is actually written to `forecast_metrics`.
+        """
+        validated_df = super().validate(
+            dataframe=dataframe,
+            columns=columns,
+            allow_missing_columns=allow_missing_columns,
+            allow_superfluous_columns=allow_superfluous_columns,
+            drop_superfluous_columns=drop_superfluous_columns,
+        )
+
+        pk_cols = list(cls.PRIMARY_KEY)
+        if not set(pk_cols).issubset(validated_df.columns):
+            return validated_df
+
+        # `n_unique`, not `is_duplicated().any()`: the two are equivalent here (every primary-key
+        # column is non-nullable once present) but `is_duplicated` materialises a per-row mask,
+        # costing ~5x the peak memory on a predict-sized frame.
+        if validated_df.select(pk_cols).n_unique() != validated_df.height:
+            raise ValueError(
+                f"Duplicate entries found for primary key columns: {pk_cols}. "
+                "Either an upstream join fanned out or these rows were written twice."
+            )
+
+        return validated_df
 
 
 class EligibleTimeSeries(pt.Model):

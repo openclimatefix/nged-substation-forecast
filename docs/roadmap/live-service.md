@@ -295,9 +295,15 @@ need a retirement path that cannot lose results.
   `valid_time` windows — **last 24 hours** and **last 7 days**. Each window writes rows to
   `forecast_metrics` Delta with `window_label` (`"24h"`/`"7d"`), the trailing
   `window_start`/`window_end` bounds, and `computed_at = now` (all columns already exist in the
-  `Metrics` schema). These rows are **append-only** — successive runs accumulate the
-  sliding-window history (unlike the leaderboard scope's idempotent overwrite; recomputations
-  are distinguished by `computed_at`).
+  `Metrics` schema). `window_start`/`window_end` are part of `Metrics.PRIMARY_KEY`, and a trailing
+  window is computed relative to "now", so most runs write rows the table has not seen before and
+  the series **accumulates**. `Metrics.validate()` rejects a batch that duplicates an existing
+  primary key, so a genuine recomputation of an existing window — a retried sensor firing, a
+  backfill — cannot land as a second row for that key: this scope's writer has to replace the
+  existing row instead. `write_forecast_metrics` does not do that today — its overwrite predicate
+  scopes only to `(experiment_name, fold_id)`, one partition shared by every window this scope
+  writes, so reusing it unchanged would delete every other window's rows sharing that partition.
+  This scope's writer needs a predicate (or another instrument) scoped to the full primary key.
 - MLflow: log the same aggregates to a **dedicated `production_monitoring` MLflow experiment**
   — never to the golden leaderboard — as **time-series points** (MLflow metric
   timestamp/step), one persistent run per window resolved by tag (mirroring the
