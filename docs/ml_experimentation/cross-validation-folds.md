@@ -146,7 +146,7 @@ A 14-day forecast reissued every 6 hours covers each target half-hour 56 times. 
 several gotchas we need to be careful of:
 
 **Overlapping forecasts do not contaminate the test set.** `load_engineering_inputs` bounds NWP by
-*target* time — `valid_time` within `[window_start, window_end]` — not by `nwp_init_time`. That NWP
+*target* time — `valid_time` within `[window_start, window_end]` — not by `init_time`. That NWP
 bound is the fold boundary, because the NWP scan sets the spine that defines the labels for the
 power forecast. No label appears on both sides of the fold boundary.
 
@@ -160,7 +160,7 @@ training fold can be read as a lagged power feature in a validation fold. Readin
 later input is intrinsic to autoregressive forecasting — yesterday's actual load is always both a
 past training target and today's input.
 
-**Overlapping forecasts inflates the apparent weight of evidence.** Within one horizon slice the
+**Overlapping forecasts inflate the apparent weight of evidence.** Within one horizon slice the
 same target half-hour is still scored many times: `extended_range` spans 168 hours and beyond. With
 6-hourly initialisations, roughly 28 forecasts therefore land in that band for a single target.
 Those are not 28 independent measurements of skill — they share the weather, the recent load and
