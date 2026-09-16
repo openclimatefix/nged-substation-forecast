@@ -6,10 +6,11 @@ explicit parameter rather than calling ``datetime.now()`` internally, so a test 
 fixed time and get a deterministic result. The two disk/MLflow helpers
 (``load_forecaster_from_dir``, ``fetch_model_artifacts``) do the IO and check that the saved
 model is one this code can still build a config for and parse the features of.
-``weather_lags_lack_their_control_member`` is the one that reads data: it collects a bounded
-probe against the slot's NWP scan, and takes that scan as an argument so a test can hand it an
-in-memory frame. The ``live_forecasts`` and ``promoted_model`` Dagster assets
-(``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over these.
+``weather_lags_lack_their_control_member`` is the one helper that reads a data table rather than
+a saved model. The read is a bounded probe against the slot's NWP scan, and the scan is an
+argument, so a test can pass an in-memory frame. The ``live_forecasts`` and ``promoted_model``
+Dagster assets (``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over
+these.
 """
 
 import json
@@ -109,17 +110,20 @@ def weather_lags_lack_their_control_member(
     requires alongside the log rather than as a substitute for it. Reading the logs is not a
     monitoring strategy: the operator reads the alert.
 
-    Returns ``False`` when the model selects no weather lag, because a missing control member
-    costs a model with no weather lags nothing.
+    Returns ``False`` when the model selects no weather lag, because a model with no weather lags
+    never reads the control member: the same-run weather join reads whichever ensemble members the
+    run does carry.
 
     ``live_forecasts`` probes the NWP scan *before* the H3 spatial join, while
-    ``_engineer_features`` probes it after, so the frame here is a superset of the one the
-    pipeline sees. The alert can therefore in principle miss a degradation the pipeline hits,
-    never the reverse — and ``load_engineering_inputs`` has already pruned the scan to the
-    model's own frozen H3 cells, so the two frames hold the same cells today.
+    ``_engineer_features`` probes the scan after. That makes the frame here a superset of the
+    frame the pipeline sees, so the alert can in principle miss a degradation the pipeline hits,
+    but can never fire on a degradation the pipeline does not hit. In practice
+    ``load_engineering_inputs`` has already pruned the scan to the model's own frozen H3 cells, so
+    the two frames hold the same cells today.
 
-    The probe reads at most one row, so a healthy run answers it from a single row group. Proving
-    a run has *no* control member costs a scan of the run, because absence cannot be shown early.
+    The probe reads at most one row, so a healthy run answers the probe from a single row group.
+    Proving a run has *no* control member costs a scan of the run, because absence cannot be shown
+    early.
 
     Args:
         nwp: The slot's NWP rows, already narrowed to the selected run.

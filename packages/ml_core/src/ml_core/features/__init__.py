@@ -6,10 +6,10 @@ Public interface:
 - ``TabularFeatureEngineer`` — default implementation: nearest-cell NWP spatial join followed
   by the declarative tabular pipeline.
 - ``NWP_PUBLICATION_DELAY_HOURS`` — hours after an NWP run's ``init_time`` before we treat that
-  run as usable. Public because it is the default of three public signatures
-  (``FeatureEngineer.engineer``, ``TabularFeatureEngineer.engineer``, and
-  ``ml_core.production_helpers.select_nwp_init_time``), so a caller reasoning about any of them
-  needs a name to reach it by.
+  run as usable. Public because the constant is the default of three public signatures:
+  ``FeatureEngineer.engineer``, ``TabularFeatureEngineer.engineer``, and
+  ``ml_core.production_helpers.select_nwp_init_time``. A caller reasoning about any of those three
+  signatures needs a name to reach the constant by.
 
 Private sub-modules (importable by tests, not part of the public API):
 

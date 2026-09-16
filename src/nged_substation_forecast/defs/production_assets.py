@@ -290,10 +290,10 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     fresh the run is, because feature engineering caps the freshest-run join it uses for weather
     lags at the run selected above rather than at a modelled publication delay. When that run
     carries no control-member rows (``ensemble_member == 0``) — a partial or malformed ECMWF ENS
-    download — the weather lags reaching back before ``power_fcst_init_time`` come back null,
-    because those are the ones the control-member analysis proxy answers. Each such lag loses the
-    first ``lag_hours`` of the horizon; the rest of the horizon is answered by the same-run join,
-    which reads whichever ensemble members the run does carry. That slot degrades rather than
+    download — the weather lags reaching back before ``power_fcst_init_time`` come back null.
+    Those are the lags the control-member analysis proxy answers, and each of them loses the first
+    ``lag_hours`` of the horizon. The rest of the horizon is answered by the same-run join, which
+    reads whichever ensemble members the run does carry. That slot degrades rather than
     failing: ``_engineer_features`` logs a warning naming the run, and this asset reports the same
     degradation to Sentry tagged ``degraded_asset=live_forecasts``, so an operator is alerted
     without having to read the logs. See
@@ -334,10 +334,10 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     # `_engineer_features` logs a warning for the same condition; rule 4 of inherent-stability
     # requires both, because an operator reads the alert rather than the logs:
     # <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>
-    # The probe cannot turn fail-open into fail-closed, so it needs no catch-all of its own:
+    # The probe cannot turn fail-open into fail-closed, so it needs no catch-all of its own.
     # `engineer` below parses the same feature names and runs the same control-member probe over
-    # the same frame, so every exception this call can raise is one the asset already suffered a
-    # few lines later, before anything is written.
+    # the same frame, so every exception this call can raise is an exception `engineer` would
+    # raise a few lines later anyway, before any forecast rows are written.
     if weather_lags_lack_their_control_member(
         nwp_lf, selected_features=forecaster.model_params.selected_features
     ):

@@ -220,12 +220,12 @@ def _capture_tagged(
         value: Tag value — the check or asset name.
         exc: The exception to capture.
         failure_note: Logged with the traceback if Sentry itself fails.
-        fingerprint: Group every event carrying this fingerprint into one Sentry issue. Pass it
-            for a *synthesised* exception — one built to carry a message rather than caught —
-            because such an exception has no traceback, so Sentry falls back to grouping by
-            exception type and message, and a message naming the run or the slot then opens a
-            fresh issue every time. Leave it ``None`` for a genuinely caught exception, whose
-            stack trace already groups it.
+        fingerprint: Group every event carrying this fingerprint into one Sentry issue. Pass a
+            fingerprint for a *synthesised* exception — an exception built to carry a message
+            rather than caught — because a synthesised exception has no traceback, so Sentry
+            falls back to grouping by exception type and message. A message naming the run or the
+            slot then opens a fresh issue every time. Leave the fingerprint ``None`` for a
+            genuinely caught exception, whose stack trace already groups the event.
     """
     try:
         with sentry_sdk.new_scope() as scope:
@@ -343,7 +343,7 @@ NWP_CONTROL_MEMBER_MISSING_FINGERPRINT: Final[str] = "nged-nwp-control-member-mi
 Combined with ``Settings.sentry_environment`` by the caller, for the reason
 `POWER_DATA_STALE_FINGERPRINT` gives above. The fingerprint is what makes the alert readable: the
 event carries a synthesised exception, which has no stack trace, so Sentry would otherwise group
-on the message — and the message names the run and the slot, so a run of degraded slots would open
+on the message. The message names the run and the slot, so a sequence of degraded slots would open
 one new issue each rather than one issue firing repeatedly."""
 
 MAX_LATE_SERIES_IN_CONTEXT: Final[int] = 50

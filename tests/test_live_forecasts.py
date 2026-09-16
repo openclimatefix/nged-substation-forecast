@@ -541,12 +541,13 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     inside the 9-hour publication delay: the shape of the 06:00 slot, when only that morning's run
     has landed. The lag is populated.
 
-    The second case (``members=(1,)``) pins the one cause of a null weather lag this change leaves
+    The second case (``members=(1,)``) pins a cause of a null weather lag this change leaves
     standing: a run with no control-member rows at all, which is a partial or malformed ECMWF ENS
-    download. The delivered row's lag points back before ``power_fcst_init_time``, so the
-    control-member analysis proxy is the only thing that could answer it and the lag comes back
-    null. A run with no control member degrades the forecast rather than failing the slot, so
-    ``materialize`` succeeding at all is itself part of what that case checks.
+    download. The delivered row's lag points back before ``power_fcst_init_time``, so of the two
+    joins ``_apply_weather_lag`` makes, only the control-member analysis proxy could answer that
+    lag. The lag therefore comes back null. A run with no control member degrades the forecast
+    rather than failing the slot, so ``materialize`` succeeding at all is itself part of what that
+    case checks.
     """
     gap = timedelta(hours=gap_hours)
     power_fcst_init_time = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
@@ -608,7 +609,7 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     assert genuine.height > 0
     lag_col = f"temperature_2m_lag_{gap_hours}h"
     # Every delivered row's target time precedes power_fcst_init_time, so the freshest-run
-    # (analysis-proxy) branch is the one under test here.
+    # (analysis-proxy) branch is the branch under test here.
     lag_is_null = genuine[lag_col].null_count() == genuine.height
     assert lag_is_null == expect_null
 

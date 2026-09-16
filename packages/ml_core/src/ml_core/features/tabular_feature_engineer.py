@@ -148,7 +148,7 @@ def _check_or_warn_on_missing_control_member(
     logger.warning(
         "NWP run %s has no control member (ensemble_member == 0). Every weather lag feature will "
         "be null for this slot over the first lag_hours of its horizon, where the lag points "
-        "back before power_fcst_init_time; the same-run join answers the rest.",
+        "back before power_fcst_init_time. The same-run join answers the rest of the horizon.",
         resolved_nwp_init_time,
     )
 
