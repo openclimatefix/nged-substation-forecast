@@ -367,10 +367,10 @@ class Metrics(pt.Model):
         dtype=UTC_DATETIME_DTYPE,
         allow_missing=True,
         description=(
-            "When this metric row was last computed. Pure provenance: PRIMARY_KEY (below) is "
-            "what determines whether a computation is new or a recomputation, so computed_at "
-            "plays no role in that decision — a recomputation of an existing key replaces the "
-            "row rather than being distinguished from it."
+            "When this metric row was last computed. computed_at is pure provenance: PRIMARY_KEY "
+            "(below), not computed_at, decides whether a write is a new row or a recomputation of "
+            "an existing one. A recomputation replaces the existing row rather than being told "
+            "apart from it by computed_at."
         ),
     )
 
