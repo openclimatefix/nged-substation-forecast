@@ -159,8 +159,8 @@ zero and two of the diff reviews in `implement-issue`. The choice is yours, unde
   nobody attacked into `main`.
 
 Carry the size, the five trigger answers and the chosen counts forward: all three go in the plan
-file (step 4), in the report (step 9), and into the PR body when `implement-issue` opens it, so
-whoever reviews the diff knows what scrutiny the diff has already had and on what grounds.
+file and the draft PR body that step 4 opens, and in the report (step 9), so whoever reviews the
+diff knows what scrutiny the diff has already had and on what grounds.
 
 ## 4. Write the plan
 
@@ -184,8 +184,8 @@ git push -u origin <branch-name>
 against `main`, with labels and `JackKelly` as assignee (`gh pr create` can't set either — follow
 with `gh pr edit --add-label <label>` and `gh pr edit --add-assignee JackKelly`), linking the issue
 so it closes on merge. The body says the plan is not yet approved and carries no code yet, and
-states the size from step 3 and which reviews it is getting. See the `github-issue-pr-workflow`
-skill for the full PR checklist. Opening it now gives every review below, and every push that
+gives step 3's five trigger answers, the size they picked, and which reviews it is getting. See
+the `github-issue-pr-workflow` skill for the full PR checklist. Opening it now gives every review below, and every push that
 follows, somewhere to land that the human reviewer can already be watching — the same place they
 will later review the diff.
 
