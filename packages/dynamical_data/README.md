@@ -46,11 +46,39 @@ significand rounding collapses NWP values into repeats that parquet's default di
 encoding captures directly, and `BYTE_STREAM_SPLIT` scatters that repetition across four byte
 planes. Writer properties are data-dependent — measure per table.
 
-**Read path** — the member-early sort means each approx 1M-row parquet row group spans only a few
-ensemble members, so a single-member read (every training run reads just the control member)
-skips most row groups via min/max stats. Measured on a real 29-day, 9-cell, control-member
-collect: **~5× faster, ~5× less peak memory** (0.15 s / ~1 GB → 0.02–0.04 s / ~205 MB), for a
-~2% storage cost.
+**Read path** — the member-early sort puts each ensemble member's rows in one contiguous block,
+and `delta_store.nwp` sizes each parquet row group to hold exactly one member, so a single-member
+read (every training run reads just the control member) matches one row group's min/max range and
+skips the other 50. Measured against a `valid_time`-first sort on a real 29-day, 9-cell,
+control-member collect, both arms freshly written through `write_nwp` and timed warm-cache as the
+median of five runs: **5.7× faster and 5.5× less peak memory** (170 ms / 2,200 MB → 30 ms / 400 MB,
+of which 164 MB is the interpreter and its imports), for a **3.7% storage cost** (4.35 GB → 4.51 GB
+across the 29 partitions).
+
+**The read decodes 1.96% of each partition — one row group in 51 — and that holds for every
+member.** A census of the stored table sampled across 2024, 2025 and 2026 reports the same 1.96%
+for the control member, for member 25 and for member 50, so no member pays for being in the middle
+of the range. Under the `valid_time`-first sort the same read decodes 100%.
+
+Both figures are local-disk measurements. On S3 a skipped row group also skips a network range
+request, so they are a floor rather than a transfer.
+
+```python
+# Two arms, one partition window, differing only in NWP_SORT_COLS; the second monkeypatches
+# delta_store.nwp.NWP_SORT_COLS to ("init_time", "valid_time", "ensemble_member", "h3_index").
+# Time each arm in its own process: ru_maxrss is a high-water mark that never falls, so two arms
+# in one process report the larger figure twice.
+frame = (
+    Nwp.scan_delta(table)
+    .filter(
+        pl.col("init_time").is_between(window_start, window_end),
+        pl.col("valid_time").is_between(window_start, window_end + timedelta(days=10)),
+        pl.col("h3_index").is_in(cells),          # the 9 cells the 33 V1 series sit in
+        pl.col("ensemble_member").is_in([0]),     # is_in, not ==, as load_engineering_inputs does
+    )
+    .collect(engine="streaming")
+)
+```
 
 **Per-variable keep_bits: considered and rejected (2026-07).** Since Dynamical's upstream
 precision caps the real information at 7–12 significand bits per variable, budgets matched to

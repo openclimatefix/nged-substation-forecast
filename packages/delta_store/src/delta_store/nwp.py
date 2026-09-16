@@ -51,6 +51,13 @@ of decoding it. That pruning holds for **any** member, not only the control memb
 is not enough, because row groups that straddle member boundaries advertise the whole span between
 their extremes.
 
+Measured on the stored table, a single-member read decodes 1.96% of a partition — one row group in
+51 — for the control member, for member 25 and for member 50 alike. Against a ``valid_time``-first
+sort of the same 29 partitions, a 9-cell control-member collect runs in 30 ms and 400 MB of peak
+resident memory rather than 170 ms and 2,200 MB, for 3.7% more stored bytes. The method and the
+full figures live beside the storage measurements in
+<https://openclimatefix.github.io/nged-substation-forecast/api/dynamical_data/>.
+
 Two conditions have to hold for the predicate to reach the Parquet scan at all. It must survive
 ``Nwp.scan_delta``'s cast, which requires that cast to be a no-op (see the ``Nwp.ensemble_member``
 field). And the row groups have to stay member-aligned, which is what
