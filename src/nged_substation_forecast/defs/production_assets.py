@@ -22,6 +22,7 @@ from dagster import (
     AssetDep,
     AssetExecutionContext,
     Config,
+    DagsterExecutionInterruptedError,
     MetadataValue,
     TableRecord,
     TimeWindowPartitionMapping,
@@ -334,24 +335,32 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     # `_engineer_features` logs a warning for the same condition; rule 4 of inherent-stability
     # requires both, because an operator reads the alert rather than the logs:
     # <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>
-    # The probe cannot turn fail-open into fail-closed, so it needs no catch-all of its own.
-    # `engineer` below parses the same feature names and runs the same control-member probe over
-    # the same frame, so every exception this call can raise is an exception `engineer` would
-    # raise a few lines later anyway, before any forecast rows are written.
-    if weather_lags_lack_their_control_member(
-        nwp_lf, selected_features=forecaster.model_params.selected_features
-    ):
-        report_asset_degradation(
-            asset_name="live_forecasts",
-            exc=ValueError(
-                f"NWP run {nwp_init.isoformat()} has no control-member rows "
-                f"(ensemble_member == 0) for this slot's H3 cells, so every weather lag in the "
-                f"{power_fcst_init_time.isoformat()} slot is null over its first lag_hours of "
-                "lead time. The forecast was still produced, on the remaining features and on "
-                "the rest of each lag's horizon."
-            ),
-            fingerprint=[NWP_CONTROL_MEMBER_MISSING_FINGERPRINT, settings.sentry_environment],
-        )
+    # Rule 7 puts the probe under a catch-all, and before the write: the probe collects against the
+    # NWP scan, so an object-store fault here would otherwise fail the slot from the warning path.
+    try:
+        if weather_lags_lack_their_control_member(
+            nwp_lf, selected_features=forecaster.model_params.selected_features
+        ):
+            report_asset_degradation(
+                asset_name="live_forecasts",
+                exc=ValueError(
+                    f"NWP run {nwp_init.isoformat()} has no control-member rows "
+                    f"(ensemble_member == 0) for this slot's H3 cells, so every weather lag in "
+                    f"the {power_fcst_init_time.isoformat()} slot is null over its first "
+                    "lag_hours of lead time. The forecast was still produced, on the remaining "
+                    "features and on the rest of each lag's horizon."
+                ),
+                fingerprint=[NWP_CONTROL_MEMBER_MISSING_FINGERPRINT, settings.sentry_environment],
+            )
+    except BaseException as exc:
+        # The same guard as the asset checks, for the same reason — see the comment in
+        # `checks.py::power_data_is_fresh` for why `BaseException` and what it costs in tests.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        # No fingerprint: this exception was caught rather than synthesised, so it carries the
+        # stack trace Sentry groups on.
+        context.log.exception("Could not probe the NWP run for its control member")
+        report_asset_degradation(asset_name="live_forecasts", exc=exc)
 
     power_full = build_live_power_frame(
         power_ts,

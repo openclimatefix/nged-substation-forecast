@@ -379,6 +379,32 @@ def test_degradation_reporters_capture_the_exception_and_tag_the_name(
     event = _build_one_event(lambda: report(name, ValueError("boom")))
     assert event["tags"] == {tag: name}
     assert event["exception"]["values"][0]["type"] == "ValueError"
+    # No fingerprint on a caught exception: its stack trace is what Sentry groups on, and a
+    # fingerprint would instead fold unrelated faults in the same asset into one issue.
+    assert "fingerprint" not in event
+    _assert_no_tags_leaked()
+
+
+def test_report_asset_degradation_fingerprints_a_synthesised_exception() -> None:
+    """A synthesised exception reaches Sentry carrying the caller's fingerprint, environment included.
+
+    ``live_forecasts`` reports a missing NWP control member by building a ``ValueError`` to carry
+    the message rather than catching one, so the event has no stack trace and Sentry would group it
+    by message — and the message names the run and the slot, so every degraded slot would open its
+    own issue. The environment is the second element for the reason
+    ``POWER_DATA_STALE_FINGERPRINT`` gives: without it, production and a laptop share one issue.
+
+    Asserted on the built event rather than on the arguments to ``capture_exception``, so a
+    fingerprint set on the wrong scope is caught — see ``_build_one_event``.
+    """
+    fingerprint = [_sentry.NWP_CONTROL_MEMBER_MISSING_FINGERPRINT, "jacks-laptop"]
+    event = _build_one_event(
+        lambda: _sentry.report_asset_degradation(
+            asset_name="live_forecasts", exc=ValueError("boom"), fingerprint=fingerprint
+        )
+    )
+    assert event["fingerprint"] == fingerprint
+    assert event["tags"] == {"degraded_asset": "live_forecasts"}
     _assert_no_tags_leaked()
 
 

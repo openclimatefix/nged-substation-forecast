@@ -15,6 +15,7 @@ from typing import Any, ClassVar, cast
 import patito as pt
 import polars as pl
 import pytest
+from _nwp_test_data import cast_to_nwp_dtypes
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries
 from contracts.weather_schemas import Nwp
@@ -366,8 +367,10 @@ def test_the_guard_rejects_a_hyperparameter_this_code_no_longer_declares(tmp_pat
 
 def _nwp_frame(members: tuple[int, ...]) -> pt.LazyFrame[Nwp]:
     """A minimal NWP frame carrying only the column the probe reads."""
-    frame = pl.LazyFrame({"ensemble_member": list(members)}, schema={"ensemble_member": pl.Int8})
-    return cast("pt.LazyFrame[Nwp]", frame)
+    frame = pl.DataFrame({"ensemble_member": list(members)}).pipe(
+        cast_to_nwp_dtypes, "ensemble_member"
+    )
+    return cast("pt.LazyFrame[Nwp]", frame.lazy())
 
 
 @pytest.mark.parametrize(

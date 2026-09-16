@@ -924,7 +924,7 @@ def test_engineer_features_single_run_proxy_ceiling_is_the_selected_run_not_the_
             "init_time": [nwp_init_time, nwp_init_time, later_init_time],
             "temperature_2m": [8.0, 99.0, 999.0],
         }
-    )
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member")
     power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
     metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
 
@@ -970,7 +970,7 @@ def test_engineer_features_single_run_ceiling_uses_the_derived_run_when_none_is_
             ],
             "temperature_2m": [8.0, 99.0, 999.0],
         }
-    )
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member")
     power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
     metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
 
