@@ -146,7 +146,7 @@ it follows from Polars' own annotations, so no checker version changes it.
 
 Writing a dictionary-encoded (`Categorical`, `Enum`) column through `write_deltalake` without
 casting it first leaves the Delta log recording `Utf8` while the parquet file holds a
-dictionary-typed column — the write succeeds, but a later `pl.read_delta` raises `SchemaError:
+dictionary-typed column. The write succeeds, but a later `pl.read_delta` raises `SchemaError:
 data type mismatch`. `delta_store.forecast_metrics.write_forecast_metrics` casts its `Enum`
 columns to `String` before writing for exactly this reason. Two consequences:
 
