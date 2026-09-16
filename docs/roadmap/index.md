@@ -433,11 +433,11 @@ undone, and adds
 **Deferred until after v2 ships.** Every model promoted to production should get a model card
 recording detailed feature importance, calibration behaviour, and the population it was trained
 and validated against — the record an operator or an auditor needs to trust a specific promoted
-model. This is a heavier, promotion-time record, distinct from the lightweight per-training-run
-feature attributions every model gets (see [Log feature importances for every trained
-model](xgboost-improvements.md#log-feature-importances-for-every-trained-model)). Model cards are
-a stretch beyond what v2 needs in order to ship live, so this workstream starts once the v2
-service is running.
+model. A model card is a heavier, promotion-time record, distinct from the lightweight
+per-training-run feature attributions every model gets (see [Log feature importances for every
+trained model](xgboost-improvements.md#log-feature-importances-for-every-trained-model)). Model
+cards are a stretch beyond what v2 needs in order to ship live, so this workstream starts once the
+v2 service is running.
 
 ---
 

@@ -125,9 +125,10 @@ either a specific operator action or "escalate to OCF". An alert without a runbo
 operator contract.
 
 **Today, during the NIA project, who responds is informal rather than mapped.** A single small OCF
-team reads Sentry and responds next business day — the [declined availability service-level
-objective](../design-philosophy/design-principles.md#deliberately-absent) is what makes that
-acceptable — so there is no rota and no per-`fault_category` routing to a named role. Mapping
+team reads Sentry and responds next business day, because the [availability service-level
+objective we declined](../design-philosophy/design-principles.md#deliberately-absent) makes that
+acceptable. As a result, there is no rota and no per-`fault_category` routing to a named role.
+Mapping
 specific alerts to specific NGED roles is deferred to [workstream
 5](#5-confirm-ngeds-cloud-and-security-standards-early), once NGED's own team ownership is agreed;
 building that mapping before the ownership split exists would mean guessing at an organisation
@@ -225,10 +226,10 @@ simple enough to run that routine operation needs far less than a week.
 ### 7. Organisational prerequisites
 
 **Today, during the NIA project, OCF develops, operates, and maintains the whole pipeline
-single-handedly; NGED's role is to supply telemetry and other trial-area data and to receive and
-use the delivery tables.** The three prerequisites below cover what changes once operation moves to
-NGED. They are not engineering workstreams, but the handover depends on them, so they are recorded
-here alongside the technical work:
+single-handedly.** NGED's role is to supply telemetry and other trial-area data and to receive and
+use the delivery tables. The three prerequisites below — which cover what changes once operation
+moves to NGED — are not engineering workstreams, but the handover depends on them, so they are
+recorded here alongside the technical work:
 
 - A **named service owner at NGED** with allocated time to operate the service.
 - **Funding for running costs and support**: the AWS spend and whatever support the written

@@ -453,7 +453,7 @@ storage premium compounds into real money rather than staying a rounding error.
 
 No data-residency requirement has been raised for this data, by NGED or by regulation, so the
 region choice above is a settled operational decision rather than an open question — `eu-west-2`
-because that is where NGED's own bucket already sits, not because anything compels it.
+because that is where NGED's own bucket already sits.
 
 ## Strict data contracts (machine-verifiable)
 

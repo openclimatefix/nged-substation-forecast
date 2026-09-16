@@ -749,10 +749,10 @@ maintenance windows" offered nearby as an example cadence for OCF's scheduled wo
 [production-monitoring design](../roadmap/live-service.md#production-monitoring) — not yet
 built — would chart trailing-window performance over time once it lands, but nothing in that design
 acts on the chart. Standard MLOps practice ties retraining to a stated cadence, a
-performance-drift trigger, or both. We have neither yet, and adding a trigger meets the same open
+performance-drift trigger, or both. We have neither yet. Adding a trigger meets the same open
 question as [input drift detection](#input-drift-detection) above: a stated cadence is easy to
-add, but a trigger risks reacting to a legitimate distribution
-shift — a hot, dry summer, a wave of new solar connections — as if it were model decay.
+add, but a trigger risks reacting to a legitimate distribution shift — a hot, dry summer, a wave
+of new solar connections — as if it were model decay.
 
 ### Monitoring how NGED uses the delivered forecasts
 
@@ -762,8 +762,9 @@ NGED are "already finding uses for our 'firehose of data' that we had never cons
 of the five delivery tables, or which columns within them, NGED actually read. Standard practice
 for a delivered data product tracks read patterns — for example S3 server-access logs or
 CloudTrail data events on the delivery bucket — to learn which tables carry weight and which sit
-unread. We have not built this, and doing so raises its own question of how much read-pattern
-instrumentation is proportionate for a single-consumer delivery mechanism.
+unread. We have not built read-pattern tracking for the delivery tables, and building it would
+raise its own question of how much read-pattern instrumentation is proportionate for a
+single-consumer delivery mechanism.
 
 ## Where these principles come from
 
