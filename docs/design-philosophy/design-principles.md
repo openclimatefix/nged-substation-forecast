@@ -756,12 +756,12 @@ shift — a hot, dry summer, a wave of new solar connections — as if it were m
 
 NGED's use of the delivered forecasts is observed anecdotally rather than measured:
 [Evolving requirements](../architecture/forecast-delivery.md#evolving-requirements) records that
-NGED are "already finding uses we had never considered", not which of the five delivery tables, or
-which columns within them, NGED actually read. Standard practice for a delivered data product
-tracks read patterns — for example S3 server-access logs or CloudTrail data events on the delivery
-bucket — to learn which tables carry weight and which sit unread. We have not built this, and doing
-so raises its own question of how much read-pattern instrumentation is proportionate for a
-single-consumer delivery mechanism.
+NGED are "already finding uses for our 'firehose of data' that we had never considered", not which
+of the five delivery tables, or which columns within them, NGED actually read. Standard practice
+for a delivered data product tracks read patterns — for example S3 server-access logs or
+CloudTrail data events on the delivery bucket — to learn which tables carry weight and which sit
+unread. We have not built this, and doing so raises its own question of how much read-pattern
+instrumentation is proportionate for a single-consumer delivery mechanism.
 
 ## Where these principles come from
 
