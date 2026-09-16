@@ -1,7 +1,7 @@
 """Tests for `scripts/rewrite_nwp_row_groups.py`.
 
 The script is a one-shot migration that will be pointed at the whole ``nwp`` table with no
-rehearsal, so the part worth testing is the one that decides what *not* to touch. Two ways of
+rehearsal, so the part worth testing is the part that decides what *not* to touch. Two ways of
 getting that decision wrong are silent: reporting nothing leaves every partition unmigrated while
 exiting cleanly, and reporting an already-aligned partition rewrites the table on every pass
 without ever converging.

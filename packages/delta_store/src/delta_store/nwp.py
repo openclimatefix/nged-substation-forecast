@@ -59,12 +59,13 @@ field). And the row groups have to stay member-aligned, which is what
 NWP_TARGET_FILE_SIZE_BYTES: Final[int] = 2_000_000_000
 """Target size for each Parquet file delta-rs writes, sized to keep one partition in one file.
 
-A daily ECMWF ENS partition is ~145 MB, so this leaves more than a tenfold headroom.
+A daily ECMWF ENS partition is ~145 MB, so the target leaves more than a tenfold headroom.
 
-**This is an optimisation, not a correctness requirement.** A partition that outgrows this target
-still writes correctly and still prunes well, because the single Arrow chunk and the member-aligned
-row-group size below do the real work. Measured on a real partition, a single-member read touches
-1.96% of rows when the partition lands in one file and 3.92% when delta-rs splits it in two."""
+**The file-size target is an optimisation, not a correctness requirement.** A partition that
+outgrows the target still writes correctly and still prunes well, because the single Arrow chunk
+and the member-aligned row-group size below do the real work. Measured on a real partition, a
+single-member read touches 1.96% of rows when the partition lands in one file and 3.92% when
+delta-rs splits it in two."""
 
 NWP_ROW_GROUP_SIZE_LIMITS: Final[tuple[int, int]] = (1_024, 1_048_576)
 """Floor and ceiling clamped around the member-aligned row-group size.
@@ -181,7 +182,7 @@ def write_nwp(
 
     # One Arrow chunk, not 32. delta-rs consumes a multi-chunk table out of order when
     # partitioning the write, which scatters the member-sorted rows across row groups and widens
-    # every row group's ensemble_member min/max range — measured on a real partition, a
+    # every row group's ensemble_member min/max range. Measured on a real partition, a
     # single-member read went from 1.96% of rows to 33% purely from the chunking. Combining costs
     # one copy of the frame.
     prepared = rounded.to_arrow().combine_chunks()

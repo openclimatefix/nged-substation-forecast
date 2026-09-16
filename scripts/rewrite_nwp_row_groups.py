@@ -3,14 +3,17 @@
 `delta_store.nwp.write_nwp` lands one ensemble member per Parquet row group, which is what lets a
 single-member read skip the rest of a partition. Partitions written before that layout existed hold
 row groups spanning many members, and because an NWP partition is written once and never revisited,
-they stay that way until something rewrites them. This script is that something.
+they stay that way until a migration rewrites them. This script is that migration.
 
-**Run this against the local table.** The only single-member NWP read in the repo is the
-control-member read the cross-validation assets do at training time, and training runs locally. The
-live forecast on AWS reads the whole ensemble out of a single partition, so member-aligned row
-groups save it nothing and its S3 table is not worth rewriting. Run this against the S3 table if
-training ever moves to AWS: the script rewrites only the partitions it measures as unaligned, so
-running it later costs exactly what running it now would.
+**Run this against the local table.** What this layout speeds up is a single-member read that
+spans many stored runs, and the read spanning the most runs by far is the control-member read the
+cross-validation assets do at training time, against the local table. Nothing running on AWS reads
+the back catalogue: the live forecast pins ``init_time`` to the one freshest run, which every write
+from now on lays out correctly anyway. The ``view_forecasts`` dashboard does read about 17 stored
+runs from S3 with a single-member filter, but an ``h3_index`` filter already cuts that query to one
+H3 cell in 1,671 and it returns in about 0.2 s, so the S3 table is not worth rewriting for it. Run
+this against the S3 table if training ever moves to AWS: the script rewrites only the partitions it
+measures as unaligned, so running it later costs exactly what running it now would.
 
 Each partition is read back through the contract, re-validated, and written through ``write_nwp``,
 which replaces that ``(nwp_model_id, init_time)`` partition and nothing else. A partition whose row
@@ -58,14 +61,16 @@ def _unaligned_partitions(table_uri: str, storage_options: ObjectStoreOptions) -
     incomplete run is the case that prunes worst.
 
     A partition counts as aligned when it holds at least as many row groups as the ensemble
-    members its statistics span. **Demanding that every row group hold exactly one member would
-    not converge**: where the row count does not divide evenly by the member count, the aligned
-    layout still straddles one boundary by design, so such a partition would be rewritten on
-    every pass, each time writing another full copy of its data.
+    members its statistics span, counted across the whole partition rather than within one file:
+    a partition split across files has no member range of its own until every file's range is
+    folded together. **Demanding that every row group hold exactly one member would not
+    converge.** Where the row count does not divide evenly by the member count, the aligned layout
+    still straddles one boundary by design, so a ragged partition would be rewritten on every
+    pass, each time writing another full copy of its data.
 
     A file whose footer cannot be read is reported as unaligned, so the migration rewrites it
     rather than skipping it. Rewriting an already-aligned partition is wasted work; skipping an
-    unaligned one leaves the defect in place.
+    unaligned partition leaves the defect in place.
 
     Args:
         table_uri: Path or URI of the ``nwp`` Delta table.
@@ -79,7 +84,8 @@ def _unaligned_partitions(table_uri: str, storage_options: ObjectStoreOptions) -
     filesystem, root = pa_fs.FileSystem.from_uri(table_uri)
 
     row_groups: dict[datetime, int] = {}
-    member_range: dict[datetime, int] = {}
+    lowest_member: dict[datetime, int] = {}
+    highest_member: dict[datetime, int] = {}
     unreadable: set[datetime] = set()
     for row in actions.iter_rows(named=True):
         init_time = row["partition.init_time"]
@@ -104,12 +110,14 @@ def _unaligned_partitions(table_uri: str, storage_options: ObjectStoreOptions) -
         row_groups[init_time] = row_groups.get(init_time, 0) + len(statistics)
         lowest = min(statistic.min for statistic in statistics)
         highest = max(statistic.max for statistic in statistics)
-        member_range[init_time] = max(member_range.get(init_time, 0), highest - lowest + 1)
+        lowest_member[init_time] = min(lowest_member.get(init_time, lowest), lowest)
+        highest_member[init_time] = max(highest_member.get(init_time, highest), highest)
 
     unaligned = unreadable | {
         init_time
         for init_time, count in row_groups.items()
-        if count < member_range[init_time] and init_time not in unreadable
+        if count < highest_member[init_time] - lowest_member[init_time] + 1
+        and init_time not in unreadable
     }
     return sorted(unaligned)
 
