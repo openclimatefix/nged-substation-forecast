@@ -293,8 +293,9 @@ flag, event age, attributed magnitude) are themselves natural features for this 
   run per past target time with no publication-time constraint, and is leak-free today only as a
   side effect of daily run cadence. The residual pipeline must therefore add an explicit
   availability cut, guarded by a leakage test in the spirit of the `_nullify_leaky_lags` tests.
-  The natural home for that cut is beside the single-run ceiling the feature pipeline already
-  applies before reducing with `weather_utils.analysis_proxy.select_analysis_proxy`.
+  The natural home for that cut is where the feature pipeline already applies its single-run
+  ceiling: the filter on the NWP frame that runs before the reduction by
+  `weather_utils.analysis_proxy.select_analysis_proxy`.
 - **Cross-series features are new machinery.** Neighbour residuals need the trial-area adjacency
   list (a dependency in [Open items](#open-items-dependencies)) plus a cross-series join in feature engineering. The feature-schema
   question (each series has its own neighbour set, of varying size) is answered by the pooled
@@ -459,8 +460,8 @@ residual lags already need.
 **The same no-lookahead discipline.** The draft at the target time must be hindcast on NWP *as
 available at that lead time*, not on fresh analysis-like data, or stage 2 calibrates its corrections
 against a draft that is systematically better than the live draft — the same availability cut the
-residual-lag hindcasts and the freshest-run join require. The feature pipeline applies that cut as
-a ceiling on the selected NWP run. The lead-time feature belongs in stage
+residual-lag hindcasts and the freshest-run join require. The feature pipeline applies that cut in single-run mode, as a
+ceiling at the selected NWP run. The lead-time feature belongs in stage
 1 so the draft's own attenuation with horizon is honest.
 
 **The prize — a plausible route to a global corrector.** The correction target `(actual − draft)`

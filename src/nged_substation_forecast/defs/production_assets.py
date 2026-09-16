@@ -38,9 +38,10 @@ from ml_core.production_helpers import (
     fetch_model_artifacts,
     load_forecaster_from_dir,
     select_nwp_init_time,
+    weather_lags_lack_their_control_member,
 )
 
-from nged_substation_forecast._sentry import send_forecast_checkin
+from nged_substation_forecast._sentry import report_asset_degradation, send_forecast_checkin
 from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
 from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS, RESEARCH_LAYER_TAGS
 
@@ -281,15 +282,19 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     ``write_power_forecasts``'s ``replace_predicate_extra``, so re-running a 6-hourly slot (or
     replaying one) never duplicates rows or wipes the rest of the ``"live"`` fold.
 
-    Note: only one NWP run is loaded here, and weather-lag features are built from that run
-    however fresh the run is — feature engineering caps its freshest-run join at the run selected
-    above rather than at a modelled publication delay. A run whose control member
+    Note: only one NWP run is loaded here. Weather-lag features are built from that run however
+    fresh the run is, because feature engineering caps the freshest-run join it uses for weather
+    lags at the run selected above rather than at a modelled publication delay. When a run's
+    control member
     (``ensemble_member == 0``) is wholly absent — a partial or malformed ECMWF ENS download —
-    still nulls every weather lag for the slot. ``_engineer_features`` logs a warning naming the
-    run rather than failing the slot.
-    See ``test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay``. None of the
-    current champion config's features are weather lags, so that path does not fire today, but a
-    future feature change touching weather lags should trip over this consciously.
+    every weather lag for the slot still comes back null. That slot degrades rather than failing:
+    ``_engineer_features`` logs a warning naming the run, and this asset reports the same
+    degradation to Sentry tagged ``degraded_asset=live_forecasts``, so an operator is alerted
+    without having to read the logs. See
+    ``test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay``. None of the
+    current champion config's features are weather lags, so the missing-control-member path does
+    not fire today, but a future feature change touching weather lags should trip over this
+    consciously.
     """
     settings = Settings()
     power_fcst_init_time = context.partition_time_window.end
@@ -319,6 +324,22 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         init_time_start=nwp_init,
         init_time_end=nwp_init,
     )
+    # The Sentry channel for the one degradation that still nulls a whole slot's weather lags.
+    # `_engineer_features` logs a warning for the same condition; rule 4 of inherent-stability
+    # requires both, because an operator reads the alert rather than the logs:
+    # <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>
+    if weather_lags_lack_their_control_member(
+        nwp_lf, selected_features=forecaster.model_params.selected_features
+    ):
+        report_asset_degradation(
+            asset_name="live_forecasts",
+            exc=ValueError(
+                f"NWP run {nwp_init.isoformat()} has no control member (ensemble_member == 0), "
+                f"so every weather lag in the {power_fcst_init_time.isoformat()} slot is null. "
+                "The forecast was still produced, on the remaining features."
+            ),
+        )
+
     power_full = build_live_power_frame(
         power_ts,
         trained_ids,

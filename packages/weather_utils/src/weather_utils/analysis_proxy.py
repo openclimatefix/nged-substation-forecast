@@ -12,31 +12,6 @@ from typing import Final
 
 import polars as pl
 
-NWP_PUBLICATION_DELAY_HOURS: Final[int] = 9
-"""Hours after an NWP run's ``init_time`` before we treat that run as usable.
-
-This models when a run reaches *our* disk, not when Dynamical publish it. Dynamical publish each
-00Z run between 08:05 and 08:20 UTC, and ``ecmwf_ens_schedule`` downloads it at 08:30 UTC, so a 00Z
-run is ours from roughly 08:30 — 8.5 hours. Nine is the nearest whole hour at or after that.
-
-The feature pipeline uses the delay to derive ``power_fcst_init_time`` from ``nwp_init_time`` in
-bulk mode, and to derive ``nwp_init_time`` when a single-run caller omits it.
-``select_nwp_init_time`` uses the delay to reconstruct availability for ``"replay"`` backfills.
-``select_analysis_proxy`` needs no delay: a single-run caller caps the proxy at the NWP run that
-caller already selected.
-
-Of ``select_nwp_init_time``'s two modes, only ``"replay"`` needs the delay. A live run joins
-whatever is genuinely on disk, so reality already constrains the NWP table to runs that were
-genuinely published. A replay of a past init time would otherwise join runs that only landed
-afterwards — lookahead bias rather than mere inaccuracy. The asymmetry in full:
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#resolve-nwp-availability-asymmetrically-live-vs-replay>
-
-Two bounds constrain the value, given one 00Z run a day and forecast slots at 00/06/12/18 UTC. The
-06:00 slot must *not* see that morning's run, which has not landed yet, so the value must exceed 6.
-The 12:00 slot *must* see it, so the value must not exceed 12. Both bounds move if
-``ecmwf_ens_schedule``'s start time changes.
-"""
-
 NWP_ANALYSIS_MEMBER: Final[int] = 0
 """The ensemble member the analysis proxy uses.
 

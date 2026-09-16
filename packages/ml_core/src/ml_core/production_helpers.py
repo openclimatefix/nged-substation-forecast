@@ -23,7 +23,9 @@ import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.config_schemas import import_class
 from contracts.power_schemas import PowerTimeSeries
+from contracts.weather_schemas import Nwp
 from pydantic import ValidationError
+from weather_utils import NWP_ANALYSIS_MEMBER
 
 from ml_core.base_forecaster import (
     TRAINED_METADATA_FILENAME,
@@ -86,6 +88,44 @@ def select_nwp_init_time(
             f"{sorted(available_init_times)}"
         )
     return max(qualifying)
+
+
+def weather_lags_lack_their_control_member(
+    nwp: pt.LazyFrame[Nwp], *, selected_features: set[str]
+) -> bool:
+    """Whether this slot asks for weather lags that its NWP run cannot supply.
+
+    Weather lags are built from the analysis proxy, which reads the control member
+    (``ensemble_member == 0``) alone, so a run that carries no control member — a partial or
+    malformed ECMWF ENS download — nulls every weather lag for the slot. ``_engineer_features``
+    already degrades rather than failing there and logs a warning naming the run. This function
+    exists so ``live_forecasts`` can *also* raise the degradation on the Sentry channel, which
+    [rule 4](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
+    requires alongside the log rather than as a substitute for it. Reading the logs is not a
+    monitoring strategy: the operator reads the alert.
+
+    Returns ``False`` when the model selects no weather lag, because a missing control member
+    costs such a model nothing — the same-run weather join reads whichever members are present.
+
+    The probe is bounded to at most one row, so it costs a row-group read rather than a scan of
+    the run.
+
+    Args:
+        nwp: The slot's NWP rows, already narrowed to the selected run.
+        selected_features: The promoted model's feature names.
+
+    Returns:
+        ``True`` when a weather lag is selected and the run has no control member.
+    """
+    weather_lags = [
+        lag
+        for lag in ParsedFeatures.from_strings(selected_features).lags
+        if lag.base_col != "power"
+    ]
+    if not weather_lags:
+        return False
+    control_member = nwp.filter(pl.col("ensemble_member") == NWP_ANALYSIS_MEMBER)
+    return control_member.limit(1).collect().is_empty()
 
 
 def build_live_power_frame(

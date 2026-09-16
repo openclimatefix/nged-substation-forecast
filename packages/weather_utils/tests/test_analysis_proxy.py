@@ -32,7 +32,8 @@ def test_freshest_run_wins_per_group_and_valid_time() -> None:
     valid = BASE + timedelta(hours=30)
     # The freshest run is listed *first*, so input order and init_time order disagree: the
     # reduction has to sort rather than take the last row it happens to see. `pl.scan_delta`
-    # guarantees no row order, and the dashboard passes one straight into this function.
+    # guarantees no row order, and the dashboard passes a `pl.scan_delta` frame straight into
+    # this function.
     lf = _nwp(
         [
             _row(1, BASE + timedelta(hours=24), valid, 0, 11.0),  # 6 h lead — freshest, wins

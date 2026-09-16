@@ -515,10 +515,10 @@ def _save_model_trained_on_weather_lag(path: Path, lag_hours: int) -> None:
 
 
 @pytest.mark.parametrize(
-    ("gap_hours", "members", "expect_null"),
+    ("gap_hours", "members", "expect_null", "expect_degradation_reported"),
     [
-        pytest.param(6, (0,), False, id="6h_gap_below_the_publication_delay"),
-        pytest.param(9, (1,), True, id="9h_gap_no_control_member"),
+        pytest.param(6, (0,), False, False, id="6h_gap_below_the_publication_delay"),
+        pytest.param(9, (1,), True, True, id="9h_gap_no_control_member"),
     ],
 )
 def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
@@ -528,20 +528,22 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     gap_hours: int,
     members: tuple[int, ...],
     expect_null: bool,
+    expect_degradation_reported: bool,
 ) -> None:
     """A weather lag survives a run fresher than ``NWP_PUBLICATION_DELAY_HOURS``.
 
     ``live_forecasts`` selects its one NWP run in ``"live"`` availability mode, which applies no
     modelled delay — any run genuinely present in the Delta table qualifies. The single-run
-    analysis-proxy inside ``_engineer_features`` ceilings its freshest-run join at that same
-    selected run, so the two agree and the gap between the run and ``power_fcst_init_time`` does
-    not matter. The first case puts the run 6 hours back, well inside the 9-hour publication delay
-    — the 06:00 slot's shape, when only that morning's run has landed — and the lag is populated.
+    analysis proxy inside ``_engineer_features`` caps its freshest-run join at that same selected
+    run. Run selection and the analysis proxy therefore agree, and the gap between the selected run
+    and ``power_fcst_init_time`` does not matter. The first case puts the run 6 hours back, well
+    inside the 9-hour publication delay: the shape of the 06:00 slot, when only that morning's run
+    has landed. The lag is populated.
 
-    The second case (``members=(1,)``) pins the one cause of an all-null weather lag that remains:
-    a run with no control member at all, which is a partial or malformed ECMWF ENS download. It
-    degrades rather than failing the slot, so ``materialize`` succeeding at all is itself part of
-    what that case checks.
+    The second case (``members=(1,)``) pins the cause of an all-null weather lag this change leaves
+    standing: a run with no control member at all, which is a partial or malformed ECMWF ENS
+    download. A run with no control member degrades the forecast rather than failing the slot, so
+    ``materialize`` succeeding at all is itself part of what that case checks.
     """
     gap = timedelta(hours=gap_hours)
     power_fcst_init_time = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
@@ -581,6 +583,13 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
 
     monkeypatch.setattr(XGBoostForecaster, "predict", _spy_predict)
 
+    reported: list[tuple[str, BaseException]] = []
+    monkeypatch.setattr(
+        target=production_assets,
+        name="report_asset_degradation",
+        value=lambda asset_name, exc: reported.append((asset_name, exc)),
+    )
+
     result = materialize(
         [live_forecasts],
         partition_key=partition_key,
@@ -595,3 +604,11 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     lag_col = f"temperature_2m_lag_{gap_hours}h"
     lag_is_entirely_null = genuine[lag_col].null_count() == genuine.height
     assert lag_is_entirely_null == expect_null
+
+    # Rule 4 of inherent-stability requires the degradation to reach Sentry, not only the logs.
+    assert bool(reported) == expect_degradation_reported
+    if reported:
+        (asset_name, exc) = reported[0]
+        assert asset_name == "live_forecasts"
+        # The alert has to name the run at fault, not merely the kind of error.
+        assert nwp_init.isoformat() in str(exc)

@@ -10,7 +10,7 @@ from contracts.power_schemas import (
     TimeSeriesMetadata,
 )
 from ml_core.features._lags import _apply_power_lag, _apply_weather_lag, _nullify_leaky_lags
-from ml_core.features._nwp import _upsample_nwp_to_half_hourly
+from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS, _upsample_nwp_to_half_hourly
 from ml_core.features._parsed_features import (
     STATIC_FEATURE_REGISTRY,
     LagFeature,
@@ -23,7 +23,6 @@ from ml_core.features.tabular_feature_engineer import (
     _local_utc_offset_minutes,
 )
 from pydantic import ValidationError
-from weather_utils import NWP_PUBLICATION_DELAY_HOURS
 
 
 def test_apply_power_lag_with_source():
@@ -901,7 +900,7 @@ def test_engineer_features_single_run_proxy_ceiling_is_the_selected_run_not_the_
 
     ``live_forecasts`` selects its NWP run in ``"live"`` availability mode, which accepts any run
     genuinely present in the Delta table however fresh. The freshest-run join must accept that same
-    run, so the ceiling is the selected run rather than a modelled publication delay. Here
+    run. The ceiling is therefore the selected run rather than a modelled publication delay. Here
     power_fcst_init_time is only 1 hour after the selected run while nwp_publication_delay_hours is
     9, so a delay-based cut would exclude the selected run and null the lag.
 
@@ -945,16 +944,16 @@ def test_engineer_features_single_run_ceiling_uses_the_derived_run_when_none_is_
 
     Single-run mode lets a backfill caller omit nwp_init_time, in which case the run is derived as
     power_fcst_init_time - nwp_publication_delay_hours. The analysis-proxy ceiling routes through
-    that same derivation, so a run initialised after the derived one must still be excluded even
-    though it landed before power_fcst_init_time.
+    that same derivation, so a run initialised after the derived run must still be excluded, even
+    though that later run landed before power_fcst_init_time.
     """
     power_fcst_init_time = datetime(2026, 6, 11, 9, 0)
     # Derived run: power_fcst_init_time - 9h. Not passed to _engineer_features.
     valid_time = datetime(2026, 6, 11, 10, 0)
     # lag=8h -> target_time = 02:00, before power_fcst_init_time, so the freshest-run branch
     # answers it. The decoy run sits between the derived run and power_fcst_init_time, so a
-    # ceiling of power_fcst_init_time — or one derived by adding the delay rather than
-    # subtracting it — would wrongly admit the decoy.
+    # ceiling of power_fcst_init_time — or a ceiling derived by adding the delay rather than
+    # subtracting the delay — would wrongly admit the decoy.
     target_time = valid_time - timedelta(hours=8)
     decoy_init_time = datetime(2026, 6, 11, 1, 0)
 
