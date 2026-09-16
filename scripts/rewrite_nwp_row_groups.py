@@ -3,8 +3,14 @@
 `delta_store.nwp.write_nwp` lands one ensemble member per Parquet row group, which is what lets a
 single-member read skip the rest of a partition. Partitions written before that layout existed hold
 row groups spanning many members, and because an NWP partition is written once and never revisited,
-they stay that way until something rewrites them. This script is that something: run it once per
-table, then delete it.
+they stay that way until something rewrites them. This script is that something.
+
+**Run this against the local table.** The only single-member NWP read in the repo is the
+control-member read the cross-validation assets do at training time, and training runs locally. The
+live forecast on AWS reads the whole ensemble out of a single partition, so member-aligned row
+groups save it nothing and its S3 table is not worth rewriting. Run this against the S3 table if
+training ever moves to AWS: the script rewrites only the partitions it measures as unaligned, so
+running it later costs exactly what running it now would.
 
 Each partition is read back through the contract, re-validated, and written through ``write_nwp``,
 which replaces that ``(nwp_model_id, init_time)`` partition and nothing else. A partition whose row
