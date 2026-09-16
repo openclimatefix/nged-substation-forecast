@@ -22,14 +22,19 @@ A double-underscore reduces collision risk with experiment names that contain si
 def date_to_utc_datetime(d: date, *, end_of_day: bool = False) -> datetime:
     """Return a tz-aware UTC datetime at the start (or inclusive end) of the given date.
 
-    Used to turn a fold's ``[start, end]`` calendar dates into the half-open-free, inclusive
-    ``[start 00:00:00, end 23:59:59]`` UTC window that the training and validation data loads filter
-    on (and that eligibility uses for ``val_end``).
+    Used to turn a fold's ``[start, end]`` calendar dates into the ``[start 00:00:00, end
+    23:59:59]`` UTC window that the training and validation data loads filter on (and that
+    eligibility uses for ``val_end``). That window is closed rather than half-open: both ends are
+    inclusive, so a filter written against it needs no ``<`` where the caller meant ``<=``.
 
     Args:
         d: The calendar date.
         end_of_day: If True, return ``d`` at ``23:59:59`` (the inclusive end-of-day used by both
             the training/validation windows and ``val_end``); otherwise ``00:00:00``.
+
+    Returns:
+        ``d`` at ``00:00:00`` UTC when ``end_of_day`` is False, or at ``23:59:59`` UTC when True.
+        Always the same calendar date as ``d``, with ``tzinfo`` set to ``UTC``.
     """
     clock = time(23, 59, 59) if end_of_day else time(0, 0, 0)
     return datetime.combine(d, clock, tzinfo=UTC)

@@ -1,17 +1,20 @@
 # Performance and Scale
 
-This page holds the measured performance engineering behind three of the
+**The full pipeline — training and a complete 51-member backtest — runs on an ordinary laptop.**
+Everything on this page exists to keep that true, because it is what keeps experimentation fast
+([H2, a hundred experiments per person in a peak
+month](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month))
+and the running service cheap
+([H4, it runs for pocket money](../design-philosophy/engineering-hypotheses.md#h4-it-runs-for-pocket-money)).
+
+The page holds the measured performance engineering behind three of the
 [design principles](../design-philosophy/design-principles.md) — [*the whole system must be
 exercisable on one
 laptop*](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop),
-[*push the work down to the engine; materialise once, as late as
-possible*](../design-philosophy/design-principles.md#11-push-the-work-down-to-the-engine-materialise-once-as-late-as-possible),
+[*push the work down to the query engine; materialise once, as late as
+possible*](../design-philosophy/design-principles.md#11-push-the-work-down-to-the-query-engine-materialise-once-as-late-as-possible),
 and [*measure; do not
-assume*](../design-philosophy/design-principles.md#12-measure-do-not-assume). Everything here exists so that the full
-pipeline — training and a complete 51-member backtest — runs on an ordinary laptop, which is what
-keeps experimentation fast
-([H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)) and the
-running service cheap ([H4](../design-philosophy/engineering-hypotheses.md#h4-it-runs-for-pocket-money)).
+assume*](../design-philosophy/design-principles.md#12-measure-do-not-assume).
 
 ## Storage formats: measured, not assumed
 
@@ -26,9 +29,9 @@ assumed:
   default dictionary+RLE encodings — `BYTE_STREAM_SPLIT` measures *worse* here, because the
   significand rounding collapses many cells/members onto repeated values that a dictionary exploits
   better. Rows are sorted member-early so single-member reads can skip row groups. The result is
-  ~40–41 GB per year for the full ECMWF ENS dataset for Great Britain, and a single day's NWP data
-  takes about one minute to download and convert. The measured numbers are in
-  [PR #271](https://github.com/openclimatefix/nged-substation-forecast/pull/271).
+  ~40–41 GB per year for the full ECMWF ENS dataset for Great Britain, and a single day's NWP
+  data takes about 1 minute to download and convert. The measured numbers are in [PR
+  #271](https://github.com/openclimatefix/nged-substation-forecast/pull/271).
 
 * **`power_forecasts`** (`delta_store.power_forecasts`) sorts ensemble members of the same target
   adjacent, uses `DELTA_BINARY_PACKED` timestamps and `BYTE_STREAM_SPLIT` for `power_fcst`
@@ -69,7 +72,7 @@ What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 
 | Predicate on the **raw NWP scan** | Effect |
 |---|---|
-| `init_time ∈ [start − 16d, end]` | **Partition prune** — NWP is partitioned by `init_time`, so only those partition directories are opened. A `valid_time` filter *alone* does **not** prune partitions (it scanned ~887 files). |
+| `init_time ∈ [start − 16d, end]` | **Partition prune** — NWP is partitioned by `(nwp_model_id, init_time)`, so only those partition directories are opened. A `valid_time` filter *alone* does **not** prune partitions (it scanned ~887 files). |
 | `ensemble_member ∈ {…}` on the raw scan | Only the requested members are decoded — this requires the predicate to reach the Parquet scan unchanged, which in turn requires `Nwp`'s declared `ensemble_member` dtype to match what delta-rs actually stores (see `Nwp.ensemble_member`). Once it does, rows sorted member-early (`delta_store.nwp.NWP_SORT_COLS`) let row-group min/max stats skip most of each partition outright for a single-member predicate. The exact speed-up needs re-measuring against real data. |
 | `h3_index ∈ {cells}` | Restricts to the cells the requested series sit in, on the same condition as `ensemble_member` above (the declared dtype must match what's on disk). `h3_index` is not a sort-early column (see below), so this is row-level filtering during decode rather than row-group skipping. |
 | `time_series_id == x` on the **output** | Prunes the power scan + metadata join, but **not** the NWP scan (no `time_series_id` there), and only after the upsample. Doesn't help. |
@@ -86,7 +89,31 @@ What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 | All eligible series at once | ~5 GB → `train` collects once, groups in memory | ~25 GB ✘ (OOMs) |
 | One `init_time` chunk at a time | — | ~9 GB → `cv_power_forecasts` chunks by `init_time`, appends to Delta |
 
-Prediction is bounded by chunking on **`init_time`** (`_PREDICT_INIT_CHUNK`, 14 days), *not* by cell. `init_time` is both the partition key and the axis that fans the output out across runs, so a chunk's forecast frame stays small while each partition is read exactly once and all series/cells/members are processed together (a per-*cell* loop instead OOMs on the busiest cell — 10 series × 51 members × the 10-month window ≈ 116M rows ≈ 25 GB). Measured end-to-end on the `mid_2025_to_mid_2026` fold: training peaks ~5 GB and the full 51-member validation prediction (~321M forecast rows) peaks ~9 GB — both well under a 24 GB laptop.
+Prediction is bounded by chunking on **`init_time`** (`_PREDICT_INIT_CHUNK`, 14 days), *not* by cell. `init_time` is one of the table's two partition columns and the axis that fans the output out across runs, so a chunk's forecast frame stays small while each partition is read exactly once and all series/cells/members are processed together (a per-*cell* loop instead OOMs on the busiest cell — 10 series × 51 members × the 10-month window ≈ 116M rows ≈ 25 GB). Measured end-to-end on the `mid_2025_to_mid_2026` fold: training peaks ~5 GB and the full 51-member validation prediction (~321M forecast rows) peaks ~9 GB — both well under a 24 GB laptop.
+
+### Scoring the metrics: batch the series, and stream every scan
+
+**Scoring a whole fold at once OOM-kills a 29 GB machine, so `_score_forecast_group` scores a batch
+of time series at a time.** `compute_metrics` is independent per series, which is what makes the
+batching sound. Measured on the `mid_2025_to_mid_2026` fold when it held 28 series of about 13M
+forecast rows each, a batch of 4 series completes in roughly 50 seconds at about 18 GB peak process
+resident set size. That fold has gained series since, so the figures below understate today's fold
+and the case for batching is only stronger. That peak is dominated by the streaming Delta scan
+rather than by the data: each batch re-scans the partition, while the materialised batch frame
+itself is a few GB. A batch of 2 measured only about 2 GB lower, so a smaller batch saves little
+memory — the scan overhead is roughly constant in the *fold* size, which is what keeps the approach
+workable as folds grow to V2 scale.
+
+**Every scan in the scoring path streams, because the eager equivalent materialises full-length rows
+before it reduces them.** Discovering which groups a fold holds projects just the two partition
+columns, `experiment_name` and `fold_id`, and takes their distinct values. Collected eagerly, those
+two columns are still materialised at full row length before the unique, which OOM-killed that fold
+at its then-size of 364M rows; the streaming collect peaks at 0.3 GB. The same rule applies to the
+`time_series_id` and `ensemble_member` values `cv_power_forecasts` accumulates from each chunk:
+taking the unique values gives a roughly 30-element Python list per chunk instead of a roughly
+14M-element one. Measured on a 14M-row `Int32` column, the full-length list cost 2.78 seconds and
+560 MB peak against 0.05 seconds and no measurable allocation — and that 560 MB landed inside the
+loop whose whole job is holding the frame at 2 to 3 GB.
 
 ## The other hard ceiling: Polars' 32-bit row index
 

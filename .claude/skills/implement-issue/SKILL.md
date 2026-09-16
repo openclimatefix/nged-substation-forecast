@@ -133,6 +133,13 @@ front — a report back after step 1 is not finished work.
 9. **Stop for human review. Never merge.** Report the size the issue was given, which reviews ran,
    what each of them changed, and what each found that you rejected.
 
+**Run a prose-review pass whenever the diff carries more than a few lines of new prose** — a
+docstring, a README section, a skill update, a PR body, in a Python file or a markdown file. Steps
+5 and 7 only ask for *concision*; they don't run the sentence-level rule sweep the `prose-review`
+skill does, so a diff heavy in new prose can pass both adversarial reviews with pronoun,
+superlative, and umbrella-noun violations still in it. Size the pass to the text using
+`prose-review`'s own table, fix what it finds, and push again before stopping for human review.
+
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
 **Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an

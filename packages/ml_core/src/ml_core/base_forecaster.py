@@ -425,4 +425,12 @@ class BaseForecaster(ABC):
                 inherent notion of which CV fold it is serving (``fold_id`` is orchestration
                 context), so the caller supplies it: ``cv_power_forecasts`` passes the fold's
                 label, while production inference keeps the ``"live"`` default.
+
+        Returns:
+            One row per ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)``
+            present in ``data``, holding the predicted ``power_fcst`` (MW or MVA, per the series'
+            unit in ``TimeSeriesMetadata``), the model identity (``power_fcst_model_name``,
+            ``power_fcst_model_version``), and ``fold_id`` set to the given ``fold_id``. Eager, not
+            lazy: this is the model boundary where the caller's ``pt.LazyFrame[AllFeatures]`` is
+            finally materialised.
         """

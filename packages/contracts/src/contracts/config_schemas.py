@@ -143,6 +143,11 @@ class CvConfig(BaseModel):
         Args:
             fold_id: The fold identifier to look up (e.g. ``"2022"``).
 
+        Returns:
+            The ``CvFoldConfig`` whose ``fold_id`` matches, carrying that fold's train and
+            validation date ranges, its ``leaderboard`` flag, and its
+            ``min_training_months`` override.
+
         Raises:
             KeyError: If no fold with that id exists in the config.
         """

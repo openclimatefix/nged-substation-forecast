@@ -2,7 +2,7 @@
 
 Splitting the asset graph this way lets whoever operates the live service filter the experiment
 assets out of the Dagster UI — see
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/#core-components>.
 """
 
 from typing import Final

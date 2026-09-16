@@ -8,7 +8,7 @@ and written idempotently so a re-materialisation does not duplicate rows.
 """
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import mlflow
@@ -30,6 +30,10 @@ pytestmark = pytest.mark.integration
 
 RegisterExperiment = Callable[[DagsterInstance, str], None]
 """Type of the ``register_experiment`` fixture (``tests/conftest.py``)."""
+
+RegisterExperimentWithFeatures = Callable[[DagsterInstance, str, list[str]], None]
+"""Type of the ``register_experiment`` fixture when called with its optional ``selected_features``
+argument."""
 
 FOLD_ID = "mid_2025_to_mid_2026"
 EXPERIMENT_NAME = "exp_predict_smoke"
@@ -146,6 +150,38 @@ def test_cv_power_forecasts_predicts_validation_fold(
     # A tag, not a metric: the count shrinks when the trained population or the validation window
     # does, and MLflow reports a metric's latest value as the max over all writes.
     assert fold_runs[0].data.tags["n_forecast_rows"] == str(forecasts.height)
+
+
+def test_cv_power_forecasts_derives_power_lookback_from_selected_features(
+    env: dict[str, str],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperimentWithFeatures,
+    spy_power_lookback: Callable[[], list[timedelta]],
+) -> None:
+    """``cv_power_forecasts`` derives ``power_lookback`` from the experiment's own
+    ``selected_features`` and passes it through to ``load_engineering_inputs`` on every
+    ``init_time`` chunk.
+
+    Mirrors ``test_trained_cv_model_derives_power_lookback_from_selected_features`` in
+    ``tests/test_trained_cv_model.py``, for this asset's own call site. The shared
+    ``register_experiment`` fixture defaults to a ``selected_features`` set with no power lag, so
+    passing ``power_lag_24h`` explicitly here is what exercises this call site's own derivation.
+    """
+    register_experiment(dagster_instance, EXPERIMENT_NAME, ["temperature_2m", "power_lag_24h"])
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+
+    # Install the spy only after training, so its calls list holds only cv_power_forecasts' own
+    # load_engineering_inputs calls, not trained_cv_model's.
+    calls = spy_power_lookback()
+
+    assert materialize(
+        [cv_power_forecasts], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+
+    assert calls
+    assert all(call == timedelta(hours=24) for call in calls)
 
 
 def test_cv_power_forecasts_storage_format(

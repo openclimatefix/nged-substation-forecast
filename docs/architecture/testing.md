@@ -153,9 +153,9 @@ not treated as a target and still runs in parallel, since a filtered run can sti
 worker's captured-off stdout never reaches the controller, so parallelising a `-s` run would
 silently drop the output `-s` exists to show — exactly the debug-print step of the "single test"
 loop this plugin otherwise protects. The plugin reads pytest's own parsed `known_args_namespace`
-rather than hand-scanning the raw argument list, so every pytest flag that takes a value (`-W`,
-`-o`, `--deselect`, …) is handled correctly, not just the ones the plugin happens to name (see the
-plugin's own docstring for the one narrow exception).
+rather than hand-scanning the raw argument list. Every pytest flag that takes a value (`-W`,
+`-o`, `--deselect`, …) is therefore handled correctly, not just the ones the plugin happens to
+name (see the plugin's own docstring for the one narrow exception).
 
 The auto-injection can't be a `pytest_load_initial_conftests` hook in the root `conftest.py`
 itself — that hook fires as part of loading the root `conftest.py`, so a hookimpl defined inside it
@@ -193,6 +193,18 @@ code — and carries a comment naming the package, the version, and the conditio
 When a dependency upgrade introduces a new upstream warning, the suite fails loudly. Add a new
 entry in that same form rather than widening an existing one; if the warning comes from our code,
 fix the code. Later entries take precedence, so `error` stays first.
+
+## A production `except BaseException` swallows pytest's `fail` and `skip` too
+
+**`pytest.fail()` and `pytest.skip()` raise from `BaseException`, so a broad `except BaseException`
+in the code under test swallows them along with every real error.** `defs/checks.py` and
+`defs/assets.py` each guard an asset check's body with `except BaseException`, because a Rust panic
+from a compiled dependency does not derive from `Exception` — see [Warn on stale power data with a
+Dagster asset
+check](production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check) for the full
+reasoning. Calling `pytest.fail()` or `pytest.skip()` *inside* such a guarded body, as a "this
+branch must not run" sentinel, is caught by the same guard instead of failing the test. Assert
+after the call returns instead of relying on either one inside it.
 
 ## Network-gated tests
 
@@ -232,16 +244,17 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
 
 - **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`:
   `ruff check`, `ruff format --check`, `ty check`, the `pymarkdown scan` command from CLAUDE.md,
-  and the offline test suite (plain `uv run pytest` — the network gate above keeps CI off the
-  network). The job installs with `uv sync --locked --all-packages`: `--all-packages` because
+  `mkdocs build --strict`, `check_docs_links.py` (see below), and the offline test suite (plain `uv run pytest` — the
+  network gate above keeps CI off the network). The job installs with `uv sync --locked
+  --all-packages`: `--all-packages` because
   `ty` type-checks the source of every workspace member, including leaf packages that a plain
   sync would omit, and `--locked` so the build fails loudly when `uv.lock` is stale. Every
   subsequent step passes `uv run --no-sync`, because a bare `uv run` re-syncs to the root
   environment and would silently uninstall those extra workspace members. The job also sets
   dummy values for the three required `NGED_S3_*` `Settings` fields: most tests monkeypatch
   them, but a few construct `Settings()` directly and locally rely on the developer's `.env`,
-  which CI doesn't have. The `ci` job is a required status check on `main` (configured in the
-  GitHub branch-protection settings, not in the workflow file).
+  which CI doesn't have. The `ci` job is a required status check on `main` (configured in a
+  GitHub repository ruleset, not in the workflow file).
 - **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated
   tests (`uv run pytest --run-network -m network`) on a daily schedule, plus
   `workflow_dispatch` for on-demand runs. This is the only CI that touches the real
@@ -249,6 +262,22 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
   (GitHub emails the workflow author when a scheduled run fails) but deliberately does not
   block PRs: a red nightly run signals drift in the upstream catalog's conventions, not a
   defect in whatever PR happens to be open.
+
+**Two steps validate links, because neither sees what the other does.** `mkdocs build --strict`
+fails on a broken link *within* `docs/`. `scripts/check_docs_links.py` fails on a link *into* the
+published site — the form CLAUDE.md requires from a docstring, a comment or a GitHub issue body —
+whose page a rename moved or whose anchor a heading rewrite killed.
+
+`check_docs_links.py` resolves each anchor by running the real `markdown.Markdown()` converter over
+the target page rather than guessing a slug, because Python-Markdown's `toc` extension preserves
+underscores. An extension the script cannot load fails the run rather than being skipped: dropping
+`pymdownx.superfences` makes a `#` comment inside an indented fenced code block parse as a heading,
+which would invent anchors the real site does not have and pass links that are broken. The script
+also reports a URL that has been reflowed across two lines, because the anchor left stranded on the
+second line is no longer part of the link for the reader either. The one gap is a `docs/api/` page,
+whose anchors mkdocstrings generates at build time, so only the page's existence is checked there.
+The check runs in `ci.yml` and as a pre-commit hook, scanning the whole repo each time because a
+link can sit in any text file.
 
 ### Why a bespoke workflow rather than OCF's template
 
@@ -282,6 +311,22 @@ cached `astral-sh/setup-uv`, and locked installs (`UV_LOCKED=1` there, `uv sync 
 here). If OCF's reusable workflow ever grows first-class uv-workspace support, revisiting it
 would shrink `ci.yml` to a few lines — but until then the bespoke workflow is smaller than the
 configuration the template would need.
+
+## Keeping the interpreter and dependencies current
+
+**`.python-version` pins the exact interpreter patch `uv` resolves, so `uv sync` gives the same
+Python everywhere — local development, CI, and pre-commit — rather than whatever patch happens to
+already be installed or however `uv`'s own downloader resolves on the day a job runs.** Without a
+pin, CI's `astral-sh/setup-uv` step (see above) can pick up a newer patch on a later run with no
+diff in this repo, so a bug that depends on the interpreter's exact patch version can stop
+reproducing between two runs of the same commit.
+
+**Bump `.python-version` in the same pull request that runs `uv lock --upgrade`, not on its own
+schedule.** Run `uv python install <version>` then `uv python pin <version>` for the newest
+released patch of the pinned major version (check with `uv python list`), so the interpreter and
+the locked dependencies age together and both get retested at once. A release candidate for the
+next major version is not a candidate for the pin: wait until it ships as final and the compiled
+dependencies this repo relies on — pyarrow, polars, deltalake — publish wheels for it.
 
 ## NWP grid → H3 orientation coverage
 
