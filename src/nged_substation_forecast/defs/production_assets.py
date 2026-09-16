@@ -286,8 +286,8 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     ``NWP_PUBLICATION_DELAY_HOURS`` to ``power_fcst_init_time`` — e.g. the 06:00 slot, when only
     that morning's run has landed — and is populated at every other slot. A run whose control
     member (``ensemble_member == 0``) is wholly absent — a partial or malformed ECMWF ENS
-    download — degrades the same way: every weather lag for that slot comes back null, and
-    ``_engineer_features`` logs a warning naming the run rather than failing the slot; see
+    download — degrades the same way. Every weather lag for that slot comes back null, and
+    ``_engineer_features`` logs a warning naming the run rather than failing the slot. See
     ``test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh``. None of the current
     champion config's features are weather lags, so neither path fires today, but a future feature
     change touching weather lags should trip over this consciously.

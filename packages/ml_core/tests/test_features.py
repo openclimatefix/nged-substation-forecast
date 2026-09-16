@@ -1081,8 +1081,8 @@ def test_engineer_features_nulls_weather_lag_in_single_run_mode_when_no_control_
     nwp_init_time = datetime(2023, 1, 1, 0, 0)
     power_fcst_init_time = nwp_init_time + timedelta(hours=NWP_PUBLICATION_DELAY_HOURS)
     # target_time (valid_time - 6h) must land strictly before power_fcst_init_time so
-    # _apply_weather_lag's >= boundary (_lags.py) routes to the freshest-run join, which is the
-    # one that depends on the control member — the same-run join wouldn't exercise this path.
+    # _apply_weather_lag's >= boundary (_lags.py) routes to the freshest-run join, which depends
+    # on the control member — the same-run join wouldn't exercise this path.
     valid_time = power_fcst_init_time + timedelta(hours=3)
     target_time = valid_time - timedelta(hours=6)
 

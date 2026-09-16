@@ -16,10 +16,10 @@ Lazy Evaluation:
     column names and dtypes without executing it. The NWP control-member check calls
     ``.collect()`` on a frame already cut to ``.limit(1)``, so the eager read is bounded to at
     most one row rather than the table — that bound is what makes collecting here acceptable. In
-    bulk mode (training/backtesting), a missing control member is a fail-fast guard and raises. In
-    single-run mode (production inference, replay), a missing control member is absent input, not
-    a contract violation: it is logged and left to degrade weather lags to null through the
-    ordinary join-miss path.
+    bulk mode (training/backtesting), a missing control member raises immediately. In single-run
+    mode (production inference, replay), a missing control member is absent input, not a contract
+    violation: it is logged and left to degrade weather lags to null through the ordinary
+    join-miss path.
 
 Nullify Leaky Lags Rationale:
     ``_nullify_leaky_lags`` (in ``_lags.py``) is called at the end of the pipeline to enforce
@@ -43,6 +43,7 @@ from ml_core.features._nwp import (
     NWP_PUBLICATION_DELAY_HOURS,
     _join_nwp_bulk_mode,
     _join_nwp_single_run,
+    _resolve_nwp_init_time,
     _upsample_nwp_to_half_hourly,
 )
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, LagFeature, ParsedFeatures
@@ -133,17 +134,14 @@ def _check_or_warn_on_missing_control_member(
             "build historical weather during bulk training or backtesting, but no such rows "
             "were found in the NWP data."
         )
-    # Single-run mode: degrade rather than raise (inherent-stability.md rule 1); every
+    # Single-run mode: degrade rather than raise (inherent-stability.md rule 1). Every
     # past-target-time weather lag comes back null through the ordinary join-miss path in
-    # `_engineer_features`. Mirrors `_join_nwp_single_run`'s own derivation when the caller left
-    # `nwp_init_time` to be inferred.
-    resolved_nwp_init_time = (
-        nwp_init_time
-        if nwp_init_time is not None
-        else power_fcst_init_time - timedelta(hours=nwp_publication_delay_hours)
+    # `_engineer_features`.
+    resolved_nwp_init_time = _resolve_nwp_init_time(
+        nwp_init_time, power_fcst_init_time, nwp_publication_delay_hours
     )
     logger.warning(
-        "NWP run %s has no control member (ensemble_member == 0); weather lag features will be "
+        "NWP run %s has no control member (ensemble_member == 0). Weather lag features will be "
         "null for this slot.",
         resolved_nwp_init_time,
     )

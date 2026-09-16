@@ -49,6 +49,24 @@ def _join_nwp_bulk_mode(
     return result
 
 
+def _resolve_nwp_init_time(
+    nwp_init_time: datetime | None,
+    power_fcst_init_time: datetime,
+    nwp_publication_delay_hours: int,
+) -> datetime:
+    """The single-run NWP run identity: the caller's own value, or the derived fallback.
+
+    Shared by ``_join_nwp_single_run`` (the join itself) and
+    ``tabular_feature_engineer._check_or_warn_on_missing_control_member`` (naming the run in a
+    degradation warning), so the two never drift on what "the selected run" means.
+    """
+    return (
+        nwp_init_time
+        if nwp_init_time is not None
+        else power_fcst_init_time - timedelta(hours=nwp_publication_delay_hours)
+    )
+
+
 def _join_nwp_single_run(
     power_lf: pl.LazyFrame,
     processed_nwp: pl.LazyFrame | None,
@@ -64,10 +82,8 @@ def _join_nwp_single_run(
 
     ``power_lf`` carries no metadata — see ``_join_nwp_bulk_mode``.
     """
-    nwp_init_time_val = (
-        nwp_init_time
-        if nwp_init_time is not None
-        else power_fcst_init_time - timedelta(hours=nwp_publication_delay_hours)
+    nwp_init_time_val = _resolve_nwp_init_time(
+        nwp_init_time, power_fcst_init_time, nwp_publication_delay_hours
     )
     power_with_init = power_lf.with_columns(
         power_fcst_init_time=pl.lit(power_fcst_init_time),

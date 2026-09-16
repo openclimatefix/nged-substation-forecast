@@ -543,7 +543,7 @@ def test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh(
     "live" mode should apply the same delay is a serving-path semantic decision, tracked
     separately from this test. The third case (``members=(1,)``) instead pins a different cause of
     the same null: a run with no control member at all — a partial or malformed ECMWF ENS
-    download — degrades the same way rather than failing the slot; ``materialize`` succeeding at
+    download — degrades the same way rather than failing the slot. ``materialize`` succeeding at
     all is itself part of what that case checks.
     """
     gap = timedelta(hours=gap_hours)
