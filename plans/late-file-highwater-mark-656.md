@@ -63,6 +63,17 @@ arrival and the mid-history gap this plan targets.
 `select_new_rows`'s `_ProcessedFileListing` branch keeps using `TimeSeriesCoverage.last_time` (see
 next item), so `time_series_coverage` stays as it is and both call sites keep working.
 
+**Move the `time_series_coverage(delta_path, storage_options)` call (currently storage.py:403,
+unconditional before the branch split) inside the `elif "end_time" in time_series.columns` branch,
+so it runs only for `_ProcessedFileListing`.** Call the new `_existing_power_time_series_keys`
+helper only inside the `if "time" in time_series.columns` branch. Leaving the existing
+`time_series_coverage()` call where it is and simply adding the new helper call alongside it would
+make every `PowerTimeSeries`-branch call pay for both the full-table `time_series_coverage` scan
+and the new restricted anti-join scan — silently doubling cost every hour and defeating the
+partition-pruning this plan's cost argument rests on. No test can catch this by output alone
+(the result is correct, just slower), so this restructuring is a required step, not an
+implementation detail to improvise.
+
 **`select_new_rows`, the `_ProcessedFileListing` branch (currently storage.py:410-413,
 425-433).** We don't have per-row times for an undownloaded file — only its `start_time`/`end_time`
 window from the S3 key — so an anti-join isn't available at this stage; keep the `last_time`
@@ -142,8 +153,17 @@ All in `packages/nged_data/tests/test_storage.py`, alongside the existing `selec
   margin) and one whose `end_time` is five days before it (outside the margin). Assert the first is
   kept and the second is dropped. **Fails on `main` today**: the current filter drops both, since
   both are `<= last_time`.
-- Keep `test_select_new_rows_power_time_series` and `test_select_new_rows_file_listing` unchanged
-  as regression coverage for the ordinary in-order case.
+- Keep `test_select_new_rows_power_time_series` unchanged as regression coverage for the ordinary
+  in-order case — its rows all postdate the watermark either way, so the anti-join and the old
+  `last_time` filter agree on it.
+- **`test_select_new_rows_file_listing` needs updating, not left as-is.** Its `old.json` fixture
+  row has `end_time` exactly equal to `time_series_id=1`'s on-disk `last_time`
+  (`2026-01-01T12:00`), asserted excluded under today's strict `end_time > last_time`. Under the
+  loosened `end_time > last_time - _LATE_FILE_LOOKBACK` filter, `old.json` now falls inside the
+  3-day margin and is correctly *included* — a value sitting exactly at the watermark is genuinely
+  within the lookback window under the new semantics. Update the test's expected `result.height`
+  to `3` and its expected path set to add `"old.json"`, so it keeps exercising the ordinary
+  in-order case without asserting behaviour the plan is deliberately changing.
 - Extend `test_select_new_rows_power_time_series` (or add a sibling) to cover **more than one
   reporting `time_series_id` in the same call**, confirming the `time_series_ids`-restricted
   anti-join scan doesn't accidentally scope to only the first series' keys or leak another
@@ -154,8 +174,16 @@ All in `packages/nged_data/tests/test_storage.py`, alongside the existing `selec
 - `select_new_rows` and `time_series_coverage` docstrings, as described above — the "Write about
   the present, not the past" rule means these should describe the anti-join and the lookback
   margin as how the code works now, not narrate that a high-water mark used to be there.
-- No `docs/` page names `select_new_rows`' mechanism directly (checked
-  `docs/architecture/` and `docs/design-philosophy/`), so no cross-page update is needed. This
+- **`packages/nged_data/README.md`'s public-surface entry for `select_new_rows`** (currently:
+  "filters `time_series` down to rows newer than what the `power_time_series` Delta table ...
+  already holds, per `time_series_id`") describes the old per-series high-water-mark mechanism for
+  both input kinds. Rewrite it to say the `PowerTimeSeries` input is filtered by existence — an
+  anti-join on `(time_series_id, time)` — while the file-listing input keeps the `last_time`
+  comparison, now with the lookback margin.
+- `docs/live_service/operations.md`'s one mention of `select_new_rows` ("won't offer those files
+  again") stays accurate — the anti-join still backs that guarantee — so it needs no change.
+- No other `docs/` page names `select_new_rows`' mechanism directly (checked
+  `docs/architecture/` and `docs/design-philosophy/`), so no further cross-page update is needed. This
   issue doesn't complete a roadmap item, so no ship-time triage section applies.
 
 ## Verification commands
@@ -227,3 +255,36 @@ finding was applied; the rest confirmed the plan's existing scope calls:
 - **Rejected — building the `(path, e_tag)` manifest now instead of the lookback margin**: no,
   per the plan's own "Risks and open questions" item above — speculative state for an unconfirmed
   failure mode.
+
+## Correctness and testability review (second adversarial pass)
+
+A second, independent fresh sub-agent checked this revised plan for correctness and whether its
+tests would actually catch a wrong implementation. All three findings were applied:
+
+- **Applied**: `test_select_new_rows_file_listing`'s `old.json` fixture row sits exactly at
+  `time_series_id=1`'s on-disk `last_time`, so under the loosened lookback filter it moves from
+  excluded to included — the plan's earlier claim that this test needs no change was wrong.
+  Updated the "Tests" section to say so and to specify the corrected expected assertions, instead
+  of listing it as unchanged regression coverage.
+- **Applied**: `packages/nged_data/README.md`'s `select_new_rows` public-surface entry documents
+  the old per-series high-water-mark mechanism for both input kinds; the plan's docs sweep had
+  checked `docs/architecture/` and `docs/design-philosophy/` but missed the package READMEs.
+  Added it to "Docs to update", along with confirming `docs/live_service/operations.md`'s one
+  mention needs no change.
+- **Applied**: the plan named the control-flow split (anti-join for `PowerTimeSeries`,
+  `time_series_coverage` for `_ProcessedFileListing`) but never said to actually move the existing
+  unconditional `time_series_coverage()` call inside its own branch. Left as-is, an implementer
+  could add the new helper call alongside the existing one and silently pay for both full-table
+  and restricted scans every hour on the `PowerTimeSeries` path — defeating the plan's own cost
+  argument, with no test able to catch it (the output would still be correct, only slower). Added
+  an explicit instruction to the "What changes" section.
+
+Everything else the reviewer attacked checked out unchanged: the claimed current-behaviour line
+numbers all matched `main`, both new tests were confirmed to fail before the change and pass
+after, the anti-join has no null/duplicate-key or cross-model-join hazard (`PowerTimeSeries`
+already enforces `(time_series_id, time)` uniqueness, and the helper returns a plain
+`pl.LazyFrame`), the retry-idempotency guarantee in `assets.py` still holds because it never
+depended on which mechanism backs the dedupe, the lookback margin compares against on-disk
+`last_time` rather than wall-clock time so the new test needs no time-freezing, and the
+same-timestamp-correction scope cut interacts safely with `download_and_parse_files`' existing
+`unique(..., keep="last")` dedupe.
