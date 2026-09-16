@@ -75,8 +75,8 @@ frame = (
     .filter(
         pl.col("init_time").is_between(window_start, window_end),
         pl.col("valid_time").is_between(window_start, window_end + timedelta(days=10)),
-        pl.col("h3_index").is_in(cells),          # the 9 cells the V1 series sit in
-        pl.col("ensemble_member").is_in([0]),     # is_in, not ==, as load_engineering_inputs does
+        pl.col("h3_index").is_in(cells),  # the 9 cells the V1 series sit in
+        pl.col("ensemble_member").is_in([0]),  # is_in, not ==, as load_engineering_inputs does
     )
     .collect(engine="streaming")
 )
