@@ -84,8 +84,8 @@ and none is named in the issue.** Meanwhile one location the issue does name nee
 | `src/nged_substation_forecast/defs/_engineering_inputs.py:78-83` | Carries **no** figure and no "needs re-measuring" sentence — names the mechanism and links to `performance.md` | **Leave untouched** |
 
 **`_engineering_inputs.py` is already correct, and adding a figure there would create another copy of
-a number this plan is trying to keep in one place.** The issue lists it because #653 edited it; what
-#653 left behind needs nothing.
+a number this plan is trying to keep in one place.** The issue lists it because #653 edited it;
+what #653 left behind needs nothing.
 
 **The issue's "Not in scope" paragraph points at a file that no longer exists.**
 `docs/architecture/adapting-to-another-geography.md` is not in `docs/architecture/`, and nothing
