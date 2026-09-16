@@ -182,12 +182,12 @@ git push -u origin <branch-name>
 
 **Open the PR now, as a draft, rather than waiting for implementation.** `gh pr create --draft`
 against `main`, with labels and `JackKelly` as assignee (`gh pr create` can't set either — follow
-with `gh pr edit --add-label <label>` and `gh pr edit --add-assignee JackKelly`), linking the issue
-so it closes on merge. The body says the plan is not yet approved and carries no code yet, and
-gives step 3's five trigger answers, the size they picked, and which reviews it is getting. See
-the `github-issue-pr-workflow` skill for the full PR checklist. Opening it now gives every review below, and every push that
-follows, somewhere to land that the human reviewer can already be watching — the same place they
-will later review the diff.
+with `gh pr edit --add-label <label>` and `gh pr edit --add-assignee JackKelly`), linking the
+issue so it closes on merge. The body says the plan is not yet approved and carries no code yet,
+and gives step 3's five trigger answers, the size they picked, and which reviews it is getting.
+See the `github-issue-pr-workflow` skill for the full PR checklist. Opening it now gives every
+review below, and every push that follows, somewhere to land that the human reviewer can already
+be watching — the same place they will later review the diff.
 
 **Then hand over the plan before anything else happens to it.** Say in your next reply that the
 plan is ready and give **clickable markdown links** to both: the plan as the path relative to the
