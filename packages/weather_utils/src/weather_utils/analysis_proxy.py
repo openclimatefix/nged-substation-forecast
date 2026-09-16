@@ -19,11 +19,11 @@ This models when a run reaches *our* disk, not when Dynamical publish it. Dynami
 00Z run between 08:05 and 08:20 UTC, and ``ecmwf_ens_schedule`` downloads it at 08:30 UTC, so a 00Z
 run is ours from roughly 08:30 — 8.5 hours. Nine is the nearest whole hour at or after that.
 
-The feature pipeline uses it to derive ``power_fcst_init_time`` from ``nwp_init_time`` in bulk
-mode, and to derive ``nwp_init_time`` when a single-run caller omits it; and
-``select_nwp_init_time`` uses it to reconstruct availability for ``"replay"`` backfills.
-``select_analysis_proxy`` itself does not use it: a single-run caller ceilings the proxy at the NWP
-run it already selected, which needs no modelled delay.
+The feature pipeline uses the delay to derive ``power_fcst_init_time`` from ``nwp_init_time`` in
+bulk mode, and to derive ``nwp_init_time`` when a single-run caller omits it.
+``select_nwp_init_time`` uses the delay to reconstruct availability for ``"replay"`` backfills.
+``select_analysis_proxy`` needs no delay: a single-run caller caps the proxy at the NWP run that
+caller already selected.
 
 Of ``select_nwp_init_time``'s two modes, only ``"replay"`` needs the delay. A live run joins
 whatever is genuinely on disk, so reality already constrains the NWP table to runs that were

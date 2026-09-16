@@ -129,9 +129,7 @@ and both easy to miss:
 - The body docstring's pushdown sentence names `available_at` in its list of pushdownable filters
   (`member`, `max_lead`, `available_at`). Drop it from the list; the other two survive.
 - `datetime` is imported only for the `available_at` annotation, so the import narrows to
-  `timedelta` alone, which `max_lead` still needs. `ruff check` catches this, but it is listed here
-  because the plan calls out the mirror-image case in `tabular_feature_engineer.py` and silence
-  would read as a decision rather than an oversight.
+  `timedelta` alone, which `max_lead` still needs. `ruff check` catches this.
 
 Rewrite the `NWP_PUBLICATION_DELAY_HOURS` docstring's third paragraph, which lists
 `select_analysis_proxy`'s `available_at` cut as one of the constant's three consumers. After this
@@ -274,8 +272,7 @@ tests go with it. Nothing is left unpinned: the leakage guard they approximate i
 the real caller by
 `test_engineer_features_single_run_freshest_run_excludes_unpublished_nwp_run`.
 
-The third of them is the only timezone-aware test of `select_analysis_proxy`, which is worth a
-sentence rather than a silent deletion. After the change the function compares no Python `datetime`
+The third of them is the only timezone-aware test of `select_analysis_proxy`. After the change the function compares no Python `datetime`
 literal at all — `max_lead` adds a `timedelta` to a column, which is timezone-agnostic — so the
 timezone-sensitive comparison moves to the new caller-side filter, where
 `tests/test_live_forecasts.py` covers it end to end with timezone-aware UTC data. A mismatch there
@@ -346,8 +343,7 @@ to attack.
 passing an explicit `nwp_init_time` *older* than the freshest published run, alongside a multi-run
 frame, gets a strictly smaller proxy set than today's cut gives. No caller does this —
 `live_forecasts` always passes what `select_nwp_init_time` returned — and the new behaviour is the
-more self-consistent of the two, since a caller naming a run is saying that is the run it had. Noted
-so the claim is not read as stronger than it is.
+more self-consistent of the two, since a caller naming a run is saying that is the run it had.
 
 **Should `nwp_init_time` become required in single-run mode?** No non-test caller reaches the
 derived fallback: `live_forecasts` passes `nwp_init_time` explicitly in both availability modes, so

@@ -10,9 +10,9 @@ import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.weather_schemas import Nwp
 
-# Re-export shim: the canonical definition lives in ``weather_utils`` (``select_nwp_init_time``'s
-# ``"replay"`` cutoff is the consumer there), but the join helpers here and ``production_helpers`` /
-# ``feature_engineer`` still import it from this module.
+# Re-export shim: the canonical definition lives in ``weather_utils``, beside the analysis proxy
+# the value was derived for. Every consumer is in ``ml_core`` — the join helpers here,
+# ``production_helpers`` and ``feature_engineer`` — and each imports it from this module.
 from weather_utils import NWP_PUBLICATION_DELAY_HOURS
 
 __all__ = ["NWP_PUBLICATION_DELAY_HOURS"]

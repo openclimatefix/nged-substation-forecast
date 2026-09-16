@@ -205,11 +205,9 @@ def _engineer_features(
         nwp_publication_delay_hours: Hours after an NWP run's ``nwp_init_time`` before it is
             usable — disk arrival, not upstream publication; see
             ``weather_utils.analysis_proxy.NWP_PUBLICATION_DELAY_HOURS`` for what drives the
-            default and its derivation. Used throughout, not only in one mode: it derives
-            ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode, derives
-            ``nwp_init_time`` when it is omitted in single-run mode. Single-run mode's
-            analysis-proxy ceiling is the selected ``nwp_init_time`` itself, so the delay reaches
-            the proxy only through that fallback.
+            default and its derivation. Derives ``power_fcst_init_time`` from ``nwp_init_time``
+            in bulk mode, and derives ``nwp_init_time`` when a single-run caller omits it.
+            Single-run mode consumes the delay nowhere else.
         local_timezone: IANA zone the local-time features (time of day, day of week, UTC
             offset) are computed in. Defaults to ``DEFAULT_LOCAL_TIMEZONE``.
 
@@ -271,11 +269,13 @@ def _engineer_features(
         # construction the freshest one that was available — `select_nwp_init_time` returns the
         # newest qualifying run in both availability modes — so the runs at or before it are
         # exactly the runs that were available, and no modelled publication delay is needed to work
-        # that out. Two consequences worth stating. A `"live"` slot keeps the run it is forecasting
-        # with even when that run is fresher than nwp_publication_delay_hours, matching bulk mode's
-        # effective ceiling (the invariant in the branch below) instead of nulling every weather lag
-        # for the slot. And a run later than the selected one is excluded whether the caller passes
-        # one run or a wide multi-run frame.
+        # that out. A `"live"` slot therefore keeps the run it is forecasting with even when that
+        # run is fresher than nwp_publication_delay_hours, matching bulk mode's effective ceiling
+        # (the invariant in the branch below).
+        # Reusable-package input validation rather than a reachable production state: the only
+        # single-run caller, `live_forecasts`, passes a frame holding just the selected run, so the
+        # filter drops nothing today. It guards the multi-run frame this function's docstring lets
+        # a single-run caller pass.
         historical_weather = select_analysis_proxy(
             processed_nwp.filter(
                 pl.col("nwp_init_time")

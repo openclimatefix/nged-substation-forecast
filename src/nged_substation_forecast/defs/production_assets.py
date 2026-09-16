@@ -281,12 +281,12 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     ``write_power_forecasts``'s ``replace_predicate_extra``, so re-running a 6-hourly slot (or
     replaying one) never duplicates rows or wipes the rest of the ``"live"`` fold.
 
-    Note: only one NWP run is loaded here, and weather-lag features are built from it however
-    fresh it is — feature engineering ceilings its freshest-run join at the run selected above
-    rather than at a modelled publication delay, so "live" and "replay" agree on what was
-    available. One thing still nulls every weather lag for a slot: a run whose control member
-    (``ensemble_member == 0``) is wholly absent, which is a partial or malformed ECMWF ENS
-    download. ``_engineer_features`` logs a warning naming the run rather than failing the slot.
+    Note: only one NWP run is loaded here, and weather-lag features are built from that run
+    however fresh the run is — feature engineering caps its freshest-run join at the run selected
+    above rather than at a modelled publication delay. A run whose control member
+    (``ensemble_member == 0``) is wholly absent — a partial or malformed ECMWF ENS download —
+    still nulls every weather lag for the slot. ``_engineer_features`` logs a warning naming the
+    run rather than failing the slot.
     See ``test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay``. None of the
     current champion config's features are weather lags, so that path does not fire today, but a
     future feature change touching weather lags should trip over this consciously.

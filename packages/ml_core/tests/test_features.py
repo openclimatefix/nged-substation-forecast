@@ -788,6 +788,8 @@ def test_engineer_features_weather_lag_leakage_prevention():
     # Create dummy data to verify weather lag leakage prevention
     valid_time = datetime(2026, 6, 11, 12, 0)
     nwp_init_time = datetime(2026, 6, 10, 0, 0)
+    # Deliberately inside NWP_PUBLICATION_DELAY_HOURS: the freshest-run join must accept the
+    # selected run however fresh it is, so this gap must not be widened to clear a delay.
     power_fcst_init_time = nwp_init_time + timedelta(hours=2)
 
     # NWP data has two runs:
@@ -903,9 +905,8 @@ def test_engineer_features_single_run_proxy_ceiling_is_the_selected_run_not_the_
     power_fcst_init_time is only 1 hour after the selected run while nwp_publication_delay_hours is
     9, so a delay-based cut would exclude the selected run and null the lag.
 
-    Both halves of the ceiling are asserted, because a populated value alone would also survive
-    removing the ceiling altogether: the selected run answers (8.0), and the later run's decoy
-    (999.0) does not.
+    Both halves of the ceiling are asserted together in one frame: the selected run answers (8.0),
+    and the later run's decoy (999.0) does not.
     """
     nwp_init_time = datetime(2026, 6, 11, 0, 0)
     power_fcst_init_time = datetime(2026, 6, 11, 1, 0)
@@ -934,7 +935,6 @@ def test_engineer_features_single_run_proxy_ceiling_is_the_selected_run_not_the_
         selected_features={"temperature_2m_lag_24h"},
         power_fcst_init_time=power_fcst_init_time,
         nwp_init_time=nwp_init_time,
-        nwp_publication_delay_hours=NWP_PUBLICATION_DELAY_HOURS,
     ).collect()
 
     assert engineered["temperature_2m_lag_24h"][0] == 8.0

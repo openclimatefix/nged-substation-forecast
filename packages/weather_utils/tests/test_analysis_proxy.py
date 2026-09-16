@@ -1,7 +1,7 @@
 """Tests for ``weather_utils.select_analysis_proxy``.
 
 Mirrors the leakage-test style of ``ml_core``'s ``_nullify_leaky_lags`` tests: small hand-built
-frames whose expected freshest-run / availability behaviour is obvious by inspection.
+frames whose expected freshest-run behaviour is obvious by inspection.
 """
 
 from datetime import datetime, timedelta
