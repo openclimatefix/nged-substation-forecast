@@ -501,8 +501,8 @@ def test_select_new_rows_power_time_series(tmp_path: Path):
 
 def test_select_new_rows_power_time_series_fills_a_gap_before_the_watermark(tmp_path: Path):
     """A genuinely-missing reading is kept even when it predates the series' high-water mark —
-    the anti-join checks existence, not recency, so a late file backfilling a gap is no longer
-    permanently excluded just because a later reading already made it onto disk."""
+    the anti-join checks existence, not recency, so a late file backfilling a gap is ingested even
+    though a later reading for the same series is already on disk."""
     delta_path = tmp_path / "power.delta"
 
     pl.DataFrame(
