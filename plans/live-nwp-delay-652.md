@@ -11,24 +11,27 @@ back null. The two pieces of the serving path disagree about what "available" me
 caller already selected, then call `select_analysis_proxy` with no availability parameters at all —
 and delete `available_at` and `publication_delay` from `select_analysis_proxy`, which after this
 change has no other caller for them. The selected run is by construction the freshest run that was
-available, so a ceiling at that run reproduces the availability set exactly in both `"live"` and
-`"replay"` mode, with no `availability_mode` parameter threaded into feature engineering. Replay and
-the derived-`nwp_init_time` backfill path come out unchanged; only the live case changes, and it
-changes to match what bulk-mode training already does.
+available, so a ceiling at that run reproduces the availability set in both `"live"` and `"replay"`
+mode, with no `availability_mode` parameter threaded into feature engineering. The
+derived-`nwp_init_time` backfill path is unchanged exactly, and replay is unchanged for every caller
+that exists; only the live case changes, and it changes to match what bulk-mode training already
+does.
 
 ## Verdict, size and departures
 
 **Verdict: worth doing, and the answer to the issue's question is that `"live"` mode should not
 apply the delay.** Three reasons, in order of weight:
 
-**The project has already decided this, and `_engineer_features` never got the memo.** The
-asymmetry is documented as deliberate in three places: the `AvailabilityModeType` docstring in
+**The project has already decided this for run selection, and never extended the decision to the
+analysis proxy.** The asymmetry is documented as deliberate in three places: the `AvailabilityModeType` docstring in
 `production_helpers.py`, the `NWP_PUBLICATION_DELAY_HOURS` docstring in `analysis_proxy.py` ("Of
 `select_nwp_init_time`'s two modes, only `"replay"` needs the delay"), and
 [Resolve NWP availability asymmetrically](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#resolve-nwp-availability-asymmetrically-live-vs-replay)
 in `docs/architecture/production-deployment.md`. So #652 is not an open semantic question. It is one
-code path contradicting a decision the rest of the serving path already records. The reasoning
-behind that decision applies unchanged here: a modelled delay reconstructs availability when
+code path contradicting a decision the rest of the serving path already records. All three
+passages are about `select_nwp_init_time` and none mentions the analysis proxy, which is precisely
+how the two drifted — so this is the decision's reasoning being applied where it always should have
+been, not a fresh appeal to authority. That reasoning applies unchanged here: a modelled delay reconstructs availability when
 availability cannot be observed, and in live mode it can be observed, because the Delta table
 contains only runs that genuinely landed.
 
@@ -120,10 +123,29 @@ Filtering at the caller instead is the pattern the repo already uses: the dashbo
 function's own docstring asks callers to check. The single-run filter runs one node earlier than
 `available_at` did — before the member filter rather than after — which is no worse for pushdown.
 
+Two further references to `available_at` go stale in the same file, both outside the `Args:` block
+and both easy to miss:
+
+- The body docstring's pushdown sentence names `available_at` in its list of pushdownable filters
+  (`member`, `max_lead`, `available_at`). Drop it from the list; the other two survive.
+- `datetime` is imported only for the `available_at` annotation, so the import narrows to
+  `timedelta` alone, which `max_lead` still needs. `ruff check` catches this, but it is listed here
+  because the plan calls out the mirror-image case in `tabular_feature_engineer.py` and silence
+  would read as a decision rather than an oversight.
+
 Rewrite the `NWP_PUBLICATION_DELAY_HOURS` docstring's third paragraph, which lists
 `select_analysis_proxy`'s `available_at` cut as one of the constant's three consumers. After this
 change the consumers are bulk mode's per-row `power_fcst_init_time` derivation, single-run mode's
 `nwp_init_time` fallback, and `select_nwp_init_time`'s replay cutoff.
+
+### `packages/ml_core/src/ml_core/features/_nwp.py`
+
+The re-export shim's comment says the canonical `NWP_PUBLICATION_DELAY_HOURS` lives in
+`weather_utils` because "the analysis-proxy availability cut owns it". This change deletes that cut,
+so `weather_utils.analysis_proxy` stops consuming the constant altogether and the stated reason
+evaporates. Rewrite the parenthetical to name a reason that survives — `select_nwp_init_time`'s
+replay cutoff is the remaining `weather_utils` consumer. **Whether the constant should move is a
+separate question this issue does not need to answer**, and the plan deliberately does not.
 
 ### `src/nged_substation_forecast/defs/production_assets.py`
 
@@ -220,6 +242,12 @@ Add a single-run test with an explicit `nwp_init_time` and a `nwp_publication_de
 enough that the selected run would fail the old cut, asserting the weather lag is populated. **On
 `main` this asserts a populated value where the old cut returns null, so it fails today.**
 
+**Give the fixture a second NWP run later than `nwp_init_time`, carrying a distinguishable decoy
+value, and assert the decoy is not chosen.** Without it the test pins only half the rule: a mutant
+deleting the ceiling filter outright would still leave the lag populated and the test green. With
+it, the one test named for the rule pins both halves — the selected run is included, and anything
+later is excluded.
+
 The first plan review argued this is redundant once the leakage test above carries a failing-on-`main`
 assertion, and that is nearly right — the two overlap. It is kept anyway, for one reason: the whole
 issue is that this rule was invisible, and a rule pinned only as a side effect of a test named for
@@ -246,6 +274,13 @@ tests go with it. Nothing is left unpinned: the leakage guard they approximate i
 the real caller by
 `test_engineer_features_single_run_freshest_run_excludes_unpublished_nwp_run`.
 
+The third of them is the only timezone-aware test of `select_analysis_proxy`, which is worth a
+sentence rather than a silent deletion. After the change the function compares no Python `datetime`
+literal at all — `max_lead` adds a `timedelta` to a column, which is timezone-agnostic — so the
+timezone-sensitive comparison moves to the new caller-side filter, where
+`tests/test_live_forecasts.py` covers it end to end with timezone-aware UTC data. A mismatch there
+fails `assert result.success`.
+
 ## Docs to update
 
 - **`docs/architecture/production-deployment.md`**, the "Resolve NWP availability asymmetrically:
@@ -259,6 +294,10 @@ the real caller by
   `available_at` cut". That clause goes stale. Rewrite the sentence to point at the caller-side
   ceiling the single-run branch now applies. The surrounding claim — that the bulk freshest-run join
   is leak-free only as a side effect of daily run cadence — stays true and stays.
+- **`docs/roadmap/switching-events.md` again, around lines 461–466.** A second passage goes stale
+  identically: it calls the availability cut one "which `weather_utils.analysis_proxy.
+  select_analysis_proxy` applies". Rewrite it the same way. Both passages must be found — this one
+  is the sentence a future reader of the switching-events design would act on.
 - **No roadmap ship-time triage.** #652 is a spike under the v0.2.1 follow-ups epic (#642) and
   completes no roadmap item, so there is no "Implementation details" section to delete and no status
   banner to move.
@@ -368,4 +407,43 @@ scope here either way.
 
 ### Review 2 — correctness and testability
 
-Pending.
+Run by a fresh sub-agent, told to treat the record above as process history rather than as evidence.
+
+**Verdict returned: the plan is correct.** The reviewer verified the central equivalence claim
+against the code and then checked it empirically — it simulated the change in memory and ran every
+fixture-free test in `test_features.py` and `test_cross_mode_equivalence.py`, 37 of them, with none
+failing. That includes `test_bulk_and_single_run_features_are_identical` and the lookahead guard,
+which still returns `8.0` rather than the `999.0` decoy. It also confirmed by execution that the
+leakage test genuinely fails on `main` under the plan's `+ timedelta(hours=2)` edit
+(`lag_36h` comes back `None`) and passes after.
+
+**Accepted — four stale references the plan had not enumerated, and one test strengthened:**
+
+- **`packages/ml_core/src/ml_core/features/_nwp.py`'s re-export comment** justifies the constant
+  living in `weather_utils` by "the analysis-proxy availability cut owns it" — the cut this change
+  deletes. The plan listed no edit to that file; it now has its own section.
+- **`analysis_proxy.py`'s body docstring** names `available_at` in its pushdownable-filters list,
+  outside the `Args:` block the plan committed to editing, so it would have survived naming a
+  parameter that no longer exists.
+- **`analysis_proxy.py`'s `datetime` import** becomes unused once the `available_at` annotation
+  goes.
+- **A second stale passage in `docs/roadmap/switching-events.md`** (around lines 461–466), beyond
+  the one at 290–299 the plan already had.
+- **The new `test_features.py` test needs a decoy run**, or it pins only that the lag is populated
+  and survives a mutant that deletes the ceiling filter entirely — the exact weakness the plan cited
+  as its reason for keeping the test over the first review's objection.
+
+**Accepted as calibration rather than defect:**
+
+- The summary's "replay comes out unchanged" was stronger than the argument supporting it, which the
+  Risks section already scoped correctly. The summary now matches.
+- The verdict's "the project has already decided this" rested on three passages that are all about
+  `select_nwp_init_time` and none about the analysis proxy. That is true, and it is *why* the two
+  drifted; the claim is now stated that way.
+- The deleted timezone-aware `select_analysis_proxy` test leaves no gap, but the plan should say why
+  rather than assert it.
+
+**Nothing rejected.** The reviewer explicitly found no defect on attacks 1, 2, 4, 5, 6, and 8,
+including the interactions worth worrying about: the upsample commutes with an init-time filter, the
+per-column null-fill sees an identical row set, the filter's new position before the
+`ensemble_member` filter commutes, and no degradation path gains a raise.
