@@ -54,11 +54,12 @@ def load_engineering_inputs(
     exactly sufficient: the scan predicate below is inclusive, and the earliest target time any
     lag can read is exactly ``window_start - power_lookback``.
 
-    The guarantee that widening the power scan adds no spine rows assumes the NWP-centric
-    bulk-mode join, in which power is left-joined *onto* the NWP-derived spine. The guarantee
-    does not hold when NWP is absent, where the spine is the power frame itself. Every caller
-    that passes ``power_lookback`` also passes NWP, so ``load_engineering_inputs`` never reaches
-    the NWP-absent branch with a widened power scan.
+    The spine is the ``(time_series_id, valid_time)`` row scaffold that power values are later
+    joined onto as labels. The guarantee that widening the power scan adds no spine rows assumes
+    the NWP-centric bulk-mode join, in which power is left-joined *onto* the NWP-derived spine.
+    The guarantee does not hold when NWP is absent, where the spine is the power frame itself.
+    Every caller that passes ``power_lookback`` also passes NWP, so ``load_engineering_inputs``
+    never reaches the NWP-absent branch with a widened power scan.
 
     **Memory: prune the NWP scan at the source.** The NWP Delta is large (tens of GB: every
     ``init_time`` × every H3 cell × ~51 ensemble members × the 30-min forecast horizon). Every

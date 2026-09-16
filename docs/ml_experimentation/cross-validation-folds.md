@@ -147,8 +147,9 @@ several gotchas we need to be careful of:
 
 **Overlapping forecasts do not contaminate the test set.** `load_engineering_inputs` bounds NWP by
 *target* time — `valid_time` within `[window_start, window_end]` — not by `init_time`. That NWP
-bound is the fold boundary, because the NWP scan sets the spine that defines the labels for the
-power forecast. No label appears on both sides of the fold boundary.
+bound is the fold boundary, because the NWP scan builds the spine: the `(time_series_id,
+valid_time)` row scaffold that power values are joined onto as labels. No label appears on both
+sides of the fold boundary.
 
 **Power lag features deliberately reach back across the fold boundary, and stay leak-free.** Power
 is bounded only on its upper edge (`time <= window_end`). The lower edge widens to `window_start -
