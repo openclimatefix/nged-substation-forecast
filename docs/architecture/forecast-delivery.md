@@ -481,7 +481,7 @@ format we already rely on internally — and it is a good internal choice for re
   same read of a `valid_time`-sorted table. **That speed is what lets us run cross-validation
   across every ensemble member, for every fold, on a laptop, in a few minutes** — no cluster
   required for day-to-day model development. The 1.96% holds for every member, not only the
-  control member, so a run that reads member 25 costs what a run that reads member 0 costs.
+  control member: every partition sampled holds 51 row groups, each spanning a single member.
 - **It scales to parallel cloud training too.** S3 is built for very high aggregate throughput to
   many concurrent readers, so when V2 needs multiple ML training runs in parallel, each worker can
   read directly from the same S3-hosted Delta tables at full bandwidth — no shared filesystem, no

@@ -29,7 +29,7 @@ assumed:
   default dictionary+RLE encodings — `BYTE_STREAM_SPLIT` measures *worse* here, because the
   significand rounding collapses many cells/members onto repeated values that a dictionary exploits
   better. Rows are sorted member-early so single-member reads can skip row groups. The result is
-  ~40–41 GB per year for the full ECMWF ENS dataset for Great Britain, and a single day's NWP
+  ~58 GB per year for the full ECMWF ENS dataset for Great Britain, and a single day's NWP
   data takes about 1 minute to download and convert. The measured numbers are in [PR
   #271](https://github.com/openclimatefix/nged-substation-forecast/pull/271).
 
@@ -64,7 +64,7 @@ Nwp.scan_delta(path)                     # lazy scan, already Float32 physical u
 
 ### Bounding feature-engineering memory: prune the inputs, not the output
 
-The feature-engineering plan is dominated by the **NWP scan**. The NWP Delta is large — for the V1 trial it is **~86 GB**: 810 daily `init_time` partitions, each up to ~7.24M rows = **1671 H3 cells × 51 ensemble members × 85 native steps** (control member alone is 142k rows/partition). The 30-min upsample and the multi-run bulk join inflate that further. So the whole memory question is: *how little of that NWP do we touch?*
+The feature-engineering plan is dominated by the **NWP scan**. The NWP Delta is large — for the V1 trial it is **~142 GB**: 899 daily `init_time` partitions, each up to ~7.24M rows = **1671 H3 cells × 51 ensemble members × 85 native steps** (control member alone is 142k rows/partition). The 30-min upsample and the multi-run bulk join inflate that further. So the whole memory question is: *how little of that NWP do we touch?*
 
 **You cannot prune the scan by filtering the engineered output.** `data.filter(time_series_id == x)` runs the cell-attach join, the 30-min upsample (`group_by` + `explode` + `interpolate`) and the bulk join *first*, then drops rows. And NWP is keyed by `h3_index`, not `time_series_id`, so a `time_series_id` predicate can never reach the NWP scan at all. Pruning must be applied to the **raw inputs**, in `load_engineering_inputs`, directly on the `Nwp.scan_delta` scan.
 
@@ -73,7 +73,7 @@ What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 | Predicate on the **raw NWP scan** | Effect |
 |---|---|
 | `init_time ∈ [start − 16d, end]` | **Partition prune** — NWP is partitioned by `(nwp_model_id, init_time)`, so only those partition directories are opened. A `valid_time` filter *alone* does **not** prune partitions (it scanned ~887 files). |
-| `ensemble_member ∈ {…}` on the raw scan | Only the requested members are decoded — this requires the predicate to reach the Parquet scan unchanged, which in turn requires `Nwp`'s declared `ensemble_member` dtype to match what delta-rs actually stores (see `Nwp.ensemble_member`). Once it does, `delta_store.nwp` writes one row group per ensemble member, so a single-member predicate matches one row group's min/max range and skips the rest of the partition — for any member, not only the control member. Measured on the stored table, a single-member read decodes 1.96% of a partition — one row group in 51 — for the control member, for member 25 and for member 50 alike. |
+| `ensemble_member ∈ {…}` on the raw scan | Only the requested members are decoded — this requires the predicate to reach the Parquet scan unchanged, which in turn requires `Nwp`'s declared `ensemble_member` dtype to match what delta-rs actually stores (see `Nwp.ensemble_member`). Once it does, `delta_store.nwp` writes one row group per ensemble member, so a single-member predicate matches one row group's min/max range and skips the rest of the partition — for any member, not only the control member. Measured on the stored table, a single-member read decodes 1.96% of a partition — one row group in 51. Every partition census sampled held 51 row groups, each spanning a single member, so the share is the same for every member. |
 | `h3_index ∈ {cells}` | Restricts to the cells the requested series sit in, on the same condition as `ensemble_member` above (the declared dtype must match what's on disk). `h3_index` is not a sort-early column (see below), so this is row-level filtering during decode rather than row-group skipping. |
 | `time_series_id == x` on the **output** | Prunes the power scan + metadata join, but **not** the NWP scan (no `time_series_id` there), and only after the upsample. Doesn't help. |
 | `slice(n)` / `head(n)` (row count) on the output | **Nothing** — a row slice can't push through a join; the whole join runs first. |

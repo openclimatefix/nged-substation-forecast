@@ -29,10 +29,13 @@ for MSL pressure), rows sorted `init_time → ensemble_member → valid_time →
 ZSTD level 3.
 
 **How much space does GB-wide ECMWF ENS take?** One daily run (1,671 H3 cells × 51 members ×
-85 lead times, up to ~7.24M rows) averages ~113 MB, so a year is **~41 GB**. The full local
-development table — 810 daily runs (Apr 2024 → Jun 2026, ~5.9 billion rows) — is **86 GB**.
+85 lead times, up to ~7.24M rows) averages ~158 MB, so a year is **~58 GB**. The full local
+development table — 899 daily runs (Apr 2024 → Sep 2026, ~6.5 billion rows) — is **142 GB**.
 
-**Storage** (nine real partitions spread across every season):
+**Storage** (nine real partitions spread across every season). **The table compares writer
+configurations, not row-group layouts** — every row was measured at parquet's default row-group
+size, and `delta_store.nwp` now sizes each row group to one ensemble member, which is what the
+~158 MB average above reflects:
 
 | Config | avg MB/partition | extrapolated GB/yr |
 |---|---:|---:|
@@ -51,14 +54,13 @@ and `delta_store.nwp` sizes each parquet row group to hold exactly one member, s
 read (every training run reads just the control member) matches one row group's min/max range and
 skips the other 50. Measured against a `valid_time`-first sort on a real 29-day, 9-cell,
 control-member collect, both arms freshly written through `write_nwp` and timed warm-cache as the
-median of five runs: **5.7× faster and 5.5× less peak memory** (170 ms / 2,200 MB → 30 ms / 400 MB,
-of which 164 MB is the interpreter and its imports), for a **3.7% storage cost** (4.35 GB → 4.51 GB
-across the 29 partitions).
+median of five runs: **5.7× faster and 5.5× less peak memory** (170 ms / 2,200 MB → 30 ms /
+400 MB), for a **3.7% storage cost** (4.35 GB → 4.51 GB across the 29 partitions).
 
 **The read decodes 1.96% of each partition — one row group in 51 — and that holds for every
-member.** A census of the stored table sampled across 2024, 2025 and 2026 reports the same 1.96%
-for the control member, for member 25 and for member 50, so no member pays for being in the middle
-of the range. Under the `valid_time`-first sort the same read decodes 100%.
+member.** A census of partitions from 2024, 2025, and 2026 found 51 row groups in each, every one
+spanning a single member and the 51 together covering members 0 to 50, so no member pays for being
+in the middle of the range. Under the `valid_time`-first sort the same read decodes 100%.
 
 Both figures are local-disk measurements. On S3 a skipped row group also skips a network range
 request, so they are a floor rather than a transfer.
@@ -73,7 +75,7 @@ frame = (
     .filter(
         pl.col("init_time").is_between(window_start, window_end),
         pl.col("valid_time").is_between(window_start, window_end + timedelta(days=10)),
-        pl.col("h3_index").is_in(cells),          # the 9 cells the 33 V1 series sit in
+        pl.col("h3_index").is_in(cells),          # the 9 cells the V1 series sit in
         pl.col("ensemble_member").is_in([0]),     # is_in, not ==, as load_engineering_inputs does
     )
     .collect(engine="streaming")

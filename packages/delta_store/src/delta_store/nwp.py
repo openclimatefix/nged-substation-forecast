@@ -52,7 +52,8 @@ is not enough, because row groups that straddle member boundaries advertise the 
 their extremes.
 
 Measured on the stored table, a single-member read decodes 1.96% of a partition — one row group in
-51 — for the control member, for member 25 and for member 50 alike. Against a ``valid_time``-first
+51 — for every member: each partition censused held 51 row groups, each spanning a single member.
+Against a ``valid_time``-first
 sort of the same 29 partitions, a 9-cell control-member collect runs in 30 ms and 400 MB of peak
 resident memory rather than 170 ms and 2,200 MB, for 3.7% more stored bytes. The method and the
 full figures live beside the storage measurements in
@@ -66,7 +67,7 @@ field). And the row groups have to stay member-aligned, which is what
 NWP_TARGET_FILE_SIZE_BYTES: Final[int] = 2_000_000_000
 """Target size for each Parquet file delta-rs writes, sized to keep one partition in one file.
 
-A daily ECMWF ENS partition is ~145 MB, so the target leaves more than a tenfold headroom.
+A daily ECMWF ENS partition is ~158 MB, so the target leaves more than a tenfold headroom.
 
 **The file-size target is an optimisation, not a correctness requirement.** A partition that
 outgrows the target still writes correctly and still prunes well, because the single Arrow chunk
