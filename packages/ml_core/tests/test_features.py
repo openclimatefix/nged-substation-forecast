@@ -79,7 +79,7 @@ def test_upsample_nwp_to_half_hourly_forward_fills_categorical_vars():
             "nwp_init_time": [datetime(2020, 1, 1, 0)] * 2,
             "ensemble_member": [0, 0],
             "valid_time": [datetime(2020, 1, 1, 0), datetime(2020, 1, 1, 3)],
-            "categorical_precipitation_type_surface": pl.Series([0, 5], dtype=pl.UInt8),
+            "categorical_precipitation_type_surface": pl.Series([0, 5], dtype=pl.Int16),
         }
     )
     result = _upsample_nwp_to_half_hourly(df.lazy()).collect().sort("valid_time")
@@ -156,7 +156,7 @@ def test_upsample_nwp_no_cross_group_forward_fill():
                 datetime(2020, 1, 1, 9),
             ],
             # Group A: both steps have value 5. Group B: lead-time-0 is null, then 2.
-            "categorical_precipitation_type_surface": pl.Series([5, 5, None, 2], dtype=pl.UInt8),
+            "categorical_precipitation_type_surface": pl.Series([5, 5, None, 2], dtype=pl.Int16),
         }
     )
     result = _upsample_nwp_to_half_hourly(df.lazy()).collect().sort(["nwp_init_time", "valid_time"])
@@ -1303,7 +1303,7 @@ def test_upsample_nwp_fills_agree_across_engines():
             "valid_time": steps * len(members),
             "temperature_2m": [float(i) for i in range(len(steps))] * len(members),
             "categorical_precipitation_type_surface": pl.Series(
-                [0, 0, 0, 5, 5, 5, 0, 0, 0] * len(members), dtype=pl.UInt8
+                [0, 0, 0, 5, 5, 5, 0, 0, 0] * len(members), dtype=pl.Int16
             ),
         }
     )
