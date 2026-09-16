@@ -44,10 +44,21 @@ Delta table's `time_series_id`/`time` columns, restricted to the `time_series_id
 candidate frame, and anti-join on `["time_series_id", "time"]` instead of filtering on
 `time > last_time`. Add a small helper, `_existing_power_time_series_keys(delta_path,
 storage_options, time_series_ids) -> pl.LazyFrame`, next to `time_series_coverage`, returning that
-restricted `(time_series_id, time)` frame (or an empty one of the right schema if the table
-doesn't exist, mirroring `time_series_coverage`'s empty-table branch). Filtering by
-`time_series_ids` before the join keeps the build side of the anti-join proportional to the
-handful of series that reported this hour, not the whole table — see the cost note below.
+restricted `(time_series_id, time)` frame. Unlike `time_series_coverage`, this helper needs no
+empty-table branch: its only caller, `select_new_rows`, already returns early via
+`delta_table_exists` (storage.py:398-400) before either branch runs, so by the time the helper is
+called the table is guaranteed to exist. Filtering by `time_series_ids` before the join keeps the
+build side of the anti-join proportional to the handful of series that reported this hour, not the
+whole table — see the cost note below. This restriction matters more than it looks: the table is
+partitioned by `time_series_id` (`delta_store/power_time_series.py`'s `partition_by`), so an
+unrestricted anti-join would force a full 43.8M-row materialisation every hour, while the
+restricted version is a partition-pruned scan proportional only to the reporting series' own
+history.
+
+Both mechanisms this plan fixes are real, not theoretical: `list_timeseries_json_files`'s own
+docstring (storage.py:64-82) says a file's S3 key encodes the time window its *data* covers, not
+when it was uploaded, so a file uploaded today can freely carry an old window — exactly the late
+arrival and the mid-history gap this plan targets.
 
 `select_new_rows`'s `_ProcessedFileListing` branch keeps using `TimeSeriesCoverage.last_time` (see
 next item), so `time_series_coverage` stays as it is and both call sites keep working.
@@ -103,8 +114,8 @@ This is on the production ingest path (`power_time_series_and_metadata`, tagged
 `PRODUCTION_LAYER_TAGS`), so `docs/design-philosophy/inherent-stability.md` applies: nothing here
 introduces a new way to raise on absent or malformed input. The anti-join and the lookback filter
 are both ordinary Polars operations over data already validated by `PowerTimeSeries`/
-`_ProcessedFileListing`; a missing Delta table is handled the same way `time_series_coverage`
-already handles it (empty frame, not an exception). No asset check is added or changed. This
+`_ProcessedFileListing`; a missing Delta table is still handled by `select_new_rows`'s existing
+early return (storage.py:398-400), unchanged by this plan. No asset check is added or changed. This
 change is squarely **H-series adjacent** (fewer silently-dropped genuine readings improves the
 completeness of what `eligible_time_series` and the CV pipeline ultimately see) but does not
 itself correspond to a numbered hypothesis in `engineering-hypotheses.md`.
@@ -182,3 +193,37 @@ no rendered docs page.
   *Recommendation*: don't build this speculatively; the bounded lookback plus the row-level
   anti-join fixes the case the issue actually reports, and the manifest is easy to add later
   without touching this change's row-level logic if evidence shows it's needed.
+- **For the corrected-republication follow-up, when it's planned**: prefer `DeltaTable.merge()`
+  (`WHEN NOT MATCHED THEN INSERT`, keyed on `(time_series_id, time)`) over extending
+  `_existing_power_time_series_keys` with update semantics — it pushes the existence/overwrite
+  decision into the storage engine instead of a bespoke Python anti-join, and upgrading a
+  read-only-membership merge to also handle `WHEN MATCHED THEN UPDATE` is a small step from there.
+  No `DeltaTable.merge()` call exists anywhere in the repo today, so this is a new pattern to
+  introduce carefully, not a drop-in swap for this issue's fix.
+
+## Simplicity review (first adversarial pass)
+
+A fresh sub-agent reviewed this plan for a simpler approach before the correctness pass below. One
+finding was applied; the rest confirmed the plan's existing scope calls:
+
+- **Applied**: dropped the empty-table branch originally planned for
+  `_existing_power_time_series_keys` — unreachable, since `select_new_rows` already guards
+  `delta_table_exists` before either branch runs. Reflected above.
+- **Applied**: added the "both mechanisms this plan fixes are real" paragraph above, citing
+  `list_timeseries_json_files`'s docstring, so the plan states explicitly why a file can be
+  uploaded today covering an old time window.
+- **Rejected — restricting the anti-join to reporting `time_series_id`s is premature
+  optimisation**: no. The table is partitioned by `time_series_id`, so the restriction is what
+  keeps the new anti-join partition-pruned rather than a full-table materialisation; doing it
+  unrestricted would be strictly worse than today's `time_series_coverage` scan, not simpler.
+- **Rejected — reuse `TimeSeriesCoverage` instead of a new helper**: no. `TimeSeriesCoverage` only
+  carries `first_time`/`last_time` per series, which cannot answer "does this exact
+  `(time_series_id, time)` exist" — the new helper is genuinely new capability, not reinvention.
+- **Rejected — drop the file-listing lookback margin for a pure wall-clock cutoff**: no. A new
+  `time_series_id` still needs the existing `last_time.is_null()` branch to download its full
+  backlog regardless of age, which still requires the coverage join — the wall-clock alternative
+  relocates the arbitrary constant without removing the join it would need to remove to be
+  simpler.
+- **Rejected — building the `(path, e_tag)` manifest now instead of the lookback margin**: no,
+  per the plan's own "Risks and open questions" item above — speculative state for an unconfirmed
+  failure mode.
