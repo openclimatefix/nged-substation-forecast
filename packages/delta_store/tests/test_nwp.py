@@ -16,6 +16,7 @@ import patito as pt
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 from contracts.weather_schemas import Nwp
 from delta_store.nwp import (
     NWP_ROW_GROUP_SIZE_LIMITS,
@@ -105,7 +106,9 @@ def test_every_member_lands_in_its_own_row_group(tmp_path: Path) -> None:
     have a minimum of 0. The members in the middle of the range are the case that breaks.
     """
     n_members = 4
-    rows_per_member = NWP_ROW_GROUP_SIZE_LIMITS[0]
+    # Twice the clamp floor, so the derived size and the floor differ and the test sees the
+    # derivation rather than the clamp.
+    rows_per_member = 2 * NWP_ROW_GROUP_SIZE_LIMITS[0]
     table = tmp_path / "nwp"
     write_nwp(_make_nwp(n_members * rows_per_member, n_members=n_members), table)
 
@@ -121,6 +124,49 @@ def test_every_member_lands_in_its_own_row_group(tmp_path: Path) -> None:
     assert len(spans) == n_members, f"expected one row group per member, got {spans}"
     assert all(low == high for low, high in spans), f"a row group spans several members: {spans}"
     assert {low for low, _ in spans} == set(range(n_members))
+
+
+def test_row_groups_stay_member_aligned_when_the_frame_arrives_in_many_chunks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A multi-chunk Arrow table still lands one ensemble member per row group.
+
+    delta-rs consumes a multi-chunk table out of order while partitioning a write, which is what
+    scatters members across row groups. Polars only leaves a frame multi-chunk after the sort when
+    it has many threads to sort with, and ``conftest.py`` pins ``POLARS_MAX_THREADS`` to 4, so the
+    chunking is reproduced here by slicing the sorted table exactly as a higher thread count would.
+    """
+    chunks = 8
+    unchunked = pl.DataFrame.to_arrow
+
+    def _sliced(frame: pl.DataFrame) -> pa.Table:
+        table = unchunked(frame)
+        size = table.num_rows // chunks
+        return pa.concat_tables(
+            [
+                table.slice(
+                    index * size,
+                    size if index < chunks - 1 else table.num_rows - index * size,
+                )
+                for index in range(chunks)
+            ]
+        )
+
+    monkeypatch.setattr(pl.DataFrame, "to_arrow", _sliced)
+
+    n_members = 4
+    table = tmp_path / "nwp"
+    write_nwp(_make_nwp(n_members * NWP_ROW_GROUP_SIZE_LIMITS[0], n_members=n_members), table)
+
+    spans = []
+    for parquet_file in table.rglob("*.parquet"):
+        parquet = pq.ParquetFile(parquet_file)
+        member_column = parquet.schema_arrow.get_field_index("ensemble_member")
+        for group in range(parquet.metadata.num_row_groups):
+            statistics = parquet.metadata.row_group(group).column(member_column).statistics
+            spans.append((statistics.min, statistics.max))
+
+    assert all(low == high for low, high in spans), f"a row group spans several members: {spans}"
 
 
 def test_continuous_vars_rounded_to_significand_bits(tmp_path: Path) -> None:

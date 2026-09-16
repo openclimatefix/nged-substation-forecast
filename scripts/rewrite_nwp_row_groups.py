@@ -8,8 +8,12 @@ table, then delete it.
 
 Each partition is read back through the contract, re-validated, and written through ``write_nwp``,
 which replaces that ``(nwp_model_id, init_time)`` partition and nothing else. A partition whose row
-groups are already member-aligned is skipped, so an interrupted run resumes where it stopped and a
-finished table costs one metadata pass.
+groups are already member-aligned is skipped, so an interrupted run resumes where it stopped.
+
+**The rewrite roughly doubles the table on disk** until the superseded files are reclaimed, so
+migrating a 123 GB table needs about 250 GB free. Reclaim with ``vacuum(full=True)``; plain
+``vacuum()`` reports deleting the files and does not, for the reason recorded on
+<https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/>.
 
 Usage::
 
@@ -22,8 +26,11 @@ import logging
 import time
 from datetime import datetime
 from typing import Final
+from urllib.parse import unquote
 
 import polars as pl
+import pyarrow.fs as pa_fs
+import pyarrow.parquet as pq
 from contracts.settings import get_settings
 from contracts.typing_utils import typeddict_to_dict
 from contracts.uri import ObjectStoreOptions
@@ -34,31 +41,52 @@ from deltalake import DeltaTable
 _LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
 
 
-def _partition_file_counts(table_uri: str, storage_options: ObjectStoreOptions) -> pl.DataFrame:
-    """Each ``init_time`` partition and how many Parquet files it holds, from the Delta log.
+def _unaligned_partitions(table_uri: str, storage_options: ObjectStoreOptions) -> list[datetime]:
+    """Partitions holding a row group that spans more than one ``ensemble_member``.
 
-    Used to decide which partitions still need rewriting. The current `write_nwp` lands one file
-    per partition, where the layout this script migrates away from always split a full ECMWF ENS
-    run across two or more — so a single-file partition has already been rewritten. Reading the
-    log rather than the data keeps this to one metadata call: listing partitions by scanning the
-    table instead would read every row of a table that runs to tens of GB.
+    Reads each active file's Parquet footer, which is the only sound way to tell: the Delta log's
+    own per-file statistics give a file's *overall* member range, which spans the whole ensemble
+    whether the row groups inside are aligned or not. A file-count heuristic is not sound either —
+    an incomplete ECMWF run is small enough to land in one file under either layout, and an
+    incomplete run is the case that prunes worst.
+
+    A file whose footer cannot be read is reported as unaligned, so the migration rewrites it
+    rather than skipping it. Rewriting an already-aligned partition is wasted work; skipping an
+    unaligned one leaves the defect in place.
 
     Args:
         table_uri: Path or URI of the ``nwp`` Delta table.
         storage_options: delta-rs object-store options; empty for a local path.
 
     Returns:
-        One row per partition, with columns ``init_time`` and ``n_files``, ordered by
-        ``init_time``.
+        The ``init_time`` of each partition needing a rewrite, in ascending order.
     """
     delta_table = DeltaTable(table_uri, storage_options=typeddict_to_dict(storage_options))
     actions = pl.DataFrame(delta_table.get_add_actions(flatten=True))
-    return (
-        actions.group_by("partition.init_time")
-        .len(name="n_files")
-        .rename({"partition.init_time": "init_time"})
-        .sort("init_time")
-    )
+    filesystem, root = pa_fs.FileSystem.from_uri(table_uri)
+
+    unaligned: set[datetime] = set()
+    for row in actions.iter_rows(named=True):
+        init_time = row["partition.init_time"]
+        if init_time in unaligned:
+            continue
+        try:
+            parquet = pq.ParquetFile(
+                f"{root.rstrip('/')}/{unquote(row['path'])}", filesystem=filesystem
+            )
+            member_column = parquet.schema_arrow.get_field_index("ensemble_member")
+            spans_one_member = all(
+                (statistics := parquet.metadata.row_group(group).column(member_column).statistics)
+                is not None
+                and statistics.min == statistics.max
+                for group in range(parquet.metadata.num_row_groups)
+            )
+        except OSError as error:
+            _LOGGER.warning("could not read %s, rewriting its partition: %s", row["path"], error)
+            spans_one_member = False
+        if not spans_one_member:
+            unaligned.add(init_time)
+    return sorted(unaligned)
 
 
 def _rewrite_partition(
@@ -71,6 +99,10 @@ def _rewrite_partition(
         init_time: The single ``init_time`` value identifying the partition.
         storage_options: delta-rs object-store options; empty for a local path.
     """
+    # Filtered on init_time alone although the partition key is (nwp_model_id, init_time):
+    # NwpModelId has one member today, so an init_time identifies a partition. A second NWP model
+    # would need this predicate widened, and would be a reason to revisit this script rather than
+    # delete it.
     rows = (
         Nwp.scan_delta(table_uri, storage_options=storage_options)
         .filter(pl.col("init_time") == init_time)
@@ -84,7 +116,7 @@ def _rewrite_partition(
 
 
 def main() -> None:
-    """Rewrite each partition of the ``nwp`` table that is not already member-aligned."""
+    """Rewrite each partition of the ``nwp`` table whose row groups are not member-aligned."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--table-uri", default="", help="nwp Delta table; defaults to settings.nwp_data_path."
@@ -94,11 +126,6 @@ def main() -> None:
         action="store_true",
         help="Report which partitions would be rewritten, and write nothing.",
     )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Rewrite every partition, including ones that already hold a single file.",
-    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
@@ -106,31 +133,33 @@ def main() -> None:
     table_uri = args.table_uri or settings.nwp_data_path
     storage_options = settings.storage_options
 
-    partitions = _partition_file_counts(table_uri, storage_options)
-    _LOGGER.info("%s holds %d partitions", table_uri, partitions.height)
+    pending = _unaligned_partitions(table_uri, storage_options)
+    _LOGGER.info("%s has %d partitions to rewrite", table_uri, len(pending))
 
-    total = partitions.height
-    rewritten = 0
-    for index, row in enumerate(partitions.iter_rows(named=True), start=1):
-        init_time, n_files = row["init_time"], row["n_files"]
-        if n_files == 1 and not args.force:
-            _LOGGER.info("[%d/%d] %s already rewritten", index, total, init_time.isoformat())
-            continue
-        rewritten += 1
+    for index, init_time in enumerate(pending, start=1):
         if args.dry_run:
-            _LOGGER.info("[%d/%d] %s would be rewritten", index, total, init_time.isoformat())
+            _LOGGER.info(
+                "[%d/%d] %s would be rewritten", index, len(pending), init_time.isoformat()
+            )
             continue
         started = time.perf_counter()
-        _rewrite_partition(table_uri, init_time, storage_options)
+        _rewrite_partition(
+            table_uri=table_uri, init_time=init_time, storage_options=storage_options
+        )
         _LOGGER.info(
             "[%d/%d] %s rewritten in %.1fs",
             index,
-            total,
+            len(pending),
             init_time.isoformat(),
             time.perf_counter() - started,
         )
 
-    _LOGGER.info("%d partitions %s", rewritten, "to rewrite" if args.dry_run else "rewritten")
+    if not args.dry_run and pending:
+        _LOGGER.info(
+            "Superseded files are still on disk and roughly double the table until reclaimed."
+            " Use vacuum(full=True); plain vacuum() silently deletes nothing here — see"
+            " https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/"
+        )
 
 
 if __name__ == "__main__":

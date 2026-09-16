@@ -59,16 +59,12 @@ field). And the row groups have to stay member-aligned, which is what
 NWP_TARGET_FILE_SIZE_BYTES: Final[int] = 2_000_000_000
 """Target size for each Parquet file delta-rs writes, sized to keep one partition in one file.
 
-A daily ECMWF ENS partition is ~145 MB, so this leaves more than a tenfold headroom. Keeping the
-partition in a single file matters because delta-rs splits a larger write across concurrent
-writers that consume the incoming Arrow chunks out of order, which scatters the member-sorted rows
-across row groups and widens every row group's ``ensemble_member`` min/max range.
+A daily ECMWF ENS partition is ~145 MB, so this leaves more than a tenfold headroom.
 
 **This is an optimisation, not a correctness requirement.** A partition that outgrows this target
 still writes correctly and still prunes well, because the single Arrow chunk and the member-aligned
 row-group size below do the real work. Measured on a real partition, a single-member read touches
-1.96% of rows when the partition lands in one file and 3.92% when delta-rs splits it in two —
-against 29% with the row groups unaligned, and 72% with none of the three levers."""
+1.96% of rows when the partition lands in one file and 3.92% when delta-rs splits it in two."""
 
 NWP_ROW_GROUP_SIZE_LIMITS: Final[tuple[int, int]] = (1_024, 1_048_576)
 """Floor and ceiling clamped around the member-aligned row-group size.
@@ -86,18 +82,13 @@ def _member_aligned_row_group_size(nwp: pt.DataFrame[Nwp]) -> int:
     `NWP_SORT_COLS`, lands each ensemble member in a row group of its own. A single-member
     predicate then matches one row group's ``ensemble_member`` min/max range exactly, so the scan
     decodes 1/51 of the partition instead of whatever wider range a straddling row group would
-    advertise. Parquet statistics record only a minimum and a maximum, so a row group holding a
-    *non-contiguous* set of members — which is what an unaligned write produces — advertises the
-    whole span between its extremes and admits every member in between.
+    advertise.
 
     Derived from the frame rather than hard-coded so the alignment survives a change to the H3
     grid or the forecast horizon, both of which change how many rows one member occupies. Where
     the division is inexact the alignment degrades gently: a row group straddles two members
-    instead of one, rather than reverting to the full span.
-
-    Sizing the row groups is necessary but not sufficient — the rows reaching the writer have to be
-    in sorted order too, which is why `write_nwp` combines the frame into a single Arrow chunk
-    before writing.
+    instead of one, rather than reverting to the full span. Measured on a real partition with half
+    its rows removed at random members, the worst member still reads 5.88% against the 1.96% floor.
 
     Args:
         nwp: The frame about to be written, carrying every ensemble member for one run.
@@ -106,7 +97,7 @@ def _member_aligned_row_group_size(nwp: pt.DataFrame[Nwp]) -> int:
         The row-group size to give `WriterProperties`, within `NWP_ROW_GROUP_SIZE_LIMITS`.
     """
     floor, ceiling = NWP_ROW_GROUP_SIZE_LIMITS
-    rows_per_member = nwp.height // max(nwp.get_column("ensemble_member").n_unique(), 1)
+    rows_per_member = nwp.height // nwp.get_column("ensemble_member").n_unique()
     return min(max(rows_per_member, floor), ceiling)
 
 
@@ -193,12 +184,6 @@ def write_nwp(
     # every row group's ensemble_member min/max range — measured on a real partition, a
     # single-member read went from 1.96% of rows to 33% purely from the chunking. Combining costs
     # one copy of the frame.
-    #
-    # No unit test covers this line, and one cannot: Polars only leaves a frame multi-chunk after
-    # the sort above when it has many threads to sort with, and `conftest.py` pins
-    # POLARS_MAX_THREADS to 4, at which every fixture size rechunks to one chunk before reaching
-    # here. The scattering this prevents therefore cannot be reproduced under the test suite at
-    # any frame size, and is verified by measurement against the real table instead.
     prepared = rounded.to_arrow().combine_chunks()
 
     write_deltalake(
