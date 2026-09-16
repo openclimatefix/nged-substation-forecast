@@ -14,11 +14,16 @@ never has to import ``conftest`` by name to use one.
 """
 
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from typing import Any
 
+import patito as pt
 import pytest
+from contracts.power_schemas import PowerTimeSeries
+from contracts.weather_schemas import Nwp
 from dagster import DagsterInstance, RunConfig
 
+from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
 from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
 
@@ -58,7 +63,11 @@ def register_experiment() -> Callable[[DagsterInstance, str], None]:
     docstring for why that import is ambiguous).
     """
 
-    def _register(instance: DagsterInstance, experiment_name: str) -> None:
+    def _register(
+        instance: DagsterInstance,
+        experiment_name: str,
+        selected_features: list[str] | None = None,
+    ) -> None:
         result = register_experiment_job.execute_in_process(
             run_config=RunConfig(
                 ops={
@@ -66,7 +75,7 @@ def register_experiment() -> Callable[[DagsterInstance, str], None]:
                         experiment_name=experiment_name,
                         base_model_config="conf/model/xgboost.yaml",
                         config_overrides={
-                            "selected_features": ["temperature_2m"],
+                            "selected_features": selected_features or ["temperature_2m"],
                             "n_estimators": 5,
                         },
                         run_mode="full_cv",
@@ -78,6 +87,37 @@ def register_experiment() -> Callable[[DagsterInstance, str], None]:
         assert result.success
 
     return _register
+
+
+@pytest.fixture
+def spy_power_lookback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[[], list[timedelta]]:
+    """Return a callable that patches ``cv_assets.load_engineering_inputs`` and returns the list
+    of ``power_lookback`` values every subsequent call passes it.
+
+    Installed by the returned callable rather than by the fixture itself, so a test can
+    materialise its own set-up assets first and keep their calls out of the returned list —
+    ``cv_power_forecasts`` must materialise ``trained_cv_model`` before it can run. Reads
+    ``power_lookback`` out of ``**kwargs`` rather than restating the loader's own parameter list,
+    so the spy cannot go stale the way a hand-copied signature can when the loader gains a
+    parameter, and raises loudly if a call site ever stops passing ``power_lookback`` by keyword
+    rather than silently recording a default.
+    """
+
+    def _install() -> list[timedelta]:
+        calls: list[timedelta] = []
+
+        def _spy(
+            *args: Any, **kwargs: Any
+        ) -> tuple[pt.LazyFrame[PowerTimeSeries], pt.LazyFrame[Nwp]]:
+            calls.append(kwargs["power_lookback"])
+            return load_engineering_inputs(*args, **kwargs)
+
+        monkeypatch.setattr("nged_substation_forecast.defs.cv_assets.load_engineering_inputs", _spy)
+        return calls
+
+    return _install
 
 
 @pytest.fixture(autouse=True)

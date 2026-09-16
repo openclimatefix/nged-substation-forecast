@@ -13,29 +13,27 @@ from pathlib import Path
 
 import mlflow
 import numpy as np
-import patito as pt
 import polars as pl
 import pyarrow.parquet as pq
 import pytest
 from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from contracts.settings import Settings
-from contracts.weather_schemas import Nwp
-from dagster import DagsterInstance, RunConfig, materialize
+from dagster import DagsterInstance, materialize
 from delta_store.power_forecasts import POWER_FCST_SIGNIFICAND_BITS
 from delta_store.precision import FLOAT32_SIGNIFICAND_BITS
 from deltalake import write_deltalake
 from mlflow.tracking import MlflowClient
 
-from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
 from nged_substation_forecast.defs.cv_assets import cv_power_forecasts, trained_cv_model
-from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
 pytestmark = pytest.mark.integration
 
 RegisterExperiment = Callable[[DagsterInstance, str], None]
 """Type of the ``register_experiment`` fixture (``tests/conftest.py``)."""
+
+RegisterExperimentWithFeatures = Callable[[DagsterInstance, str, list[str]], None]
+"""Type of the ``register_experiment`` fixture when called with its optional ``selected_features``
+argument."""
 
 FOLD_ID = "mid_2025_to_mid_2026"
 EXPERIMENT_NAME = "exp_predict_smoke"
@@ -155,7 +153,10 @@ def test_cv_power_forecasts_predicts_validation_fold(
 
 
 def test_cv_power_forecasts_derives_power_lookback_from_selected_features(
-    env: dict[str, str], dagster_instance: DagsterInstance, monkeypatch: pytest.MonkeyPatch
+    env: dict[str, str],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperimentWithFeatures,
+    spy_power_lookback: Callable[[], list[timedelta]],
 ) -> None:
     """``cv_power_forecasts`` derives ``power_lookback`` from the experiment's own
     ``selected_features`` and passes it through to ``load_engineering_inputs`` on every
@@ -163,61 +164,17 @@ def test_cv_power_forecasts_derives_power_lookback_from_selected_features(
 
     Mirrors ``test_trained_cv_model_derives_power_lookback_from_selected_features`` in
     ``tests/test_trained_cv_model.py``, for this asset's own call site. The shared
-    ``register_experiment`` fixture used by every other test in this module never requests a
-    power lag feature, so it cannot catch a hardcoded ``power_lookback=timedelta(0)`` or a
-    derivation from the wrong config field here.
+    ``register_experiment`` fixture defaults to a ``selected_features`` set with no power lag, so
+    passing ``power_lag_24h`` explicitly here is what exercises this call site's own derivation.
     """
-    result = register_experiment_job.execute_in_process(
-        run_config=RunConfig(
-            ops={
-                "register_experiment": RegisterExperimentConfig(
-                    experiment_name=EXPERIMENT_NAME,
-                    base_model_config="conf/model/xgboost.yaml",
-                    config_overrides={
-                        "selected_features": ["temperature_2m", "power_lag_24h"],
-                        "n_estimators": 5,
-                    },
-                    run_mode="full_cv",
-                )
-            }
-        ),
-        instance=dagster_instance,
-    )
-    assert result.success
+    register_experiment(dagster_instance, EXPERIMENT_NAME, ["temperature_2m", "power_lag_24h"])
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
     ).success
 
-    calls: list[timedelta] = []
-
-    def spy_load_engineering_inputs(
-        settings: Settings,
-        time_series_ids: list[int],
-        metadata: pt.DataFrame[TimeSeriesMetadata],
-        window_start: datetime,
-        window_end: datetime,
-        ensemble_members: list[int] | None = None,
-        init_time_start: datetime | None = None,
-        init_time_end: datetime | None = None,
-        power_lookback: timedelta = timedelta(0),
-    ) -> tuple[pt.LazyFrame[PowerTimeSeries], pt.LazyFrame[Nwp]]:
-        calls.append(power_lookback)
-        return load_engineering_inputs(
-            settings,
-            time_series_ids,
-            metadata,
-            window_start,
-            window_end,
-            ensemble_members=ensemble_members,
-            init_time_start=init_time_start,
-            init_time_end=init_time_end,
-            power_lookback=power_lookback,
-        )
-
-    monkeypatch.setattr(
-        "nged_substation_forecast.defs.cv_assets.load_engineering_inputs",
-        spy_load_engineering_inputs,
-    )
+    # Install the spy only after training, so its calls list holds only cv_power_forecasts' own
+    # load_engineering_inputs calls, not trained_cv_model's.
+    calls = spy_power_lookback()
 
     assert materialize(
         [cv_power_forecasts], partition_key=PARTITION_KEY, instance=dagster_instance
