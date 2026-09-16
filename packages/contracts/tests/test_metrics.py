@@ -5,8 +5,14 @@ import pytest
 from contracts.ml_schemas import Metrics
 
 
-def _full_key_rows(window_ends: list[datetime]) -> pt.DataFrame[Metrics]:
-    """Two `Metrics` rows sharing every column except `window_end`, with the full key present."""
+def _full_key_rows(
+    window_ends: list[datetime], metric_values: list[float] | None = None
+) -> pt.DataFrame[Metrics]:
+    """`Metrics` rows sharing every key column except `window_end`, with the full key present.
+
+    `metric_values` defaults to the same value for every row; pass distinct values to build rows
+    that share their full primary key but differ in a non-key column.
+    """
     n = len(window_ends)
     window_start = datetime(2026, 1, 1, tzinfo=UTC)
     return (
@@ -20,7 +26,7 @@ def _full_key_rows(window_ends: list[datetime]) -> pt.DataFrame[Metrics]:
                 "horizon_slice": ["all"] * n,
                 "metric_name": ["mae"] * n,
                 "metric_param": ["all"] * n,
-                "metric_value": [1.23] * n,
+                "metric_value": metric_values if metric_values is not None else [1.23] * n,
                 "window_start": [window_start] * n,
                 "window_end": window_ends,
             }
@@ -35,6 +41,17 @@ def test_metrics_rejects_duplicate_primary_key():
     window_end = datetime(2026, 1, 2, tzinfo=UTC)
     with pytest.raises(ValueError, match="Duplicate entries found for primary key"):
         _full_key_rows(window_ends=[window_end, window_end])
+
+
+def test_metrics_rejects_duplicate_primary_key_with_different_metric_value():
+    """The check compares only `PRIMARY_KEY` columns, not the whole row.
+
+    Two rows sharing the full key but disagreeing on `metric_value` are still a duplicate key —
+    the same window scored twice with a different result, not two legitimately distinct rows.
+    """
+    window_end = datetime(2026, 1, 2, tzinfo=UTC)
+    with pytest.raises(ValueError, match="Duplicate entries found for primary key"):
+        _full_key_rows(window_ends=[window_end, window_end], metric_values=[1.23, 4.56])
 
 
 def test_metrics_accepts_rows_differing_only_in_window_end():
