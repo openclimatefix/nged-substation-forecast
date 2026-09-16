@@ -1,7 +1,7 @@
 """Extracts metadata and time series from NGED JSON data.
 
-The JSON is expected to have a structure where metadata fields are at the top level,
-and a 'data' field contains an array of time series data points.
+The JSON is expected to have a structure where metadata fields are at the top level, and a `data`
+field contains an array of time series data points.
 """
 
 import logging
@@ -39,7 +39,7 @@ class ExtractedPowerTimeSeries(NamedTuple):
 def _extract_time_series_metadata(df: pl.DataFrame) -> pt.DataFrame[TimeSeriesMetadata]:
     """Extract TimeSeriesMetadata from NGED's JSON data converted to DataFrame.
 
-    This assumes that all columns other than 'data' are metadata.
+    The parser assumes every column other than `data` is metadata.
     """
     metadata_df = df.drop("data")
 

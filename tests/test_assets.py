@@ -1257,7 +1257,7 @@ def test_definitions_resolve(env: Path) -> None:
     # `live_forecasts_schedule` is built by `build_schedule_from_partitioned_job`, so its cron is
     # *derived* from that inferred partitions_def — the one thing dropping the explicit argument
     # could plausibly have broken. Pin the resolved schedule, not just the job.
-    live_schedule = repo.get_schedule_def("live_forecasts_job_schedule")
+    live_schedule = repo.get_schedule_def("live_forecasts_schedule")
     assert live_schedule.cron_schedule == live_forecast_partitions.cron_schedule
     assert live_schedule.execution_timezone == "UTC"
 
@@ -1286,38 +1286,39 @@ def _file_listing(
 
 
 def test_file_listing_summary_non_empty() -> None:
-    """Non-empty frame: the ``@field_validator``s format the datetime and dedup the IDs (two of the
-    three files share ``time_series_id`` 11), and ``n_time_series_ids`` parses the resulting string
-    back to a count distinct from ``n_files``."""
+    """Non-empty frame: the ``@field_validator`` formats the datetimes, and ``n_time_series_ids``
+    is deduped (two of the three files share ``time_series_id`` 11), so it differs from
+    ``n_files``."""
     summary = _FileListingSummary.from_data_frame(
         "Files with new data", _file_listing(3, time_series_ids=[11, 9, 11])
     )
     assert summary.n_files == 3
     assert summary.start_time == "2026-03-26 08:00"
     assert summary.end_time == "2026-03-26 10:00"
-    assert summary.time_series_ids == "[9, 11]"  # deduped and sorted
     assert summary.n_time_series_ids == 2
     assert summary.min_file_size_bytes == 1000
     assert summary.max_file_size_bytes == 1002
 
 
 def test_power_time_series_summary_non_empty() -> None:
+    """Non-empty frame, with a duplicate ``time_series_id`` across rows (as
+    ``test_file_listing_summary_non_empty`` has), so ``n_time_series_ids`` is pinned against a
+    count that just copies ``n_rows``."""
     base = datetime(year=2026, month=3, day=26, hour=8, tzinfo=UTC)
     df = (
         PowerTimeSeries.DataFrame(
             {
-                "time_series_id": [1, 2],
-                "time": [base, base + timedelta(minutes=30)],
-                "power": [2.5, 1.5],
+                "time_series_id": [1, 2, 2],
+                "time": [base, base + timedelta(minutes=30), base + timedelta(minutes=60)],
+                "power": [2.5, 1.5, 1.6],
             }
         )
         .cast()
         .validate()
     )
     summary = _PowerTimeSeriesSummary.from_data_frame("Downloaded timeseries", df)
-    assert summary.n_rows == 2
+    assert summary.n_rows == 3
     assert summary.start_time == "2026-03-26 08:00"
-    assert summary.time_series_ids == "[1, 2]"
     assert summary.n_time_series_ids == 2
 
 
@@ -1328,15 +1329,14 @@ def test_power_time_series_summary_non_empty() -> None:
         (_PowerTimeSeriesSummary, PowerTimeSeries.DataFrame(schema=PowerTimeSeries.dtypes)),
     ],
 )
-def test_summary_empty_frame_uses_na_defaults(
+def test_summary_empty_frame_uses_defaults(
     summary_cls: type[_BaseSummary], empty_df: pt.DataFrame
 ) -> None:
-    """Empty frame → the ``"N/A"`` defaults survive (the validators pass them through untouched) and
-    ``n_time_series_ids`` short-circuits to 0 without calling ``ast.literal_eval``."""
+    """Empty frame → the ``"N/A"`` start/end defaults survive (the validator passes them through
+    untouched) and ``n_time_series_ids`` stays at its ``0`` default."""
     summary = summary_cls.from_data_frame("stage", empty_df)
     assert summary.start_time == "N/A"
     assert summary.end_time == "N/A"
-    assert summary.time_series_ids == "N/A"
     assert summary.n_time_series_ids == 0
 
 

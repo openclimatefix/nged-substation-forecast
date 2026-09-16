@@ -38,11 +38,10 @@ cannot drift apart.
 `selected_features` is a set of strings, written in the YAML as a list. Registration only checks
 that it is a list of strings coercible to that set — a typo'd top-level key (e.g.
 `selected_featuers`) is rejected there, by pydantic's `extra="forbid"` on `BaseForecasterConfig`.
-The individual strings inside the list are not
-parsed until training runs: the feature engineering pipeline
-(`ml_core.features._parsed_features.ParsedFeatures.from_strings`) parses each one into a typed
-descriptor and raises `ValueError` on any unrecognised or forbidden name, so a typo'd feature
-name (e.g. `tempurature_2m`) surfaces only then, not at registration.
+The individual strings inside the list are not parsed until training runs. The feature
+engineering pipeline (`ml_core.features._parsed_features.ParsedFeatures.from_strings`) parses
+each one into a typed descriptor and raises `ValueError` on any unrecognised or forbidden name,
+so a typo'd feature name (e.g. `tempurature_2m`) surfaces only then, not at registration.
 
 ### Power lags
 
@@ -70,7 +69,7 @@ These are the NWP variables available directly from ECMWF ENS at `valid_time`.
 | `geopotential_height_500hpa` | 500 hPa geopotential height (m) |
 | `downward_long_wave_radiation_flux_surface` | Downward LW radiation (W/m²) |
 | `downward_short_wave_radiation_flux_surface` | Downward SW radiation (W/m²) |
-| `precipitation_surface` | Total precipitation (kg/m²) |
+| `precipitation_surface` | Total precipitation rate (kg/m²/s) |
 | `categorical_precipitation_type_surface` | Precipitation type (categorical) |
 
 ### Weather lags and rolling means
@@ -183,12 +182,13 @@ constructed.
 
 **Every key must name a field the config class declares** — the two tables above. Write
 `n_estimtors` instead of `n_estimators` and registration fails, before a single fold is scheduled,
-with a `ValidationError` naming the key. This matters more than a typo usually would, because the searches that drive most
-registrations are unattended: the LLM auto-research agent registers, materialises and reads the
-leaderboard with nobody in the loop, and the variant grid sweeps several dimensions at once. A key
-that was quietly dropped would give you a grid of *identical* runs, each scoring plausibly, each
-landing on the leaderboard, and nothing to distinguish that grid from a genuine null result. That
-is [principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically).
+with a `ValidationError` naming the key. This matters more than a typo usually would, because the
+searches that drive most registrations are unattended. The LLM auto-research agent registers,
+materialises, and reads the leaderboard with nobody in the loop, and the variant grid sweeps
+several dimensions at once. A key that was quietly dropped would give you a grid of *identical*
+runs, each scoring plausibly, each landing on the leaderboard, and nothing to distinguish that
+grid from a genuine null result. That is [principle
+8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically).
 
 Two further keys are refused for their own reasons. `_target_` names the forecaster class, and the
 config class follows from it: to use a different one, point `base_model_config` at a different

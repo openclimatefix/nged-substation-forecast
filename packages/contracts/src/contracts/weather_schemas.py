@@ -322,7 +322,7 @@ class Nwp(pt.Model):
 
     All three are legitimately null at lead-0, and they share a de-accumulation step whose known
     upstream corruption leaves further nulls beyond it. Those are tolerated at ingest and reported
-    by :func:`assess_nwp_quality`; only a variable null in *every* slice beyond lead-0 is fatal.
+    by `assess_nwp_quality`; only a variable null in *every* slice beyond lead-0 is fatal.
     Which corruption patterns arrive, what the H3 aggregation absorbs before they reach a validated
     frame, and why the survivors are tolerated:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#nulls-in-the-de-accumulated-variables-tolerated>.
@@ -380,7 +380,7 @@ class Nwp(pt.Model):
         That is, one that is null in *every* (ensemble_member, valid_time) slice beyond lead-0 of
         a run.
 
-        Every smaller null pattern is *tolerated* and reported by :func:`assess_nwp_quality`
+        Every smaller null pattern is *tolerated* and reported by `assess_nwp_quality`
         instead, so this is a cliff rather than a slope: a run one slice short of empty lands with
         a warning. There is no tunable fraction — the test is that *nothing* survives.
 
@@ -398,7 +398,7 @@ class Nwp(pt.Model):
           raise, even though that same slice was deliberately landed when the whole run was
           validated. Latent rather than live today: the only production caller validates one whole
           run, and reads go through `scan_delta`/`set_model`, which do not validate.
-        - Raising is not the end of the partition. :class:`NwpVariableWhollyMissing` is a distinct
+        - Raising is not the end of the partition. `NwpVariableWhollyMissing` is a distinct
           type because the `ecmwf_ens` asset retries it rather than failing outright.
         """
         slices_per_run = (
@@ -498,6 +498,11 @@ class Nwp(pt.Model):
             storage_options: delta-rs object-store options (credentials/endpoint) for a remote
                 ``path``; defaults to ``get_settings().storage_options`` (empty for a local
                 ``path``).
+
+        Returns:
+            A lazy frame over the ``nwp`` Delta table, set to the ``Nwp`` model and cast to its
+            declared dtypes — one row per (NWP model, init time, ensemble member, valid time,
+            H3 cell), with the weather variables already in physical units.
         """
         settings = get_settings()
         if path is None:
@@ -519,7 +524,7 @@ def _deaccumulated_null_breakdown(dataframe: pl.DataFrame) -> pl.DataFrame:
     Covers every slice beyond lead-0.
 
     Returns only slices that have at least one null. Shared by the fatal wholly-missing-variable
-    check and the non-fatal :func:`assess_nwp_quality`, so both agree on what a "null" is, and so
+    check and the non-fatal `assess_nwp_quality`, so both agree on what a "null" is, and so
     the fatal case is exactly the extreme of what the warning reports. ``init_time`` is in the
     group key so the counts stay correct even on a multi-run frame (each grid cell is one row, so
     ``n_total`` is the slice's cell count). Operates on a single NWP run in practice (~1M rows), far
@@ -549,12 +554,12 @@ class NwpQualityReport:
     arrived empty, plus the cells where upstream scatter happened to take out every contributing
     grid point; the two are counted separately because they warrant different responses, but
     neither fails the run. Only a variable that is null in *every* slice is fatal, and
-    :meth:`Nwp.validate` rejects that before this runs.
+    `Nwp.validate` rejects that before this runs.
 
     Read this as "how much did we lose", not as "how corrupt was the feed". The aggregation absorbs
     most per-pixel upstream corruption before it reaches a cell, so this is a poor proxy for the
     upstream null rate. That rate is measured where it lives, on the raw grid, by
-    :class:`dynamical_data.ecmwf_ens.upstream_nulls.UpstreamNullRate`; the ``ecmwf_ens`` asset
+    `dynamical_data.ecmwf_ens.upstream_nulls.UpstreamNullRate`; the ``ecmwf_ens`` asset
     publishes both on one check, and they are not comparable as rates.
     """
 
@@ -613,7 +618,7 @@ def assess_nwp_quality(dataframe: pt.DataFrame[Nwp]) -> NwpQualityReport:
     """Summarise the tolerated-but-noteworthy nulls in a *validated* NWP run.
 
     Reports the nulls in the de-accumulated variables (precipitation/radiation) beyond lead-0 that
-    :meth:`Nwp.validate` deliberately tolerates: whole (ensemble_member, valid_time) slices that
+    `Nwp.validate` deliberately tolerates: whole (ensemble_member, valid_time) slices that
     arrived empty, and the cells where the upstream per-pixel corruption survived the H3
     aggregation by taking out every grid point of a cell. Pure and Dagster-free
     (unit-testable in isolation); the ``ecmwf_ens`` asset wraps the result into a WARN
@@ -786,6 +791,13 @@ def assess_nwp_run_completeness(
             ensemble, the only `NwpModelId` we ingest today.
         expected_lead_time_hours: Forecast steps, in hours after `init_time`, the run should carry.
             Defaults to the ECMWF ENS native step structure.
+
+    Returns:
+        A `NwpRunCompletenessReport` giving the observed row count against the expected
+        complete-grid row count, the observed versus expected ensemble members and H3 cell
+        count, the earliest and latest `valid_time` (`None` for an empty frame), and which
+        expected lead times are missing or which observed `valid_time`s are unexpected — the
+        latter two both empty when the frame does not hold exactly one `init_time`.
     """
     init_times = tuple(sorted(dataframe["init_time"].unique().to_list()))
     observed_members = set(dataframe["ensemble_member"].unique().to_list())

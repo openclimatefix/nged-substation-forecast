@@ -2,18 +2,18 @@
 
 ## Phased Rollout
 
-**Version 1** (current focus): 32 time series in NGED's trial area — 16 primary substations, 6 solar PV farms (5 EHV, 1 HV), 3 wind farms, 2 GSPs, 2 BSPs, 1 biofuel generator, 1 BESS, and 1 reciprocating gas generator. All implemented with a single XGBoost model family.
+**Version 1** (current focus): 32 time series in NGED's trial area — 16 primary substations, 6 solar PV farms (5 extra-high-voltage, 1 high-voltage), 3 wind farms, 2 grid supply points (GSPs), 2 bulk supply points (BSPs), 1 biofuel generator, 1 battery energy storage system (BESS), and 1 reciprocating gas generator. All implemented with a single XGBoost model family.
 
 **Version 2** (future): Scale to approximately 2,500 time series (all of NGED's primary substations, BSPs, GSPs, and most customer meters). See [Roadmap](../roadmap/index.md).
 
 ## Core Objectives
 
-This is a research project, and our NGED partners treat it as one: the single hard requirement
-is that the project gives NGED **new information about forecasting for their assets**. Even a
-negative result carries value — if we try our hardest and cannot, say, detect switching events
-from power data alone, that is evidence NGED can take to their senior leadership to argue for
-investing in technology to extract switching labels from their operational systems. The
-objectives below therefore sit on a **priority continuum**, not a must-have/nice-to-have split.
+This is a research project, and our NGED partners treat it as a research project: the single
+hard requirement is that the project gives NGED **new information about forecasting for their
+assets**. Even a negative result carries value — if we try our hardest and cannot, say, detect
+switching events from power data alone, a well-evidenced negative result would inform future
+decisions about extracting switching records from operational systems. The objectives below therefore sit on a **priority continuum**, not a
+must-have/nice-to-have split.
 
 **Highest priority — probabilistic power forecasts under the normal running arrangement
 (NRA):**
@@ -21,8 +21,8 @@ objectives below therefore sit on a **priority continuum**, not a must-have/nice
 * Probabilistic, half-hourly, 14-day horizon forecasts updated every 6 hours. Within that
   horizon, users mostly act on forecasts roughly **1 to 10 days ahead**, so skill in that band
   matters most.
-    * For the day-ahead forecast: NGED want to look at the forecast at 11am to see the forecast from midnight to
-    23:59 on the next day.
+    * The day-ahead forecast must be available by 11:00 and must cover midnight to 23:59 on the
+      next day.
 * Cover substations (primary, BSP, GSP), metered generators (solar PV, wind, BESS, etc.), and customer meters.
 
 **Everything else exists primarily to improve those forecasts.** Switching-event handling,
@@ -32,39 +32,56 @@ phenomena *implicitly*. That said, explicit estimates are genuinely wanted where
 them:
 
 * Track the **effective capacity** of metered generators over time (turbine failures, inverter
-  faults, PV panel degradation), ignoring NGED-imposed ANM curtailment — including detecting
-  misbehaving generators.
-* Detect and compensate for **switching events** — where power is diverted from one substation
-  to another due to maintenance, changing the local demand signature. (Whether this ships as a
-  discrete event table or as continuous switching-state signals is an open question — see
-  [the decision point](../roadmap/switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).)
-* Automatically detect and flag **faulty metering** (stuck values, physically impossible
-  values, missing data).
-* An optional **"prevailing conditions" forecast** assembled from the delivered building
-  blocks — explicitly lower priority than the NRA forecast. See
-  [forecast building blocks](../roadmap/forecast-building-blocks.md).
+  faults, PV panel degradation), including detecting misbehaving generators. The "effective
+  capacity" ignores Active Network Management (ANM) curtailment because a curtailed
+  generator is being held down rather than broken.
+* Detect and compensate for **switching events** — where power is diverted from one substation to
+  another due to maintenance, changing the local demand signature. (Whether this ships as a discrete
+  event table or as continuous switching-state signals is an open question — see [the decision
+  point](../roadmap/switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).)
+* Automatically detect and flag **faulty metering** (stuck values, physically impossible values,
+  missing data).
+* An optional **"prevailing conditions" forecast** assembled from the delivered building blocks —
+  explicitly lower priority than the NRA forecast. See [forecast building
+  blocks](../roadmap/forecast-building-blocks.md).
 
-The five [delivery tables](../roadmap/delivery-tables.md) were specified in our most recent
-formal report to NGED, so a change of shape there (such as replacing the discrete
-`substation_switching` table with continuous signals) is something to agree with NGED, not to
-decide unilaterally.
+The shapes of the five [delivery tables](../roadmap/delivery-tables.md) were specified in a
+formal report to NGED, so changing a shape (such as replacing the discrete `substation_switching` table with continuous
+signals) needs NGED's agreement.
 
 ### The worst case matters most: forecasting threshold exceedance
 
-NGED's need for these forecasts is driven by **flexibility procurement**: deciding, days
-ahead, whether to pay flexible customers to reduce their demand when a substation risks
-running beyond its capability. So the question users ask of a forecast is rarely "what is the
-most likely load?" and usually "**how likely is load to cross this limit?**" — NGED's
-[incumbent forecasting tool](nged-incumbent-forecast.md#the-operators-view) literally plots
-demand as headroom below a constraint line. The project's value therefore concentrates in the
-**upper tail** of each forecast distribution: a model that is excellent on typical half-hours
-but unreliable in the handful of near-limit hours has failed at the job. This is why the
-delivery quantiles are deliberately tail-heavy, and why evaluation includes
-[tail & exceedance metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
+Flexpectation aims to save money for end users in two specific ways. The first is **flexibility
+procurement**: deciding, days ahead, whether to pay flexible customers to reduce their demand when a
+substation risks running beyond its capability. The second is **generator curtailment**: holding
+embedded generation down when export risks running beyond a limit. That limit is usually not the
+substation's own: a generation constraint typically binds above the primary, driven by the
+aggregated flow across several substations rather than by any single meter in isolation. The
+forecasts that matter for curtailment are therefore the forecasts that net and sum correctly up the
+hierarchy — which is why [curtailment
+scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at one primary before
+summing up the substation hierarchy. Curtailment savings accrue to the whole system rather
+than to NGED's own spend. Curtailment is nonetheless in scope alongside flexibility
+procurement, so the forecast requirement is the same for both decisions. So the question users
+ask of a forecast is rarely "what is the most likely load?" and usually "**how likely is net
+demand to cross this limit?**" — a [mock-up of the operator
+view](manual-heuristic-forecast.md#the-operators-view) plots demand as headroom below a
+constraint line.
+
+The project's value therefore concentrates in **both tails** of each forecast distribution: A
+model that is excellent on typical half-hours but unreliable in the handful of near-limit
+hours has failed at the job. The near-limit hours sit at both ends. Flexibility procurement
+turns on the upper tail, where demand rises towards firm capacity, and bites in winter.
+Curtailment turns on the lower tail, where export rises towards whichever limit binds because
+embedded generation is high and demand is low, and bites in summer. The 13
+`DELIVERY_QUANTILES` are deliberately tail-heavy at both ends and symmetric about the median —
+p1, p2, and p5 matching p95, p98, and p99. The delivery shape therefore already serves both
+decisions. This is why evaluation includes [tail & exceedance
+metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
 alongside average-error metrics. (One honest complication: a substation's real limit is not a
 single number — it varies with ambient temperature and with how long an overload lasts — so
-the evaluation metrics use documented static proxies; see
-[the threshold-choice discussion](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived).)
+the evaluation metrics use documented static proxies; see [the threshold-choice
+discussion](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived).)
 
 ## Stretch Goals
 
@@ -79,12 +96,15 @@ Nearly every objective above is an open research question — improving NRA fore
 detecting switching events, estimating effective capacity, flagging faulty meters,
 disaggregating DERs — and we hold far more ideas than we can try at once. That turns
 experimentation throughput into an infrastructure requirement in its own right: we need to run
-**on the order of hundreds of ML experiments per month**, and the workflow must make each one
-as frictionless as possible. The pre-registered version of that requirement — deliberately relaxed
-to a peak-month, per-person claim, so that months spent hardening the service are not spurious
-falsifications — is
-[H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month); the
-promotion half below is [H3](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
+**on the order of hundreds of ML experiments per month**, and the workflow must make each
+experiment as frictionless as possible. That the throughput produces a better forecast is a
+bet this project is making rather than a result the literature has settled, for the reasons
+set out in [Our approach to MLOps](../ml_experimentation/index.md#our-approach-to-mlops). The
+pre-registered version of that requirement — deliberately relaxed to a peak-month, per-person
+claim, so that months spent hardening the service are not spurious falsifications — is
+[H2, a hundred experiments per person in a peak month](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month);
+the promotion half below is
+[H3, one-click promotion and one-click rollback](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 
 Three properties matter as much as raw throughput:
 
@@ -112,67 +132,67 @@ in choosing Dagster over Airflow (see
 
 ## Operating model & handover
 
-NGED confirmed (2026-07-14) that their preference for running Flexpectation business-as-usual
-*after* the NIA project is for **NGED to run our code themselves, on NGED's own AWS
-infrastructure**. This is a statement of preference, not yet a commitment: NGED still need to
-check with their DSO, Cyber, and IT&D teams before giving a concrete answer. Even so, it sets
-a standing design requirement for everything we build:
+The working assumption is that, after the Network Innovation Allowance (NIA) project, **NGED
+runs the service on its own AWS account**. That working assumption sets a standing design
+requirement for everything we build:
 
-* **The service must be operable day to day by a non-expert at NGED** — every routine action
-  reduced to a dashboard check, a button in the Dagster UI, or a runbook. See
+* **The service must be operable day to day by NGED staff who did not develop the code, working
+  from the runbooks** — every routine action reduced to a dashboard check, a button in the
+  Dagster UI, or a runbook step. See
   [Handover to NGED](../roadmap/handover.md) for the engineering consequences and the handover
   workstreams.
 * **Uptime requirements are deliberately lenient** — recovery is "next business day, via
   runbook", never a 2am page. See [Uptime: lenient by design](#uptime-lenient-by-design) below
-  for exactly why an outage costs so little.
+  for exactly why an outage does so little damage.
 
 The phasing:
 
 1. For the duration of the NIA project, OCF develops **and runs** Flexpectation on OCF's own
    AWS account (unchanged from the existing plan).
 2. We will not know whether the service is truly hand-over-able until OCF has run the full v2
-   service (~2,500 time series) for a few months. NGED has accepted this.
+   service (~2,500 time series) for a few months. The v2 gate is part of the working assumption.
 3. In the last few months of the NIA project, NGED progressively takes control of the service,
    with OCF support. NGED then decides whether to run it themselves.
 4. Post-NIA, OCF is no longer on call; NGED handles day-to-day issues. OCF may continue
-   developing the software and models, possibly under a retainer — details TBD.
+   developing the software and models.
 
 A **hybrid model** may prove beneficial: NGED runs the production service while OCF continues
 to develop the code and ML models, and perhaps runs a second service instance of its own (e.g.
-adapted for other DNOs, or feeding OCF's substation forecasts into a commercial demand-forecast
-product). This makes account-portable infrastructure doubly valuable — see
+adapted for other DNOs). A hybrid model makes account-portable infrastructure doubly valuable — see
 [Handover to NGED](../roadmap/handover.md#4-infrastructure-as-code-portable-to-ngeds-account).
 
 ## Uptime: lenient by design
 
 Flexpectation carries **no hard availability target**. We aim for a highly robust service, but
 the requirement when something breaks is recovery "next business day, via runbook" — never a
-2am page, and no on-call rota. This leniency is a property of how NGED consumes the forecasts,
-not an aspiration; three things bound the damage of an outage:
+2am page, and no on-call rota. The lenient uptime requirement follows from how the forecasts are
+consumed, not from aspiration. Three factors bound the damage of an outage:
 
 1. **Every forecast extends 14 days ahead**, refreshed every 6 hours, and users mostly act on
    the forecast roughly 1 to 10 days ahead (see [Core Objectives](#core-objectives)). If the
    service stops producing new forecasts for a few hours — or even a day — the most recent
-   forecast remains useful; it merely ages, degrading skill gradually rather than cutting NGED
+   forecast remains useful. It merely ages, degrading skill gradually rather than cutting NGED
    off.
 2. **Delivery is decoupled from compute.** Forecasts are delivered as Delta tables on S3 (see
    [Forecast Delivery](#forecast-delivery) below), so every previously published forecast stays
    readable even while all of OCF's compute is down — the read path never touches our
    infrastructure.
-3. **A legacy fallback exists.** In the worst case, NGED can temporarily fall back to their
-   legacy forecasting approach while Flexpectation is fixed.
+3. **NGED's existing forecasting tools remain available** if Flexpectation is temporarily
+   unavailable.
 
 **One case these three arguments do not cover.** All three assume the outage is *our compute
-stopping*. An extended NWP outage is different in kind: compute keeps running, but the forecast
-either degrades silently or — as the code stands today — hard-fails, and meanwhile the last good
-forecast ages out, so the 14-day-horizon argument expires along with it. Leniency about *our*
-uptime is therefore not the same as leniency about *input* outages, and the second is handled by a
-separate design principle: see [Inherent Stability](../design-philosophy/inherent-stability.md), whose
-degradation ladder sets out what the service should produce at each stage of input loss.
+stopping*. An extended NWP outage is different in kind: compute keeps running, but the
+forecast either degrades silently or — as the code stands today — hard-fails. Meanwhile the
+last good forecast ages out, so the 14-day-horizon argument expires along with it. Leniency
+about *our* uptime is therefore not the same as leniency about *input* outages, and the second
+is handled by a separate design principle: see [Inherent
+Stability](../design-philosophy/inherent-stability.md), whose degradation ladder sets out what
+the service should produce at each stage of input loss.
 
-This section is the *defensive* half of the argument — an outage does not cost much. The
-corresponding *positive* claim, that interventions will be rare in the first place, is stated and
-tested as [H1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+This section is the *defensive* half of the argument — an outage does little damage. The
+corresponding *positive* claim, that interventions will be rare in the first place, is stated
+and tested as [H1, a service that mostly runs
+itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 Missed forecasts are also not lost for evaluation purposes: once the service is back, missed
 slots are backfilled in replay mode, reconstructing what would have been forecast at the time —
@@ -180,11 +200,11 @@ see [Operating the live service: Backfilling a missed slot](../live_service/oper
 
 The same properties give the service **built-in maintenance windows**. New forecasts are
 produced only once every 6 hours, and NGED reads published forecasts directly from S3 rather
-than from any OCF-run service — so the gap between one forecast run and the next is a regular,
-roughly six-hour window in which OCF can stop, patch, upgrade, or even rebuild its compute
-(most notably the always-on control-plane VM) without NGED noticing. No downtime needs to be
-negotiated or announced, and even a maintenance overrun costs only a missed slot, recovered by
-the replay-mode backfill above.
+than from any OCF-run service. So the gap between one forecast run and the next is a regular,
+roughly 6-hour window in which OCF can stop, patch, upgrade, or even rebuild its compute (most
+notably the always-on control-plane VM) without interrupting the forecasts NGED reads. Routine
+maintenance therefore needs no separate downtime window. Even a maintenance overrun causes
+only a missed slot, recovered by the replay-mode backfill above.
 
 This requirement shapes the architecture: it is why a single always-on control-plane VM is an
 acceptable single point of failure (see

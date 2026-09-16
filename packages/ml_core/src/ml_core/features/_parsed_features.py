@@ -8,6 +8,7 @@ it also enforces architectural guardrails (no raw target, no index columns as fe
 import re
 from abc import abstractmethod
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Annotated, ClassVar, Final, Literal, Self, cast, get_args
 
 import polars as pl
@@ -236,6 +237,17 @@ class ParsedFeatures:
         The pipeline uses this list to selectively nullify them based on the forecast lead time.
         """
         return [feature for feature in self._get_all_lookback_features() if feature.is_leaky()]
+
+    def max_power_lag(self) -> timedelta:
+        """The longest power lag these features request, or zero when none of them request power.
+
+        Sizes ``load_engineering_inputs``'s ``power_lookback``: a caller needs power history
+        reaching back at least the returned duration before its window to keep every requested
+        power lag non-null near the window's start.
+        """
+        return timedelta(
+            hours=max((lag.hours for lag in self.lags if lag.base_col == "power"), default=0)
+        )
 
     def requires_weather_data(self) -> bool:
         """Determine if the requested features require weather (NWP) data.

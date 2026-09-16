@@ -22,7 +22,7 @@ UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
 MIN_PLAUSIBLE_DATETIME: Final[datetime] = datetime(2000, 1, 1, tzinfo=UTC)
 """The earliest timestamp a bounded datetime column may carry (inclusive).
 
-A column is bounded when its model's ``validate`` passes it to :func:`check_datetime_bounds`; the
+A column is bounded when its model's ``validate`` passes it to `check_datetime_bounds`; the
 constant says nothing about columns that have not opted in.
 
 NGED telemetry cannot predate the instrumentation that produced it, and the ECMWF archive we
@@ -62,8 +62,8 @@ def check_datetime_bounds(dataframe: pl.DataFrame, column: str, *more_columns: s
         *more_columns: Names of any further datetime columns to bound.
 
     Raises:
-        ValueError: If any value is before :data:`MIN_PLAUSIBLE_DATETIME` or after
-            :data:`MAX_PLAUSIBLE_DATETIME`. Nulls are ignored — absence is not malformedness — and
+        ValueError: If any value is before `MIN_PLAUSIBLE_DATETIME` or after
+            `MAX_PLAUSIBLE_DATETIME`. Nulls are ignored — absence is not malformedness — and
             an empty frame always passes.
     """
     columns = (column, *more_columns)
@@ -80,12 +80,12 @@ def split_by_datetime_plausibility(
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Partition ``dataframe`` into ``(plausible, implausible)`` rows by ``column``.
 
-    A row is implausible when its ``column`` value is before :data:`MIN_PLAUSIBLE_DATETIME` or
-    after :data:`MAX_PLAUSIBLE_DATETIME` — the same bounds :func:`check_datetime_bounds` enforces.
+    A row is implausible when its ``column`` value is before `MIN_PLAUSIBLE_DATETIME` or
+    after `MAX_PLAUSIBLE_DATETIME` — the same bounds `check_datetime_bounds` enforces.
     Nulls are always plausible (absence is not malformedness).
 
     Use this at an ingestion boundary to drop-and-report malformed external rows instead of
-    aborting the whole batch; use :func:`check_datetime_bounds` where a hard assertion is
+    aborting the whole batch; use `check_datetime_bounds` where a hard assertion is
     appropriate instead (e.g. inside a Patito model's ``validate``).
 
     Args:

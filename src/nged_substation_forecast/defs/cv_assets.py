@@ -35,13 +35,16 @@ from dagster import (
     StaticPartitionsDefinition,
     asset,
 )
+from delta_store.effective_capacity import write_effective_capacity
+from delta_store.eligible_time_series import write_eligible_time_series
+from delta_store.forecast_metrics import write_forecast_metrics
 from delta_store.power_forecasts import write_power_forecasts
-from deltalake import write_deltalake
 from ml_core.cv_helpers import (
     date_to_utc_datetime,
     eligible_time_series_ids,
     parse_cv_partition_key,
 )
+from ml_core.features._parsed_features import ParsedFeatures
 from ml_core.metrics import (
     NoOverlappingActualsError,
     build_mlflow_aggregate_metrics,
@@ -97,7 +100,8 @@ _PREDICT_INIT_CHUNK: Final[timedelta] = timedelta(days=14)
 """``init_time`` window processed per ``cv_power_forecasts`` iteration.
 
 Prediction fans every NWP run out across all ~51 ensemble members, so the full validation window at
-once is tens of GB. ``init_time`` is both the partition key and the axis that inflates the output,
+once is tens of GB. ``init_time`` is one of the table's two partition columns and the axis that
+inflates the output,
 so chunking by it bounds the per-iteration forecast frame (~2-3 GB at 14 days) while each partition
 is still read exactly once. See ``cv_power_forecasts``.
 """
@@ -111,15 +115,22 @@ is still read exactly once. See ``cv_power_forecasts``.
 def eligible_time_series(context: AssetExecutionContext) -> None:
     """Compute and persist the canonical eligible ``time_series_id``s for one CV fold.
 
-    A time series is eligible for a fold when its observed-power coverage has at least
-    ``min_training_months`` of history before the fold's ``val_start`` *and* reaches the fold's
-    ``val_end``. Eligibility is derived from data coverage alone (not from any model/config), so
-    every experiment evaluates the fold on the identical population — this is what keeps the
-    leaderboard apples-to-apples.
+    Reads observed-power coverage from the ``power_time_series_and_metadata`` Delta table. A time
+    series is eligible for a fold when its coverage has at least ``min_training_months`` of history
+    before the fold's ``val_start`` *and* reaches the fold's ``val_end``. Eligibility is derived
+    from data coverage alone (not from any model/config), so every experiment evaluates the fold on
+    the identical population — this is what keeps the leaderboard apples-to-apples. See
+    "Eligibility" in
+    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/cross-validation-folds/#eligibility>
+    for the fold definitions this population is computed against.
 
     The result is written to the ``eligible_time_series`` Delta table as one partition per
-    ``fold_id`` via an idempotent partition overwrite, so re-materialising a fold replaces its
-    rows rather than duplicating them.
+    ``fold_id`` via an idempotent partition overwrite, so re-materialising a fold replaces its rows
+    rather than duplicating them. ``trained_cv_model`` reads this fold's partition to select which
+    series to train on; ``cv_power_forecasts`` does not read it directly, but inherits the same
+    population through the trained model's ``trained_time_series_ids``. A stale or missing
+    partition here therefore shows up downstream as a fold trained on the wrong population, not as
+    a failure at either of those assets.
     """
     settings = Settings()
     storage_options = settings.storage_options
@@ -141,13 +152,11 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     )
 
     if_local_path_then_make_parent_dir(settings.eligible_time_series_data_path)
-    write_deltalake(
-        table_or_uri=settings.eligible_time_series_data_path,
-        data=eligible_df.to_arrow(),
-        mode="overwrite",
-        predicate=f"fold_id = '{fold_id}'",
-        partition_by=["fold_id"],
-        storage_options=typeddict_to_dict(storage_options),
+    write_eligible_time_series(
+        eligible=eligible_df,
+        table_uri=settings.eligible_time_series_data_path,
+        fold_id=fold_id,
+        storage_options=storage_options,
     )
 
     context.add_output_metadata(
@@ -192,11 +201,10 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     capacity_df = compute_effective_capacity(power_lf)
 
     if_local_path_then_make_parent_dir(settings.effective_capacity_data_path)
-    write_deltalake(
-        table_or_uri=settings.effective_capacity_data_path,
-        data=capacity_df.to_arrow(),
-        mode="overwrite",
-        storage_options=typeddict_to_dict(storage_options),
+    write_effective_capacity(
+        capacity=capacity_df,
+        table_uri=settings.effective_capacity_data_path,
+        storage_options=storage_options,
     )
 
     context.add_output_metadata(
@@ -218,7 +226,10 @@ def _time_series_ids_missing_metadata(
     the metadata frame is already eager and already filtered to ``time_series_ids``.
 
     The CV assets raise on a non-empty answer; ``live_forecasts`` does not, and reports the
-    missing series through ``live_forecasts_are_healthy`` instead. See
+    missing series through ``live_forecasts_are_healthy`` instead. CV is R&D and fails fast, so a
+    silently-shrunk population can never poison a leaderboard comparison; ``live_forecasts`` is
+    production and must never raise on an absent input, so it degrades and reports the gap. The
+    split in full:
     <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
     """
     return sorted(set(time_series_ids) - set(metadata["time_series_id"].to_list()))
@@ -295,9 +306,11 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     the training window and population.
 
     The fold run is resolved **by tag**, never by a handle passed between assets, so this is safe
-    across processes and idempotent under Dagster retries. Because that run is *reused* on every
-    re-materialisation, the training window and population go in tags rather than MLflow params
-    (which are write-once and would reject a changed value).
+    across processes and idempotent under Dagster retries — see "Cross-process run resolution:
+    discover by tag, never pass handles" in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#cross-process-run-resolution-discover-by-tag-never-pass-handles>.
+    Because that run is *reused* on every re-materialisation, the training window and population go
+    in tags rather than MLflow params (which are write-once and would reject a changed value).
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -331,6 +344,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
 
     metadata_df = _load_roster(settings, eligible_ids)
     _require_metadata_coverage(metadata_df, eligible_ids, population="eligible")
+    power_lookback = ParsedFeatures.from_strings(config.selected_features).max_power_lag()
     power_ts, nwp_lf = load_engineering_inputs(
         settings,
         time_series_ids=eligible_ids,
@@ -338,6 +352,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
         window_start=train_start,
         window_end=train_end,
         ensemble_members=[0],
+        power_lookback=power_lookback,
     )
 
     forecaster = forecaster_cls(model_params=config)
@@ -431,10 +446,11 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
 
     To keep RAM bounded, prediction runs **one ``init_time`` window at a time**
     (``_PREDICT_INIT_CHUNK``). The full validation window fans every NWP run out across all ~51
-    ensemble members and all trained series — tens of GB. ``init_time`` is the NWP partition key
-    *and* the axis that inflates the output, so chunking by it bounds the per-iteration forecast
-    frame (~2-3 GB) while each partition is still read exactly once. See the "NWP scan pruning"
-    notes in <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
+    ensemble members and all trained series — tens of GB. ``init_time`` is one of the NWP table's
+    two partition columns *and* the axis that inflates the output, so chunking by it bounds the
+    per-iteration forecast frame (~2-3 GB) while each partition is still read exactly once. See
+    "Bounding feature-engineering memory: prune the inputs, not the output" in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
     Forecasts are written to the ``power_forecasts`` Delta table keyed by
     ``(experiment_name, fold_id)``: the **first** chunk overwrites the partition (clearing any prior
@@ -477,12 +493,16 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     metadata_df = _load_roster(settings, trained_ids)
     _require_metadata_coverage(metadata_df, trained_ids, population="trained")
 
+    power_lookback = ParsedFeatures.from_strings(config.selected_features).max_power_lag()
+
     # Walk disjoint init_time chunks covering every run that can forecast into the window:
     # init_time in [val_start - MAX_NWP_LEAD, val_end].
     chunk_start = val_start - MAX_NWP_LEAD
     is_first = True
     while chunk_start <= val_end:
         chunk_end = min(chunk_start + _PREDICT_INIT_CHUNK, val_end)
+        # The power scan is lazy and re-issued per init_time chunk; it is small next to the NWP
+        # scan, whose partition-pruned chunking is what this loop exists for.
         power_ts, nwp_lf = load_engineering_inputs(
             settings,
             time_series_ids=trained_ids,
@@ -491,6 +511,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             window_end=val_end,
             init_time_start=chunk_start,
             init_time_end=chunk_end,
+            power_lookback=power_lookback,
         )
         features = forecaster.feature_engineer.engineer(
             selected_features=config.selected_features,
@@ -688,55 +709,17 @@ def _resolve_eval_window(
     return window_start, window_end, "ad_hoc"
 
 
-def _write_metrics_to_delta(
-    path: str,
-    enriched: pt.DataFrame[Metrics],
-    exp_name: str,
-    fold_id: str,
-    storage_options: ObjectStoreOptions | None = None,
-) -> None:
-    """Write enriched Metrics rows to the ``forecast_metrics`` Delta table.
-
-    Casts the ``Enum`` columns (e.g. ``metric_name``, ``horizon_slice``) to ``String`` before
-    writing — delta-rs stores Arrow dictionary arrays as plain String in Parquet, so the on-disk
-    schema is always String. Re-sending Enum data on an overwrite would cause a schema-mismatch
-    error. Performs an idempotent overwrite of the ``(experiment_name, fold_id)`` partition
-    so re-materialising the asset replaces rows rather than duplicating them.
-
-    Args:
-        path: Local path or remote URI of the ``forecast_metrics`` Delta table.
-        enriched: Fully populated ``Metrics`` rows, with all provenance columns set by
-            ``enrich_metrics_rows()``.
-        exp_name: Experiment name; used in the Delta overwrite predicate to scope the
-            replacement to this ``(experiment_name, fold_id)`` partition.
-        fold_id: Fold identifier; used alongside ``exp_name`` in the predicate.
-        storage_options: Object-store options for a remote ``path``; ``None``/empty for local.
-    """
-    enum_cols = [c for c, dtype in enriched.schema.items() if isinstance(dtype, pl.Enum)]
-    delta_data = enriched.with_columns(pl.col(c).cast(pl.String) for c in enum_cols).to_arrow()
-    write_deltalake(
-        table_or_uri=path,
-        data=delta_data,
-        mode="overwrite",
-        predicate=f"experiment_name = '{exp_name}' AND fold_id = '{fold_id}'",
-        partition_by=["experiment_name", "fold_id"],
-        storage_options=typeddict_to_dict(storage_options),
-    )
-
-
 _METRICS_SERIES_BATCH_SIZE: Final[int] = 4
 """How many ``time_series_id`` values to materialise per scoring batch in the ``metrics`` asset.
 
-A single V1 fold is far too big to collect whole (~370M rows with the full ``PowerForecast``
-schema OOM-kills a 29 GB machine), but ``compute_metrics`` is independent per
+A single leaderboard fold is far too big to collect whole: at 364M rows — the
+``mid_2025_to_mid_2026`` fold as it stood at 28 series, and it has gained series since — the full
+``PowerForecast`` schema OOM-kills a 29 GB machine. But ``compute_metrics`` is independent per
 ``time_series_id`` — every group key includes it — so scoring per-series batches and
-concatenating the tall ``Metrics`` results is exactly equivalent to one big call.
-
-Measured on the V1 fold (28 series, ~13M rows each): batch size 4 completes in ~50 s with
-~18 GB peak process RSS, dominated by the streaming Delta scan (each batch re-scans the
-partition; the materialised batch frame itself is a few GB). Batch size 2 measured only
-~2 GB lower, so shrinking the batch buys little — the scan overhead is roughly constant in
-fold size, which is what keeps this workable at V2 scale.
+concatenating the tall ``Metrics`` results is exactly equivalent to one big call. For the
+batch-size measurements behind the value 4, see "Scoring the metrics: batch the series, and
+stream every scan" in
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#scoring-the-metrics-batch-the-series-and-stream-every-scan>.
 """
 
 
@@ -811,7 +794,7 @@ def _score_forecast_group(
     Writes ``Metrics`` to Delta and optionally logs to MLflow.
 
     The group is scored in per-series batches of ``_METRICS_SERIES_BATCH_SIZE`` so that peak
-    memory is one batch, never the whole fold (a single V1 fold is already too big to
+    memory is one batch, never the whole fold (a single leaderboard fold is already too big to
     materialise). ``compute_metrics`` is independent per ``time_series_id``, so concatenating
     the per-batch ``Metrics`` frames produces exactly the metric values a whole-group call
     would. A batch whose series have no overlapping actuals is skipped — mirroring how such
@@ -892,7 +875,13 @@ def _score_forecast_group(
         now,
         mlflow_run_id,
     )
-    _write_metrics_to_delta(metrics_path, enriched, exp_name, fold_id, storage_options)
+    write_forecast_metrics(
+        metrics=enriched,
+        table_uri=metrics_path,
+        experiment_name=exp_name,
+        fold_id=fold_id,
+        storage_options=storage_options,
+    )
 
     if evaluation_scope == "leaderboard":
         fold_metric_dict = build_mlflow_aggregate_metrics(per_series_metrics)
@@ -949,11 +938,13 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     ).set_model(PowerForecast)
     pruned_scan = config.population_filter.apply(scan)
 
-    # Discover the matching groups from the pruned scan. The streaming engine is essential
-    # here even though only the two partition columns are projected: the in-memory engine
-    # materialises them at full row length before the unique (measured: OOM-killed on the
-    # 364M-row fold vs 0.3 GB peak streaming). Each group is then scored in per-series
-    # batches, so peak memory is one batch, never a whole fold.
+    # Discover the matching groups from the pruned scan. The streaming engine is essential here
+    # even though only the two partition columns are projected — the eager equivalent still
+    # materialises every row before the unique. See "Scoring the metrics: batch the series, and
+    # stream every scan":
+    # <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#scoring-the-metrics-batch-the-series-and-stream-every-scan>.
+    # Each group is then scored in per-series batches, so peak memory is one batch, never a whole
+    # fold.
     groups = (
         pruned_scan.select(["experiment_name", "fold_id"])
         .unique()

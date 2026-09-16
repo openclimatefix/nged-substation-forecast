@@ -1,7 +1,7 @@
 """Shared fixtures for the ``dynamical_data`` tests.
 
 These build in-memory ``xarray`` datasets that mimic the ECMWF ENS structure the code consumes,
-plus small :class:`H3GridWeights` frames, so every test runs fully offline (no Dynamical.org
+plus small `H3GridWeights` frames, so every test runs fully offline (no Dynamical.org
 network access).
 """
 
@@ -72,6 +72,12 @@ def _build_ens_dataset(
         init_time_as_dim: If True, keep ``init_time`` as a size-1 dimension (the shape
             ``open_ecmwf_ens_run`` expects from the catalog). If False, reduce it to a scalar
             coordinate (the post-``open`` shape ``convert`` consumes).
+
+    Returns:
+        A dataset with all 13 downloaded ECMWF ENS variables on dims
+        ``(lead_time, ensemble_member, latitude, longitude)`` — plus a leading ``init_time``
+        dimension when ``init_time_as_dim`` is True — and a ``valid_time`` coordinate equal
+        to ``init_time`` plus each lead time.
     """
     lats = np.asarray(latitudes, dtype=np.float32)
     lons = np.asarray(longitudes, dtype=np.float32)
@@ -119,7 +125,7 @@ def _build_h3_grid(
     nwp_lon: Sequence[float],
     proportion: Sequence[float],
 ) -> pt.DataFrame[H3GridWeights]:
-    """Build a valid :class:`H3GridWeights` frame from column values."""
+    """Build a valid `H3GridWeights` frame from column values."""
     return (
         pt.DataFrame(
             {

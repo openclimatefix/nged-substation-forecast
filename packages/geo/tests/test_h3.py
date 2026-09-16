@@ -6,6 +6,7 @@ nearest-grid-centre snapping, the four documented ``ValueError`` guards on
 error path.
 """
 
+import logging
 from collections.abc import Callable
 from typing import Final
 
@@ -130,6 +131,24 @@ def test_grid_weights_preserve_geographic_orientation() -> None:
     # Relative: north stays north (larger lat), west stays west (smaller lon).
     assert min(edinburgh_lats) > max(lands_end_lats)
     assert max(lands_end_lons) < min(edinburgh_lons)
+
+
+def test_grid_weights_log_reports_the_resolved_child_resolution(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The progress log names the child resolution actually used, not the ``None`` passed in.
+
+    ``child_h3_res`` defaults to ``h3_res + 2``, and that default is applied part-way through the
+    function. A message emitted before then reports ``None`` on every call that relies on the
+    default, which is every production call.
+    """
+    with caplog.at_level(logging.INFO, logger="geo.h3"):
+        compute_h3_grid_weights(nwp_grid_size_degrees=0.25, h3_index=_res5_cells())
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert len(messages) == 1, messages
+    assert "child resolution 7" in messages[0]
+    assert "None" not in messages[0]
 
 
 @pytest.mark.parametrize(
