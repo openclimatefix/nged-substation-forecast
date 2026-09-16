@@ -124,6 +124,15 @@ Every alert — missed-check-in and per-task alike — must link directly to a r
 either a specific operator action or "escalate to OCF". An alert without a runbook is a bug in the
 operator contract.
 
+**Today, during the NIA project, who responds is informal rather than mapped.** A single small OCF
+team reads Sentry and responds next business day — the [declined availability service-level
+objective](../design-philosophy/design-principles.md#deliberately-absent) is what makes that
+acceptable — so there is no rota and no per-`fault_category` routing to a named role. Mapping
+specific alerts to specific NGED roles is deferred to [workstream
+5](#5-confirm-ngeds-cloud-and-security-standards-early), once NGED's own team ownership is agreed;
+building that mapping before the ownership split exists would mean guessing at an organisation
+chart that is not OCF's to decide.
+
 ### 3. Make the control-plane box rebuildable from scratch
 
 **The always-on EC2 control-plane box ([the accepted option](live-service.md#aws-architecture)) is
@@ -187,6 +196,10 @@ Concrete steps:
   game days train.
 - Stand up a **staging copy in NGED's account well before handover**, so that any mismatch
   between our networking approach and NGED's standards surfaces early.
+- Confirm which compliance regimes apply: General Data Protection Regulation (GDPR) coverage for
+  any personally-identifiable telemetry, the Network and Information Systems (NIS) Regulations,
+  and whether any part of the service counts as Critical National Infrastructure (CNI) — and
+  whether NGED requires a penetration test before go-live.
 
 ### 6. Game days and in-person training
 
@@ -211,9 +224,11 @@ simple enough to run that routine operation needs far less than a week.
 
 ### 7. Organisational prerequisites
 
-**The transition to business-as-usual needs planning of its own.** The three prerequisites below
-are not engineering workstreams, but the handover depends on them, so they are recorded here
-alongside the technical work:
+**Today, during the NIA project, OCF develops, operates, and maintains the whole pipeline
+single-handedly; NGED's role is to supply telemetry and other trial-area data and to receive and
+use the delivery tables.** The three prerequisites below cover what changes once operation moves to
+NGED. They are not engineering workstreams, but the handover depends on them, so they are recorded
+here alongside the technical work:
 
 - A **named service owner at NGED** with allocated time to operate the service.
 - **Funding for running costs and support**: the AWS spend and whatever support the written

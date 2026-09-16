@@ -451,7 +451,9 @@ reach on the order of a **trillion rows** (see [How big is Flexpectation's power
 data?](#how-big-is-flexpectations-power-forecast-data), above) — at that volume, a per-GB
 storage premium compounds into real money rather than staying a rounding error.
 
-The region choice is provisional until the data-residency requirement for this data is settled.
+No data-residency requirement has been raised for this data, by NGED or by regulation, so the
+region choice above is a settled operational decision rather than an open question — `eu-west-2`
+because that is where NGED's own bucket already sits, not because anything compels it.
 
 ## Strict data contracts (machine-verifiable)
 

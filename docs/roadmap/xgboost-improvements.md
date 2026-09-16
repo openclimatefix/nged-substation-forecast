@@ -466,6 +466,17 @@ column in `_parsed_features.py`, in the mould of the existing derived features �
 bottom of Tier 1. The PV variant can run now on a raw GHI delta; the wind variant waits on the
 [solar/wind physics proxies](#linearised-physics-features-for-solar-and-wind).
 
+### Log feature importances for every trained model
+
+Every model this project trains — one XGBoost booster per `time_series_id`, for every
+cross-validation fold and every promoted run — should log its feature importances (XGBoost's
+built-in gain-based `feature_importances_`) to the MLflow run that already exists for that model.
+The cost is a few lines and a dictionary of floats, with no new training step, and the diagnostic
+value shows up the first time a booster's feature ranking looks wrong and the current tooling has
+nothing to point at. This is a lightweight, per-training-run habit, distinct from the detailed
+model cards deferred until [after v2 ships](index.md#model-cards-for-promoted-models) for models
+actually promoted to production.
+
 ## Tier 2 — low-effort feature engineering (about a day each)
 
 ### Per-`time_series_type` feature lists
@@ -620,6 +631,19 @@ XGBoost's `monotone_constraints`: PV power non-decreasing in irradiance, wind po
 speed below rated. Mostly delivers sane extrapolation in weather regimes the training year never saw
 — precisely the failure mode of a single-fold training set. A config-field addition once the
 solar/wind physics features exist.
+
+### BMRS day-ahead price as a feature
+
+The trial population includes a battery, a gas generator, and a biofuel plant behind one set of
+primaries ([several estimators, one winner](capacity-estimation.md#several-estimators-one-winner))
+— assets whose output responds to market price rather than to weather alone, and no market signal
+reaches the model today. The low-effort version: fetch the GB day-ahead wholesale price from the
+Balancing Mechanism Reporting Service (BMRS, run by Elexon), join it by settlement period, and add
+it as a feature for these `time_series_type`s — pairing naturally with the [per-`time_series_type`
+feature lists](#per-time_series_type-feature-lists) above, so the price feature need not pollute the
+demand and PV/wind lists. This is deliberately the cheap version: modelling *how* a distributed
+energy resource actually responds to price is a [differentiable-physics stretch goal well after
+v2](index.md#after-v21-research-advanced-ml), not this item.
 
 ## Tier 3 — new feature machinery (days)
 

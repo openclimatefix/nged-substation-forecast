@@ -651,7 +651,7 @@ never considered.
 ## Industry best practices we have not yet absorbed
 
 The list above is not finished, and pretending otherwise would undermine it. A review of what
-comparable systems practise surfaced five practices we respect but have **not yet absorbed into
+comparable systems practise surfaced seven practices we respect but have **not yet absorbed into
 the code or the plan**. They are parked on
 [#449](https://github.com/openclimatefix/nged-substation-forecast/issues/449), to be considered
 once the live service has run for long enough to inform them; we expect to adopt whichever of them
@@ -740,6 +740,29 @@ schemas, and `delta_store`'s write helpers make the storage format the path of l
 rather than a rule to remember — but it is a habit applied opportunistically, not yet a stated
 rule.
 
+### A retraining cadence and trigger
+
+Retraining today happens on a manually-triggered, unspecified cadence: [the operator
+contract](../roadmap/handover.md#1-the-operator-contract) calls re-training "triggering and
+reviewing an automated run on a regular cadence" without naming one, and the trailing-window
+metrics the [production-monitoring design](../roadmap/live-service.md#production-monitoring)
+computes chart performance over time without anything acting on them. Standard MLOps practice ties
+retraining to a stated cadence, a performance-drift trigger, or both. We have neither yet, and
+adding a trigger meets the same open question as [input drift detection](#input-drift-detection)
+above: a stated cadence is easy to add, but a trigger risks reacting to a legitimate distribution
+shift — a hot, dry summer, a wave of new solar connections — as if it were model decay.
+
+### Monitoring how NGED uses the delivered forecasts
+
+NGED's use of the delivered forecasts is observed anecdotally rather than measured:
+[Evolving requirements](../architecture/forecast-delivery.md#evolving-requirements) records that
+NGED are "already finding uses we had never considered", not which of the five delivery tables, or
+which columns within them, NGED actually read. Standard practice for a delivered data product
+tracks read patterns — for example S3 server-access logs or CloudTrail data events on the delivery
+bucket — to learn which tables carry weight and which sit unread. We have not built this, and doing
+so raises its own question of how much read-pattern instrumentation is proportionate for a
+single-consumer delivery mechanism.
+
 ## Where these principles come from
 
 The framing — a greenfield chance to test-drive other industries' best practice and produce a field
@@ -758,7 +781,7 @@ years.
 
 Not every borrowed idea survives contact with reality, and we record those outcomes too — that is
 what makes this a field report rather than a manifesto. *Error budgets* were examined and declined
-([Deliberately absent](#deliberately-absent)); [five practices we respect are not yet
+([Deliberately absent](#deliberately-absent)); [seven practices we respect are not yet
 absorbed](#industry-best-practices-we-have-not-yet-absorbed); and Postel's law is named on the
 [Inherent
 Stability](inherent-stability.md#not-postels-law) page precisely so that nobody mistakes it for what
