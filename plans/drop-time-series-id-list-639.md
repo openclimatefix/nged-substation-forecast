@@ -88,7 +88,14 @@ All in `src/nged_substation_forecast/defs/assets.py`.
   - Replace the `n_time_series_ids` `@computed_field` `@property` (~lines 753–756) with a plain
     field `n_time_series_ids: int = 0`, populated directly by each subclass's `from_data_frame`
     rather than derived from a string.
-  - Drop the now-unused `import ast` (line 6) — nothing else in the file uses it.
+  - Drop the now-unused `import ast` (line 6) — nothing else in the file uses it. Also drop
+    `computed_field` from the `from pydantic import ...` line — it's used only on the
+    `n_time_series_ids` property being deleted, so leaving it would fail `uv run ruff check .`
+    (F401).
+  - `TableRecord(summary.model_dump())` (~line 826, unchanged) will show `n_time_series_ids` in a
+    different column position in the Dagster UI table once it's a plain field instead of a
+    computed one dumped last — cosmetic only, since every record in a table comes from the same
+    class, so the schema stays self-consistent.
 - **`_FileListingSummary.from_data_frame`** (~line 781): replace
   `time_series_ids=df["time_series_id"]` with `n_time_series_ids=df["time_series_id"].n_unique()`;
   delete the TODO comment above it (line 791).
@@ -121,7 +128,9 @@ All in `tests/test_assets.py`, in the "summary classes (pure, no Dagster)" secti
   the string-parse path. **Would fail on `main` today** in the sense that
   `summary.time_series_ids` won't exist as an attribute after the field is deleted — the test as
   written today would `AttributeError`/fail a `pydantic` extra-field check if run against the new
-  class, which is exactly the signal that the field is gone.
+  class, which is exactly the signal that the field is gone. Its docstring also describes the
+  deleted machinery (dedup via the validator, `n_time_series_ids` parsing the string back to a
+  count) and needs rewriting to describe the direct `.n_unique()` count instead.
 - **`test_power_time_series_summary_non_empty`** (~line 1304): same edit — drop the
   `time_series_ids` assertion, keep `n_time_series_ids == 2`.
 - **`test_summary_empty_frame_uses_na_defaults`** (~line 1331): drop
@@ -187,7 +196,15 @@ more machinery for no extra capability. One finding accepted: the proposed V2-sc
 fixture cost without adding coverage, since nothing in the new code path is scale-dependent — cut
 from the "Tests" section above. No findings rejected.
 
-**Correctness review (step 7):** not run — see "Chosen reviews" above.
+**Correctness review (step 7, run after all):** re-run once the branch caught up with ~570 commits
+of `main` drift, to confirm the plan's file/line references and proposed diff still match current
+code before implementation starts. Confirmed the core change is still correct and testable, with
+line numbers stale but the class/method structure unchanged. Two findings accepted and folded into
+"What changes, file by file" and "Tests" above: the plan's proposed `import ast` deletion left
+`computed_field` unused (would fail `ruff check` with F401), and `test_file_listing_summary_non_empty`'s
+docstring also needed rewriting, not just the empty-frame test's. One further note accepted as a
+one-line addition rather than a design change: making `n_time_series_ids` a plain field moves its
+column position in the Dagster UI table, which is cosmetic only.
 
 ## Risks and open questions
 
