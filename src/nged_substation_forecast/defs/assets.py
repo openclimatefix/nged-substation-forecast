@@ -795,10 +795,10 @@ class _BaseSummary[T: pt.Model](ABC, BaseModel):
     The type parameter ``T`` makes this superclass generic over ``pt.Model`` subclasses.
     """
 
-    stage: str
-    start_time: str = "N/A"
-    end_time: str = "N/A"
-    n_time_series_ids: int = 0
+    stage: str  # which pipeline stage this row summarises, e.g. "Files with new data"
+    start_time: str = "N/A"  # earliest timestamp in the batch, "N/A" for an empty frame
+    end_time: str = "N/A"  # latest timestamp in the batch, "N/A" for an empty frame
+    n_time_series_ids: int = 0  # count of distinct time_series_id values in the batch
 
     @field_validator("start_time", "end_time", mode="before")
     @classmethod
