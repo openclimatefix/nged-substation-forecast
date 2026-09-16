@@ -239,7 +239,7 @@ def test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table() -> No
 
 
 # ---------------------------------------------------------------------------
-# Silencing series we already know are dead.
+# Silencing series that have already stopped reporting.
 # ---------------------------------------------------------------------------
 
 
@@ -356,7 +356,7 @@ def test_the_check_result_reports_silencing(stale_id: int | None) -> None:
     )
 
     assert result.description is not None
-    assert "Ignoring 1 known-dead time series: 33." in result.description
+    assert "Ignoring 1 silenced time series: 33." in result.description
     assert result.metadata["n_silenced"].value == 1
     assert result.metadata["silenced_time_series_ids"].value == "[33]"
     assert result.passed is (stale_id is None)
@@ -375,14 +375,14 @@ def test_a_resurrection_fails_the_check_and_says_where_to_edit() -> None:
     )
     assert not result.passed
     assert result.description is not None
-    assert "Reporting again, so no longer dead: 33." in result.description
-    assert "_KNOWN_DEAD_TIME_SERIES_IDS" in result.description
+    assert "Reporting again, so remove 33 from _SILENCED_TIME_SERIES_IDS" in result.description
+    assert "_SILENCED_TIME_SERIES_IDS" in result.description
 
 
 def test_a_deployment_with_no_data_yet_still_says_so_while_silencing() -> None:
-    """The dead list is never empty in production, so "watching nothing" must keep meaning "no data
-    yet" — the state every fresh deployment starts in — rather than being read as the list having
-    swallowed the roster."""
+    """The silenced list is never empty in production, so "watching nothing" must keep meaning "no
+    data yet" — the state every fresh deployment starts in — rather than being read as the list
+    having swallowed the roster."""
     result = checks._to_asset_check_result(
         evaluate_power_freshness(
             coverage=_coverage({}),
@@ -392,9 +392,7 @@ def test_a_deployment_with_no_data_yet_still_says_so_while_silencing() -> None:
             silenced_ids=(33,),
         )
     )
-    assert result.description == (
-        "No power data on disk yet. Ignoring 1 known-dead time series: 33."
-    )
+    assert result.description == ("No power data on disk yet. Ignoring 1 silenced time series: 33.")
     assert not result.passed
 
 
@@ -406,12 +404,12 @@ def test_a_deployment_with_no_data_yet_still_says_so_while_silencing() -> None:
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point ``Settings`` at a temp data root (mirrors ``tests/test_assets.py``), and empty the
-    known-dead list so silencing is something a test opts into rather than inherits from whichever
-    ids are really dead today."""
+    silenced list so silencing is something a test opts into rather than inherits from whichever
+    ids have really stopped reporting today."""
     monkeypatch.setenv("DATA_PATH_INTERNAL", str(tmp_path))
     monkeypatch.setenv("DATA_PATH_DELIVERY", str(tmp_path))
     monkeypatch.setenv("LOCAL_ARTIFACTS_PATH", str(tmp_path))
-    monkeypatch.setattr(checks, "_KNOWN_DEAD_TIME_SERIES_IDS", ())
+    monkeypatch.setattr(checks, "_SILENCED_TIME_SERIES_IDS", ())
     return tmp_path
 
 
@@ -502,17 +500,17 @@ def test_power_data_is_fresh_all_current_passes(env: Path) -> None:
     assert result.metadata["n_late_listed"].value == 0
     assert result.metadata["n_silenced"].value == 0
     assert result.metadata["silenced_time_series_ids"].value == "[]"
-    # Silencing nothing says nothing: no "Ignoring 0 known-dead time series: ." on every green run.
+    # Silencing nothing says nothing: no "Ignoring 0 silenced time series: ." on every green run.
     assert result.description is not None
     assert "Ignoring" not in result.description
 
 
-def test_power_data_is_fresh_silences_the_configured_dead_series(
+def test_power_data_is_fresh_silences_the_configured_series(
     env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The whole path, through ``Settings`` and a real Delta table: a series that would otherwise
     hold the check yellow for ever is ignored, and said to be ignored."""
-    monkeypatch.setattr(checks, "_KNOWN_DEAD_TIME_SERIES_IDS", (99,))
+    monkeypatch.setattr(checks, "_SILENCED_TIME_SERIES_IDS", (99,))
     now = datetime.now(UTC)
     settings = Settings()
     pl.DataFrame(
@@ -532,7 +530,7 @@ def test_power_data_is_fresh_silences_the_configured_dead_series(
     assert result.metadata["n_late"].value == 0
     assert result.metadata["n_series_total"].value == 1
     assert result.description is not None
-    assert "Ignoring 1 known-dead time series: 99." in result.description
+    assert "Ignoring 1 silenced time series: 99." in result.description
 
 
 def test_power_data_is_fresh_uses_the_production_threshold(env: Path) -> None:

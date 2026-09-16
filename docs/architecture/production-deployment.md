@@ -122,12 +122,12 @@ function, so the Sentry warning reuses the same `PowerFreshnessResult` the check
 rather than recomputing it; the same result will later also feed the forecast-warnings delivery
 table.
 
-## Silence the series we already know are dead
+## Silence a series that has stopped reporting
 
 A broken monitor keeps the check yellow for months, and an always-yellow channel trains the human
 operator to ignore it. That habit ruins the [provider
 channel](../design-philosophy/inherent-stability.md#three-audiences-three-channels) entirely.
-`_KNOWN_DEAD_TIME_SERIES_IDS` in `defs/checks.py` names the `time_series_id`s the check ignores.
+`_SILENCED_TIME_SERIES_IDS` in `defs/checks.py` names the `time_series_id`s the check ignores.
 
 **The silenced ids are removed from the check's inputs, not from its output.**
 `evaluate_power_freshness` drops them from the coverage frame and the roster before it classifies
@@ -144,8 +144,9 @@ writes anything is a warning path that can fail, which [rule
 clears when a human deletes the line. The check also names every silenced id in its own output
 every hour it runs, so the silencing stays visible and cannot quietly be forgotten.
 
-**The list lives with the code because a dead series is a fact about the world, not about a
-deployment** — it is equally dead whether we run on a laptop or on AWS. The same fact is the
+**The list lives with the code because a series that has stopped reporting is a fact about the
+world, not about a deployment** — it has equally stopped reporting whether we run on a laptop or
+on AWS. The same fact is the
 argument against the obvious alternative of Dagster's own database, which is per-deployment. The
 drawback is that silencing a series takes a commit and a redeploy, which is the wrong interface for a
 list expected to change several times a month at V2 scale. Making the list operator-editable from
