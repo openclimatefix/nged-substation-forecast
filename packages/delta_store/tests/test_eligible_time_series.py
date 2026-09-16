@@ -45,8 +45,7 @@ def test_empty_frame_still_clears_partition(tmp_path: Path) -> None:
     table = tmp_path / "eligible_time_series"
     write_eligible_time_series(_make_eligible("fold_a", [1, 2]), table, fold_id="fold_a")
 
-    empty = EligibleTimeSeries.DataFrame({"fold_id": [], "time_series_id": []}).cast().validate()
-    write_eligible_time_series(empty, table, fold_id="fold_a")
+    write_eligible_time_series(_make_eligible("fold_a", []), table, fold_id="fold_a")
 
     stored = pl.read_delta(str(table))
     assert stored.filter(pl.col("fold_id") == "fold_a").is_empty()

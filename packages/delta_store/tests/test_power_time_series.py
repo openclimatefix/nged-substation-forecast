@@ -15,13 +15,14 @@ from delta_store.power_time_series import write_power_time_series
 _T0 = datetime(2025, 6, 1, tzinfo=UTC)
 
 
-def _make_power_ts(time_series_id: int, n: int = 2) -> pt.DataFrame[PowerTimeSeries]:
+def _make_power_ts(time_series_id: int) -> pt.DataFrame[PowerTimeSeries]:
+    n = 2
     return (
         PowerTimeSeries.DataFrame(
             {
                 "time_series_id": [time_series_id] * n,
                 "time": [_T0.replace(hour=i) for i in range(n)],
-                "power": [1.5 * (i + 1) for i in range(n)],
+                "power": [1.5, 3.0],
             }
         )
         .cast()

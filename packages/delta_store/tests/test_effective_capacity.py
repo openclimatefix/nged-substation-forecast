@@ -35,7 +35,7 @@ def test_overwrite_replaces_whole_table(tmp_path: Path) -> None:
     write_effective_capacity(_make_capacity([1, 2, 3]), table)
     write_effective_capacity(_make_capacity([4, 5]), table)
 
-    assert not list(table.glob("*="))  # no Hive partitioning
+    assert not list(table.glob("*=*"))  # no Hive partitioning
 
     stored = pl.read_delta(str(table))
     assert sorted(stored["time_series_id"]) == [4, 5]

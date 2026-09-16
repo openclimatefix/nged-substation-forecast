@@ -47,8 +47,9 @@ def test_enum_columns_cast_to_string_on_disk(tmp_path: Path) -> None:
     schema = pq.ParquetFile(parquet_files[0]).schema_arrow
     for col in ("metric_name", "horizon_slice", "metric_param"):
         field_type = schema.field(col).type
-        assert not pa.types.is_dictionary(field_type), f"{col} written as {field_type}"
-        assert pa.types.is_string(field_type) or pa.types.is_large_string(field_type)
+        assert pa.types.is_string(field_type) or pa.types.is_large_string(field_type), (
+            f"{col} written as {field_type}"
+        )
 
 
 def test_overwrite_is_partition_scoped_by_experiment_and_fold(tmp_path: Path) -> None:
