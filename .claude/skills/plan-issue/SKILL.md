@@ -201,8 +201,9 @@ not have to wait for them, nor work out afterwards which parts of the plan the r
 One worktree per issue means `plans/` holds exactly one file on each branch, so the "at most one
 plan" rule in `plans/README.md` holds with no coordination between parallel sessions. Committing
 now rather than at implementation time makes the plan durable: it survives Claude Code shutting
-down, and it is already in the diff when the PR opens, so the reviewer sees the plan next to the
-code that claims to follow it. It is deleted at ship time into the PR body, per the existing rule.
+down. The plan is also the whole of the draft PR's diff opened above, so the reviewer reads the
+plan before any code exists, and later sees the plan beside the code that claims to follow it. It
+is deleted at ship time into the PR body, per the existing rule.
 
 Open the file with two brief summaries, before any of the sections below: what the problem or
 feature is, then what the planned solution is. A reader who stops after the first two paragraphs
