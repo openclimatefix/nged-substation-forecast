@@ -3,7 +3,6 @@
 NGED telemetry and metadata, the H3 grid weights, and the daily-partitioned ECMWF ENS download.
 """
 
-import ast
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Any, Final, Self
@@ -66,7 +65,7 @@ from nged_data.storage import (
     select_new_rows,
     upsert_metadata,
 )
-from pydantic import BaseModel, computed_field, field_validator
+from pydantic import BaseModel, field_validator
 
 from nged_substation_forecast._sentry import report_asset_degradation, report_check_degradation
 from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS
@@ -799,22 +798,12 @@ class _BaseSummary[T: pt.Model](ABC, BaseModel):
     stage: str
     start_time: str = "N/A"
     end_time: str = "N/A"
-    time_series_ids: str = "N/A"  # str representation of a list of ints
+    n_time_series_ids: int = 0
 
     @field_validator("start_time", "end_time", mode="before")
     @classmethod
     def datetime_to_string(cls, v: Any) -> Any:
         return v.strftime("%Y-%m-%d %H:%M") if isinstance(v, datetime) else v
-
-    @field_validator("time_series_ids", mode="before")
-    @classmethod
-    def unique_time_series_ids(cls, v: Any) -> Any:
-        return str(v.unique().sort().to_list()) if isinstance(v, pl.Series) else v
-
-    @computed_field
-    @property
-    def n_time_series_ids(self) -> int:
-        return 0 if self.time_series_ids == "N/A" else len(ast.literal_eval(self.time_series_ids))
 
     @classmethod
     def make_table(
@@ -849,8 +838,7 @@ class _FileListingSummary(_BaseSummary[_ProcessedFileListing]):
                 n_files=len(df),
                 start_time=df["start_time"].min(),
                 end_time=df["end_time"].max(),
-                # TODO: We can't list *all* time_series_ids when we're handling 1,000s of IDs!
-                time_series_ids=df["time_series_id"],
+                n_time_series_ids=df["time_series_id"].n_unique(),
                 min_file_size_bytes=df["filesize_bytes"].min(),  # ty: ignore[invalid-argument-type]
                 max_file_size_bytes=df["filesize_bytes"].max(),  # ty: ignore[invalid-argument-type]
             )
@@ -868,7 +856,6 @@ class _PowerTimeSeriesSummary(_BaseSummary[PowerTimeSeries]):
                 n_rows=len(df),
                 start_time=df["time"].min(),
                 end_time=df["time"].max(),
-                # TODO: We can't list *all* time_series_ids when we're handling 1,000s of IDs!
-                time_series_ids=df["time_series_id"],
+                n_time_series_ids=df["time_series_id"].n_unique(),
             )
         return cls(stage=stage_name, n_rows=0)

@@ -1286,16 +1286,15 @@ def _file_listing(
 
 
 def test_file_listing_summary_non_empty() -> None:
-    """Non-empty frame: the ``@field_validator``s format the datetime and dedup the IDs (two of the
-    three files share ``time_series_id`` 11), and ``n_time_series_ids`` parses the resulting string
-    back to a count distinct from ``n_files``."""
+    """Non-empty frame: the ``@field_validator`` formats the datetime, and ``n_time_series_ids``
+    counts the distinct IDs directly from the dataframe (two of the three files share
+    ``time_series_id`` 11), a count distinct from ``n_files``."""
     summary = _FileListingSummary.from_data_frame(
         "Files with new data", _file_listing(3, time_series_ids=[11, 9, 11])
     )
     assert summary.n_files == 3
     assert summary.start_time == "2026-03-26 08:00"
     assert summary.end_time == "2026-03-26 10:00"
-    assert summary.time_series_ids == "[9, 11]"  # deduped and sorted
     assert summary.n_time_series_ids == 2
     assert summary.min_file_size_bytes == 1000
     assert summary.max_file_size_bytes == 1002
@@ -1317,7 +1316,6 @@ def test_power_time_series_summary_non_empty() -> None:
     summary = _PowerTimeSeriesSummary.from_data_frame("Downloaded timeseries", df)
     assert summary.n_rows == 2
     assert summary.start_time == "2026-03-26 08:00"
-    assert summary.time_series_ids == "[1, 2]"
     assert summary.n_time_series_ids == 2
 
 
@@ -1328,15 +1326,14 @@ def test_power_time_series_summary_non_empty() -> None:
         (_PowerTimeSeriesSummary, PowerTimeSeries.DataFrame(schema=PowerTimeSeries.dtypes)),
     ],
 )
-def test_summary_empty_frame_uses_na_defaults(
+def test_summary_empty_frame_uses_defaults(
     summary_cls: type[_BaseSummary], empty_df: pt.DataFrame
 ) -> None:
     """Empty frame → the ``"N/A"`` defaults survive (the validators pass them through untouched) and
-    ``n_time_series_ids`` short-circuits to 0 without calling ``ast.literal_eval``."""
+    ``n_time_series_ids`` short-circuits to its ``0`` default without touching the empty column."""
     summary = summary_cls.from_data_frame("stage", empty_df)
     assert summary.start_time == "N/A"
     assert summary.end_time == "N/A"
-    assert summary.time_series_ids == "N/A"
     assert summary.n_time_series_ids == 0
 
 
