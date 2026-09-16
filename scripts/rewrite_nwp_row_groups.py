@@ -29,6 +29,7 @@ from typing import Final
 from urllib.parse import unquote
 
 import polars as pl
+import pyarrow as pa
 import pyarrow.fs as pa_fs
 import pyarrow.parquet as pq
 from contracts.settings import get_settings
@@ -50,6 +51,12 @@ def _unaligned_partitions(table_uri: str, storage_options: ObjectStoreOptions) -
     an incomplete ECMWF run is small enough to land in one file under either layout, and an
     incomplete run is the case that prunes worst.
 
+    A partition counts as aligned when it holds at least as many row groups as the ensemble
+    members its statistics span. **Demanding that every row group hold exactly one member would
+    not converge**: where the row count does not divide evenly by the member count, the aligned
+    layout still straddles one boundary by design, so such a partition would be rewritten on
+    every pass, each time writing another full copy of its data.
+
     A file whose footer cannot be read is reported as unaligned, so the migration rewrites it
     rather than skipping it. Rewriting an already-aligned partition is wasted work; skipping an
     unaligned one leaves the defect in place.
@@ -65,27 +72,39 @@ def _unaligned_partitions(table_uri: str, storage_options: ObjectStoreOptions) -
     actions = pl.DataFrame(delta_table.get_add_actions(flatten=True))
     filesystem, root = pa_fs.FileSystem.from_uri(table_uri)
 
-    unaligned: set[datetime] = set()
+    row_groups: dict[datetime, int] = {}
+    member_range: dict[datetime, int] = {}
+    unreadable: set[datetime] = set()
     for row in actions.iter_rows(named=True):
         init_time = row["partition.init_time"]
-        if init_time in unaligned:
-            continue
         try:
             parquet = pq.ParquetFile(
                 f"{root.rstrip('/')}/{unquote(row['path'])}", filesystem=filesystem
             )
-            member_column = parquet.schema_arrow.get_field_index("ensemble_member")
-            spans_one_member = all(
-                (statistics := parquet.metadata.row_group(group).column(member_column).statistics)
-                is not None
-                and statistics.min == statistics.max
-                for group in range(parquet.metadata.num_row_groups)
-            )
-        except OSError as error:
+        except (OSError, pa.ArrowInvalid) as error:
+            # A truncated or empty footer is what an interrupted write leaves behind, and
+            # pyarrow raises ArrowInvalid (a ValueError) rather than an OSError for it.
             _LOGGER.warning("could not read %s, rewriting its partition: %s", row["path"], error)
-            spans_one_member = False
-        if not spans_one_member:
-            unaligned.add(init_time)
+            unreadable.add(init_time)
+            continue
+        member_column = parquet.schema_arrow.get_field_index("ensemble_member")
+        statistics = [
+            parquet.metadata.row_group(group).column(member_column).statistics
+            for group in range(parquet.metadata.num_row_groups)
+        ]
+        if any(statistic is None for statistic in statistics):
+            unreadable.add(init_time)
+            continue
+        row_groups[init_time] = row_groups.get(init_time, 0) + len(statistics)
+        lowest = min(statistic.min for statistic in statistics)
+        highest = max(statistic.max for statistic in statistics)
+        member_range[init_time] = max(member_range.get(init_time, 0), highest - lowest + 1)
+
+    unaligned = unreadable | {
+        init_time
+        for init_time, count in row_groups.items()
+        if count < member_range[init_time] and init_time not in unreadable
+    }
     return sorted(unaligned)
 
 

@@ -169,6 +169,20 @@ def test_row_groups_stay_member_aligned_when_the_frame_arrives_in_many_chunks(
     assert all(low == high for low, high in spans), f"a row group spans several members: {spans}"
 
 
+def test_the_row_group_limits_bracket_a_real_ensemble_run() -> None:
+    """The clamp never binds on a real ECMWF ENS run, which is the case it must not alter.
+
+    Pinned here because the alignment tests size their fixtures *from* these limits, so they grow
+    and shrink with the constant and can never see it change. A floor raised above a real run's
+    rows-per-member, or a ceiling lowered below it, would silently undo the alignment the rest of
+    this module exists to check, with every test still green. This is the same guard, and for the
+    same reason, as `test_the_nwp_significand_bits_is_thirteen`.
+    """
+    rows_per_member_in_a_real_run = 1_671 * 85  # H3 cells over GB x forecast steps
+    floor, ceiling = NWP_ROW_GROUP_SIZE_LIMITS
+    assert floor < rows_per_member_in_a_real_run < ceiling
+
+
 def test_continuous_vars_rounded_to_significand_bits(tmp_path: Path) -> None:
     table = tmp_path / "nwp"
     n = 6
