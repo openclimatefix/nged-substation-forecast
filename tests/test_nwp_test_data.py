@@ -11,8 +11,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import patito as pt
+import polars as pl
 import pytest
-from _nwp_test_data import nwp_records, write_test_nwp
+from _nwp_test_data import cast_to_nwp_dtypes, nwp_records, write_test_nwp
 from contracts.weather_schemas import Nwp
 from delta_store.nwp import write_nwp
 from deltalake import DeltaTable
@@ -65,3 +66,18 @@ def test_rejects_contract_invalid_records(tmp_path: Path) -> None:
 
     with pytest.raises(DataFrameValidationError):
         write_test_nwp(str(tmp_path / "invalid"), records)
+
+
+def test_cast_to_nwp_dtypes_takes_the_dtype_from_the_contract():
+    """A fixture column comes out with `Nwp`'s dtype, whatever dtype it went in with."""
+    frame = pl.DataFrame({"ensemble_member": pl.Series([0, 1], dtype=pl.UInt8)})
+
+    assert cast_to_nwp_dtypes(frame, "ensemble_member").schema["ensemble_member"] == pl.Int8
+
+
+def test_cast_to_nwp_dtypes_rejects_a_column_the_contract_does_not_declare():
+    """A column name `Nwp` does not carry is a typo or a renamed field, not a dtype to look up."""
+    frame = pl.DataFrame({"ensemble_membr": [0, 1]})
+
+    with pytest.raises(KeyError, match="ensemble_membr"):
+        cast_to_nwp_dtypes(frame, "ensemble_membr")
