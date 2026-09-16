@@ -430,17 +430,17 @@ def select_new_rows(
     and scans nothing.
 
     For `PowerTimeSeries` rows, this is a genuine existence check: an anti-join on
-    `(time_series_id, time)` against `_existing_power_time_series_keys`, so a genuinely-missing
-    reading is kept regardless of arrival order — a late file, or one that fills a gap earlier in a
-    series' history, is no longer permanently excluded just because a later reading already made it
-    onto disk. See that function's docstring for the cost this trades in return.
+    `(time_series_id, time)` against `_existing_power_time_series_keys`, so a late file, or one
+    that fills a gap earlier in a series' history, is ingested even when a later reading for the
+    same series is already on disk. See that function's docstring for the cost this trades in
+    return.
 
     For the file listing, there is no per-row `time` to check existence against before download —
     only the file's `start_time`/`end_time` window from its S3 key — so the filter instead compares
     `end_time` against each series' on-disk `last_time` from `time_series_coverage`, loosened by
     `_LATE_FILE_LOOKBACK` so a file landing a short while after the watermark is still downloaded. A
     file whose `end_time` falls more than `_LATE_FILE_LOOKBACK` before `last_time` is still dropped
-    before download — a bounded, named gap, not the unbounded one this replaces.
+    before download.
 
     Cost: the file-listing branch runs `time_series_coverage`, paying one full two-column scan of
     `power_time_series` — see that function for the measured figures. The `PowerTimeSeries` branch
