@@ -178,7 +178,6 @@ class XGBoostForecaster(BaseForecaster):
                     "power_fcst_init_time",
                 ]
             ).with_columns(
-                pl.col("ensemble_member").cast(pl.Int8),
                 pl.Series("power_fcst", predictions, dtype=pl.Float32),
                 power_fcst_model_name=pl.lit(self.MODEL_NAME),
                 power_fcst_model_version=pl.lit(self.MODEL_VERSION, dtype=pl.Int16),
