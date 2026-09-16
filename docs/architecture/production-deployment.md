@@ -474,6 +474,10 @@ modes are deliberately asymmetric:
 - **`"live"`** joins the freshest NWP run actually present in Delta, with **no modelled
   publication delay** — reality already constrains the table to genuinely published runs, so a
   faster provider is used automatically without a config change.
+- **Both modes share one rule downstream.** Feature engineering ceilings its weather-lag
+  freshest-run join at the NWP run selected here, rather than re-deriving availability from the
+  publication delay. So the delay is applied in exactly one place, and a `"live"` slot keeps the
+  run it is forecasting with however fresh that run is.
 - **`"replay"`** joins the freshest run at least `nwp_publication_delay_hours` old, reconstructing
   what was genuinely available at that historical init time. Without the delay, a replay would
   leak NWP runs that only landed after the fact — a lookahead-bias bug, not just an inaccuracy.

@@ -517,12 +517,11 @@ def _save_model_trained_on_weather_lag(path: Path, lag_hours: int) -> None:
 @pytest.mark.parametrize(
     ("gap_hours", "members", "expect_null"),
     [
-        pytest.param(6, (0,), True, id="6h_gap_below_the_publication_delay"),
-        pytest.param(9, (0,), False, id="9h_gap_at_the_publication_delay"),
+        pytest.param(6, (0,), False, id="6h_gap_below_the_publication_delay"),
         pytest.param(9, (1,), True, id="9h_gap_no_control_member"),
     ],
 )
-def test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh(
+def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     monkeypatch: pytest.MonkeyPatch,
     dagster_instance: DagsterInstance,
     tmp_path: Path,
@@ -530,21 +529,19 @@ def test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh(
     members: tuple[int, ...],
     expect_null: bool,
 ) -> None:
-    """Pins when the single-run freshest-run join nulls a weather lag rather than populating it.
+    """A weather lag survives a run fresher than ``NWP_PUBLICATION_DELAY_HOURS``.
 
     ``live_forecasts`` selects its one NWP run in ``"live"`` availability mode, which applies no
-    modelled delay — any run genuinely present in the Delta table qualifies. But the single-run
-    analysis-proxy inside ``_engineer_features`` still gates its freshest-run join with the
-    ``NWP_PUBLICATION_DELAY_HOURS`` (9h) ``available_at`` cut. When the selected run is closer
-    than 9 hours to ``power_fcst_init_time`` — as at the 06:00 slot, when only that morning's run
-    has landed — the cut excludes the run entirely from the freshest-run join and a weather lag
-    targeting an earlier time goes null; a run 9 hours or further back passes the cut and the lag
-    is populated. This pins the behaviour as it stands, not as a design endorsement: whether
-    "live" mode should apply the same delay is a serving-path semantic decision, tracked
-    separately from this test. The third case (``members=(1,)``) instead pins a different cause of
-    the same null: a run with no control member at all — a partial or malformed ECMWF ENS
-    download — degrades the same way rather than failing the slot. ``materialize`` succeeding at
-    all is itself part of what that case checks.
+    modelled delay — any run genuinely present in the Delta table qualifies. The single-run
+    analysis-proxy inside ``_engineer_features`` ceilings its freshest-run join at that same
+    selected run, so the two agree and the gap between the run and ``power_fcst_init_time`` does
+    not matter. The first case puts the run 6 hours back, well inside the 9-hour publication delay
+    — the 06:00 slot's shape, when only that morning's run has landed — and the lag is populated.
+
+    The second case (``members=(1,)``) pins the one cause of an all-null weather lag that remains:
+    a run with no control member at all, which is a partial or malformed ECMWF ENS download. It
+    degrades rather than failing the slot, so ``materialize`` succeeding at all is itself part of
+    what that case checks.
     """
     gap = timedelta(hours=gap_hours)
     power_fcst_init_time = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)

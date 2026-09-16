@@ -281,16 +281,15 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     ``write_power_forecasts``'s ``replace_predicate_extra``, so re-running a 6-hourly slot (or
     replaying one) never duplicates rows or wipes the rest of the ``"live"`` fold.
 
-    Note: only one NWP run is loaded here, and "live" availability applies no publication delay,
-    so a weather-lag feature goes null only when that run is closer than
-    ``NWP_PUBLICATION_DELAY_HOURS`` to ``power_fcst_init_time`` — e.g. the 06:00 slot, when only
-    that morning's run has landed — and is populated at every other slot. A run whose control
-    member (``ensemble_member == 0``) is wholly absent — a partial or malformed ECMWF ENS
-    download — degrades the same way. Every weather lag for that slot comes back null, and
-    ``_engineer_features`` logs a warning naming the run rather than failing the slot. See
-    ``test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh``. None of the current
-    champion config's features are weather lags, so neither path fires today, but a future feature
-    change touching weather lags should trip over this consciously.
+    Note: only one NWP run is loaded here, and weather-lag features are built from it however
+    fresh it is — feature engineering ceilings its freshest-run join at the run selected above
+    rather than at a modelled publication delay, so "live" and "replay" agree on what was
+    available. One thing still nulls every weather lag for a slot: a run whose control member
+    (``ensemble_member == 0``) is wholly absent, which is a partial or malformed ECMWF ENS
+    download. ``_engineer_features`` logs a warning naming the run rather than failing the slot.
+    See ``test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay``. None of the
+    current champion config's features are weather lags, so that path does not fire today, but a
+    future feature change touching weather lags should trip over this consciously.
     """
     settings = Settings()
     power_fcst_init_time = context.partition_time_window.end

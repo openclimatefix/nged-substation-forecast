@@ -788,9 +788,7 @@ def test_engineer_features_weather_lag_leakage_prevention():
     # Create dummy data to verify weather lag leakage prevention
     valid_time = datetime(2026, 6, 11, 12, 0)
     nwp_init_time = datetime(2026, 6, 10, 0, 0)
-    # power_fcst_init_time must clear select_analysis_proxy's default publication_delay
-    # (NWP_PUBLICATION_DELAY_HOURS) for run 1 to count as "available" for the freshest-run join.
-    power_fcst_init_time = nwp_init_time + timedelta(hours=NWP_PUBLICATION_DELAY_HOURS)
+    power_fcst_init_time = nwp_init_time + timedelta(hours=2)
 
     # NWP data has two runs:
     # 1. Run initialized at 2026-06-10 00:00:00 (the one we should use)
@@ -853,21 +851,20 @@ def test_engineer_features_weather_lag_leakage_prevention():
     assert engineered["temperature_2m_lag_36h"][0] == 8.0
 
 
-def test_engineer_features_single_run_freshest_run_excludes_unpublished_nwp_run():
-    """The single-run availability gate must reject a run not yet published by power_fcst_init_time.
+def test_engineer_features_single_run_freshest_run_excludes_later_nwp_run():
+    """The single-run ceiling must reject a run initialised after the selected one.
 
-    Three runs carry a value at the same lag target_time: T0, legitimately available by
-    power_fcst_init_time; T1, the row's own run (nwp_init_time), with no row at target_time so
-    the same-run branch cannot answer and the freshest-run branch is exercised; and T2, fresher
-    than T1 but with ``init_time + publication_delay`` still after power_fcst_init_time — not yet
-    published. Without the ``available_at``/``publication_delay`` cut on ``select_analysis_proxy``
-    in single-run mode, the freshest-run join picks up T2's decoy value; with it, T2 is excluded
-    and T0 answers instead.
+    Three runs carry a value at the same lag target_time: T0, older than the selected run and so
+    genuinely available; T1, the row's own run (nwp_init_time), with no row at target_time so the
+    same-run branch cannot answer and the freshest-run branch is exercised; and T2, initialised
+    after T1 and therefore not available when this forecast was made, carrying a decoy value.
+    Without the single-run ceiling at nwp_init_time, the freshest-run join picks up T2's decoy;
+    with it, T2 is excluded and T0 answers instead.
     """
     power_fcst_init_time = datetime(2026, 6, 11, 6, 0)
     nwp_init_time = datetime(2026, 6, 11, 0, 0)  # T1: the row's own run
     older_run_init_time = datetime(2026, 6, 10, 0, 0)  # T0: legitimately available
-    too_fresh_init_time = datetime(2026, 6, 11, 3, 0)  # T2: fresher than T1, not yet published
+    too_fresh_init_time = datetime(2026, 6, 11, 3, 0)  # T2: initialised after T1
     valid_time = datetime(2026, 6, 11, 12, 0)
     # lag=24h -> target_time = 2026-06-10 12:00: before power_fcst_init_time (freshest-run
     # branch), and T1 carries no row there at all, so only T0 or T2 can answer it.
@@ -892,6 +889,52 @@ def test_engineer_features_single_run_freshest_run_excludes_unpublished_nwp_run(
         selected_features={"temperature_2m_lag_24h"},
         power_fcst_init_time=power_fcst_init_time,
         nwp_init_time=nwp_init_time,
+    ).collect()
+
+    assert engineered["temperature_2m_lag_24h"][0] == 8.0
+
+
+def test_engineer_features_single_run_proxy_ceiling_is_the_selected_run_not_the_delay():
+    """The single-run analysis proxy cuts at nwp_init_time, whatever the publication delay says.
+
+    ``live_forecasts`` selects its NWP run in ``"live"`` availability mode, which accepts any run
+    genuinely present in the Delta table however fresh. The freshest-run join must accept that same
+    run, so the ceiling is the selected run rather than a modelled publication delay. Here
+    power_fcst_init_time is only 1 hour after the selected run while nwp_publication_delay_hours is
+    9, so a delay-based cut would exclude the selected run and null the lag.
+
+    Both halves of the ceiling are asserted, because a populated value alone would also survive
+    removing the ceiling altogether: the selected run answers (8.0), and the later run's decoy
+    (999.0) does not.
+    """
+    nwp_init_time = datetime(2026, 6, 11, 0, 0)
+    power_fcst_init_time = datetime(2026, 6, 11, 1, 0)
+    later_init_time = datetime(2026, 6, 11, 2, 0)
+    valid_time = datetime(2026, 6, 11, 12, 0)
+    # lag=24h -> target_time = 2026-06-10 12:00, before power_fcst_init_time, so the freshest-run
+    # branch answers it rather than the same-run join.
+    target_time = valid_time - timedelta(hours=24)
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1", "ts1", "ts1"],
+            "valid_time": [target_time, valid_time, target_time],
+            "ensemble_member": [0, 0, 0],
+            "init_time": [nwp_init_time, nwp_init_time, later_init_time],
+            "temperature_2m": [8.0, 99.0, 999.0],
+        }
+    )
+    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    engineered = _engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=nwp_df.lazy(),
+        selected_features={"temperature_2m_lag_24h"},
+        power_fcst_init_time=power_fcst_init_time,
+        nwp_init_time=nwp_init_time,
+        nwp_publication_delay_hours=NWP_PUBLICATION_DELAY_HOURS,
     ).collect()
 
     assert engineered["temperature_2m_lag_24h"][0] == 8.0
