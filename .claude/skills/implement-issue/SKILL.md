@@ -2,14 +2,15 @@
 name: implement-issue
 description: >-
   The routine for implementing an approved plan for a GitHub issue in
-  openclimatefix/nged-substation-forecast: isolated worktree, implement, the green-before-push
-  verification set, PR with labels and the JackKelly assignee, then up to two fresh sub-agents
-  adversarially review the diff in turn — one for correctness and for keeping the code, tests and
-  prose as short as they can be, then one that mutation-tests the change — triaging and pushing
-  after each, stop for human review, never merge. How many of those reviews run is set by the issue
-  size: a simple issue arrives here with no plan and gets none. Load before writing any code for an
-  issue, and when dispatching a sub-agent or a fresh session to solve one. To decide *what* to
-  build, use `plan-issue` first.
+  openclimatefix/nged-substation-forecast, in the worktree and draft PR `plan-issue` already
+  opened: implement, the green-before-push verification set, mark the PR ready for review, then up
+  to two fresh sub-agents adversarially review the diff in turn — one for correctness and for
+  keeping the code, tests and prose as short as they can be, then one that mutation-tests the
+  change — triaging and pushing after each, stop for human review, never merge. How many of those
+  reviews run is set by the issue size: a simple issue arrives here with no plan and no draft PR,
+  so it opens its own PR and gets no review at all. Load before writing any code for an issue, and
+  when dispatching a sub-agent or a fresh session to solve one. To decide *what* to build, use
+  `plan-issue` first.
 ---
 
 # Implement a GitHub issue
@@ -63,14 +64,14 @@ front — a report back after step 1 is not finished work.
 4. **Commit, push, and mark the PR ready for review.** If a plan preceded this, `plan-issue`
    already opened the PR as a draft in its own step 4 — commit the implementation, push, and take
    it out of draft with `gh pr ready <PR-number>`. Rewrite the body for the code that now exists:
-   drop the draft's "plan not approved, no code yet" line, describe the change, and restate the
-   size, the five trigger answers and the reviews the change is getting, updating any that changed
-   since the plan was written. If there is no plan (the simple-issue path, which
-   arrives here directly), open the PR now instead: `gh pr create` against `main`, with labels and
-   `JackKelly` as assignee (`gh pr create` can't set either — follow with `gh pr edit --add-label
-   <label>` and `gh pr edit --add-assignee JackKelly`), linking the issue so it closes on merge.
-   Commit messages end with `Co-Authored-By: Claude <noreply@anthropic.com>`. See the
-   `github-issue-pr-workflow` skill for the full PR checklist and the never-squash-merge rule.
+   drop the line saying the plan is unapproved and carries no code, describe the change, and update
+   the size, the trigger answers and the reviews named below if any of them changed since the plan
+   was written. If there is no plan (the simple-issue path, which arrives here directly), open the
+   PR now instead: `gh pr create` against `main`, with labels and `JackKelly` as assignee (`gh pr
+   create` can't set either — follow with `gh pr edit --add-label <label>` and `gh pr edit
+   --add-assignee JackKelly`), linking the issue so it closes on merge. Commit messages end with
+   `Co-Authored-By: Claude <noreply@anthropic.com>`. See the `github-issue-pr-workflow` skill for
+   the full PR checklist and the never-squash-merge rule.
 
     The body says **how the issue was sized and which adversarial reviews it is getting** — and
     where that is none, says so outright. A PR that no sub-agent has attacked is one where human
@@ -152,14 +153,13 @@ superlative, and umbrella-noun violations still in it. Size the pass to the text
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
-**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an
-adversarial pass by the time a human is asked to review the diff, so that human review is the last
-line of defence
-rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by
-the implementer's rationale; the triage step exists because reviewer findings are often wrong and
-must not be applied uncritically. Mutation testing goes second because it should be aimed at the
-tests that survive the first round, not at ones the first round deletes — and it gets its own
-reviewer because a green suite proves nothing on its own: the only way to learn whether a test
+**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an adversarial
+pass by the time a human is asked to review the diff, so that human review is the last line of
+defence rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be
+anchored by the implementer's rationale; the triage step exists because reviewer findings are often
+wrong and must not be applied uncritically. Mutation testing goes second because it should be aimed
+at the tests that survive the first round, not at ones the first round deletes — and it gets its
+own reviewer because a green suite proves nothing on its own: the only way to learn whether a test
 would catch the bug it exists for is to write that bug and watch.
 
 **Why the reviews are sized rather than always run:** an adversarial pass costs wall-clock time

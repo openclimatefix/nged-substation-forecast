@@ -62,7 +62,7 @@ needed one, the mistake is already written.
 | `plan-wave` | choosing the next batch of issues under an epic to run in parallel (`/plan-wave <EPIC>`) |
 | `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — sizes the issue, then writes a reviewed plan unless it is trivial, no code |
 | `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
-| `implement-issue` | writing code for an approved plan: worktree, verify set, PR, up to two adversarial reviews, stop |
+| `implement-issue` | writing code for an approved plan: implement in the draft PR `plan-issue` opened, verify set, mark it ready, up to two adversarial reviews, stop |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh pr merge`, or ship-time triage |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
 | `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
@@ -448,13 +448,12 @@ examples in `docs/`, leaderboard rows, dashboards, reports, papers, and issue or
 Substations are not covered by this rule, and a generator's name may still appear in a lookup table
 that carries no time series.
 
-**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an
-adversarial pass by the time a human is asked to review the diff, so that human review is the last
-line of defence
-rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by the
-implementer's rationale; the triage step exists because reviewer findings are often wrong and
-must not be applied uncritically. Simplicity gets its own reviewer, and gets it first, because a
-plan that is more complicated than the issue requires is the failure mode that survives a
+**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an adversarial
+pass by the time a human is asked to review the diff, so that human review is the last line of
+defence rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be
+anchored by the implementer's rationale; the triage step exists because reviewer findings are often
+wrong and must not be applied uncritically. Simplicity gets its own reviewer, and gets it first,
+because a plan that is more complicated than the issue requires is the failure mode that survives a
 correctness review intact. Mutation testing gets the last reviewer because a green suite proves
 nothing on its own: whether a test would catch the bug it exists for is only settled by writing
 that bug and watching. The sizing exists because that machinery costs wall-clock time and a round
