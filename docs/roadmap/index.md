@@ -322,11 +322,12 @@ forecast-skill milestones above. Items so far:
   [live-service plan](live-service.md#deployment-workstream-3-aws-infrastructure); the
   account-portability requirement is in
   [Handover to NGED](handover.md#4-infrastructure-as-code-portable-to-ngeds-account).
-- Consider five pieces of industry best practice we currently lack
+- Consider seven pieces of industry best practice we currently lack
   ([#449](https://github.com/openclimatefix/nged-substation-forecast/issues/449)): input-drift
   detection, shadow deployment of a challenger model, a schema-evolution policy for the delivery
   contract (which may need pulling forward to v0.6), statistical process control on forecast
-  error, and naming *poka-yoke* among the design principles — each discussed in
+  error, naming *poka-yoke* among the design principles, a retraining cadence and trigger, and
+  monitoring how NGED uses the delivered forecasts — each discussed in
   [Design Principles → Industry best practices we have not yet absorbed](../design-philosophy/design-principles.md#industry-best-practices-we-have-not-yet-absorbed).
   A holding issue: the task is
   to consider them once the live service has run for a while, not a commitment to build them.
@@ -409,7 +410,6 @@ delivery of the v2 live service)*
 
 - Scale to approximately 2,500 time series: all of NGED's primary substations (1,161), BSPs (271), GSPs (52), and most customer meters (~1,000)
 - Estimate the installed capacity of *unmetered* solar PV and wind on each primary substation (by [disaggregating net primary substation power flows](disaggregation.md))
-- Compare top-down forecasts vs. bottom-up forecasts for BSPs and GSPs
 
 **Stretch goals**:
 
@@ -428,6 +428,23 @@ undone, and adds
 
 ---
 
+## Model cards for promoted models
+
+**Deferred until after v2 ships.** Every model promoted to production should get a model card
+recording detailed feature importance, calibration behaviour, and the population it was trained
+and validated against — the record an operator or an auditor needs to trust a specific promoted
+model. The Energy Systems Catapult [DNO Forecasting
+Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/) names model cards under the same
+"Explainability" characteristic as the feature attributions below, as what supports operator trust
+and incident investigation. A model card is a heavier, promotion-time record, distinct from the
+lightweight per-training-run feature attributions every model gets (see [Log feature importances
+for every trained
+model](xgboost-improvements.md#log-feature-importances-for-every-trained-model)). Model
+cards are a stretch beyond what v2 needs in order to ship live, so this workstream starts once the
+v2 service is running.
+
+---
+
 ## After v2.1 — Research (Advanced ML)
 
 **The research items run roughly in the order listed.** The weather encoder trains through the
@@ -435,6 +452,7 @@ differentiable-physics modules, so the encoder comes after the physics and disag
 
 - **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (see [the graph-structured engine](disaggregation.md#the-graph-structured-engine) and [MVA metering](disaggregation.md#apparent-power-mva-metering))
 - **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing. (See [Net-demand disaggregation](disaggregation.md) — the canonical page for this arc, including the [convex dictionary baseline](disaggregation.md#the-convex-dictionary-baseline) it must beat — and [the switching-events approaches](switching-events.md#the-approaches).)
+- **Top-down forecast coherence checking**: check whether independently-produced primary, BSP, and GSP forecasts sum consistently up the substation hierarchy — a lighter check than the comparison below, worth running first because it needs no new modelling, only the forecasts v2 already produces. The Energy Systems Catapult [DNO Forecasting Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/) names hierarchy coherence as its own forecast characteristic, for exactly this reason.
 - **Bottom-up vs top-down substation forecasts**: compare a substation forecast built by summing the forecasts of the assets behind that substation (metered generators, disaggregated demand, and disaggregated unmetered generation) against a forecast of the substation's own net power taken directly, to see which is more accurate.
 - **Latent-demand recovery under switching**: reconstruct the demand each substation would have metered under the *normal running arrangement*, using a time-varying neighbourhood mixture (optionally type-resolved into demand / PV / wind) over the network graph. This neighbourhood-mixture approach reconstructs the topology-normalised demand NGED requires, and goes beyond the v0.6 statistical detector — which only flags and masks switching periods. See [Switching events & latent demand](switching-events.md).
 - **Synthetic telemetry from fitted models, for the problems whose labels are missing**: three of this project's problems are scored against labels that are incomplete or absent — disaggregating unmetered distributed energy resources (DERs), detecting switching events, and estimating the effective capacity of metered generators. Fitting the per-site generation modules ([differentiable physics](../techniques/differentiable-physics.md)) and the shared demand-profile basis ([the `BasisLoadNode`](disaggregation.md#node-definitions)), then running them forward on real weather and summing the sites, produces a simulated substation whose generation, demand, and capacity are all written down by construction. Editing the simulated sum writes the labels the other two problems need: reassigning a site from one substation's sum to a named neighbour over a known window labels a switching event, and stepping a site's capacity down on a known date labels a capacity change. Both edits are exact in simulation, where the real-data harnesses can only approximate them by scaling a fraction of net power. The hazard is circularity: an estimator scored on data generated by its own model family measures whether the parameters are identifiable, not whether that model family matches reality. Two consequences follow. Parameters must be drawn afresh rather than frozen at their fitted values wherever the fitted value is the quantity under test — a capacity estimator scored against its own earlier answer measures only that the fit reproduces, and simulating with the same biased irradiance hides the [weather-bias aliasing](capacity-estimation.md#keeping-weather-bias-out-of-capacity) that page names as the dominant systematic error. And a passing score never stands alone, because the simulated telemetry carries none of the meter noise the switching detector's thresholds are normalised against. The simulator therefore supplements the real-data harnesses rather than replacing them: [injection into real telemetry](switching-events.md#validation-injection-and-what-the-detector-delivers) stays the primary evidence for switching detection, and the [other disaggregation spokes](../techniques/disaggregation-evaluation.md) stay the primary evidence for disaggregation.
@@ -442,6 +460,7 @@ differentiable-physics modules, so the encoder comes after the physics and disag
 - **Pre-trained neural network [encoders](../techniques/encoders.md)**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
 - **Multi-sequence alignment** with axial attention: find "similar" historical days and feed them as additional context to the forecasting model
 - **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
+- **Modelling DER response to market signals** (stretch goal, only if time remains well after v2): extend the [differentiable-physics](../techniques/differentiable-physics.md) DER modules to react to a price signal directly — battery charge/discharge and other price-sensitive dispatch as a function of the market signal, rather than as unexplained residual behaviour
 
 ---
 

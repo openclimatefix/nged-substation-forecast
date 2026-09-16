@@ -466,6 +466,21 @@ column in `_parsed_features.py`, in the mould of the existing derived features �
 bottom of Tier 1. The PV variant can run now on a raw GHI delta; the wind variant waits on the
 [solar/wind physics proxies](#linearised-physics-features-for-solar-and-wind).
 
+### Log feature importances for every trained model
+
+Every model this project trains during cross-validation — one XGBoost `Booster` per
+`time_series_id`, for every fold — should have its feature importances
+(`Booster.get_score(importance_type="gain")`) logged to the MLflow run already created for that
+fold. The cost is a few lines and a dictionary of floats per booster, with no new training step.
+The diagnostic value shows up the first time a booster's feature ranking looks wrong, when the
+current tooling has nothing to point at. Feature attributions are exactly the diagnostic the
+Energy Systems Catapult [DNO Forecasting
+Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/) names under its "Explainability"
+characteristic, for supporting operator trust and reducing "black box" risk. Logging feature
+importances this way is a lightweight, per-fold habit, distinct from the detailed model cards
+deferred until [after v2 ships](index.md#model-cards-for-promoted-models) for models actually
+promoted to production.
+
 ## Tier 2 — low-effort feature engineering (about a day each)
 
 ### Per-`time_series_type` feature lists
@@ -620,6 +635,23 @@ XGBoost's `monotone_constraints`: PV power non-decreasing in irradiance, wind po
 speed below rated. Mostly delivers sane extrapolation in weather regimes the training year never saw
 — precisely the failure mode of a single-fold training set. A config-field addition once the
 solar/wind physics features exist.
+
+### BMRS day-ahead price as a feature
+
+The trial population includes a battery, a gas generator, and a biofuel plant behind one set of
+primaries ([several estimators, one winner](capacity-estimation.md#several-estimators-one-winner))
+— assets whose output responds to market price rather than to weather alone. No market signal
+reaches the model today, though the Energy Systems Catapult [DNO Forecasting
+Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/) names market signals as one of
+the standard forecast covariates in its use-case characteristics. The low-effort version: fetch
+the GB day-ahead wholesale price from the Balancing Mechanism Reporting Service (BMRS, run by
+Elexon), join it by settlement period, and add
+it as a feature for these `time_series_type`s — pairing naturally with the [per-`time_series_type`
+feature lists](#per-time_series_type-feature-lists) above, so the price feature need not pollute the
+demand and PV/wind lists. Adding the BMRS price this way is deliberately the cheap version:
+modelling *how* a distributed energy resource actually responds to price is a
+[differentiable-physics stretch goal well after v2](index.md#after-v21-research-advanced-ml), not
+this item.
 
 ## Tier 3 — new feature machinery (days)
 

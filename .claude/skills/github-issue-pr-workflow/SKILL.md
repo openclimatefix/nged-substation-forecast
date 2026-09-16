@@ -84,6 +84,17 @@ jq -n --rawfile body /tmp/pr_body.md '{body: $body}' \
 The same pattern PATCHes an issue body (`issues/<N>`) or posts a comment
 (`issues/<N>/comments`, which also works for PR comments).
 
+## Open every GitHub body with the attribution line
+
+**Every issue, PR, and comment body Claude writes opens with the attribution line —
+`🤖 Generated with [Claude Code](https://claude.com/claude-code)` — as its first line, before any
+other content.** This repo convention takes the line from wherever a session's own environment
+instructions would otherwise place it (commonly the end of a PR description) and puts it first
+instead, so a reader skimming a long issue thread or a wave-tracking comment sees the automated
+origin before reading a word of the content. It is separate from the commit-message trailer
+(`Co-Authored-By: Claude ... <noreply@anthropic.com>`), which stays on commits only and keeps its
+usual placement at the end of the message. `plan-wave`'s epic-ledger comment already follows this.
+
 ## Never hard-wrap a GitHub body or comment
 
 **Write one line per paragraph. No hard wraps, at any width.** This applies to every issue body,
