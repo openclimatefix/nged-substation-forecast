@@ -51,6 +51,18 @@ restating the rule too, replacing it with a link — matching the pattern `docs/
 `docs/roadmap/delivery-tables.md` already use. Drift becomes structurally impossible rather than
 merely detected: there is nothing left to fall out of sync, so no new test is needed.
 
+## Post-merge relevance check
+
+`main` was merged into this branch after the plan above was written and reviewed (bringing in a
+large docs restructuring, including a 317-line rewrite of `cost-savings-metrics.md`). A fresh
+Sonnet 5 review re-verified every current-state claim in this plan against the post-merge files:
+all wording, structure, and tooling claims still hold — the "back" vs. "backwards into the grid"
+drift the issue reports is still present and unfixed, `include-markdown` is still installed and
+used the same way, and no new duplication of the sign-convention rule was introduced by the
+restructuring. Only two line-number references had drifted (fixed above): `power_fcst`'s sentence
+group is at lines 391–397, not 392–398, and the `cost-savings-metrics.md` section moved to ~line
+233, not ~line 124.
+
 ## Verdict, size, departures (step 2/3)
 
 - **Verdict:** worth doing, as scoped. Verified against the code, not just the issue body — see
@@ -107,7 +119,7 @@ reference page for free.
 
 ### `packages/contracts/src/contracts/power_schemas.py`
 
-Today, `PowerTimeSeries.power` (lines 49–56) and `PowerForecast.power_fcst` (lines 392–398) each
+Today, `PowerTimeSeries.power` (lines 49–56) and `PowerForecast.power_fcst` (lines 391–397) each
 embed this identical sentence group inside their Field `description=`:
 
 > Sign convention depends on `substation_type` in `TimeSeriesMetadata`. At a substation (`BSP`,
@@ -143,7 +155,7 @@ The `#sign-convention` anchor is unchanged (the heading itself stays in this fil
 existing link to it — `docs/index.md`, `docs/roadmap/delivery-tables.md`,
 `docs/roadmap/cost-savings-metrics.md` — keeps resolving.
 
-### `docs/roadmap/cost-savings-metrics.md` (`### Which direction is the constraint on?`, ~line 124)
+### `docs/roadmap/cost-savings-metrics.md` (`### Which direction is the constraint on?`, ~line 233)
 
 Current text restates the rule in its own wording, with a link appended parenthetically:
 
