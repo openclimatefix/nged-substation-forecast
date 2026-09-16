@@ -593,3 +593,55 @@ def test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh(
     lag_col = f"temperature_2m_lag_{gap_hours}h"
     lag_is_entirely_null = genuine[lag_col].null_count() == genuine.height
     assert lag_is_entirely_null == expect_null
+
+
+def test_live_forecasts_degrades_when_no_control_member_for_weather_lag(
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    tmp_path: Path,
+) -> None:
+    """A selected run with no control member nulls the weather lag rather than failing the slot.
+
+    A partial or malformed ECMWF ENS download that drops the control member (``ensemble_member
+    == 0``) is the outside world misbehaving, not our bug, so ``_engineer_features`` degrades
+    rather than raises in single-run mode (see ``tabular_feature_engineer.py``'s control-member
+    check). ``test_engineer_features_nulls_weather_lag_in_single_run_mode_when_no_control_member``
+    already pins *which* column goes null and by what mechanism, with no layer between it and
+    ``live_forecasts``'s own call (``production_assets.py`` calls ``engineer()`` directly, nothing
+    wraps the raise). This test's job is narrower: confirm the materialisation itself doesn't
+    fail — the fact that would be false on `main` today.
+    """
+    gap_hours = 9  # at the publication delay, so the freshest-run join is exercised (see above)
+    power_fcst_init_time = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
+    partition_key = "2026-07-04-00:00"
+    nwp_init = power_fcst_init_time - timedelta(hours=gap_hours)
+    forecast_valid_time = power_fcst_init_time + timedelta(minutes=30)
+    target_time = forecast_valid_time - timedelta(hours=gap_hours)
+
+    nged_path = tmp_path / "NGED"
+    nged_path.mkdir()
+    production_model_path = tmp_path / "production_model"
+
+    monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
+    monkeypatch.setenv("NWP_DATA_PATH", str(tmp_path / "NWP"))
+    monkeypatch.setenv("POWER_FORECASTS_DATA_PATH", str(tmp_path / "power_forecasts"))
+    monkeypatch.setenv("PRODUCTION_MODEL_PATH", str(production_model_path))
+
+    _write_power_for(str(nged_path / "power_time_series.delta"), (1,))
+    records = nwp_records(
+        _TRAINED_CELL,
+        nwp_init,
+        (1,),  # no control member (0)
+        init_time=nwp_init,
+        valid_times=[target_time, forecast_valid_time],
+    )
+    write_test_nwp(str(tmp_path / "NWP"), records)
+    _save_model_trained_on_weather_lag(production_model_path, gap_hours)
+
+    result = materialize(
+        [live_forecasts],
+        partition_key=partition_key,
+        run_config=RunConfig(ops={"live_forecasts": LiveForecastsConfig(availability_mode="live")}),
+        instance=dagster_instance,
+    )
+    assert result.success

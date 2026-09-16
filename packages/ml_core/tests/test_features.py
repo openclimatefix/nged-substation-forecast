@@ -1074,8 +1074,47 @@ def test_engineer_features_bulk_mode_derives_power_fcst_init_time():
     assert result["power_fcst_init_time"][0] == expected
 
 
-def test_engineer_features_raises_when_no_control_member_for_weather_lag():
-    """Weather lag features require ensemble_member==0; missing control member must raise loudly."""
+def test_engineer_features_nulls_weather_lag_in_single_run_mode_when_no_control_member(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """In single-run mode, a missing control member degrades the weather lag to null and logs."""
+    nwp_init_time = datetime(2023, 1, 1, 0, 0)
+    power_fcst_init_time = nwp_init_time + timedelta(hours=NWP_PUBLICATION_DELAY_HOURS)
+    # target_time (valid_time - 6h) must land strictly before power_fcst_init_time so
+    # _apply_weather_lag's >= boundary (_lags.py) routes to the freshest-run join, which is the
+    # one that depends on the control member — the same-run join wouldn't exercise this path.
+    valid_time = power_fcst_init_time + timedelta(hours=3)
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"],
+            "valid_time": [valid_time],
+            "ensemble_member": [1],  # no control member
+            "init_time": [nwp_init_time],
+            "temperature_2m": [10.0],
+        }
+    )
+    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    with caplog.at_level("WARNING"):
+        result = _engineer_features(
+            power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
+                PowerTimeSeries
+            ),
+            time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+            nwp=nwp_df.lazy(),
+            selected_features={"temperature_2m_lag_6h"},
+            power_fcst_init_time=power_fcst_init_time,
+            nwp_init_time=nwp_init_time,
+        ).collect()
+
+    assert result["temperature_2m_lag_6h"][0] is None
+    assert any("control member" in message for message in caplog.messages)
+
+
+def test_engineer_features_raises_in_bulk_mode_when_no_control_member_for_weather_lag():
+    """Bulk mode (training/backtesting) keeps failing fast on a missing control member."""
     valid_time = datetime(2023, 1, 1, 12, 0)
     nwp_init_time = datetime(2023, 1, 1, 0, 0)
 
@@ -1099,8 +1138,6 @@ def test_engineer_features_raises_when_no_control_member_for_weather_lag():
             time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
             nwp=nwp_df.lazy(),
             selected_features={"temperature_2m_lag_6h"},
-            power_fcst_init_time=datetime(2023, 1, 1, 6, 0),
-            nwp_init_time=nwp_init_time,
         )
 
 
