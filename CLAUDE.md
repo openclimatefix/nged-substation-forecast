@@ -401,15 +401,19 @@ before any code moves:
    launched as its own Claude Code session. It plans one wave and stops, because the epic gains
    issues while a wave is in flight. Skip it when the issue to work on has already been named.
 2. **`plan-issue`** (`/plan-issue <N>`) reads the issue, decides whether it is worth implementing
-   at all, and sizes how much process it needs. It writes `plans/<branch-name>.md`, links to the
-   plan as soon as it is committed and pushed, has up to two fresh sub-agents adversarially review
-   that plan in turn — the first hunting for a simpler approach, the second checking correctness
-   and testability — and stops for human review. It writes no code.
-3. **`implement-issue`** picks up an approved plan: worktree, implement, the green-before-push
-   verification set, PR with labels and assignee, then up to two *further independent* adversarial
-   reviews of the diff — the first for correctness and for cutting the code, tests and prose
-   down to what the change needs, the second mutation-testing the change — committing, triaging
-   and pushing after each, stop for human review. **Never merge.**
+   at all, and sizes how much process it needs. It creates the worktree and branch, writes
+   `plans/<branch-name>.md`, opens the PR as a draft with labels and the `JackKelly` assignee,
+   links to both the plan and the draft PR as soon as they are pushed, has up to two fresh
+   sub-agents adversarially review that plan in turn — the first hunting for a simpler approach,
+   the second checking correctness and testability — and stops for human review. It writes no
+   code.
+3. **`implement-issue`** picks up an approved plan in the worktree and draft PR `plan-issue`
+   already created: implement, the green-before-push verification set, push and mark the PR ready
+   for review, then up to two *further independent* adversarial reviews of the diff — the first
+   for correctness and for cutting the code, tests and prose down to what the change needs, the
+   second mutation-testing the change — committing, triaging and pushing after each, stop for
+   human review. **Never merge.** A simple issue arrives here with no plan and no draft PR, so
+   `implement-issue` makes the worktree and opens the PR itself.
 
 **How much process an issue gets is sized to the issue**, in step 3 of `plan-issue`:
 
@@ -445,7 +449,8 @@ Substations are not covered by this rule, and a generator's name may still appea
 that carries no time series.
 
 **Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an
-adversarial pass by the time a human opens it, so that human review is the last line of defence
+adversarial pass by the time a human is asked to review the diff, so that human review is the last
+line of defence
 rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by the
 implementer's rationale; the triage step exists because reviewer findings are often wrong and
 must not be applied uncritically. Simplicity gets its own reviewer, and gets it first, because a

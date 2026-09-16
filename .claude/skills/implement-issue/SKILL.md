@@ -23,10 +23,11 @@ so when it hands over, the worktree, branch and draft PR already exist and imple
 at step 2.
 
 The one issue that arrives here **without** a plan is one `plan-issue` sized as simple: a
-mechanical change with no design to approve, which runs steps 1 to 4 and then stops for human
-review with no adversarial pass at all. If you reach this skill without having gone through
-`plan-issue` — a direct instruction to fix something, say — make that sizing judgement first,
-using the criteria in `plan-issue` step 3, and say which size you picked before you start.
+mechanical change with no design to approve, which runs steps 1 to 4, then the prose-review pass
+below if the diff carries new prose, then stops at step 9 with no adversarial pass at all. If you
+reach this skill without having gone through `plan-issue` — a direct instruction to fix something,
+say — make that sizing judgement first, using the criteria in `plan-issue` step 3, and say which
+size you picked before you start.
 
 **How many of the two reviews below to run** comes from that sizing: both for a complex issue,
 none for a simple one, and between zero and two for a medium one — your choice, under the rules in
@@ -61,8 +62,10 @@ front — a report back after step 1 is not finished work.
 
 4. **Commit, push, and mark the PR ready for review.** If a plan preceded this, `plan-issue`
    already opened the PR as a draft in its own step 4 — commit the implementation, push, and take
-   it out of draft with `gh pr ready <N>`. Refresh the body if the size or the reviews it is
-   getting changed since the plan was written. If there is no plan (the simple-issue path, which
+   it out of draft with `gh pr ready <PR-number>`. Rewrite the body for the code that now exists:
+   drop the draft's "plan not approved, no code yet" line, describe the change, and restate the
+   size, the five trigger answers and the reviews the change is getting, updating any that changed
+   since the plan was written. If there is no plan (the simple-issue path, which
    arrives here directly), open the PR now instead: `gh pr create` against `main`, with labels and
    `JackKelly` as assignee (`gh pr create` can't set either — follow with `gh pr edit --add-label
    <label>` and `gh pr edit --add-assignee JackKelly`), linking the issue so it closes on merge.
@@ -150,7 +153,8 @@ superlative, and umbrella-noun violations still in it. Size the pass to the text
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
 **Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an
-adversarial pass by the time a human opens it, so that human review is the last line of defence
+adversarial pass by the time a human is asked to review the diff, so that human review is the last
+line of defence
 rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by
 the implementer's rationale; the triage step exists because reviewer findings are often wrong and
 must not be applied uncritically. Mutation testing goes second because it should be aimed at the
