@@ -7,34 +7,17 @@ measured before PR #653 corrected the `Nwp` dtype mismatch, during the period wh
 `Nwp.scan_delta` silently defeated Parquet predicate pushdown. The other two had their figures
 stripped by #653 and now say the speed-up "needs re-measuring against real data".
 
-**The planned solution: once issue #759 has landed, measure the rewritten table through the
-production read path and write the figures into the five locations.** The work is a short probe run
-against the local development NWP table, then an edit to five files. No S3 read, no new file, no new
-test.
+**The planned solution: measure the table through the production read path and write the figures
+into the five locations.** The work is a short probe run against the local development NWP table,
+then an edit to five files. No S3 read, no new file, no new test.
 
-## Sequencing: this issue runs after #759
-
-**Planning this issue found a one-line defect in `write_nwp` and it is being dealt with first, in
-issue #759.** `write_nwp` sorts member-early so a single-member read can skip row groups, but
-delta-rs splits each partition across two Parquet files and scatters the Arrow chunks, so each row
-group ends up holding about 12 *non-contiguous* members. Parquet min/max cannot express a set with
-holes, so a row group holding `{0, 1, 4, 5, 6, 15…22}` advertises `[0, 22]`. The measured effect is
-that only members at the ends of the range prune at all: the control member reads 14.2% of rows,
-while member 25 reads 95.7%. Passing a `target_file_size` large enough to hold a partition in one
-file restores the order and brings every member to ~14.5%, storage-neutral. #759 makes that change
-and rewrites the 898 stored partitions (about 1 hour serial, measured at 4.2 s per partition).
-
-**Running this issue first would mean documenting a defect we can remove in one line.** The prose
-explaining why min/max over-advertises a non-contiguous member set is the hardest writing in this
-job, and it would be deleted days later — which CLAUDE.md's "write about the present, not the past"
-rule forbids. Worse, the `NWP_SORT_COLS` docstring's existing claim that each row group "spans only
-a handful of member values instead of all ~51" is *false today and true after #759*, so waiting
-turns a rewrite into an insertion.
-
-**What this issue measures therefore changes.** After #759 the pruning is uniform across members, so
-the write-up states one figure that holds for any member, rather than a table showing the benefit
-collapsing in the middle of the range. The comparison the issue asks for — member-early against the
-`valid_time`-first sort it replaced — is unaffected and still runs.
+**Issue #759 landed first and changed what there is to measure.** Planning this issue found that
+`write_nwp` sorted member-early but delta-rs scattered the sorted rows across row groups, so only
+members at the ends of the range pruned at all. #759 fixed the layout and rewrote all 899 stored
+partitions, so pruning is now uniform across members. The write-up therefore states one figure that
+holds for any member, rather than a table showing the benefit collapsing in the middle of the
+range. The comparison the issue asks for — member-early against the `valid_time`-first sort it
+replaced — is unaffected and still runs.
 
 ## Verdict, size and departures
 
@@ -55,7 +38,7 @@ the maintainer's explicit sign-off". It does not.** A complete, current NWP Delt
 machine at `/home/jack/dev/nged-substation-forecast/data/NWP`, reachable from the worktree through
 the repo's usual `data` symlink. Checked while planning:
 
-- 123 GB, 898 daily `init_time` partitions, 2024-04-01 to 2026-09-16.
+- 899 daily `init_time` partitions, 2024-04-01 to 2026-09-16, one Parquet file each.
 - Every partition file has an mtime of 2026-09-05 or later, so the whole table was written by the
   current `write_nwp`, after PR #653 merged on 2026-08-14.
 - The logical schema reads back as `ensemble_member: Int8`, `h3_index: Int64`, `nwp_model_id:
@@ -78,7 +61,7 @@ and none is named in the issue.** Meanwhile one location the issue does name nee
 |---|---|---|
 | `packages/delta_store/src/delta_store/nwp.py` module docstring, line 21 | Asserts "~5x faster and ~5x less peak memory for a ~2% storage cost" | **Delete** the parenthetical; the sentence already links to the README that will carry the figures |
 | `packages/dynamical_data/README.md:49-53` ("Read path") | Asserts "**~5× faster, ~5× less peak memory** (0.15 s / ~1 GB → 0.02–0.04 s / ~205 MB), for a ~2% storage cost" | Rewrite as the single home of method and figures |
-| `packages/delta_store/src/delta_store/nwp.py` `NWP_SORT_COLS` docstring | "need re-measuring" | Replace with the measured figure; the "handful of member values" sentence becomes true once #759 lands and stays |
+| `packages/delta_store/src/delta_store/nwp.py` `NWP_SORT_COLS` docstring | Describes the layout #759 built, with no figure | Add the measured figure |
 | `docs/architecture/performance.md:76` and `:81` | "needs re-measuring"; a parenthetical two sentences below `:81` makes an unmeasured peak-memory claim | Replace both, and delete the parenthetical |
 | `docs/architecture/forecast-delivery.md:477-479` | Asserts "0.02 seconds and uses 205 MB of RAM", then claims that speed "is what lets us run cross-validation across **every ensemble member**" | Replace; after #759 the every-member claim becomes true, which is worth stating rather than deleting |
 | `src/nged_substation_forecast/defs/_engineering_inputs.py:78-83` | Carries **no** figure and no "needs re-measuring" sentence — names the mechanism and links to `performance.md` | **Leave untouched** |
@@ -113,17 +96,15 @@ fenced block beside the figures it produced, so the method cannot drift from the
 
 ### The probe (run, not committed)
 
-**Run this after #759 has landed and the table has been rewritten**, so it measures the layout the
-docs will describe. Re-confirm before starting that a sampled partition really does hold one Parquet
-file and that a mid-range member prunes, since those are #759's deliverables and this issue's
-premise.
+**The probe measures the table as #759 left it**, so it measures the layout the docs will
+describe. Confirm before starting that a sampled partition really does hold one Parquet file and
+that a mid-range member prunes, since those are #759's deliverables and this issue's premise.
 
 *The layout census is read-only and needs no scratch table.* Read the `ensemble_member` row-group
-statistics of partitions sampled across 2024, 2025, and 2026, decode the column to count the members
-each row group actually holds, and report rows decoded for a control member and for a mid-range
-member. Sampling across eras matters: before #759 the control-member figure was stable at 14.1–16.2%
-while the mid-range figure swung from 78% to 96%, so the write-up must not quote a single era as
-though it were table-wide.
+statistics of partitions sampled across 2024, 2025, and 2026 and report the rows a read of the
+control member, a mid-range member, and the last member must decode. Sampling across eras matters
+because the stored partitions were written over two and a half years, and a census of one era could
+not tell a table-wide figure from a recent one.
 
 *The sort-order comparison writes two arms* from one partition read back through `Nwp.scan_delta`:
 
@@ -133,10 +114,9 @@ though it were table-wide.
    member-early sort replaced (`83a40738^:.../convert_to_polars.py:60`). Patch the module global,
    not a local `from ... import` binding; `write_nwp` reads it at call time.
 
-**Both arms must be freshly written**, and this matters more than it looks: before #759 delta-rs's
-reordering was non-deterministic, so a fresh write of a partition did not reproduce the stored
-copy's row-group boundaries. Comparing a fresh arm against the stored table would confound sort
-order with that non-determinism.
+**Both arms must be freshly written**, so that the only difference between them is the sort
+order. Both arms go through the real `write_nwp`, which sizes row groups to one member's rows in
+either arm, so the comparison isolates the row order rather than mixing it with the row-group size.
 
 *The timing arm uses the 29-day production read shape*, since a single partition returns 765 rows
 and would measure fixed costs rather than decode. Write 29 partitions per arm and time
@@ -152,9 +132,8 @@ Measure peak resident memory once per arm, each in **its own subprocess**:
 arms in one process would report the larger figure twice. `tracemalloc` is not an alternative —
 Polars allocates outside Python's allocator.
 
-Scratch usage peaks at about **8.4 GB** (2 arms × 29 partitions × ~145 MB), under
+Scratch usage peaks at about **9 GB** (2 arms × 29 partitions × ~155 MB), under
 `~/.cache/nged-nwp-sort-benchmark/` and deleted afterwards. Not `/tmp`, which is a 31 GB tmpfs.
-There is 542 GB free.
 
 ### `packages/dynamical_data/README.md`
 
@@ -169,11 +148,9 @@ silently change what the table means.
 
 ### `packages/delta_store/src/delta_store/nwp.py`
 
-Delete the module docstring's figure parenthetical, keeping the link. Replace `NWP_SORT_COLS`' "need
-re-measuring" sentence with the measured figure. Its "handful of member values" sentence needs no
-change once #759 has landed, but the docstring should say that the claim depends on a partition
-landing in one file — which is #759's `target_file_size` — so the two constants are not edited
-independently later.
+The module docstring's figure parenthetical was deleted by #759, which left the link in place, so
+this issue adds nothing there. `NWP_SORT_COLS` gains the measured figure beside the layout it
+already describes.
 
 ### `docs/architecture/performance.md`
 
@@ -191,8 +168,9 @@ gains the evidence it currently lacks. This page is written for an outside reade
 matters most here.
 
 The same bullet's neighbour says the local table is "821 daily runs, ~5.9 billion rows, April 2024 to
-July 2026 — **~93 GB**". It is now 898 partitions and 123 GB. Strictly outside the issue, but it is
-the adjacent line in the bullet being rewritten, and CLAUDE.md requires docs to describe the present.
+July 2026 — **~93 GB**". Every one of those figures is now stale. Strictly outside the issue, but it
+is the adjacent line in the bullet being rewritten, and CLAUDE.md requires docs to describe the
+present.
 
 ## Design-philosophy check
 
