@@ -135,9 +135,9 @@ def test_ensemble_member_has_one_dtype_across_the_schemas_it_flows_through():
 
     Feature engineering reads the column from `Nwp` and carries it into `AllFeatures`, and
     `BaseForecaster.predict` writes it to `PowerForecast`. `Nwp.scan_delta` casts to the `Nwp`
-    dtype, and `PowerForecast.validate` rejects a frame carrying the wrong one. Nothing validates
-    an `AllFeatures` frame, so an `AllFeatures` declaration that disagrees with `Nwp` raises
-    nothing and only misdescribes the frame the pipeline builds.
+    dtype, and `PowerForecast.validate` rejects any other dtype. Nothing validates an
+    `AllFeatures` frame, so an `AllFeatures` declaration that disagrees with `Nwp` raises nothing
+    and only misdescribes the frame the pipeline builds.
     """
     assert Nwp.dtypes["ensemble_member"] == pl.Int8
     assert AllFeatures.dtypes["ensemble_member"] == pl.Int8
