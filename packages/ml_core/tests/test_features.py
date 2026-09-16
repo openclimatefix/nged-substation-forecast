@@ -1084,14 +1084,19 @@ def test_engineer_features_nulls_weather_lag_in_single_run_mode_when_no_control_
     # _apply_weather_lag's >= boundary (_lags.py) routes to the freshest-run join, which is the
     # one that depends on the control member — the same-run join wouldn't exercise this path.
     valid_time = power_fcst_init_time + timedelta(hours=3)
+    target_time = valid_time - timedelta(hours=6)
 
     nwp_df = pl.DataFrame(
         {
-            "time_series_id": ["ts1"],
-            "valid_time": [valid_time],
-            "ensemble_member": [1],  # no control member
-            "init_time": [nwp_init_time],
-            "temperature_2m": [10.0],
+            "time_series_id": ["ts1", "ts1"],
+            # A row genuinely exists at target_time, so the null below is pinned to the missing
+            # control member specifically — not to "no NWP row at that instant", which a fixture
+            # with only the valid_time row cannot distinguish (select_analysis_proxy keeps only
+            # ensemble_member == 0, so this row is invisible to the freshest-run join regardless).
+            "valid_time": [target_time, valid_time],
+            "ensemble_member": [1, 1],  # no control member
+            "init_time": [nwp_init_time, nwp_init_time],
+            "temperature_2m": [7.0, 10.0],
         }
     )
     power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})

@@ -116,37 +116,31 @@ def _check_or_warn_on_missing_control_member(
     nwp_init_time: datetime | None,
     nwp_publication_delay_hours: int,
 ) -> None:
-    """Fail fast in bulk mode, degrade and log in single-run mode, when no control member exists.
-
-    Probes the raw NWP rather than the upsampled frame: `ensemble_member` is one of the upsample's
-    group-by keys, so the upsample can neither create nor destroy control-member rows, and `SLICE`
-    cannot push through its window functions — probing the upsampled frame would run the whole
-    upsample before answering.
-    """
+    """Fail fast in bulk mode, degrade and log in single-run mode, when no control member exists."""
+    # Probes the raw frame, not the upsampled one: `SLICE` cannot push through the upsample's
+    # window functions, so probing post-upsample would run the whole upsample before answering.
     control_member_missing = (
         nwp_lf is not None
-        and weather_lags
+        and bool(weather_lags)
         and nwp_lf.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty()
     )
     if not control_member_missing:
         return
     if power_fcst_init_time is None:
-        # Bulk mode: a training or backtesting run that silently produced all-null weather lags
-        # would poison every comparison built on it (inherent-stability.md rule 9), so fail fast
-        # here rather than degrade.
+        # Bulk mode: fail fast (inherent-stability.md rule 9).
         raise ValueError(
             "Weather lag features require the NWP control member (ensemble_member == 0) to "
             "build historical weather during bulk training or backtesting, but no such rows "
             "were found in the NWP data."
         )
-    # Single-run mode (production inference, replay backfills): the outside world misbehaving (a
-    # partial or malformed ECMWF ENS download) is not our bug, so degrade instead of raise
-    # (inherent-stability.md rule 1) — every past-target-time weather lag comes back null through
-    # the ordinary join-miss path in `_engineer_features`. Logged, not silent, so the degradation
-    # still leaves a record (inherent-stability.md rule 4). Fall back to the derived run identity
-    # (mirroring `_join_nwp_single_run`) when the caller left `nwp_init_time` to be inferred.
-    resolved_nwp_init_time = nwp_init_time or power_fcst_init_time - timedelta(
-        hours=nwp_publication_delay_hours
+    # Single-run mode: degrade rather than raise (inherent-stability.md rule 1); every
+    # past-target-time weather lag comes back null through the ordinary join-miss path in
+    # `_engineer_features`. Mirrors `_join_nwp_single_run`'s own derivation when the caller left
+    # `nwp_init_time` to be inferred.
+    resolved_nwp_init_time = (
+        nwp_init_time
+        if nwp_init_time is not None
+        else power_fcst_init_time - timedelta(hours=nwp_publication_delay_hours)
     )
     logger.warning(
         "NWP run %s has no control member (ensemble_member == 0); weather lag features will be "
