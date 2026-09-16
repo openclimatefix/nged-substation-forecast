@@ -137,8 +137,9 @@ conclusion that does not show its inputs. Issue #728 was sized medium on the con
 alone. It also edited `XGBoostForecaster.predict`, which sits on the production serving path, and
 the serving-path trigger would have made it complex. Write one line per trigger — what gets stored,
 the production serving path, a degradation rule, more than one defensible design, and code whose
-callers you could not name without searching — and let those five answers pick the bucket. Any
-trigger that fires makes the issue complex, however small the diff looks.
+callers you could not name without searching — and let those five answers settle whether the issue
+is complex. Any trigger that fires makes the issue complex, however small the diff looks. An issue
+where none fires is simple or medium, on the conditions above.
 
 **Medium — everything else.** Write the plan, then choose how much review to spend on it: between
 zero and two of the plan reviews below (steps 5 and 7, each with its triage step), and between
