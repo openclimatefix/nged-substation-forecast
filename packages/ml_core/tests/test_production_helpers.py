@@ -10,19 +10,22 @@ import json
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import patito as pt
 import polars as pl
 import pytest
+from _nwp_test_data import cast_to_nwp_dtypes
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries
+from contracts.weather_schemas import Nwp
+from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
 from ml_core.production_helpers import (
     build_live_power_frame,
     load_forecaster_from_dir,
     select_nwp_init_time,
+    weather_lags_lack_their_control_member,
 )
-from weather_utils import NWP_PUBLICATION_DELAY_HOURS
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 _POWER_FCST_INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
@@ -355,3 +358,43 @@ def test_the_guard_rejects_a_hyperparameter_this_code_no_longer_declares(tmp_pat
         load_forecaster_from_dir(tmp_path)
 
     assert str(tmp_path) in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# weather_lags_lack_their_control_member
+# ---------------------------------------------------------------------------
+
+
+def _nwp_frame(members: tuple[int, ...]) -> pt.LazyFrame[Nwp]:
+    """A minimal NWP frame carrying only the column the probe reads."""
+    frame = pl.DataFrame({"ensemble_member": list(members)}).pipe(
+        cast_to_nwp_dtypes, "ensemble_member"
+    )
+    return cast("pt.LazyFrame[Nwp]", frame.lazy())
+
+
+@pytest.mark.parametrize(
+    ("members", "selected_features", "expected"),
+    [
+        pytest.param((0, 1), {"temperature_2m_lag_24h"}, False, id="control_member_present"),
+        pytest.param((1, 2), {"temperature_2m_lag_24h"}, True, id="control_member_absent"),
+        pytest.param((1, 2), {"temperature_2m"}, False, id="no_weather_lag_selected"),
+        pytest.param((1, 2), {"power_lag_24h"}, False, id="power_lag_is_not_a_weather_lag"),
+    ],
+)
+def test_weather_lags_lack_their_control_member(
+    members: tuple[int, ...], selected_features: set[str], expected: bool
+) -> None:
+    """The probe fires only when a weather lag is selected and the control member is missing.
+
+    The last two cases matter as much as the first two: a model that selects no weather lag loses
+    nothing to a missing control member, because the same-run weather join reads whichever members
+    are present. Reporting a degradation there would be a false alarm, and ``power_lag_24h`` is
+    the lag that most easily gets miscounted as a weather lag.
+    """
+    assert (
+        weather_lags_lack_their_control_member(
+            _nwp_frame(members), selected_features=selected_features
+        )
+        is expected
+    )

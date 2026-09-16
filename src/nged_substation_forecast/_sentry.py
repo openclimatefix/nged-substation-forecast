@@ -206,7 +206,13 @@ def sentry_capture_failure(context: HookContext) -> None:
     )
 
 
-def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str) -> None:
+def _capture_tagged(
+    tag: str,
+    value: str,
+    exc: BaseException,
+    failure_note: str,
+    fingerprint: list[str] | None = None,
+) -> None:
     """Send ``exc`` to Sentry, tagged ``tag=value`` on a scope forked so the tag cannot leak.
 
     Args:
@@ -214,10 +220,18 @@ def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str)
         value: Tag value — the check or asset name.
         exc: The exception to capture.
         failure_note: Logged with the traceback if Sentry itself fails.
+        fingerprint: Group every event carrying this fingerprint into one Sentry issue. Pass a
+            fingerprint for a *synthesised* exception — an exception built to carry a message
+            rather than caught — because a synthesised exception has no traceback, so Sentry
+            falls back to grouping by exception type and message. A message naming the run or the
+            slot then opens a fresh issue every time. Leave the fingerprint ``None`` for a
+            genuinely caught exception, whose stack trace already groups the event.
     """
     try:
         with sentry_sdk.new_scope() as scope:
             scope.set_tag(key=tag, value=value)
+            if fingerprint is not None:
+                scope.fingerprint = fingerprint
             sentry_sdk.capture_exception(exc)
     except Exception:
         # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
@@ -225,7 +239,9 @@ def _capture_tagged(tag: str, value: str, exc: BaseException, failure_note: str)
         logger.exception(failure_note)
 
 
-def report_asset_degradation(asset_name: str, exc: BaseException) -> None:
+def report_asset_degradation(
+    asset_name: str, exc: BaseException, fingerprint: list[str] | None = None
+) -> None:
     """Report an asset that degraded rather than failing, as a Sentry error event.
 
     Closes the same gap as `report_check_degradation` below, for an asset:
@@ -239,12 +255,16 @@ def report_asset_degradation(asset_name: str, exc: BaseException) -> None:
         asset_name: The Dagster asset name, attached as a ``degraded_asset`` tag so events can be
             filtered per asset. Set on an isolated scope so it cannot leak into later events.
         exc: The exception the asset degraded on.
+        fingerprint: Group every event carrying this fingerprint into one ongoing Sentry issue —
+            see ``_capture_tagged``. Required when ``exc`` was synthesised to carry a message
+            rather than caught.
     """
     _capture_tagged(
         tag="degraded_asset",
         value=asset_name,
         exc=exc,
         failure_note=f"Failed to report the degraded {asset_name} asset to Sentry",
+        fingerprint=fingerprint,
     )
 
 
@@ -316,6 +336,15 @@ deployment gets its *own* ongoing Sentry issue — Sentry's ``environment`` is a
 grouping dimension, so without the environment in the fingerprint every deployment (production and
 each ``<name>-laptop``) would share one issue. A stable fingerprint also collapses the hourly
 re-reports of an ongoing stall into that single issue rather than a fresh issue each hour."""
+
+NWP_CONTROL_MEMBER_MISSING_FINGERPRINT: Final[str] = "nged-nwp-control-member-missing"
+"""Stable fingerprint root for the ``live_forecasts`` missing-control-member degradation.
+
+Combined with ``Settings.sentry_environment`` by the caller, for the reason
+`POWER_DATA_STALE_FINGERPRINT` gives above. The fingerprint is what makes the alert readable: the
+event carries a synthesised exception, which has no stack trace, so Sentry would otherwise group
+on the message. The message names the run and the slot, so a sequence of degraded slots would open
+one new issue each rather than one issue firing repeatedly."""
 
 MAX_LATE_SERIES_IN_CONTEXT: Final[int] = 50
 """Cap on the number of late series listed in the Sentry event *context* (the structured payload).

@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import patito as pt
 import polars as pl
 import pytest
+from _nwp_test_data import cast_to_nwp_dtypes
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import (
     LIST_OF_TIME_SERIES_TYPES,
@@ -10,7 +11,7 @@ from contracts.power_schemas import (
     TimeSeriesMetadata,
 )
 from ml_core.features._lags import _apply_power_lag, _apply_weather_lag, _nullify_leaky_lags
-from ml_core.features._nwp import _upsample_nwp_to_half_hourly
+from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS, _upsample_nwp_to_half_hourly
 from ml_core.features._parsed_features import (
     STATIC_FEATURE_REGISTRY,
     LagFeature,
@@ -23,7 +24,6 @@ from ml_core.features.tabular_feature_engineer import (
     _local_utc_offset_minutes,
 )
 from pydantic import ValidationError
-from weather_utils import NWP_PUBLICATION_DELAY_HOURS
 
 
 def test_apply_power_lag_with_source():
@@ -79,9 +79,9 @@ def test_upsample_nwp_to_half_hourly_forward_fills_categorical_vars():
             "nwp_init_time": [datetime(2020, 1, 1, 0)] * 2,
             "ensemble_member": [0, 0],
             "valid_time": [datetime(2020, 1, 1, 0), datetime(2020, 1, 1, 3)],
-            "categorical_precipitation_type_surface": pl.Series([0, 5], dtype=pl.Int16),
+            "categorical_precipitation_type_surface": [0, 5],
         }
-    )
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member", "categorical_precipitation_type_surface")
     result = _upsample_nwp_to_half_hourly(df.lazy()).collect().sort("valid_time")
 
     # At 1:30 (before the 3:00 step), categorical should still be 0
@@ -156,9 +156,9 @@ def test_upsample_nwp_no_cross_group_forward_fill():
                 datetime(2020, 1, 1, 9),
             ],
             # Group A: both steps have value 5. Group B: lead-time-0 is null, then 2.
-            "categorical_precipitation_type_surface": pl.Series([5, 5, None, 2], dtype=pl.Int16),
+            "categorical_precipitation_type_surface": [5, 5, None, 2],
         }
-    )
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member", "categorical_precipitation_type_surface")
     result = _upsample_nwp_to_half_hourly(df.lazy()).collect().sort(["nwp_init_time", "valid_time"])
 
     # Group B lead-time-0 (06:00) must stay null — not forward-filled from Group A's 5
@@ -788,9 +788,9 @@ def test_engineer_features_weather_lag_leakage_prevention():
     # Create dummy data to verify weather lag leakage prevention
     valid_time = datetime(2026, 6, 11, 12, 0)
     nwp_init_time = datetime(2026, 6, 10, 0, 0)
-    # power_fcst_init_time must clear select_analysis_proxy's default publication_delay
-    # (NWP_PUBLICATION_DELAY_HOURS) for run 1 to count as "available" for the freshest-run join.
-    power_fcst_init_time = nwp_init_time + timedelta(hours=NWP_PUBLICATION_DELAY_HOURS)
+    # Deliberately inside NWP_PUBLICATION_DELAY_HOURS: the freshest-run join must accept the
+    # selected run however fresh it is, so this gap must not be widened to clear a delay.
+    power_fcst_init_time = nwp_init_time + timedelta(hours=2)
 
     # NWP data has two runs:
     # 1. Run initialized at 2026-06-10 00:00:00 (the one we should use)
@@ -853,21 +853,20 @@ def test_engineer_features_weather_lag_leakage_prevention():
     assert engineered["temperature_2m_lag_36h"][0] == 8.0
 
 
-def test_engineer_features_single_run_freshest_run_excludes_unpublished_nwp_run():
-    """The single-run availability gate must reject a run not yet published by power_fcst_init_time.
+def test_engineer_features_single_run_freshest_run_excludes_later_nwp_run():
+    """The single-run ceiling must reject a run initialised after the selected one.
 
-    Three runs carry a value at the same lag target_time: T0, legitimately available by
-    power_fcst_init_time; T1, the row's own run (nwp_init_time), with no row at target_time so
-    the same-run branch cannot answer and the freshest-run branch is exercised; and T2, fresher
-    than T1 but with ``init_time + publication_delay`` still after power_fcst_init_time — not yet
-    published. Without the ``available_at``/``publication_delay`` cut on ``select_analysis_proxy``
-    in single-run mode, the freshest-run join picks up T2's decoy value; with it, T2 is excluded
-    and T0 answers instead.
+    Three runs carry a value at the same lag target_time: T0, older than the selected run and so
+    genuinely available; T1, the row's own run (nwp_init_time), with no row at target_time so the
+    same-run branch cannot answer and the freshest-run branch is exercised; and T2, initialised
+    after T1 and therefore not available when this forecast was made, carrying a decoy value.
+    Without the single-run ceiling at nwp_init_time, the freshest-run join picks up T2's decoy;
+    with it, T2 is excluded and T0 answers instead.
     """
     power_fcst_init_time = datetime(2026, 6, 11, 6, 0)
     nwp_init_time = datetime(2026, 6, 11, 0, 0)  # T1: the row's own run
     older_run_init_time = datetime(2026, 6, 10, 0, 0)  # T0: legitimately available
-    too_fresh_init_time = datetime(2026, 6, 11, 3, 0)  # T2: fresher than T1, not yet published
+    too_fresh_init_time = datetime(2026, 6, 11, 3, 0)  # T2: initialised after T1
     valid_time = datetime(2026, 6, 11, 12, 0)
     # lag=24h -> target_time = 2026-06-10 12:00: before power_fcst_init_time (freshest-run
     # branch), and T1 carries no row there at all, so only T0 or T2 can answer it.
@@ -895,6 +894,95 @@ def test_engineer_features_single_run_freshest_run_excludes_unpublished_nwp_run(
     ).collect()
 
     assert engineered["temperature_2m_lag_24h"][0] == 8.0
+
+
+def test_engineer_features_single_run_proxy_ceiling_is_the_selected_run_not_the_delay():
+    """The single-run analysis proxy cuts at nwp_init_time, whatever the publication delay says.
+
+    ``live_forecasts`` selects its NWP run in ``"live"`` availability mode, which accepts any run
+    genuinely present in the Delta table however fresh. The freshest-run join must accept that same
+    run. The ceiling is therefore the selected run rather than a modelled publication delay. Here
+    power_fcst_init_time is only 1 hour after the selected run while nwp_publication_delay_hours is
+    9, so a delay-based cut would exclude the selected run and null the lag.
+
+    Both halves of the ceiling are asserted together in one frame: the selected run answers (8.0),
+    and the later run's decoy (999.0) does not.
+    """
+    nwp_init_time = datetime(2026, 6, 11, 0, 0)
+    power_fcst_init_time = datetime(2026, 6, 11, 1, 0)
+    later_init_time = datetime(2026, 6, 11, 2, 0)
+    valid_time = datetime(2026, 6, 11, 12, 0)
+    # lag=24h -> target_time = 2026-06-10 12:00, before power_fcst_init_time, so the freshest-run
+    # branch answers it rather than the same-run join.
+    target_time = valid_time - timedelta(hours=24)
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1", "ts1", "ts1"],
+            "valid_time": [target_time, valid_time, target_time],
+            "ensemble_member": [0, 0, 0],
+            "init_time": [nwp_init_time, nwp_init_time, later_init_time],
+            "temperature_2m": [8.0, 99.0, 999.0],
+        }
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member")
+    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    engineered = _engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=nwp_df.lazy(),
+        selected_features={"temperature_2m_lag_24h"},
+        power_fcst_init_time=power_fcst_init_time,
+        nwp_init_time=nwp_init_time,
+    ).collect()
+
+    assert engineered["temperature_2m_lag_24h"][0] == 8.0
+
+
+def test_engineer_features_single_run_ceiling_uses_the_derived_run_when_none_is_given():
+    """With nwp_init_time omitted, the ceiling is the run the delay derives, not a wider one.
+
+    Single-run mode lets a backfill caller omit nwp_init_time, in which case the run is derived as
+    power_fcst_init_time - nwp_publication_delay_hours. The analysis-proxy ceiling routes through
+    that same derivation, so a run initialised after the derived run must still be excluded, even
+    though that later run landed before power_fcst_init_time.
+    """
+    power_fcst_init_time = datetime(2026, 6, 11, 9, 0)
+    # Derived run: power_fcst_init_time - 9h. Not passed to _engineer_features.
+    valid_time = datetime(2026, 6, 11, 10, 0)
+    # lag=8h -> target_time = 02:00, before power_fcst_init_time, so the freshest-run branch
+    # answers it. The decoy run sits between the derived run and power_fcst_init_time, so a
+    # ceiling of power_fcst_init_time — or a ceiling derived by adding the delay rather than
+    # subtracting the delay — would wrongly admit the decoy.
+    target_time = valid_time - timedelta(hours=8)
+    decoy_init_time = datetime(2026, 6, 11, 1, 0)
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1", "ts1", "ts1"],
+            "valid_time": [target_time, valid_time, target_time],
+            "ensemble_member": [0, 0, 0],
+            "init_time": [
+                power_fcst_init_time - timedelta(hours=NWP_PUBLICATION_DELAY_HOURS),
+                power_fcst_init_time - timedelta(hours=NWP_PUBLICATION_DELAY_HOURS),
+                decoy_init_time,
+            ],
+            "temperature_2m": [8.0, 99.0, 999.0],
+        }
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member")
+    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    engineered = _engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=nwp_df.lazy(),
+        selected_features={"temperature_2m_lag_8h"},
+        power_fcst_init_time=power_fcst_init_time,
+    ).collect()
+
+    assert engineered["temperature_2m_lag_8h"][0] == 8.0
 
 
 def test_apply_weather_lag_boundary_uses_same_run_at_exact_lead():
@@ -1227,7 +1315,7 @@ def test_engineer_features_rolling_mean_collects_under_streaming_engine():
             "init_time": [nwp_init_time] * len(steps) * 2,
             "temperature_2m": [10.0] * len(steps) * 2,
         }
-    ).cast({"ensemble_member": pl.Int8})
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member")
     observed_times = [nwp_init_time + timedelta(minutes=30 * i) for i in range(48)]
     power_df = pl.DataFrame(
         {
@@ -1297,16 +1385,12 @@ def test_upsample_nwp_fills_agree_across_engines():
     df = pl.DataFrame(
         {
             "nwp_init_time": [t0] * len(steps) * len(members),
-            "ensemble_member": pl.Series(
-                [member for member in members for _ in steps], dtype=pl.Int8
-            ),
+            "ensemble_member": [member for member in members for _ in steps],
             "valid_time": steps * len(members),
             "temperature_2m": [float(i) for i in range(len(steps))] * len(members),
-            "categorical_precipitation_type_surface": pl.Series(
-                [0, 0, 0, 5, 5, 5, 0, 0, 0] * len(members), dtype=pl.Int16
-            ),
+            "categorical_precipitation_type_surface": [0, 0, 0, 5, 5, 5, 0, 0, 0] * len(members),
         }
-    )
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member", "categorical_precipitation_type_surface")
     lf = _upsample_nwp_to_half_hourly(df.lazy())
 
     sort_cols = ["ensemble_member", "valid_time"]

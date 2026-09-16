@@ -2,14 +2,15 @@
 name: implement-issue
 description: >-
   The routine for implementing an approved plan for a GitHub issue in
-  openclimatefix/nged-substation-forecast: isolated worktree, implement, the green-before-push
-  verification set, PR with labels and the JackKelly assignee, then up to two fresh sub-agents
-  adversarially review the diff in turn — one for correctness and for keeping the code, tests and
-  prose as short as they can be, then one that mutation-tests the change — triaging and pushing
-  after each, stop for human review, never merge. How many of those reviews run is set by the issue
-  size: a simple issue arrives here with no plan and gets none. Load before writing any code for an
-  issue, and when dispatching a sub-agent or a fresh session to solve one. To decide *what* to
-  build, use `plan-issue` first.
+  openclimatefix/nged-substation-forecast, in the worktree and draft PR `plan-issue` already
+  opened: implement, the green-before-push verification set, mark the PR ready for review, then up
+  to two fresh sub-agents adversarially review the diff in turn — one for correctness and for
+  keeping the code, tests and prose as short as they can be, then one that mutation-tests the
+  change — triaging and pushing after each, stop for human review, never merge. How many of those
+  reviews run is set by the issue size: a simple issue arrives here with no plan and no draft PR,
+  so it opens its own PR and gets no review at all. Load before writing any code for an issue, and
+  when dispatching a sub-agent or a fresh session to solve one. To decide *what* to build, use
+  `plan-issue` first.
 ---
 
 # Implement a GitHub issue
@@ -18,14 +19,16 @@ This routine starts from an **approved plan**. The `plan-issue` skill (invoked a
 `/plan-issue <N>`) is how you get one: it reads the issue, decides whether it is worth
 implementing at all, sizes how much process the issue needs, writes `plans/<branch-name>.md`, puts
 it through up to two adversarial sub-agent reviews — one for simplicity, one for correctness and
-testability — and stops for human review. It also does step 1 below, so when it hands over, the
-worktree and branch already exist and implementation resumes at step 2.
+testability — and stops for human review. It also does step 1 below and opens the PR as a draft,
+so when it hands over, the worktree, branch and draft PR already exist and implementation resumes
+at step 2.
 
 The one issue that arrives here **without** a plan is one `plan-issue` sized as simple: a
-mechanical change with no design to approve, which runs steps 1 to 4 and then stops for human
-review with no adversarial pass at all. If you reach this skill without having gone through
-`plan-issue` — a direct instruction to fix something, say — make that sizing judgement first,
-using the criteria in `plan-issue` step 3, and say which size you picked before you start.
+mechanical change with no design to approve, which runs steps 1 to 4, then the prose-review pass
+below if the diff carries new prose, then stops at step 9 with no adversarial pass at all. If you
+reach this skill without having gone through `plan-issue` — a direct instruction to fix something,
+say — make that sizing judgement first, using the criteria in `plan-issue` step 3, and say which
+size you picked before you start.
 
 **How many of the two reviews below to run** comes from that sizing: both for a complex issue,
 none for a simple one, and between zero and two for a medium one — your choice, under the rules in
@@ -58,16 +61,24 @@ front — a report back after step 1 is not finished work.
    `uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md` and
    `uv run mkdocs build --strict`.
 
-4. **Commit, push and open the PR** against `main`, with labels and `JackKelly` as assignee (`gh
-   pr create` can't set either — follow with `gh pr edit --add-label <label>` and `gh pr edit
-   --add-assignee JackKelly`), linking the issue so it closes on merge. Commit messages end
-   with `Co-Authored-By: Claude <noreply@anthropic.com>`. See the `github-issue-pr-workflow`
-   skill for the full PR checklist and the never-squash-merge rule.
+4. **Commit, push, and mark the PR ready for review.** If a plan preceded this, `plan-issue`
+   already opened the PR as a draft in its own step 4 — commit the implementation, push, and take
+   it out of draft with `gh pr ready <PR-number>`. Rewrite the body for the code that now exists:
+   drop the line saying the plan is unapproved and carries no code, describe the change, and update
+   the size, the trigger answers and the reviews named below if any of them changed since the plan
+   was written. If there is no plan (the simple-issue path, which arrives here directly), open the
+   PR now instead: `gh pr create` against `main`, with labels and `JackKelly` as assignee (`gh pr
+   create` can't set either — follow with `gh pr edit --add-label <label>` and `gh pr edit
+   --add-assignee JackKelly`), linking the issue so it closes on merge. Commit messages end with
+   `Co-Authored-By: Claude <noreply@anthropic.com>`. See the `github-issue-pr-workflow` skill for
+   the full PR checklist and the never-squash-merge rule.
 
     The body says **how the issue was sized and which adversarial reviews it is getting** — and
     where that is none, says so outright. A PR that no sub-agent has attacked is one where human
     review is the first line of defence rather than the last, and the reviewer has to know that
-    before reading the diff.
+    before reading the diff. Give the size as the five trigger answers `plan-issue` step 3 asks
+    for, not as the one trigger that decided it, so a reviewer can see which triggers were
+    considered rather than only which trigger fired.
 
 5. **First adversarial review: correctness, and cutting the change down.** Run this if the sizing
    called for it. Spawn a *new*, independent sub-agent and give it only the PR number, not the
@@ -142,13 +153,13 @@ superlative, and umbrella-noun violations still in it. Size the pass to the text
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
-**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an
-adversarial pass by the time a human opens it, so that human review is the last line of defence
-rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by
-the implementer's rationale; the triage step exists because reviewer findings are often wrong and
-must not be applied uncritically. Mutation testing goes second because it should be aimed at the
-tests that survive the first round, not at ones the first round deletes — and it gets its own
-reviewer because a green suite proves nothing on its own: the only way to learn whether a test
+**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an adversarial
+pass by the time a human is asked to review the diff, so that human review is the last line of
+defence rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be
+anchored by the implementer's rationale; the triage step exists because reviewer findings are often
+wrong and must not be applied uncritically. Mutation testing goes second because it should be aimed
+at the tests that survive the first round, not at ones the first round deletes — and it gets its
+own reviewer because a green suite proves nothing on its own: the only way to learn whether a test
 would catch the bug it exists for is to write that bug and watch.
 
 **Why the reviews are sized rather than always run:** an adversarial pass costs wall-clock time

@@ -16,8 +16,14 @@ import patito as pt
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 from contracts.weather_schemas import Nwp
-from delta_store.nwp import NWP_SIGNIFICAND_BITS, NWP_SORT_COLS, write_nwp
+from delta_store.nwp import (
+    NWP_ROW_GROUP_SIZE_LIMITS,
+    NWP_SIGNIFICAND_BITS,
+    NWP_SORT_COLS,
+    write_nwp,
+)
 from deltalake import write_deltalake
 
 _T0 = datetime(2025, 6, 1, tzinfo=UTC)
@@ -40,18 +46,27 @@ _CONTINUOUS_BASE_VALUES = {
 mantissas so the significand-rounding assertions have something to measure."""
 
 
-def _make_nwp(n: int = 6, *, init_time: datetime = _T0) -> pt.DataFrame[Nwp]:
-    """Build a valid ``Nwp`` frame with deliberately unsorted key columns."""
+def _make_nwp(
+    n: int = 6, *, init_time: datetime = _T0, n_members: int | None = None
+) -> pt.DataFrame[Nwp]:
+    """Build a valid ``Nwp`` frame with deliberately unsorted key columns.
+
+    With ``n_members`` set, the ``n`` rows are spread over that many members, interleaved so each
+    member's rows are scattered through the frame before the writer sorts them.
+    """
+    members = list(range(n - 1, -1, -1)) if n_members is None else [i % n_members for i in range(n)]
     rows = {
         # Reverse-ordered members and cycling valid_times so the writer's sort has work to do.
         "nwp_model_id": ["ECMWF_ENS_0_25_degree"] * n,
         "init_time": [init_time] * n,
         "valid_time": [init_time + timedelta(hours=(i % 3) + 1) for i in range(n)],
-        "ensemble_member": list(range(n - 1, -1, -1)),
+        "ensemble_member": members,
         "h3_index": [100 + i for i in range(n)],
         "categorical_precipitation_type_surface": [1] * n,
         **{
-            var: [base * (1 + 0.003 * i) for i in range(n)]
+            # Cycle the scaling so a large frame stays inside each variable's contract range;
+            # for the small frames the other tests build this is identical to scaling by i.
+            var: [base * (1 + 0.003 * (i % 100)) for i in range(n)]
             for var, base in _CONTINUOUS_BASE_VALUES.items()
         },
     }
@@ -81,6 +96,91 @@ def test_on_disk_format(tmp_path: Path) -> None:
         # nwp_model_id and init_time are Hive partition values, not parquet columns.
         key = rows.select(k=pl.struct([c for c in NWP_SORT_COLS if c in rows.columns]))
         assert key["k"].is_sorted()
+
+
+def test_every_member_lands_in_its_own_row_group(tmp_path: Path) -> None:
+    """Each row group covers one ensemble member, so any member's predicate skips the rest.
+
+    The bug this guards against survived a check on the control member alone: an unaligned write
+    still prunes for member 0, because 0 is the minimum and only a row group containing it can
+    have a minimum of 0. The members in the middle of the range are the case that breaks.
+    """
+    n_members = 4
+    # Twice the clamp floor, so the derived size and the floor differ and the test sees the
+    # derivation rather than the clamp.
+    rows_per_member = 2 * NWP_ROW_GROUP_SIZE_LIMITS[0]
+    table = tmp_path / "nwp"
+    write_nwp(_make_nwp(n_members * rows_per_member, n_members=n_members), table)
+
+    spans = []
+    for parquet_file in table.rglob("*.parquet"):
+        parquet = pq.ParquetFile(parquet_file)
+        member_column = parquet.schema_arrow.get_field_index("ensemble_member")
+        for group in range(parquet.metadata.num_row_groups):
+            statistics = parquet.metadata.row_group(group).column(member_column).statistics
+            assert statistics is not None, "row-group statistics are required to prune"
+            spans.append((statistics.min, statistics.max))
+
+    assert len(spans) == n_members, f"expected one row group per member, got {spans}"
+    assert all(low == high for low, high in spans), f"a row group spans several members: {spans}"
+    assert {low for low, _ in spans} == set(range(n_members))
+
+
+def test_row_groups_stay_member_aligned_when_the_frame_arrives_in_many_chunks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A multi-chunk Arrow table still lands one ensemble member per row group.
+
+    delta-rs consumes a multi-chunk table out of order while partitioning a write, which is what
+    scatters members across row groups. Polars only leaves a frame multi-chunk after the sort when
+    it has many threads to sort with, and ``conftest.py`` pins ``POLARS_MAX_THREADS`` to 4, so the
+    chunking is reproduced here by slicing the sorted table exactly as a higher thread count would.
+    """
+    chunks = 8
+    unchunked = pl.DataFrame.to_arrow
+
+    def _sliced(frame: pl.DataFrame) -> pa.Table:
+        table = unchunked(frame)
+        size = table.num_rows // chunks
+        return pa.concat_tables(
+            [
+                table.slice(
+                    index * size,
+                    size if index < chunks - 1 else table.num_rows - index * size,
+                )
+                for index in range(chunks)
+            ]
+        )
+
+    monkeypatch.setattr(pl.DataFrame, "to_arrow", _sliced)
+
+    n_members = 4
+    table = tmp_path / "nwp"
+    write_nwp(_make_nwp(n_members * NWP_ROW_GROUP_SIZE_LIMITS[0], n_members=n_members), table)
+
+    spans = []
+    for parquet_file in table.rglob("*.parquet"):
+        parquet = pq.ParquetFile(parquet_file)
+        member_column = parquet.schema_arrow.get_field_index("ensemble_member")
+        for group in range(parquet.metadata.num_row_groups):
+            statistics = parquet.metadata.row_group(group).column(member_column).statistics
+            spans.append((statistics.min, statistics.max))
+
+    assert all(low == high for low, high in spans), f"a row group spans several members: {spans}"
+
+
+def test_the_row_group_limits_bracket_a_real_ensemble_run() -> None:
+    """The clamp never binds on a real ECMWF ENS run, which is the case it must not alter.
+
+    Pinned here because the alignment tests size their fixtures *from* these limits, so they grow
+    and shrink with the constant and can never see it change. A floor raised above a real run's
+    rows-per-member, or a ceiling lowered below it, would silently undo the alignment the rest of
+    this module exists to check, with every test still green. This is the same guard, and for the
+    same reason, as `test_the_nwp_significand_bits_is_thirteen`.
+    """
+    rows_per_member_in_a_real_run = 1_671 * 85  # H3 cells over GB x forecast steps
+    floor, ceiling = NWP_ROW_GROUP_SIZE_LIMITS
+    assert floor < rows_per_member_in_a_real_run < ceiling
 
 
 def test_continuous_vars_rounded_to_significand_bits(tmp_path: Path) -> None:

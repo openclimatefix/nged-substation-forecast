@@ -18,8 +18,8 @@ Lazy Evaluation:
     most one row rather than the table — that bound is what makes collecting here acceptable. In
     bulk mode (training/backtesting), a missing control member raises immediately. In single-run
     mode (production inference, replay), a missing control member is absent input, not a contract
-    violation: it is logged and left to degrade weather lags to null through the ordinary
-    join-miss path.
+    violation: it is logged and left to degrade past-target-time weather lags to null through the
+    ordinary join-miss path.
 
 Nullify Leaky Lags Rationale:
     ``_nullify_leaky_lags`` (in ``_lags.py``) is called at the end of the pipeline to enforce
@@ -29,14 +29,14 @@ Nullify Leaky Lags Rationale:
 
 import logging
 import math
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import patito as pt
 import polars as pl
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import Nwp
-from weather_utils import select_analysis_proxy
+from weather_utils import NWP_ANALYSIS_MEMBER, select_analysis_proxy
 
 from ml_core.features._lags import _apply_power_lag, _apply_weather_lag, _nullify_leaky_lags
 from ml_core.features._nwp import (
@@ -123,7 +123,10 @@ def _check_or_warn_on_missing_control_member(
     control_member_missing = (
         nwp_lf is not None
         and bool(weather_lags)
-        and nwp_lf.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty()
+        and nwp_lf.filter(pl.col("ensemble_member") == NWP_ANALYSIS_MEMBER)
+        .limit(1)
+        .collect()
+        .is_empty()
     )
     if not control_member_missing:
         return
@@ -138,11 +141,14 @@ def _check_or_warn_on_missing_control_member(
     # past-target-time weather lag comes back null through the ordinary join-miss path in
     # `_engineer_features`.
     resolved_nwp_init_time = _resolve_nwp_init_time(
-        nwp_init_time, power_fcst_init_time, nwp_publication_delay_hours
+        nwp_init_time=nwp_init_time,
+        power_fcst_init_time=power_fcst_init_time,
+        nwp_publication_delay_hours=nwp_publication_delay_hours,
     )
     logger.warning(
-        "NWP run %s has no control member (ensemble_member == 0). Weather lag features will be "
-        "null for this slot.",
+        "NWP run %s has no control member (ensemble_member == 0). Every weather lag feature will "
+        "be null for this slot over the first lag_hours of its horizon, where the lag points "
+        "back before power_fcst_init_time. The same-run join answers the rest of the horizon.",
         resolved_nwp_init_time,
     )
 
@@ -204,11 +210,11 @@ def _engineer_features(
 
         nwp_publication_delay_hours: Hours after an NWP run's ``nwp_init_time`` before it is
             usable — disk arrival, not upstream publication; see
-            ``weather_utils.analysis_proxy.NWP_PUBLICATION_DELAY_HOURS`` for what drives the
-            default and its derivation. Used throughout, not only in one mode: it derives
-            ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode, derives
-            ``nwp_init_time`` when it is omitted in single-run mode, and gates the single-run
-            analysis-proxy's ``available_at`` cut.
+            ``ml_core.features._nwp.NWP_PUBLICATION_DELAY_HOURS`` for what drives the
+            default and its derivation. ``_engineer_features`` uses the delay to derive
+            ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode, and to derive
+            ``nwp_init_time`` when a single-run caller omits ``nwp_init_time``. Single-run mode
+            consumes the delay nowhere else.
         local_timezone: IANA zone the local-time features (time of day, day of week, UTC
             offset) are computed in. Defaults to ``DEFAULT_LOCAL_TIMEZONE``.
 
@@ -265,20 +271,33 @@ def _engineer_features(
     if processed_nwp is None or not weather_lags:
         historical_weather = None
     elif power_fcst_init_time is not None:
-        # Single-run mode: gate the freshest-run (analysis-proxy) selection to runs available by
-        # this row's own power_fcst_init_time. This is the mode carrying the real risk: a caller
-        # can pass a wide multi-run `nwp` frame alongside an arbitrary explicit
-        # power_fcst_init_time, and without this cut nothing stops the freshest-run join from
-        # picking up a run that would not actually have been available yet.
+        # Single-run mode: cap the freshest-run (analysis-proxy) selection at the NWP run this
+        # call already selected, so a later run cannot answer a past target time. That run is by
+        # construction the freshest run that was available, because `select_nwp_init_time` returns
+        # the newest qualifying run in both availability modes. The runs at or before the selected
+        # run are therefore exactly the runs that were available, so no modelled publication delay
+        # is needed to work out which runs those are. A `"live"` slot therefore keeps the run it is
+        # forecasting with even when that run is fresher than nwp_publication_delay_hours. Keeping
+        # that run matches bulk mode's effective ceiling — the invariant spelled out in the branch
+        # below.
+        # The filter is input validation for a reusable package, not a guard on a state production
+        # can reach: the single-run caller in this repo today, `live_forecasts`, passes a frame
+        # holding just the selected run, so the filter drops nothing. The filter guards the
+        # multi-run frame this function's docstring lets a single-run caller pass.
         historical_weather = select_analysis_proxy(
-            processed_nwp,
+            processed_nwp.filter(
+                pl.col("nwp_init_time")
+                <= _resolve_nwp_init_time(
+                    nwp_init_time=nwp_init_time,
+                    power_fcst_init_time=power_fcst_init_time,
+                    nwp_publication_delay_hours=nwp_publication_delay_hours,
+                )
+            ),
             group_key="time_series_id",
             init_time_col="nwp_init_time",
-            available_at=power_fcst_init_time,
-            publication_delay=timedelta(hours=nwp_publication_delay_hours),
         )
     else:
-        # Bulk mode: no available_at cut, deliberately. historical_weather is built once, globally,
+        # Bulk mode: no ceiling, deliberately. historical_weather is built once, globally,
         # here — before every row gets its own derived power_fcst_init_time — so there is no single
         # scalar cutoff to give it. None is needed either: for a hindcast target (valid_time <=
         # that row's own power_fcst_init_time), the only causally-eligible runs are the row's own

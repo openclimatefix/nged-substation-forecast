@@ -1,4 +1,4 @@
-"""Shared NWP test data for the root integration tests.
+"""Shared NWP test data and dtypes, for any test suite in the repo.
 
 The several ``live_forecasts`` / CV / metrics integration tests each build a synthetic ``Nwp``
 frame. ``half_hours``, ``NWP_CONTINUOUS_COL_VALUES``, ``nwp_records`` and ``write_test_nwp`` live
@@ -8,6 +8,9 @@ member sets and (for a run initialised before the day it forecasts into) explici
 values get combined into one fixture — that selection is what stays local to each test file, as a
 thin ``_write_nwp(path)`` wrapper around ``nwp_records`` and ``write_test_nwp``. Importable by bare
 name via the ``pythonpath = ["tests"]`` pytest setting.
+
+``cast_to_nwp_dtypes`` serves a second set of callers: the package test suites, whose fixtures
+build a *partial* NWP frame that ``Nwp.validate`` cannot check.
 """
 
 from collections.abc import Sequence
@@ -17,7 +20,7 @@ from typing import Final
 import polars as pl
 from contracts.weather_schemas import Nwp
 from deltalake import write_deltalake
-from weather_utils import NWP_PUBLICATION_DELAY_HOURS
+from ml_core.features import NWP_PUBLICATION_DELAY_HOURS
 
 NWP_CONTINUOUS_COL_VALUES: Final[dict[str, float]] = {
     "temperature_2m": 15.0,
@@ -39,6 +42,30 @@ _PTYPE_INTRODUCED: Final[datetime] = datetime(2024, 11, 12, tzinfo=UTC)
 """``categorical_precipitation_type_surface`` must be null on or before this ``init_time`` and
 populated after it — see ``Nwp._check_variables_that_were_introduced_after_start_of_dataset``.
 ``nwp_records`` sets the column to satisfy this so its output passes ``Nwp.validate``."""
+
+
+def cast_to_nwp_dtypes(frame: pl.DataFrame, *columns: str) -> pl.DataFrame:
+    """Cast each named column of a partial NWP test fixture to the dtype `Nwp` declares for it.
+
+    A test that feeds the feature pipeline a handful of NWP columns cannot call `Nwp.validate`,
+    because the frame is missing most of the contract's fields. Spelling the dtypes out as literals
+    instead lets a fixture drift from the contract in silence: three fixtures declared
+    `categorical_precipitation_type_surface` as `UInt8` against the contract's `Int16`, and two
+    declared `h3_index` as `UInt64` against `Int64`, so those tests exercised a frame the pipeline
+    cannot produce. Casting through this helper makes the wrong dtype unwritable, and raises
+    `KeyError` on a column `Nwp` does not declare, which also catches a typo in a column name.
+
+    Name only the columns the fixture shares with `Nwp`. A column the contract does not declare —
+    `nwp_init_time`, `time_series_id` — stays out of the call and is cast by the fixture instead.
+
+    Args:
+        frame: The fixture frame to cast.
+        *columns: Column names to cast, each of which must be a field of `Nwp`.
+
+    Returns:
+        The frame, with each named column cast to `Nwp`'s dtype for it.
+    """
+    return frame.cast({column: Nwp.dtypes[column] for column in columns})
 
 
 def half_hours(day: datetime) -> pl.Series:
@@ -93,8 +120,8 @@ def nwp_records(
 def write_test_nwp(path: str, records: list[dict]) -> None:
     """Validate synthetic ``Nwp`` rows against the contract, then write them to a Delta table.
 
-    Casts every continuous weather variable to the physical-unit ``Float32`` the ``Nwp`` contract
-    declares (never the raw ints a hand-rolled sentinel could hide behind), and calls
+    Casts every column to the dtype the ``Nwp`` contract declares, continuous weather variables
+    included (never the raw ints a hand-rolled sentinel could hide behind), and calls
     ``Nwp.validate`` so a dtype or range mistake in ``records`` raises here — loudly, and before
     the frame ever reaches the CV pipeline the caller's test is exercising — rather than silently
     training and scoring a model on data the contract would reject.
@@ -111,17 +138,8 @@ def write_test_nwp(path: str, records: list[dict]) -> None:
     ``tests/test_nwp_test_data.py::test_partition_layout_matches_write_nwp``, which compares only
     ``partition_columns``.
     """
-    df = pl.DataFrame(records).cast(
-        {
-            "nwp_model_id": pl.String,
-            "init_time": pl.Datetime("us", "UTC"),
-            "valid_time": pl.Datetime("us", "UTC"),
-            "ensemble_member": pl.Int8,
-            "h3_index": pl.Int64,
-            "categorical_precipitation_type_surface": pl.Int16,
-            **dict.fromkeys(NWP_CONTINUOUS_COL_VALUES, pl.Float32),
-        }
-    )
+    df = pl.DataFrame(records)
+    df = cast_to_nwp_dtypes(df, *df.columns)
     validated = Nwp.validate(df)
     # `partition_by` hand-copies `delta_store.nwp.write_nwp`'s layout — see the docstring above
     # for why this can't just call `write_nwp`, and `test_nwp_test_data.py` for the drift guard.

@@ -62,7 +62,7 @@ needed one, the mistake is already written.
 | `plan-wave` | choosing the next batch of issues under an epic to run in parallel (`/plan-wave <EPIC>`) |
 | `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — sizes the issue, then writes a reviewed plan unless it is trivial, no code |
 | `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
-| `implement-issue` | writing code for an approved plan: worktree, verify set, PR, up to two adversarial reviews, stop |
+| `implement-issue` | writing code for an approved plan: implement in the draft PR `plan-issue` opened, verify set, mark it ready, up to two adversarial reviews, stop |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh pr merge`, or ship-time triage |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
 | `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
@@ -401,28 +401,37 @@ before any code moves:
    launched as its own Claude Code session. It plans one wave and stops, because the epic gains
    issues while a wave is in flight. Skip it when the issue to work on has already been named.
 2. **`plan-issue`** (`/plan-issue <N>`) reads the issue, decides whether it is worth implementing
-   at all, and sizes how much process it needs. It writes `plans/<branch-name>.md`, links to the
-   plan as soon as it is committed and pushed, has up to two fresh sub-agents adversarially review
-   that plan in turn — the first hunting for a simpler approach, the second checking correctness
-   and testability — and stops for human review. It writes no code.
-3. **`implement-issue`** picks up an approved plan: worktree, implement, the green-before-push
-   verification set, PR with labels and assignee, then up to two *further independent* adversarial
-   reviews of the diff — the first for correctness and for cutting the code, tests and prose
-   down to what the change needs, the second mutation-testing the change — committing, triaging
-   and pushing after each, stop for human review. **Never merge.**
+   at all, and sizes how much process it needs. It creates the worktree and branch, writes
+   `plans/<branch-name>.md`, opens the PR as a draft with labels and the `JackKelly` assignee,
+   links to both the plan and the draft PR as soon as they are pushed, has up to two fresh
+   sub-agents adversarially review that plan in turn — the first hunting for a simpler approach,
+   the second checking correctness and testability — and stops for human review. It writes no
+   code.
+3. **`implement-issue`** picks up an approved plan in the worktree and draft PR `plan-issue`
+   already created: implement, the green-before-push verification set, push and mark the PR ready
+   for review, then up to two *further independent* adversarial reviews of the diff — the first
+   for correctness and for cutting the code, tests and prose down to what the change needs, the
+   second mutation-testing the change — committing, triaging and pushing after each, stop for
+   human review. **Never merge.** A simple issue arrives here with no plan and no draft PR, so
+   `implement-issue` makes the worktree and opens the PR itself.
 
 **How much process an issue gets is sized to the issue**, in step 3 of `plan-issue`:
 
 - **Simple** — a mechanical change with one obvious way to do it, touching no contract, no
-  production degradation path and nothing stored, where the verification set is the whole of the
-  risk. It gets **no plan and no agentic review**: implement it, open the PR saying that no
-  sub-agent reviewed it, and stop for human review.
-- **Complex** — anything that changes what gets stored, touches the production serving path or a
-  degradation rule, or admits more than one defensible design. It gets the plan and **all four**
-  reviews.
+  production degradation path, no asset graph, and nothing stored, where the verification set is
+  the whole of the risk. It gets **no plan and no agentic review**: implement it, open the PR
+  saying that no sub-agent reviewed it, and stop for human review.
+- **Complex** — anything that changes what gets stored, touches the production serving path,
+  touches a degradation rule, admits more than one defensible design, or spans code whose callers
+  you could not name without searching. It gets the plan and **all four** reviews.
 - **Medium** — everything else. It gets a plan, and Claude chooses between zero and two of the
   plan reviews and between zero and two of the diff reviews, running the earlier of each pair
   first and erring towards running one more when the call is close.
+
+**State a size as an answer to each of the five triggers in the Complex bullet above, never as the
+one trigger that fired.** A size naming only the trigger you noticed hides the triggers you did not
+consider, and still reads as a complete judgement whether or not the rest were ever checked. The
+full rule, and the incident behind it, are in step 3 of `plan-issue`.
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
@@ -439,12 +448,12 @@ examples in `docs/`, leaderboard rows, dashboards, reports, papers, and issue or
 Substations are not covered by this rule, and a generator's name may still appear in a lookup table
 that carries no time series.
 
-**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an
-adversarial pass by the time a human opens it, so that human review is the last line of defence
-rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be anchored by the
-implementer's rationale; the triage step exists because reviewer findings are often wrong and
-must not be applied uncritically. Simplicity gets its own reviewer, and gets it first, because a
-plan that is more complicated than the issue requires is the failure mode that survives a
+**Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an adversarial
+pass by the time a human is asked to review the diff, so that human review is the last line of
+defence rather than the first. The fresh-reviewer requirement exists so the reviewer cannot be
+anchored by the implementer's rationale; the triage step exists because reviewer findings are often
+wrong and must not be applied uncritically. Simplicity gets its own reviewer, and gets it first,
+because a plan that is more complicated than the issue requires is the failure mode that survives a
 correctness review intact. Mutation testing gets the last reviewer because a green suite proves
 nothing on its own: whether a test would catch the bug it exists for is only settled by writing
 that bug and watching. The sizing exists because that machinery costs wall-clock time and a round
@@ -500,7 +509,7 @@ in [`docs/design-philosophy/engineering-hypotheses.md`](docs/design-philosophy/e
 | `nged_data` | Reading NGED JSON files from S3, and upserting the metadata roster to parquet. The power Delta write itself lives in `defs/assets.py` |
 | `dynamical_data` | Downloading ECMWF ensemble NWP from Dynamical.org |
 | `geo` | H3 spatial indexing utilities |
-| `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection, `NWP_PUBLICATION_DELAY_HOURS`) |
+| `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection) |
 | `xgboost_forecaster` | Concrete `BaseForecaster` implementation using XGBoost |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |

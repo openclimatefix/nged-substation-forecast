@@ -131,6 +131,16 @@ the same reply that you are taking this path, and open it with `Implementing:` r
 - More than one design would defensibly satisfy it, so the choice wants approving before code moves.
 - It spans enough code that you could not name every caller of what it changes without searching.
 
+**Answer every trigger above, not just the trigger you noticed.** A size stated as "medium,
+because it edits a Patito contract" hides which triggers were never considered, and a reader
+cannot audit a conclusion that does not show its inputs. Issue #728 was sized medium on the
+contract trigger alone. It also edited `XGBoostForecaster.predict`, which sits on the production
+serving path. The serving-path trigger would have made it complex. Write one line per trigger —
+what gets stored, the production serving path, a degradation rule, more than one defensible
+design, and code whose callers you could not name without searching — and let those five answers
+settle whether the issue is complex. Any trigger that fires makes the issue complex, however small
+the diff looks. An issue where none fires is simple or medium, on the conditions above.
+
 **Medium — everything else.** Write the plan, then choose how much review to spend on it: between
 zero and two of the plan reviews below (steps 5 and 7, each with its triage step), and between
 zero and two of the diff reviews in `implement-issue`. The choice is yours, under four rules:
@@ -148,9 +158,11 @@ zero and two of the diff reviews in `implement-issue`. The choice is yours, unde
 - **When you cannot decide, run it.** A review costs one sub-agent; the other error puts a design
   nobody attacked into `main`.
 
-Carry the size and the chosen counts forward: they go in the plan file (step 4), in the report
-(step 9), and into the PR body when `implement-issue` opens it, so whoever reviews the diff knows
-what scrutiny it has already had.
+Carry the size, the five trigger answers, and the chosen counts forward: all three go in the plan
+file and the draft PR body that step 4 opens, and in the report (step 9). A simple issue reaches
+none of those three, having left this skill at the sizing step, so its answers go in the reply
+that announces the size and in the PR body `implement-issue` step 4 opens. Either way, whoever
+reviews the diff knows what scrutiny the diff has already had and on what grounds.
 
 ## 4. Write the plan
 
@@ -170,18 +182,28 @@ branch:
 git push -u origin <branch-name>
 ```
 
+**Open the PR now, as a draft, rather than waiting for implementation.** `gh pr create --draft`
+against `main`, with labels and `JackKelly` as assignee (`gh pr create` can't set either — follow
+with `gh pr edit --add-label <label>` and `gh pr edit --add-assignee JackKelly`), linking the
+issue so it closes on merge. The body says the plan is not yet approved and carries no code yet,
+and gives step 3's five trigger answers, the size they picked, and which reviews it is getting.
+See the `github-issue-pr-workflow` skill for the full PR checklist. Opening it now gives every
+review below, and every push that follows, somewhere to land that the human reviewer can already
+be watching — the same place they will later review the diff.
+
 **Then hand over the plan before anything else happens to it.** Say in your next reply that the
-plan is ready and give a **clickable markdown link** to it, written as the path relative to the
-worktree so the terminal turns it into a link: `[plans/<branch-name>.md](plans/<branch-name>.md)`.
-Do this *before* launching any reviewer. The reviews take minutes, and whoever wants to read the
-first draft — or to stop the work outright — should not have to wait for them, nor work out
-afterwards which parts of the plan the reviews wrote.
+plan is ready and give **clickable markdown links** to both: the plan as the path relative to the
+worktree so the terminal turns it into a link (`[plans/<branch-name>.md](plans/<branch-name>.md)`),
+and the PR as the URL `gh pr create` printed. Do this *before* launching any reviewer. The reviews
+take minutes, and whoever wants to read the first draft — or to stop the work outright — should
+not have to wait for them, nor work out afterwards which parts of the plan the reviews wrote.
 
 One worktree per issue means `plans/` holds exactly one file on each branch, so the "at most one
 plan" rule in `plans/README.md` holds with no coordination between parallel sessions. Committing
 now rather than at implementation time makes the plan durable: it survives Claude Code shutting
-down, and it is already in the diff when the PR opens, so the reviewer sees the plan next to the
-code that claims to follow it. It is deleted at ship time into the PR body, per the existing rule.
+down. The plan is also the whole of the draft PR's diff opened above, so the reviewer reads the
+plan before any code exists, and later sees the plan beside the code that claims to follow it. It
+is deleted at ship time into the PR body, per the existing rule.
 
 Open the file with two brief summaries, before any of the sections below: what the problem or
 feature is, then what the planned solution is. A reader who stops after the first two paragraphs
@@ -283,7 +305,7 @@ for, or trades away a rule in `docs/design-philosophy/` — and say which, in on
 
 For each finding you reject, record the finding and the one-line reason in the plan file, so the
 human reviewer can see what was considered and dismissed. Commit the revised plan and push, so the
-branch on GitHub is never behind what the reviews have already done.
+branch — and the draft PR opened in step 4 — is never behind what the reviews have already done.
 
 **A proposed rearchitecture is the human reviewer's call, not yours** — it is bigger than the
 issue, so neither adopting it nor dropping it silently is right. Put it in the plan's "Risks and
@@ -319,15 +341,17 @@ defect, or not.
 
 Verify each finding against the code, on the same terms as step 6: fix the genuine ones in the
 plan file, and record each rejected finding with its one-line reason. Commit and push the updated
-plan, so the branch carries the original plan and what each review did to it.
+plan, so the branch — and the PR — carries the original plan and what each review did to it.
 
 ## 9. Stop
 
-Report: the verdict from step 2, the size from step 3 and which reviews it bought, a short summary
-of the plan, what each review that ran changed, and what each found that you rejected. Give the
-branch name and, again, the clickable link to the plan file.
+Report: the verdict from step 2, step 3's five trigger answers with the size they picked and which
+reviews it bought, a short summary of the plan, what each review that ran changed, and what each
+found that you rejected. Give the branch name and, again, the clickable links to the plan file and
+the draft PR.
 
-**Do not write any code, and do not open a PR.** Once a human approves the plan, implementation runs
-under the `implement-issue` skill, resuming at its step 2 in the worktree this skill already
-created — implement, verify, PR, then the diff reviews this skill's step 3 called for, each by a
-further independent sub-agent, triaging and pushing after each, stop for human review.
+**Do not write any code.** The PR opened in step 4 stays a draft until a human approves the plan.
+Once approved, implementation runs under the `implement-issue` skill, resuming at its step 2 in
+the worktree and draft PR this skill already created — implement, verify, push, mark the PR ready
+for review, then the diff reviews this skill's step 3 called for, each by a further independent
+sub-agent, triaging and pushing after each, stop for human review.

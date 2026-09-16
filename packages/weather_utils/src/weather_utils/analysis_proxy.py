@@ -7,33 +7,10 @@ that selection so the dashboard (which exists to show what a model sees) and the
 (which builds weather-lag features) compute it identically.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Final
 
 import polars as pl
-
-NWP_PUBLICATION_DELAY_HOURS: Final[int] = 9
-"""Hours after an NWP run's ``init_time`` before we treat that run as usable.
-
-This models when a run reaches *our* disk, not when Dynamical publish it. Dynamical publish each
-00Z run between 08:05 and 08:20 UTC, and ``ecmwf_ens_schedule`` downloads it at 08:30 UTC, so a 00Z
-run is ours from roughly 08:30 — 8.5 hours. Nine is the nearest whole hour at or after that.
-
-``select_analysis_proxy`` applies it for the optional ``available_at`` leakage cut; the feature
-pipeline uses it to derive ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode; and
-``select_nwp_init_time`` uses it to reconstruct availability for ``"replay"`` backfills.
-
-Of ``select_nwp_init_time``'s two modes, only ``"replay"`` needs the delay. A live run joins
-whatever is genuinely on disk, so reality already constrains the NWP table to runs that were
-genuinely published. A replay of a past init time would otherwise join runs that only landed
-afterwards — lookahead bias rather than mere inaccuracy. The asymmetry in full:
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#resolve-nwp-availability-asymmetrically-live-vs-replay>
-
-Two bounds constrain the value, given one 00Z run a day and forecast slots at 00/06/12/18 UTC. The
-06:00 slot must *not* see that morning's run, which has not landed yet, so the value must exceed 6.
-The 12:00 slot *must* see it, so the value must not exceed 12. Both bounds move if
-``ecmwf_ens_schedule``'s start time changes.
-"""
 
 NWP_ANALYSIS_MEMBER: Final[int] = 0
 """The ensemble member the analysis proxy uses.
@@ -50,8 +27,6 @@ def select_analysis_proxy(
     init_time_col: str = "init_time",
     member: int = NWP_ANALYSIS_MEMBER,
     max_lead: timedelta | None = None,
-    available_at: datetime | None = None,
-    publication_delay: timedelta = timedelta(hours=NWP_PUBLICATION_DELAY_HOURS),
 ) -> pl.LazyFrame:
     """Select the freshest-run analysis proxy: one row per ``(group_key, valid_time)``.
 
@@ -68,7 +43,7 @@ def select_analysis_proxy(
 
     ``pl.LazyFrame`` in / ``pl.LazyFrame`` out, so it composes with both ``pl.scan_delta`` (the
     dashboard, keyed by ``h3_index``) and in-memory post-spatial-join frames (the pipeline, keyed
-    by ``time_series_id``). The pushdownable filters (``member``, ``max_lead``, ``available_at``)
+    by ``time_series_id``). The pushdownable filters (``member`` and ``max_lead``)
     are applied *before* the reduction so a Delta scan's partition pruning and row-group skipping
     survive — confirm with ``.explain()`` when wiring a new scan through it.
 
@@ -88,11 +63,6 @@ def select_analysis_proxy(
         max_lead: If given, keep only rows with ``valid_time < init_time + max_lead`` — the
             dashboard passes its per-run stitching window (wide enough to overlap the next run, so
             the null-fill above has an older run to draw on); the pipeline leaves it unbounded.
-        available_at: If given, keep only runs available by this as-of time, i.e.
-            ``init_time + publication_delay <= available_at`` (replay-mode availability — it models
-            what a hindcast could have seen, not the live path, which reads only already-published
-            runs). Guards against lookahead bias in historical hindcasts.
-        publication_delay: The publication delay used by the ``available_at`` cut.
 
     Returns:
         The analysis-proxy rows, one per ``(group_key, valid_time)``, without ``ensemble_member``.
@@ -100,8 +70,6 @@ def select_analysis_proxy(
     lf = nwp.filter(pl.col("ensemble_member") == member).drop("ensemble_member")
     if max_lead is not None:
         lf = lf.filter(pl.col("valid_time") < pl.col(init_time_col) + max_lead)
-    if available_at is not None:
-        lf = lf.filter(pl.col(init_time_col) + publication_delay <= available_at)
     # Freshest run wins per (location, valid_time), per column: sort each column by init_time,
     # drop its nulls, then take the last (freshest non-null) value — so a null in the freshest run
     # falls back to the next-freshest run that has a value. group_by(...).agg(...) guarantees
