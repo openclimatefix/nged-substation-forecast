@@ -23,9 +23,12 @@ list_timeseries_json_files`, etc.).
   `power_time_series` (`PowerTimeSeries`), and `n_implausible_power_rows_dropped`. Raises
   `NoNewData` if the listing was empty, or if every listed file's `data` field was null.
 - `nged_data.storage.select_new_rows(time_series, delta_path, storage_options=None)` — filters
-  `time_series` down to rows newer than what the `power_time_series` Delta table at `delta_path`
-  already holds, per `time_series_id`. Accepts either `PowerTimeSeries` rows, compared on `time`,
-  or the file listing `list_timeseries_json_files` returns, compared on `end_time`.
+  `time_series` down to rows genuinely missing from the `power_time_series` Delta table at
+  `delta_path`. `PowerTimeSeries` rows are filtered by existence, an anti-join on
+  `(time_series_id, time)`, so a reading is kept regardless of arrival order. The file listing
+  `list_timeseries_json_files` returns is filtered by comparing each file's `end_time` against its
+  series' on-disk high-water mark, loosened by a lookback margin so a late file is still
+  downloaded.
 - `nged_data.storage.time_series_coverage(delta_path, storage_options=None)` — the earliest and
   latest observation `time` on disk for each `time_series_id` in the `power_time_series` Delta
   table.

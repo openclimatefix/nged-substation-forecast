@@ -1,5 +1,5 @@
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import patito as pt
@@ -384,7 +384,12 @@ def test_parse_file_listing_valid(object_key: str, expected_time_series_id: int)
 
 
 def test_select_new_rows_file_listing(tmp_path: Path):
-    """Regression: trailing comma made filtered_df a tuple, causing superfluous column_0 error."""
+    """Regression: trailing comma made filtered_df a tuple, causing superfluous column_0 error.
+
+    Also covers the lookback margin's ordinary case: a file sitting exactly at a series' on-disk
+    `last_time` now falls inside the margin and is kept, rather than excluded as it would be under
+    a strict `end_time > last_time` high-water mark.
+    """
     delta_path = tmp_path / "power.delta"
 
     pl.DataFrame(
@@ -411,7 +416,7 @@ def test_select_new_rows_file_listing(tmp_path: Path):
                 [
                     datetime(
                         2026, 1, 1, 12, 0, tzinfo=UTC
-                    ),  # equals last_time for ts_id=1 → excluded
+                    ),  # equals last_time for ts_id=1, within lookback margin → included
                     datetime(2026, 1, 1, 18, 0, tzinfo=UTC),  # > last_time for ts_id=1 → included
                     datetime(2026, 1, 1, 6, 0, tzinfo=UTC),  # ts_id=2 not in delta → included
                 ]
@@ -422,9 +427,44 @@ def test_select_new_rows_file_listing(tmp_path: Path):
 
     result = select_new_rows(file_listing, str(delta_path))
 
-    assert result.height == 2
-    assert set(result["path"].to_list()) == {"new_ts1.json", "new_ts2.json"}
+    assert result.height == 3
+    assert set(result["path"].to_list()) == {"old.json", "new_ts1.json", "new_ts2.json"}
     _ProcessedFileListing.validate(result)  # schema must survive filtering
+
+
+def test_select_new_rows_file_listing_drops_a_file_outside_the_lookback_margin(tmp_path: Path):
+    """A file landing further before the watermark than `_LATE_FILE_LOOKBACK` is still dropped —
+    the lookback margin bounds re-download cost rather than removing the cutoff outright."""
+    delta_path = tmp_path / "power.delta"
+    last_time = datetime(2026, 1, 4, 0, 0, tzinfo=UTC)
+
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1], dtype=pl.Int32),
+            "time": pl.Series([last_time]).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0], dtype=pl.Float32),
+        }
+    ).write_delta(delta_path)
+
+    raw = pl.DataFrame(
+        {
+            "path": ["within_margin.json", "outside_margin.json"],
+            "filesize_bytes": pl.Series([1000, 1000], dtype=pl.Int64),
+            "time_series_id": pl.Series([1, 1], dtype=pl.Int32),
+            "start_time": pl.Series([last_time, last_time]).cast(UTC_DATETIME_DTYPE),
+            "end_time": pl.Series(
+                [
+                    last_time - timedelta(days=1),  # within the 3-day margin → included
+                    last_time - timedelta(days=5),  # outside the 3-day margin → dropped
+                ]
+            ).cast(UTC_DATETIME_DTYPE),
+        }
+    )
+    file_listing = pt.DataFrame(raw).set_model(_ProcessedFileListing).validate()
+
+    result = select_new_rows(file_listing, str(delta_path))
+
+    assert result["path"].to_list() == ["within_margin.json"]
 
 
 def test_select_new_rows_power_time_series(tmp_path: Path):
@@ -457,6 +497,83 @@ def test_select_new_rows_power_time_series(tmp_path: Path):
     assert result.height == 1
     assert result["time"][0] == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
     PowerTimeSeries.validate(result)  # schema must survive filtering
+
+
+def test_select_new_rows_power_time_series_fills_a_gap_before_the_watermark(tmp_path: Path):
+    """A genuinely-missing reading is kept even when it predates the series' high-water mark —
+    the anti-join checks existence, not recency, so a late file backfilling a gap is no longer
+    permanently excluded just because a later reading already made it onto disk."""
+    delta_path = tmp_path / "power.delta"
+
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1], dtype=pl.Int32),
+            "time": pl.Series(
+                [
+                    datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+                    datetime(2026, 1, 1, 13, 0, tzinfo=UTC),
+                ]
+            ).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0, 1.0], dtype=pl.Float32),
+        }
+    ).write_delta(delta_path)
+
+    input_power = PowerTimeSeries.validate(
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series([1, 1, 1], dtype=pl.Int32),
+                "time": pl.Series(
+                    [
+                        datetime(2026, 1, 1, 12, 0, tzinfo=UTC),  # already on disk
+                        datetime(2026, 1, 1, 12, 30, tzinfo=UTC),  # the gap
+                        datetime(2026, 1, 1, 13, 30, tzinfo=UTC),  # past the watermark
+                    ]
+                ).cast(UTC_DATETIME_DTYPE),
+                "power": pl.Series([1.0, 2.0, 3.0], dtype=pl.Float32),
+            }
+        )
+    )
+
+    result = select_new_rows(input_power, str(delta_path))
+
+    assert result["time"].to_list() == [
+        datetime(2026, 1, 1, 12, 30, tzinfo=UTC),
+        datetime(2026, 1, 1, 13, 30, tzinfo=UTC),
+    ]
+    PowerTimeSeries.validate(result)  # schema must survive filtering
+
+
+def test_select_new_rows_power_time_series_restricts_to_reporting_series(tmp_path: Path):
+    """The anti-join scans only the `time_series_id`s present in the candidate frame, so it must
+    not scope to only the first reporting series or leak another series' rows into the result."""
+    delta_path = tmp_path / "power.delta"
+    T = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 2, 3], dtype=pl.Int32),
+            "time": pl.Series([T, T, T]).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0, 2.0, 3.0], dtype=pl.Float32),
+        }
+    ).write_delta(delta_path)
+
+    input_power = PowerTimeSeries.validate(
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series([1, 2, 3], dtype=pl.Int32),
+                "time": pl.Series([T, T, datetime(2026, 1, 1, 12, 30, tzinfo=UTC)]).cast(
+                    UTC_DATETIME_DTYPE
+                ),
+                "power": pl.Series([1.0, 2.0, 3.0], dtype=pl.Float32),
+            }
+        )
+    )
+
+    result = select_new_rows(input_power, str(delta_path))
+
+    assert result.height == 1
+    assert result["time_series_id"][0] == 3
+    assert result["time"][0] == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
 
 
 def test_time_series_coverage(tmp_path: Path):

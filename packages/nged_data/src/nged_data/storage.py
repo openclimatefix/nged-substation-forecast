@@ -10,6 +10,7 @@ what is new, but neither writes to it.
 
 import logging
 from collections.abc import Sequence
+from datetime import timedelta
 from typing import Final, NamedTuple, TypedDict, overload
 
 import obstore
@@ -308,10 +309,11 @@ def time_series_coverage(
     ``time``/``time_series_id`` value is read; computing both bounds instead of one is ~20% more
     wall-clock and no extra memory (the shared scan dominates). The ``collect`` uses the streaming
     engine to keep peak memory bounded, because this scan runs hourly on a small control-plane VM
-    and runs two or three times per hour: once for the ``power_data_is_fresh`` asset check, once
-    inside the ``select_new_rows`` call ``power_time_series_and_metadata`` makes on the file
-    listing, and a third time inside the ``select_new_rows`` call it makes on the parsed rows —
-    which only happens in an hour that had new data to parse. Measured on a synthetic V2 table
+    and runs twice per hour: once for the ``power_data_is_fresh`` asset check, and once inside the
+    ``select_new_rows`` call ``power_time_series_and_metadata`` makes on the file listing. The
+    second ``select_new_rows`` call, on the parsed rows, uses ``_existing_power_time_series_keys``
+    instead — a scan restricted to the reporting series' own history, not this function's
+    whole-table scan. Measured on a synthetic V2 table
     (2,500 series, half-hourly, partitioned by ``time_series_id``) for a year of history (43.8M
     rows): streaming ~0.21 s / ~190 MB peak, versus ~1.3 GB peak for the in-memory engine — same
     result, ~7x less memory. Cost
@@ -345,6 +347,53 @@ def time_series_coverage(
     return pt.DataFrame(coverage).set_model(TimeSeriesCoverage).validate()
 
 
+_LATE_FILE_LOOKBACK: Final[timedelta] = timedelta(days=3)
+"""How far before a series' on-disk `last_time` a file's `end_time` may still fall and be
+downloaded, in `select_new_rows`'s `_ProcessedFileListing` branch.
+
+NGED's files land "at irregular intervals with no fixed schedule" and "several-hours-apart" (see
+`power_time_series_and_metadata`'s docstring), so a file arriving a short while after the current
+watermark is an ordinary late arrival, not a fault. 3 days is a judgement call — generous enough to
+cover that, small enough that an hour doesn't re-download the whole bucket. Getting this exactly
+right doesn't matter for correctness: `select_new_rows`'s `PowerTimeSeries` branch is what decides
+which downloaded rows are genuinely new, so a file let through by too generous a margin here just
+costs an extra download, and one dropped by too tight a margin is still caught the next hour it's
+listed, unless it ages past the margin first."""
+
+
+def _existing_power_time_series_keys(
+    delta_path: str,
+    storage_options: ObjectStoreOptions | None,
+    time_series_ids: Sequence[int],
+) -> pl.LazyFrame:
+    """Return the `(time_series_id, time)` pairs already on disk for `time_series_ids`.
+
+    Restricting to `time_series_ids` — the series present in the candidate frame `select_new_rows`
+    is filtering — keeps this a partition-pruned scan of just the reporting series' own history:
+    `power_time_series` is partitioned by `time_series_id` (see
+    `delta_store.power_time_series.write_power_time_series`), so an unrestricted version of this
+    scan would instead materialise every row in the table to build the join's hash table, which is
+    the more expensive of the two operations `time_series_coverage`'s docstring compares it
+    against. The only caller, `select_new_rows`, already returns early via `delta_table_exists`
+    before calling this, so — unlike `time_series_coverage` — this function does not need its own
+    empty-table branch.
+
+    Measured on the same synthetic V2 table `time_series_coverage`'s docstring uses (2,500 series,
+    half-hourly, 1 year, 43.8M rows): ~0.04 s and negligible extra memory at 1-20 reporting series
+    (the expected case, since NGED's files land a few at a time), rising to ~110 MB at 100
+    reporting series, ~585 MB at 500, and ~2.75 GB at all 2,500 — an hour where nearly every series
+    reports at once (a bulk backfill, or recovery from an extended NGED outage) costs more memory
+    here than `time_series_coverage`'s own whole-table scan (~90 MB), because an anti-join has to
+    materialise the actual rows to hash-join against rather than collapsing each series to two
+    values the way an aggregate does.
+    """
+    return (
+        pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
+        .filter(pl.col("time_series_id").is_in(time_series_ids))
+        .select("time_series_id", "time")
+    )
+
+
 # This overload tells type checkers that if you pass a `pt.DataFrame[PowerTimeSeries]` into
 # `select_new_rows` then you get a `pt.DataFrame[PowerTimeSeries]` back.
 @overload
@@ -370,69 +419,76 @@ def select_new_rows(
     delta_path: str,
     storage_options: ObjectStoreOptions | None = None,
 ) -> pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing]:
-    """Return rows in `time_series` newer than what our Delta table already holds.
+    """Return rows in `time_series` genuinely missing from the Delta table.
 
-    The comparison is made on a time_series_id by time_series_id basis. `time_series` is either
-    `PowerTimeSeries` rows, compared on their `time` column, or the `_ProcessedFileListing` a raw
-    S3 listing parses into, compared on `end_time` — the function tells the two apart by which of
-    those columns is present, and the two `@overload` declarations above tell a type checker which
-    input type produces which output type.
+    `time_series` is either `PowerTimeSeries` rows or the `_ProcessedFileListing` a raw S3 listing
+    parses into — the function tells the two apart by which of `time`/`end_time` is present, and
+    the two `@overload` declarations above tell a type checker which input type produces which
+    output type. `delta_path` is a local path or remote URI for the ``power_time_series`` Delta
+    table; `storage_options` carries the object-store credentials/endpoint for a remote
+    `delta_path`. A call against a Delta table that does not exist yet returns its input unchanged
+    and scans nothing.
 
-    `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
-    `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`. Both
-    input kinds are compared against this same table: a file's `end_time` is the latest reading it
-    could possibly carry, so comparing it against `power_time_series`' on-disk `last_time` finds
-    files that cannot hold a reading newer than what is already stored, and drops them before
-    they are downloaded. Passing `PowerTimeSeries` rows filters after the download instead, on
-    each row's own `time`.
+    For `PowerTimeSeries` rows, this is a genuine existence check: an anti-join on
+    `(time_series_id, time)` against `_existing_power_time_series_keys`, so a genuinely-missing
+    reading is kept regardless of arrival order — a late file, or one that fills a gap earlier in a
+    series' history, is no longer permanently excluded just because a later reading already made it
+    onto disk. See that function's docstring for the cost this trades in return.
 
-    Cost: each call against an existing table runs `time_series_coverage`, so it pays one full
-    two-column scan of `power_time_series` — see that function for the measured figures and for
-    why row-group statistics cannot answer it. The signature reads like an in-memory filter and
-    is not one. `power_time_series_and_metadata` calls this once on the file listing and then,
-    only if that listing turned up files worth downloading, again on the parsed rows: an hour in
-    which NGED published nothing new stops after the first call, because `download_and_parse_files`
-    raises `NoNewData` in between and the asset returns. A call against a Delta table that does
-    not exist yet returns its input unchanged and scans nothing.
+    For the file listing, there is no per-row `time` to check existence against before download —
+    only the file's `start_time`/`end_time` window from its S3 key — so the filter instead compares
+    `end_time` against each series' on-disk `last_time` from `time_series_coverage`, loosened by
+    `_LATE_FILE_LOOKBACK` so a file landing a short while after the watermark is still downloaded. A
+    file whose `end_time` falls more than `_LATE_FILE_LOOKBACK` before `last_time` is still dropped
+    before download — a bounded, named gap, not the unbounded one this replaces.
+
+    Cost: the file-listing branch runs `time_series_coverage`, paying one full two-column scan of
+    `power_time_series` — see that function for the measured figures. The `PowerTimeSeries` branch
+    instead runs `_existing_power_time_series_keys`, restricted to the `time_series_id`s in
+    `time_series` — see that function's docstring for its own measured figures.
+    `power_time_series_and_metadata` calls this once on the file listing and then, only if that
+    listing turned up files worth downloading, again on the parsed rows: an hour in which NGED
+    published nothing new stops after the first call, because `download_and_parse_files` raises
+    `NoNewData` in between and the asset returns.
     """
     if not delta_table_exists(delta_path, storage_options):
         log.info(f"{delta_path=} does not exist yet.")
         return time_series
 
-    # Scan the existing delta table for the most recent time per time_series_id.
-    coverage = time_series_coverage(delta_path, storage_options)
-
-    # Check whether `time_series` is a `PowerTimeSeries` or a `_ProcessedFileListing`
     if "time" in time_series.columns:
-        pt_model = PowerTimeSeries
-        time_col = "time"
-        columns_to_sort_by = PowerTimeSeries.columns_to_sort_by
-    elif "end_time" in time_series.columns:
-        pt_model = _ProcessedFileListing
-        time_col = "end_time"
-        columns_to_sort_by = "end_time"
-    else:
-        raise ValueError(
-            "Expected `time_series` to have either a `time` column or an `end_time` column,"
-            f" not {time_series.columns=}"
+        reporting_ids = time_series["time_series_id"].unique().to_list()
+        existing_keys = _existing_power_time_series_keys(delta_path, storage_options, reporting_ids)
+        filtered_df = (
+            time_series.lazy()
+            .join(existing_keys, on=["time_series_id", "time"], how="anti")
+            .sort(by=PowerTimeSeries.columns_to_sort_by)
+            .collect()
         )
-
-    # Strip the Patito model from `coverage` so Polars' cross-subclass join check accepts it, and
-    # keep only `last_time` (the most recent time on disk per series) for the new-row filter.
-    plain_last_times = pl.LazyFrame._from_pyldf(coverage.lazy()._ldf).select(
-        "time_series_id", "last_time"
+        return pt.DataFrame(filtered_df).set_model(PowerTimeSeries).validate()
+    if "end_time" in time_series.columns:
+        # Strip the Patito model from `coverage` so Polars' cross-subclass join check accepts it,
+        # and keep only `last_time` (the most recent time on disk per series) for the filter below.
+        coverage = time_series_coverage(delta_path, storage_options)
+        plain_last_times = pl.LazyFrame._from_pyldf(coverage.lazy()._ldf).select(
+            "time_series_id", "last_time"
+        )
+        filtered_df = (
+            time_series.lazy()
+            .join(plain_last_times, on="time_series_id", how="left")
+            # A null last_time means this is a new time_series_id, so keep it unconditionally.
+            .filter(
+                pl.col("last_time").is_null()
+                | (pl.col("end_time") > pl.col("last_time") - _LATE_FILE_LOOKBACK)
+            )
+            .drop("last_time")
+            .sort(by="end_time")
+            .collect()
+        )
+        return pt.DataFrame(filtered_df).set_model(_ProcessedFileListing).validate()
+    raise ValueError(
+        "Expected `time_series` to have either a `time` column or an `end_time` column,"
+        f" not {time_series.columns=}"
     )
-    filtered_df = (
-        time_series.lazy()
-        .join(plain_last_times, on="time_series_id", how="left")
-        # If last_time is null for this time_series_id then this is a new time_series_id.
-        .filter(pl.col("last_time").is_null() | (pl.col(time_col) > pl.col("last_time")))
-        .drop("last_time")
-        .sort(by=columns_to_sort_by)
-        .collect()
-    )
-
-    return pt.DataFrame(filtered_df).set_model(pt_model).validate()
 
 
 class UpsertMetadataStats(TypedDict, total=False):
