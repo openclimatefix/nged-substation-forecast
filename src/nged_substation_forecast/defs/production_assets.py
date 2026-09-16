@@ -53,7 +53,10 @@ LIVE_POWER_HISTORY: Final[timedelta] = timedelta(days=15)
 reaches.
 
 Must cover the longest power lag feature any production model uses (currently up to 336 h /
-14 days) plus a margin.
+14 days) plus a margin. A CV caller sizes the equivalent bound automatically per experiment via
+``load_engineering_inputs``'s ``power_lookback`` parameter (``ParsedFeatures.max_power_lag()``).
+``LIVE_POWER_HISTORY`` is set by hand instead, and must be revisited if a future promoted model's
+longest power lag grows past 15 days.
 """
 
 live_forecast_partitions = TimeWindowPartitionsDefinition(

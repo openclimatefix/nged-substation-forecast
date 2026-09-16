@@ -42,6 +42,7 @@ from ml_core.cv_helpers import (
     eligible_time_series_ids,
     parse_cv_partition_key,
 )
+from ml_core.features._parsed_features import ParsedFeatures
 from ml_core.metrics import (
     NoOverlappingActualsError,
     build_mlflow_aggregate_metrics,
@@ -344,6 +345,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
 
     metadata_df = _load_roster(settings, eligible_ids)
     _require_metadata_coverage(metadata_df, eligible_ids, population="eligible")
+    power_lookback = ParsedFeatures.from_strings(config.selected_features).max_power_lag()
     power_ts, nwp_lf = load_engineering_inputs(
         settings,
         time_series_ids=eligible_ids,
@@ -351,6 +353,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
         window_start=train_start,
         window_end=train_end,
         ensemble_members=[0],
+        power_lookback=power_lookback,
     )
 
     forecaster = forecaster_cls(model_params=config)
@@ -491,12 +494,16 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     metadata_df = _load_roster(settings, trained_ids)
     _require_metadata_coverage(metadata_df, trained_ids, population="trained")
 
+    power_lookback = ParsedFeatures.from_strings(config.selected_features).max_power_lag()
+
     # Walk disjoint init_time chunks covering every run that can forecast into the window:
     # init_time in [val_start - MAX_NWP_LEAD, val_end].
     chunk_start = val_start - MAX_NWP_LEAD
     is_first = True
     while chunk_start <= val_end:
         chunk_end = min(chunk_start + _PREDICT_INIT_CHUNK, val_end)
+        # The power scan is lazy and re-issued per init_time chunk; it is small next to the NWP
+        # scan, whose partition-pruned chunking is what this loop exists for.
         power_ts, nwp_lf = load_engineering_inputs(
             settings,
             time_series_ids=trained_ids,
@@ -505,6 +512,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             window_end=val_end,
             init_time_start=chunk_start,
             init_time_end=chunk_end,
+            power_lookback=power_lookback,
         )
         features = forecaster.feature_engineer.engineer(
             selected_features=config.selected_features,

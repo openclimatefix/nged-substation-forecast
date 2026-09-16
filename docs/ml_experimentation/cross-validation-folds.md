@@ -142,16 +142,26 @@ join in feature engineering) is separate engineering work — see the
 
 ## Overlapping forecasts: what the fold boundary does and does not protect
 
-A 14-day forecast reissued every 6 hours covers each target half-hour 56 times. It is
-therefore worth saying precisely which problems that creates.
+A 14-day forecast reissued every 6 hours covers each target half-hour 56 times. This overlap creates
+several gotchas we need to be careful of:
 
-**Overlapping forecasts do not contaminate the test set.** `load_engineering_inputs` bounds both
-power and NWP by *target* time — power on `time` and NWP on `valid_time`, each within
-`[window_start, window_end]` — not by forecast origin. The fold boundary is a boundary on
-*observations*. No observation appears on both sides of a fold boundary. Power lag features are
-separately protected by `_nullify_leaky_lags`, which nulls any lag shorter than the lead time.
+**Overlapping forecasts do not contaminate the test set.** `load_engineering_inputs` bounds NWP by
+*target* time — `valid_time` within `[window_start, window_end]` — not by `init_time`. That NWP
+bound is the fold boundary, because the NWP scan builds the spine: the `(time_series_id,
+valid_time)` row scaffold that power values are joined onto as labels. No label appears on both
+sides of the fold boundary.
 
-**Overlapping forecasts does inflate the apparent weight of evidence.** Within one horizon slice the
+**Power lag features deliberately reach back across the fold boundary, and stay leak-free.** Power
+is bounded only on its upper edge (`time <= window_end`). The lower edge widens to `window_start -
+power_lookback`, so a lag feature can read history from *before* the fold, exactly as the live
+service already does. That reach-back is not contamination: `_nullify_leaky_lags` keeps a power lag
+only when its target time is strictly before the row's own forecast-issue time, a per-row guarantee
+independent of where the joined value came from. A power value that was a training target during a
+training fold can be read as a lagged power feature in a validation fold. Reading a past label as a
+later input is intrinsic to autoregressive forecasting — yesterday's actual load is always both a
+past training target and today's input.
+
+**Overlapping forecasts inflate the apparent weight of evidence.** Within one horizon slice the
 same target half-hour is still scored many times: `extended_range` spans 168 hours and beyond. With
 6-hourly initialisations, roughly 28 forecasts therefore land in that band for a single target.
 Those are not 28 independent measurements of skill — they share the weather, the recent load and
@@ -159,7 +169,7 @@ most of the model state. The leaderboard's per-slice counts therefore overstate 
 evidence separates two experiments. A naive significance test on them would report more confidence
 than the data supports.
 
-We have not fixed this. The [energy-forecasting literature
+We have not fixed the "overlapping forecasts" issue. The [energy-forecasting literature
 review](../background/energy-forecasting-review.md) found no paper offering a method to copy. The
 closest is [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335), who build the
 consistency intervals on their calibration diagrams "considering the temporal correlation of

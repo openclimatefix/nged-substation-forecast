@@ -170,6 +170,16 @@ acronym expanded on first use — but without the two journalistic habits that w
 doc, so no punning or whimsical headings, and no scene-setting opening: state the conclusion first,
 then explain it.
 
+**State the point directly; don't write a sentence whose only job is announcing that a point is
+coming.** "It is therefore worth saying precisely which problems that creates" spends a whole
+sentence promising content instead of giving it. "This overlap creates several problems:" gives
+the same information in half the words and leads straight into the list that follows — the
+announcing sentence and the content it was announcing collapse into one. The usual offenders open
+with "it is worth noting/saying/pointing out that," "it is important to note that," "let us
+consider," "we now turn to," "there are several reasons why," or "this raises the question of."
+Replace each by naming the noun the throat-clearing was circling and stating the claim in its
+place.
+
 **Name the thing; don't write "it".** Wherever a pronoun or a demonstrative makes the reader look
 backwards to work out what it refers to, repeat the noun instead. "It", "this", "that", "these",
 "those", "they", "such", "one", "ones", "the former" and "the latter" are the usual offenders. A
