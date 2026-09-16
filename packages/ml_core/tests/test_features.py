@@ -940,6 +940,51 @@ def test_engineer_features_single_run_proxy_ceiling_is_the_selected_run_not_the_
     assert engineered["temperature_2m_lag_24h"][0] == 8.0
 
 
+def test_engineer_features_single_run_ceiling_uses_the_derived_run_when_none_is_given():
+    """With nwp_init_time omitted, the ceiling is the run the delay derives, not a wider one.
+
+    Single-run mode lets a backfill caller omit nwp_init_time, in which case the run is derived as
+    power_fcst_init_time - nwp_publication_delay_hours. The analysis-proxy ceiling routes through
+    that same derivation, so a run initialised after the derived one must still be excluded even
+    though it landed before power_fcst_init_time.
+    """
+    power_fcst_init_time = datetime(2026, 6, 11, 9, 0)
+    # Derived run: power_fcst_init_time - 9h. Not passed to _engineer_features.
+    valid_time = datetime(2026, 6, 11, 10, 0)
+    # lag=8h -> target_time = 02:00, before power_fcst_init_time, so the freshest-run branch
+    # answers it. The decoy run sits between the derived run and power_fcst_init_time, so a
+    # ceiling of power_fcst_init_time — or one derived by adding the delay rather than
+    # subtracting it — would wrongly admit the decoy.
+    target_time = valid_time - timedelta(hours=8)
+    decoy_init_time = datetime(2026, 6, 11, 1, 0)
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1", "ts1", "ts1"],
+            "valid_time": [target_time, valid_time, target_time],
+            "ensemble_member": [0, 0, 0],
+            "init_time": [
+                power_fcst_init_time - timedelta(hours=NWP_PUBLICATION_DELAY_HOURS),
+                power_fcst_init_time - timedelta(hours=NWP_PUBLICATION_DELAY_HOURS),
+                decoy_init_time,
+            ],
+            "temperature_2m": [8.0, 99.0, 999.0],
+        }
+    )
+    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    engineered = _engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=nwp_df.lazy(),
+        selected_features={"temperature_2m_lag_8h"},
+        power_fcst_init_time=power_fcst_init_time,
+    ).collect()
+
+    assert engineered["temperature_2m_lag_8h"][0] == 8.0
+
+
 def test_apply_weather_lag_boundary_uses_same_run_at_exact_lead():
     """At target_time == power_fcst_init_time, the boundary belongs to the same-run branch.
 
