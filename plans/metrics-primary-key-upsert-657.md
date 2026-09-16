@@ -8,15 +8,17 @@ key — and should be mirrored.
 
 **Solution.** Add the ten-column key the issue specifies to `Metrics`, with a `validate()`
 override mirroring `PowerForecast.validate()`'s `n_unique()` check but guarded for the four key
-columns that are `allow_missing` (they are not yet populated at the one call site that validates
+columns that are `allow_missing` (they are not yet populated at the two call sites that validate
 before enrichment). Correct the class docstring and the `computed_at` docstring to match the new
-key. No change to the write path (`write_forecast_metrics` in `delta_store/forecast_metrics.py`):
-its existing partition-scoped overwrite is already correct for both current callers
-(`leaderboard`, `ad_hoc`), which always recompute their entire `(experiment_name, fold_id)`
-partition in one call. The write-path question the issue raises only bites once a
-`production_monitoring` writer exists, which is unbuilt (`EvalScopeType` deliberately excludes it)
-— that decision is recorded as a design note in `docs/roadmap/live-service.md`'s "Implementation
-details" section rather than as new code with no caller.
+key, and correct `docs/roadmap/live-service.md`'s now-inaccurate description of monitoring rows as
+append-only-and-disambiguated-by-`computed_at`. No change to the write path
+(`write_forecast_metrics` in `delta_store/forecast_metrics.py`) and no write-path design note
+added to the roadmap doc: its existing partition-scoped overwrite is already correct for both
+current callers (`leaderboard`, `ad_hoc`), which always recompute their entire
+`(experiment_name, fold_id)` partition in one call, and the question of what a future
+`production_monitoring` writer needs has no caller to build it for yet (`EvalScopeType`
+deliberately excludes that scope) — see departure 2 below for why this plan does not try to answer
+it in advance.
 
 ## Verdict, size, departures
 
@@ -28,35 +30,51 @@ both diff reviews, per the issue's own sizing call.
 Departures from the issue body:
 
 1. **The `validate()` override cannot check the full key unconditionally**, unlike
-   `PowerForecast`. `_score_forecast_group` (`src/nged_substation_forecast/defs/cv_assets.py:857`)
-   calls `Metrics.validate(pl.concat(batch_metrics), allow_superfluous_columns=True)` *before*
-   `enrich_metrics_rows()` adds `experiment_name`, `evaluation_scope`, `window_start`, and
-   `window_end` — four of the ten key columns, all declared `allow_missing=True` on `Metrics`. At
-   that call site those columns do not exist on the frame at all (not merely null), so
-   `validated_df.select(pk_cols)` would raise `ColumnNotFoundError` if the check ran
-   unconditionally. `PowerForecast`'s four key columns are all mandatory, so its own
-   `validate()` never has to consider this. The override here skips the uniqueness check unless
-   every key column is present, which means the real check runs where it should: inside
-   `enrich_metrics_rows()`'s own `Metrics.validate()` call (`packages/ml_core/src/ml_core/metrics.py:600`),
-   once the full key exists, on exactly the frame that gets written. This still catches everything
-   the issue is after (a join fanning out inside `compute_metrics()`, or double-writing rows) — it
-   just can't also fire on the partial-key frame from the earlier call, which has no key to check
-   yet.
-2. **No write-path code changes.** The issue asks the plan to "determine what the write path
-   needs to become" once monitoring writes land incrementally — it does not ask for that writer to
-   be built now, and no caller exists yet to build it for (`EvalScopeType` in ml_schemas.py is
-   deliberately narrower than `EVALUATION_SCOPES`, per its own docstring, until Phase 8). Writing
-   a MERGE or a key-scoped predicate with nothing to call it is exactly the "generalising for a
-   caller that does not exist" trap the simplicity review would flag. Instead this plan records
-   the direction as a design decision in the roadmap doc that already tracks that future work
-   (`docs/roadmap/live-service.md`, "Production monitoring" section), so Phase 8 does not have to
-   re-derive it. See "Write-path decision" below for the reasoning and recommendation.
+   `PowerForecast`. Two call sites validate `Metrics` before `enrich_metrics_rows()` adds
+   `experiment_name`, `evaluation_scope`, `window_start`, and `window_end` — four of the ten key
+   columns, all declared `allow_missing=True` on `Metrics`: inside `compute_metrics()` itself
+   (`packages/ml_core/src/ml_core/metrics.py:473`) and in `_score_forecast_group`
+   (`src/nged_substation_forecast/defs/cv_assets.py:857`, `Metrics.validate(pl.concat(batch_metrics),
+   allow_superfluous_columns=True)`, called on `compute_metrics()`'s already-validated output). At
+   both, the four columns do not exist on the frame at all (not merely null) — confirmed
+   empirically against Patito's `allow_missing` behaviour — so `validated_df.select(pk_cols)` would
+   raise `ColumnNotFoundError` if the check ran unconditionally. `PowerForecast`'s four key columns
+   are all mandatory, so its own `validate()` never has to consider this. The override here skips
+   the uniqueness check unless every key column is present, which means the real check runs where
+   it should: inside `enrich_metrics_rows()`'s own `Metrics.validate()` call
+   (`packages/ml_core/src/ml_core/metrics.py:600`), once the full key exists, on exactly the frame
+   that gets written. This still catches everything the issue is after (a join fanning out inside
+   `compute_metrics()`, or double-writing rows) — it just can't also fire on the two partial-key
+   frames upstream, which have no key to check yet.
+
+   *Considered and rejected*: keep `Metrics` self-enforcing by putting the uniqueness check in a
+   `validate()` override (as above), versus dropping the override and adding a plain classmethod
+   called explicitly from `enrich_metrics_rows()` once the key exists — the latter needs no
+   presence guard and drops one test, since there would be nothing to skip. Rejected because it
+   moves contract enforcement out of `contracts` and into a caller in `ml_core`, against this
+   repo's stated design (`packages/contracts/README.md`: duplicate/uniqueness checks live inside a
+   model's own `validate()` and are never relaxed) — and unlike the write-path question in
+   departure 2, the presence guard exists for two callers that are real and present today, not a
+   hypothetical future one.
+2. **No write-path code changes, and no write-path design note added to the roadmap doc.** The
+   issue asks the plan to "determine what the write path needs to become" once monitoring writes
+   land incrementally — read as asking for a decision, not for that writer to be built now, since
+   no caller exists yet to build it for (`EvalScopeType` in ml_schemas.py is deliberately narrower
+   than `EVALUATION_SCOPES`, per its own docstring, until Phase 8). An earlier draft of this plan
+   recorded a MERGE-vs-predicate-scoped-overwrite recommendation in `docs/roadmap/live-service.md`
+   for that future writer; dropped after review, because it rests on no measurement of the real
+   table (this environment has no AWS credentials to take one) and would commit a future
+   implementer to an unverified choice ahead of the work being agreed — the "don't commit the
+   project to work it has not agreed to" rule. Phase 8's implementer re-derives the write strategy
+   against real data when that work starts.
 3. **`docs/roadmap/live-service.md` needs a correction, not just `ml_schemas.py`.** That page
    currently describes monitoring rows as "**append-only** ... unlike the leaderboard scope's
    idempotent overwrite; recomputations are distinguished by `computed_at`" — i.e. it documents the
-   opposite of the issue's model (append + disambiguate, rather than key + replace). This is a
-   real design change the issue is making, not only a docstring typo in `ml_schemas.py`, so both
-   pages need to move together.
+   opposite of the issue's model (append + disambiguate, rather than key + replace). Once `Metrics`
+   carries a key that includes `window_start`/`window_end`, that sentence becomes factually wrong —
+   a recomputed window now collides on the key and replaces rather than appending — so this is a
+   direct consequence of the schema change, not scope creep, and the correction stays in this plan
+   even though the write-path recommendation (departure 2) was cut.
 
 ## What changes, file by file
 
@@ -106,47 +124,14 @@ scope's idempotent overwrite; recomputations are distinguished by `computed_at`)
 description matching the new model — each run's `(window_start, window_end)` is normally distinct
 from the last (a trailing window is calculated relative to "now"), so most runs do append a new
 row, but a run that recomputes an existing `(window_start, window_end)` — a retried sensor firing,
-a backfill — replaces that row rather than duplicating it, keyed on `Metrics.PRIMARY_KEY`.
-
-Add the write-path decision (see below) as a short paragraph in the same section, so it is in
-place before anyone implements the `production_monitoring` writer.
+a backfill — replaces that row rather than duplicating it, keyed on `Metrics.PRIMARY_KEY`. Nothing
+else in that section changes: how a future writer implements the replace (a key-scoped predicate,
+a `MERGE`, or something else) is left to whoever builds it, since nobody has measured the real
+table's write cost yet.
 
 ### `packages/delta_store/src/delta_store/forecast_metrics.py`
 
-No code change. Add one sentence to `write_forecast_metrics`'s docstring noting that the
-partition-scoped overwrite is correct because every current caller (`leaderboard`, `ad_hoc`)
-recomputes its whole `(experiment_name, fold_id)` partition in one write, and pointing at the
-roadmap doc for what an incremental (window-at-a-time) writer will need instead.
-
-## Write-path decision (recorded in docs, not implemented)
-
-The current `write_forecast_metrics` does an idempotent overwrite scoped to the
-`(experiment_name, fold_id)` partition — coarser than the new row-level `PRIMARY_KEY`, but
-correct today only because both existing callers always recompute every row of that partition in
-one call, so a coarse partition replace and a precise key-level upsert produce the same table.
-
-A `production_monitoring` writer breaks that assumption: `fold_id="live"` is one partition shared
-by every trailing-window write, and a single write only ever recomputes one window
-(`"24h"` or `"7d"`), not the whole partition. Recommendation for that future writer, to save
-Phase 8 re-deriving it:
-
-- **Prefer a key-scoped overwrite predicate over a `MERGE`.** A write only ever targets one
-  `(experiment_name, fold_id, evaluation_scope, window_label)` combination at a time (one sensor
-  firing scores one trailing window), so the predicate can name that combination directly —
-  `write_deltalake(mode="overwrite", predicate=...)` — the same instrument
-  `write_forecast_metrics` already uses, just narrowed from partition-scoped to key-scoped. This
-  avoids `MERGE`'s traps in this repo (parenthesising every `IS DISTINCT FROM` clause, writer
-  properties silently dropped unless passed explicitly) for no loss: a `MERGE` only earns its cost
-  over a predicate-scoped overwrite when a single write must both insert brand-new rows and update
-  scattered existing ones in the same statement, and a monitoring write never does — it is always
-  "replace this one window's rows, whatever they were."
-- **Measure before trusting this recommendation.** Get the row count and file count from delta-rs
-  metadata (not `pl.len()` — a whole-table `pl.len()` wraps at `u32` on a large table, the trap
-  already hit on the NWP table) once real monitoring data exists, and re-check that a
-  partition-scoped-but-narrower predicate still commits quickly at that size. Neither this plan
-  nor this environment has access to the live `forecast_metrics` table to measure now (no AWS
-  credentials in this worktree) — the Phase 8 implementer should measure before committing to the
-  approach above rather than trusting it unchecked.
+No change.
 
 ## Design-philosophy check
 
@@ -177,9 +162,10 @@ this change.
   `horizon_slice`, `metric_name`, `metric_param`) plus duplicated rows on those six, validated with
   `allow_missing_columns=True` (or however `Metrics.validate()` is normally called pre-enrichment)
   → does not raise. **This is the regression this plan must not introduce**: without the presence
-  guard, this call raises `ColumnNotFoundError` instead of validating, which would break
-  `_score_forecast_group` on `main`'s own calling pattern once `PRIMARY_KEY` is added. Reproduce
-  the guard's absence by writing this test first against a version of the override with no guard,
+  guard, this call raises `ColumnNotFoundError` instead of validating, which would break both
+  `compute_metrics()` (`ml_core/metrics.py:473`) and `_score_forecast_group`
+  (`cv_assets.py:857`) on `main`'s own calling pattern once `PRIMARY_KEY` is added. Reproduce the
+  guard's absence by writing this test first against a version of the override with no guard,
   confirming it fails with `ColumnNotFoundError`, then confirming the guarded version passes.
 
 `packages/delta_store/tests/test_forecast_metrics.py`: no new tests needed —
@@ -189,8 +175,8 @@ is untouched by this change (no code changes there).
 `tests/test_metrics.py` (root-level integration tests for the `metrics` asset — 13 tests,
 including `test_metrics_is_idempotent` and `test_score_forecast_group_per_series_batches`, the two
 most relevant to this change): no new tests needed here either, but this file is the regression
-check that the partial-key `Metrics.validate()` call in `cv_assets.py:857`
-(`_score_forecast_group`) still works once `PRIMARY_KEY` exists — it must stay green unchanged.
+check that both partial-key `Metrics.validate()` call sites (`compute_metrics()` and
+`_score_forecast_group`) still work once `PRIMARY_KEY` exists — it must stay green unchanged.
 `test_metrics_is_idempotent` in particular already exercises re-running the same group and
 asserting the row count does not grow, so it would have caught a coarser regression than this
 plan's own new tests target.
@@ -200,7 +186,7 @@ plan's own new tests target.
 - `packages/contracts/src/contracts/ml_schemas.py`: class docstring (primary key, ten columns) and
   `computed_at` field docstring (provenance-only, not disambiguation) — both listed above.
 - `docs/roadmap/live-service.md`: "The `production_monitoring` evaluation scope" section —
-  append-only wording and the write-path decision, both listed above.
+  append-only wording, listed above.
 - `docs/roadmap/metrics-and-leaderboard.md` line 331 references "the primary key includes
   `metric_param`" in an unrelated context (a different discussion, about `metric_param="all"` not
   colliding with new parametric rows) — checked, and it stays correct under the new ten-column key
@@ -226,12 +212,7 @@ uv run mkdocs build --strict  # docs/roadmap/live-service.md edit
    `production_monitoring` can both produce `fold_id="live"` rows over the *same* window — which
    they can (an ad-hoc analyst could evaluate the same trailing window an automated monitoring run
    already covered). Recommend keeping it, as the issue specifies.
-2. **Should the write-path recommendation (key-scoped overwrite predicate, not `MERGE`) be
-   binding, or just a starting point for whoever builds the `production_monitoring` writer?**
-   Recommend treating it as a starting point — it is reasoned from the access pattern described in
-   the roadmap doc today, but nobody has measured the real table, and the roadmap doc already says
-   Phase 8 is not yet scheduled.
-3. **Confirm the `docs/roadmap/live-service.md` wording change is the intended design change**,
+2. **Confirm the `docs/roadmap/live-service.md` wording change is the intended design change**,
    not an unintended side effect of this issue. The issue body argues for it directly (`computed_at`
    is "pure provenance... under this model recomputations are not distinguished, they replace"),
    but that roadmap page was written describing the opposite behaviour, so this plan is knowingly
