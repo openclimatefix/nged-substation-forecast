@@ -255,6 +255,18 @@ locates each series from the promoted model's own frozen copy of the roster rows
 never from the roster itself. What a stalled upsert loses is the metadata change, which matters at
 the next training run.
 
+**Reading a missing NWP control member.** A Sentry event tagged `degraded_asset:live_forecasts`
+naming an NWP run means that run reached us with no control-member rows (`ensemble_member == 0`)
+for the cells the champion model forecasts — a partial or malformed ECMWF ENS download. The slot
+**was** written: only the weather lags degrade, and only over each lag's first `lag_hours` of lead
+time, where the lag points back before `power_fcst_init_time` and the control-member analysis proxy
+is the only thing that can answer it. Every later lead is answered by the same-run join, which reads
+whichever ensemble members the run does carry, and every non-lag feature is untouched. Re-materialise
+the `ecmwf_ens` partition for that `init_time` to repair the run, then re-materialise the
+`live_forecasts` partition for the slot — the write is idempotent, so replaying a slot replaces its
+rows rather than duplicating them. The event carries a stable fingerprint, so repeated slots keep
+firing one ongoing issue rather than opening a fresh one each time.
+
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from
 the frame already in memory, and is likewise non-blocking WARN. Nulls in the three de-accumulated
 variables are *expected* and are not a fault — see

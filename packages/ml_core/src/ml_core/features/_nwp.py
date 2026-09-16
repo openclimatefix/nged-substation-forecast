@@ -11,8 +11,6 @@ import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.weather_schemas import Nwp
 
-__all__ = ["NWP_PUBLICATION_DELAY_HOURS"]
-
 NWP_PUBLICATION_DELAY_HOURS: Final[int] = 9
 """Hours after an NWP run's ``init_time`` before we treat that run as usable.
 
@@ -104,7 +102,9 @@ def _join_nwp_single_run(
     ``power_lf`` carries no metadata — see ``_join_nwp_bulk_mode``.
     """
     nwp_init_time_val = _resolve_nwp_init_time(
-        nwp_init_time, power_fcst_init_time, nwp_publication_delay_hours
+        nwp_init_time=nwp_init_time,
+        power_fcst_init_time=power_fcst_init_time,
+        nwp_publication_delay_hours=nwp_publication_delay_hours,
     )
     power_with_init = power_lf.with_columns(
         power_fcst_init_time=pl.lit(power_fcst_init_time),

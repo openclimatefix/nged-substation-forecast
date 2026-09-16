@@ -17,7 +17,7 @@ from typing import Final
 import polars as pl
 from contracts.weather_schemas import Nwp
 from deltalake import write_deltalake
-from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
+from ml_core.features import NWP_PUBLICATION_DELAY_HOURS
 
 NWP_CONTINUOUS_COL_VALUES: Final[dict[str, float]] = {
     "temperature_2m": 15.0,

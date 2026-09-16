@@ -29,6 +29,7 @@ from dagster import (
 from ml_core.base_forecaster import write_trained_metadata
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
+from nged_substation_forecast._sentry import NWP_CONTROL_MEMBER_MISSING_FINGERPRINT
 from nged_substation_forecast.defs import production_assets
 from nged_substation_forecast.defs.checks import live_forecasts_are_healthy
 from nged_substation_forecast.defs.production_assets import LiveForecastsConfig, live_forecasts
@@ -540,9 +541,11 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     inside the 9-hour publication delay: the shape of the 06:00 slot, when only that morning's run
     has landed. The lag is populated.
 
-    The second case (``members=(1,)``) pins the cause of an all-null weather lag this change leaves
-    standing: a run with no control member at all, which is a partial or malformed ECMWF ENS
-    download. A run with no control member degrades the forecast rather than failing the slot, so
+    The second case (``members=(1,)``) pins the one cause of a null weather lag this change leaves
+    standing: a run with no control-member rows at all, which is a partial or malformed ECMWF ENS
+    download. The delivered row's lag points back before ``power_fcst_init_time``, so the
+    control-member analysis proxy is the only thing that could answer it and the lag comes back
+    null. A run with no control member degrades the forecast rather than failing the slot, so
     ``materialize`` succeeding at all is itself part of what that case checks.
     """
     gap = timedelta(hours=gap_hours)
@@ -583,11 +586,13 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
 
     monkeypatch.setattr(XGBoostForecaster, "predict", _spy_predict)
 
-    reported: list[tuple[str, BaseException]] = []
+    reported: list[tuple[str, BaseException, list[str] | None]] = []
     monkeypatch.setattr(
         target=production_assets,
         name="report_asset_degradation",
-        value=lambda asset_name, exc: reported.append((asset_name, exc)),
+        value=lambda asset_name, exc, fingerprint=None: reported.append(
+            (asset_name, exc, fingerprint)
+        ),
     )
 
     result = materialize(
@@ -602,13 +607,20 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     genuine = predicted_from.collect()
     assert genuine.height > 0
     lag_col = f"temperature_2m_lag_{gap_hours}h"
-    lag_is_entirely_null = genuine[lag_col].null_count() == genuine.height
-    assert lag_is_entirely_null == expect_null
+    # Every delivered row's target time precedes power_fcst_init_time, so the freshest-run
+    # (analysis-proxy) branch is the one under test here.
+    lag_is_null = genuine[lag_col].null_count() == genuine.height
+    assert lag_is_null == expect_null
 
     # Rule 4 of inherent-stability requires the degradation to reach Sentry, not only the logs.
     assert bool(reported) == expect_degradation_reported
     if reported:
-        (asset_name, exc) = reported[0]
+        (asset_name, exc, fingerprint) = reported[0]
         assert asset_name == "live_forecasts"
-        # The alert has to name the run at fault, not merely the kind of error.
+        # The alert has to name the run and the slot at fault, not merely the kind of error.
         assert nwp_init.isoformat() in str(exc)
+        assert power_fcst_init_time.isoformat() in str(exc)
+        # A synthesised exception carries no stack trace, so only the fingerprint stops each
+        # degraded slot opening its own Sentry issue.
+        assert fingerprint is not None
+        assert fingerprint[0] == NWP_CONTROL_MEMBER_MISSING_FINGERPRINT

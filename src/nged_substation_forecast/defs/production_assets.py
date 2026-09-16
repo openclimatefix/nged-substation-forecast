@@ -41,7 +41,11 @@ from ml_core.production_helpers import (
     weather_lags_lack_their_control_member,
 )
 
-from nged_substation_forecast._sentry import report_asset_degradation, send_forecast_checkin
+from nged_substation_forecast._sentry import (
+    NWP_CONTROL_MEMBER_MISSING_FINGERPRINT,
+    report_asset_degradation,
+    send_forecast_checkin,
+)
 from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
 from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS, RESEARCH_LAYER_TAGS
 
@@ -284,11 +288,13 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
 
     Note: only one NWP run is loaded here. Weather-lag features are built from that run however
     fresh the run is, because feature engineering caps the freshest-run join it uses for weather
-    lags at the run selected above rather than at a modelled publication delay. When a run's
-    control member
-    (``ensemble_member == 0``) is wholly absent — a partial or malformed ECMWF ENS download —
-    every weather lag for the slot still comes back null. That slot degrades rather than failing:
-    ``_engineer_features`` logs a warning naming the run, and this asset reports the same
+    lags at the run selected above rather than at a modelled publication delay. When that run
+    carries no control-member rows (``ensemble_member == 0``) — a partial or malformed ECMWF ENS
+    download — the weather lags reaching back before ``power_fcst_init_time`` come back null,
+    because those are the ones the control-member analysis proxy answers. Each such lag loses the
+    first ``lag_hours`` of the horizon; the rest of the horizon is answered by the same-run join,
+    which reads whichever ensemble members the run does carry. That slot degrades rather than
+    failing: ``_engineer_features`` logs a warning naming the run, and this asset reports the same
     degradation to Sentry tagged ``degraded_asset=live_forecasts``, so an operator is alerted
     without having to read the logs. See
     ``test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay``. None of the
@@ -324,20 +330,27 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         init_time_start=nwp_init,
         init_time_end=nwp_init,
     )
-    # The Sentry channel for the one degradation that still nulls a whole slot's weather lags.
+    # The Sentry channel for the degradation that nulls the near leads of every weather lag.
     # `_engineer_features` logs a warning for the same condition; rule 4 of inherent-stability
     # requires both, because an operator reads the alert rather than the logs:
     # <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>
+    # The probe cannot turn fail-open into fail-closed, so it needs no catch-all of its own:
+    # `engineer` below parses the same feature names and runs the same control-member probe over
+    # the same frame, so every exception this call can raise is one the asset already suffered a
+    # few lines later, before anything is written.
     if weather_lags_lack_their_control_member(
         nwp_lf, selected_features=forecaster.model_params.selected_features
     ):
         report_asset_degradation(
             asset_name="live_forecasts",
             exc=ValueError(
-                f"NWP run {nwp_init.isoformat()} has no control member (ensemble_member == 0), "
-                f"so every weather lag in the {power_fcst_init_time.isoformat()} slot is null. "
-                "The forecast was still produced, on the remaining features."
+                f"NWP run {nwp_init.isoformat()} has no control-member rows "
+                f"(ensemble_member == 0) for this slot's H3 cells, so every weather lag in the "
+                f"{power_fcst_init_time.isoformat()} slot is null over its first lag_hours of "
+                "lead time. The forecast was still produced, on the remaining features and on "
+                "the rest of each lag's horizon."
             ),
+            fingerprint=[NWP_CONTROL_MEMBER_MISSING_FINGERPRINT, settings.sentry_environment],
         )
 
     power_full = build_live_power_frame(

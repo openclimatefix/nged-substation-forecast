@@ -1,12 +1,14 @@
-"""Pure, IO-light helpers for production (live) inference.
+"""IO-light helpers for production (live) inference.
 
-Every function here is unit-testable in isolation: the two data-shaping helpers
+Every function here is unit-testable in isolation. The two data-shaping helpers
 (``select_nwp_init_time``, ``build_live_power_frame``) take ``power_fcst_init_time`` as an
 explicit parameter rather than calling ``datetime.now()`` internally, so a test can pass any
-fixed time and get a deterministic result; the two disk/MLflow helpers
+fixed time and get a deterministic result. The two disk/MLflow helpers
 (``load_forecaster_from_dir``, ``fetch_model_artifacts``) do the IO and check that the saved
-model is one this code can still build a config for and parse the features of. The
-``live_forecasts`` and ``promoted_model`` Dagster assets
+model is one this code can still build a config for and parse the features of.
+``weather_lags_lack_their_control_member`` is the one that reads data: it collects a bounded
+probe against the slot's NWP scan, and takes that scan as an argument so a test can hand it an
+in-memory frame. The ``live_forecasts`` and ``promoted_model`` Dagster assets
 (``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over these.
 """
 
@@ -33,7 +35,7 @@ from ml_core.base_forecaster import (
     _download_and_unpack_model,
     load_trained_metadata,
 )
-from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
+from ml_core.features import NWP_PUBLICATION_DELAY_HOURS
 from ml_core.features._parsed_features import ParsedFeatures
 
 AvailabilityModeType = Literal["live", "replay"]
@@ -93,29 +95,38 @@ def select_nwp_init_time(
 def weather_lags_lack_their_control_member(
     nwp: pt.LazyFrame[Nwp], *, selected_features: set[str]
 ) -> bool:
-    """Whether this slot asks for weather lags that its NWP run cannot supply.
+    """Whether this slot asks for weather lags that its NWP run cannot fully supply.
 
-    Weather lags are built from the analysis proxy, which reads the control member
-    (``ensemble_member == 0``) alone, so a run that carries no control member — a partial or
-    malformed ECMWF ENS download — nulls every weather lag for the slot. ``_engineer_features``
-    already degrades rather than failing there and logs a warning naming the run. This function
-    exists so ``live_forecasts`` can *also* raise the degradation on the Sentry channel, which
+    A weather lag reaching back before ``power_fcst_init_time`` is answered by the analysis
+    proxy, which reads the control member (``ensemble_member == 0``) alone. A run carrying no
+    control-member rows — a partial or malformed ECMWF ENS download — therefore nulls each
+    weather lag over the first ``lag_hours`` of the horizon, where the lag still points into the
+    past. The rest of the horizon is answered by the same-run join, which reads whichever
+    ensemble members the run does carry. ``_engineer_features`` already degrades rather than
+    failing there and logs a warning naming the run. This function exists so ``live_forecasts``
+    can *also* report the degradation on the Sentry channel, which
     [rule 4](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
     requires alongside the log rather than as a substitute for it. Reading the logs is not a
     monitoring strategy: the operator reads the alert.
 
     Returns ``False`` when the model selects no weather lag, because a missing control member
-    costs such a model nothing — the same-run weather join reads whichever members are present.
+    costs a model with no weather lags nothing.
 
-    The probe is bounded to at most one row, so it costs a row-group read rather than a scan of
-    the run.
+    ``live_forecasts`` probes the NWP scan *before* the H3 spatial join, while
+    ``_engineer_features`` probes it after, so the frame here is a superset of the one the
+    pipeline sees. The alert can therefore in principle miss a degradation the pipeline hits,
+    never the reverse — and ``load_engineering_inputs`` has already pruned the scan to the
+    model's own frozen H3 cells, so the two frames hold the same cells today.
+
+    The probe reads at most one row, so a healthy run answers it from a single row group. Proving
+    a run has *no* control member costs a scan of the run, because absence cannot be shown early.
 
     Args:
         nwp: The slot's NWP rows, already narrowed to the selected run.
         selected_features: The promoted model's feature names.
 
     Returns:
-        ``True`` when a weather lag is selected and the run has no control member.
+        ``True`` when a weather lag is selected and the run has no control-member rows.
     """
     weather_lags = [
         lag

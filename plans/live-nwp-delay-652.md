@@ -354,9 +354,9 @@ single-run/bulk split easier to explain. It costs an argument at eight test call
 **Recommendation: its own issue afterwards, not this one.** It is a pure API change with no behaviour
 at stake, and folding it in would roughly double this diff.
 
-**Should the remaining all-null weather-lag case record a degradation rather than log a warning?**
-After this change the only cause left is a run with no control member, which nulls every weather lag
-behind nothing more than a `logger.warning`, while
+**Should the remaining null weather-lag case record a degradation rather than log a warning?**
+After this change the only cause left is a run with no control member, which nulls each weather lag
+over the first `lag_hours` of the horizon behind nothing more than a `logger.warning`, while
 `docs/design-philosophy/inherent-stability.md` asks for degradation recorded on the row and named in
 telemetry an alert rule can route on. **Recommendation: check whether #655
 (`degrade-missing-control-member-655`) already covers it; if not, raise a separate issue.** Out of
