@@ -1,21 +1,36 @@
 # Degrade instead of raise on missing NWP control member (#655)
 
-**Status: plan complete, both adversarial reviews done and folded in, awaiting human approval.**
-No code has been written. Branch `degrade-missing-control-member-655`, worktree not yet created in
-a fresh session — the `implement-issue` skill's step 1 (worktree setup) already ran for this plan,
-so a session resuming this work should check out this branch into a new worktree (or reuse one if
-still present) and resume `implement-issue` at its step 2 (implement, following the plan below),
-rather than re-running `plan-issue`. The plan needs nothing further from a human beyond a decision
-on the three items in "Risks and open questions" below — everything else here is settled and ready
-to implement as written.
+**Status: plan complete, three adversarial reviews done and folded in, awaiting human approval.**
+No code has been written. Branch `degrade-missing-control-member-655` has had `main` merged in
+(post-merge line numbers reflected throughout below). The `implement-issue` skill's step 1
+(worktree setup) already ran for this plan, so a session resuming this work should check out this
+branch into a new worktree (or reuse one if still present) and resume `implement-issue` at its
+step 2 (implement, following the plan below), rather than re-running `plan-issue`. Size is now
+**medium** (revised down from complex — see "Verdict, size, departures"), so one diff-correctness
+review after implementation is enough; the plan needs nothing further from a human beyond a
+decision on the three items in "Risks and open questions" below — everything else here is settled
+and ready to implement as written.
 
-**Problem.** `_engineer_features` (in `tabular_feature_engineer.py`) raises whenever weather-lag
-features are requested and the NWP frame it was handed has no `ensemble_member == 0` (control
-member) rows. `live_forecasts` reaches this on every 6-hourly slot through single-run mode, so a
-partial or malformed ECMWF ENS download that drops the control member aborts the whole slot for
-every series and every ensemble member — a hard failure for what is, per
+**Problem.** `_engineer_features` (in `tabular_feature_engineer.py:216-224`) raises whenever
+weather-lag features are requested and the NWP frame it was handed has no `ensemble_member == 0`
+(control member) rows. This is **latent today, not live**: the guard only fires when
+`weather_lags` (lags whose `base_col` isn't `"power"`) is non-empty, and the champion config
+(`conf/model/xgboost.yaml`) selects no weather-lag features — only plain weather features and
+power lags — a fact both `production_assets.py:289` and `ml_core/features/_lags.py:121` already
+state in their own comments. So `live_forecasts` does not hit this raise on any slot today. It
+would start hitting it the moment a future model config adds a weather-lag feature, at which point
+a partial or malformed ECMWF ENS download that drops the control member would abort the whole slot
+for every series and every ensemble member — a hard failure for what is, per
 [inherent-stability rule 1](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules),
-the outside world misbehaving, not our bug.
+the outside world misbehaving, not our bug. The state itself is reachable by design, not merely a
+hypothetical: nothing between ingest and this join enforces the control member's presence
+(`Nwp.ensemble_member` has no required-value constraint, `assess_nwp_run_completeness` is a
+non-blocking `WARN` check, and `write_nwp` writes unconditionally regardless of completeness — see
+`docs/architecture/ecmwf-ens-known-issues.md`, "Why it warns instead of failing the run"). No
+recorded incident has hit this specific case; the two real NWP incidents on record
+(`docs/live_service/intervention-log.md`, `docs/architecture/ecmwf-ens-known-issues.md`) are a
+wholly-missing variable and a 50/51-member step dropout, both a different, fatal/malformed shape
+that this guard doesn't gate.
 
 **Solution.** Gate the raise on `power_fcst_init_time is None` — i.e. keep it in bulk
 training/backtesting mode (the only mode any current caller uses to get there: both `cv_assets.py`
@@ -29,13 +44,22 @@ No new nulling logic is needed.
 
 ## Verdict, size, departures
 
-**Worth implementing, as described.** The issue's premise checks out against the code
-(`tabular_feature_engineer.py:205-213`, `production_assets.py:316`), and the fix it asks for —
-delete/scope the raise, confirm the existing null-join path covers it, keep fail-fast for
-CV/training — is the right shape.
+**Worth implementing, with the scope narrowed.** The issue's premise checks out against the
+mechanism (`tabular_feature_engineer.py:216-224`, `production_assets.py:328`) but not against its
+claimed severity: the raise is latent, gated behind a feature the champion config never selects,
+not something `live_forecasts` hits today (see Problem above). The fix it asks for — delete/scope
+the raise, confirm the existing null-join path covers it, keep fail-fast for CV/training — is still
+the right shape, with one addition the issue also asked for and the original plan wrongly declined
+in full: the raise being removed was added deliberately, in commit `a330567f`, specifically to stop
+a silent all-null weather-lag failure ("Fail loudly when no NWP control member for weather lag
+features"). Removing it without adding a degradation record would reinstate exactly the silent
+behaviour that commit fixed, so this plan now adds a log warning naming the run at fault (see "What
+changes" below) to land as "degrade and record" rather than "degrade silently".
 
-**Size: complex**, as the issue states. It changes production error-handling behaviour on a path
-`live_forecasts` hits every slot. Full plan, all four adversarial reviews.
+**Size: medium**, revised down from the issue's "complex". The premise that justified "complex" —
+that `live_forecasts` hits this every slot — is false, and the actual change is a three-line mode
+gate, one warning log call, and two tests, on a path no promoted model reaches today. Plan review
+already ran (see below); one further diff-correctness review before the PR is enough.
 
 **Departures from the issue body:**
 
@@ -62,42 +86,61 @@ CV/training — is the right shape.
 **`packages/ml_core/src/ml_core/features/tabular_feature_engineer.py`**
 
 - `_engineer_features`: wrap the existing `if nwp_lf is not None and weather_lags and
-  nwp_lf.filter(...).limit(1).collect().is_empty(): raise ValueError(...)` block in an additional
-  `power_fcst_init_time is None` condition, so it only fires in bulk mode. Single-run mode (used by
-  both live inference and replay backfills) skips the check entirely and falls through to the
-  existing `historical_weather` construction and `_apply_weather_lag` join, which already produces
-  nulls when `historical_weather` is empty.
+  nwp_lf.filter(...).limit(1).collect().is_empty(): raise ValueError(...)` block (currently at
+  lines 216-224) in an additional `power_fcst_init_time is None` condition, so it only fires in
+  bulk mode. Single-run mode (used by both live inference and replay backfills) skips the check
+  entirely and falls through to the existing `historical_weather` construction and
+  `_apply_weather_lag` join, which already produces nulls when `historical_weather` is empty.
+- In the single-run branch, when that same emptiness condition holds (weather lags requested, no
+  control member present), log a warning naming `nwp_init_time` and the affected series before
+  falling through — e.g. `logger.warning("NWP run %s has no control member (ensemble_member == 0); "
+  "weather lag features will be null for this slot", nwp_init_time)`. This is the degradation
+  record the issue asked for and the original raise (`a330567f`, "Fail loudly when no NWP control
+  member for weather lag features") existed to guarantee some form of; without it, removing the
+  raise would make the failure silent rather than recorded, which the previous version of this plan
+  wrongly accepted as the whole fix. This is not a new detection mechanism — it does not touch
+  `assess_nwp_run_completeness` or Sentry — it is the minimum needed so the failure leaves a trace
+  in the `live_forecasts` run logs.
 - Update the `ValueError` message to make clear it's a bulk-mode/training guard (e.g. "... to build
   historical weather during bulk training or backtesting, but no such rows were found ..."), so a
   future reader hitting it in a traceback isn't confused about why single-run mode never sees it.
-- Module docstring (lines 12-18, "Lazy Evaluation"): rewrite the "NWP control-member check" bullet
-  to say the eager `.collect()` guard runs only in bulk mode (training/backtesting fail-fast); in
-  single-run mode (production, replay) a missing control member is absent input, not a contract
-  violation, and is left to degrade weather lags to null through the ordinary join-miss path.
+- Module docstring (lines 12-18, "Lazy Evaluation"): rewrite the control-member-check sentence
+  (currently lines 16-18) to say the eager `.collect()` guard runs only in bulk mode
+  (training/backtesting fail-fast); in single-run mode (production, replay) a missing control
+  member is absent input, not a contract violation, and degrades weather lags to null through the
+  ordinary join-miss path, with a warning logged naming the run.
 
 **`src/nged_substation_forecast/defs/production_assets.py`**
 
-- `live_forecasts` docstring (the existing paragraph starting "Note: only one NWP run is loaded
-  here..."): extend it to also cover this case — a control-member-absent run nulls every weather
-  lag feature for that slot, the same way a too-fresh run already does, rather than failing the
-  slot. Point at the new test (see below) alongside the existing
-  `test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh` reference.
+- `live_forecasts` (function now at line 241, `engineer()` call at line 328) docstring (the
+  existing paragraph starting "Note: only one NWP run is loaded here...", now around line 289):
+  extend it to also cover this case — a control-member-absent run nulls every weather lag feature
+  for that slot and logs a warning naming the run, the same way a too-fresh run already does,
+  rather than failing the slot. Point at the new test (see below) alongside the existing
+  `test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh` reference. Also correct the
+  existing "None are in the current champion config" sentence here to note this is exactly the
+  condition that keeps today's raise latent rather than live.
 
 **`docs/architecture/performance.md`**
 
-- Line 58 ("The one exception is a `limit(1).collect()` guard...fails loudly instead of silently
-  returning an empty frame"): qualify to say this applies in bulk/training mode only, so the
-  "always eager, always fails loudly" framing doesn't contradict the new single-run behaviour.
+- Line 61 ("The one exception is a `limit(1).collect()` guard...fails loudly instead of silently
+  returning an empty frame" — text unchanged by the `main` merge, only its line number moved from
+  58 to 61): qualify to say this applies in bulk/training mode only, so the "always eager, always
+  fails loudly" framing doesn't contradict the new single-run behaviour, and add a clause noting
+  single-run mode instead logs a warning rather than failing silently.
 
 ## Design-philosophy check
 
 This is squarely the production-degradation path inherent-stability.md describes. A missing
 control member is the outside world misbehaving (a partial/malformed ECMWF ENS download), not our
-bug, so per rule 1 it must degrade rather than raise. The fix keeps the CV/training raise (rule 9:
-R&D fails fast, because a silently-degraded training run poisons every comparison built on it,
-while production fails forward). No asset check changes, so rule 6/7 (WARN, non-blocking,
-guarded-body) aren't touched — `assess_nwp_run_completeness`'s existing check already satisfies
-them. Delivers toward
+bug, so per rule 1 it must degrade rather than raise — and per rule 4, the degradation must be
+recorded, not silent, which is why this revision of the plan adds the warning log above. The fix
+keeps the CV/training raise (rule 9: R&D fails fast, because a silently-degraded training run
+poisons every comparison built on it, while production fails forward). No asset check changes, so
+rule 6/7 (WARN, non-blocking, guarded-body) aren't touched — `assess_nwp_run_completeness` (now in
+`packages/contracts/src/contracts/weather_schemas.py:761-834`, called from `assets.py:491`)'s
+existing check already covers detection at ingest time; this plan's warning log covers the
+separate, later point where a bad run actually affects a forecast. Delivers toward
 [H1](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/engineering-hypotheses/#h1-a-service-that-mostly-runs-itself):
 one fewer way for `live_forecasts` to need a human to intervene on a 6-hourly cadence.
 
@@ -105,11 +148,13 @@ one fewer way for `live_forecasts` to need a human to intervene on a 6-hourly ca
 
 **`packages/ml_core/tests/test_features.py`**
 
-- Rename and rework `test_engineer_features_raises_when_no_control_member_for_weather_lag` (its
-  name asserts a raise, which is no longer true) to assert the *new* behaviour: no raise, and the
-  weather-lag column comes back entirely null. **Fix the fixture's timing, not just the
-  assertion**: today's fixture sets `target_time` (`valid_time - lag_hours`) exactly equal to
-  `power_fcst_init_time`, which `_apply_weather_lag`'s `>=` boundary (`_lags.py:111`) routes to the
+- Rename and rework `test_engineer_features_raises_when_no_control_member_for_weather_lag`
+  (currently at lines 1077-1103; its name asserts a raise, which is no longer true in single-run
+  mode) to assert the *new* behaviour: no raise, the weather-lag column comes back entirely null,
+  and the warning is logged (via `caplog` or equivalent). **Fix the fixture's timing, not just the
+  assertion**: today's fixture sets `valid_time` 12:00 with a `temperature_2m_lag_6h` feature and
+  `power_fcst_init_time` 06:00, so `target_time` (`valid_time - lag_hours`) lands exactly equal to
+  `power_fcst_init_time`, which `_apply_weather_lag`'s `>=` boundary (`_lags.py:123`) routes to the
   *same-run* join, not the freshest-run join that consumes `historical_weather` — so the null it
   observes today is really "no NWP row at that instant", not "no control member". Give the
   reworked test a `target_time` strictly *before* `power_fcst_init_time`, and keep
@@ -165,7 +210,7 @@ uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 
 1. **A missing control member also drops that member's own forecast row, not just its
    weather-lag history — this issue doesn't reach that.** `_join_nwp_single_run`
-   (`_nwp.py:79-81`) left-joins power onto NWP on `(time_series_id, valid_time, nwp_init_time)`,
+   (`_nwp.py:79-80`) left-joins power onto NWP on `(time_series_id, valid_time, nwp_init_time)`,
    *not* `ensemble_member`, so the row for `ensemble_member == 0` fans in from whichever NWP rows
    match — if the control member is wholly absent from the run, no row for it is produced at all
    (not null: absent). That's a second, separate failure surface from the weather-lag nulling
@@ -219,3 +264,25 @@ raise that no longer happens. One finding noted but not actioned: the plan doesn
 `inherent-stability.md`'s separate mention of the *different*, already-tracked raise in
 `select_nwp_init_time` (issue #446) — correctly out of scope for #655, and the reviewer agreed it's
 cosmetic rather than a defect, so left as is.
+
+## Third review (necessity, and staleness after the `main` merge)
+
+Run after `main` was merged into this branch (~160 files changed upstream since this plan was
+written), with two questions: is this fix needed at all, and is the plan still accurate against the
+merged code. On necessity: **implement, with scope reduced**, not "don't implement" and not
+"unchanged". The raise cannot fire in production today — it is gated behind `weather_lags` being
+non-empty, and the champion config selects none — so the Problem statement's "hits every 6-hourly
+slot" claim was false, both in this plan and in the issue body it was copied from; size dropped from
+complex to medium accordingly. The state itself is reachable by design (ingest has no control-member
+completeness gate stronger than a non-blocking WARN check), so the fix is still worth making, just
+not urgently and not at complex-review cost. The review also found the raise being deleted was added
+deliberately in commit `a330567f` to stop a silent all-null failure, and that the plan's original
+"Departures" section declined all three of the issue's requested degradation channels without
+proposing any substitute record — reinstating exactly the silent behaviour `a330567f` fixed. This
+plan now adds a warning log naming the run at fault as the minimum fix for that gap (see "What
+changes" above). On staleness: the mechanism the plan depends on is fully intact after the merge —
+no function was renamed, no test was removed, no CV call site's mode changed — only line numbers
+moved (this plan's line references above are updated accordingly), and `assess_nwp_run_completeness`
+moved from `assets.py` into `packages/contracts/src/contracts/weather_schemas.py:761-834`. Net: the
+plan needed content edits (Problem statement, size, the added warning log) rather than a re-plan
+from scratch; both are folded in above.
