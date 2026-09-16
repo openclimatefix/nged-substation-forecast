@@ -348,17 +348,18 @@ def time_series_coverage(
 
 
 _LATE_FILE_LOOKBACK: Final[timedelta] = timedelta(days=3)
-"""How far before a series' on-disk `last_time` a file's `end_time` may still fall and be
-downloaded, in `select_new_rows`'s `_ProcessedFileListing` branch.
+"""How far before a series' on-disk `last_time` a file's `end_time` may fall with the file still
+being downloaded, in `select_new_rows`'s `_ProcessedFileListing` branch.
 
 NGED's files land "at irregular intervals with no fixed schedule" and "several-hours-apart" (see
-`power_time_series_and_metadata`'s docstring), so a file arriving a short while after the current
-watermark is an ordinary late arrival, not a fault. 3 days is a judgement call — generous enough to
-cover that, small enough that an hour doesn't re-download the whole bucket. Getting this exactly
-right doesn't matter for correctness: `select_new_rows`'s `PowerTimeSeries` branch is what decides
-which downloaded rows are genuinely new, so a file let through by too generous a margin here just
-costs an extra download, and one dropped by too tight a margin is still caught the next hour it's
-listed, unless it ages past the margin first."""
+`power_time_series_and_metadata`'s docstring). A file whose `end_time` falls a short while before
+the current watermark is therefore an ordinary late arrival, not a fault. The 3-day margin is a
+judgement call — generous enough to cover an ordinary late arrival, small enough that an hour
+doesn't re-download the whole bucket. Getting the margin's length exactly right doesn't matter for
+correctness: `select_new_rows`'s `PowerTimeSeries` branch is what decides which downloaded rows are
+genuinely new. A file let through by too generous a margin here just costs an extra download. A
+file dropped by too tight a margin is still caught the next hour it's listed, unless it ages past
+the margin first."""
 
 
 def _existing_power_time_series_keys(
@@ -369,23 +370,23 @@ def _existing_power_time_series_keys(
     """Return the `(time_series_id, time)` pairs already on disk for `time_series_ids`.
 
     Restricting to `time_series_ids` — the series present in the candidate frame `select_new_rows`
-    is filtering — keeps this a partition-pruned scan of just the reporting series' own history:
+    is filtering — keeps the scan partition-pruned, reading just the reporting series' own history:
     `power_time_series` is partitioned by `time_series_id` (see
-    `delta_store.power_time_series.write_power_time_series`), so an unrestricted version of this
-    scan would instead materialise every row in the table to build the join's hash table, which is
-    the more expensive of the two operations `time_series_coverage`'s docstring compares it
-    against. The only caller, `select_new_rows`, already returns early via `delta_table_exists`
-    before calling this, so — unlike `time_series_coverage` — this function does not need its own
-    empty-table branch.
+    `delta_store.power_time_series.write_power_time_series`). An unrestricted version of this scan
+    would instead materialise every row in the table to build the join's hash table, which is the
+    whole-table materialisation `time_series_coverage`'s streaming aggregate avoids. The only
+    caller, `select_new_rows`, already returns early via `delta_table_exists` before calling
+    `_existing_power_time_series_keys`, so — unlike `time_series_coverage` — this function does not
+    need its own empty-table branch.
 
     Measured on the same synthetic V2 table `time_series_coverage`'s docstring uses (2,500 series,
     half-hourly, 1 year, 43.8M rows): ~0.04 s and negligible extra memory at 1-20 reporting series
     (the expected case, since NGED's files land a few at a time), rising to ~110 MB at 100
-    reporting series, ~585 MB at 500, and ~2.75 GB at all 2,500 — an hour where nearly every series
-    reports at once (a bulk backfill, or recovery from an extended NGED outage) costs more memory
-    here than `time_series_coverage`'s own whole-table scan (~90 MB), because an anti-join has to
-    materialise the actual rows to hash-join against rather than collapsing each series to two
-    values the way an aggregate does.
+    reporting series, ~585 MB at 500 reporting series, and ~2.75 GB at all 2,500 series. An hour
+    where nearly every series reports at once (a bulk backfill or recovery from an extended NGED
+    outage) therefore costs more memory here than `time_series_coverage`'s own whole-table scan,
+    because an anti-join has to materialise the actual rows to hash-join against rather than
+    collapsing each series to two values the way an aggregate does.
     """
     return (
         pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
@@ -429,18 +430,18 @@ def select_new_rows(
     `delta_path`. A call against a Delta table that does not exist yet returns its input unchanged
     and scans nothing.
 
-    For `PowerTimeSeries` rows, this is a genuine existence check: an anti-join on
-    `(time_series_id, time)` against `_existing_power_time_series_keys`, so a late file, or one
-    that fills a gap earlier in a series' history, is ingested even when a later reading for the
-    same series is already on disk. See that function's docstring for the cost this trades in
-    return.
+    For `PowerTimeSeries` rows, the filter is a genuine existence check: an anti-join on
+    `(time_series_id, time)` against `_existing_power_time_series_keys`. A late file, or a file
+    that fills a gap earlier in a series' history, is therefore ingested even when a later reading
+    for the same series is already on disk. See `_existing_power_time_series_keys`'s docstring for
+    the cost the existence check trades in return.
 
     For the file listing, there is no per-row `time` to check existence against before download —
-    only the file's `start_time`/`end_time` window from its S3 key — so the filter instead compares
+    only the file's `start_time`/`end_time` window from its S3 key. The filter therefore compares
     `end_time` against each series' on-disk `last_time` from `time_series_coverage`, loosened by
-    `_LATE_FILE_LOOKBACK` so a file landing a short while after the watermark is still downloaded. A
-    file whose `end_time` falls more than `_LATE_FILE_LOOKBACK` before `last_time` is still dropped
-    before download.
+    `_LATE_FILE_LOOKBACK` so a file whose `end_time` falls a short while before the watermark is
+    still downloaded. A file whose `end_time` falls more than `_LATE_FILE_LOOKBACK` before
+    `last_time` is still dropped before download.
 
     Cost: the file-listing branch runs `time_series_coverage`, paying one full two-column scan of
     `power_time_series` — see that function for the measured figures. The `PowerTimeSeries` branch
