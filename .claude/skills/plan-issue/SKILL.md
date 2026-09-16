@@ -131,6 +131,16 @@ the same reply that you are taking this path, and open it with `Implementing:` r
 - More than one design would defensibly satisfy it, so the choice wants approving before code moves.
 - It spans enough code that you could not name every caller of what it changes without searching.
 
+**Answer every trigger above, not just the trigger you noticed.** A size stated as "medium,
+because it edits a Patito contract" hides which triggers were never considered, and a reader
+cannot audit a conclusion that does not show its inputs. Issue #728 was sized medium on the
+contract trigger alone. It also edited `XGBoostForecaster.predict`, which sits on the production
+serving path. The serving-path trigger would have made it complex. Write one line per trigger —
+what gets stored, the production serving path, a degradation rule, more than one defensible
+design, and code whose callers you could not name without searching — and let those five answers
+settle whether the issue is complex. Any trigger that fires makes the issue complex, however small
+the diff looks. An issue where none fires is simple or medium, on the conditions above.
+
 **Medium — everything else.** Write the plan, then choose how much review to spend on it: between
 zero and two of the plan reviews below (steps 5 and 7, each with its triage step), and between
 zero and two of the diff reviews in `implement-issue`. The choice is yours, under four rules:
@@ -148,9 +158,11 @@ zero and two of the diff reviews in `implement-issue`. The choice is yours, unde
 - **When you cannot decide, run it.** A review costs one sub-agent; the other error puts a design
   nobody attacked into `main`.
 
-Carry the size and the chosen counts forward: they go in the plan file (step 4), in the report
-(step 9), and into the PR body when `implement-issue` opens it, so whoever reviews the diff knows
-what scrutiny it has already had.
+Carry the size, the five trigger answers, and the chosen counts forward: all three go in the plan
+file and the draft PR body that step 4 opens, and in the report (step 9). A simple issue reaches
+none of those three, having left this skill at the sizing step, so its answers go in the reply
+that announces the size and in the PR body `implement-issue` step 4 opens. Either way, whoever
+reviews the diff knows what scrutiny the diff has already had and on what grounds.
 
 ## 4. Write the plan
 
@@ -172,12 +184,12 @@ git push -u origin <branch-name>
 
 **Open the PR now, as a draft, rather than waiting for implementation.** `gh pr create --draft`
 against `main`, with labels and `JackKelly` as assignee (`gh pr create` can't set either — follow
-with `gh pr edit --add-label <label>` and `gh pr edit --add-assignee JackKelly`), linking the issue
-so it closes on merge. The body says the plan is not yet approved and carries no code yet, and
-states the size from step 3 and which reviews it is getting. See the `github-issue-pr-workflow`
-skill for the full PR checklist. Opening it now gives every review below, and every push that
-follows, somewhere to land that the human reviewer can already be watching — the same place they
-will later review the diff.
+with `gh pr edit --add-label <label>` and `gh pr edit --add-assignee JackKelly`), linking the
+issue so it closes on merge. The body says the plan is not yet approved and carries no code yet,
+and gives step 3's five trigger answers, the size they picked, and which reviews it is getting.
+See the `github-issue-pr-workflow` skill for the full PR checklist. Opening it now gives every
+review below, and every push that follows, somewhere to land that the human reviewer can already
+be watching — the same place they will later review the diff.
 
 **Then hand over the plan before anything else happens to it.** Say in your next reply that the
 plan is ready and give **clickable markdown links** to both: the plan as the path relative to the
@@ -332,9 +344,10 @@ plan, so the branch — and the PR — carries the original plan and what each r
 
 ## 9. Stop
 
-Report: the verdict from step 2, the size from step 3 and which reviews it bought, a short summary
-of the plan, what each review that ran changed, and what each found that you rejected. Give the
-branch name and, again, the clickable link to the plan file.
+Report: the verdict from step 2, step 3's five trigger answers with the size they picked and which
+reviews it bought, a short summary of the plan, what each review that ran changed, and what each
+found that you rejected. Give the branch name and, again, the clickable links to the plan file and
+the draft PR.
 
 **Do not write any code.** The PR opened in step 4 stays a draft until a human approves the plan.
 Once approved, implementation runs under the `implement-issue` skill, resuming at its step 2 in
