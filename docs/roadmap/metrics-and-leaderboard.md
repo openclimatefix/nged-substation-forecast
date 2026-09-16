@@ -365,7 +365,7 @@ the shared rails, none baseline-specific.
   unchanged.
 - **After PRs 1 + 2 land back-to-back, run one `trained_cv_model++` backfill over every existing
   experiment partition** — retrain, re-predict, and re-score everything under the new collapse.
-  This is deliberately the exact "re-run everything after a pipeline fix"
+  The backfill is deliberately the exact "re-run everything after a pipeline fix"
   drill, and it doubles as the empirical verification of the backfill mechanics before the recipe is
   written into `docs/ml_experimentation/dagster-workflow.md`. Treat both PRs as a single leaderboard
   epoch event, since each shifts existing numbers.
@@ -413,8 +413,8 @@ landing on a now-proven rail.
   are null are dropped with the count logged and per-series surviving-member counts recorded in asset
   metadata. No point forecast is emitted — PR 1's metrics layer produces the median headline and the
   p95 / p50 labelled rows.
-- The 55-week annual lags need `load_engineering_inputs`'s `power_lookback` parameter to be
-  non-zero — already landed (issue #638), not part of PR 2.
+- The 55-week annual lags need a non-zero `power_lookback` on `load_engineering_inputs`, which the
+  function already takes.
 - **Data check before interpreting results:** `val_start − 55 weeks` ≈ mid-2024. Confirm which
   eligible series actually have observations that far back — eligibility requires only
   `min_training_months` of history, so a series can qualify yet have too little for the annual

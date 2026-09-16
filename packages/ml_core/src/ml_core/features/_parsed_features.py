@@ -239,11 +239,11 @@ class ParsedFeatures:
         return [feature for feature in self._get_all_lookback_features() if feature.is_leaky()]
 
     def max_power_lag(self) -> timedelta:
-        """The longest power lag these features request, or zero if none do.
+        """The longest power lag these features request, or zero when none of them request power.
 
-        Sizes ``load_engineering_inputs``'s ``power_lookback``: a caller needs power history from
-        this far before its window to keep every requested power lag non-null near the window's
-        start.
+        Sizes ``load_engineering_inputs``'s ``power_lookback``: a caller needs power history
+        reaching back at least the returned duration before its window to keep every requested
+        power lag non-null near the window's start.
         """
         return timedelta(
             hours=max((lag.hours for lag in self.lags if lag.base_col == "power"), default=0)

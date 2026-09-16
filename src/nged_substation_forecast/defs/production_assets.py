@@ -54,9 +54,9 @@ reaches.
 
 Must cover the longest power lag feature any production model uses (currently up to 336 h /
 14 days) plus a margin. A CV caller sizes the equivalent bound automatically per experiment via
-``load_engineering_inputs``'s ``power_lookback`` parameter (``ParsedFeatures.max_power_lag()``);
-this constant is not derived the same way and must be revisited by hand if a future promoted
-model's longest power lag grows past what it covers.
+``load_engineering_inputs``'s ``power_lookback`` parameter (``ParsedFeatures.max_power_lag()``).
+``LIVE_POWER_HISTORY`` is set by hand instead, and must be revisited if a future promoted model's
+longest power lag grows past 15 days.
 """
 
 live_forecast_partitions = TimeWindowPartitionsDefinition(

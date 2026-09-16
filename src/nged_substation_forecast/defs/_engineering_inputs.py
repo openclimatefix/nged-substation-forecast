@@ -45,18 +45,20 @@ def load_engineering_inputs(
     ``time_series_ids``.
 
     A caller that needs power history from before ``window_start`` — to compute a power lag
-    feature whose target time falls earlier than the window — must either widen ``window_start``
-    itself (as ``live_forecasts`` does, which also widens the NWP bound and needs an explicit
-    ``init_time_start``/``init_time_end`` plus a post-hoc filter to stay correct) or pass
-    ``power_lookback`` (which widens only the power scan). The default widens neither. Passing
-    ``power_lookback == the longest power lag a caller's features need`` is exactly sufficient,
-    with no margin required: the scan predicate below is inclusive, and the earliest target time
-    any lag can read is exactly ``window_start - power_lookback``.
+    feature whose target time falls earlier than the window — has two options. The caller can
+    widen ``window_start`` itself, as ``live_forecasts`` does; widening ``window_start`` also
+    widens the NWP bound, so ``live_forecasts`` passes an explicit
+    ``init_time_start``/``init_time_end`` and filters the result afterwards to stay correct. Or
+    the caller can pass ``power_lookback``, which widens only the power scan. The default widens
+    neither. A ``power_lookback`` equal to the longest power lag a caller's features need is
+    exactly sufficient: the scan predicate below is inclusive, and the earliest target time any
+    lag can read is exactly ``window_start - power_lookback``.
 
-    The "widening the power scan adds no spine rows" guarantee this relies on assumes the
-    NWP-centric bulk-mode join (power is left-joined *onto* the NWP-derived spine) — it does not
-    hold when NWP is absent, where the spine is the power frame itself. Every current caller of
-    ``power_lookback`` always passes NWP, so that branch is unreachable here.
+    The guarantee that widening the power scan adds no spine rows assumes the NWP-centric
+    bulk-mode join, in which power is left-joined *onto* the NWP-derived spine. The guarantee
+    does not hold when NWP is absent, where the spine is the power frame itself. Every caller
+    that passes ``power_lookback`` also passes NWP, so ``load_engineering_inputs`` never reaches
+    the NWP-absent branch with a widened power scan.
 
     **Memory: prune the NWP scan at the source.** The NWP Delta is large (tens of GB: every
     ``init_time`` × every H3 cell × ~51 ensemble members × the 30-min forecast horizon). Every
@@ -108,8 +110,7 @@ def load_engineering_inputs(
         power_lookback: How far before ``window_start`` to widen the power scan's lower bound, so
             power lag features near the start of the window have real history to read instead of
             silently nulling. Widens the power scan only — the NWP bounds are untouched. Defaults to
-            ``timedelta(0)`` (today's behaviour: power bounded to ``[window_start, window_end]``,
-            same as NWP).
+            ``timedelta(0)``, which bounds power to ``[window_start, window_end]`` like NWP.
 
     Returns:
         ``(power_time_series, nwp)`` — a lazy power frame and a lazy NWP frame, both filtered to
