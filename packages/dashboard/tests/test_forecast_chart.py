@@ -269,7 +269,7 @@ def _nwp(members: tuple[int, ...] = (0, 1, 2)) -> pl.LazyFrame:
         {
             "valid_time": pl.concat([valid_times for _ in members]),
             "ensemble_member": pl.Series(
-                [m for m in members for _ in range(len(valid_times))], dtype=pl.UInt8
+                [m for m in members for _ in range(len(valid_times))], dtype=pl.Int8
             ),
             "temperature_2m": pl.Series(
                 [float(m + i % 24) for m in members for i in range(len(valid_times))],
@@ -304,7 +304,7 @@ def _nwp_analysis(inits: Sequence[datetime]) -> pl.LazyFrame:
                 {
                     "init_time": [run_init] * len(valid_times),
                     "valid_time": valid_times,
-                    "ensemble_member": pl.Series([0] * len(valid_times), dtype=pl.UInt8),
+                    "ensemble_member": pl.Series([0] * len(valid_times), dtype=pl.Int8),
                     "h3_index": pl.Series([100] * len(valid_times), dtype=pl.UInt64),
                     "temperature_2m": pl.Series(
                         [float(index)] * len(valid_times), dtype=pl.Float32

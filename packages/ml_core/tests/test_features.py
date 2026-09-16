@@ -1227,7 +1227,7 @@ def test_engineer_features_rolling_mean_collects_under_streaming_engine():
             "init_time": [nwp_init_time] * len(steps) * 2,
             "temperature_2m": [10.0] * len(steps) * 2,
         }
-    ).cast({"ensemble_member": pl.UInt8})
+    ).cast({"ensemble_member": pl.Int8})
     observed_times = [nwp_init_time + timedelta(minutes=30 * i) for i in range(48)]
     power_df = pl.DataFrame(
         {
@@ -1298,7 +1298,7 @@ def test_upsample_nwp_fills_agree_across_engines():
         {
             "nwp_init_time": [t0] * len(steps) * len(members),
             "ensemble_member": pl.Series(
-                [member for member in members for _ in steps], dtype=pl.UInt8
+                [member for member in members for _ in steps], dtype=pl.Int8
             ),
             "valid_time": steps * len(members),
             "temperature_2m": [float(i) for i in range(len(steps))] * len(members),
