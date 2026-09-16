@@ -405,8 +405,7 @@ class Metrics(pt.Model):
         "window_start",
         "window_end",
     )
-    """At most one metric value per series, model, experiment, fold, scope, horizon slice, metric,
-    parameter and window."""
+    """See the class docstring's "Primary key" paragraph."""
 
     @classmethod
     def validate(  # ty: ignore[invalid-method-override]
