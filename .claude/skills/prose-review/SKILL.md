@@ -265,6 +265,8 @@ expensive passes get the freshest attention:
 10. Serial commas
 11. Acronyms expanded on first use
 12. Sentences readable two ways, and noun-piles
+13. Sentences that announce content instead of stating it — "it is worth noting/saying,"
+    "it is important to note," "let us consider," "there are several reasons why"
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
 
@@ -311,6 +313,13 @@ is where the fault lives, and a methods sentence reporting a screening funnel is
 chain lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds
 them, and most will be fine. The ones that are not hand the reader a different unit at each number
 and define none of them.
+
+**Rule 13 has a cheap way in too: grep for the throat-clearing openers themselves.**
+`grep -inE "it (is|would be) (worth|important|useful|interesting) (noting|saying|pointing out|mentioning)|let us (consider|turn to)|we now turn to|there are (several|many) reasons why|this raises the question of"`
+over a whitespace-normalised copy finds most instances directly, because the phrase itself is the
+fault rather than a symptom of it. The finding is real wherever the sentence could instead state
+its content and skip the announcement — which is nearly always; the rare exception is a genuine
+transition sentence that a reader needs to see coming (a change of topic mid-page), which stays.
 
 ## What is deliberately not a finding
 
