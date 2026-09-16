@@ -47,7 +47,7 @@ def _find_project_root(start: Path) -> Path:
 PROJECT_ROOT: Final[Path] = _find_project_root(Path(__file__))
 """The repo root — anchor for the repo-relative defaults below (``conf/``, ``data/``, ``.env``).
 
-Resolved by :func:`_find_project_root`; see its docstring for the per-install-mode behaviour
+Resolved by `_find_project_root`; see its docstring for the per-install-mode behaviour
 and the caveat for wheels installed outside a workspace checkout.
 """
 
@@ -126,6 +126,11 @@ class Settings(BaseSettings):
 
     def get_nged_s3_store(self) -> obstore.store.S3Store:
         """Returns an initialized obstore.store.S3Store instance for the NGED bucket.
+
+        Returns:
+            An ``S3Store`` bound to ``nged_s3_bucket_url`` and authenticated with the
+            ``nged_s3_bucket_access_key`` / ``nged_s3_bucket_secret`` pair, ready to read
+            NGED's source JSON files.
 
         Raises:
             ValueError: If any of the three source-bucket credentials is unset.

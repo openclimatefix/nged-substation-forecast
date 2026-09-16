@@ -19,6 +19,7 @@ from contracts.settings import Settings
 from dagster import DagsterInstance, materialize
 from deltalake import write_deltalake
 from ml_core.base_forecaster import load_trained_metadata
+from ml_core.features.tabular_feature_engineer import TabularFeatureEngineer
 from ml_core.production_helpers import fetch_model_artifacts
 from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
@@ -31,6 +32,10 @@ pytestmark = pytest.mark.integration
 
 RegisterExperiment = Callable[[DagsterInstance, str], None]
 """Type of the ``register_experiment`` fixture (``tests/conftest.py``)."""
+
+RegisterExperimentWithFeatures = Callable[[DagsterInstance, str, list[str]], None]
+"""Type of the ``register_experiment`` fixture when called with its optional ``selected_features``
+argument."""
 
 FOLD_ID = "mid_2025_to_mid_2026"
 EXPERIMENT_NAME = "exp_smoke"
@@ -241,6 +246,115 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
     assert _EARLY_INIT_TIME not in nwp_after_early_cluster.collect()["init_time"].unique().to_list()
 
 
+def test_load_engineering_inputs_power_lookback_widens_only_the_power_scan(env: None) -> None:
+    """``power_lookback`` widens the power scan's lower bound only.
+
+    NWP stays bounded to ``[window_start, window_end]`` regardless of ``power_lookback``, and the
+    default (omitted) excludes power from before ``window_start``.
+    """
+    settings = Settings()
+    metadata = _load_roster(settings, [1])
+    # `env` writes ts1's power and NWP at 10:00-12:00 on _IN_WINDOW, so a window starting at 11:00
+    # leaves real power *and* real NWP rows in the hour before it — the NWP assertions below can
+    # only pass if power_lookback leaves the NWP bound alone.
+    before_window = _IN_WINDOW + timedelta(hours=10)
+    window_start = _IN_WINDOW + timedelta(hours=11)
+    window_end = _IN_WINDOW + timedelta(days=1)
+
+    power_default, nwp_default = load_engineering_inputs(
+        settings, [1], metadata, window_start, window_end
+    )
+    assert before_window not in power_default.collect()["time"].to_list()
+    assert min(nwp_default.collect()["valid_time"].to_list()) >= window_start
+
+    power_widened, nwp_widened = load_engineering_inputs(
+        settings, [1], metadata, window_start, window_end, power_lookback=timedelta(hours=1)
+    )
+    assert before_window in power_widened.collect()["time"].to_list()
+    # power_lookback widens the power scan only — NWP stays bounded to window_start.
+    assert min(nwp_widened.collect()["valid_time"].to_list()) >= window_start
+
+
+def test_power_lag_near_window_start_is_non_null_with_lookback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A power lag near a fold's start is null without ``power_lookback`` and a real value with
+    it, exercised end-to-end through the public ``TabularFeatureEngineer`` entry point.
+
+    Uses ``_EARLY_INIT_TIME`` (an NWP run initialised before the training window) so the target
+    row's lead time stays under the 336h lag length even with the lookback applied — a lag that
+    survives with the lookback but whose lead time is *also* short enough to survive
+    ``_nullify_leaky_lags`` proves the fix, rather than a lag ``_nullify_leaky_lags`` would have
+    nulled either way.
+    """
+    nged_path = tmp_path / "NGED"
+    nged_path.mkdir()
+    monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
+    monkeypatch.setenv("NWP_DATA_PATH", str(tmp_path / "NWP"))
+
+    window_start = _TRAIN_START
+    window_end = window_start + timedelta(days=1)
+    target_valid_time = window_start + timedelta(hours=3)
+    lag_target_time = target_valid_time - timedelta(hours=336)
+    historical_power = 42.0
+
+    pl.DataFrame(
+        [
+            {"time_series_id": 1, "time": lag_target_time, "power": historical_power},
+            {"time_series_id": 1, "time": target_valid_time, "power": 100.0},
+        ]
+    ).cast(
+        {"time_series_id": pl.Int32, "time": pl.Datetime("us", "UTC"), "power": pl.Float32}
+    ).write_delta(str(nged_path / "power_time_series.delta"))
+    _write_metadata(nged_path / "metadata.parquet")
+    write_test_nwp(
+        str(tmp_path / "NWP"),
+        nwp_records(
+            _TS1_CELL,
+            window_start,
+            (0,),
+            init_time=_EARLY_INIT_TIME,
+            valid_times=[target_valid_time],
+        ),
+    )
+
+    settings = Settings()
+    metadata = _load_roster(settings, [1])
+    selected_features = {"power_lag_336h"}
+
+    power_no_lookback, nwp_no_lookback = load_engineering_inputs(
+        settings, [1], metadata, window_start, window_end
+    )
+    features_no_lookback = (
+        TabularFeatureEngineer()
+        .engineer(
+            selected_features=selected_features,
+            power_time_series=power_no_lookback,
+            time_series_metadata=metadata,
+            nwp=nwp_no_lookback,
+        )
+        .collect()
+    )
+    assert features_no_lookback["power_lag_336h"].to_list() == [None]
+
+    power_with_lookback, nwp_with_lookback = load_engineering_inputs(
+        settings, [1], metadata, window_start, window_end, power_lookback=timedelta(hours=336)
+    )
+    features_with_lookback = (
+        TabularFeatureEngineer()
+        .engineer(
+            selected_features=selected_features,
+            power_time_series=power_with_lookback,
+            time_series_metadata=metadata,
+            nwp=nwp_with_lookback,
+        )
+        .collect()
+    )
+    # One row, not two: the widened power scan adds no spine rows, because power is left-joined
+    # onto the NWP-derived spine rather than being the spine.
+    assert features_with_lookback["power_lag_336h"].to_list() == [historical_power]
+
+
 def _fold_run(client: MlflowClient) -> Run:
     """Return the single MLflow fold run for this test's ``(experiment, fold)``."""
     experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
@@ -251,6 +365,33 @@ def _fold_run(client: MlflowClient) -> Run:
     )
     assert len(fold_runs) == 1
     return fold_runs[0]
+
+
+def test_trained_cv_model_derives_power_lookback_from_selected_features(
+    env: None,
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperimentWithFeatures,
+    spy_power_lookback: Callable[[], list[timedelta]],
+) -> None:
+    """``trained_cv_model`` derives ``power_lookback`` from the experiment's own
+    ``selected_features`` and passes it through to ``load_engineering_inputs``.
+
+    The two tests above prove ``load_engineering_inputs`` and
+    ``ParsedFeatures.max_power_lag()`` are each correct in isolation; this proves the asset's own
+    wiring — computing ``power_lookback`` and passing it to the loader — is correct too. The
+    shared ``register_experiment`` fixture defaults to a ``selected_features`` set with no power
+    lag, so every other test in this module cannot catch a hardcoded ``power_lookback=timedelta(0)``
+    or a derivation from the wrong config field; this test passes ``power_lag_24h`` explicitly to
+    exercise that derivation.
+    """
+    register_experiment(dagster_instance, EXPERIMENT_NAME, ["temperature_2m", "power_lag_24h"])
+    calls = spy_power_lookback()
+
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+
+    assert calls == [timedelta(hours=24)]
 
 
 def test_trained_cv_model_trains_and_saves_to_mlflow(

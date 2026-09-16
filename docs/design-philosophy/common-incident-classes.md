@@ -1,6 +1,6 @@
 # Common incident classes in production forecasting services
 
-Production services that ingest third-party weather, satellite or telemetry feeds tend to fail in
+Production services that ingest third-party weather, satellite, or telemetry feeds tend to fail in
 a small number of recurring shapes, largely independent of the specific stack behind them. This
 page catalogues those shapes and states, for each, which mechanism in this project's design
 targets it — honestly marking what already exists against what is designed but not yet built, and
@@ -11,26 +11,27 @@ This page is broader than [Inherent Stability](inherent-stability.md), which arg
 these shapes — an input going missing or stale — in full. Several of the shapes below sit outside
 inherent stability's remit entirely: shared-compute contention, deploy drift, and fault
 propagation across independent units of work are blast-radius and process concerns, not
-input-degradation ones.
+input-degradation concerns.
 
 ## Upstream data outage
 
 A third-party feed — weather, satellite imagery, telemetry — stops arriving, for anywhere from
 minutes to days, for reasons entirely outside the consuming service's control.
 
-This is the shape [Inherent Stability](inherent-stability.md) is built around: the
+This kind of outage is the shape [Inherent Stability](inherent-stability.md) is built around: the
 [degradation ladder](inherent-stability.md#the-degradation-ladder) states what the forecast should
 still produce at each stage of loss, from one missed weather-model run through to no fresh data at
 all. Telemetry already degrades this way today — a stalled meter widens nothing yet, but it does
-not stop the forecast either. Weather data is the sharper case: a sustained NWP outage currently
-makes the live-forecast asset **raise** rather than degrade — one of three hard-failure rows in the
-[failure-modes table](inherent-stability.md#failure-modes), and the only one tracked to change
-([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)). The other two stay
-deliberate raises: an empty or unloadable promoted model is a promotion bug rather than a data
-outage, and a duplicated forecast primary key means one of our own joins has fanned out, which
-`PowerForecast.validate` rejects at the contract boundary rather than delivering. The NWP gap is tracked, and the fix is deliberately sequenced behind training
-the model against realistic outages, so that a degraded forecast is measured rather than merely
-produced.
+not stop the forecast either. Weather data is the sharper case: a sustained numerical weather
+prediction (NWP) outage currently makes the live-forecast asset **raise** rather than degrade —
+one of three hard-failure rows in the [failure-modes table](inherent-stability.md#failure-modes),
+and the only row tracked to change
+([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)). The other two
+stay deliberate raises: an empty or unloadable promoted model is a promotion bug rather than a
+data outage, and a duplicated forecast primary key means one of our own joins has fanned out,
+which `PowerForecast.validate` rejects at the contract boundary rather than delivering. The NWP
+gap is tracked, and the fix is deliberately sequenced behind training the model against realistic
+outages, so that a degraded forecast is measured rather than merely produced.
 
 ## Upstream data malformed or silently reshaped
 
@@ -50,7 +51,7 @@ payload reached a model.
 
 The forecast pipeline runs cleanly end to end and delivers a value — but the value itself is
 wrong: an implausible magnitude, an internally inconsistent set of quantiles, or a forecast that
-quietly diverges from reality — and nothing rejects or flags it before a consumer notices.
+quietly diverges from reality. Nothing rejects or flags it before a consumer notices.
 
 Two mechanisms already point the right way, both 🚧 planned rather than shipped. Normalising
 `power_fcst` to **[−1, +1]**
@@ -63,40 +64,44 @@ time
 ([Probabilistic Forecasting](../techniques/probabilistic-forecasting.md#turning-51-quantile-sets-into-one-the-pooling-recipe),
 [#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)).
 
-The gap: `live_forecasts_are_healthy` already warns on a null, NaN or infinite `power_fcst`, but
-nothing checks a *finite, plausible-looking* output for implausible magnitude or, once quantiles
-ship, crossed levels — the same "validate, and warn on what validation can't reject outright"
-pattern every input boundary in this project follows has not yet been applied to the output
-itself ([#560](https://github.com/openclimatefix/nged-substation-forecast/issues/560)).
+The gap: `live_forecasts_are_healthy` already warns on a null, NaN, or infinite `power_fcst`,
+but nothing checks a *finite, plausible-looking* output for implausible magnitude or, once
+quantiles ship, crossed levels — the same "validate, and warn on what validation can't reject
+outright" pattern every input boundary in this project follows has not yet been applied to the
+output itself ([#560](https://github.com/openclimatefix/nged-substation-forecast/issues/560)).
 
 ## Shared-compute blast radius
 
-One heavy or misbehaving component — an expensive dashboard query, a bulk API request, an
-ad-hoc analytical query — exhausts a resource (memory, database connections, disk) shared with
-unrelated services, and takes all of them down together rather than just itself.
+One heavy or misbehaving component — an expensive dashboard query, a bulk application
+programming interface (API) request, an ad-hoc analytical query — exhausts a resource (memory,
+database connections, disk) shared with unrelated services, and takes all of them down
+together rather than just itself.
 
-[Every write is atomic, idempotent and confined to one partition](design-principles.md#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition)
-is the data-layer answer, and the [accepted AWS architecture](../roadmap/live-service.md#aws-architecture)
-extends the same instinct to compute: every live and backtest run dispatches to its own ephemeral
-Fargate task, so a bad run cannot starve another one. The gap sits on the always-on control-plane
-box itself, where the Dagster daemon, webserver and dashboard run as separate processes sharing
-one machine's memory and disk with no per-process limit — today's mitigation is restart-on-failure
-plus the [missed-check-in alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm),
-both reactive rather than preventive
+[Every write is atomic, idempotent, and confined to one
+partition](design-principles.md#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition)
+is the data-layer answer, and the [accepted AWS
+architecture](../roadmap/live-service.md#aws-architecture) extends the same instinct to compute:
+every live and backtest run dispatches to its own ephemeral Fargate task, so a bad run cannot
+starve another one. The gap sits on the always-on control-plane box itself, where the Dagster
+daemon, webserver, and dashboard run as separate processes sharing one machine's memory and disk
+with no per-process limit — today's mitigation is restart-on-failure plus the [missed-check-in
+alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm), both reactive
+rather than preventive
 ([#561](https://github.com/openclimatefix/nged-substation-forecast/issues/561)).
 
 ## Orchestrator or scheduler silently stops
 
-The process responsible for triggering scheduled work dies, hangs, or stops firing — and because
+The process responsible for triggering scheduled work dies, hangs, or stops firing. Because
 nothing failed loudly, the absence produces no alert of its own. It surfaces only when someone
 notices stale output, which can be hours or days later.
 
-This is the shape the
+This silent-stop scenario is the shape the
 [missed-check-in alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm)
 exists to close, and closes about as directly as a single mechanism can: it is evaluated from
 **outside** the deployment, on the logic that a dead process cannot be relied on to report its own
 death, and it fires on the absence of a successful run rather than on any particular failure
-signal. Of every shape on this page, this is the one with the most direct, already-shipped answer.
+signal. Of every shape on this page, this is the shape with the most direct, already-shipped
+answer.
 
 ## Deploy or configuration drift between environments
 

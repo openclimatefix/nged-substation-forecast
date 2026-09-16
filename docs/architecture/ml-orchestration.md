@@ -41,6 +41,27 @@ The complementary decision — the resolved config is stamped onto the MLflow ex
 registration and read back by the assets, never re-read from YAML — is explained in
 [Running an experiment end-to-end](../ml_experimentation/dagster-workflow.md).
 
+## Re-registering an experiment under a changed config is rejected
+
+**An experiment's identity is its config**, not its `experiment_name` alone, so a changed config is
+treated as a *new* experiment: `register_experiment_job` rejects a re-registration that would change
+it. Why an experiment carries one config, and what the operator should do instead, is in [An
+experiment's identity is its
+config](../ml_experimentation/dagster-workflow.md#an-experiments-identity-is-its-config).
+
+**The rejection compares two identity tags: the canonical JSON dump of the resolved config, and the
+forecaster's class target.** Both are compared against what MLflow already has stored for that
+`experiment_name`. A tag absent from the stored experiment does not count as a change, because an
+absent tag is what `get_or_create_experiment` leaves behind when its self-healing fallback creates
+an untagged experiment, and this registration is entitled to complete that experiment.
+
+**A rejected re-registration leaves the experiment exactly as it found it.** The comparison runs,
+and any rejection happens, before the registration writes a single MLflow param or tag.
+
+**The `description` tag is excluded from the comparison, so an experiment's prose stays freely
+editable by re-registering.** What an experiment is called and what it is for are not part of what
+makes an experiment that experiment — only the config and the forecaster class are.
+
 ## Model artifacts: one replaceable archive, no local cache
 
 Trained models live in MLflow's artifact store, wrapped by two concrete `BaseForecaster`
@@ -137,7 +158,7 @@ are recorded so the decision is auditable and so we can revisit them as more dat
 
 ### Monthly expanding CV — rejected (redundant folds)
 
-Slide a 12-month validation window forward by one month per fold, expanding training by one month
+Slide a 12-month validation window forward by 1 month per fold, expanding training by 1 month
 each time (fold 1 validates 2025-04→2026-03, fold 2 validates 2025-05→2026-04, …). This "buys"
 several folds from today's data, but consecutive folds share **11/12 of the validation window** and
 >90% of the training data, so their metrics are correlated ~0.9+. The effective number of
@@ -173,10 +194,10 @@ apples-to-oranges. Reanalysis is valuable, but for **pre-training** (see
 [Cross-validation folds: Target](../ml_experimentation/cross-validation-folds.md#target-multiple-yearly-folds)),
 not for validation.
 
-This rejects reanalysis as a *promotion criterion*, not as a measurement. Scoring against ERA5 is
-legitimate as a **diagnostic** — it decomposes total error into the weather-to-power response and
-the implicit hedging against forecast error — and lands as its own `evaluation_scope`, leaving the
-leaderboard folds ENS-only. See
+Rejecting ERA5-backed folds excludes reanalysis only as a *promotion criterion*, not as a
+measurement. Scoring against ERA5 is legitimate as a **diagnostic** — it decomposes total
+error into the weather-to-power response and the implicit hedging against forecast error —
+and lands as its own `evaluation_scope`, leaving the leaderboard folds ENS-only. See
 [Extending the training history](../roadmap/training-history.md#evaluation).
 
 ## Two metric stores, one division of labour

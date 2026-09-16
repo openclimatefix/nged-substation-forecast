@@ -34,23 +34,44 @@ def load_engineering_inputs(
     ensemble_members: list[int] | None = None,
     init_time_start: datetime | None = None,
     init_time_end: datetime | None = None,
+    power_lookback: timedelta = timedelta(0),
 ) -> tuple[pt.LazyFrame[PowerTimeSeries], pt.LazyFrame[Nwp]]:
     """Load observed power and NWP for a window and time-series population.
 
     Called by ``trained_cv_model`` (training window + eligible population), ``cv_power_forecasts``
     (validation window + trained population) and ``live_forecasts`` (the live window + the promoted
-    model's population). Both are filtered to the inclusive ``[window_start, window_end]`` window
-    and to ``time_series_ids``.
+    model's population). Power is filtered to the inclusive ``[window_start - power_lookback,
+    window_end]`` window; NWP stays bounded to ``[window_start, window_end]``. Both are filtered to
+    ``time_series_ids``.
+
+    A caller that needs power history from before ``window_start`` — to compute a power lag
+    feature whose target time falls earlier than the window — has two options. The caller can
+    widen ``window_start`` itself, as ``live_forecasts`` does; widening ``window_start`` also
+    widens the NWP bound, so ``live_forecasts`` passes an explicit
+    ``init_time_start``/``init_time_end`` and filters the result afterwards to stay correct. Or
+    the caller can pass ``power_lookback``, which widens only the power scan. The default widens
+    neither. A ``power_lookback`` equal to the longest power lag a caller's features need is
+    exactly sufficient: the scan predicate below is inclusive, and the earliest target time any
+    lag can read is exactly ``window_start - power_lookback``.
+
+    The spine is the ``(time_series_id, valid_time)`` row scaffold that power values are later
+    joined onto as labels. The guarantee that widening the power scan adds no spine rows assumes
+    the NWP-centric bulk-mode join, in which power is left-joined *onto* the NWP-derived spine.
+    The guarantee does not hold when NWP is absent, where the spine is the power frame itself.
+    Every caller that passes ``power_lookback`` also passes NWP, so ``load_engineering_inputs``
+    never reaches the NWP-absent branch with a widened power scan.
 
     **Memory: prune the NWP scan at the source.** The NWP Delta is large (tens of GB: every
     ``init_time`` × every H3 cell × ~51 ensemble members × the 30-min forecast horizon). Every
     filter below is applied directly to the ``Nwp.scan_delta`` scan, so only the surviving rows
-    are ever decoded into memory. This is the difference between a few GB and an OOM. See the
-    "NWP scan pruning" notes in
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>. The three
-    levers:
+    are ever decoded into memory. This is the difference between a few GB and an OOM. The measured
+    effect of each lever, and a table of what actually prunes the scan:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>
 
-    - ``init_time``: the table is partitioned by ``init_time``, so bounding it to the runs that can
+    The three levers:
+
+    - ``init_time``: the table is partitioned by ``(nwp_model_id, init_time)``, so bounding
+      ``init_time`` to the runs that can
       cover the window (``[window_start - MAX_NWP_LEAD, window_end]``) is a true *partition* prune
       — Polars opens only those partition directories. Filtering ``valid_time`` alone does **not**
       prune partitions.
@@ -58,8 +79,8 @@ def load_engineering_inputs(
       member-early sort (``delta_store.nwp.NWP_SORT_COLS``) additionally lets Parquet row-group
       stats skip most of each partition outright for this predicate, provided the predicate
       reaches the Parquet scan unchanged — which requires ``Nwp``'s declared ``ensemble_member``
-      dtype to match what's physically on disk. See
-      <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
+      dtype to match what's physically on disk. Measured effect on pruning:
+      <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
     - ``h3_index``: restricted to the cells the requested series sit in. There is a *many-to-one*
       relationship between ``time_series_id`` and ``h3_index`` (one NWP cell covers several series),
       so this is a small set of cells; the per-cell weather is later replicated across the series in
@@ -87,6 +108,10 @@ def load_engineering_inputs(
             ``cv_power_forecasts`` pass a narrower sub-range and process the validation window in
             ``init_time`` chunks, so the full-ensemble forecast frame for one chunk stays in RAM
             while the rest streams from the partition-pruned scan.
+        power_lookback: How far before ``window_start`` to widen the power scan's lower bound, so
+            power lag features near the start of the window have real history to read instead of
+            silently nulling. Widens the power scan only — the NWP bounds are untouched. Defaults to
+            ``timedelta(0)``, which bounds power to ``[window_start, window_end]`` like NWP.
 
     Returns:
         ``(power_time_series, nwp)`` — a lazy power frame and a lazy NWP frame, both filtered to
@@ -101,7 +126,7 @@ def load_engineering_inputs(
         settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
     ).filter(
         pl.col("time_series_id").is_in(time_series_ids),
-        pl.col("time") >= window_start,
+        pl.col("time") >= window_start - power_lookback,
         pl.col("time") <= window_end,
     )
     power_ts = pt.LazyFrame.from_existing(power_lf).set_model(PowerTimeSeries)
@@ -110,7 +135,8 @@ def load_engineering_inputs(
     cells = metadata["h3_res_5"].unique().to_list()
 
     nwp_scan = Nwp.scan_delta(settings.nwp_data_path, storage_options=storage_options).filter(
-        # init_time is the partition key — this prunes whole partitions, not just row groups.
+        # init_time is one of the two partition columns — this prunes whole partitions, not
+        # just row groups.
         pl.col("init_time") >= init_time_start,
         pl.col("init_time") <= init_time_end,
         pl.col("valid_time") >= window_start,
