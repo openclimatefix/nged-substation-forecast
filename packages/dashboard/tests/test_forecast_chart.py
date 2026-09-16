@@ -305,7 +305,7 @@ def _nwp_analysis(inits: Sequence[datetime]) -> pl.LazyFrame:
                     "init_time": [run_init] * len(valid_times),
                     "valid_time": valid_times,
                     "ensemble_member": pl.Series([0] * len(valid_times), dtype=pl.Int8),
-                    "h3_index": pl.Series([100] * len(valid_times), dtype=pl.UInt64),
+                    "h3_index": pl.Series([100] * len(valid_times), dtype=pl.Int64),
                     "temperature_2m": pl.Series(
                         [float(index)] * len(valid_times), dtype=pl.Float32
                     ),

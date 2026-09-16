@@ -22,7 +22,7 @@ def _nwp_two_cells() -> pt.LazyFrame[Nwp]:
     init_time = datetime(2024, 6, 1, 0, 0)
     df = pl.DataFrame(
         {
-            "h3_index": pl.Series([10, 20, 99], dtype=pl.UInt64),
+            "h3_index": pl.Series([10, 20, 99], dtype=pl.Int64),
             "valid_time": [valid_time, valid_time, valid_time],
             "init_time": [init_time, init_time, init_time],
             "ensemble_member": pl.Series([0, 0, 0], dtype=pl.Int8),
