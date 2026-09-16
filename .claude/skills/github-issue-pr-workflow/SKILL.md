@@ -58,22 +58,23 @@ see: https://github.blog/changelog/2024-05-23-sunset-notice-projects-classic/.
 (repository.pullRequest.projectCards)
 ```
 
-**Check `gh --version` and `apt-cache policy gh` (or the equivalent for your package manager)
-first.** Ubuntu's own `universe` package can sit many releases behind GitHub's official apt
-repository, and a `gh` this far out of date is the confirmed cause
+**Check `gh --version` and `apt-cache policy gh` (or the equivalent for your package manager) —
+upgrading to a current release from GitHub's own apt/homebrew repository fixes it.** Confirmed on
+this repo: `gh pr edit --body-file` failed on Ubuntu's `universe` package (2.46.0, many releases
+behind) and succeeded cleanly after switching to
+[GitHub's own repository](https://github.com/cli/cli#installation) (2.101.0)
 ([cli/cli#13069](https://github.com/cli/cli/issues/13069),
-[cli/cli#11983](https://github.com/cli/cli/issues/11983)): install from
-[GitHub's own apt/homebrew repository](https://github.com/cli/cli#installation) and the error
-goes away. The underlying `projectCards` field is still emitted on every version pending
-[cli/cli#11769](https://github.com/cli/cli/issues/11769), so a recurrence after upgrading is worth
-reporting upstream rather than assuming the fix failed.
+[cli/cli#11983](https://github.com/cli/cli/issues/11983)). The underlying `projectCards` field is
+still emitted by every build pending [cli/cli#11769](https://github.com/cli/cli/issues/11769), so
+a recurrence after upgrading is worth reporting upstream rather than a sign the fix failed.
 
-**Until `gh` is upgraded, PATCH the body through the REST API instead of `gh pr edit`.** Build the
-JSON payload with `jq --rawfile` and pipe it through `--input`, rather than passing the body as a
-field value — `gh api`'s `-f key=value` (`--raw-field`) treats the value as a literal string, so
-`-f body=@file.md` sends the literal text `@file.md` rather than the file's contents (only
-`-F`/`--field` has the `@file`-reads-from-file behaviour, and even that still needs correct JSON
-escaping for a body containing quotes or backticks, which `--input` handles for free):
+**When editing a body through the REST API directly — a stopgap on a `gh` you can't upgrade, or
+for scripting comments — build the JSON payload with `jq --rawfile` and pipe it through `--input`,
+never pass the body as a `-f`/`-F` field value.** `gh api`'s `-f key=value` (`--raw-field`) treats
+the value as a literal string, so `-f body=@file.md` sends the literal text `@file.md` rather than
+the file's contents (only `-F`/`--field` has the `@file`-reads-from-file behaviour, and even that
+still needs correct JSON escaping for a body containing quotes or backticks, which `--input`
+handles for free):
 
 ```bash
 jq -n --rawfile body /tmp/pr_body.md '{body: $body}' \
