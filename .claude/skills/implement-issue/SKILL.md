@@ -74,7 +74,7 @@ front — a report back after step 1 is not finished work.
     review is the first line of defence rather than the last, and the reviewer has to know that
     before reading the diff. Give the size as the five trigger answers `plan-issue` step 3 asks
     for, not as the one trigger that decided it, so a reviewer can see which triggers were
-    considered rather than only which one fired.
+    considered rather than only which trigger fired.
 
 5. **First adversarial review: correctness, and cutting the change down.** Run this if the sizing
    called for it. Spawn a *new*, independent sub-agent and give it only the PR number, not the

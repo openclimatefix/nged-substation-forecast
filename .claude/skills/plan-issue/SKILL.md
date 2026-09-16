@@ -131,15 +131,15 @@ the same reply that you are taking this path, and open it with `Implementing:` r
 - More than one design would defensibly satisfy it, so the choice wants approving before code moves.
 - It spans enough code that you could not name every caller of what it changes without searching.
 
-**Answer every trigger above, not just the one you noticed.** A size stated as "medium, because it
-edits a Patito contract" hides which triggers were never considered, and a reader cannot audit a
-conclusion that does not show its inputs. Issue #728 was sized medium on the contract trigger
-alone. It also edited `XGBoostForecaster.predict`, which sits on the production serving path, and
-the serving-path trigger would have made it complex. Write one line per trigger — what gets stored,
-the production serving path, a degradation rule, more than one defensible design, and code whose
-callers you could not name without searching — and let those five answers settle whether the issue
-is complex. Any trigger that fires makes the issue complex, however small the diff looks. An issue
-where none fires is simple or medium, on the conditions above.
+**Answer every trigger above, not just the trigger you noticed.** A size stated as "medium,
+because it edits a Patito contract" hides which triggers were never considered, and a reader
+cannot audit a conclusion that does not show its inputs. Issue #728 was sized medium on the
+contract trigger alone. It also edited `XGBoostForecaster.predict`, which sits on the production
+serving path. The serving-path trigger would have made it complex. Write one line per trigger —
+what gets stored, the production serving path, a degradation rule, more than one defensible
+design, and code whose callers you could not name without searching — and let those five answers
+settle whether the issue is complex. Any trigger that fires makes the issue complex, however small
+the diff looks. An issue where none fires is simple or medium, on the conditions above.
 
 **Medium — everything else.** Write the plan, then choose how much review to spend on it: between
 zero and two of the plan reviews below (steps 5 and 7, each with its triage step), and between
@@ -158,7 +158,7 @@ zero and two of the diff reviews in `implement-issue`. The choice is yours, unde
 - **When you cannot decide, run it.** A review costs one sub-agent; the other error puts a design
   nobody attacked into `main`.
 
-Carry the size, the five trigger answers and the chosen counts forward: all three go in the plan
+Carry the size, the five trigger answers, and the chosen counts forward: all three go in the plan
 file and the draft PR body that step 4 opens, and in the report (step 9). A simple issue reaches
 none of those three, having left this skill at the sizing step, so its answers go in the reply
 that announces the size and in the PR body `implement-issue` step 4 opens. Either way, whoever

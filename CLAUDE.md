@@ -414,7 +414,7 @@ before any code moves:
 **How much process an issue gets is sized to the issue**, in step 3 of `plan-issue`:
 
 - **Simple** — a mechanical change with one obvious way to do it, touching no contract, no
-  production degradation path, no asset graph and nothing stored, where the verification set is
+  production degradation path, no asset graph, and nothing stored, where the verification set is
   the whole of the risk. It gets **no plan and no agentic review**: implement it, open the PR
   saying that no sub-agent reviewed it, and stop for human review.
 - **Complex** — anything that changes what gets stored, touches the production serving path,
@@ -425,9 +425,9 @@ before any code moves:
   first and erring towards running one more when the call is close.
 
 **State a size as an answer to each of the five triggers in the Complex bullet above, never as the
-one trigger that fired.** A size naming only the trigger you noticed hides the triggers you did not consider,
-and reads as a complete judgement either way. The full rule, and the incident behind it, are in
-step 3 of `plan-issue`.
+one trigger that fired.** A size naming only the trigger you noticed hides the triggers you did not
+consider, and still reads as a complete judgement whether or not the rest were ever checked. The
+full rule, and the incident behind it, are in step 3 of `plan-issue`.
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
