@@ -159,8 +159,10 @@ zero and two of the diff reviews in `implement-issue`. The choice is yours, unde
   nobody attacked into `main`.
 
 Carry the size, the five trigger answers and the chosen counts forward: all three go in the plan
-file and the draft PR body that step 4 opens, and in the report (step 9), so whoever reviews the
-diff knows what scrutiny the diff has already had and on what grounds.
+file and the draft PR body that step 4 opens, and in the report (step 9). A simple issue reaches
+none of those three, having left this skill at the sizing step, so its answers go in the reply
+that announces the size and in the PR body `implement-issue` step 4 opens. Either way, whoever
+reviews the diff knows what scrutiny the diff has already had and on what grounds.
 
 ## 4. Write the plan
 
@@ -342,9 +344,10 @@ plan, so the branch — and the PR — carries the original plan and what each r
 
 ## 9. Stop
 
-Report: the verdict from step 2, the size from step 3 and which reviews it bought, a short summary
-of the plan, what each review that ran changed, and what each found that you rejected. Give the
-branch name and, again, the clickable link to the plan file.
+Report: the verdict from step 2, step 3's five trigger answers with the size they picked and which
+reviews it bought, a short summary of the plan, what each review that ran changed, and what each
+found that you rejected. Give the branch name and, again, the clickable links to the plan file and
+the draft PR.
 
 **Do not write any code.** The PR opened in step 4 stays a draft until a human approves the plan.
 Once approved, implementation runs under the `implement-issue` skill, resuming at its step 2 in
