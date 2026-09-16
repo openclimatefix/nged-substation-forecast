@@ -46,6 +46,43 @@ Whenever you create a PR, also set:
 `gh pr create` can't set either: use `gh pr edit --add-label` and `gh pr edit --add-assignee
 JackKelly` right after creating the PR.
 
+## Editing an issue or PR body after creation
+
+**`gh pr edit --body-file` (and other `gh issue`/`gh pr` commands that fetch the item's current
+state first) can fail with an unrelated `Projects (classic)` GraphQL error, on a `gh` build old
+enough to still request that field:**
+
+```text
+GraphQL: Projects (classic) is being deprecated in favor of the new Projects experience,
+see: https://github.blog/changelog/2024-05-23-sunset-notice-projects-classic/.
+(repository.pullRequest.projectCards)
+```
+
+**Check `gh --version` and `apt-cache policy gh` (or the equivalent for your package manager)
+first.** Ubuntu's own `universe` package can sit many releases behind GitHub's official apt
+repository, and a `gh` this far out of date is the confirmed cause
+([cli/cli#13069](https://github.com/cli/cli/issues/13069),
+[cli/cli#11983](https://github.com/cli/cli/issues/11983)): install from
+[GitHub's own apt/homebrew repository](https://github.com/cli/cli#installation) and the error
+goes away. The underlying `projectCards` field is still emitted on every version pending
+[cli/cli#11769](https://github.com/cli/cli/issues/11769), so a recurrence after upgrading is worth
+reporting upstream rather than assuming the fix failed.
+
+**Until `gh` is upgraded, PATCH the body through the REST API instead of `gh pr edit`.** Build the
+JSON payload with `jq --rawfile` and pipe it through `--input`, rather than passing the body as a
+field value — `gh api`'s `-f key=value` (`--raw-field`) treats the value as a literal string, so
+`-f body=@file.md` sends the literal text `@file.md` rather than the file's contents (only
+`-F`/`--field` has the `@file`-reads-from-file behaviour, and even that still needs correct JSON
+escaping for a body containing quotes or backticks, which `--input` handles for free):
+
+```bash
+jq -n --rawfile body /tmp/pr_body.md '{body: $body}' \
+  | gh api repos/OWNER/REPO/pulls/<N> -X PATCH --input - --silent
+```
+
+The same pattern PATCHes an issue body (`issues/<N>`) or posts a comment
+(`issues/<N>/comments`, which also works for PR comments).
+
 ## Never hard-wrap a GitHub body or comment
 
 **Write one line per paragraph. No hard wraps, at any width.** This applies to every issue body,
