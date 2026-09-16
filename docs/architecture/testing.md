@@ -52,7 +52,8 @@ tests: Polars row counts wrapping past 2³² rows, in
   `uv run pytest` session, so every module placed at the top level of `tests/` is importable by
   bare name from any test suite in the repo — `packages/delta_store/tests`,
   `packages/ml_core/tests`, and the root `tests/` alike — the same mechanism
-  `tests/_nwp_test_data.py` already relies on for the root integration tests, and the mechanism
+  `tests/_nwp_test_data.py` already relies on for its synthetic-`Nwp` writer and its
+  `cast_to_nwp_dtypes` dtype helper, and the mechanism
   `tests/_pytest_autoinject.py` (see [Running the suite in
   parallel](#running-the-suite-in-parallel)) relies on to be loadable as a pytest plugin by bare
   name. Putting a cross-package factory inside one specific package's `tests/` and importing it

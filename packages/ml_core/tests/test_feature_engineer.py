@@ -5,6 +5,7 @@ from datetime import datetime
 
 import patito as pt
 import polars as pl
+from _nwp_test_data import cast_to_nwp_dtypes
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import Nwp
 from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE, FeatureEngineer
@@ -22,13 +23,13 @@ def _nwp_two_cells() -> pt.LazyFrame[Nwp]:
     init_time = datetime(2024, 6, 1, 0, 0)
     df = pl.DataFrame(
         {
-            "h3_index": pl.Series([10, 20, 99], dtype=pl.Int64),
+            "h3_index": [10, 20, 99],
             "valid_time": [valid_time, valid_time, valid_time],
             "init_time": [init_time, init_time, init_time],
-            "ensemble_member": pl.Series([0, 0, 0], dtype=pl.Int8),
+            "ensemble_member": [0, 0, 0],
             "temperature_2m": [10.0, 12.0, 14.0],
         }
-    )
+    ).pipe(cast_to_nwp_dtypes, "h3_index", "ensemble_member")
     return pt.LazyFrame.from_existing(df.lazy()).set_model(Nwp)
 
 

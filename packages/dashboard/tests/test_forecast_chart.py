@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import polars as pl
+from _nwp_test_data import cast_to_nwp_dtypes
 from altair import LayerChart
 from contracts.weather_schemas import Nwp
 from dashboard.forecast_chart import (
@@ -265,21 +266,27 @@ def _nwp(members: tuple[int, ...] = (0, 1, 2)) -> pl.LazyFrame:
         time_zone="UTC",
         eager=True,
     )
-    return pl.DataFrame(
-        {
-            "valid_time": pl.concat([valid_times for _ in members]),
-            "ensemble_member": pl.Series(
-                [m for m in members for _ in range(len(valid_times))], dtype=pl.Int8
-            ),
-            "temperature_2m": pl.Series(
-                [float(m + i % 24) for m in members for i in range(len(valid_times))],
-                dtype=pl.Float32,
-            ),
-            "precipitation_surface": pl.Series(
-                [m * 1e-4 for m in members for _ in range(len(valid_times))], dtype=pl.Float32
-            ),
-        }
-    ).lazy()
+    return (
+        pl.DataFrame(
+            {
+                "valid_time": pl.concat([valid_times for _ in members]),
+                "ensemble_member": [m for m in members for _ in range(len(valid_times))],
+                "temperature_2m": [
+                    float(m + i % 24) for m in members for i in range(len(valid_times))
+                ],
+                "precipitation_surface": [
+                    m * 1e-4 for m in members for _ in range(len(valid_times))
+                ],
+            }
+        )
+        .pipe(
+            cast_to_nwp_dtypes,
+            "ensemble_member",
+            "temperature_2m",
+            "precipitation_surface",
+        )
+        .lazy()
+    )
 
 
 def _nwp_analysis(inits: Sequence[datetime]) -> pl.LazyFrame:
@@ -304,15 +311,17 @@ def _nwp_analysis(inits: Sequence[datetime]) -> pl.LazyFrame:
                 {
                     "init_time": [run_init] * len(valid_times),
                     "valid_time": valid_times,
-                    "ensemble_member": pl.Series([0] * len(valid_times), dtype=pl.Int8),
-                    "h3_index": pl.Series([100] * len(valid_times), dtype=pl.Int64),
-                    "temperature_2m": pl.Series(
-                        [float(index)] * len(valid_times), dtype=pl.Float32
-                    ),
-                    "precipitation_surface": pl.Series(
-                        [1e-4 * (index + 1)] * len(valid_times), dtype=pl.Float32
-                    ),
+                    "ensemble_member": [0] * len(valid_times),
+                    "h3_index": [100] * len(valid_times),
+                    "temperature_2m": [float(index)] * len(valid_times),
+                    "precipitation_surface": [1e-4 * (index + 1)] * len(valid_times),
                 }
+            ).pipe(
+                cast_to_nwp_dtypes,
+                "ensemble_member",
+                "h3_index",
+                "temperature_2m",
+                "precipitation_surface",
             )
         )
     raw = pl.concat(frames).lazy()

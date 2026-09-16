@@ -344,6 +344,14 @@ allow-init-docstring = true
 # rather than an argument anybody passes.
 exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 
+[tool.ty.environment]
+# Mirror `pythonpath = ["tests"]` in `[tool.pytest.ini_options]` below, so `ty` resolves a bare
+# `_nwp_test_data` import the same way pytest does. Without this setting, the import resolves only
+# from a module sitting beside `_nwp_test_data` in `tests/`, and the same import from a package's
+# own test suite — `packages/ml_core/tests`, say — is an `unresolved-import` error even though
+# pytest runs it fine.
+extra-paths = ["tests"]
+
 [tool.pytest.ini_options]
 # importlib mode lets test modules in different directories share a basename (e.g.
 # tests/test_metrics.py and packages/ml_core/tests/test_metrics.py); the default prepend
