@@ -516,10 +516,11 @@ def _save_model_trained_on_weather_lag(path: Path, lag_hours: int) -> None:
 
 
 @pytest.mark.parametrize(
-    ("gap_hours", "members", "expect_null", "expect_degradation_reported"),
+    ("gap_hours", "members", "availability_mode", "expect_null", "expect_degradation_reported"),
     [
-        pytest.param(6, (0,), False, False, id="6h_gap_below_the_publication_delay"),
-        pytest.param(9, (1,), True, True, id="9h_gap_no_control_member"),
+        pytest.param(6, (0,), "live", False, False, id="6h_gap_below_the_publication_delay"),
+        pytest.param(9, (1,), "live", True, True, id="9h_gap_no_control_member"),
+        pytest.param(9, (0,), "replay", False, False, id="9h_gap_replay_mode"),
     ],
 )
 def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
@@ -528,6 +529,7 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     tmp_path: Path,
     gap_hours: int,
     members: tuple[int, ...],
+    availability_mode: str,
     expect_null: bool,
     expect_degradation_reported: bool,
 ) -> None:
@@ -548,6 +550,12 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     lag. The lag therefore comes back null. A run with no control member degrades the forecast
     rather than failing the slot, so ``materialize`` succeeding at all is itself part of what that
     case checks.
+
+    The third case runs the same slot in ``"replay"`` mode, where the cutoff *is* the publication
+    delay, with the run sitting exactly on that inclusive cutoff. Run selection and the ceiling
+    both still admit the run, so the lag is populated. That the ceiling cannot admit a *later* run
+    is pinned at value level by ``_engineer_features``' own decoy tests; what this case adds is
+    that the two agree end to end in the mode where a loosened ceiling would leak.
     """
     gap = timedelta(hours=gap_hours)
     power_fcst_init_time = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
@@ -600,7 +608,9 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     result = materialize(
         [live_forecasts],
         partition_key=partition_key,
-        run_config=RunConfig(ops={"live_forecasts": LiveForecastsConfig(availability_mode="live")}),
+        run_config=RunConfig(
+            ops={"live_forecasts": LiveForecastsConfig(availability_mode=availability_mode)}
+        ),
         instance=dagster_instance,
     )
     assert result.success

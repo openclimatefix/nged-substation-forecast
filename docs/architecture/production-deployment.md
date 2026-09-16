@@ -479,8 +479,8 @@ modes are deliberately asymmetric:
   leak NWP runs that only landed after the fact — a lookahead-bias bug, not just an inaccuracy.
 
 Downstream, feature engineering caps the freshest-run join it uses for weather lags at whichever
-run was selected here, rather than re-deriving availability from the publication delay. A `"live"` slot
-therefore keeps the run it is forecasting with, however fresh that run is.
+run was selected here, rather than re-deriving availability from the publication delay. A `"live"`
+slot therefore keeps the run it is forecasting with, however fresh that run is.
 
 The scheduled path always uses `"live"`; backfills of missed or historical partitions use
 `"replay"`. The mode is an explicit, manually-set flag rather than an automatic live-iff-recent rule

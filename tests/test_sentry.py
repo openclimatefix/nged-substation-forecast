@@ -386,7 +386,7 @@ def test_degradation_reporters_capture_the_exception_and_tag_the_name(
 
 
 def test_report_asset_degradation_fingerprints_a_synthesised_exception() -> None:
-    """A synthesised exception reaches Sentry carrying the caller's fingerprint, environment included.
+    """A synthesised exception reaches Sentry carrying the caller's whole fingerprint.
 
     ``live_forecasts`` reports a missing NWP control member by building a ``ValueError`` to carry
     the message rather than catching one, so the event has no stack trace and Sentry would group it
