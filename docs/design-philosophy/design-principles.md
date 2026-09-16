@@ -742,14 +742,16 @@ rule.
 
 ### A retraining cadence and trigger
 
-Retraining today happens on a manually-triggered, unspecified cadence: [the operator
-contract](../roadmap/handover.md#1-the-operator-contract) calls re-training "triggering and
-reviewing an automated run on a regular cadence" without naming one, and the trailing-window
-metrics the [production-monitoring design](../roadmap/live-service.md#production-monitoring)
-computes chart performance over time without anything acting on them. Standard MLOps practice ties
-retraining to a stated cadence, a performance-drift trigger, or both. We have neither yet, and
-adding a trigger meets the same open question as [input drift detection](#input-drift-detection)
-above: a stated cadence is easy to add, but a trigger risks reacting to a legitimate distribution
+Retraining today happens on a manually-triggered cadence that is not committed to for retraining
+specifically: [the operator contract](../roadmap/handover.md#1-the-operator-contract) calls
+re-training "triggering and reviewing an automated run on a regular cadence", with only "quarterly
+maintenance windows" offered nearby as an example cadence for OCF's scheduled work in general. The
+[production-monitoring design](../roadmap/live-service.md#production-monitoring) — not yet
+built — would chart trailing-window performance over time once it lands, but nothing in that design
+acts on the chart. Standard MLOps practice ties retraining to a stated cadence, a
+performance-drift trigger, or both. We have neither yet, and adding a trigger meets the same open
+question as [input drift detection](#input-drift-detection) above: a stated cadence is easy to
+add, but a trigger risks reacting to a legitimate distribution
 shift — a hot, dry summer, a wave of new solar connections — as if it were model decay.
 
 ### Monitoring how NGED uses the delivered forecasts

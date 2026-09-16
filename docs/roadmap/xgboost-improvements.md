@@ -468,14 +468,14 @@ bottom of Tier 1. The PV variant can run now on a raw GHI delta; the wind varian
 
 ### Log feature importances for every trained model
 
-Every model this project trains — one XGBoost booster per `time_series_id`, for every
-cross-validation fold and every promoted run — should log its feature importances (XGBoost's
-built-in gain-based `feature_importances_`) to the MLflow run that already exists for that model.
-The cost is a few lines and a dictionary of floats, with no new training step, and the diagnostic
-value shows up the first time a booster's feature ranking looks wrong and the current tooling has
-nothing to point at. This is a lightweight, per-training-run habit, distinct from the detailed
-model cards deferred until [after v2 ships](index.md#model-cards-for-promoted-models) for models
-actually promoted to production.
+Every model this project trains during cross-validation — one XGBoost `Booster` per
+`time_series_id`, for every fold — should have its feature importances
+(`Booster.get_score(importance_type="gain")`) logged to the MLflow run already created for that
+fold. The cost is a few lines and a dictionary of floats per booster, with no new training step,
+and the diagnostic value shows up the first time a booster's feature ranking looks wrong and the
+current tooling has nothing to point at. This is a lightweight, per-fold habit, distinct from the
+detailed model cards deferred until [after v2 ships](index.md#model-cards-for-promoted-models) for
+models actually promoted to production.
 
 ## Tier 2 — low-effort feature engineering (about a day each)
 

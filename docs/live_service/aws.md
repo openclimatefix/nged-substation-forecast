@@ -46,8 +46,8 @@ In the AWS console → **S3** → **Create bucket**, twice:
 - **Region** `eu-west-2` (London) for both — keep every resource in one region so S3 ↔ compute
   transfer stays free. It isn't the cheapest region available (`eu-west-1` runs meaningfully
   cheaper for Fargate); see [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
-  for the price comparison and why `eu-west-2` is picked anyway. The region choice is
-  provisional until the data-residency requirement is settled.
+  for the price comparison and why `eu-west-2` is picked anyway, and for why the region choice is
+  settled rather than an open question.
 - **Names**: `nged-forecast-delivery` (the five NGED-facing tables) and
   `nged-forecast-internal` (NWP, raw power telemetry, forecast metrics, and everything else
   OCF's pipeline needs but hasn't promised to keep stable). Bucket names are globally unique;
