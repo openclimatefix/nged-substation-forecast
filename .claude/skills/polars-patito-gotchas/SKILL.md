@@ -144,9 +144,11 @@ it follows from Polars' own annotations, so no checker version changes it.
 
 ## Delta Lake dictionary-encoded columns: declare Delta filter/partition columns as `String`
 
-delta-rs stores all Arrow dictionary-encoded columns (`Categorical`, `Enum`) as plain `String` in
-Parquet (this is the write-path gotcha documented in `_write_metrics_to_delta`, which casts the
-remaining `Enum` columns to `String` before writing). Two consequences:
+Writing a dictionary-encoded (`Categorical`, `Enum`) column through `write_deltalake` without
+casting it first leaves the Delta log recording `Utf8` while the parquet file holds a
+dictionary-typed column. The write succeeds, but a later `pl.read_delta` raises `SchemaError:
+data type mismatch`. `delta_store.forecast_metrics.write_forecast_metrics` casts its `Enum`
+columns to `String` before writing for exactly this reason. Two consequences:
 
 1. **A contract column you filter or partition on in Delta should be `String`, not `Categorical`.**
    If the schema declared it `Categorical`, every read would need a `String → Categorical` cast to
