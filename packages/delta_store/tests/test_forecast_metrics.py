@@ -59,6 +59,11 @@ def test_overwrite_is_partition_scoped_by_experiment_and_fold(tmp_path: Path) ->
     write_forecast_metrics(
         _make_metrics("exp_a", "fold_b", [3]), table, experiment_name="exp_a", fold_id="fold_b"
     )
+    # Same fold_id as the first write, but a different experiment_name — the predicate must key
+    # on both columns, or this overwrite would also wipe "exp_a"'s "fold_a" rows.
+    write_forecast_metrics(
+        _make_metrics("exp_b", "fold_a", [7]), table, experiment_name="exp_b", fold_id="fold_a"
+    )
     write_forecast_metrics(
         _make_metrics("exp_a", "fold_a", [4, 5, 6]),
         table,
@@ -66,7 +71,19 @@ def test_overwrite_is_partition_scoped_by_experiment_and_fold(tmp_path: Path) ->
         fold_id="fold_a",
     )
 
+    partition_dirs = sorted(
+        str(p.relative_to(table)) for p in table.glob("experiment_name=*/fold_id=*")
+    )
+    assert partition_dirs == [
+        "experiment_name=exp_a/fold_id=fold_a",
+        "experiment_name=exp_a/fold_id=fold_b",
+        "experiment_name=exp_b/fold_id=fold_a",
+    ]
+
     stored = pl.read_delta(str(table))
-    a_ids = stored.filter(pl.col("fold_id") == "fold_a")["time_series_id"]
+    a_ids = stored.filter((pl.col("experiment_name") == "exp_a") & (pl.col("fold_id") == "fold_a"))[
+        "time_series_id"
+    ]
     assert sorted(a_ids) == [4, 5, 6]
     assert stored.filter(pl.col("fold_id") == "fold_b")["time_series_id"].to_list() == [3]
+    assert stored.filter(pl.col("experiment_name") == "exp_b")["time_series_id"].to_list() == [7]

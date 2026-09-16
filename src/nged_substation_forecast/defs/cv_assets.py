@@ -153,8 +153,8 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
 
     if_local_path_then_make_parent_dir(settings.eligible_time_series_data_path)
     write_eligible_time_series(
-        eligible_df,
-        settings.eligible_time_series_data_path,
+        eligible=eligible_df,
+        table_uri=settings.eligible_time_series_data_path,
         fold_id=fold_id,
         storage_options=storage_options,
     )
@@ -202,7 +202,9 @@ def effective_capacity(context: AssetExecutionContext) -> None:
 
     if_local_path_then_make_parent_dir(settings.effective_capacity_data_path)
     write_effective_capacity(
-        capacity_df, settings.effective_capacity_data_path, storage_options=storage_options
+        capacity=capacity_df,
+        table_uri=settings.effective_capacity_data_path,
+        storage_options=storage_options,
     )
 
     context.add_output_metadata(
@@ -874,8 +876,8 @@ def _score_forecast_group(
         mlflow_run_id,
     )
     write_forecast_metrics(
-        enriched,
-        metrics_path,
+        metrics=enriched,
+        table_uri=metrics_path,
         experiment_name=exp_name,
         fold_id=fold_id,
         storage_options=storage_options,

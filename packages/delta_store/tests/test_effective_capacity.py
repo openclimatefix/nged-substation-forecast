@@ -2,7 +2,7 @@
 end-to-end.
 
 Writes real (tiny) ``EffectiveCapacity`` frames into a temp Delta table and asserts the
-whole-table overwrite semantics (no partitioning, unlike the other three new tables).
+whole-table overwrite semantics.
 """
 
 from datetime import UTC, datetime
@@ -34,6 +34,8 @@ def test_overwrite_replaces_whole_table(tmp_path: Path) -> None:
     table = tmp_path / "effective_capacity"
     write_effective_capacity(_make_capacity([1, 2, 3]), table)
     write_effective_capacity(_make_capacity([4, 5]), table)
+
+    assert not list(table.glob("*="))  # no Hive partitioning
 
     stored = pl.read_delta(str(table))
     assert sorted(stored["time_series_id"]) == [4, 5]

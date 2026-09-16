@@ -1,8 +1,6 @@
 """Storage policy for the ``power_time_series`` Delta table.
 
-No writer-properties, sort-order or precision tuning yet — see this package's ``__init__``
-docstring for which tables carry that tuning. This module exists so the write itself goes through
-``delta_store`` like every other table, rather than being open-coded in a Dagster asset.
+See this package's ``__init__`` docstring for which tables carry writer-properties tuning.
 """
 
 from pathlib import Path

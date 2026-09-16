@@ -1,7 +1,7 @@
 """Tests for ``write_power_time_series`` — the ``power_time_series`` storage format end-to-end.
 
 Writes real (tiny) ``PowerTimeSeries`` frames into a temp Delta table and asserts the append /
-Hive-partition-by-``time_series_id`` behaviour ported from the old ``.write_delta()`` call site.
+Hive-partition-by-``time_series_id`` behaviour.
 """
 
 from datetime import UTC, datetime

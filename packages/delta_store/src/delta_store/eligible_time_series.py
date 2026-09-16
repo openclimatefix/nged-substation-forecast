@@ -1,8 +1,6 @@
 """Storage policy for the ``eligible_time_series`` Delta table.
 
-No writer-properties, sort-order or precision tuning yet — see this package's ``__init__``
-docstring for which tables carry that tuning. This module exists so the write itself goes through
-``delta_store`` like every other table, rather than being open-coded in a Dagster asset.
+See this package's ``__init__`` docstring for which tables carry writer-properties tuning.
 """
 
 from pathlib import Path
@@ -17,8 +15,8 @@ from deltalake import write_deltalake
 def write_eligible_time_series(
     eligible: pt.DataFrame[EligibleTimeSeries],
     table_uri: str | Path,
-    fold_id: str,
     *,
+    fold_id: str,
     storage_options: ObjectStoreOptions | None = None,
 ) -> None:
     """Write one fold's ``EligibleTimeSeries`` rows to the ``eligible_time_series`` Delta table.

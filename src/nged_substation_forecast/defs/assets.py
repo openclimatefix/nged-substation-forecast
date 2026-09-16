@@ -200,7 +200,9 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     new_power_ts_deduped = select_new_rows(new_power_ts, delta_path, storage_options)
     if not new_power_ts_deduped.is_empty():
         if_local_path_then_make_parent_dir(delta_path)
-        write_power_time_series(new_power_ts_deduped, delta_path, storage_options=storage_options)
+        write_power_time_series(
+            power_ts=new_power_ts_deduped, table_uri=delta_path, storage_options=storage_options
+        )
 
     # Log statistics to be shown in Dagster's UI.
     context.add_output_metadata(

@@ -1,10 +1,8 @@
 """Storage policy for the ``forecast_metrics`` Delta table.
 
-No writer-properties, sort-order or precision tuning yet — see this package's ``__init__``
-docstring for which tables carry that tuning. This module exists so the write itself goes through
-``delta_store`` like every other table, and so the Enum→String cast below — on-disk-format
-knowledge, not evaluation logic — lives next to the write it protects rather than in a Dagster
-module.
+See this package's ``__init__`` docstring for which tables carry writer-properties tuning. The
+Enum→String cast below is on-disk-format knowledge, so it lives here rather than in evaluation
+logic.
 """
 
 from pathlib import Path
@@ -20,18 +18,21 @@ from deltalake import write_deltalake
 def write_forecast_metrics(
     metrics: pt.DataFrame[Metrics],
     table_uri: str | Path,
+    *,
     experiment_name: str,
     fold_id: str,
-    *,
     storage_options: ObjectStoreOptions | None = None,
 ) -> None:
     """Write ``Metrics`` rows to the ``forecast_metrics`` Delta table.
 
     Casts the ``Enum`` columns (e.g. ``metric_name``, ``horizon_slice``) to ``String`` before
-    writing — delta-rs stores Arrow dictionary arrays as plain String in Parquet, so the on-disk
-    schema is always String. Re-sending Enum data on an overwrite would cause a schema-mismatch
-    error. Performs an idempotent overwrite of the ``(experiment_name, fold_id)`` partition
-    so re-materialising the asset replaces rows rather than duplicating them.
+    writing. Without the cast, delta-rs writes the column as a dictionary-typed parquet column but
+    records it as ``Utf8`` in the Delta log — the write itself succeeds, but a later
+    ``pl.read_delta`` then raises ``SchemaError: data type mismatch for column ...: incoming:
+    Enum([...]) != target: String`` (verified against deltalake 1.6.3 / polars 1.44.2). Casting
+    before the write keeps the file's physical type and the log's logical type in step. Performs
+    an idempotent overwrite of the ``(experiment_name, fold_id)`` partition so re-materialising the
+    asset replaces rows rather than duplicating them.
 
     Args:
         metrics: Fully populated ``Metrics`` rows, with all provenance columns set by
