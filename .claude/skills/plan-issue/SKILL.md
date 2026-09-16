@@ -170,12 +170,21 @@ branch:
 git push -u origin <branch-name>
 ```
 
+**Open the PR now, as a draft, rather than waiting for implementation.** `gh pr create --draft`
+against `main`, with labels and `JackKelly` as assignee (`gh pr create` can't set either — follow
+with `gh pr edit --add-label <label>` and `gh pr edit --add-assignee JackKelly`), linking the issue
+so it closes on merge. The body says the plan is not yet approved and carries no code yet, and
+states the size from step 3 and which reviews it is getting. See the `github-issue-pr-workflow`
+skill for the full PR checklist. Opening it now gives every review below, and every push that
+follows, somewhere to land that the human reviewer can already be watching — the same place they
+will later review the diff.
+
 **Then hand over the plan before anything else happens to it.** Say in your next reply that the
-plan is ready and give a **clickable markdown link** to it, written as the path relative to the
-worktree so the terminal turns it into a link: `[plans/<branch-name>.md](plans/<branch-name>.md)`.
-Do this *before* launching any reviewer. The reviews take minutes, and whoever wants to read the
-first draft — or to stop the work outright — should not have to wait for them, nor work out
-afterwards which parts of the plan the reviews wrote.
+plan is ready and give **clickable markdown links** to both: the plan as the path relative to the
+worktree so the terminal turns it into a link (`[plans/<branch-name>.md](plans/<branch-name>.md)`),
+and the PR as the URL `gh pr create` printed. Do this *before* launching any reviewer. The reviews
+take minutes, and whoever wants to read the first draft — or to stop the work outright — should
+not have to wait for them, nor work out afterwards which parts of the plan the reviews wrote.
 
 One worktree per issue means `plans/` holds exactly one file on each branch, so the "at most one
 plan" rule in `plans/README.md` holds with no coordination between parallel sessions. Committing
@@ -283,7 +292,7 @@ for, or trades away a rule in `docs/design-philosophy/` — and say which, in on
 
 For each finding you reject, record the finding and the one-line reason in the plan file, so the
 human reviewer can see what was considered and dismissed. Commit the revised plan and push, so the
-branch on GitHub is never behind what the reviews have already done.
+branch — and the draft PR opened in step 4 — is never behind what the reviews have already done.
 
 **A proposed rearchitecture is the human reviewer's call, not yours** — it is bigger than the
 issue, so neither adopting it nor dropping it silently is right. Put it in the plan's "Risks and
@@ -319,7 +328,7 @@ defect, or not.
 
 Verify each finding against the code, on the same terms as step 6: fix the genuine ones in the
 plan file, and record each rejected finding with its one-line reason. Commit and push the updated
-plan, so the branch carries the original plan and what each review did to it.
+plan, so the branch — and the PR — carries the original plan and what each review did to it.
 
 ## 9. Stop
 
@@ -327,7 +336,8 @@ Report: the verdict from step 2, the size from step 3 and which reviews it bough
 of the plan, what each review that ran changed, and what each found that you rejected. Give the
 branch name and, again, the clickable link to the plan file.
 
-**Do not write any code, and do not open a PR.** Once a human approves the plan, implementation runs
-under the `implement-issue` skill, resuming at its step 2 in the worktree this skill already
-created — implement, verify, PR, then the diff reviews this skill's step 3 called for, each by a
-further independent sub-agent, triaging and pushing after each, stop for human review.
+**Do not write any code.** The PR opened in step 4 stays a draft until a human approves the plan.
+Once approved, implementation runs under the `implement-issue` skill, resuming at its step 2 in
+the worktree and draft PR this skill already created — implement, verify, push, mark the PR ready
+for review, then the diff reviews this skill's step 3 called for, each by a further independent
+sub-agent, triaging and pushing after each, stop for human review.

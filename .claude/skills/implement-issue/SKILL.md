@@ -18,8 +18,9 @@ This routine starts from an **approved plan**. The `plan-issue` skill (invoked a
 `/plan-issue <N>`) is how you get one: it reads the issue, decides whether it is worth
 implementing at all, sizes how much process the issue needs, writes `plans/<branch-name>.md`, puts
 it through up to two adversarial sub-agent reviews — one for simplicity, one for correctness and
-testability — and stops for human review. It also does step 1 below, so when it hands over, the
-worktree and branch already exist and implementation resumes at step 2.
+testability — and stops for human review. It also does step 1 below and opens the PR as a draft,
+so when it hands over, the worktree, branch and draft PR already exist and implementation resumes
+at step 2.
 
 The one issue that arrives here **without** a plan is one `plan-issue` sized as simple: a
 mechanical change with no design to approve, which runs steps 1 to 4 and then stops for human
@@ -58,11 +59,15 @@ front — a report back after step 1 is not finished work.
    `uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md` and
    `uv run mkdocs build --strict`.
 
-4. **Commit, push and open the PR** against `main`, with labels and `JackKelly` as assignee (`gh
-   pr create` can't set either — follow with `gh pr edit --add-label <label>` and `gh pr edit
-   --add-assignee JackKelly`), linking the issue so it closes on merge. Commit messages end
-   with `Co-Authored-By: Claude <noreply@anthropic.com>`. See the `github-issue-pr-workflow`
-   skill for the full PR checklist and the never-squash-merge rule.
+4. **Commit, push, and mark the PR ready for review.** If a plan preceded this, `plan-issue`
+   already opened the PR as a draft in its own step 4 — commit the implementation, push, and take
+   it out of draft with `gh pr ready <N>`. Refresh the body if the size or the reviews it is
+   getting changed since the plan was written. If there is no plan (the simple-issue path, which
+   arrives here directly), open the PR now instead: `gh pr create` against `main`, with labels and
+   `JackKelly` as assignee (`gh pr create` can't set either — follow with `gh pr edit --add-label
+   <label>` and `gh pr edit --add-assignee JackKelly`), linking the issue so it closes on merge.
+   Commit messages end with `Co-Authored-By: Claude <noreply@anthropic.com>`. See the
+   `github-issue-pr-workflow` skill for the full PR checklist and the never-squash-merge rule.
 
     The body says **how the issue was sized and which adversarial reviews it is getting** — and
     where that is none, says so outright. A PR that no sub-agent has attacked is one where human
