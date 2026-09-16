@@ -15,7 +15,11 @@ Lazy Evaluation:
     exceptions, and neither reads the full table. ``collect_schema()`` inspects the query plan's
     column names and dtypes without executing it. The NWP control-member check calls
     ``.collect()`` on a frame already cut to ``.limit(1)``, so the eager read is bounded to at
-    most one row rather than the table — that bound is what makes collecting here acceptable.
+    most one row rather than the table — that bound is what makes collecting here acceptable. In
+    bulk mode (training/backtesting), a missing control member raises immediately. In single-run
+    mode (production inference, replay), a missing control member is absent input, not a contract
+    violation: it is logged and left to degrade weather lags to null through the ordinary
+    join-miss path.
 
 Nullify Leaky Lags Rationale:
     ``_nullify_leaky_lags`` (in ``_lags.py``) is called at the end of the pipeline to enforce
@@ -23,6 +27,7 @@ Nullify Leaky Lags Rationale:
     ahead. It nullifies any lag shorter than or equal to the forecast lead time.
 """
 
+import logging
 import math
 from datetime import datetime, timedelta
 
@@ -38,10 +43,13 @@ from ml_core.features._nwp import (
     NWP_PUBLICATION_DELAY_HOURS,
     _join_nwp_bulk_mode,
     _join_nwp_single_run,
+    _resolve_nwp_init_time,
     _upsample_nwp_to_half_hourly,
 )
-from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, ParsedFeatures
+from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, LagFeature, ParsedFeatures
 from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE, FeatureEngineer
+
+logger = logging.getLogger(__name__)
 
 
 def _attach_nearest_nwp_cell(
@@ -99,6 +107,44 @@ class TabularFeatureEngineer(FeatureEngineer):
             nwp_publication_delay_hours=nwp_publication_delay_hours,
             local_timezone=local_timezone,
         )
+
+
+def _check_or_warn_on_missing_control_member(
+    nwp_lf: pl.LazyFrame | None,
+    *,
+    weather_lags: list[LagFeature],
+    power_fcst_init_time: datetime | None,
+    nwp_init_time: datetime | None,
+    nwp_publication_delay_hours: int,
+) -> None:
+    """Fail fast in bulk mode, degrade and log in single-run mode, when no control member exists."""
+    # Probes the raw frame, not the upsampled one: `SLICE` cannot push through the upsample's
+    # window functions, so probing post-upsample would run the whole upsample before answering.
+    control_member_missing = (
+        nwp_lf is not None
+        and bool(weather_lags)
+        and nwp_lf.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty()
+    )
+    if not control_member_missing:
+        return
+    if power_fcst_init_time is None:
+        # Bulk mode: fail fast (inherent-stability.md rule 9).
+        raise ValueError(
+            "Weather lag features require the NWP control member (ensemble_member == 0) to "
+            "build historical weather during bulk training or backtesting, but no such rows "
+            "were found in the NWP data."
+        )
+    # Single-run mode: degrade rather than raise (inherent-stability.md rule 1). Every
+    # past-target-time weather lag comes back null through the ordinary join-miss path in
+    # `_engineer_features`.
+    resolved_nwp_init_time = _resolve_nwp_init_time(
+        nwp_init_time, power_fcst_init_time, nwp_publication_delay_hours
+    )
+    logger.warning(
+        "NWP run %s has no control member (ensemble_member == 0). Weather lag features will be "
+        "null for this slot.",
+        resolved_nwp_init_time,
+    )
 
 
 def _engineer_features(
@@ -209,19 +255,13 @@ def _engineer_features(
     else:
         processed_nwp = None
     weather_lags = [lag for lag in parsed_features.lags if lag.base_col != "power"]
-    # Probe the raw NWP rather than `processed_nwp`: `ensemble_member` is one of the upsample's
-    # group-by keys, so the upsample can neither create nor destroy control-member rows, and
-    # `SLICE` cannot push through its window functions — probing the upsampled frame would run
-    # the whole upsample before answering.
-    if (
-        nwp_lf is not None
-        and weather_lags
-        and nwp_lf.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty()
-    ):
-        raise ValueError(
-            "Weather lag features require the NWP control member (ensemble_member == 0) "
-            "to build historical weather, but no such rows were found in the NWP data."
-        )
+    _check_or_warn_on_missing_control_member(
+        nwp_lf,
+        weather_lags=weather_lags,
+        power_fcst_init_time=power_fcst_init_time,
+        nwp_init_time=nwp_init_time,
+        nwp_publication_delay_hours=nwp_publication_delay_hours,
+    )
     if processed_nwp is None or not weather_lags:
         historical_weather = None
     elif power_fcst_init_time is not None:
