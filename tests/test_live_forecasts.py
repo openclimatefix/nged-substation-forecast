@@ -29,6 +29,7 @@ from dagster import (
 from ml_core.base_forecaster import write_trained_metadata
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
+from nged_substation_forecast._sentry import NWP_CONTROL_MEMBER_MISSING_FINGERPRINT
 from nged_substation_forecast.defs import production_assets
 from nged_substation_forecast.defs.checks import live_forecasts_are_healthy
 from nged_substation_forecast.defs.production_assets import LiveForecastsConfig, live_forecasts
@@ -515,36 +516,46 @@ def _save_model_trained_on_weather_lag(path: Path, lag_hours: int) -> None:
 
 
 @pytest.mark.parametrize(
-    ("gap_hours", "members", "expect_null"),
+    ("gap_hours", "members", "availability_mode", "expect_null", "expect_degradation_reported"),
     [
-        pytest.param(6, (0,), True, id="6h_gap_below_the_publication_delay"),
-        pytest.param(9, (0,), False, id="9h_gap_at_the_publication_delay"),
-        pytest.param(9, (1,), True, id="9h_gap_no_control_member"),
+        pytest.param(6, (0,), "live", False, False, id="6h_gap_below_the_publication_delay"),
+        pytest.param(9, (1,), "live", True, True, id="9h_gap_no_control_member"),
+        pytest.param(9, (0,), "replay", False, False, id="9h_gap_replay_mode"),
     ],
 )
-def test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh(
+def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     monkeypatch: pytest.MonkeyPatch,
     dagster_instance: DagsterInstance,
     tmp_path: Path,
     gap_hours: int,
     members: tuple[int, ...],
+    availability_mode: str,
     expect_null: bool,
+    expect_degradation_reported: bool,
 ) -> None:
-    """Pins when the single-run freshest-run join nulls a weather lag rather than populating it.
+    """A weather lag survives a run fresher than ``NWP_PUBLICATION_DELAY_HOURS``.
 
     ``live_forecasts`` selects its one NWP run in ``"live"`` availability mode, which applies no
-    modelled delay — any run genuinely present in the Delta table qualifies. But the single-run
-    analysis-proxy inside ``_engineer_features`` still gates its freshest-run join with the
-    ``NWP_PUBLICATION_DELAY_HOURS`` (9h) ``available_at`` cut. When the selected run is closer
-    than 9 hours to ``power_fcst_init_time`` — as at the 06:00 slot, when only that morning's run
-    has landed — the cut excludes the run entirely from the freshest-run join and a weather lag
-    targeting an earlier time goes null; a run 9 hours or further back passes the cut and the lag
-    is populated. This pins the behaviour as it stands, not as a design endorsement: whether
-    "live" mode should apply the same delay is a serving-path semantic decision, tracked
-    separately from this test. The third case (``members=(1,)``) instead pins a different cause of
-    the same null: a run with no control member at all — a partial or malformed ECMWF ENS
-    download — degrades the same way rather than failing the slot. ``materialize`` succeeding at
-    all is itself part of what that case checks.
+    modelled delay — any run genuinely present in the Delta table qualifies. The single-run
+    analysis proxy inside ``_engineer_features`` caps its freshest-run join at that same selected
+    run. Run selection and the analysis proxy therefore agree, and the gap between the selected run
+    and ``power_fcst_init_time`` does not matter. The first case puts the run 6 hours back, well
+    inside the 9-hour publication delay: the shape of the 06:00 slot, when only that morning's run
+    has landed. The lag is populated.
+
+    The second case (``members=(1,)``) pins a cause of a null weather lag this change leaves
+    standing: a run with no control-member rows at all, which is a partial or malformed ECMWF ENS
+    download. The delivered row's lag points back before ``power_fcst_init_time``, so of the two
+    joins ``_apply_weather_lag`` makes, only the control-member analysis proxy could answer that
+    lag. The lag therefore comes back null. A run with no control member degrades the forecast
+    rather than failing the slot, so ``materialize`` succeeding at all is itself part of what that
+    case checks.
+
+    The third case runs the same slot in ``"replay"`` mode, where the cutoff *is* the publication
+    delay, with the run sitting exactly on that inclusive cutoff. Run selection and the ceiling
+    both still admit the run, so the lag is populated. That the ceiling cannot admit a *later* run
+    is pinned at value level by ``_engineer_features``' own decoy tests; what this case adds is
+    that the two agree end to end in the mode where a loosened ceiling would leak.
     """
     gap = timedelta(hours=gap_hours)
     power_fcst_init_time = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
@@ -561,6 +572,7 @@ def test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh(
     monkeypatch.setenv("NWP_DATA_PATH", str(tmp_path / "NWP"))
     monkeypatch.setenv("POWER_FORECASTS_DATA_PATH", str(tmp_path / "power_forecasts"))
     monkeypatch.setenv("PRODUCTION_MODEL_PATH", str(production_model_path))
+    monkeypatch.setenv("SENTRY_ENVIRONMENT", "test-env")
 
     _write_power_for(str(nged_path / "power_time_series.delta"), (1,))
     records = nwp_records(
@@ -584,10 +596,21 @@ def test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh(
 
     monkeypatch.setattr(XGBoostForecaster, "predict", _spy_predict)
 
+    reported: list[tuple[str, BaseException, list[str] | None]] = []
+    monkeypatch.setattr(
+        target=production_assets,
+        name="report_asset_degradation",
+        value=lambda asset_name, exc, fingerprint=None: reported.append(
+            (asset_name, exc, fingerprint)
+        ),
+    )
+
     result = materialize(
         [live_forecasts],
         partition_key=partition_key,
-        run_config=RunConfig(ops={"live_forecasts": LiveForecastsConfig(availability_mode="live")}),
+        run_config=RunConfig(
+            ops={"live_forecasts": LiveForecastsConfig(availability_mode=availability_mode)}
+        ),
         instance=dagster_instance,
     )
     assert result.success
@@ -596,5 +619,62 @@ def test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh(
     genuine = predicted_from.collect()
     assert genuine.height > 0
     lag_col = f"temperature_2m_lag_{gap_hours}h"
-    lag_is_entirely_null = genuine[lag_col].null_count() == genuine.height
-    assert lag_is_entirely_null == expect_null
+    # Every delivered row's target time precedes power_fcst_init_time, so the freshest-run
+    # (analysis-proxy) branch is the branch under test here.
+    lag_is_null = genuine[lag_col].null_count() == genuine.height
+    assert lag_is_null == expect_null
+
+    # Rule 4 of inherent-stability requires the degradation to reach Sentry, not only the logs.
+    assert bool(reported) == expect_degradation_reported
+    if reported:
+        (asset_name, exc, fingerprint) = reported[0]
+        assert asset_name == "live_forecasts"
+        # The alert has to name the run and the slot at fault, not merely the kind of error.
+        assert nwp_init.isoformat() in str(exc)
+        assert power_fcst_init_time.isoformat() in str(exc)
+        # A synthesised exception carries no stack trace, so only the fingerprint stops each
+        # degraded slot opening its own Sentry issue.
+        # The environment is the second element, so production and a laptop never share an issue.
+        assert fingerprint == [NWP_CONTROL_MEMBER_MISSING_FINGERPRINT, "test-env"]
+
+
+class _FakePanic(BaseException):
+    """Stands in for the ``pyo3_runtime.PanicException`` a polars or deltalake fault raises.
+
+    It derives from ``BaseException`` rather than ``Exception``, which is why the guard on the
+    probe catches ``BaseException`` — an ``except Exception`` would let this one through."""
+
+
+def test_a_failing_control_member_probe_degrades_the_slot_instead_of_failing_it(
+    env: dict[str, str], monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    """The control-member probe is a warning path, so its own failure must not cost the slot.
+
+    The probe collects against the NWP scan, so an object-store fault can raise there even when
+    the forecast itself would have been fine. Rule 7 of inherent-stability forbids a warning path
+    from failing the asset it warns about, because Dagster fails the run and the failure hook then
+    pages over telemetry rather than over a bad forecast. The forecast still lands, and the
+    swallowed fault reaches Sentry — with no fingerprint, because a caught exception carries the
+    stack trace Sentry groups on.
+    """
+
+    def _boom(*_: object, **__: object) -> bool:
+        raise _FakePanic("object store down")
+
+    monkeypatch.setattr(production_assets, "weather_lags_lack_their_control_member", _boom)
+    reported: list[tuple[str, BaseException, list[str] | None]] = []
+    monkeypatch.setattr(
+        target=production_assets,
+        name="report_asset_degradation",
+        value=lambda asset_name, exc, fingerprint=None: reported.append(
+            (asset_name, exc, fingerprint)
+        ),
+    )
+
+    assert _materialize(dagster_instance, "live").success
+    assert _read_forecasts(env).height > 0
+
+    (asset_name, exc, fingerprint) = reported[0]
+    assert asset_name == "live_forecasts"
+    assert isinstance(exc, _FakePanic)
+    assert fingerprint is None

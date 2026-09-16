@@ -5,17 +5,36 @@ can consume, and the two NWP join modes (bulk training vs. single-run inference)
 """
 
 from datetime import datetime, timedelta
+from typing import Final
 
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.weather_schemas import Nwp
 
-# Re-export shim: the canonical definition lives in ``weather_utils`` (the analysis-proxy
-# availability cut owns it), but the join helpers here and ``production_helpers`` /
-# ``feature_engineer`` still import it from this module.
-from weather_utils import NWP_PUBLICATION_DELAY_HOURS
+NWP_PUBLICATION_DELAY_HOURS: Final[int] = 9
+"""Hours after an NWP run's ``init_time`` before we treat that run as usable.
 
-__all__ = ["NWP_PUBLICATION_DELAY_HOURS"]
+This models when a run reaches *our* disk, not when Dynamical publish it. Dynamical publish each
+00Z run between 08:05 and 08:20 UTC, and ``ecmwf_ens_schedule`` downloads it at 08:30 UTC, so a 00Z
+run is ours from roughly 08:30 — 8.5 hours. Nine is the nearest whole hour at or after that.
+
+The feature pipeline uses the delay to derive ``power_fcst_init_time`` from ``nwp_init_time`` in
+bulk mode, and to derive ``nwp_init_time`` when a single-run caller omits ``nwp_init_time``.
+``select_nwp_init_time`` uses the delay to reconstruct availability for ``"replay"`` backfills.
+``select_analysis_proxy`` needs no delay: in single-run mode ``_engineer_features`` caps the
+proxy at the NWP run that call already selected.
+
+Of ``select_nwp_init_time``'s two modes, only ``"replay"`` needs the delay. A live run joins
+whatever is genuinely on disk, so reality already constrains the NWP table to runs that were
+genuinely published. A replay of a past init time would otherwise join runs that only landed
+afterwards — lookahead bias rather than mere inaccuracy. The asymmetry in full:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#resolve-nwp-availability-asymmetrically-live-vs-replay>
+
+Two bounds constrain the value, given one 00Z run a day and forecast slots at 00/06/12/18 UTC. The
+06:00 slot must *not* see that morning's run, which has not landed yet, so the value must exceed 6.
+The 12:00 slot *must* see it, so the value must not exceed 12. Both bounds move if
+``ecmwf_ens_schedule``'s start time changes.
+"""
 
 
 def _join_nwp_bulk_mode(
@@ -83,7 +102,9 @@ def _join_nwp_single_run(
     ``power_lf`` carries no metadata — see ``_join_nwp_bulk_mode``.
     """
     nwp_init_time_val = _resolve_nwp_init_time(
-        nwp_init_time, power_fcst_init_time, nwp_publication_delay_hours
+        nwp_init_time=nwp_init_time,
+        power_fcst_init_time=power_fcst_init_time,
+        nwp_publication_delay_hours=nwp_publication_delay_hours,
     )
     power_with_init = power_lf.with_columns(
         power_fcst_init_time=pl.lit(power_fcst_init_time),

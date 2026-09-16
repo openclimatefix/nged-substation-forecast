@@ -1,13 +1,13 @@
 """Tests for ``weather_utils.select_analysis_proxy``.
 
 Mirrors the leakage-test style of ``ml_core``'s ``_nullify_leaky_lags`` tests: small hand-built
-frames whose expected freshest-run / availability behaviour is obvious by inspection.
+frames whose expected freshest-run behaviour is obvious by inspection.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import polars as pl
-from weather_utils import NWP_PUBLICATION_DELAY_HOURS, select_analysis_proxy
+from weather_utils import select_analysis_proxy
 
 
 def _nwp(rows: list[dict]) -> pl.LazyFrame:
@@ -30,10 +30,14 @@ BASE = datetime(2026, 1, 1, 0, 0)
 
 def test_freshest_run_wins_per_group_and_valid_time() -> None:
     valid = BASE + timedelta(hours=30)
+    # The freshest run is listed *first*, so input order and init_time order disagree: the
+    # reduction has to sort rather than take the last row it happens to see. `pl.scan_delta`
+    # guarantees no row order, and the dashboard passes a `pl.scan_delta` frame straight into
+    # this function.
     lf = _nwp(
         [
-            _row(1, BASE, valid, 0, 10.0),  # 30 h lead — older run
             _row(1, BASE + timedelta(hours=24), valid, 0, 11.0),  # 6 h lead — freshest, wins
+            _row(1, BASE, valid, 0, 10.0),  # 30 h lead — older run
         ]
     )
     result = select_analysis_proxy(lf, group_key="group").collect()
@@ -109,36 +113,6 @@ def test_max_lead_bounds_each_run_strictly() -> None:
     assert sorted(result["valid_time"].to_list()) == valids[:2]
 
 
-def test_available_at_excludes_runs_not_yet_published() -> None:
-    # Two runs straddle the publication cut for one valid time. The fresher run is NOT yet
-    # available at the as-of time, so the older-but-published run must win — even though it is
-    # not the freshest by lead. This is the leakage guard.
-    valid = BASE + timedelta(hours=48)
-    early = BASE  # published at BASE + delay
-    late = BASE + timedelta(hours=24)  # published at BASE + 24 h + delay
-    available_at = BASE + timedelta(hours=24)  # < late's publication time
-    lf = _nwp(
-        [
-            _row(1, early, valid, 0, 10.0),
-            _row(1, late, valid, 0, 11.0),
-        ]
-    )
-    result = select_analysis_proxy(lf, group_key="group", available_at=available_at).collect()
-    assert result["temperature_2m"].to_list() == [10.0]
-    # Sanity: with no availability cut the freshest (late) run would have won instead.
-    unbounded = select_analysis_proxy(lf, group_key="group").collect()
-    assert unbounded["temperature_2m"].to_list() == [11.0]
-
-
-def test_available_at_boundary_is_inclusive() -> None:
-    valid = BASE + timedelta(hours=48)
-    init = BASE
-    available_at = init + timedelta(hours=NWP_PUBLICATION_DELAY_HOURS)  # exactly published
-    lf = _nwp([_row(1, init, valid, 0, 10.0)])
-    result = select_analysis_proxy(lf, group_key="group", available_at=available_at).collect()
-    assert result["temperature_2m"].to_list() == [10.0]
-
-
 def test_init_time_col_is_configurable() -> None:
     # The pipeline calls the function with its renamed init-time column.
     valid = BASE + timedelta(hours=6)
@@ -188,19 +162,3 @@ def test_collapses_to_one_row_when_two_runs_tie_at_the_freshest_init_time() -> N
     )
     result = select_analysis_proxy(lf, group_key="group").collect()
     assert result.height == 1
-
-
-def test_available_at_works_with_tz_aware_datetimes() -> None:
-    # The real NWP columns are tz-aware UTC; the leakage cut must work against that dtype, not just
-    # the tz-naive datetimes the other tests use.
-    base = datetime(2026, 1, 1, tzinfo=UTC)
-    valid = base + timedelta(hours=48)
-    lf = _nwp(
-        [
-            _row(1, base, valid, 0, 10.0),  # published at base + delay
-            _row(1, base + timedelta(hours=24), valid, 0, 11.0),  # not yet available
-        ]
-    )
-    available_at = base + timedelta(hours=24)
-    result = select_analysis_proxy(lf, group_key="group", available_at=available_at).collect()
-    assert result["temperature_2m"].to_list() == [10.0]

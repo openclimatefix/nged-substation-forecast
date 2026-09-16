@@ -293,10 +293,10 @@ flag, event age, attributed magnitude) are themselves natural features for this 
   run per past target time with no publication-time constraint, and is leak-free today only as a
   side effect of daily run cadence. The residual pipeline must therefore add an explicit
   availability cut, guarded by a leakage test in the spirit of the `_nullify_leaky_lags` tests.
-  The natural home for that cut is `weather_utils.analysis_proxy.select_analysis_proxy`, the
-  shared NWP analysis-proxy function that already unifies the dashboard's stitched proxy-analysis
-  query with the feature pipeline's freshest-run-per-valid-time join, and already applies an
-  `available_at` cut.
+  The natural home for that cut is a filter on the NWP frame before
+  `weather_utils.analysis_proxy.select_analysis_proxy` reduces it — the shape single-run mode
+  already uses for its ceiling. The residual pipeline runs in bulk mode, which applies no such
+  cut today.
 - **Cross-series features are new machinery.** Neighbour residuals need the trial-area adjacency
   list (a dependency in [Open items](#open-items-dependencies)) plus a cross-series join in feature engineering. The feature-schema
   question (each series has its own neighbour set, of varying size) is answered by the pooled
@@ -461,9 +461,9 @@ residual lags already need.
 **The same no-lookahead discipline.** The draft at the target time must be hindcast on NWP *as
 available at that lead time*, not on fresh analysis-like data, or stage 2 calibrates its corrections
 against a draft that is systematically better than the live draft — the same availability cut the
-residual-lag hindcasts and the freshest-run join require, which
-`weather_utils.analysis_proxy.select_analysis_proxy` applies. The lead-time feature belongs in stage
-1 so the draft's own attenuation with horizon is honest.
+residual-lag hindcasts and the freshest-run join require. The feature pipeline applies that cut in
+single-run mode, as a ceiling at the selected NWP run. The lead-time feature belongs in stage 1 so
+the draft's own attenuation with horizon is honest.
 
 **The prize — a plausible route to a global corrector.** The correction target `(actual − draft)`
 has far smaller variance than raw power and is far more stationary across series: recent-anomaly
