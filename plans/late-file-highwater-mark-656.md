@@ -114,6 +114,17 @@ this in `_existing_power_time_series_keys`'s docstring the same way `time_series
 documents its own cost, so the next person to touch this understands why it doesn't need the same
 streaming-engine treatment applied to a full-table scan.
 
+Measured on the same synthetic V2 table `time_series_coverage`'s own docstring uses (2,500 series,
+half-hourly, 1 year, 43.8M rows, partitioned by `time_series_id`): the existing full-table
+aggregate scan (`time_series_coverage`'s own mechanism) took 0.47s and ~90MB. The restricted
+anti-join scaled with the reporting series count: ~0.04s and negligible extra memory at 1–20
+reporting series, 0.06s/~110MB at 100, 0.14s/~585MB at 500, and 0.57s/~2.75GB at the full 2,500 —
+worse on memory than the existing aggregate scan at that point, because an anti-join has to
+materialise the actual `(time_series_id, time)` rows to hash-join against, while an aggregate
+collapses each series to two values before it ever leaves the query engine. At the handful-per-hour
+volume the plan expects, this is a clear improvement over today's two full scans; see the risk
+noted below for the case where many series report in the same hour.
+
 ### No changes to `write_power_time_series`, `delta_store`, or any Patito contract
 
 Confirms the scope departure above: nothing about *how* rows are written changes, only which rows
@@ -201,6 +212,17 @@ no rendered docs page.
 
 ## Risks and open questions
 
+- **Memory spikes if an unusually large number of series report new data in the same hour.**
+  Measured on a synthetic 2,500-series, 1-year (43.8M-row) table: the restricted anti-join costs
+  ~0.04s and negligible extra memory at 1–20 reporting series (the expected case), but ~585MB at
+  500 and ~2.75GB at all 2,500 — worse than the existing full-table aggregate scan (~90MB) at that
+  point, because an anti-join must materialise the actual rows to hash-join against rather than
+  collapsing to a per-series aggregate. This only bites on an hour where a large fraction of all
+  series report simultaneously — a bulk backfill, or NGED recovering from an extended platform
+  outage — not on an ordinary hour. *Recommendation*: accept this for now, since the ordinary-hour
+  cost is a clear improvement over today's two full scans; if a bulk backfill needs to run, do it
+  with a larger memory allocation than the hourly production run gets, or in batches of series
+  small enough to stay in the cheap regime, rather than changing the mechanism for the common case.
 - **Is `_LATE_FILE_LOOKBACK = timedelta(days=3)` the right margin?** It only bounds re-download
   cost; it cannot cause an incorrect row to be *stored*, because the row-level anti-join is the
   actual correctness gate. A file arriving later than the margin is still silently dropped at the
