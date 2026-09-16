@@ -128,6 +128,15 @@ Never squash-merge. We keep the full commit history in `main`, so use a merge co
 (`gh pr merge --merge`) or rebase (`gh pr merge --rebase`), not `gh pr merge --squash`. Under the
 `implement-issue` routine you stop for human review rather than merging at all.
 
+**Wait for the head commit's `ci` check to finish before merging — don't merge in the same breath
+as a push.** `main`'s branch ruleset requires the `ci` GitHub Actions check to pass, and that check
+takes roughly two minutes to run on a fresh commit. Calling `gh pr merge` immediately after `git
+push` races that run: if `ci` hasn't completed yet, `gh pr merge` fails with `is not mergeable: the
+base branch policy prohibits the merge`, which reads like a permanent block but means only "a
+required check is still pending". Confirm with `gh pr checks <N>` (wants `pass`, not merely
+"running") or the GraphQL `mergeStateStatus` field (wants `CLEAN`) before retrying, rather than
+reaching for `--admin` or assuming the failure is a `gh` bug.
+
 **Check what the merge will close, before you merge.** Issues are closed by two independent routes,
 the **PR body** and the **commit messages**, and neither is reliably visible in
 `closingIssuesReferences` beforehand. Read the text yourself:
