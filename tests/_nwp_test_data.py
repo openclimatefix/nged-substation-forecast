@@ -55,8 +55,8 @@ def cast_to_nwp_dtypes(frame: pl.DataFrame, *columns: str) -> pl.DataFrame:
     cannot produce. Casting through this helper makes the wrong dtype unwritable, and raises
     `KeyError` on a column `Nwp` does not declare, which also catches a typo in a column name.
 
-    Name only the columns the fixture shares with `Nwp`. A fixture carrying `nwp_init_time` or
-    `time_series_id` — names the contract does not use — leaves those out and casts them itself.
+    Name only the columns the fixture shares with `Nwp`. A column the contract does not declare —
+    `nwp_init_time`, `time_series_id` — stays out of the call and is cast by the fixture instead.
 
     Args:
         frame: The fixture frame to cast.
