@@ -22,6 +22,7 @@ from dagster import (
     AssetDep,
     AssetExecutionContext,
     Config,
+    DagsterExecutionInterruptedError,
     MetadataValue,
     TableRecord,
     TimeWindowPartitionMapping,
@@ -38,9 +39,14 @@ from ml_core.production_helpers import (
     fetch_model_artifacts,
     load_forecaster_from_dir,
     select_nwp_init_time,
+    weather_lags_lack_their_control_member,
 )
 
-from nged_substation_forecast._sentry import send_forecast_checkin
+from nged_substation_forecast._sentry import (
+    NWP_CONTROL_MEMBER_MISSING_FINGERPRINT,
+    report_asset_degradation,
+    send_forecast_checkin,
+)
 from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
 from nged_substation_forecast.defs._tags import PRODUCTION_LAYER_TAGS, RESEARCH_LAYER_TAGS
 
@@ -281,16 +287,21 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     ``write_power_forecasts``'s ``replace_predicate_extra``, so re-running a 6-hourly slot (or
     replaying one) never duplicates rows or wipes the rest of the ``"live"`` fold.
 
-    Note: only one NWP run is loaded here, and "live" availability applies no publication delay,
-    so a weather-lag feature goes null only when that run is closer than
-    ``NWP_PUBLICATION_DELAY_HOURS`` to ``power_fcst_init_time`` — e.g. the 06:00 slot, when only
-    that morning's run has landed — and is populated at every other slot. A run whose control
-    member (``ensemble_member == 0``) is wholly absent — a partial or malformed ECMWF ENS
-    download — degrades the same way. Every weather lag for that slot comes back null, and
-    ``_engineer_features`` logs a warning naming the run rather than failing the slot. See
-    ``test_live_weather_lag_nulls_only_when_the_selected_run_is_too_fresh``. None of the current
-    champion config's features are weather lags, so neither path fires today, but a future feature
-    change touching weather lags should trip over this consciously.
+    Note: only one NWP run is loaded here. Weather-lag features are built from that run however
+    fresh the run is, because feature engineering caps the freshest-run join it uses for weather
+    lags at the run selected above rather than at a modelled publication delay. When that run
+    carries no control-member rows (``ensemble_member == 0``) — a partial or malformed ECMWF ENS
+    download — the weather lags reaching back before ``power_fcst_init_time`` come back null.
+    Those are the lags the control-member analysis proxy answers, and each of them loses the first
+    ``lag_hours`` of the horizon. The rest of the horizon is answered by the same-run join, which
+    reads whichever ensemble members the run does carry. That slot degrades rather than
+    failing: ``_engineer_features`` logs a warning naming the run, and this asset reports the same
+    degradation to Sentry tagged ``degraded_asset=live_forecasts``, so an operator is alerted
+    without having to read the logs. See
+    ``test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay``. None of the
+    current champion config's features are weather lags, so the missing-control-member path does
+    not fire today, but a future feature change touching weather lags should trip over this
+    consciously.
     """
     settings = Settings()
     power_fcst_init_time = context.partition_time_window.end
@@ -320,6 +331,37 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         init_time_start=nwp_init,
         init_time_end=nwp_init,
     )
+    # The Sentry channel for the degradation that nulls the near leads of every weather lag.
+    # `_engineer_features` logs a warning for the same condition; rule 4 of inherent-stability
+    # requires both, because an operator reads the alert rather than the logs:
+    # <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>
+    # Rule 7 puts the probe under a catch-all, and before the write: the probe collects against the
+    # NWP scan, so an object-store fault here would otherwise fail the slot from the warning path.
+    try:
+        if weather_lags_lack_their_control_member(
+            nwp_lf, selected_features=forecaster.model_params.selected_features
+        ):
+            report_asset_degradation(
+                asset_name="live_forecasts",
+                exc=ValueError(
+                    f"NWP run {nwp_init.isoformat()} has no control-member rows "
+                    f"(ensemble_member == 0) for this slot's H3 cells, so every weather lag in "
+                    f"the {power_fcst_init_time.isoformat()} slot is null over its first "
+                    "lag_hours of lead time. The forecast was still produced, on the remaining "
+                    "features and on the rest of each lag's horizon."
+                ),
+                fingerprint=[NWP_CONTROL_MEMBER_MISSING_FINGERPRINT, settings.sentry_environment],
+            )
+    except BaseException as exc:
+        # The same guard as the asset checks, for the same reason — see the comment in
+        # `checks.py::power_data_is_fresh` for why `BaseException` and what it costs in tests.
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        # No fingerprint: this exception was caught rather than synthesised, so it carries the
+        # stack trace Sentry groups on.
+        context.log.exception("Could not probe the NWP run for its control member")
+        report_asset_degradation(asset_name="live_forecasts", exc=exc)
+
     power_full = build_live_power_frame(
         power_ts,
         trained_ids,

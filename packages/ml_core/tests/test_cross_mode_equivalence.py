@@ -164,14 +164,8 @@ def test_bulk_and_single_run_features_are_identical() -> None:
             nwp=nwp,
             power_fcst_init_time=run + timedelta(hours=_DELAY_HOURS),
             nwp_init_time=run,
-            # Must match bulk mode's nwp_publication_delay_hours: select_analysis_proxy's
-            # available_at cut uses this to gate which runs it treats as published, and this
-            # test's own power_fcst_init_time = nwp_init_time + _DELAY_HOURS derivation is only
-            # self-consistent if the same delay is used everywhere. Leaving this on the default
-            # (9h) instead of _DELAY_HOURS (6h) would make the row's own run look "not yet
-            # published" by this test's own power_fcst_init_time — exactly the mismatch the
-            # nwp_publication_delay_hours docstring warns callers about.
-            nwp_publication_delay_hours=_DELAY_HOURS,
+            # No nwp_publication_delay_hours: with nwp_init_time passed explicitly, single-run mode
+            # consumes the delay nowhere — the analysis-proxy ceiling is that run itself.
         ).collect()
         # Keep only rows the NWP run actually covers (single-run mode is power-centric and
         # emits null-weather rows for valid_times outside this run's window), and only

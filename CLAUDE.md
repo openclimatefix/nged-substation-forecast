@@ -509,7 +509,7 @@ in [`docs/design-philosophy/engineering-hypotheses.md`](docs/design-philosophy/e
 | `nged_data` | Reading NGED JSON files from S3, and upserting the metadata roster to parquet. The power Delta write itself lives in `defs/assets.py` |
 | `dynamical_data` | Downloading ECMWF ensemble NWP from Dynamical.org |
 | `geo` | H3 spatial indexing utilities |
-| `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection, `NWP_PUBLICATION_DELAY_HOURS`) |
+| `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection) |
 | `xgboost_forecaster` | Concrete `BaseForecaster` implementation using XGBoost |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |
