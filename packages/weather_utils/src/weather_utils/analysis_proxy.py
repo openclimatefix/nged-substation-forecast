@@ -23,6 +23,12 @@ run is ours from roughly 08:30 — 8.5 hours. Nine is the nearest whole hour at 
 pipeline uses it to derive ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode; and
 ``select_nwp_init_time`` uses it to reconstruct availability for ``"replay"`` backfills.
 
+Of ``select_nwp_init_time``'s two modes, only ``"replay"`` needs the delay. A live run joins
+whatever is genuinely on disk, so reality already constrains the NWP table to runs that were
+genuinely published. A replay of a past init time would otherwise join runs that only landed
+afterwards — lookahead bias rather than mere inaccuracy. The asymmetry in full:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#resolve-nwp-availability-asymmetrically-live-vs-replay>
+
 Two bounds constrain the value, given one 00Z run a day and forecast slots at 00/06/12/18 UTC. The
 06:00 slot must *not* see that morning's run, which has not landed yet, so the value must exceed 6.
 The 12:00 slot *must* see it, so the value must not exceed 12. Both bounds move if

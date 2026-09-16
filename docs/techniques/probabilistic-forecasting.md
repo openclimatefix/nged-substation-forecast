@@ -58,7 +58,8 @@ The rest of this page makes that sketch precise.
 Total predictive uncertainty decomposes into three terms:
 
 1. **Weather uncertainty** — we don't know what the weather will do. This is what the 51 NWP
-   members sample: their divergence *is* the weather uncertainty, growing with lead time.
+   (Numerical Weather Prediction) members sample: their divergence *is* the weather
+   uncertainty, growing with lead time.
 2. **Weather→power model error** — even given the true weather, our model's mapping from
    weather to power is imperfect (finite training data, missing features, wrong functional
    form).
@@ -67,29 +68,28 @@ Total predictive uncertainty decomposes into three terms:
 
 A deterministic model (XGBoost trained with squared error learns the **conditional mean**)
 pushed through 51 members captures term 1 *only*. Terms 2 and 3 are dropped entirely, at *every*
-lead time. The resulting ensemble is **under-dispersed** — systematically overconfident — and the
+lead time. The resulting ensemble is **under-dispersed** — systematically overconfident. The
 failure is most conspicuous at short horizons, where term 1 has barely grown, so the fan
-collapses toward the single line of the sketch above while our errors do not. The
-[spread-skill ratio](evaluation-metrics.md#spread-skill-ratio) is the metric
-that catches this: spread ÷ error ≪ 1 means the fan is too thin.
+collapses toward the single line of the sketch above while our errors do not. The [spread-skill
+ratio](evaluation-metrics.md#spread-skill-ratio) is the metric that catches this: spread ÷
+error ≪ 1 means the fan is too thin.
 
-This matters commercially, not just statistically: flexibility procurement keys off the
-**tails** (P90+ peaks), and under-dispersion is precisely the error that makes tails look safer
-than they are.
+Under-dispersion matters commercially, not just statistically: flexibility procurement keys off
+the **tails** (P90+ peaks), and it is precisely the error that makes tails look safer than they
+are.
 
 ### Long horizons are not automatically safe
 
-The long-horizon end looks like the safe one. By day 8–14 the 51 weather stories have diverged
-enormously, so the fan is anything but a thin line — the opposite of the short-horizon failure
-above. But the same two dropped terms still bite here; they just hide better. A wide *input* fan
-does not guarantee an honest *output* fan, because the learned weather→power mapping sits between
-them, and squared-error training quietly narrows what that mapping passes through as lead time
-grows.
+The long-horizon end looks safe. By day 8–14 the 51 weather stories have diverged enormously, so
+the fan is anything but a thin line — the opposite of the short-horizon failure above. But the
+same two dropped terms still bite here; they just hide better. A wide *input* fan does not
+guarantee an honest *output* fan, because the learned weather→power mapping sits between them.
+Squared-error training quietly narrows what that mapping passes through as lead time grows.
 
 Far out, ECMWF's individual trajectories are themselves close to noise: the model was trained on
 forecast weather as its input, and at long lead times that input is wrong by a large,
-lead-time-dependent amount. Squared-error training responds to noisy inputs by hedging toward the
-mean — attenuating the fitted weather→power sensitivity — and today's model applies one
+lead-time-dependent amount. Squared-error training responds to noisy inputs by hedging toward
+the mean — attenuating the fitted weather→power sensitivity. Today's model applies one
 sensitivity across all lead times, because it has no feature telling it how trustworthy the
 weather input is. So the day-8–14 fan can be merely *wide-looking*: large NWP spread pushed
 through a damped, horizon-blind sensitivity, with the dropped term-2 residual (largest exactly
@@ -104,6 +104,16 @@ double-counting mitigation discussed in the caveat below, the lead-time feature 
 model learn *how much* to attenuate its weather sensitivity per horizon — narrow when the weather
 input is trustworthy, wide when it isn't — instead of the one horizon-averaged compromise it is
 forced into today.
+
+**The energy-forecasting review found no published result testing this combination — a
+weather ensemble driving substation-level uncertainty out to 14 days** — and the horizon sits
+near a measured limit, as the [energy-forecasting
+review](../background/energy-forecasting-review.md#horizon-ensembles-and-tails) sets out: the
+nearest built system, [Ludwig et al. (2023)](https://doi.org/10.1080/01605682.2022.2115411),
+covers the whole of Great Britain rather than a substation, and [Buizza and Leutbecher
+(2015)](https://doi.org/10.1002/qj.2619) found a weather ensemble stops beating a
+climatological distribution 16 to 23 days out — on upper-air variables, not the near-surface
+temperature and irradiance that drive substation load.
 
 ## The fix, formally: a mixture of conditional distributions
 
@@ -133,8 +143,8 @@ Representation 2 is *derived from* Representation 3 by pooling.
 
 ## Turning 51 quantile sets into one: the pooling recipe
 
-Inverting the mixture CDF sounds like numerical work, but with quantile forecasts there is a
-trick that makes it three lines of Polars:
+Inverting the mixture cumulative distribution function (CDF) sounds like numerical work, but
+with quantile forecasts there is a trick that makes it three lines of Polars:
 
 1. **Sort each member's quantiles.** Quantile-regression models fit each quantile level
    independently, so a member's p80 can come out *below* its p65 ("quantile crossing").
@@ -151,6 +161,17 @@ One practical note on step 2: the recipe is exact when the K levels are equally 
 delivery levels are deliberately tail-heavy (p1, p2, p5, …, p98, p99), so either have the model
 emit a denser equally-spaced set internally and reduce to the delivery levels at the end, or
 weight the pseudo-samples by the probability gap each one represents.
+
+**The extreme ends of that set need a caveat, because the literature found the quantile-regression
+forecast uncalibrated exactly there.** [Browell and Fasiolo
+(2021)](https://arxiv.org/abs/2103.10335), the only study the [energy-forecasting
+review](../background/energy-forecasting-review.md#horizon-ensembles-and-tails) found that models
+substation-scale tails explicitly, report that "below 1% and above 99% the forecasts based on
+quantile regression only are not calibrated at any GSP [grid supply point] Group. Therefore, these
+quantiles are not suitable for use in decision-making." Outside those percentiles Browell and
+Fasiolo switch to a fitted parametric tail at each end. The recipe above reads p1 and p99 straight
+off each member's quantile-regression output before mixing. The mixture's own p1 and p99 may
+therefore need the same parametric-tail treatment before they can be trusted.
 
 ## The tempting shortcut that doesn't work: averaging the quantiles
 
@@ -201,8 +222,10 @@ over-stated risk) is a far safer failure mode than the under-dispersion it repla
   Phases A–B of the
   [probabilistic evaluation plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
 - **Cheap stopgap**: post-hoc spread inflation of the existing deterministic ensemble ([Phase C
-  of the probabilistic evaluation plan](../roadmap/metrics-and-leaderboard.md#phase-c-cheap-calibration-after-b-proves-the-diagnosis)) buys calibration without any of this machinery — the full mixture pipeline must beat
-  it to earn its keep.
+  of the probabilistic evaluation
+  plan](../roadmap/metrics-and-leaderboard.md#phase-c-low-effort-calibration-after-b-proves-the-diagnosis))
+  achieves calibration without any of this machinery — the full mixture pipeline must beat it
+  to justify the added complexity.
 - **The full pipeline** ([Phase D of the probabilistic evaluation plan](../roadmap/metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)): a quantile-objective XGBoost emits Representation 3;
   the pooling recipe above derives Representation 2 for
   [delivery](../roadmap/delivery-tables.md#table-1-power_forecast).

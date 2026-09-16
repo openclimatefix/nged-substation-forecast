@@ -7,4 +7,4 @@ deleted when that work merges (paste the plan, or a summary, into the PR body fi
 necessarily one where the step was skipped. One worktree per branch is what keeps it to a single
 file, so parallel sessions never collide; on `main` the directory is empty. Everything durable
 belongs elsewhere, and nothing may link here from code or `docs/`: see "How planning works" in
-`docs/roadmap/index.md`.
+`docs/documentation-guide.md`.

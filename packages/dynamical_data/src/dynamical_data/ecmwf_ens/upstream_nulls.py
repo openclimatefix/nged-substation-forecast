@@ -3,7 +3,9 @@
 The H3 aggregation renormalises each cell over the grid points that supplied a value, so a corrupt
 grid point costs only its own share of its cell. That is what makes the stored cells robust, and it
 is also why counting null *cells* is a poor proxy for how corrupt the feed was. This module counts
-the nulls where they arrive.
+the nulls where they arrive, before that renormalisation absorbs most of them. The aggregation
+mechanics and the measurements behind that claim are in
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#spatial-aggregation-is-where-a-grid-points-null-is-resolved>.
 """
 
 from collections.abc import Collection
@@ -30,7 +32,7 @@ _PER_VARIABLE_SCHEMA: Final[pl.Schema] = pl.Schema(
         "n_total": pl.Int64,
     }
 )
-"""Columns of :attr:`UpstreamNullRate.per_variable`.
+"""Columns of `UpstreamNullRate.per_variable`.
 
 Declared rather than inferred for the empty-``variables`` case, which no caller in this repo reaches
 but a reusable package should survive: an inferred empty frame carries no columns at all, and the
@@ -45,7 +47,7 @@ class UpstreamNullRate:
     feed is degrading. It counts grid points on the 0.25° lat/lon box we downloaded, before any H3
     aggregation.
 
-    Read it alongside, never instead of, :class:`contracts.weather_schemas.NwpQualityReport`, which
+    Read it alongside, never instead of, `contracts.weather_schemas.NwpQualityReport`, which
     counts null H3 *cells* and answers the different question of how much the model lost. The two
     are not comparable as rates: different units over different populations.
 
@@ -82,7 +84,7 @@ class UpstreamNullRate:
         """The counted variables carrying at least one null grid point.
 
         In ``per_variable``'s row order, which is sorted by variable name because
-        :func:`assess_upstream_grid_point_nulls` builds it that way — ``filter`` preserves row
+        `assess_upstream_grid_point_nulls` builds it that way — ``filter`` preserves row
         order rather than imposing one.
         """
         return tuple(self.per_variable.filter(pl.col("n_null") > 0)["variable"])
@@ -115,12 +117,12 @@ def assess_upstream_grid_point_nulls(
 
     Args:
         ds: One downloaded ECMWF ENS run, as returned by
-            :func:`dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
+            `dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
             ``(lead_time, ensemble_member, latitude, longitude)``, with ``init_time`` already
             reduced to a scalar coordinate.
         variables: The variables to count over, named as ``ds`` names them rather than as the
             ``Nwp`` contract does — the two differ on wind, so
-            :data:`dynamical_data.ecmwf_ens.download.ECMWF_ENS_INSTANTANEOUS_VARS` exists to be
+            `dynamical_data.ecmwf_ens.download.ECMWF_ENS_INSTANTANEOUS_VARS` exists to be
             passed here. Their nulls must share one meaning, because a rate pooled over variables
             with opposite null semantics measures nothing: the asset passes the de-accumulated
             variables, whose nulls are known upstream corruption, and the instantaneous ones, whose
@@ -129,6 +131,12 @@ def assess_upstream_grid_point_nulls(
             there by design, so counting it would report every healthy run as corrupt. False for
             the instantaneous ones, where lead-0 is an ordinary step and a null in it means what a
             null in any other step means.
+
+    Returns:
+        An `UpstreamNullRate` whose `per_variable` frame holds one row per counted variable,
+        sorted by variable name, with that variable's null grid-point count (`n_null`), the
+        count of (ensemble_member, lead_time) slices holding at least one null
+        (`n_affected_slices`), and the total grid-point count counted (`n_total`).
     """
     # Selected per variable rather than once on `ds`: this runs inside `ecmwf_ens` while the
     # whole downloaded run is still held in memory, and slicing the whole dataset would copy all

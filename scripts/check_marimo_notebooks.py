@@ -59,6 +59,11 @@ def unbound_cells(path: Path) -> list[UnboundCell]:
     Args:
         path: Path to a marimo notebook.
 
+    Returns:
+        One `UnboundCell` per cell whose references include a name no cell defines and that is not
+        in `ALWAYS_BOUND`, in the notebook's file order. Each carries the cell's `lineno` and the
+        sorted tuple of its unbound `names`. Empty when every cell's references are bound.
+
     Raises:
         MarimoFileError: if marimo cannot parse `path` at all.
         ValueError: if the notebook cannot be checked in full — it parses into no cells, or it

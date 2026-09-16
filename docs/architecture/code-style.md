@@ -90,7 +90,7 @@ stricter type exists — a genuinely heterogeneous or open-ended dict stays `dic
 `write_nwp(nwp, uri, options)`. The keyword names what each value is for, so the reader learns it
 from the call site instead of opening the callee; and if a parameter is later reordered, renamed or
 removed, the call fails loudly rather than binding the wrong value in silence. The payoff is
-biggest for bare strings, numbers and booleans, whose meaning is invisible without the keyword.
+biggest for bare strings, numbers, and booleans, whose meaning is invisible without the keyword.
 
 Three places where a positional argument is right:
 
@@ -106,9 +106,12 @@ Three places where a positional argument is right:
 
 ## Comments, docstrings and links
 
-- **Do not remove existing comments** unless they are misleading or out of date. Only add new
-  comments if you're doing something that isn't obvious from the code. Write self-documenting
-  code, and assume the reader is fluent in Python.
+- **Do not remove existing comments** unless they are misleading, out of date, or a second copy of
+  an argument a `docs/` page already makes. Only add new comments if you're doing something that
+  isn't obvious from the code. Write self-documenting code, and assume the reader is fluent in
+  Python. The third ground is the duplication rule below, applied in the direction of deletion:
+  where a docs page develops the same argument at comparable length, the comment keeps a short
+  version of it and carries the link. Shortening is not deleting — the reasoning stays.
 - **Comments and docs must reflect current state only** — never reference previous iterations of
   the code or deleted files. This is the same rule as "Write about the present, not the past" in
   `CLAUDE.md`, applied to code.
@@ -128,15 +131,64 @@ Three places where a positional argument is right:
   because the path resolves against the rendered site tree. And a URL survives the file being moved
   or renamed, which a path does not. Use it in `#` comments too: those are never rendered, so a
   path would do, but one spelling everywhere is one fewer thing to get right.
-- **One home per argument** — a design decision's *rationale* lives on one docs page, and the
-  docstring links to it. The docstring's own job is to say what the function guarantees and what a
-  caller must not assume. A sentence of "because" is fine; a paragraph of it means the paragraph
-  belongs on the page. Two copies of an argument drift, and the drift is silent — a later change
-  updates the page, the docstring goes on asserting the superseded reasoning, and no linter, type
-  checker or test can tell. This is the same trade the durable-docs rule above makes: a link that
-  might rot is cheaper than a copy that rots invisibly. It cuts the other way too — rationale
-  worth a paragraph does not belong *only* in a docstring, where no reader browsing the docs will
-  find it.
+- **A little duplication beats a link the reader has to follow — cut only where the duplication is
+  excessive.** The full development of a design decision lives on one docs page, and the code links
+  to it. But keep the code's own account of *why*, even where that docs page says much the same: a
+  developer reading a function should not have to open a browser to learn what the code is doing
+  and what it is defending against. "Excessive" means the same argument developed at comparable
+  length in both places — a page restated as a page. A paragraph of "because" beside the code that
+  implements it is not excessive, and is worth keeping. Two copies do drift, silently: a later
+  change updates the page while the docstring goes on asserting the superseded reasoning, and no
+  linter, type checker or test can tell. That drift is the cost being traded, and it is worth
+  paying for a paragraph but not for a page. The rule cuts the other way too — rationale worth a
+  paragraph does not belong *only* in a docstring, where no reader browsing the docs will find it.
+- **A worked example lives in exactly one place, whatever the rule above says.** A worked example
+  — a concrete partition key traced through to a concrete result, a named date, a sample row — is
+  the prose most likely to drift into being actively wrong, because it carries specific values that
+  a later change invalidates without touching the sentence around them. A second copy is a second
+  thing to update and the one nobody remembers. Keep it next to the behaviour it illustrates: where
+  two docstrings both want the same example, the one nearer the code that produces the result keeps
+  it, and the other names the example and links. This is the one case where the duplication bar is
+  low rather than high, and it holds between two docstrings in the same file as much as between
+  code and `docs/`.
+- **Link into the docs generously, but never make a link load-bearing.** Where a docs page develops
+  an argument the code rests on, link to it, and a docstring can carry several such links. The links
+  cost a line each and are read by both people and coding agents, for whom they are the cheapest
+  route to context.
+
+    **A long explanation does not oblige you to create a docs page.** An argument that matters only
+    to the one piece of code it sits beside belongs in that docstring or comment, developed at
+    whatever length it needs, and gets no page and no link. `docs/` is for arguments a reader
+    outside this function needs — because they span several modules, because someone browsing the
+    docs would look for them, or because they outlive the code that prompted them. Adding a page
+    per long comment bloats `docs/` with material nobody browsing it wants, and leaves the code
+    poorer for having exported its own reasoning. A link is *additional context only*: a reader must be
+  able to understand the prose in the code without following any of them. Every link is a
+  nice-to-have, never a requirement.
+
+    The test is mechanical, and worth applying to each link as you add it: **delete the link, re-read
+    the passage, and check nothing needed is now missing.** If the passage no longer explains itself
+    — "see the design page for why", with the why nowhere in the code — the prose is what needs
+    fixing, not the link. Say the reason in a sentence, then link to the page that develops it at
+    length. Adding a link is never a licence to delete the prose beside it.
+- **A Dagster docstring is operator documentation, and is where even the duplication rule above
+  gives way.** Dagster renders the docstring of an asset, asset check, job, schedule and sensor in its
+  UI, and that docstring is often the only documentation an operator sees while running the
+  pipeline. Each docstring has to make sense read on its own, by someone who has not opened the
+  source file, and has to place the asset in the pipeline: what it consumes, what it produces, what
+  triggers it, and what a degraded run looks like. Link into `docs/` for the reasoning behind a
+  design, but keep the account of what the asset does and what it sits between in the docstring,
+  even where a docs page says the same — an operator reading the Dagster UI cannot follow a link
+  they never see. Text passed as `description=` to an `AssetCheckSpec`, a `define_asset_job` call
+  or a Dagster `Config` field renders in that same UI and carries the same duty; a check with no
+  `description` shows the operator a blank.
+
+    **Only a decorated definition has a docstring Dagster can read.** A schedule built by calling
+    `ScheduleDefinition(...)` or `build_schedule_from_partitioned_job(...)` is an assignment, and
+    the string literal underneath it is a module-level variable docstring that the UI never
+    renders — so its operator-facing summary has to be passed as `description=`. Keep the string
+    literal for the reasoning a developer reading the file wants, and let `description=` carry
+    what the operator needs.
 - **Say why a guard exists, when the reason is not "this state happens"** — validation that
   defends a reusable package's public API, rather than a state production can reach, says so in a
   clause: `# Reusable-package input validation, not a reachable production state: the ecmwf_ens
@@ -156,6 +208,47 @@ Three places where a positional argument is right:
     Optional further detail.
     """
     ```
+
+- **A package README must never restate a module docstring, because both render on the same
+  page.** Each `docs/api/<package>/index.md` includes the package README and then the `:::`
+  directives that render the package's docstrings, so an overlap between the two reaches the
+  reader twice within one screen. On that page the README is the contents page and the docstrings
+  are the content: the README says what the package owns, what it deliberately does not own and
+  which neighbouring package does, and gives one line per module pointing down. Where a mechanism
+  needs explaining, the README names it and defers — `delta_store`'s "The trick and its
+  preconditions are rigorously documented on the function" is the shape to copy. Which of the
+  three homes a given paragraph belongs in is decided by the tests in [Documentation
+  Guide](../documentation-guide.md#docstrings-readmes-and-docs-hold-three-different-jobs).
+- **A docstring must describe the signature the function actually has, and a rename is where that
+  breaks.** Parameters go under `Args:`, never under `Attributes:`, `Parameters:` or `Arguments:`
+  — on a function those three render as ordinary prose rather than as parameter documentation, so
+  the parameters end up undocumented while looking documented. Ruff's `D417` catches only the case
+  where an `Args:` section is present and incomplete; a block under the wrong heading, and an entry
+  naming a parameter a rename removed, both pass every rule this repo configures. `pydoclint`
+  catches those two, as a pre-commit hook and a CI step, and also requires a `Returns:` section on
+  every function that returns something. Which of its checks this repo wants, and why each of the
+  others is switched off, is in the `[tool.pydoclint]` block in `pyproject.toml`. Nothing catches a
+  stale name in the *prose* around the parameter list, which is why `compute_h3_grid_weights`
+  described "a DataFrame" for months after it began taking a list — check the description against
+  the signature whenever you rename anything.
+- **Cross-reference another function with plain backticks, never a Sphinx role.** Write
+  `` `write_nwp` ``, not `` :func:`write_nwp` ``. mkdocstrings parses these docstrings as Markdown
+  and no extension interprets a reStructuredText role, so the role and its backticked name reach
+  the published API page verbatim, and the reader meets the markup where the name should be.
+  Double backticks render identically to single ones, so the rule is about the role rather than the
+  number of backticks. A `pygrep` pre-commit hook is what catches a role, because `ruff`,
+  `pydoclint` and `mkdocs build --strict` all read a docstring as prose and have no opinion about
+  what is inside it: 46 roles across six role names accumulated in the source before anyone read
+  the built HTML, 13 of them rendering as visible markup on `api/contracts/` and `api/ml_core/` and
+  the rest sitting in modules that have no `docs/api/` page. **When a docstring change is about how
+  something renders, read the generated page, not the source.**
+- **When a prose sweep meets an obviously wrong claim outside the change it set out to make, fix
+  it.** A sweep is the one occasion anybody reads these files closely, so filing the defect for
+  later spends the pass that found it and leaves the wrong version in front of readers meanwhile.
+  The bar is that the claim is checkably wrong against the code, not merely improvable — six
+  passages called `init_time` "the NWP partition key" when `delta_store.nwp` partitions on
+  `(nwp_model_id, init_time)`. Say in the pull-request body why the change reaches outside its
+  stated scope, so a reviewer expecting one thing is not surprised by another.
 
 ## Data Handling
 
@@ -250,9 +343,9 @@ confusing failure:
 - **Research and production share one execution path.** There is no research-only implementation of
   a pipeline step — see
   [design principle 3](../design-philosophy/design-principles.md#3-one-execution-path-from-research-to-production).
-  What legitimately differs between them is failure policy, not code: the CV, training and metrics
-  assets fail fast, while the production service degrades (see
-  [Inherent stability](../design-philosophy/inherent-stability.md)).
+  What legitimately differs between them is failure policy, not code: the CV, training, and
+  metrics assets fail fast, while the production service degrades (see [Inherent
+  stability](../design-philosophy/inherent-stability.md)).
 
 ## Error Handling
 
