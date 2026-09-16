@@ -11,12 +11,14 @@ assets stay thin by writing through this package rather than calling `write_delt
 ad-hoc settings — and it becomes impossible to land rows in a table without its storage format
 applied.
 
-Every lever below is measured against real data rather than assumed — see [Storage formats:
-measured, not
+Every lever `power_forecasts` and `nwp` apply below is measured against real data rather than
+assumed — see [Storage formats: measured, not
 assumed](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed)
-for the comparison across both tables, and [design principle
+for the comparison between those two tables, and [design principle
 12](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#12-measure-do-not-assume)
-for why that discipline matters project-wide. The flagship example is the internal
+for why that discipline matters project-wide. The other four tables below carry no writer-properties
+tuning, because there is no measurement yet to back one. The flagship example of a tuned table is
+the internal
 `power_forecasts` table: ZSTD + `DELTA_BINARY_PACKED` timestamps + `BYTE_STREAM_SPLIT` floats +
 member-adjacent sorting + rounding `power_fcst` to a 13-bit significand shrank the 403.6M-row
 development table from 6.33 GB to 0.73 GB. `POWER_FORECASTS_WRITER_PROPERTIES`, below on this
@@ -33,3 +35,12 @@ page, breaks that figure down lever by lever.
 - `nwp` — the `nwp` table's writer properties, sort order, precision policy, and `write_nwp()`;
   its writer properties are deliberately *different* from `power_forecasts`'s, because the same
   encodings measured worse on NWP data.
+- `power_time_series` — `write_power_time_series()`, an append-only write to the
+  `power_time_series` table with no writer-properties tuning.
+- `eligible_time_series` — `write_eligible_time_series()`, a per-`fold_id`-partition overwrite to
+  the `eligible_time_series` table with no writer-properties tuning.
+- `effective_capacity` — `write_effective_capacity()`, a whole-table overwrite to the
+  `effective_capacity` table with no writer-properties tuning.
+- `forecast_metrics` — `write_forecast_metrics()`, a per-`(experiment_name, fold_id)`-partition
+  overwrite to the `forecast_metrics` table, including the Enum→String cast delta-rs needs before
+  writing; no writer-properties tuning.

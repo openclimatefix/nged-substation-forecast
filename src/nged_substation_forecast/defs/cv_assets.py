@@ -35,8 +35,10 @@ from dagster import (
     StaticPartitionsDefinition,
     asset,
 )
+from delta_store.effective_capacity import write_effective_capacity
+from delta_store.eligible_time_series import write_eligible_time_series
+from delta_store.forecast_metrics import write_forecast_metrics
 from delta_store.power_forecasts import write_power_forecasts
-from deltalake import write_deltalake
 from ml_core.cv_helpers import (
     date_to_utc_datetime,
     eligible_time_series_ids,
@@ -150,13 +152,11 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     )
 
     if_local_path_then_make_parent_dir(settings.eligible_time_series_data_path)
-    write_deltalake(
-        table_or_uri=settings.eligible_time_series_data_path,
-        data=eligible_df.to_arrow(),
-        mode="overwrite",
-        predicate=f"fold_id = '{fold_id}'",
-        partition_by=["fold_id"],
-        storage_options=typeddict_to_dict(storage_options),
+    write_eligible_time_series(
+        eligible_df,
+        settings.eligible_time_series_data_path,
+        fold_id=fold_id,
+        storage_options=storage_options,
     )
 
     context.add_output_metadata(
@@ -201,11 +201,8 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     capacity_df = compute_effective_capacity(power_lf)
 
     if_local_path_then_make_parent_dir(settings.effective_capacity_data_path)
-    write_deltalake(
-        table_or_uri=settings.effective_capacity_data_path,
-        data=capacity_df.to_arrow(),
-        mode="overwrite",
-        storage_options=typeddict_to_dict(storage_options),
+    write_effective_capacity(
+        capacity_df, settings.effective_capacity_data_path, storage_options=storage_options
     )
 
     context.add_output_metadata(
@@ -710,42 +707,6 @@ def _resolve_eval_window(
     return window_start, window_end, "ad_hoc"
 
 
-def _write_metrics_to_delta(
-    path: str,
-    enriched: pt.DataFrame[Metrics],
-    exp_name: str,
-    fold_id: str,
-    storage_options: ObjectStoreOptions | None = None,
-) -> None:
-    """Write enriched Metrics rows to the ``forecast_metrics`` Delta table.
-
-    Casts the ``Enum`` columns (e.g. ``metric_name``, ``horizon_slice``) to ``String`` before
-    writing — delta-rs stores Arrow dictionary arrays as plain String in Parquet, so the on-disk
-    schema is always String. Re-sending Enum data on an overwrite would cause a schema-mismatch
-    error. Performs an idempotent overwrite of the ``(experiment_name, fold_id)`` partition
-    so re-materialising the asset replaces rows rather than duplicating them.
-
-    Args:
-        path: Local path or remote URI of the ``forecast_metrics`` Delta table.
-        enriched: Fully populated ``Metrics`` rows, with all provenance columns set by
-            ``enrich_metrics_rows()``.
-        exp_name: Experiment name; used in the Delta overwrite predicate to scope the
-            replacement to this ``(experiment_name, fold_id)`` partition.
-        fold_id: Fold identifier; used alongside ``exp_name`` in the predicate.
-        storage_options: Object-store options for a remote ``path``; ``None``/empty for local.
-    """
-    enum_cols = [c for c, dtype in enriched.schema.items() if isinstance(dtype, pl.Enum)]
-    delta_data = enriched.with_columns(pl.col(c).cast(pl.String) for c in enum_cols).to_arrow()
-    write_deltalake(
-        table_or_uri=path,
-        data=delta_data,
-        mode="overwrite",
-        predicate=f"experiment_name = '{exp_name}' AND fold_id = '{fold_id}'",
-        partition_by=["experiment_name", "fold_id"],
-        storage_options=typeddict_to_dict(storage_options),
-    )
-
-
 _METRICS_SERIES_BATCH_SIZE: Final[int] = 4
 """How many ``time_series_id`` values to materialise per scoring batch in the ``metrics`` asset.
 
@@ -912,7 +873,13 @@ def _score_forecast_group(
         now,
         mlflow_run_id,
     )
-    _write_metrics_to_delta(metrics_path, enriched, exp_name, fold_id, storage_options)
+    write_forecast_metrics(
+        enriched,
+        metrics_path,
+        experiment_name=exp_name,
+        fold_id=fold_id,
+        storage_options=storage_options,
+    )
 
     if evaluation_scope == "leaderboard":
         fold_metric_dict = build_mlflow_aggregate_metrics(per_series_metrics)

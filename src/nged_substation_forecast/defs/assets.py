@@ -41,6 +41,7 @@ from dagster import (
     asset,
 )
 from delta_store.nwp import write_nwp
+from delta_store.power_time_series import write_power_time_series
 from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe,
 )
@@ -199,12 +200,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     new_power_ts_deduped = select_new_rows(new_power_ts, delta_path, storage_options)
     if not new_power_ts_deduped.is_empty():
         if_local_path_then_make_parent_dir(delta_path)
-        new_power_ts_deduped.write_delta(
-            delta_path,
-            mode="append",
-            storage_options=typeddict_to_dict(storage_options),
-            delta_write_options={"partition_by": "time_series_id"},
-        )
+        write_power_time_series(new_power_ts_deduped, delta_path, storage_options=storage_options)
 
     # Log statistics to be shown in Dagster's UI.
     context.add_output_metadata(
