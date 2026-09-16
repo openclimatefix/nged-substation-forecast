@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import patito as pt
 import polars as pl
 import pytest
+from _nwp_test_data import cast_to_nwp_dtypes
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import (
     LIST_OF_TIME_SERIES_TYPES,
@@ -78,9 +79,9 @@ def test_upsample_nwp_to_half_hourly_forward_fills_categorical_vars():
             "nwp_init_time": [datetime(2020, 1, 1, 0)] * 2,
             "ensemble_member": [0, 0],
             "valid_time": [datetime(2020, 1, 1, 0), datetime(2020, 1, 1, 3)],
-            "categorical_precipitation_type_surface": pl.Series([0, 5], dtype=pl.Int16),
+            "categorical_precipitation_type_surface": [0, 5],
         }
-    )
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member", "categorical_precipitation_type_surface")
     result = _upsample_nwp_to_half_hourly(df.lazy()).collect().sort("valid_time")
 
     # At 1:30 (before the 3:00 step), categorical should still be 0
@@ -155,9 +156,9 @@ def test_upsample_nwp_no_cross_group_forward_fill():
                 datetime(2020, 1, 1, 9),
             ],
             # Group A: both steps have value 5. Group B: lead-time-0 is null, then 2.
-            "categorical_precipitation_type_surface": pl.Series([5, 5, None, 2], dtype=pl.Int16),
+            "categorical_precipitation_type_surface": [5, 5, None, 2],
         }
-    )
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member", "categorical_precipitation_type_surface")
     result = _upsample_nwp_to_half_hourly(df.lazy()).collect().sort(["nwp_init_time", "valid_time"])
 
     # Group B lead-time-0 (06:00) must stay null — not forward-filled from Group A's 5
@@ -1314,7 +1315,7 @@ def test_engineer_features_rolling_mean_collects_under_streaming_engine():
             "init_time": [nwp_init_time] * len(steps) * 2,
             "temperature_2m": [10.0] * len(steps) * 2,
         }
-    ).cast({"ensemble_member": pl.Int8})
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member")
     observed_times = [nwp_init_time + timedelta(minutes=30 * i) for i in range(48)]
     power_df = pl.DataFrame(
         {
@@ -1384,16 +1385,12 @@ def test_upsample_nwp_fills_agree_across_engines():
     df = pl.DataFrame(
         {
             "nwp_init_time": [t0] * len(steps) * len(members),
-            "ensemble_member": pl.Series(
-                [member for member in members for _ in steps], dtype=pl.Int8
-            ),
+            "ensemble_member": [member for member in members for _ in steps],
             "valid_time": steps * len(members),
             "temperature_2m": [float(i) for i in range(len(steps))] * len(members),
-            "categorical_precipitation_type_surface": pl.Series(
-                [0, 0, 0, 5, 5, 5, 0, 0, 0] * len(members), dtype=pl.Int16
-            ),
+            "categorical_precipitation_type_surface": [0, 0, 0, 5, 5, 5, 0, 0, 0] * len(members),
         }
-    )
+    ).pipe(cast_to_nwp_dtypes, "ensemble_member", "categorical_precipitation_type_surface")
     lf = _upsample_nwp_to_half_hourly(df.lazy())
 
     sort_cols = ["ensemble_member", "valid_time"]
