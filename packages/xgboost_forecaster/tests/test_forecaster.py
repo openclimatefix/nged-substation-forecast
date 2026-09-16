@@ -42,7 +42,7 @@ def _make_df(
         pl.col("power_fcst_init_time").cast(_UTC),
         pl.col("nwp_init_time").cast(_UTC),
         pl.col("time_series_id").cast(pl.Int32),
-        pl.col("ensemble_member").cast(pl.UInt8),
+        pl.col("ensemble_member").cast(pl.Int8),
         pl.col("power").cast(pl.Float32),
         pl.col("local_time_of_day_sin").cast(pl.Float32),
         pl.col("local_time_of_day_cos").cast(pl.Float32),

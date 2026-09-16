@@ -74,7 +74,7 @@ class AllFeatures(pt.Model):
             "null: the feature pipeline drops any time series with no row in the metadata."
         ),
     )
-    ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
+    ensemble_member: int | None = pt.Field(dtype=pl.Int8, allow_missing=True)
 
     power_fcst_init_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,

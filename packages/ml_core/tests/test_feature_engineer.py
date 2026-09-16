@@ -25,7 +25,7 @@ def _nwp_two_cells() -> pt.LazyFrame[Nwp]:
             "h3_index": pl.Series([10, 20, 99], dtype=pl.UInt64),
             "valid_time": [valid_time, valid_time, valid_time],
             "init_time": [init_time, init_time, init_time],
-            "ensemble_member": pl.Series([0, 0, 0], dtype=pl.UInt8),
+            "ensemble_member": pl.Series([0, 0, 0], dtype=pl.Int8),
             "temperature_2m": [10.0, 12.0, 14.0],
         }
     )

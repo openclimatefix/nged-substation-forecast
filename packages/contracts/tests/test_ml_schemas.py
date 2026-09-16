@@ -10,6 +10,8 @@ from contracts.ml_schemas import (
     SafeInputBaseColumn,
     TimeFeature,
 )
+from contracts.power_schemas import PowerForecast
+from contracts.weather_schemas import Nwp
 
 
 def test_all_features_validation():
@@ -126,6 +128,18 @@ def test_all_features_invalid_time_series_type():
         pl.exceptions.InvalidOperationError, match="conversion from `str` to `enum`"
     ):
         df.cast().validate()
+
+
+def test_ensemble_member_has_one_dtype_across_the_schemas_it_flows_through():
+    """`ensemble_member` keeps one dtype from the NWP source to the forecast output.
+
+    Feature engineering reads the column from `Nwp` and carries it into `AllFeatures`, and
+    `BaseForecaster.predict` writes it to `PowerForecast`. Declaring a different dtype at any of
+    those three points makes the forecaster cast the column to get past `PowerForecast.validate`.
+    """
+    assert Nwp.dtypes["ensemble_member"] == pl.Int8
+    assert AllFeatures.dtypes["ensemble_member"] == pl.Int8
+    assert PowerForecast.dtypes["ensemble_member"] == pl.Int8
 
 
 def test_time_feature_names_are_all_features_fields():
