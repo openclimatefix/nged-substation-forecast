@@ -18,6 +18,20 @@ This package is designed to be extremely lightweight. It defines the *shape* of 
 - **`AllFeatures`**: The final joined dataset passed to ML models. Primary key is `(time_series_id, power_fcst_init_time, valid_time[, ensemble_member])`. Includes NWP weather variables, power lag/rolling features and datetime features. `time_series_type` is the one metadata column it can carry, and only when a feature set asks for it.
 - **`PowerForecast`**: ML model output schema. `power_fcst` is in MW (active power) or MVA (apparent power), with the unit given per `time_series_id` in `TimeSeriesMetadata`. A planned change will normalise it to [−1, +1] for NGED to multiply by a capacity — see [Forecast Building Blocks](https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/). Includes `power_fcst_model_name`, `power_fcst_model_version`, `power_fcst_init_time`, `nwp_init_time`, `valid_time`, `time_series_id`, and `ensemble_member`.
 
+## Sign convention
+
+<!-- sign-convention:start -->
+Sign convention depends on `substation_type` in `TimeSeriesMetadata`, whose five values (`BSP`,
+`EHV Customer`, `GSP`, `HV Customer`, `Primary`) partition into two behavioural cases:
+
+- **Substations** (`BSP`, `GSP`, `Primary`): positive = power flowing **towards end-users**;
+  negative = excess generation flowing **back into the grid**.
+- **Customer meters** (`EHV Customer`, `HV Customer`): positive = the customer is **sending**
+  power to NGED's grid; negative = the customer is **drawing** power from it. A customer meter can
+  sit at a demand site or a generation site, so this case is not "generators only".
+
+<!-- sign-convention:end -->
+
 ## Design Principles
 
 - **The contract is the authoritative account of what the data means.** It says what the data
