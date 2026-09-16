@@ -18,8 +18,7 @@ tables need different writer properties. See
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed>
 for the measured GB/yr numbers, and
 <https://openclimatefix.github.io/nged-substation-forecast/api/dynamical_data/> for the
-member-early-sort read-speed benchmark (a single-member, 29-day, 9-cell collect: ~5x faster and
-~5x less peak memory for a ~2% storage cost).
+member-early-sort read-speed benchmark.
 """
 
 from pathlib import Path
@@ -45,21 +44,89 @@ NWP_SORT_COLS: Final[tuple[str, ...]] = ("init_time", "ensemble_member", "valid_
 """Within-file row order for ``nwp`` writes — **member before valid_time** (the opposite
 priority from ``power_forecasts``, which sorts member-adjacent for a different reason: there
 it's about compressing near-duplicate ensemble values; here it's about row-group pruning).
-Sorting ``ensemble_member`` early means each ~1M-row Parquet row group spans only a handful of
-member values instead of all ~51, so a single-member predicate (the control-member read every
-training run does) can skip most row groups via min/max stats instead of decoding the whole
-partition — provided that predicate reaches the Parquet scan unchanged, which requires
-``Nwp.scan_delta``'s cast to be a no-op (see the ``Nwp.ensemble_member`` field). The speed and
-storage cost of this ordering versus a ``valid_time``-first sort need re-measuring against real
-production data; the old figures predate a period where that cast was not a no-op and are not
-restored here."""
+Sorting ``ensemble_member`` early puts each member's rows in one contiguous block, which
+`_member_aligned_row_group_size` then turns into one row group per member, so a single-member
+predicate matches a single row group's min/max range and skips the rest of the partition instead
+of decoding it. That pruning holds for **any** member, not only the control member: the sort alone
+is not enough, because row groups that straddle member boundaries advertise the whole span between
+their extremes.
 
-NWP_WRITER_PROPERTIES: Final[WriterProperties] = WriterProperties(
-    compression="ZSTD", compression_level=3
-)
-"""Deliberately **no** per-column encoding overrides (no ``BYTE_STREAM_SPLIT``,
-``DELTA_BINARY_PACKED``, or disabled dictionary encoding) — see this module's docstring for why
-that choice, which won for ``power_forecasts``, measures worse here."""
+Two conditions have to hold for the predicate to reach the Parquet scan at all. It must survive
+``Nwp.scan_delta``'s cast, which requires that cast to be a no-op (see the ``Nwp.ensemble_member``
+field). And the row groups have to stay member-aligned, which is what
+`_member_aligned_row_group_size` and `NWP_TARGET_FILE_SIZE_BYTES` exist to guarantee."""
+
+NWP_TARGET_FILE_SIZE_BYTES: Final[int] = 2_000_000_000
+"""Target size for each Parquet file delta-rs writes, sized to keep one partition in one file.
+
+A daily ECMWF ENS partition is ~145 MB, so this leaves more than a tenfold headroom. Keeping the
+partition in a single file matters because delta-rs splits a larger write across concurrent
+writers that consume the incoming Arrow chunks out of order, which scatters the member-sorted rows
+across row groups and widens every row group's ``ensemble_member`` min/max range.
+
+**This is an optimisation, not a correctness requirement.** A partition that outgrows this target
+still writes correctly and still prunes well, because the single Arrow chunk and the member-aligned
+row-group size below do the real work. Measured on a real partition, a single-member read touches
+1.96% of rows when the partition lands in one file and 3.92% when delta-rs splits it in two —
+against 29% with the row groups unaligned, and 72% with none of the three levers."""
+
+NWP_ROW_GROUP_SIZE_LIMITS: Final[tuple[int, int]] = (1_024, 1_048_576)
+"""Floor and ceiling clamped around the member-aligned row-group size.
+
+The floor stops a frame with very few rows per member producing row groups too small to compress
+or too numerous to track; it never binds on a real ECMWF ENS run, where one member occupies
+~142,000 rows. The ceiling is Parquet's conventional maximum, which also bounds the streaming
+engine's peak memory per morsel."""
+
+
+def _member_aligned_row_group_size(nwp: pt.DataFrame[Nwp]) -> int:
+    """Rows one ensemble member occupies, clamped to `NWP_ROW_GROUP_SIZE_LIMITS`.
+
+    Setting Parquet's row-group size to this value, on a frame already sorted member-early by
+    `NWP_SORT_COLS`, lands each ensemble member in a row group of its own. A single-member
+    predicate then matches one row group's ``ensemble_member`` min/max range exactly, so the scan
+    decodes 1/51 of the partition instead of whatever wider range a straddling row group would
+    advertise. Parquet statistics record only a minimum and a maximum, so a row group holding a
+    *non-contiguous* set of members — which is what an unaligned write produces — advertises the
+    whole span between its extremes and admits every member in between.
+
+    Derived from the frame rather than hard-coded so the alignment survives a change to the H3
+    grid or the forecast horizon, both of which change how many rows one member occupies. Where
+    the division is inexact the alignment degrades gently: a row group straddles two members
+    instead of one, rather than reverting to the full span.
+
+    Sizing the row groups is necessary but not sufficient — the rows reaching the writer have to be
+    in sorted order too, which is why `write_nwp` combines the frame into a single Arrow chunk
+    before writing.
+
+    Args:
+        nwp: The frame about to be written, carrying every ensemble member for one run.
+
+    Returns:
+        The row-group size to give `WriterProperties`, within `NWP_ROW_GROUP_SIZE_LIMITS`.
+    """
+    floor, ceiling = NWP_ROW_GROUP_SIZE_LIMITS
+    rows_per_member = nwp.height // max(nwp.get_column("ensemble_member").n_unique(), 1)
+    return min(max(rows_per_member, floor), ceiling)
+
+
+def _writer_properties(*, max_row_group_size: int) -> WriterProperties:
+    """Parquet writer properties for the ``nwp`` table, at the given row-group size.
+
+    Deliberately **no** per-column encoding overrides (no ``BYTE_STREAM_SPLIT``,
+    ``DELTA_BINARY_PACKED``, or disabled dictionary encoding) — see this module's docstring for why
+    that choice, which won for ``power_forecasts``, measures worse here. Built per write rather
+    than held as a module constant because the row-group size is derived from the frame.
+
+    Args:
+        max_row_group_size: Rows per Parquet row group, from `_member_aligned_row_group_size`.
+
+    Returns:
+        Writer properties to hand to ``write_deltalake``.
+    """
+    return WriterProperties(
+        compression="ZSTD", compression_level=3, max_row_group_size=max_row_group_size
+    )
 
 
 def write_nwp(
@@ -70,7 +137,8 @@ def write_nwp(
     """Write one NWP run into the ``nwp`` Delta table in its storage format.
 
     Rounds every continuous weather variable to ``NWP_SIGNIFICAND_BITS`` significand bits, sorts
-    rows by ``NWP_SORT_COLS``, and writes with ``NWP_WRITER_PROPERTIES``. The table is
+    rows by ``NWP_SORT_COLS``, and writes one row group per ensemble member (see
+    `_member_aligned_row_group_size`) into a single file per partition. The table is
     partitioned by ``(nwp_model_id, init_time)``, matching ``Nwp.scan_delta``'s
     partition-pruning assumptions; the first write creates the table.
 
@@ -120,7 +188,18 @@ def write_nwp(
         }
     ).sort(*NWP_SORT_COLS)
 
-    prepared = rounded.to_arrow()
+    # One Arrow chunk, not 32. delta-rs consumes a multi-chunk table out of order when
+    # partitioning the write, which scatters the member-sorted rows across row groups and widens
+    # every row group's ensemble_member min/max range — measured on a real partition, a
+    # single-member read went from 1.96% of rows to 33% purely from the chunking. Combining costs
+    # one copy of the frame.
+    #
+    # No unit test covers this line, and one cannot: Polars only leaves a frame multi-chunk after
+    # the sort above when it has many threads to sort with, and `conftest.py` pins
+    # POLARS_MAX_THREADS to 4, at which every fixture size rechunks to one chunk before reaching
+    # here. The scattering this prevents therefore cannot be reproduced under the test suite at
+    # any frame size, and is verified by measurement against the real table instead.
+    prepared = rounded.to_arrow().combine_chunks()
 
     write_deltalake(
         table_or_uri=table_uri,
@@ -132,6 +211,9 @@ def write_nwp(
             f"AND init_time = '{nwp.item(0, 'init_time').isoformat()}'"
         ),
         partition_by=["nwp_model_id", "init_time"],
-        writer_properties=NWP_WRITER_PROPERTIES,
+        writer_properties=_writer_properties(
+            max_row_group_size=_member_aligned_row_group_size(nwp)
+        ),
+        target_file_size=NWP_TARGET_FILE_SIZE_BYTES,
         storage_options=typeddict_to_dict(storage_options),
     )

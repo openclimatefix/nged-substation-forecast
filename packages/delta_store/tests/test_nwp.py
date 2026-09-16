@@ -17,7 +17,12 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 from contracts.weather_schemas import Nwp
-from delta_store.nwp import NWP_SIGNIFICAND_BITS, NWP_SORT_COLS, write_nwp
+from delta_store.nwp import (
+    NWP_ROW_GROUP_SIZE_LIMITS,
+    NWP_SIGNIFICAND_BITS,
+    NWP_SORT_COLS,
+    write_nwp,
+)
 from deltalake import write_deltalake
 
 _T0 = datetime(2025, 6, 1, tzinfo=UTC)
@@ -40,18 +45,27 @@ _CONTINUOUS_BASE_VALUES = {
 mantissas so the significand-rounding assertions have something to measure."""
 
 
-def _make_nwp(n: int = 6, *, init_time: datetime = _T0) -> pt.DataFrame[Nwp]:
-    """Build a valid ``Nwp`` frame with deliberately unsorted key columns."""
+def _make_nwp(
+    n: int = 6, *, init_time: datetime = _T0, n_members: int | None = None
+) -> pt.DataFrame[Nwp]:
+    """Build a valid ``Nwp`` frame with deliberately unsorted key columns.
+
+    With ``n_members`` set, the ``n`` rows are spread over that many members, interleaved so each
+    member's rows are scattered through the frame before the writer sorts them.
+    """
+    members = list(range(n - 1, -1, -1)) if n_members is None else [i % n_members for i in range(n)]
     rows = {
         # Reverse-ordered members and cycling valid_times so the writer's sort has work to do.
         "nwp_model_id": ["ECMWF_ENS_0_25_degree"] * n,
         "init_time": [init_time] * n,
         "valid_time": [init_time + timedelta(hours=(i % 3) + 1) for i in range(n)],
-        "ensemble_member": list(range(n - 1, -1, -1)),
+        "ensemble_member": members,
         "h3_index": [100 + i for i in range(n)],
         "categorical_precipitation_type_surface": [1] * n,
         **{
-            var: [base * (1 + 0.003 * i) for i in range(n)]
+            # Cycle the scaling so a large frame stays inside each variable's contract range;
+            # for the small frames the other tests build this is identical to scaling by i.
+            var: [base * (1 + 0.003 * (i % 100)) for i in range(n)]
             for var, base in _CONTINUOUS_BASE_VALUES.items()
         },
     }
@@ -81,6 +95,32 @@ def test_on_disk_format(tmp_path: Path) -> None:
         # nwp_model_id and init_time are Hive partition values, not parquet columns.
         key = rows.select(k=pl.struct([c for c in NWP_SORT_COLS if c in rows.columns]))
         assert key["k"].is_sorted()
+
+
+def test_every_member_lands_in_its_own_row_group(tmp_path: Path) -> None:
+    """Each row group covers one ensemble member, so any member's predicate skips the rest.
+
+    The bug this guards against survived a check on the control member alone: an unaligned write
+    still prunes for member 0, because 0 is the minimum and only a row group containing it can
+    have a minimum of 0. The members in the middle of the range are the case that breaks.
+    """
+    n_members = 4
+    rows_per_member = NWP_ROW_GROUP_SIZE_LIMITS[0]
+    table = tmp_path / "nwp"
+    write_nwp(_make_nwp(n_members * rows_per_member, n_members=n_members), table)
+
+    spans = []
+    for parquet_file in table.rglob("*.parquet"):
+        parquet = pq.ParquetFile(parquet_file)
+        member_column = parquet.schema_arrow.get_field_index("ensemble_member")
+        for group in range(parquet.metadata.num_row_groups):
+            statistics = parquet.metadata.row_group(group).column(member_column).statistics
+            assert statistics is not None, "row-group statistics are required to prune"
+            spans.append((statistics.min, statistics.max))
+
+    assert len(spans) == n_members, f"expected one row group per member, got {spans}"
+    assert all(low == high for low, high in spans), f"a row group spans several members: {spans}"
+    assert {low for low, _ in spans} == set(range(n_members))
 
 
 def test_continuous_vars_rounded_to_significand_bits(tmp_path: Path) -> None:
