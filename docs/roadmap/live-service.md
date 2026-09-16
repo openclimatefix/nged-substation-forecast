@@ -299,8 +299,8 @@ need a retirement path that cannot lose results.
   window is computed relative to "now", so most runs write rows the table has not seen before and
   the series **accumulates**. `Metrics.validate()` rejects a batch that duplicates an existing
   primary key, so a genuine recomputation of an existing window — a retried sensor firing, a
-  backfill — cannot land as a second row for that key: whatever writer this scope uses has to
-  replace it instead. `write_forecast_metrics` does not do that today — its overwrite predicate
+  backfill — cannot land as a second row for that key: this scope's writer has to replace the
+  existing row instead. `write_forecast_metrics` does not do that today — its overwrite predicate
   scopes only to `(experiment_name, fold_id)`, one partition shared by every window this scope
   writes, so reusing it unchanged would delete every other window's rows sharing that partition.
   This scope's writer needs a predicate (or another instrument) scoped to the full primary key.
