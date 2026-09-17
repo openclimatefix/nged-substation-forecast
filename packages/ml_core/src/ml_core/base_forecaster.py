@@ -124,8 +124,8 @@ def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
 
     Raises:
         FileNotFoundError: The directory holds no such file, so the model was saved by code
-            predating ``TRAINED_METADATA_FILENAME`` or assembled by hand. That is a promotion fault
-            rather than a data outage: the model on disk is not a model this code can serve. A
+            predating ``TRAINED_METADATA_FILENAME`` or assembled by hand. The absence is a promotion
+            fault rather than a data outage: the model on disk is not a model this code can serve. A
             promotion fault raises rather than degrading, just as a missing ``meta.json`` does.
     """
     path = model_dir / TRAINED_METADATA_FILENAME
@@ -431,7 +431,7 @@ class BaseForecaster(ABC):
             data: The engineered features to forecast from.
             fold_id: The value stamped onto every row's ``fold_id`` column. The model has no
                 inherent notion of which CV fold it is serving — ``fold_id`` names the fold the
-                orchestrating asset is scoring, not anything the model learned — so the caller
+                orchestrating asset is scoring, not a property the model learned — so the caller
                 supplies the value. ``cv_power_forecasts`` passes the fold's label, while production
                 inference keeps the ``"live"`` default.
 

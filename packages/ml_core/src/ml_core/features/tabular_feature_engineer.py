@@ -236,12 +236,13 @@ def _engineer_features(
     power_lf = pl.LazyFrame._from_pyldf(power_time_series._ldf).rename({"time": "valid_time"})
     metadata_lf = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf)
     # The metadata is the registry of what we forecast, so a series with power observations but no
-    # metadata row is dropped here rather than carried to the model. Bulk mode drops such a series
-    # regardless, because `_attach_nearest_nwp_cell` inner-joins on `h3_res_5`. Single-run mode is
-    # power-centric and would otherwise keep the series with every weather feature null and predict
-    # on it, a garbage forecast that reads as healthy because the series is present. Dropping it
-    # instead makes `live_forecasts_are_healthy` report it, via `missing_time_series_ids`.
-    # Unconditional, so the output row set never depends on which features were requested.
+    # metadata row is dropped here rather than carried to the model. Bulk mode drops a series with
+    # no metadata row regardless, because `_attach_nearest_nwp_cell` inner-joins on `h3_res_5`.
+    # Single-run mode is power-centric and would otherwise keep the series with every weather
+    # feature null and predict on it, a garbage forecast that reads as healthy because the series is
+    # present. Dropping it instead makes `live_forecasts_are_healthy` report it, via
+    # `missing_time_series_ids`. Unconditional, so the output row set never depends on which
+    # features were requested.
     power_lf = power_lf.join(metadata_lf.select("time_series_id"), on="time_series_id", how="semi")
     nwp_lf: pl.LazyFrame | None = nwp
 
@@ -306,9 +307,9 @@ def _engineer_features(
         # power_fcst_init_time (= nwp_init_time + nwp_publication_delay_hours): closing that gap
         # needs the run cadence to exceed the delay. We ingest exactly one ECMWF ENS run per day,
         # and NWP_PUBLICATION_DELAY_HOURS is 9, so no run falls strictly between a row's own run and
-        # its power_fcst_init_time. This is the invariant to re-check if the freshest-run selection
-        # ever needs to become row-aware, or if a second daily run or a delay past 24 hours is
-        # introduced.
+        # its power_fcst_init_time. That absence of an intervening run is the invariant to re-check
+        # if the freshest-run selection ever needs to become row-aware, or if a second daily run or
+        # a delay past 24 hours is introduced.
         historical_weather = select_analysis_proxy(
             processed_nwp, group_key="time_series_id", init_time_col="nwp_init_time"
         )

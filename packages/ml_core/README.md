@@ -11,11 +11,11 @@ model supplies five members — `train`, `predict`, `save`, `load`, and the `tra
 property — and inherits the rest from this package: the feature pipeline that builds its input, the
 MLflow wiring that gives its run an identity, the archive format its weights are shipped in, the
 checks that decide whether a saved model can still be served, and the scoring that puts it on the
-leaderboard. `XGBoostForecaster` in `xgboost_forecaster` is the only subclass in the repo today, so
-the second model family is the real test of that split. Writing that second family should mean
-writing five members, not a second pipeline.
+leaderboard. `XGBoostForecaster` in `xgboost_forecaster` is the only subclass outside the tests
+today, so the second model family is the real test of that split. Writing that second family should
+mean writing five members, not a second pipeline.
 
-**The Dagster assets delegate here rather than implementing anything themselves.** The
+**The Dagster assets delegate here rather than implementing the forecasting logic themselves.** The
 cross-validation, metrics, and live-inference assets in `src/nged_substation_forecast/defs/` are
 thin shells over the functions below. That thinness keeps every one of those functions unit-testable
 without a Dagster instance, an MLflow server, or an object store. The assets hold the orchestration
@@ -24,9 +24,10 @@ without a Dagster instance, an MLflow server, or an object store. The assets hol
 **Every neighbouring package owns a piece of the data; `ml_core` owns what is done with it.**
 `contracts` owns what every frame means, and `ml_core` consumes those Patito schemas without
 declaring any of its own. `delta_store` owns how a table is physically written, and `ml_core` writes
-no Delta table at all — the only file it writes is the frozen roster copy inside a saved model
-directory. `nged_data` and `dynamical_data` own the ingest of observed power and of gridded weather,
-and `ml_core` starts from whatever those two packages landed. `geo` owns H3 indexing, and
+no Delta table at all. The files it does write are a saved model's frozen roster copy, the gzipped
+tar archive that model ships in, and the `promotion.json` recording which run was promoted.
+`nged_data` and `dynamical_data` own the ingest of observed power and of gridded weather, and
+`ml_core` starts from whatever those two packages landed. `geo` owns H3 indexing, and
 `weather_utils` owns the analysis-proxy query the weather-lag join is built on. What is left —
 turning power, weather, and metadata into a model-ready frame, and turning a model's output into a
 leaderboard row — is this package.
@@ -41,8 +42,8 @@ The two columns differ by the publication delay — the hours between a numerica
 legitimate only if it was knowable at `power_fcst_init_time`, never if it was merely knowable at
 `nwp_init_time`. Every power lag shorter than or equal to the forecast lead time is nullified
 against `power_fcst_init_time`, in `_nullify_leaky_lags`. Weather lags reaching back before
-`power_fcst_init_time` are answered from an earlier NWP run rather than the current one, which is
-the dual-strategy join in `_apply_weather_lag`.
+`power_fcst_init_time` are answered from an earlier NWP run rather than from the current run.
+Answering a past target time from the earlier run is the dual-strategy join in `_apply_weather_lag`.
 
 **The train==predict population invariant keeps the leaderboard comparable.** A model scores exactly
 the `time_series_id` population it trained on, whatever the eligibility rules would admit today, and
@@ -71,7 +72,7 @@ and [design principle
   implementation, and the declarative tabular pipeline behind that implementation. A forecaster
   wanting a different view of the data (a spatial crop for a convolutional neural network, say)
   supplies a different `FeatureEngineer` rather than editing the shared pipeline. The package
-  docstring below lists the sub-modules and says what each one owns.
+  docstring below lists the sub-modules and says what each sub-module owns.
 - `base_forecaster` — `BaseForecaster`, the abstract interface every model implements, and
   `BaseForecasterConfig`, the serialisable config carrying a trained model's experiment identity.
   Also holds the MLflow round-trip that both research and production read a saved model through,
@@ -82,7 +83,7 @@ and [design principle
   probability, and interval width), the horizon-slice bands, and the MLflow aggregate keys. The
   equations and the argument for each choice are on [Evaluation
   metrics](https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/);
-  the docstrings below say what this implementation does with them.
+  the docstrings below say what this implementation does with those equations.
 - `cv_helpers` — pure, input-only helpers for the cross-validation assets: fold date arithmetic, the
   eligibility rule, partition-key parsing, and config flattening. Fold design itself is on
   [Cross-validation

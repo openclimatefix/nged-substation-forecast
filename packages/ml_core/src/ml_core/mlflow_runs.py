@@ -37,9 +37,9 @@ def load_experiment_forecaster(
 
     ``register_experiment`` stamps the config JSON and the forecaster class's fully-qualified import
     path (``forecaster_target``) on the experiment. The config JSON carries no class identity of its
-    own. The ``BaseForecasterConfig`` subclass to deserialise it into is therefore reached through
-    the forecaster's ``CONFIG_CLASS``, the same class the forecaster's ``load`` uses. The caller is
-    responsible for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
+    own. The ``BaseForecasterConfig`` subclass to deserialise that JSON into is therefore reached
+    through the forecaster's ``CONFIG_CLASS``, the same class the forecaster's ``load`` uses. The
+    caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
 
     Args:
         experiment_name: The MLflow experiment name (also the partition-key prefix).
@@ -161,11 +161,11 @@ def list_promotable_runs() -> list[PromotableRun]:
 
     A read-only convenience for the ``promotable_model_runs`` asset (``defs/production_assets.py``),
     which logs the returned list as a metadata table in the Dagster UI. Every MLflow experiment is
-    searched, and at most 1000 fold runs are returned from each. A ``promoted_model`` promotion
-    candidate's run id can then be copy-pasted into that asset's launchpad rather than retyped from
-    memory. The champion is still picked by eye off the MLflow leaderboard; ``list_promotable_runs``
-    only lists the candidates. The caller is responsible for setting the tracking URI
-    (``mlflow.set_tracking_uri``) beforehand.
+    searched, and at most 1000 fold runs are returned from each experiment. A ``promoted_model``
+    promotion candidate's run id can then be copy-pasted into that asset's launchpad rather than
+    retyped from memory. The champion is still picked by eye off the MLflow leaderboard;
+    ``list_promotable_runs`` only lists the candidates. The caller is responsible for setting the
+    tracking URI (``mlflow.set_tracking_uri``) beforehand.
     """
     client = MlflowClient()
     runs = [

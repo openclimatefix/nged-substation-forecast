@@ -90,7 +90,7 @@ class RollingFeature(BaseLookbackFeature):
     """Represents a parsed rolling mean feature.
 
     Computing the rolling mean of 'power' is currently forbidden, because a rolling window over
-    observed power would reach past the forecast-issue time and leak it.
+    observed power would reach past the forecast-issue time and leak the target.
     """
 
     # TODO: Generalise to support more weather summary stats over the rolling window, i.e.

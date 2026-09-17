@@ -7,8 +7,8 @@ tall ``Metrics`` frame. ``enrich_metrics_rows`` stamps the evaluation window and
 frame once the calling asset knows them. ``build_mlflow_aggregate_metrics`` reduces the frame to
 the flat key/value dictionary the MLflow leaderboard displays.
 
-Every function here is pure — no Dagster, no MLflow, and no IO — so each one is unit-testable on
-an in-memory frame, and the asset that calls it owns every read and write.
+Every function here is pure — no Dagster, no MLflow, and no IO — so each function is
+unit-testable on an in-memory frame, and the asset that calls it owns every read and write.
 
 The equations, and the argument for choosing each metric over the alternatives, are on
 <https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/>. The
@@ -167,8 +167,7 @@ def _fair_crps_expr() -> pl.Expr:
     The continuous ranked probability score (CRPS) is evaluated inside the per-run collapse
     ``group_by``, where each group holds the ``m`` members forecasting one ``(time_series_id,
     power_fcst_init_time, valid_time)``. The fair (finite-ensemble-unbiased, [Ferro
-    2014](https://doi.org/10.1002/qj.2270)) form
-    is::
+    2014](https://doi.org/10.1002/qj.2270)) form is::
 
         CRPS = mean_i |x_i − y|  −  Σ_{i<j} |x_i − x_j| / (m(m−1))
 
@@ -252,10 +251,10 @@ def _wide_metrics(per_run: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
         aggs[f"picp:{_band_label(lower)}"] = actual.is_between(low_col, high_col).mean()
         aggs[f"interval_width:{_band_label(lower)}"] = (high_col - low_col).mean()
     # A perfect forecast group (rmse == 0) with zero spread would score 0/0 = NaN. NaN is not null,
-    # so it would sail through Metrics.validate and poison every downstream MLflow mean. Define that
-    # corner as 0.0 (consistent with "a deterministic forecast's spread-skill ratio is 0"). Zero
-    # rmse with *positive* spread divides to +inf, which the finiteness check in compute_metrics
-    # turns into a loud error.
+    # so the NaN would sail through Metrics.validate and poison every downstream MLflow mean. Define
+    # that corner as 0.0 (consistent with "a deterministic forecast's spread-skill ratio is 0").
+    # Zero rmse with *positive* spread divides to +inf, which the finiteness check in
+    # compute_metrics turns into a loud error.
     rmse = pl.col("rmse")
     rms_spread = pl.col("_rms_spread")
     return (
@@ -341,9 +340,9 @@ def compute_metrics(
     """
     # A negative lead time means hindcast rows — valid times already in the past at
     # power_fcst_init_time, which a live forecast could never deliver. Scoring those rows would
-    # silently flatter the model, because they would land in "intraday" via the left-closed bands,
-    # so fail loudly. The CV inference pass currently emits such rows for valid times inside the NWP
-    # publication-delay window; issue #346 tracks removing them at the source.
+    # silently flatter the model, because they would land in "intraday" via the left-closed bands.
+    # Fail loudly instead. The CV inference pass currently emits such rows for valid times inside
+    # the NWP publication-delay window; issue #346 tracks removing them at the source.
     n_negative = cv_forecasts.filter(pl.col("valid_time") < pl.col("power_fcst_init_time")).height
     if n_negative > 0:
         raise ValueError(

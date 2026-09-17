@@ -115,9 +115,9 @@ def weather_lags_lack_their_control_member(
     run does carry.
 
     ``live_forecasts`` probes the NWP scan *before* the H3 spatial join, while
-    ``_engineer_features`` probes the scan after. That makes the frame here a superset of the frame
-    the pipeline sees. The alert can therefore in principle miss a degradation the pipeline hits,
-    but can never fire on a degradation the pipeline does not hit. In practice
+    ``_engineer_features`` probes the scan after. The earlier probe point makes the frame here a
+    superset of the frame the pipeline sees. The alert can therefore in principle miss a degradation
+    the pipeline hits, but can never fire on a degradation the pipeline does not hit. In practice
     ``load_engineering_inputs`` has already pruned the scan to the model's own frozen H3 cells, so
     the two frames hold the same cells today.
 

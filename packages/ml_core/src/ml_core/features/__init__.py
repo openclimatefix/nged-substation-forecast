@@ -11,8 +11,8 @@ Public interface:
   ``ml_core.production_helpers.select_nwp_init_time``. A caller reasoning about any of those
   three signatures needs a name to reach the constant by.
 
-The sub-modules holding that public interface — the two public sub-modules below, plus the private
-``_nwp``, whose ``NWP_PUBLICATION_DELAY_HOURS`` this package re-exports:
+That public interface lives in the two public sub-modules below, plus the private ``_nwp``, whose
+``NWP_PUBLICATION_DELAY_HOURS`` this package re-exports:
 
 - ``feature_engineer`` — the ``FeatureEngineer`` abstract base, plus ``DEFAULT_LOCAL_TIMEZONE``,
   the IANA zone the local-time features are computed in. The zone lives on the interface rather

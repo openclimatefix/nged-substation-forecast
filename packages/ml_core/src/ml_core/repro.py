@@ -10,16 +10,15 @@ data versioning one integer per table. A run can therefore later be replayed wit
 Every function here is deliberately **non-raising**: the git SHA, the dirty flag, and each Delta
 table's version are a record *about* a run rather than an input to that run. A missing ``.git``
 directory (containers) or an absent Delta table must never fail the surrounding training or
-forecasting run; each degrades to the sentinels ``"unknown"`` / ``"absent"`` instead.
+forecasting run; each absence degrades to the sentinels ``"unknown"`` / ``"absent"`` instead.
 
 ``provenance_tags`` **stage-prefixes** its keys (``register_``, ``train_``, ``predict_``,
 ``metrics_``) because four separate writers stamp provenance onto the same MLflow runs. Three are
-Dagster assets writing one fold run — ``trained_cv_model``, ``cv_power_forecasts``, and
-``metrics`` — each potentially on a different code revision and at a different set of Delta table
-versions. The fourth is the ``register_experiment`` op inside ``register_experiment_job``, which
-stamps the experiment's parent run; the ``metrics`` asset stamps that parent run too. Un-prefixed
-keys would clobber one another, and the prefix preserves every writer's provenance snapshot side
-by side.
+Dagster assets writing one fold run — ``trained_cv_model``, ``cv_power_forecasts``, and ``metrics``
+— each potentially on a different code revision and at a different set of Delta table versions. The
+fourth is the ``register_experiment`` op inside ``register_experiment_job``, which stamps the
+experiment's parent run; the ``metrics`` asset stamps that parent run too. Un-prefixed keys would
+clobber one another, and the prefix preserves every writer's provenance snapshot side by side.
 """
 
 import logging
