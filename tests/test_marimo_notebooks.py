@@ -3,7 +3,7 @@
 The check itself lives in `scripts/lint/check_marimo_notebooks.py`, which is also a pre-commit
 hook; its module docstring explains what the failure looks like and which tools produce it. These
 tests run it over every notebook in the repo, and — because it rides on private marimo API — keep
-hand- written notebooks either side of the line: three that it must flag, so a marimo release
+hand-written notebooks either side of the line: three that it must flag, so a marimo release
 cannot quietly turn it into a no-op, and one correct notebook that it must not.
 
 Every test drives the checker as a subprocess, which is how pre-commit drives it, so its exit
