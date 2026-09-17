@@ -15,12 +15,15 @@ assumed — see [Storage formats: measured, not
 assumed](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed)
 for the comparison between those two tables, and [design principle
 12](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#12-measure-do-not-assume)
-for why that discipline matters project-wide. The other four tables below carry no writer-properties
-tuning, because no measurement has yet been made to justify any tuning. The flagship example of a
-tuned table is the internal `power_forecasts` table: ZSTD + `DELTA_BINARY_PACKED` timestamps +
-`BYTE_STREAM_SPLIT` floats + member-adjacent sorting + rounding `power_fcst` to a 13-bit significand
-shrank the 403.6M-row development table from 6.33 GB to 0.73 GB.
-`POWER_FORECASTS_WRITER_PROPERTIES`, below on this page, breaks that figure down lever by lever.
+for why measuring rather than assuming matters project-wide. The other four tables below carry no
+writer-properties tuning, because no measurement has yet been made to justify any tuning.
+
+**The flagship tuned table is the internal `power_forecasts` table, which the format shrank from
+6.33 GB to 0.73 GB.** ZSTD + `DELTA_BINARY_PACKED` timestamps + `BYTE_STREAM_SPLIT` floats +
+member-adjacent sorting + rounding `power_fcst` to a 13-bit significand applied that shrink to the
+403.6M-row development table. `POWER_FORECASTS_WRITER_PROPERTIES`, below on this page, gives the
+lever-by-lever breakdown, measured on the table's least compressible single file rather than on the
+full table.
 
 ## Contents
 

@@ -4,7 +4,8 @@ The H3 aggregation renormalises each cell over the grid points that supplied a v
 corrupt grid point costs only its own share of its cell. That is what makes the stored cells
 robust, and it is also why counting null *cells* is a poor proxy for how corrupt the feed was.
 This module counts the nulls where they arrive, before that renormalisation absorbs most of them.
-The aggregation mechanics and the measurements behind that claim are in
+The aggregation mechanics, and the measurements behind the claim that a corrupt grid point costs
+only its own share of its cell, are in
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#spatial-aggregation-is-where-a-grid-points-null-is-resolved>.
 """
 
@@ -136,11 +137,12 @@ def assess_upstream_grid_point_nulls(
         An `UpstreamNullRate` whose `per_variable` frame holds one row per counted variable,
         sorted by variable name, with that variable's null grid-point count (`n_null`), the
         count of (ensemble_member, lead_time) slices holding at least one null
-        (`n_affected_slices`), and the total grid-point count counted (`n_total`).
+        (`n_affected_slices`), and the total number of grid points counted (`n_total`).
     """
     # Selected per variable rather than once on `ds`: this runs inside `ecmwf_ens` while the
     # whole downloaded run is still held in memory, and slicing the whole dataset would copy all
-    # thirteen downloaded variables to read three.
+    # thirteen downloaded variables to read the three de-accumulated ones or the nine instantaneous
+    # ones, depending on the call.
     beyond_lead_0 = ds.lead_time > _LEAD_0
     rows = []
     for name in sorted(variables):

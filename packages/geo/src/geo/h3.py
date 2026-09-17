@@ -36,7 +36,7 @@ def compute_h3_grid_weights_for_boundary(
     Returns:
         One row per (H3 cell, NWP grid point) pair that overlap within `boundary`, with
         `proportion` holding the fraction of that H3 cell's child cells falling inside the grid
-        point's box — see `compute_h3_grid_weights`, which this delegates to once the
+        point's box — see `compute_h3_grid_weights`, which this function delegates to once the
         boundary has been resolved to its covering `h3_index` list.
     """
     _LOG.info(f"Generating H3 cells at resolution {h3_res}...")
@@ -108,8 +108,7 @@ def compute_h3_grid_weights(
         raise ValueError(f"{child_h3_res=} must be strictly greater than {h3_res=}.")
 
     # Logged here rather than on entry so that child_h3_res is the resolution actually used: on the
-    # default path the argument is None until the line above resolves it, and the message used to
-    # report that None.
+    # default path the argument is None until the line above resolves it.
     _LOG.info(
         f"Computing H3 grid weights for grid size {nwp_grid_size_degrees} from {len(h3_index)}"
         f" H3 cells at resolution {h3_res}, sampled at child resolution {child_h3_res}..."
@@ -139,15 +138,15 @@ def compute_h3_grid_weights(
         # explodes to a single null row under both settings -- which H3GridWeights.validate() below
         # rejects regardless -- so there is no silent-data-loss risk from the choice either way.)
         .explode("child_h3", empty_as_null=False)
-        # nwp_lat takes cell_to_lat and nwp_lon takes cell_to_lng: swapping the two is the one
-        # orientation bug this expression can introduce, and it survives the row-count and
-        # weight-sum assertions in `test_grid_weights_invariant`, because the output stays
-        # well-formed and only its geography is wrong. Two tests in `geo/tests/test_h3.py` do
-        # catch it, both verified by mutation: `test_grid_weights_snap_to_nearest_grid_centre`,
-        # whose oracle builds the expected points geographically, and
-        # `test_grid_weights_preserve_geographic_orientation`, which pins two well-separated GB
-        # landmarks. The orientation-coverage table lists the three tests guarding this mapping
-        # and the mutation each one catches:
+        # nwp_lat takes cell_to_lat and nwp_lon takes cell_to_lng: swapping the two column
+        # assignments below is the one orientation bug this expression can introduce. The swap
+        # survives the row-count and weight-sum assertions in `test_grid_weights_invariant`, because
+        # the output stays well-formed and only its geography is wrong. Two tests in
+        # `geo/tests/test_h3.py` do catch the swap, both verified by mutation:
+        # `test_grid_weights_snap_to_nearest_grid_centre`, whose oracle builds the expected points
+        # geographically, and `test_grid_weights_preserve_geographic_orientation`, which pins two
+        # well-separated landmarks in Great Britain. The orientation-coverage table covers the wider
+        # set of orientation bugs this mapping can carry, and which test catches each:
         # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#nwp-grid-h3-orientation-coverage>
         .with_columns(
             nwp_lat=_snap_to_grid(plh3.cell_to_lat("child_h3")),

@@ -325,17 +325,17 @@ this repo relies on — pyarrow, polars, deltalake — publish wheels for it.
 
 The NWP-grid-to-H3 mapping is the classic place for a silent orientation bug — a vertically or
 horizontally flipped weather grid, a transpose (`np.meshgrid` `indexing="ij"` vs `"xy"`), or a
-lat/lon swap. Three tests guard it in layers, from cheap-and-synthetic to real-and-networked. Each
+lat/lon swap. Four tests guard it in layers, from cheap-and-synthetic to real-and-networked. Each
 was checked by *mutation*: introducing the bug into the production code and confirming the test goes
 red. The table records which mutation each layer catches (✓ = the test fails when that bug is
-present):
+present; n/a = the test does not exercise the code that mutation changes):
 
-| Mutation in production code | synthetic `convert` test¹ | cached real-slice test² | geo landmark test³ |
-| --- | :---: | :---: | :---: |
-| `np.meshgrid` `indexing="ij"` → `"xy"` (transpose) | ✓ | ✓ | n/a |
-| lat/lon swap in the value-join keys | ✓ | ✓ | ✓ |
-| reversed latitude ravel (vertical flip) | ✓ | ✓ | n/a |
-| swap `cell_to_lat`/`cell_to_lng` when snapping | n/a | n/a | ✓ |
+| Mutation in production code | synthetic `convert` test¹ | cached real-slice test² | geo landmark test³ | geo snapping test⁴ |
+| --- | :---: | :---: | :---: | :---: |
+| `np.meshgrid` `indexing="ij"` → `"xy"` (transpose) | ✓ | ✓ | n/a | n/a |
+| lat/lon swap in the value-join keys | ✓ | ✓ | ✓ | n/a |
+| reversed latitude ravel (vertical flip) | ✓ | ✓ | n/a | n/a |
+| swap `cell_to_lat`/`cell_to_lng` when snapping | n/a | n/a | ✓ | ✓ |
 
 - ¹
   `dynamical_data/tests/test_convert_to_polars.py::test_convert_maps_each_grid_point_to_its_own_lat_lon`
@@ -350,6 +350,10 @@ present):
   `compute_h3_grid_weights` labels each H3 cell with grid points at the cell's own (lat, lon), using
   two well-separated GB landmarks. This is what fixes the hexagon↔(lat, lon) geography the `convert`
   tests delegate.
+- ⁴ `geo/tests/test_h3.py::test_grid_weights_snap_to_nearest_grid_centre` — builds the expected grid
+  points geographically and compares them against what `compute_h3_grid_weights` produced, so it
+  catches the `cell_to_lat`/`cell_to_lng` swap as well. Both geo tests live in the same file and
+  both were re-confirmed by mutation.
 
 `test_ecmwf_ens_network.py` (network-gated, above) runs the full open → download → convert pipeline
 against the live catalog, but only re-checks *orientation and bounds*: descending latitude,

@@ -1,7 +1,7 @@
 # NGED JSON Data
 
 This package reads NGED's telemetry JSON files from S3 and parses them into the `PowerTimeSeries`
-and `TimeSeriesMetadata` schemas (see `contracts`). The metadata roster is the only thing this
+and `TimeSeriesMetadata` schemas (see `contracts`). The metadata roster is the only file this
 package owns and writes; the parsed power observations are handed back to the caller, which appends
 them to the `power_time_series` Delta table (see [Usage](#usage) below). `nged_data.storage`'s
 module docstring, below on this page, says which functions read that Delta table and which write the
@@ -25,7 +25,7 @@ list_timeseries_json_files`, etc.).
 - `nged_data.storage.select_new_rows(time_series, delta_path, storage_options=None)` — filters
   `time_series` down to rows genuinely missing from the `power_time_series` Delta table at
   `delta_path`. `PowerTimeSeries` rows are filtered by existence, an anti-join on `(time_series_id,
-  time)`, so a reading is kept regardless of arrival order. The file listing
+  time)`, so a reading is kept regardless of arrival order. The file listing that
   `list_timeseries_json_files` returns is filtered by comparing each file's `end_time` against its
   series' on-disk high-water mark, loosened by a lookback margin so a late file is still downloaded.
 - `nged_data.storage.time_series_coverage(delta_path, storage_options=None)` — the earliest and
@@ -36,8 +36,9 @@ list_timeseries_json_files`, etc.).
   `time_series_id` and rewriting the file only if the incoming metadata differs from what is stored.
 
 `nged_data.read_nged_json` parses one downloaded JSON file into the two schemas. Every function in
-it is private and called only by `download_and_parse_files`, so the module appears on the API page
-below carrying just its `ExtractedPowerTimeSeries` result type.
+`nged_data.read_nged_json` is private, and the two that parse a whole file are called only by
+`download_and_parse_files`, so the module appears on the API page below carrying just its
+`ExtractedPowerTimeSeries` result type.
 
 ## Data quality
 

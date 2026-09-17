@@ -11,14 +11,14 @@ relationship between weather and power. Features are passed via the `AllFeatures
 `contracts`), which joins NWP variables, power lag/rolling features, and static metadata.
 Categorical and string columns are encoded as integer codes before being handed to XGBoost; all
 features are cast to `Float32`, and missing values are left as `NaN` so XGBoost handles them
-natively. The model is deterministic, and an ensemble forecast still comes out of it — the
-`XGBoostForecaster` class below says how.
+natively. The model is deterministic, and an ensemble forecast still comes out of that deterministic
+model — the `XGBoostForecaster` class below says how.
 
 Both `train()` and `predict()` collect their input once, so keeping that collect bounded is the
-**caller's** job: the dominant cost is the multi-tens-of-GB NWP scan, which has to be pruned at the
-*inputs* and streamed, because filtering the engineered *output* cannot prune it. The `train` and
-`predict` docstrings below give the mechanics. For the dataset sizes and the table of which
-predicates actually prune the NWP scan, see [Bounding feature-engineering
+**caller's** job. The dominant cost is the multi-tens-of-GB NWP scan, which has to be pruned at the
+*inputs* and streamed, because filtering the engineered *output* cannot prune the NWP scan. The
+`train` and `predict` docstrings below give the mechanics. For the dataset sizes and the table of
+which predicates actually prune the NWP scan, see [Bounding feature-engineering
 memory](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output).
 
 ## Save format
@@ -26,8 +26,8 @@ memory](https://openclimatefix.github.io/nged-substation-forecast/architecture/p
 `XGBoostForecaster.save(path)` writes:
 
 - `{time_series_id}.ubj` — one XGBoost native binary model per trained substation
-- `meta.json` — the full `XGBoostConfig` serialised via Pydantic, so `load()` is completely
-  self-contained
+- `meta.json` — the full `XGBoostConfig` serialised via Pydantic, the trained `time_series_id`
+  population, and the model class, so `load()` is completely self-contained
 
 ## Configuration
 

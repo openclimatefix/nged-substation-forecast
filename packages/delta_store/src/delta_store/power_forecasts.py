@@ -95,27 +95,29 @@ def write_power_forecasts(
     are always replaced, even when the first chunk is empty — and ``None`` (append) on the rest.
 
     **Every row of ``forecasts`` must satisfy the predicate the overwrite path builds.** delta-rs
-    checks each row against it and rejects the whole write — ``DeltaError``, nothing committed —
-    if any row falls outside, rather than writing the rows that do match. So a frame spanning two
-    ``(experiment_name, fold_id)`` pairs fails under a single ``replace_partition``, and a frame
-    spanning two ``power_fcst_init_time`` values fails under a narrowing
-    ``replace_predicate_extra``. Confirmed empirically against ``deltalake`` 1.6.3: a frame
-    carrying one row outside the predicate raised ``Invalid data found: 1 rows failed validation
-    check``, and the table was left at both its previous row count and its previous Delta version.
-    ``write_nwp`` documents the same delta-rs behaviour and is no safer: its predicate is built
-    from the frame's *first row* (``nwp.item(0, ...)``), so a frame spanning two
+    checks each row against that predicate and rejects the whole write — ``DeltaError``, nothing
+    committed — if any row falls outside that predicate, rather than writing the rows that do match.
+    So a frame spanning two ``(experiment_name, fold_id)`` pairs fails under a single
+    ``replace_partition``, and a frame spanning two ``power_fcst_init_time`` values fails under a
+    narrowing ``replace_predicate_extra``. Confirmed empirically against ``deltalake`` 1.6.3: a
+    frame carrying one row outside the predicate raised ``Invalid data found: 1 rows failed
+    validation check``. The table was left at both its previous row count and its previous Delta
+    version. ``write_nwp`` documents the same delta-rs behaviour and is no safer: its predicate is
+    built from the frame's *first row* (``nwp.item(0, ...)``), so a frame spanning two
     ``(nwp_model_id, init_time)`` partitions is rejected there too. Both functions leave it to the
     caller to pass a frame the predicate covers, and neither checks before writing.
 
-    The append path takes no predicate and so has no such check: two identical appends leave two
-    copies, confirmed empirically, because nothing deduplicates on ``PowerForecast.PRIMARY_KEY``
-    at write time. ``PowerForecast``'s uniqueness constraint is checked by ``validate()``, on the
-    way in, not by the table. What stops a retry double-counting is therefore the caller's
-    chunking discipline rather than anything here: ``cv_power_forecasts`` restarts its chunk loop
-    from the first chunk on every materialisation, and that first chunk always passes
-    ``replace_partition``, so it clears whatever an interrupted run left in the
-    ``(experiment_name, fold_id)`` partition before the later chunks append into it. A caller that
-    appended without an overwriting first chunk would silently double its rows instead — see
+    The append path takes no predicate and so performs no row-by-row check: two identical appends
+    leave two copies, confirmed empirically, because nothing deduplicates on
+    ``PowerForecast.PRIMARY_KEY`` at write time. ``PowerForecast``'s uniqueness constraint is
+    checked by ``validate()``, on the way in, not by the table.
+
+    **What stops a retry double-counting is the caller's chunking discipline, not anything in this
+    function.** ``cv_power_forecasts`` restarts its chunk loop from the first chunk
+    on every materialisation, and that first chunk always passes ``replace_partition``. The
+    overwriting first chunk clears whatever an interrupted run left in the ``(experiment_name,
+    fold_id)`` partition before the later chunks append into that partition. A caller that appended
+    without an overwriting first chunk would silently double the partition's rows instead — see
     [principle 10, every write is atomic and
     idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
 
