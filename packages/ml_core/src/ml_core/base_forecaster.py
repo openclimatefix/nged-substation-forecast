@@ -63,10 +63,11 @@ _ARCHIVE_COMPRESSLEVEL: Final[int] = 1
 """gzip level used for the model archive — the fastest, not ``tarfile``'s default of 9.
 
 Measured on 40 real XGBoost boosters (500 estimators, depth 6, 24 features; 77 MB of ``.ubj``):
-level 1 takes 0.7 s for a 2.7x reduction, level 9 takes 14.9 s for 3.5x. Level 9 would put ~15
-minutes of pure CPU on every ``trained_cv_model`` materialisation at V2 scale (~2,500 series)
-to save a fifth of the bytes. Boosters are already dense, and the archive is transient — it
-exists to be one replaceable object, not to be small — so the fastest level is the right trade.
+level 1 takes 0.7 s and shrinks those 77 MB of boosters 2.7-fold, while level 9 takes 14.9 s and
+shrinks the same 77 MB 3.5-fold. Level 9 would put ~15 minutes of pure CPU on every
+``trained_cv_model`` materialisation at V2 scale (~2,500 series) to save a fifth of the bytes.
+Boosters are already dense, and the archive is transient — it exists to be one replaceable object,
+not to be small — so the fastest level is the right setting.
 """
 
 
@@ -140,8 +141,8 @@ def _download_and_unpack_model(run_id: str, work_dir: Path, remedy: str) -> Path
     """Download an MLflow run's model archive into ``work_dir`` and unpack it.
 
     Shared by ``BaseForecaster.load_from_mlflow`` and
-    ``ml_core.production_helpers.fetch_model_artifacts``, the two readers of a run's saved
-    model, so the archive layout is defined in exactly one place.
+    ``ml_core.production_helpers.fetch_model_artifacts``, the only two readers of a run's saved
+    model in this repo, so the archive layout is defined in exactly one place.
 
     The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
     beforehand.
@@ -313,7 +314,7 @@ class BaseForecaster(ABC):
 
     @abstractmethod
     def save(self, path: Path) -> None:
-        """Save the trained model state to a directory, **replacing** anything already there.
+        """Save this trained model to a directory, **replacing** every file already there.
 
         Two requirements on every implementation:
 
@@ -321,16 +322,15 @@ class BaseForecaster(ABC):
           fully-qualified ``{module}.{qualname}`` of the concrete subclass (e.g.
           ``"xgboost_forecaster.forecaster.XGBoostForecaster"``) — so that production inference
           (``ml_core.production_helpers.load_forecaster_from_dir``) can reconstruct the correct
-          class from a plain model directory with no other context (issue #221).
-        - ``path`` must be cleared first, so that saving over a directory holding a *larger*
-          model's files leaves none of them behind. Merging instead of replacing is how a dropped
-          time series' weights survive a re-train (issue #197); ``XGBoostForecaster.save`` clears
-          with ``shutil.rmtree(path, ignore_errors=True)``.
+          class from a plain model directory — no caller-supplied class name, no class registry, and
+          no MLflow run (issue #221). - ``path`` must be cleared first, so that saving over a
+          directory holding a *larger* model's files leaves none of them behind. Merging instead of
+          replacing is how a dropped time series' weights survive a re-train (issue #197);
+          ``XGBoostForecaster.save`` clears with ``shutil.rmtree(path, ignore_errors=True)``.
 
-        The clearing requirement makes ``path`` the model's to own while it saves, so anything a
-        caller left there is gone afterwards. (Depositing a file *after* a save is fine, and is
-        how ``production_helpers.fetch_model_artifacts`` puts ``promotion.json`` beside the
-        model.)
+        The clearing requirement makes ``path`` the model's to own while it saves, so any file a
+        caller left there is gone afterwards. (Depositing a file *after* a save is fine, and is how
+        ``production_helpers.fetch_model_artifacts`` puts ``promotion.json`` beside the model.)
         """
 
     @classmethod
@@ -425,9 +425,10 @@ class BaseForecaster(ABC):
         Args:
             data: The engineered features to forecast from.
             fold_id: The value stamped onto every row's ``fold_id`` column. The model has no
-                inherent notion of which CV fold it is serving (``fold_id`` is orchestration
-                context), so the caller supplies it: ``cv_power_forecasts`` passes the fold's
-                label, while production inference keeps the ``"live"`` default.
+                inherent notion of which CV fold it is serving — ``fold_id`` names the fold the
+                orchestrating asset is scoring, not anything the model learned — so the caller
+                supplies the value: ``cv_power_forecasts`` passes the fold's label, while
+                production inference keeps the ``"live"`` default.
 
         Returns:
             One row per ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)``

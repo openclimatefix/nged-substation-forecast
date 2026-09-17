@@ -329,10 +329,10 @@ def _engineer_features(
             nwp_publication_delay_hours=nwp_publication_delay_hours,
         )
 
-    # Metadata joins *after* the NWP join, not before: bulk mode left-joins power onto NWP, so a
-    # row whose valid_time has no power observation would lose time_series_type even though its
-    # time_series_id is known. Conditional because Polars keeps a left join whose right-hand
-    # columns are all projected away, so an unconditional join here would cost every caller that
+    # Metadata joins *after* the NWP join, not before: bulk mode left-joins power onto NWP, so a row
+    # whose valid_time has no power observation would lose time_series_type even though its
+    # time_series_id is known. Conditional because Polars keeps a left join whose right-hand columns
+    # are all projected away, so an unconditional join here would run the join for every caller that
     # never asked for the column.
     if "time_series_type" in selected_features:
         raw_data = raw_data.join(metadata_lf, on="time_series_id", how="left")

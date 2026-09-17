@@ -30,16 +30,16 @@ bulk mode, and to derive ``nwp_init_time`` when a single-run caller omits ``nwp_
 ``select_analysis_proxy`` needs no delay: in single-run mode ``_engineer_features`` caps the
 proxy at the NWP run that call already selected.
 
-Of ``select_nwp_init_time``'s two modes, only ``"replay"`` needs the delay. A live run joins
-whatever is genuinely on disk, so reality already constrains the NWP table to runs that were
-genuinely published. A replay of a past init time would otherwise join runs that only landed
-afterwards — lookahead bias rather than mere inaccuracy. The asymmetry in full:
+Of ``select_nwp_init_time``'s two modes, only ``"replay"`` needs the delay. A live forecast run
+joins whatever NWP runs are genuinely on disk, so reality already constrains the NWP table to the
+runs that were genuinely published. A replay of a past init time would otherwise join runs that only
+landed afterwards — lookahead bias rather than mere inaccuracy. The asymmetry in full:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#resolve-nwp-availability-asymmetrically-live-vs-replay>
 
 Two bounds constrain the value, given one 00Z run a day and forecast slots at 00/06/12/18 UTC. The
-06:00 slot must *not* see that morning's run, which has not landed yet, so the value must exceed 6.
-The 12:00 slot *must* see it, so the value must not exceed 12. Both bounds move if
-``ecmwf_ens_schedule``'s start time changes.
+06:00 slot must *not* see that morning's run, which has not landed yet, so the value must exceed 6
+hours. The 12:00 slot *must* see that morning's run, so the value must not exceed 12 hours. Both
+bounds move if ``ecmwf_ens_schedule``'s start time changes.
 """
 
 
@@ -137,16 +137,16 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     datetime_ranges + explode, then the original NWP values are left-joined back in, and
     interpolate/forward_fill are applied with over() to stay within group boundaries.
 
-    End-null propagation: Polars' interpolate() fills interior nulls but leaves both leading
-    nulls (before the first non-null value in a group) and trailing nulls (after the last one) as
-    null. Some ECMWF ENS variables (precipitation, and the radiation fluxes) are null at lead time
-    0 by convention. Every interpolated 30-min row before a group's first non-null native step
-    therefore remains null — typically a 3-hour window per NWP run, because ECMWF ENS runs at a
-    3-hour native step width out to 144 hours before coarsening to a 6-hour step width for the
-    rest of its 360-hour horizon. The trailing case is rarer but real: a wholly-null slice at the
-    last native step of the horizon is not bridged either, so that slice too reaches the caller as
-    null. Callers and downstream models should treat every one of these nulls as a genuinely
-    missing value rather than as a defect in the download.
+    End-null propagation: Polars' interpolate() fills interior nulls but leaves both leading nulls
+    (before the first non-null value in a group) and trailing nulls (after the last one) as null.
+    Some ECMWF ENS variables (precipitation, and the radiation fluxes) are null at lead time 0 by
+    convention. Every interpolated 30-min row before a group's first non-null native step therefore
+    remains null — typically a 3-hour window per NWP run, because ECMWF ENS runs at a 3-hour native
+    step width out to 144 hours before coarsening to a 6-hour step width for the rest of its
+    360-hour horizon. The trailing case is rarer but real: a wholly-null slice at the last native
+    step of the horizon is not bridged either, so that slice too reaches the caller as null. Callers
+    and downstream models should treat every one of these nulls as a genuinely missing value rather
+    than as a corrupted download to be repaired or imputed.
     """
     schema_names = nwp_lf.collect_schema().names()
     all_weather_vars = Nwp.all_weather_var_names()

@@ -21,27 +21,28 @@ thin shells over the functions below, which keeps every one of those functions u
 a Dagster instance, an MLflow server, or an object store. The assets hold the orchestration —
 partitions, schedules, retries, and asset checks — and nothing else.
 
-**The boundary against the neighbouring packages is data against modelling.** `contracts` owns what
-every frame means, and `ml_core` consumes those Patito schemas without declaring any of its own.
-`delta_store` owns how a table is physically written, and `ml_core` writes no Delta table at all —
-the only file it writes is the frozen roster copy inside a saved model directory. `nged_data` and
-`dynamical_data` own the ingest of observed power and of gridded weather, and `ml_core` starts from
-whatever those two packages landed. `geo` owns H3 indexing, and `weather_utils` owns the
-analysis-proxy query the weather-lag join is built on. What is left — turning power, weather, and
-metadata into a model-ready frame, and turning a model's output into a leaderboard row — is this
-package.
+**Every neighbouring package owns a piece of the data; `ml_core` owns what is done with it.**
+`contracts` owns what every frame means, and `ml_core` consumes those Patito schemas without
+declaring any of its own. `delta_store` owns how a table is physically written, and `ml_core` writes
+no Delta table at all — the only file it writes is the frozen roster copy inside a saved model
+directory. `nged_data` and `dynamical_data` own the ingest of observed power and of gridded weather,
+and `ml_core` starts from whatever those two packages landed. `geo` owns H3 indexing, and
+`weather_utils` owns the analysis-proxy query the weather-lag join is built on. What is left —
+turning power, weather, and metadata into a model-ready frame, and turning a model's output into a
+leaderboard row — is this package.
 
 ## Two invariants span the whole package
 
-**The no-lookahead split keeps two separate "when" columns, and confusing them is the failure this
-package is built to prevent.** `power_fcst_init_time` is when the forecast is issued;
-`nwp_init_time` is when the weather model ran. The two columns differ by the publication delay — the
-hours between a numerical weather prediction (NWP) run's `init_time` and the moment that run reaches
-our own disk — so a feature is legitimate only if it was knowable at `power_fcst_init_time`, never
-if it was merely knowable at `nwp_init_time`. Every power lag shorter than or equal to the forecast
-lead time is nullified against `power_fcst_init_time`, in `_nullify_leaky_lags`. Weather lags
-reaching back before `power_fcst_init_time` are answered from an earlier NWP run rather than the
-current one, which is the dual-strategy join in `_apply_weather_lag`.
+**Confusing the moment a forecast is issued with the moment the weather model ran is the failure
+this package is built to prevent.** `power_fcst_init_time` is the first of those two moments and
+`nwp_init_time` is the second, and the pipeline carries both as separate columns from end to end.
+The two columns differ by the publication delay — the hours between a numerical weather prediction
+(NWP) run's `init_time` and the moment that run reaches our own disk — so a feature is legitimate
+only if it was knowable at `power_fcst_init_time`, never if it was merely knowable at
+`nwp_init_time`. Every power lag shorter than or equal to the forecast lead time is nullified
+against `power_fcst_init_time`, in `_nullify_leaky_lags`. Weather lags reaching back before
+`power_fcst_init_time` are answered from an earlier NWP run rather than the current one, which is
+the dual-strategy join in `_apply_weather_lag`.
 
 **The train==predict population invariant keeps the leaderboard comparable.** A model scores exactly
 the `time_series_id` population it trained on, whatever the eligibility rules would admit today, and

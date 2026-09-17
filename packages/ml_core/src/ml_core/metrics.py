@@ -140,12 +140,13 @@ _MLFLOW_LOGGED_PARAMETRIC: Final[frozenset[tuple[str, str]]] = frozenset(
 )
 """The parametric ``(metric_name, metric_param)`` pairs logged to MLflow.
 
-Metrics with ``metric_param="all"`` are always logged; parametric metrics are restricted to
-this headline subset to keep the MLflow leaderboard legible. The key count depends on how
-many distinct ``time_series_type`` values the scored population spans (each adds a per-type
-key family): 144 keys for the V1 trial area's seven types, versus ~380 if every parametric
-metric were logged. The full 13-quantile / 6-band detail is always queryable in the
-``forecast_metrics`` Delta table.
+Metrics with ``metric_param="all"`` are always logged; parametric metrics are restricted to this
+headline subset to keep the MLflow leaderboard legible. How many MLflow metric keys that restriction
+leaves depends on how many distinct ``time_series_type`` values the scored population spans, since
+each value adds a per-type key family: 144 keys for the seven types in the V1 trial area, against
+384 keys if every parametric metric were logged. The pinball loss at all 13 delivery quantiles, and
+the PICP and interval width of all 6 bands, stay queryable in the ``forecast_metrics`` Delta table
+whichever pairs the headline subset above names.
 """
 
 
@@ -539,12 +540,12 @@ def build_mlflow_aggregate_metrics(
     (e.g. ``pinball_loss_p10``, ``picp_p10_p90``); parametric metrics are restricted to the
     ``_MLFLOW_LOGGED_PARAMETRIC`` headline subset. Key formats:
 
-    - ``"{token}__all"`` — overall aggregate (``horizon_slice="all"``).
-    - ``"{token}__{type_slug}"`` — per-type aggregates (``horizon_slice="all"``).
-    - ``"{token}__all__{horizon_slice}"`` — overall aggregate per lead-time band
-      (e.g. ``"nmae__all__day_ahead"``). Per-type sliced aggregates are deliberately not
-      logged — that detail stays queryable in the ``forecast_metrics`` Delta table, as does
-      the full 13-quantile / 6-band parametric detail.
+    - ``"{token}__all"`` — overall aggregate (``horizon_slice="all"``). - ``"{token}__{type_slug}"``
+    — per-type aggregates (``horizon_slice="all"``). - ``"{token}__all__{horizon_slice}"`` — overall
+    aggregate per lead-time band (e.g. ``"nmae__all__day_ahead"``). Per-type sliced aggregates are
+    deliberately not logged — the per-type mean for each lead-time band stays queryable in the
+    ``forecast_metrics`` Delta table, as do the pinball loss at all 13 delivery quantiles and the
+    PICP and interval width of all 6 bands.
 
     Args:
         metrics_df: Per-series ``Metrics`` rows with ``time_series_type`` populated.

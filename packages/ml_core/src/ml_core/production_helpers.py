@@ -1,16 +1,15 @@
 """IO-light helpers for production (live) inference.
 
 Every function here is unit-testable in isolation. The two data-shaping helpers
-(``select_nwp_init_time``, ``build_live_power_frame``) take ``power_fcst_init_time`` as an
-explicit parameter rather than calling ``datetime.now()`` internally, so a test can pass any
-fixed time and get a deterministic result. The two disk/MLflow helpers
-(``load_forecaster_from_dir``, ``fetch_model_artifacts``) do the IO and check that the saved
-model is one this code can still build a config for and parse the features of.
-``weather_lags_lack_their_control_member`` is the one helper that reads a data table rather than
-a saved model. The read is a bounded probe against the slot's NWP scan, and the scan is an
-argument, so a test can pass an in-memory frame. The ``live_forecasts`` and ``promoted_model``
-Dagster assets (``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over
-these.
+(``select_nwp_init_time``, ``build_live_power_frame``) take ``power_fcst_init_time`` as an explicit
+parameter rather than calling ``datetime.now()`` internally, so a test can pass any fixed time and
+get a deterministic result. The two disk/MLflow helpers (``load_forecaster_from_dir``,
+``fetch_model_artifacts``) do the IO and check that the saved model is one this code can still build
+a config for and parse the features of. Of the five helpers this module exports,
+``weather_lags_lack_their_control_member`` is the only helper that reads a data table rather than a
+saved model. The read is a bounded probe against the slot's NWP scan, and the scan is an argument,
+so a test can pass an in-memory frame. The ``live_forecasts`` and ``promoted_model`` Dagster assets
+(``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over these.
 """
 
 import json
@@ -121,16 +120,16 @@ def weather_lags_lack_their_control_member(
     ``load_engineering_inputs`` has already pruned the scan to the model's own frozen H3 cells, so
     the two frames hold the same cells today.
 
-    The probe reads at most one row, so a healthy run answers the probe from a single row group.
-    Proving a run has *no* control member costs a scan of the run, because absence cannot be shown
-    early.
+    The probe reads at most one row, so a healthy NWP run answers the probe from a single row group.
+    Proving an NWP run has *no* control member requires scanning the whole run, because absence
+    cannot be shown early.
 
     Args:
         nwp: The slot's NWP rows, already narrowed to the selected run.
         selected_features: The promoted model's feature names.
 
     Returns:
-        ``True`` when a weather lag is selected and the run has no control-member rows.
+        ``True`` when a weather lag is selected and the NWP run has no control-member rows.
     """
     weather_lags = [
         lag
@@ -261,8 +260,8 @@ def _check_trained_metadata_is_readable(model_dir: Path, run_id: str) -> None:
     before the swap, leaving the outgoing champion serving.
 
     Whether the file *covers* the trained population is not checked: ``save_to_mlflow`` is the only
-    writer, and its caller has already passed ``_require_metadata_coverage`` over a population the
-    trained one is a subset of.
+    function in this repo that writes the file, and its caller has already passed
+    ``_require_metadata_coverage`` over a population the trained population is a subset of.
 
     Args:
         model_dir: The staged, unpacked model directory (not yet moved into place).

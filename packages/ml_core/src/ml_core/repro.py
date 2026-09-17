@@ -7,15 +7,16 @@ a production container. Each Delta table's ``version()`` pins the data: Delta La
 makes data versioning one integer per table, so a run can later be replayed with
 ``pl.scan_delta(path, version=N)`` after ``git checkout {sha}``.
 
-Every function here is deliberately **non-raising**: provenance is metadata, and a missing
-``.git`` directory (containers) or an absent Delta table must never fail the surrounding training
-or forecasting run. Such failures degrade to the sentinels ``"unknown"`` / ``"absent"``.
+Every function here is deliberately **non-raising**: the git SHA, the dirty flag, and each Delta
+table's version are a record *about* a run rather than an input to it, and a missing ``.git``
+directory (containers) or an absent Delta table must never fail the surrounding training or
+forecasting run. Such failures degrade to the sentinels ``"unknown"`` / ``"absent"``.
 
 ``provenance_tags`` **stage-prefixes** its keys (``register_``, ``train_``, ``predict_``,
 ``metrics_``) because a single MLflow fold run is written by three separate assets —
-``trained_cv_model``, ``cv_power_forecasts`` and ``metrics`` — each potentially on a different
-code revision and data state. Un-prefixed keys would clobber one another; the prefix preserves
-all three provenance snapshots side by side.
+``trained_cv_model``, ``cv_power_forecasts`` and ``metrics`` — each potentially on a different code
+revision and at a different set of Delta table versions. Un-prefixed keys would clobber one another;
+the prefix preserves all three provenance snapshots side by side.
 """
 
 import logging
@@ -34,7 +35,7 @@ MlflowTags = dict[str, str]
 
 StageType = Literal["register", "train", "predict", "metrics"]
 """The assets that stamp provenance; each value becomes a tag-key prefix (see ``provenance_tags``).
-Add a new member when a new asset starts stamping."""
+Add a new ``StageType`` value when a new asset starts stamping."""
 
 TableNameType = Literal[
     "power_time_series",
@@ -44,7 +45,8 @@ TableNameType = Literal[
     "effective_capacity",
 ]
 """Logical names of the Delta tables whose versions get stamped — the keys of a ``delta_paths``
-mapping. Add a new member when a stage starts reading (and stamping) another table."""
+mapping. Add a new ``TableNameType`` value when a stage starts reading (and stamping) another
+table."""
 
 UNKNOWN: Final[str] = "unknown"
 """Sentinel git SHA / dirty flag returned when no git repository is reachable (e.g. a container)."""
@@ -66,7 +68,8 @@ editable/workspace installs."""
 
 _GIT_TIMEOUT_S: Final[float] = 5.0
 """Hard cap on each git subprocess so a stalled ``.git`` (NFS, a stale lock) can never hang the
-surrounding Dagster asset — provenance is best-effort metadata, not a blocking dependency."""
+surrounding Dagster asset — the git SHA and the Delta table versions are best-effort records, not a
+blocking dependency."""
 
 
 def get_git_info(cwd: Path | None = None) -> MlflowTags:
@@ -102,7 +105,7 @@ def get_git_info(cwd: Path | None = None) -> MlflowTags:
 
     try:
         sha = _git("rev-parse", "HEAD").strip()
-    except Exception:  # noqa: BLE001 — provenance must never fail the surrounding run.
+    except Exception:  # noqa: BLE001 — provenance must never fail the surrounding Dagster asset.
         return {"git_sha": UNKNOWN, "git_dirty": UNKNOWN}
     try:
         porcelain = _git("status", "--porcelain")
@@ -136,7 +139,7 @@ def get_delta_versions(
                 versions[key] = ABSENT
                 continue
             versions[key] = str(DeltaTable(path, storage_options=options).version())
-        except Exception:  # Provenance must never fail the surrounding run.
+        except Exception:  # Provenance must never fail the surrounding Dagster asset.
             logger.warning("Could not read Delta version for %r at %s", name, path, exc_info=True)
             versions[key] = ABSENT
     return versions
