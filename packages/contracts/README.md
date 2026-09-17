@@ -1,44 +1,47 @@
 # Contracts
 
-Defines the "data contracts": the schemas defining the precise shape of each data source and its
-semantics.
+Defines the "data contracts": the schemas defining the precise shape of each data source, the units
+each column carries, and the sign convention its values follow.
 
-It also owns the thin configuration layer that sits beside those schemas: the CV fold config, and
-the `class_target`/`import_class` pair that turns a class into a `_target_` string and back. Both
-are model-agnostic and need nothing heavier than pydantic and PyYAML.
+The contracts package also owns the thin configuration layer that sits beside those schemas: the
+cross-validation (CV) fold config and the `class_target`/`import_class` pair that turns a class into
+a `_target_` string and back. Both the fold config and the class-path pair are model-agnostic and
+need nothing heavier than pydantic and PyYAML.
 
 Two further modules sit here for the same reason — every package needs them, and none of them is
-ML-specific. `contracts.settings` holds `Settings`, the single source of every data path and
-object-store credential the pipeline reads, resolved from the environment and the workspace `.env`
-and reached through the cached `get_settings()`. `contracts.uri` holds the local-or-remote path
-helpers those settings fields need, because a data-location field may be a local path or an
-`s3://` URI, and `pathlib` mangles a URI.
+specific to machine learning (ML). `contracts.settings` holds `Settings`, the single source of every
+data path and object-store credential the pipeline reads, resolved from the environment and the
+workspace `.env` and reached through the cached `get_settings()`. `contracts.uri` holds the
+local-or-remote path helpers those settings fields need, because a data-location field may be a
+local path or an `s3://` URI, and `pathlib` mangles a URI.
 
 ## Light enough for any component to import
 
 This package is designed to be lightweight. It defines the *shape* of the data using Patito and
 Polars, plus the settings and object-store path helpers those shapes are read and written through
 (`deltalake` and `obstore`), but it contains **no** ML-specific logic and no ML dependency such as
-MLflow, XGBoost or Dagster. This ensures that any component in the system (e.g., a data
-ingestion script or a dashboard) can import these schemas without bringing in the entire ML stack.
+MLflow, XGBoost or Dagster. That light dependency footprint is what lets any component in the system
+(e.g., a data ingestion script or a dashboard) import these schemas without bringing in the entire
+ML stack.
 
 ## Key data contracts
 
-- **`PowerTimeSeries`**: Half-hourly power observations (MW or MVA) per `time_series_id`, as
-  received from NGED.
+- **`PowerTimeSeries`**: Half-hourly power observations in MW (megawatts) or MVA (megavolt-amperes)
+  per `time_series_id`, as received from NGED.
 - **`TimeSeriesMetadata`**: Substation and customer meter metadata, including lat/lon, H3 index,
   `substation_type` (Primary, BSP, GSP, EHV Customer, or HV Customer), and `time_series_type` (PV,
   Wind, BESS, Disaggregated Demand, and 18 others).
-- **`Nwp`**: ECMWF ENS NWP weather data in physical units (`Float32`), on disk and in memory alike.
-  The on-disk copy is rounded to a 13-bit significand and laid out for compression and row-group
-  pruning by `delta_store.nwp`.
+- **`Nwp`**: Numerical weather prediction (NWP) data from the European Centre for Medium-Range
+  Weather Forecasts (ECMWF) ensemble (ENS), in physical units (`Float32`), on disk and in memory
+  alike. The on-disk copy is rounded to a 13-bit significand and laid out for compression and
+  row-group pruning by `delta_store.nwp`.
 - **`AllFeatures`**: The final joined dataset passed to ML models. Primary key is `(time_series_id,
   power_fcst_init_time, valid_time[, ensemble_member])`. Includes NWP weather variables, power
-  lag/rolling features and datetime features. `time_series_type` is the one metadata column it can
+  lag/rolling features, and datetime features. `time_series_type` is the one metadata column it can
   carry, and only when a feature set asks for it.
 - **`PowerForecast`**: ML model output schema. `power_fcst` is in MW (active power) or MVA (apparent
   power), with the unit given per `time_series_id` in `TimeSeriesMetadata`. A planned change will
-  normalise it to [−1, +1] for NGED to multiply by a capacity — see [Forecast Building
+  normalise the forecast to [−1, +1] for NGED to multiply by a capacity — see [Forecast Building
   Blocks](https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/).
   Includes `power_fcst_model_name`, `power_fcst_model_version`, `power_fcst_init_time`,
   `nwp_init_time`, `valid_time`, `time_series_id`, and `ensemble_member`.
@@ -52,8 +55,8 @@ behavioural cases:
 - **Substations** (`BSP`, `GSP`, `Primary`): positive = power flowing **towards end-users**;
   negative = excess generation flowing **back into the grid**.
 - **Customer meters** (`EHV Customer`, `HV Customer`): positive = the customer is **sending** power
-  to NGED's grid; negative = the customer is **drawing** power from it. A customer meter can sit at
-  a demand site or a generation site, so this case is not "generators only".
+  to NGED's grid; negative = the customer is **drawing** power from NGED's grid. A customer meter
+  can sit at a demand site or a generation site, so this case is not "generators only".
 
 <!-- sign-convention:end -->
 
@@ -61,10 +64,10 @@ behavioural cases:
 
 - **The contract is the authoritative account of what the data means.** It says what the data
   *should* be, not what some current code path happens to produce. So when code and contract
-  disagree, the code is the first suspect: a null the contract forbids usually means an upstream
+  disagree, the code is the first suspect. A null the contract forbids usually means an upstream
   join kept a row it should have dropped, or a caller passed input it should have rejected. Widening
   a field to `| None`, or relaxing a range, so that a failing `validate()` passes buries that defect
-  in the one place the rest of the system trusts. Fix the code instead, and change the contract only
+  in the one place the rest of the system trusts. Fix the code instead. Change the contract only
   when you can say what the data now means and why that meaning is right. **Get the change agreed
   before making it**, including a widening that looks like a formality — every reader of `contracts`
   is relying on it to still mean what it said yesterday.

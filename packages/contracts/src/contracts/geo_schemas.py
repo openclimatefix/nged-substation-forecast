@@ -1,4 +1,7 @@
-"""Spatial contracts: the H3-cell-to-NWP-grid weights that drive the spatial NWP aggregation."""
+"""Spatial contracts: the weights mapping each H3 cell onto the NWP grid.
+
+Those weights drive the spatial aggregation of numerical weather prediction (NWP) data.
+"""
 
 import patito as pt
 import polars as pl

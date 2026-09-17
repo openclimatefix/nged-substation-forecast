@@ -1,14 +1,14 @@
 """Reusable typing shims.
 
-These are domain-agnostic helpers that reconcile the expressive in-code types we prefer with the
-plainer types third-party APIs annotate.
+The shims below are domain-agnostic helpers that reconcile the expressive in-code types we prefer
+with the plainer types third-party APIs annotate.
 
-Kept generic and separate from any one domain so they can be shared across the workspace (and
-promoted to their own package if they grow). The first inhabitant bridges the gap between a
-``TypedDict`` — which we use so ``ty`` checks every key at the point it is written — and the
-``dict[str, str]`` that libraries such as delta-rs, Polars, and obstore expect: a ``TypedDict``
-is deliberately *not* assignable to any ``dict[..]`` type (a ``dict`` permits destructive
-operations like ``clear()``), so it has to be widened explicitly at the boundary.
+The shims are kept generic and separate from any one domain so they can be shared across the
+workspace (and promoted to their own package if they grow). The first inhabitant bridges the gap
+between a ``TypedDict`` — which we use so ``ty`` checks every key at the point it is written —
+and the ``dict[str, str]`` that libraries such as delta-rs, Polars, and obstore expect: a
+``TypedDict`` is deliberately *not* assignable to any ``dict[..]`` type (a ``dict`` permits
+destructive operations like ``clear()``), so it has to be widened explicitly at the boundary.
 """
 
 from collections.abc import Mapping

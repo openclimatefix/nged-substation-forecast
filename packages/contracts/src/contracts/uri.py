@@ -1,15 +1,16 @@
 """Small URI helpers for paths that may be local filesystem paths *or* remote URIs.
 
 Settings data-location fields are plain ``str`` so they can hold either a local path
-(``/home/.../data/NWP``) or a remote URI (``s3://bucket/NWP``). ``pathlib.Path`` mangles a
-remote URI (``Path("s3://b/a") / "c"`` collapses the double slash after the scheme and yields
+(``/home/.../data/NWP``) or a remote URI (``s3://bucket/NWP``). ``pathlib.Path`` mangles a remote
+URI (``Path("s3://b/a") / "c"`` collapses the double slash after the scheme and yields
 ``"s3:/b/a/c"``), so joins route through here.
 
 The existence/parent helpers below give the asset IO layer a single local-or-remote-aware call
-for the two things it does around every Delta/parquet write: make sure the parent directory
-exists (a no-op on object stores, which have no directories) and check whether a table/object is
-already there. Remote calls go through delta-rs / obstore with the caller's ``storage_options``
-so the same code path serves both a local data-path root and an ``s3://`` one.
+for the two steps that layer takes around every Delta/parquet write: make sure the parent
+directory exists (a no-op on object stores, which have no directories) and check whether a table
+or object is already there. Remote calls go through delta-rs / obstore with the caller's
+``storage_options`` so the same code path serves both a local data-path root and an ``s3://``
+one.
 """
 
 import posixpath
@@ -33,9 +34,9 @@ class ObjectStoreOptions(TypedDict, total=False):
 
     Authored as a ``TypedDict`` (rather than a bare ``dict[str, str]``) so ``ty`` checks every
     key where it is written — see ``Settings.storage_options``. Widen it to the plain ``dict``
-    the IO libraries expect with ``typeddict_to_dict`` at each call boundary. Empty on AWS
-    (object_store auto-discovers the IAM-role credentials and region) and for a local data-path
-    root.
+    the IO libraries expect with ``typeddict_to_dict`` at each call boundary. The mapping is
+    empty on AWS (object_store auto-discovers the identity-and-access-management (IAM) role's
+    credentials and region) and for a local data-path root.
     """
 
     aws_endpoint_url: str
