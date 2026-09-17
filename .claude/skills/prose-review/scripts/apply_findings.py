@@ -48,7 +48,6 @@ Exits non-zero when any finding could not be applied, so a batch that half-lands
 
 from __future__ import annotations
 
-import difflib
 import functools
 import json
 import re
@@ -56,58 +55,27 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
-from typing import Final, Literal, NamedTuple, TypedDict
+from typing import Final, Literal, TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
-from scripts.lint.markdown_wrap import WIDTH
-
-LINK: Final[re.Pattern[str]] = re.compile(r"\[(?P<body>[^\]\[]*)\]\((?:[^()]|\([^()]*\))*\)")
-"""A markdown link, whose label survives the projection and whose target does not."""
-
-CODE_SPAN: Final[re.Pattern[str]] = re.compile(
-    r"(?P<fence>`+)(?P<body>(?:[^\n]|\n(?![ \t]*\n))+?)(?P=fence)(?!`)"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from prose_splice import (
+    MARKER,
+    block_at,
+    fenced_regions,
+    markup_intact,
+    plain,
+    project,
+    splice,
 )
-"""A code span, whose content survives the projection and whose backtick fences do not.
 
-The body cannot span a blank line, so an unmatched backtick in one paragraph cannot swallow the
-next: the fences of a fenced block never pair on one line either, and fall through to the
-character-by-character path that simply drops them.
-"""
-
-MARKER: Final[re.Pattern[str]] = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+)")
-"""The bullet or number that starts a list item, and therefore starts a new wrapping unit."""
+from scripts.lint.markdown_wrap import WIDTH
 
 UNWRAPPABLE: Final[re.Pattern[str]] = re.compile(r"^(\s*\||\s*#|\s*>|\s{4,}\S|```)")
 """A table row, heading, quote, indented block or fence — none of which may be re-flowed."""
 
-MARKUP: Final[tuple[str, ...]] = ("**", "`", "[", "](")
-"""The markers whose count must be identical before and after a splice."""
-
-SENTENCE_STOPS: Final[str] = ".!?"
-"""The punctuation that ends a sentence, and so ends a bolded lead inside the lead's own markers."""
-
 FRONTMATTER: Final[re.Pattern[str]] = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
 """A skill file's YAML block. Its indented lines read as list markers, so it is never re-flowed."""
-
-FENCE: Final[re.Pattern[str]] = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[^`\n]*$")
-"""The line opening or closing a fenced code block, matched against one line at a time.
-
-The indent is unbounded rather than CommonMark's three characters, because a fence inside a list
-item is indented to that item's content column: every fenced block on the code-style page is, and
-two of the six on the getting-started page are. A line that deep which is not a fence is inside an
-indented code block anyway, where an edit is no more welcome.
-
-Nothing may follow the marker except an info string carrying no backtick, which is CommonMark's own
-rule and is what tells a fence from an inline ```code span``` that a hard wrap has pushed to the
-start of a line. Read as a fence, such a span opens a region no later line closes, and every
-finding in the rest of the file is then refused.
-"""
-
-QUOTE_MARKERS: Final[re.Pattern[str]] = re.compile(r"(?:[ \t]*>)+[ \t]*")
-"""The blockquote markers a line may carry before its content, however deeply nested."""
-
-BOLD: Final[str] = "**"
-"""The emphasis marker a bolded lead is written with, and the only one a stop is moved into."""
 
 
 class Finding(TypedDict):
@@ -121,166 +89,6 @@ class Finding(TypedDict):
 StatusType = Literal[
     "applied", "pre-existing", "no match", "ambiguous", "markup refused", "code block"
 ]
-
-
-class CharSpan(NamedTuple):
-    """Where one projected character sits in the raw text, together with the markup glued to it.
-
-    `text` is the character itself. `left` and `right` widen that to include the markup that must
-    stay outside anything the splice writes: the opening backtick, `[` or `**` before the
-    character, and the closing backtick, `](url)` or `**` after it. A comma inserted at that
-    boundary therefore lands after the closing marker, which is where this repo's prose puts it —
-    215 commas sit after a closing `**` across the docs and none inside one.
-    """
-
-    left: int
-    text: int
-    right: int
-
-
-class _Projection:
-    """The markup-stripped text built so far, and where in the raw text each character came from.
-
-    Markup is dropped from the text but not forgotten: `open_at` and `close_at` widen the bounds
-    of the character beside it, which is what keeps a spliced comma outside the code span, link
-    or bold span it follows.
-    """
-
-    def __init__(self) -> None:
-        self.plain: list[str] = []
-        self.lefts: list[int] = []
-        self.texts: list[int] = []
-        self.rights: list[int] = []
-        self.pending: int | None = None
-        self.emphasis: list[int] = []
-
-    @property
-    def spans(self) -> tuple[CharSpan, ...]:
-        """One `CharSpan` per projected character, in projection order."""
-        return tuple(
-            CharSpan(left=left, text=text, right=right)
-            for left, text, right in zip(self.lefts, self.texts, self.rights, strict=True)
-        )
-
-    def open_at(self, offset: int) -> None:
-        """Record markup opening at `offset`, for the next character to carry in its `left`."""
-        if self.pending is None:
-            self.pending = offset
-
-    def close_at(self, offset: int) -> None:
-        """Extend the last character's `right` over markup that ends at `offset`."""
-        if self.rights:
-            self.rights[-1] = offset
-
-    def push(self, char: str, at: int) -> None:
-        """Append the character at `raw[at]`, collapsing a run of whitespace into one space."""
-        if char.isspace():
-            if not self.plain or self.plain[-1] == " ":
-                # The rest of a collapsed whitespace run stays inside the space it became, so no
-                # splice can land between two spaces the projection merged into one.
-                if self.rights and self.rights[-1] == at:
-                    self.close_at(at + 1)
-                return
-            char = " "
-        self.plain.append(char)
-        self.lefts.append(at if self.pending is None else self.pending)
-        self.texts.append(at)
-        self.rights.append(at + 1)
-        self.pending = None
-
-    def take_bracketed(self, match: re.Match[str]) -> None:
-        """Push a code span's or a link label's body, gluing the brackets to its end characters.
-
-        The body is hard-wrapped like any other prose, so it needs the same whitespace collapsing
-        `push` applies to everything else.
-        """
-        self.open_at(match.start())
-        pushed_before = len(self.plain)
-        for position, char in enumerate(match.group("body")):
-            self.push(char, match.start("body") + position)
-        if len(self.plain) > pushed_before:
-            self.close_at(match.end())
-
-    def take_emphasis(self, *, raw: str, index: int) -> int:
-        """Bind the run of asterisks at `index` to the character it closes, or the one it opens.
-
-        A run closing an open span of the same width binds to the character before it, so a comma
-        spliced at that boundary lands outside the markers. A run followed by text opens a span
-        and binds to the character after it. A run doing neither — the `*` starting a bullet — is
-        dropped and bound to nothing, which leaves any splice across it to be refused.
-        """
-        end = index
-        while end < len(raw) and raw[end] == "*":
-            end += 1
-        width = end - index
-        closes_an_open_span = bool(self.emphasis) and self.emphasis[-1] == width
-        if closes_an_open_span and index > 0 and not raw[index - 1].isspace():
-            self.emphasis.pop()
-            self.close_at(end)
-        elif end < len(raw) and not raw[end].isspace():
-            self.emphasis.append(width)
-            self.open_at(index)
-        return end
-
-
-@functools.lru_cache(maxsize=64)
-def project(raw: str) -> tuple[str, tuple[CharSpan, ...]]:
-    """Strip the markup from `raw`, returning the plain text and where each character came from.
-
-    Args:
-        raw: The file's text, hard wrapping and markdown included.
-
-    Returns:
-        `(plain, spans)` where `plain[i]` is the character at `raw[spans[i].text]`, every run of
-        whitespace has become one space, and the markup a sub-agent's quote will not carry — link
-        targets, emphasis markers, code fences — has been dropped. Each span's `left` and `right`
-        bounds carry that markup, so a splice writes an inserted comma after the closing backtick
-        rather than inside the code span.
-    """
-    projection = _Projection()
-    index, length = 0, len(raw)
-    while index < length:
-        bracketed = LINK.match(raw, index) or CODE_SPAN.match(raw, index)
-        if bracketed:
-            projection.take_bracketed(bracketed)
-            index = bracketed.end()
-            continue
-        if raw[index] == "*":
-            index = projection.take_emphasis(raw=raw, index=index)
-            continue
-        if raw[index] == "`":
-            index += 1
-            continue
-        if raw[index] == "_":
-            index = _push_underscores(raw=raw, index=index, projection=projection)
-            continue
-        projection.push(raw[index], index)
-        index += 1
-    return "".join(projection.plain), projection.spans
-
-
-def _push_underscores(*, raw: str, index: int, projection: _Projection) -> int:
-    """Drop a run of underscores that marks emphasis; keep one that sits inside an identifier.
-
-    `mid_2025_to_mid_2026` and `mae__all` are names, and dropping their underscores makes the
-    projection unmatchable against a quote that spells them correctly. A dropped run is bound to
-    nothing, so a splice across an underscore-emphasised span is refused rather than written —
-    the docs use `**` for emphasis, so the case has not come up.
-    """
-    end = index
-    while end < len(raw) and raw[end] == "_":
-        end += 1
-    inside_word = index > 0 and raw[index - 1].isalnum() and end < len(raw) and raw[end].isalnum()
-    if not inside_word:
-        return end
-    for position in range(index, end):
-        projection.push(raw[position], position)
-    return end
-
-
-def plain(text: str) -> str:
-    """The projection of a standalone string, for comparing a quote that carries markdown."""
-    return project(text)[0].strip()
 
 
 def trim_common_tail(*, quote: str, replacement: str) -> tuple[str, str]:
@@ -327,131 +135,6 @@ def locate(*, raw: str, quote: str) -> tuple[tuple[int, int] | None, int]:
     return (hits[0], hits[0] + len(needle)), 1
 
 
-def splice(*, raw: str, start: int, end: int, replacement: str) -> str:
-    """Rewrite the projection span `[start, end)` of `raw` as `replacement`.
-
-    Unchanged runs keep whatever markup the raw text carries there, so the links and bold markers
-    the agent's replacement omits survive. Only the runs that genuinely differ take the
-    replacement's own characters, and a rewritten run keeps the brackets around it: an identifier
-    renamed inside a code span comes back still spanned, and a comma inserted after one comes
-    back after the closing backtick.
-
-    A deleted run keeps the brackets around it too, so cutting the last word of a bolded lead
-    leaves the lead bolded. The exception is a run that is exactly one span's whole content,
-    where keeping the brackets would leave `[](url)` or an empty pair of backticks behind: there
-    the brackets go with the words, and `markup_intact` refuses the edit when that unbalances the
-    paragraph.
-    """
-    projected, spans = project(raw)
-    old = projected[start:end]
-    new = re.sub(r"\s+", " ", replacement).strip()
-    out: list[str] = []
-    written_to = spans[start].left
-    matcher = difflib.SequenceMatcher(None, old, new, autojunk=False)
-    for tag, old_lo, old_hi, new_lo, new_hi in matcher.get_opcodes():
-        if tag == "insert":
-            _append_replacement(out=out, text=new[new_lo:new_hi], raw=raw, written_to=written_to)
-            continue
-        first, last = spans[start + old_lo], spans[start + old_hi - 1]
-        if tag == "equal":
-            out.append(raw[first.left : last.right])
-            written_to = last.right
-        elif tag in ("replace", "delete"):
-            opening, closing = raw[first.left : first.text], raw[last.text + 1 : last.right]
-            if tag == "delete" and opening and closing:
-                opening, closing = "", ""
-            if opening:
-                # An empty chunk would hide the closing marker the stop may have to move inside.
-                out.append(opening)
-                written_to = first.text
-            _append_replacement(out=out, text=new[new_lo:new_hi], raw=raw, written_to=written_to)
-            if closing:
-                out.append(closing)
-            written_to = last.right
-    return raw[: spans[start].left] + "".join(out) + raw[spans[end - 1].right :]
-
-
-def _append_replacement(*, out: list[str], text: str, raw: str, written_to: int) -> None:
-    """Append replacement text, pulling a sentence-ending stop inside a bolded lead's markers.
-
-    `written_to` is the raw offset the last raw chunk in `out` ran to, which is what says whether
-    the text is being written straight after a closing `**`.
-    """
-    ends_a_sentence = bool(text) and text[0] in SENTENCE_STOPS
-    marker = _lead_marker(raw=raw, at=written_to) if ends_a_sentence else ""
-    if marker and out and out[-1].endswith(marker):
-        out[-1] = out[-1][: -len(marker)] + text[0] + marker
-        text = text[1:]
-    if text:
-        out.append(text)
-
-
-def _lead_marker(*, raw: str, at: int) -> str:
-    """The emphasis run ending at `at` when it closes a span opening its own block, else `""`.
-
-    A bolded lead's full stop belongs inside its markers and every other span's punctuation
-    belongs outside. Counted over the 78 markdown files under `docs/`, in the repository root and
-    in `.claude/skills/`: a lead opening a paragraph carries the stop inside its `**` 451 times
-    against 6 that do not, a lead on a list item 404 times against 1, and a lead in a blockquote
-    38 times against 1. A bold span in the middle of a sentence goes the other way — 144 commas
-    and 70 full stops sit after its closing `**`, against no comma and 2 full stops inside one. A
-    lead is therefore recognised through a blockquote's `>` and a list item's bullet alike.
-
-    Only `**` moves a stop. Single-asterisk emphasis was never counted, so the script leaves the
-    stop where the reviewer's replacement put it.
-    """
-    if not raw.endswith(BOLD, 0, at):
-        return ""
-    block_start, block = _block_at(raw, at)
-    opener = raw.rfind(BOLD, block_start, at - len(BOLD))
-    if opener == -1:
-        return ""
-    # A blockquote's markers are not text, so drop the leading run of them before asking what
-    # precedes the lead: what is left is either nothing or the one list marker `MARKER` describes.
-    # Only the leading run — a `>` later in the prefix is an arrow or a comparison, and `-> ` read
-    # as a bullet would pull the stop inside a bold span that opens nothing.
-    before_opener = block[: opener - block_start]
-    quoted = QUOTE_MARKERS.match(before_opener)
-    before_opener = before_opener[quoted.end() :] if quoted else before_opener
-    return BOLD if not before_opener.strip() or MARKER.fullmatch(before_opener) else ""
-
-
-@functools.lru_cache(maxsize=64)
-def fenced_regions(raw: str) -> tuple[tuple[int, int], ...]:
-    """The raw `[start, end)` bounds of every fenced code block in `raw`.
-
-    A reviewer quotes prose, but the quote can still match a comment inside a shell snippet:
-    "create the virtualenv and install all workspace packages" is a comment inside a fenced block
-    on the getting-started page, and a serial comma spliced into it rewrites the command. A block
-    left unclosed runs to the end of the file, which is how the renderer reads it too.
-    """
-    regions: list[tuple[int, int]] = []
-    opener, opened_at, offset = "", 0, 0
-    for line in raw.splitlines(keepends=True):
-        match = FENCE.match(line)
-        marker = match.group("fence") if match else ""
-        if not opener:
-            opener, opened_at = marker, offset
-        elif marker and marker[0] == opener[0] and len(marker) >= len(opener):
-            regions.append((opened_at, offset + len(line)))
-            opener = ""
-        offset += len(line)
-    if opener:
-        regions.append((opened_at, len(raw)))
-    return tuple(regions)
-
-
-def markup_intact(*, before: str, after: str) -> bool:
-    """True when the splice left every link, bold span and code span in `before` whole.
-
-    A split whose full stop lands inside a link label or between two bold markers breaks the
-    markup silently: the page still lints, still builds, and the link simply stops being a link.
-    """
-    if after.count("**") % 2 or after.count("`") % 2:
-        return False
-    return all(before.count(marker) == after.count(marker) for marker in MARKUP)
-
-
 def units(block: str) -> list[tuple[int, int]]:
     """The `(first_line, last_line + 1)` bounds of each wrapping unit in `block`.
 
@@ -489,19 +172,9 @@ def rewrap(unit_lines: list[str], width: int) -> list[str]:
     )
 
 
-def _block_at(text: str, offset: int) -> tuple[int, str]:
-    """The start offset and text of the blank-line-separated block containing `offset`."""
-    position = 0
-    for block in text.split("\n\n"):
-        if position <= offset <= position + len(block):
-            return position, block
-        position += len(block) + 2
-    raise AssertionError(f"offset {offset} falls outside every block")
-
-
 def _unit_at(text: str, offset: int) -> tuple[int, str, int, int, int]:
     """The block start, block text, unit bounds and line index of the unit holding `offset`."""
-    block_start, block = _block_at(text, offset)
+    block_start, block = block_at(text, offset)
     line = block.count("\n", 0, offset - block_start)
     low, high = next((lo, hi) for lo, hi in units(block) if lo <= line < hi)
     return block_start, block, low, high, line
@@ -578,7 +251,7 @@ def apply_one(*, raw: str, finding: Finding, merge_base: str | None) -> tuple[st
         return raw, "code block"
 
     spliced = splice(raw=raw, start=start, end=end, replacement=replacement)
-    if not markup_intact(before=_block_at(raw, offset)[1], after=_block_at(spliced, offset)[1]):
+    if not markup_intact(before=block_at(raw, offset)[1], after=block_at(spliced, offset)[1]):
         return raw, "markup refused"
     return _reflow(raw=raw, spliced=spliced, offset=offset), "applied"
 
