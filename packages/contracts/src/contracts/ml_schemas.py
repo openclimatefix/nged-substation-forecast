@@ -194,7 +194,7 @@ Probabilistic (scored on the ensemble members before the mean collapse):
 - `"spread_skill_ratio"`: Fortin-corrected root-mean-square (RMS) ensemble spread ÷ RMSE of the
   ensemble mean (dimensionless; 1.0 = well-calibrated, < 1 = underdispersed/overconfident).
 - `"pinball_loss"`: quantile loss (MW) at the quantile named by `metric_param`.
-- `"mean_pinball_loss"`: unweighted mean of `"pinball_loss"` over the thirteen
+- `"mean_pinball_loss"`: unweighted mean of `"pinball_loss"` over the 13
   `DELIVERY_QUANTILES` (MW). Tail-heavy by construction, matching NGED's priorities.
 - `"picp"`: prediction-interval coverage probability of the band named by `metric_param`
   (dimensionless fraction). The calibrated reference for empirical quantiles from a finite

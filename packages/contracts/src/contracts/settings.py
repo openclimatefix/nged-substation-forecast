@@ -1,6 +1,7 @@
-"""`Settings`: every data path and object-store credential the pipeline reads.
+"""`Settings`: every setting the pipeline reads from its environment.
 
-Values are resolved from the environment and the workspace `.env`.
+The fields cover the data paths, the object-store credentials, the MLflow tracking URI, and the
+four Sentry settings. Values are resolved from the environment and the workspace `.env`.
 """
 
 from functools import lru_cache
@@ -54,7 +55,10 @@ and the caveat for wheels installed outside a workspace checkout.
 
 
 class Settings(BaseSettings):
-    """Every data path, object-store credential, and Sentry setting the pipeline reads.
+    """Every setting the pipeline reads from its environment.
+
+    The fields cover the data paths, the object-store credentials, the MLflow tracking URI, and
+    the four Sentry settings.
 
     Each field takes its value from an environment variable of the same name, from the workspace
     ``.env``, or from the default declared here, in that order of precedence. The managed
