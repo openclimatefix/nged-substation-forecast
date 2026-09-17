@@ -130,7 +130,13 @@ def _is_blank_quote_line(line: str) -> bool:
 
 
 def _is_unwrappable(line: str) -> bool:
-    """Whether `line` opens a block whose line breaks carry meaning and must survive untouched."""
+    """Whether `line` opens a block whose line breaks carry meaning and must survive untouched.
+
+    There is no case here for a `$$...$$` display-math block: MathJax reads a newline inside one
+    as ordinary whitespace, so reflowing it is safe, but only because every token in a formula is
+    whitespace-separated the same way a word is — the corpus carries no construct where that isn't
+    true. A LaTeX block relying on a significant literal newline would need its own case here.
+    """
     return bool(
         HEADING.match(line)
         or TABLE_ROW.match(line)
