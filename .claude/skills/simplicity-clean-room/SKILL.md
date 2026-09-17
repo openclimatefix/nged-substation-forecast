@@ -132,9 +132,9 @@ copying it in leaked an internal that the spec had carefully kept out.
 **The bigger leak is `CLAUDE.md`.** It is auto-injected into every sub-agent's context as project
 instructions, the agent cannot decline it, and its "Architecture" section describes some modules
 down to their private function names — for `ml_core.features` it names `_engineer_features`,
-`_nullify_leaky_lags`, `ParsedFeatures.from_strings` and the five `*Feature` class names. Run
-stage 2 with a **working directory outside the repo** so it is not picked up. If you cannot, name
-the offending paragraph in the brief and tell the agent to treat those names as contaminated — a
+`_nullify_leaky_lags`, `ParsedFeatures.from_strings` and the five `*Feature` class names. Run stage
+2 with a **working directory outside the repo** so it is not picked up. If you cannot, name the
+offending paragraph in the brief and tell the agent to treat those names as contaminated — a
 declared contamination is recoverable, an undeclared one is not.
 
 ### The isolation rule, stated as why
@@ -191,8 +191,8 @@ searches come up empty:
 
 A search that finds the justification sends the divergence to the **"considered and rejected"**
 table, with what was found. Ask explicitly for the places the fresh design was *more* complex too —
-that is direct evidence the real code is already lean, and it is the half of the answer the
-question actually needs.
+that is direct evidence the real code is already lean, and it is the half of the answer the question
+actually needs.
 
 ### Ask for bugs, not just complexity
 

@@ -5,12 +5,11 @@ How NGED assembles different kinds of forecast from the "Lego blocks" OCF delive
 > **Status: 🚧 Planned.** The normalised [−1, +1] forecast is planned for **v0.5**, scaled by the
 > static P99 capacity
 > ([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246); the code still
-> forecasts raw MW/MVA today — see
-> [delivery tables, Table 1](delivery-tables.md#table-1-power_forecast)). The
-> capacity and switching building blocks depend on work scheduled for v0.6 (switching) and
-> v0.7 (capacity). OCF will provide
-> example Python code (likely a small package) to demonstrate assembling these forecasts. See the
-> [roadmap index](index.md) for status conventions.
+> forecasts raw MW/MVA today — see [delivery tables, Table
+> 1](delivery-tables.md#table-1-power_forecast)). The capacity and switching building blocks depend
+> on work scheduled for v0.6 (switching) and v0.7 (capacity). OCF will provide example Python code
+> (likely a small package) to demonstrate assembling these forecasts. See the [roadmap
+> index](index.md) for status conventions.
 
 ---
 
@@ -22,12 +21,12 @@ are the **normal operation forecast** and the **prevailing conditions forecast**
 
 The blocks are:
 
-1. **Power forecasts scaled to [−1, +1]** (the [`power_forecast`](delivery-tables.md#table-1-power_forecast)
-   table). These **always assume a "normal running arrangement" and perfect health** of generators
-   and substations — i.e. a worst-case network-constraint planning view. Producing this
-   topology-normalised signal in the presence of historical switching events is the subject of
-   [switching events & latent demand](switching-events.md) (v0.6 detector → v2 mixture models).
-   "Normal" means:
+1. **Power forecasts scaled to [−1, +1]** (the
+   [`power_forecast`](delivery-tables.md#table-1-power_forecast) table). These **always assume a
+   "normal running arrangement" and perfect health** of generators and substations — i.e. a
+   worst-case network-constraint planning view. Producing this topology-normalised signal in the
+   presence of historical switching events is the subject of [switching events & latent
+   demand](switching-events.md) (v0.6 detector → v2 mixture models). "Normal" means:
     - *Substations*: all "normally closed" switches are closed and all "normally open" switches are
       open.
     - *Generators*: the generator is unconstrained by NGED's Automatic Network Management (ANM) and
@@ -35,17 +34,19 @@ The blocks are:
 2. **Dynamically changing effective capacity of generators** (the
    [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table). E.g. if a wind
    turbine breaks in a wind farm, we estimate the reduced effective capacity over time.
-3. **Switching events** (the [`substation_switching`](delivery-tables.md#table-5-substation_switching)
-   table). OCF estimates the amount of power diverted across substations. This block is
-   conditional: whether a discrete event table ships at all is an open question, and continuous
-   per-substation switching-state signals may be delivered instead — see
-   [the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).
+3. **Switching events** (the
+   [`substation_switching`](delivery-tables.md#table-5-substation_switching) table). OCF estimates
+   the amount of power diverted across substations. This block is conditional: whether a discrete
+   event table ships at all is an open question, and continuous per-substation switching-state
+   signals may be delivered instead — see [the decision
+   point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).
 
 ---
 
 ## Sign convention
 
-{% include-markdown "../../packages/contracts/README.md" start="<!-- sign-convention:start -->" end="<!-- sign-convention:end -->" %}
+{% include-markdown "../../packages/contracts/README.md" start="<!-- sign-convention:start -->"
+end="<!-- sign-convention:end -->" %}
 
 ---
 
@@ -55,9 +56,9 @@ The blocks are:
 
 Multiply the [−1, +1] forecast by the asset's **maximum / nominal** capacity:
 
-- *Substations*: × the substation's
-  [effective capacity](delivery-tables.md#table-4-effective_capacity) — the 99th percentile of
-  observed power flow, written by the `effective_capacity` asset since v0.1.
+- *Substations*: × the substation's [effective
+  capacity](delivery-tables.md#table-4-effective_capacity) — the 99th percentile of observed power
+  flow, written by the `effective_capacity` asset since v0.1.
 - *Generators*: × the **maximum estimated capacity** of that generator.
 
 This answers: *"what would this asset do if it were healthy and the network were in its normal
@@ -68,12 +69,12 @@ arrangement?"* — the worst-case view useful for network-constraint planning.
 This forecast **prevails the most recent conditions**:
 
 - *Generators*: × the **most recently observed effective capacity**.
-- *Substations*: prevails the **switching state**. (How this is achieved depends on
-  [the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector):
-  assembled from Table 5's discrete events, or delivered directly by the metered-power
-  forecast, which carries the current switching state forward natively.)
-- *Both*: prevails the `GENERATOR OR CIRCUIT FAULT` value of `warning_type` (see
-  [Table 3 — `asset_health_history`](delivery-tables.md#table-3-asset_health_history)).
+- *Substations*: prevails the **switching state**. (How this is achieved depends on [the decision
+  point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector):
+  assembled from Table 5's discrete events, or delivered directly by the metered-power forecast,
+  which carries the current switching state forward natively.)
+- *Both*: prevails the `GENERATOR OR CIRCUIT FAULT` value of `warning_type` (see [Table 3 —
+  `asset_health_history`](delivery-tables.md#table-3-asset_health_history)).
 
 This answers: *"what will this asset actually do over the next 14 days if current conditions
 persist?"*
@@ -102,5 +103,5 @@ and has not restarted**:
 
 > **Why this matters for "not-on" assets.** One trial-area generator has not been operating since
 > mid-2024, so its time series carries no generation signal. The building-blocks approach lets the
-> scaled forecast stay well-behaved while the *prevailing conditions* forecast correctly reports
-> ~0 MW.
+> scaled forecast stay well-behaved while the *prevailing conditions* forecast correctly reports ~0
+> MW.

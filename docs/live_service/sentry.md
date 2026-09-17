@@ -1,10 +1,10 @@
 # Setting up Sentry telemetry
 
-How to point this project's error telemetry and missed-check-in alarm at a Sentry.io project —
-first testing it from your laptop, then turning it on in production. This is the operational
-recipe; the design rationale (why the alarm lives outside the deployment, why an explicit failure
-hook rather than log capture) is on the
-[Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)
+How to point this project's error telemetry and missed-check-in alarm at a Sentry.io project — first
+testing it from your laptop, then turning it on in production. This is the operational recipe; the
+design rationale (why the alarm lives outside the deployment, why an explicit failure hook rather
+than log capture) is on the [Send telemetry to
+Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)
 design page.
 
 Everything here is **opt-in**: with no `SENTRY_DSN` configured, every Sentry code path is a no-op,
@@ -35,9 +35,9 @@ SENTRY_DSN=<paste your DSN here>
 SENTRY_ENVIRONMENT=jacks-laptop
 ```
 
-`SENTRY_ENVIRONMENT` is the tag that separates your telemetry from everyone else's in the Sentry
-UI. Use `<your-name>-laptop` (e.g. `jacks-laptop`, `alexs-laptop`) so error events filter cleanly
-by origin, and so the production missed-check-in alert — scoped to `environment:production` — never
+`SENTRY_ENVIRONMENT` is the tag that separates your telemetry from everyone else's in the Sentry UI.
+Use `<your-name>-laptop` (e.g. `jacks-laptop`, `alexs-laptop`) so error events filter cleanly by
+origin, and so the production missed-check-in alert — scoped to `environment:production` — never
 fires for your machine.
 
 Do **not** set `SENTRY_MONITOR_FORECASTS` on a laptop. It gates the live heartbeat, and an
@@ -119,8 +119,8 @@ Then check the Sentry UI:
   environment, so they form their own issues, separate from production's.
 - **Crons → `live-forecasts-test`** — one OK check-in.
 
-Once you are satisfied, delete the throwaway `live-forecasts-test` monitor in Sentry (and
-optionally resolve the two test issues). Neither affects the production wiring.
+Once you are satisfied, delete the throwaway `live-forecasts-test` monitor in Sentry (and optionally
+resolve the two test issues). Neither affects the production wiring.
 
 ## What gets sent when you run Dagster locally
 
@@ -149,7 +149,8 @@ Dagster on your laptop does **not** forward everything to Sentry:
   fingerprinted per environment, so your `<name>-laptop` staleness forms its own Sentry issue,
   separate from production's. Resolve or ignore it as you like.
 
-The failure hook and heartbeat scope is the same in production; the [design page](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)
+The failure hook and heartbeat scope is the same in production; the [design
+page](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)
 explains why the failure hook covers only the scheduled jobs, why only success heartbeats are ever
 sent, and how the freshness warning models recovery.
 
@@ -180,22 +181,23 @@ production `live-forecasts` monitor. Four one-time console steps complete the se
    warning is a richer per-series breadcrumb layered on top of the missed-check-in alarm, which
    remains the primary two-directional signal.
 4. **Route error events by their `fault_category` tag.** `fault_category:run_failed` means a
-   scheduled job failed, so that cycle did not run — notify whoever is on for the next business
-   day. Everything else is a degradation the service kept forecasting through, and belongs in a
-   digest rather than a notification: `degraded_asset:*` (an asset carried on with reduced
-   function) and `asset_check:*` (a check could not evaluate its own inputs, so one signal is
-   unknown rather than bad). Nothing here warrants waking anyone — see
-   [Inherent stability](../design-philosophy/inherent-stability.md) for the uptime posture that
-   makes that the right call.
+   scheduled job failed, so that cycle did not run — notify whoever is on for the next business day.
+   Everything else is a degradation the service kept forecasting through, and belongs in a digest
+   rather than a notification: `degraded_asset:*` (an asset carried on with reduced function) and
+   `asset_check:*` (a check could not evaluate its own inputs, so one signal is unknown rather than
+   bad). Nothing here warrants waking anyone — see [Inherent
+   stability](../design-philosophy/inherent-stability.md) for the uptime posture that makes that the
+   right call.
 
-One handover note: the Sentry account is OCF's today, so at handover the alert routing (and
-possibly the account itself) moves to NGED — see
-[Handover to NGED](../roadmap/handover.md#2-alert-on-absence-not-just-failure).
+One handover note: the Sentry account is OCF's today, so at handover the alert routing (and possibly
+the account itself) moves to NGED — see [Handover to
+NGED](../roadmap/handover.md#2-alert-on-absence-not-just-failure).
 
 ## See also
 
-- [Send telemetry to Sentry, and alarm on absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)
-  — the design rationale.
+- [Send telemetry to Sentry, and alarm on
+  absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence) —
+  the design rationale.
 - [Setting up the live service on AWS](aws.md) — where the production `SENTRY_*` variables sit in
   the full bring-up.
 - [Configuration reference](setup.md) — how `.env` and environment variables feed `Settings`.

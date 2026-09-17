@@ -2,29 +2,28 @@
 
 How OCF delivers forecasts and supporting data to NGED.
 
-> **Status legend** — ✅ Implemented in code · 🚧 Planned · 🔬 Research (v2). See the
-> [roadmap index](index.md) for the version timeline these statuses refer to.
+> **Status legend** — ✅ Implemented in code · 🚧 Planned · 🔬 Research (v2). See the [roadmap
+> index](index.md) for the version timeline these statuses refer to.
 
 ---
 
 ## How forecasts are delivered
 
-For v1 of the live service, OCF delivers live forecasts (and the supporting tables below) as
-**Delta Lake** tables in an AWS S3 bucket. We are **not** building a REST API for v1 (a REST API is a v2
-[stretch goal](index.md#v20-scale-up)); an API may be added later if it brings
-additional benefit.
+For v1 of the live service, OCF delivers live forecasts (and the supporting tables below) as **Delta
+Lake** tables in an AWS S3 bucket. We are **not** building a REST API for v1 (a REST API is a v2
+[stretch goal](index.md#v20-scale-up)); an API may be added later if it brings additional benefit.
 
 - **Why Delta Lake?** It is just Parquet files plus a transaction log, giving ACID guarantees on
-  cheap object storage. NGED never reads a half-written forecast, and the tables are readable
-  from Excel, Polars, pandas, DuckDB, Power BI, etc. The full rationale (including the
-  comparison with a custom REST API) is on the durable [Forecast
-  Delivery](../architecture/forecast-delivery.md) architecture page.
+  cheap object storage. NGED never reads a half-written forecast, and the tables are readable from
+  Excel, Polars, pandas, DuckDB, Power BI, etc. The full rationale (including the comparison with a
+  custom REST API) is on the durable [Forecast Delivery](../architecture/forecast-delivery.md)
+  architecture page.
 - **Which bucket, and how it's secured**: these five tables live in a dedicated
-  `nged-forecast-delivery` S3 bucket, separate from OCF's internal working tables. Neither bucket
-  is public — both need S3/IAM authentication — and only the five tables below are a stable
-  contract. The internal bucket's tables may change shape at any time. See [Forecast Delivery:
-  Securing it](../architecture/forecast-delivery.md#securing-it) for the full reasoning and the
-  concrete bucket/IAM setup.
+  `nged-forecast-delivery` S3 bucket, separate from OCF's internal working tables. Neither bucket is
+  public — both need S3/IAM authentication — and only the five tables below are a stable contract.
+  The internal bucket's tables may change shape at any time. See [Forecast Delivery: Securing
+  it](../architecture/forecast-delivery.md#securing-it) for the full reasoning and the concrete
+  bucket/IAM setup.
 - **Update cadence**: every 6 hours, when a new forecast run is generated.
 - **Reading it** is a one-liner — `scan_delta` is lazy and only fetches the partitions a query
   touches, so a single forecast comes back in a fraction of a second even though the full dataset is
@@ -53,8 +52,8 @@ There are **five** tables. This table tracks where each one stands today:
 ## Table 1 — `power_forecast`
 
 > **Status: ✅ Implemented** as `contracts.power_schemas.PowerForecast`, but only the
-> **deterministic-ensemble** representation of uncertainty (below; v0.1). The two
-> percentile-based representations are 🚧 planned for v0.5.
+> **deterministic-ensemble** representation of uncertainty (below; v0.1). The two percentile-based
+> representations are 🚧 planned for v0.5.
 
 Stores OCF's probabilistic power forecasts. The table extends ~14 days **forwards** in time (the
 forecast horizon) and **backwards** to the start of the backtesting period.
@@ -62,29 +61,29 @@ forecast horizon) and **backwards** to the start of the backtesting period.
 The Milestone 1 report describes **three** ways of expressing uncertainty. We may deliver one or
 several of these:
 
-1. **Ensemble of deterministic forecasts** — one row per NWP ensemble member.
-   ✅ **Implemented in v0.1**.
+1. **Ensemble of deterministic forecasts** — one row per NWP ensemble member. ✅ **Implemented in
+   v0.1**.
 2. **Percentiles** — one row per `valid_time`, with a column per percentile. 🚧 Planned (v0.5).
 3. **Ensemble of percentile forecasts** — per-member *and* per-percentile. 🚧 Planned (v0.5).
 
-Representations 2 and 3 are two stages of one pipeline, not independent options:
-Representation 3 (per-member conditional quantiles) is produced by the model, and
-Representation 2 is **derived from it** by linear-pool mixing — see
-[Probabilistic forecasting from NWP ensembles](../techniques/probabilistic-forecasting.md) for
-the theory and
-[Phase D of the probabilistic evaluation plan](metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)
+Representations 2 and 3 are two stages of one pipeline, not independent options: Representation 3
+(per-member conditional quantiles) is produced by the model, and Representation 2 is **derived from
+it** by linear-pool mixing — see [Probabilistic forecasting from NWP
+ensembles](../techniques/probabilistic-forecasting.md) for the theory and [Phase D of the
+probabilistic evaluation
+plan](metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)
 for the implementation plan.
 
 **🚧 The bands must widen when the inputs degrade (v0.5).** Percentiles produced from clean-data
 residuals alone would be over-confident during an NWP outage or a telemetry stall — precisely when
-the consumer most needs to be told to be cautious. The interval width is the **in-band** signal
-that a forecast is degraded: it is the only number the consumer is certain to read. So it must
-not be left to the warnings table alone. The mechanism is conformal calibration **per
-degradation regime**, which works with today's XGBoost and needs no retraining
-([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)); the principle
-is [Inherent Stability → Widening
-bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal), and
-whether it worked is measured by [T1.3, faithful
+the consumer most needs to be told to be cautious. The interval width is the **in-band** signal that
+a forecast is degraded: it is the only number the consumer is certain to read. So it must not be
+left to the warnings table alone. The mechanism is conformal calibration **per degradation regime**,
+which works with today's XGBoost and needs no retraining
+([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)); the principle is
+[Inherent Stability → Widening
+bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal), and whether it
+worked is measured by [T1.3, faithful
 uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 ### Fields common to all three representations
@@ -99,13 +98,12 @@ uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mo
 | `power_fcst_model_version` | `int16` | Version of OCF's model. |
 
 **Internal-only extensions (beyond the report draft), which NGED does not receive:** the live
-`PowerForecast` schema also carries `experiment_name` (`string`), `ml_flow_experiment_id`
-(`int32`, nullable), and `fold_id` (`string`; the fold's label from `conf/cv/default.yaml`,
-such as `"mid_2025_to_mid_2026"`, or `"live"` for production forecasts). All three let
-cross-validation rows and live rows share one internal table — filter on `fold_id` to select
-the population you need — and all three are projected out of the
-`power_forecast` table delivered to NGED. See
-[metrics & leaderboard](metrics-and-leaderboard.md).
+`PowerForecast` schema also carries `experiment_name` (`string`), `ml_flow_experiment_id` (`int32`,
+nullable), and `fold_id` (`string`; the fold's label from `conf/cv/default.yaml`, such as
+`"mid_2025_to_mid_2026"`, or `"live"` for production forecasts). All three let cross-validation rows
+and live rows share one internal table — filter on `fold_id` to select the population you need — and
+all three are projected out of the `power_forecast` table delivered to NGED. See [metrics &
+leaderboard](metrics-and-leaderboard.md).
 
 ### Representation 1 — ensemble of deterministic forecasts ✅
 
@@ -118,18 +116,18 @@ the population you need — and all three are projected out of the
 > ([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246), v0.5).** The
 > delivery contract is a normalised forecast in the range **[−1, +1]**, which NGED multiplies by a
 > capacity to obtain MW/MVA (see [forecast building blocks](forecast-building-blocks.md)). The code
-> still forecasts raw MW/MVA, but now that the static P99 `effective_capacity` estimate exists
-> there is no need to wait for dynamic capacity estimation: the switch to [−1, +1] is planned for
-> **v0.5**. This planned change is also noted in a comment on the `PowerForecast.power_fcst` field in
-> `power_schemas.py`.
+> still forecasts raw MW/MVA, but now that the static P99 `effective_capacity` estimate exists there
+> is no need to wait for dynamic capacity estimation: the switch to [−1, +1] is planned for
+> **v0.5**. This planned change is also noted in a comment on the `PowerForecast.power_fcst` field
+> in `power_schemas.py`.
 
 ### Representation 2 — percentiles 🚧
 
 One row per `valid_time`, with one column per percentile. Representation 2 is the primary
 NGED-facing probabilistic representation, derived from [Representation
 3](#representation-3-ensemble-of-percentile-forecasts) by pooling the per-member quantiles (the
-equal-weight mixture — *not* per-level averaging, which would discard the between-member spread;
-see [the
+equal-weight mixture — *not* per-level averaging, which would discard the between-member spread; see
+[the
 explainer](../techniques/probabilistic-forecasting.md#the-tempting-shortcut-that-doesnt-work-averaging-the-quantiles)):
 
 | Fields | Data type | Notes |
@@ -138,11 +136,11 @@ explainer](../techniques/probabilistic-forecasting.md#the-tempting-shortcut-that
 
 ### Representation 3 — ensemble of percentile forecasts 🚧
 
-Each ensemble member is itself a percentile forecast — "given this member's weather, power will
-land in this range with this shape" — produced by a quantile-objective model (see
-[Phase D](metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)).
-Primarily an *internal* stage that Representation 2 is pooled from, but it may also be
-delivered for power users who want the weather-scenario structure:
+Each ensemble member is itself a percentile forecast — "given this member's weather, power will land
+in this range with this shape" — produced by a quantile-objective model (see [Phase
+D](metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)).
+Primarily an *internal* stage that Representation 2 is pooled from, but it may also be delivered for
+power users who want the weather-scenario structure:
 
 | Fields | Data type | Notes |
 |---|---|---|
@@ -153,18 +151,18 @@ delivered for power users who want the weather-scenario structure:
 
 ## Table 2 — `power_forecast_warnings` 🚧
 
-> **Status: 🚧 Planned.** Some warning types depend on switching-event detection and effective-capacity
-> estimation, which do not exist yet — so this table will be **partial when it first ships** and
-> complete by v1.0.
+> **Status: 🚧 Planned.** Some warning types depend on switching-event detection and
+> effective-capacity estimation, which do not exist yet — so this table will be **partial when it
+> first ships** and complete by v1.0.
 
 Tells NGED whenever we detect abnormal behaviour in the **most recent meter reading** for a
-`time_series_id`. Such abnormality means the asset's actual performance may deviate from the
-"normal operation" forecast over the next 14 days. Each warning is valid for one entire forecast run
-and is refreshed every 6 hours.
+`time_series_id`. Such abnormality means the asset's actual performance may deviate from the "normal
+operation" forecast over the next 14 days. Each warning is valid for one entire forecast run and is
+refreshed every 6 hours.
 
-> *Example:* a generator has run at only 60% of nominal capacity for the last month. The
-> "normal operation" forecast still assumes 100% capacity, so we must flag that the forecast is
-> deliberately deviating from reality.
+> *Example:* a generator has run at only 60% of nominal capacity for the last month. The "normal
+> operation" forecast still assumes 100% capacity, so we must flag that the forecast is deliberately
+> deviating from reality.
 
 Join `power_forecast_warnings` to `power_forecast` on `time_series_id` **and**
 `power_fcst_init_time`.
@@ -180,11 +178,12 @@ Join `power_forecast_warnings` to `power_forecast` on `time_series_id` **and**
 
 **Why `warning_source`.** This table is the channel aimed at **data providers**, and a warning is
 only actionable if it names whose feed broke and since when — "the weather feed was delayed" cannot
-be chased, but "the 2026-08-03 00Z ECMWF run never arrived" can. See
-[Inherent Stability → Three audiences, three channels](../design-philosophy/inherent-stability.md#three-audiences-three-channels).
-`STALE NWP` should be raised on **missed runs**, not on raw NWP age — healthy NWP is legitimately
-12–30 hours old depending on the slot
-([why age is not a health signal](../design-philosophy/inherent-stability.md#three-audiences-three-channels)).
+be chased, but "the 2026-08-03 00Z ECMWF run never arrived" can. See [Inherent Stability → Three
+audiences, three
+channels](../design-philosophy/inherent-stability.md#three-audiences-three-channels). `STALE NWP`
+should be raised on **missed runs**, not on raw NWP age — healthy NWP is legitimately 12–30 hours
+old depending on the slot ([why age is not a health
+signal](../design-philosophy/inherent-stability.md#three-audiences-three-channels)).
 
 **`warning_type` enum values** (mostly mutually exclusive — there is a hierarchy: a meter error
 blinds us to all other errors at that timestep; a generator/circuit fault blinds us to reduced
@@ -200,11 +199,11 @@ capacity):
 - `STALE NWP` — the weather feed was delayed, forcing the forecast onto stale NWP
 - `STALE POWER` — the live power data was delayed
 
-**Self-assembly note:** NGED (or any user) can build their own forecast by multiplying the
-(future) [−1, +1] `power_forecast` by a capacity derived from the
-[`effective_capacity`](#table-4-effective_capacity) table's `effective_capacity_mw` column —
-its **maximum** over history (→ a "normal" forecast) or its **most recent** value (→ a
-"prevailing conditions" forecast). See [forecast building blocks](forecast-building-blocks.md).
+**Self-assembly note:** NGED (or any user) can build their own forecast by multiplying the (future)
+[−1, +1] `power_forecast` by a capacity derived from the
+[`effective_capacity`](#table-4-effective_capacity) table's `effective_capacity_mw` column — its
+**maximum** over history (→ a "normal" forecast) or its **most recent** value (→ a "prevailing
+conditions" forecast). See [forecast building blocks](forecast-building-blocks.md).
 
 ---
 
@@ -213,7 +212,8 @@ its **maximum** over history (→ a "normal" forecast) or its **most recent** va
 > **Status: 🚧 Planned.**
 
 A complete **historical** record of the health of each `time_series_id`. The main use case: when an
-NGED engineer sees a warning, they can manually investigate the recent behaviour of that time series.
+NGED engineer sees a warning, they can manually investigate the recent behaviour of that time
+series.
 
 | Field | Data type | Notes |
 |---|---|---|
@@ -234,64 +234,59 @@ Notes on specific flags:
 ## Table 4 — `effective_capacity`
 
 > **Status: ✅ Implemented (v0.1)** — the `effective_capacity` Dagster asset writes P99 of observed
-> power as a static capacity proxy.
-> Schema lives in `contracts.power_schemas.EffectiveCapacity`.
+> power as a static capacity proxy. Schema lives in `contracts.power_schemas.EffectiveCapacity`.
 > **Planned upgrade in v0.7**
 > ([#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247)) to time-varying
 > capacity estimation, produced by whichever candidate estimator wins the head-to-head — see
 > [Capacity estimation](capacity-estimation.md).
 
 OCF's estimate of each generator's or substation's **effective capacity** at every half-hourly
-timestep of the historical time series data. This table is **backward-looking only** — it does
-not cover the forecast period.
+timestep of the historical time series data. This table is **backward-looking only** — it does not
+cover the forecast period.
 
-**v0.1 approach:** one row per `time_series_id`, `effective_capacity_mw` = P99 of
-`|power|` over the full available observation history. The v0.1 effective_capacity_mw value is a
-static scalar per series — a robust capacity proxy that is less sensitive to outlier spikes than
-the maximum, and more capacity-representative than the mean (which is dragged down by
-zero-output periods for PV/wind). It is also the denominator used to normalise NMAE in the
-`forecast_metrics` table. The denominator comes from the `effective_capacity` Delta table
-(schema `contracts.power_schemas.EffectiveCapacity`), which carries one row per
-`time_series_id` with `time` set to the latest observed timestep. `compute_metrics`
-(`ml_core.metrics`) joins that table onto the per-series metrics **on `time_series_id` alone**
-and divides.
+**v0.1 approach:** one row per `time_series_id`, `effective_capacity_mw` = P99 of `|power|` over the
+full available observation history. The v0.1 effective_capacity_mw value is a static scalar per
+series — a robust capacity proxy that is less sensitive to outlier spikes than the maximum, and more
+capacity-representative than the mean (which is dragged down by zero-output periods for PV/wind). It
+is also the denominator used to normalise NMAE in the `forecast_metrics` table. The denominator
+comes from the `effective_capacity` Delta table (schema
+`contracts.power_schemas.EffectiveCapacity`), which carries one row per `time_series_id` with `time`
+set to the latest observed timestep. `compute_metrics` (`ml_core.metrics`) joins that table onto the
+per-series metrics **on `time_series_id` alone** and divides.
 
-**Why v0.1 is a single row per series, not the value repeated at every half-hour.** The
-v0.7 upgrade below *will* store one row per `(time_series_id, time)` half-hour — but with a
-genuinely *time-varying* value. In v0.1 the value is a single constant per series, so repeating it
-across every half-hour would just be a denormalised encoding of one number: at V2 scale (~2,500
-series × ~4 years × 17,520 half-hours/yr ≈ 175M rows) that is hundreds of millions of rows to
-express ~2,500 scalars, for zero extra information. It would also *not* buy forward-compatibility,
-because the real v0.1→v0.7 interface change is not the data shape but **the join** (below). The
-`EffectiveCapacity` schema — `(time_series_id, time, effective_capacity_mw)` — already accommodates
-both the one-row-per-series v0.1 shape and the one-row-per-half-hour v0.7 shape; that is the
+**Why v0.1 is a single row per series, not the value repeated at every half-hour.** The v0.7 upgrade
+below *will* store one row per `(time_series_id, time)` half-hour — but with a genuinely
+*time-varying* value. In v0.1 the value is a single constant per series, so repeating it across
+every half-hour would just be a denormalised encoding of one number: at V2 scale (~2,500 series × ~4
+years × 17,520 half-hours/yr ≈ 175M rows) that is hundreds of millions of rows to express ~2,500
+scalars, for zero extra information. It would also *not* buy forward-compatibility, because the real
+v0.1→v0.7 interface change is not the data shape but **the join** (below). The `EffectiveCapacity`
+schema — `(time_series_id, time, effective_capacity_mw)` — already accommodates both the
+one-row-per-series v0.1 shape and the one-row-per-half-hour v0.7 shape; that is the
 forward-compatibility we want. (The v0.7 upgrade does widen the *columns* — the value becomes a
-mean + std pair,
-[#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247) — but the row shape
-and the join are unaffected by that.)
+mean + std pair, [#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247) — but
+the row shape and the join are unaffected by that.)
 
-**v0.7 upgrade:** replace the static P99 with a time-varying estimate from the winning
-[capacity estimator](capacity-estimation.md#several-estimators-one-winner). For generators, the
-prior comes from the Embedded Capacity Register
-and is updated at each half-hour from the generator's power time series, absorbing PV-panel
-degradation, partial inverter trips, etc., but **ignoring ANM** (a wind farm ANM-capped at 5 MW
-with 10 MW physical capability has `effective_capacity_mw = 10`). For substations, the 99th
-percentile of observed load over a rolling window, under normal running arrangement only. During a
-switching event, effective capacity = last known normal-arrangement value plus the "switched
-power" from [Table 5](#table-5-substation_switching) — a step that inherits Table 5's
-conditional status, since it needs the per-event magnitudes only the discrete detector produces
-(see
-[the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector));
-if the discrete detector is not built, in-event effective capacity falls back to the last known
-normal-arrangement value alone. The v0.7 estimate should carry uncertainty
-(a [first-class judging criterion](capacity-estimation.md#uncertainty-a-first-class-judging-criterion)
-in the head-to-head), so the
-single `effective_capacity_mw` column is upgraded to a mean + std pair
+**v0.7 upgrade:** replace the static P99 with a time-varying estimate from the winning [capacity
+estimator](capacity-estimation.md#several-estimators-one-winner). For generators, the prior comes
+from the Embedded Capacity Register and is updated at each half-hour from the generator's power time
+series, absorbing PV-panel degradation, partial inverter trips, etc., but **ignoring ANM** (a wind
+farm ANM-capped at 5 MW with 10 MW physical capability has `effective_capacity_mw = 10`). For
+substations, the 99th percentile of observed load over a rolling window, under normal running
+arrangement only. During a switching event, effective capacity = last known normal-arrangement value
+plus the "switched power" from [Table 5](#table-5-substation_switching) — a step that inherits Table
+5's conditional status, since it needs the per-event magnitudes only the discrete detector produces
+(see [the decision
+point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector)); if
+the discrete detector is not built, in-event effective capacity falls back to the last known
+normal-arrangement value alone. The v0.7 estimate should carry uncertainty (a [first-class judging
+criterion](capacity-estimation.md#uncertainty-a-first-class-judging-criterion) in the head-to-head),
+so the single `effective_capacity_mw` column is upgraded to a mean + std pair
 ([#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247), matching Table 5's
-Normal-distribution convention); the asset body changes to emit one row per
-`(time_series_id, time)`, and the metrics pipeline swaps
-its `time_series_id`-only capacity join for a temporal as-of join (see
-[Effective-capacity normalisation, and the v0.7 upgrade to time-varying](metrics-and-leaderboard.md#effective-capacity-normalisation-and-the-v07-upgrade-to-time-varying)).
+Normal-distribution convention); the asset body changes to emit one row per `(time_series_id,
+time)`, and the metrics pipeline swaps its `time_series_id`-only capacity join for a temporal as-of
+join (see [Effective-capacity normalisation, and the v0.7 upgrade to
+time-varying](metrics-and-leaderboard.md#effective-capacity-normalisation-and-the-v07-upgrade-to-time-varying)).
 
 | Field | Data type | Notes |
 |---|---|---|
@@ -303,18 +298,18 @@ its `time_series_id`-only capacity join for a temporal as-of join (see
 
 ## Table 5 — `substation_switching` 🚧
 
-> **Status: 🚧 Planned (v0.6), now conditional.** Depends on switching-event detection — and
-> whether a discrete event table ships at all is an open question: continuous per-substation
-> switching-state signals may be delivered instead. See
-> [the decision point in the switching-events plan](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).
+> **Status: 🚧 Planned (v0.6), now conditional.** Depends on switching-event detection — and whether
+> a discrete event table ships at all is an open question: continuous per-substation switching-state
+> signals may be delivered instead. See [the decision point in the switching-events
+> plan](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).
 
 Captures the amount of power OCF estimates has been **switched** from a "donor" substation to a
 "recipient" substation. OCF estimates switching events purely from the power-flow time series and
 the known electrical connections between substations — it has **no** access to NGED's operational
 switch-control system. Represented as the mean + std of a Normal distribution.
 
-A single donor can split power across multiple recipients (e.g. donor A loses 1 MW, emerging as
-0.6 MW to B, 0.3 MW to C, 0.1 MW to D). The table therefore uses **one row per recipient**.
+A single donor can split power across multiple recipients (e.g. donor A loses 1 MW, emerging as 0.6
+MW to B, 0.3 MW to C, 0.1 MW to D). The table therefore uses **one row per recipient**.
 
 | Field | Data type | Notes |
 |---|---|---|

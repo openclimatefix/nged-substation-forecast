@@ -14,10 +14,10 @@ description: >-
 
 # Writing a literature review that someone else will publish
 
-This skill is for a review that leaves the building: a state-of-the-art section in a report a
-funder publishes, a survey for an external audience, anything where the cited authors will read
-what you wrote about their work. **The worst possible outcome is a wrong claim about someone's
-published work**, and the whole routine below is built around making that outcome unlikely.
+This skill is for a review that leaves the building: a state-of-the-art section in a report a funder
+publishes, a survey for an external audience, anything where the cited authors will read what you
+wrote about their work. **The worst possible outcome is a wrong claim about someone's published
+work**, and the whole routine below is built around making that outcome unlikely.
 
 The prose rules in [`CLAUDE.md`](../../../CLAUDE.md) under "Prose style" apply throughout and are
 not repeated here. Two of them do most of the work in a review: say what the source found rather
@@ -26,18 +26,18 @@ than what is always true, and name the thing instead of writing "it".
 ## The shape of the work
 
 1. **Fix the questions first.** Write down the problems the project actually has to solve, then
-   review the literature against those problems. A review organised around the questions is
-   useful to the funder; a review organised around the papers is a reading list.
+   review the literature against those problems. A review organised around the questions is useful
+   to the funder; a review organised around the papers is a reading list.
 2. **Assemble the library** — full texts on local disk, not abstracts.
 3. **Draft**, one problem at a time, with the sources open rather than a summary of them. Load
    `long-form-prose` first. A review is exactly the long connected argument that skill plans for,
    and the outline it produces is what "one problem at a time" should follow.
 4. **Fact-check new prose before you commit it**, not after. A section that lands and is then
-   corrected twenty times leaves a history that is honest but avoidable. Every uncorrected
-   hour is an hour the wrong claim could have been read.
+   corrected twenty times leaves a history that is honest but avoidable. Every uncorrected hour is
+   an hour the wrong claim could have been read.
 5. **Review in rounds**, each round asking a different question. Accuracy and readability are
-   separate rounds, because they find different defects and a reviewer asked for both does
-   neither well.
+   separate rounds, because they find different defects and a reviewer asked for both does neither
+   well.
 6. **Triage every finding against the source yourself** before changing a word.
 
 Rounds 5 and 6 repeat. Expect the review to keep finding real defects for longer than feels
@@ -47,24 +47,24 @@ reasonable.
 
 **Get the full text. An abstract is not a source you can quote from.** An abstract states what was
 done and that it worked. An abstract almost never carries the number, the baseline, the horizon or
-the caveat that makes a finding worth citing. Several of the worst errors caught in review came
-from drafting off an abstract and inferring the rest.
+the caveat that makes a finding worth citing. Several of the worst errors caught in review came from
+drafting off an abstract and inferring the rest.
 
-**Draft from the source, not from a summary of the source.** A research agent's report — or your
-own notes, or a previous draft — is a map of where to look, never a substitute for looking. Writing
-a section against notes rather than against the papers is the single most productive way to
-introduce errors that read perfectly well: a number drifts (a source's "approximately five years"
-became "more than a decade"), a hedge evaporates ("their internal benchmark was easier" acquired
-"and saying by how much", which the source never says), and the summariser's paraphrase hardens into
-your assertion. One section written this way needed twenty corrections in two thousand words, an
-error rate several times worse than anything drafted with the PDFs open. If you must write against
-notes to get the shape down, treat that draft as unpublishable until every sourced sentence has been
+**Draft from the source, not from a summary of the source.** A research agent's report — or your own
+notes, or a previous draft — is a map of where to look, never a substitute for looking. Writing a
+section against notes rather than against the papers is the single most productive way to introduce
+errors that read perfectly well: a number drifts (a source's "approximately five years" became "more
+than a decade"), a hedge evaporates ("their internal benchmark was easier" acquired "and saying by
+how much", which the source never says), and the summariser's paraphrase hardens into your
+assertion. One section written this way needed twenty corrections in two thousand words, an error
+rate several times worse than anything drafted with the PDFs open. If you must write against notes
+to get the shape down, treat that draft as unpublishable until every sourced sentence has been
 opened against its source.
 
 **A source you are citing for one claim may bear on the claim next to it.** The same section cited a
-paper for one fact while contradicting that paper's account of a second, three sentences away —
-the absence claim it made was refuted on a page it had already quoted from. When you open a source,
-read what it says about the neighbouring claims too, not only the sentence you came for.
+paper for one fact while contradicting that paper's account of a second, three sentences away — the
+absence claim it made was refuted on a page it had already quoted from. When you open a source, read
+what it says about the neighbouring claims too, not only the sentence you came for.
 
 **Only legitimate routes. Never use a pirate mirror.** The routes divide into two kinds, and the
 division matters far more than the order within either kind.
@@ -105,13 +105,13 @@ never the search.
 
 **An author profile that lists the author's other papers but not the one being hunted is real
 evidence of absence.** One author of Ruhhütl et al. (2023) has a university profile that loads and
-names that author 11 times, yet carries no hit for the paper's title, for "forecast", or "CIRED".
-A route that answers is worth far more than a route that stays silent, so prefer the routes that can
+names that author 11 times, yet carries no hit for the paper's title, for "forecast", or "CIRED". A
+route that answers is worth far more than a route that stays silent, so prefer the routes that can
 say no.
 
 **Watch for the namesake.** An ORCID and Zenodo trail under the right surname belonged to a radio
-astronomer rather than to the network-operator engineer being searched for. That false trail is
-what made a wrong negative look convincing. Confirm a profile belongs to the right person — by
+astronomer rather than to the network-operator engineer being searched for. That false trail is what
+made a wrong negative look convincing. Confirm a profile belongs to the right person — by
 affiliation, by co-authors, by field — before drawing any conclusion from what the profile does or
 does not list.
 
@@ -139,14 +139,14 @@ file, because the people who ran the study can say what baseline they used.
 
 **Every PDF you download goes into the library, under the library's naming pattern, whether or not
 the review ends up citing it.** In this repo that means `literature/papers/` for academic papers,
-named `<first-author-surname>-<year>-<short-title>.pdf`, with a `.txt` cache of the same stem
-beside it. A paper you read and set aside is still evidence about what was searched, and it is the
-answer to the next person who asks the same question. A library holding only the citations is a
-record of the conclusions, not of the work. Never leave a download in the session scratchpad: the
-scratchpad is under `/tmp`, which is tmpfs here and is lost on reboot. Once the file is gone, "I
-already checked that one" is worth nothing. Where you hold both a preprint and the version of
-record, keep both and suffix them `-arxiv`/`-preprint` and `-published`. Suffix an author's
-conference deck `-slides`.
+named `<first-author-surname>-<year>-<short-title>.pdf`, with a `.txt` cache of the same stem beside
+it. A paper you read and set aside is still evidence about what was searched, and it is the answer
+to the next person who asks the same question. A library holding only the citations is a record of
+the conclusions, not of the work. Never leave a download in the session scratchpad: the scratchpad
+is under `/tmp`, which is tmpfs here and is lost on reboot. Once the file is gone, "I already
+checked that one" is worth nothing. Where you hold both a preprint and the version of record, keep
+both and suffix them `-arxiv`/`-preprint` and `-published`. Suffix an author's conference deck
+`-slides`.
 
 **When a paper cannot be obtained, say so in the review at the point of citation**, and record it in
 the library's README with what was tried. A documented negative is a result; a quiet reliance on an
@@ -159,8 +159,8 @@ the reporting format that makes a negative checkable.
 
 ## Reading the PDFs: six traps that silently corrupt what you quote
 
-Each of these produces plausible-looking text. Nothing warns you that the sentence you are
-about to quote is not the sentence in the paper.
+Each of these produces plausible-looking text. Nothing warns you that the sentence you are about to
+quote is not the sentence in the paper.
 
 **Form-feed page breaks swallow records.** `pdftotext` separates pages with `\014`, and a line-based
 tool reads the last line of one page and the first of the next as a single line. When extracting a
@@ -171,8 +171,8 @@ pdftotext paper.pdf - | tr '\014' '\n' | grep -n 'RMSE'
 ```
 
 **Two-column papers interleave.** Default `pdftotext` reads across the page, so a sentence in the
-left column continues into an unrelated sentence in the right. Always use `-layout`, and extract
-one page at a time when quoting precisely:
+left column continues into an unrelated sentence in the right. Always use `-layout`, and extract one
+page at a time when quoting precisely:
 
 ```bash
 pdftotext -layout -f 7 -l 7 paper.pdf -
@@ -196,40 +196,40 @@ rendered page rather than trusting the extraction. If the signs are missing, say
 pdftoppm -png -r 150 -f 3 -l 3 paper.pdf page   # render page 3 and read the number off it
 ```
 
-**A running side-stamp lands in the middle of a sentence.** PubMed Central author manuscripts
-carry a vertical "Author Manuscript" stamp down the margin of every page. `pdftotext` puts that
-stamp into the text in reading order — often mid-sentence. A CASP paper's definition of its
-targets extracted as "the experimental structure is about **Author Manuscript** to be solved",
-so a search for the whole phrase returned nothing even after whitespace normalisation. An empty
-result is exactly what a misquotation would return. **Search on a short fragment either side of
-the gap before concluding a quotation is wrong**, and strip the stamp before quoting:
+**A running side-stamp lands in the middle of a sentence.** PubMed Central author manuscripts carry
+a vertical "Author Manuscript" stamp down the margin of every page. `pdftotext` puts that stamp into
+the text in reading order — often mid-sentence. A CASP paper's definition of its targets extracted
+as "the experimental structure is about **Author Manuscript** to be solved", so a search for the
+whole phrase returned nothing even after whitespace normalisation. An empty result is exactly what a
+misquotation would return. **Search on a short fragment either side of the gap before concluding a
+quotation is wrong**, and strip the stamp before quoting:
 
 ```bash
 sed 's/Author Manuscript//g' paper.txt
 ```
 
 **`file` under-reports the page count, so a complete PDF looks truncated.** `file` guesses by
-counting `/Type /Page` in the raw stream, which misses every page whose entry sits in a
-compressed object stream. `file` called a 21-page paper 4 pages. A brief written on that number
-sent a sub-agent hunting for text it thought had been cut off. Use `pdfinfo`, which reads the
-catalogue, and check the page count against the version of record's page range before deciding a
-download is incomplete.
+counting `/Type /Page` in the raw stream, which misses every page whose entry sits in a compressed
+object stream. `file` called a 21-page paper 4 pages. A brief written on that number sent a
+sub-agent hunting for text it thought had been cut off. Use `pdfinfo`, which reads the catalogue,
+and check the page count against the version of record's page range before deciding a download is
+incomplete.
 
 Cache the cleaned text next to the PDF. Reviewers will need to check the same passages, and
 re-extracting per query wastes their time and yours.
 
 ## What a useful entry on a paper contains
 
-**For a closely relevant paper, extract the conclusions, not a nod.** A sentence saying that a
-paper "investigated substation load disaggregation" tells the reader nothing they could act on.
-Give the method that won, the margin it won by, the baseline it beat, and the lesson that
-transfers. If a paper is worth citing at all, it is worth two or three sentences of what it found.
+**For a closely relevant paper, extract the conclusions, not a nod.** A sentence saying that a paper
+"investigated substation load disaggregation" tells the reader nothing they could act on. Give the
+method that won, the margin it won by, the baseline it beat, and the lesson that transfers. If a
+paper is worth citing at all, it is worth two or three sentences of what it found.
 
 **Give every number the four things that make it comparable**: what was forecast, at what
-aggregation level, over what horizon, and against what baseline. A percentage error with no
-baseline is not evidence, and a review that reprints one lends it credibility it has not earned.
-Where a paper's headline number fails this test, either say so at the point of citation or leave
-the number out.
+aggregation level, over what horizon, and against what baseline. A percentage error with no baseline
+is not evidence, and a review that reprints one lends it credibility it has not earned. Where a
+paper's headline number fails this test, either say so at the point of citation or leave the number
+out.
 
 **Prefer errors normalised by something physical** — a rating, a capacity — over errors normalised
 by the load that happened to occur. Say which normalisation each quoted number used. Numbers
@@ -243,10 +243,10 @@ speak for itself.
 
 ## The four classes of claim that go wrong
 
-**Absence claims** — "nobody has", "no published work", "the first". CLAUDE.md's rule applies
-(state what was searched, and prefer a narrower true claim to a wider claim you cannot defend).
-What this round adds is that such claims survive review longest. Several such claims in this
-session's review survived three accuracy rounds and were refuted by a fourth with a wider net.
+**Absence claims** — "nobody has", "no published work", "the first". CLAUDE.md's rule applies (state
+what was searched, and prefer a narrower true claim to a wider claim you cannot defend). What this
+round adds is that such claims survive review longest. Several such claims in this session's review
+survived three accuracy rounds and were refuted by a fourth with a wider net.
 
 **Superlatives** — "the closest paper to our problem", "the largest study". Two of these in one
 document contradict each other, and a reader who notices stops trusting the rest. Scope every
@@ -262,8 +262,8 @@ another, a method named after a project that did not invent it, a benchmark run 
 rather than by its host — these are easy to blur and embarrassing to get wrong in a document the
 parties will read. **When the claim is about software, check the tagged source, not the current
 release.** A review once said an open-source stack "carries no trace" of a method its own
-maintainers had published. The method shipped in every release across a whole major version, and
-the current release still ships its simplified descendant pre-trained. Fetching three tags from the
+maintainers had published. The method shipped in every release across a whole major version, and the
+current release still ships its simplified descendant pre-trained. Fetching three tags from the
 project's repository settled in a minute what the sentence had got backwards.
 
 ## Consistency with your own project's documents
@@ -281,8 +281,8 @@ the other. Check which half the project is actually betting on.
 
 ## Reviewing: the personas
 
-Run these as separate sub-agents, in parallel, each reading the whole document. They find
-different things and merging them into one brief loses most of the value.
+Run these as separate sub-agents, in parallel, each reading the whole document. They find different
+things and merging them into one brief loses most of the value.
 
 - **The junior colleague.** Knows the domain, not the method. Every sentence they read twice is a
   defect; every unexplained piece of jargon is a defect. Ask them to state the document's argument
@@ -290,9 +290,9 @@ different things and merging them into one brief loses most of the value.
 - **The senior manager.** Will not read end to end. Reads the headings, then three paragraphs at
   random. Ask specifically for every paragraph opening with an unresolved pronoun or demonstrative,
   and whether the headings alone tell the story.
-- **The cited author.** Looks for their own work described as a failure rather than a scope,
-  for loaded verbs, for a caveat they were careful to state and the review dropped, and for credit
-  taken for their insight.
+- **The cited author.** Looks for their own work described as a failure rather than a scope, for
+  loaded verbs, for a caveat they were careful to state and the review dropped, and for credit taken
+  for their insight.
 - **The regulator or funder.** Looks for unsupported novelty claims, for scope not under control,
   for duplication of work already funded, for whether the benefit to the end customer is visible,
   and for commitments too vague to be held to.
@@ -307,9 +307,9 @@ Two further rounds ask different questions and belong on their own:
 - **Accuracy.** Split the document into chunks, one agent per chunk, each checking every claim
   against the source PDFs on disk. Tell each agent explicitly that the full texts are local and
   where they are, or it will work from what it can find online.
-- **Relevance and bloat.** Is the review as a whole, and each paper in it, relevant to the
-  questions the project has to answer? This finds things an accuracy round cannot: a correct
-  passage about a paper that does not matter.
+- **Relevance and bloat.** Is the review as a whole, and each paper in it, relevant to the questions
+  the project has to answer? This finds things an accuracy round cannot: a correct passage about a
+  paper that does not matter.
 
 ## Briefing a sub-agent
 
@@ -322,8 +322,8 @@ Every reviewer brief needs all of these, or the findings come back unusable.
 - **Line numbers and quoted text for every finding, plus a concrete replacement sentence.** A
   finding that says "tighten this" cannot be triaged and is worth nothing. Insist on the actual
   wording.
-- **Report only; do not edit.** Concurrent agents editing one file collide, and a finding you
-  cannot triage before it lands is a finding you cannot reject.
+- **Report only; do not edit.** Concurrent agents editing one file collide, and a finding you cannot
+  triage before it lands is a finding you cannot reject.
 - **Do not spawn sub-agents.** A grandchild agent cannot report back once its parent has finished,
   so the work is simply lost.
 - **No browser tools.** A browser tool can open a file-download dialog on an unattended screen.
@@ -342,9 +342,9 @@ own favour.
 
 **A search that returns nothing is not a finding until you have proved the search ran.** A grep
 against a mistyped path, a wrong directory or a PDF that extracted to zero lines prints exactly what
-a genuine absence prints. Before recording any "we found no…", confirm the corpus was actually
-read — count the lines the extraction produced, or grep for a string you know is present. This is
-the same failure as the hard-wrapping trap: both return a confident empty result from a search that
+a genuine absence prints. Before recording any "we found no…", confirm the corpus was actually read
+— count the lines the extraction produced, or grep for a string you know is present. This is the
+same failure as the hard-wrapping trap: both return a confident empty result from a search that
 never happened.
 
 Three triage rules earn their keep:
@@ -356,27 +356,26 @@ Three triage rules earn their keep:
   not evidence the cut is right.** Look for the third option: usually a rewrite rather than a
   deletion.
 
-**Your own drafting is in scope for the same scepticism.** The single clearest error in this
-session was mine, not an agent's: writing a plausible mechanism into a sentence about a paper's
-method when the abstract did not state it. The failure mode is inference dressed as citation, and
-it does not announce itself.
+**Your own drafting is in scope for the same scepticism.** The single clearest error in this session
+was mine, not an agent's: writing a plausible mechanism into a sentence about a paper's method when
+the abstract did not state it. The failure mode is inference dressed as citation, and it does not
+announce itself.
 
 ## Mechanical checks
 
-**Citation closure, both directions.** Every in-text citation must appear in the reference list,
-and every reference must be cited in the body. Do this with a script rather than by eye — match on
+**Citation closure, both directions.** Every in-text citation must appear in the reference list, and
+every reference must be cited in the body. Do this with a script rather than by eye — match on
 canonicalised URL, since the link text varies. `scripts/check_citations.py` in this skill's
 directory does it — `python3 .claude/skills/literature-review/scripts/check_citations.py <file>` —
 and the checks it runs are:
 
 - every in-text citation is hyperlinked (find citation-shaped text outside a link)
-- every body link resolves to a reference entry, and every reference entry's URL appears in the
-  body
+- every body link resolves to a reference entry, and every reference entry's URL appears in the body
 - no duplicate URLs in the reference list
 - the reference list is in alphabetical order by first author
 - the in-text label's surname and year agree with the reference entry they link to
-- citation form matches house style: `Author et al. (year)` for three or more authors,
-  `Author and Other (year)` for two
+- citation form matches house style: `Author et al. (year)` for three or more authors, `Author and
+  Other (year)` for two
 
 **Edit a hard-wrapped file through a wrap-tolerant substitution**, never with a literal string
 match, or every edit whose target spans a line break fails:
@@ -406,9 +405,9 @@ nobody can review.
 recur.** Deleting by line number goes stale after the first cut, so the natural fix is to anchor a
 span by the words it starts and ends with. That fix has its own failure: `opening + .*? + closing`
 finds the *next* occurrence of the closing words. If those words appear again later, the deletion
-swallows everything in between and reports success. Twice in one session that removed whole
-sections — once about 250 words, once about 550 — with nothing in the output to show it. Two
-guards between them make the tool safe, and neither costs anything:
+swallows everything in between and reports success. Twice in one session that removed whole sections
+— once about 250 words, once about 550 — with nothing in the output to show it. Two guards between
+them make the tool safe, and neither costs anything:
 
 - **Cap the match length** and refuse anything longer, because a legitimate sentence-level cut is
   tens of words and a runaway one is hundreds.
@@ -424,8 +423,8 @@ which is why an assertion on the match count is not optional.
 **Build the short version by lifting whole sentences out of the long one, not by writing a summary
 from memory.** Every sentence in the long review has already survived fact-checking; a freshly
 written paraphrase has not. Drafting from notes rather than from sources is what produced twenty
-errors in two thousand words the last time it was tried. Lifting also keeps the two documents
-saying the same thing, which matters when a reader has both.
+errors in two thousand words the last time it was tried. Lifting also keeps the two documents saying
+the same thing, which matters when a reader has both.
 
 **Write the extraction as a script, not as retyping.** A script that pulls each span out of the
 source file and refuses anything that does not match exactly once cannot mistype a number or drop a
@@ -433,10 +432,10 @@ hedge. The connective prose written as literals in that script is then the only 
 version that has never been checked, and it is small enough to check by hand.
 
 **Audit the result with shingles.** Split the short version into overlapping nine-word runs and
-check each against the long review. Every run that is not found is either connective prose you
-wrote or a join between two lifted passages. The joins are where the faults are: a stranded "the
-ones" whose referent was in the sentence you cut, a bare "0.07" whose result sentence went with
-it, a space left before a full stop. Read every miss.
+check each against the long review. Every run that is not found is either connective prose you wrote
+or a join between two lifted passages. The joins are where the faults are: a stranded "the ones"
+whose referent was in the sentence you cut, a bare "0.07" whose result sentence went with it, a
+space left before a full stop. Read every miss.
 
 **Expect the cuts to strand referents.** A pronoun or a demonstrative that was clear in the long
 review points at nothing once the sentence naming its subject is gone. After each round of cutting,
@@ -445,8 +444,8 @@ that the noun is still in the previous sentence.
 
 **Verify the render, not just the lint.** A clean lint and a successful build both pass on markdown
 that renders visibly wrong — see the `mkdocs-authoring` skill. After each batch, rebuild and count
-the elements in the generated HTML: headings at each level, table count, reference list items, and
-a grep for stray `**` or `](http` that a broken edit leaves behind.
+the elements in the generated HTML: headings at each level, table count, reference list items, and a
+grep for stray `**` or `](http` that a broken edit leaves behind.
 
 ```bash
 uv run pymarkdown scan -r docs
@@ -459,7 +458,6 @@ readable.
 ## See also
 
 `long-form-prose` plans the outline before any prose exists — load it before drafting a section of
-the review rather than after. `prose-review` owns the readability round referenced above, which is
-a separate pass from the accuracy round this skill owns. `prose-review` also reuses the
-wrap-tolerant `rsub` substitution and the hard-wrapping warnings from this skill for editing the
-review itself.
+the review rather than after. `prose-review` owns the readability round referenced above, which is a
+separate pass from the accuracy round this skill owns. `prose-review` also reuses the wrap-tolerant
+`rsub` substitution and the hard-wrapping warnings from this skill for editing the review itself.

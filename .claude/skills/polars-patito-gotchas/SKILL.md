@@ -20,8 +20,8 @@ they are written down.
 ## Cross-model LazyFrame joins
 
 Patito creates a unique Python subclass for each model (e.g. `PowerTimeSeriesLazyFrame`,
-`PowerForecastLazyFrame`). Polars' `assert_same_type` check inside `.join()` rejects joining
-two differently-typed Patito LazyFrames with a `TypeError`.
+`PowerForecastLazyFrame`). Polars' `assert_same_type` check inside `.join()` rejects joining two
+differently-typed Patito LazyFrames with a `TypeError`.
 
 Workaround: strip the Patito subclass from the right-hand operand before joining:
 
@@ -31,9 +31,9 @@ plain_lf = pl.LazyFrame._from_pyldf(patito_lf._ldf)
 left_patito_lf.join(plain_lf.select(...), on=..., how="inner")
 ```
 
-`pl.LazyFrame._from_pyldf` constructs a plain `pl.LazyFrame` from the same underlying Rust
-object — zero-copy, no data movement. The check passes because `type(left_lf)` is a subclass
-of `pl.LazyFrame`, so `isinstance(left_lf, type(plain_lf))` is `True`.
+`pl.LazyFrame._from_pyldf` constructs a plain `pl.LazyFrame` from the same underlying Rust object —
+zero-copy, no data movement. The check passes because `type(left_lf)` is a subclass of
+`pl.LazyFrame`, so `isinstance(left_lf, type(plain_lf))` is `True`.
 
 ## `.cast({...})` on a model-bearing frame
 
@@ -79,11 +79,11 @@ holds only on a plain Polars frame.
 ## `ge`/`le` are silently ignored on a datetime field
 
 `pt.Field(ge=..., le=...)` enforces nothing on a `datetime` column. Patito builds its bounds checks
-by reading the `minimum`/`maximum` keywords out of the Pydantic JSON schema, and JSON Schema
-defines those keywords for numbers only — so a datetime field's `Ge`/`Le` metadata never reaches
-the JSON schema, Patito finds no keyword to turn into a filter, and `validate()` accepts every
-year. There is no warning and no error; the constraint simply does not exist. (`ge`/`le` on a
-numeric field works exactly as documented, which is what makes this so easy to miss.)
+by reading the `minimum`/`maximum` keywords out of the Pydantic JSON schema, and JSON Schema defines
+those keywords for numbers only — so a datetime field's `Ge`/`Le` metadata never reaches the JSON
+schema, Patito finds no keyword to turn into a filter, and `validate()` accepts every year. There is
+no warning and no error; the constraint simply does not exist. (`ge`/`le` on a numeric field works
+exactly as documented, which is what makes this so easy to miss.)
 
 **How to apply:** bound a datetime column from the model's `validate` override, not from the field.
 `contracts.common.check_datetime_bounds` is the shared helper, and `MIN_PLAUSIBLE_DATETIME` /
@@ -104,9 +104,9 @@ is not assignable to `patito.polars.LazyFrame[PowerForecast]`
 ```
 
 **This is a type-annotation gap, not a runtime one.** At runtime the model survives every one of
-these methods, on both frame types — see the table under
-[`.cast({...})` on a model-bearing frame](#cast-on-a-model-bearing-frame). Nothing is lost and
-nothing needs restoring; the re-wrap below exists only to satisfy the annotation.
+these methods, on both frame types — see the table under [`.cast({...})` on a model-bearing
+frame](#cast-on-a-model-bearing-frame). Nothing is lost and nothing needs restoring; the re-wrap
+below exists only to satisfy the annotation.
 
 The gap is in `patito/polars.py`, and it is narrower than "lazy versus eager".
 `patito.polars.DataFrame` carries a block of type-annotation overrides re-declaring exactly three
@@ -114,8 +114,8 @@ methods — `filter`, `select` and `with_columns` — as `(self: DF) -> DF`. Tho
 `pt.DataFrame`, need no workaround. **Every other method on either frame type does**, because
 `patito.polars.LazyFrame` has no such block at all and `DataFrame`'s block stops at three. So
 `df.sort(...)`, `df.head(...)`, `df.unique()` and `df.rename(...)` on an *eager* `pt.DataFrame`
-raise the same `invalid-assignment` as the lazy case. (`df.drop(...)` happens not to, because
-Polars annotates `DataFrame.drop` as returning `Self`.)
+raise the same `invalid-assignment` as the lazy case. (`df.drop(...)` happens not to, because Polars
+annotates `DataFrame.drop` as returning `Self`.)
 
 **Upgrading `ty` will not fix this, because `ty` is not wrong.** Polars annotates
 `LazyFrame.filter`, `.sort`, `.select`, `.with_columns`, `.head`, `.unique`, `.drop` and `.rename`
@@ -146,9 +146,9 @@ it follows from Polars' own annotations, so no checker version changes it.
 
 Writing a dictionary-encoded (`Categorical`, `Enum`) column through `write_deltalake` without
 casting it first leaves the Delta log recording `Utf8` while the parquet file holds a
-dictionary-typed column. The write succeeds, but a later `pl.read_delta` raises `SchemaError:
-data type mismatch`. `delta_store.forecast_metrics.write_forecast_metrics` casts its `Enum`
-columns to `String` before writing for exactly this reason. Two consequences:
+dictionary-typed column. The write succeeds, but a later `pl.read_delta` raises `SchemaError: data
+type mismatch`. `delta_store.forecast_metrics.write_forecast_metrics` casts its `Enum` columns to
+`String` before writing for exactly this reason. Two consequences:
 
 1. **A contract column you filter or partition on in Delta should be `String`, not `Categorical`.**
    If the schema declared it `Categorical`, every read would need a `String → Categorical` cast to
@@ -176,6 +176,5 @@ columns to `String` before writing for exactly this reason. Two consequences:
 
 ## The friction budget
 
-Five is the budget. If a sixth workaround becomes necessary, revisit the approach rather than
-adding it here — the alternatives are in `docs/architecture/code-style.md` under "Patito friction
-budget".
+Five is the budget. If a sixth workaround becomes necessary, revisit the approach rather than adding
+it here — the alternatives are in `docs/architecture/code-style.md` under "Patito friction budget".

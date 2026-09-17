@@ -23,8 +23,8 @@ silently damaged a page that then passed `pymarkdown scan`, `mkdocs build --stri
 - A quote can match inside a fenced code block, where the words are a command rather than prose.
   Splicing there rewrites the command, and every check downstream passes. A finding whose span
   reaches into a fence is refused, as one landing in YAML frontmatter already is.
-- Re-wrapping the whole file buries the change, and re-wrapping at the wrong width reflows every
-  line it touches. The width is solved from the lines being replaced, per unit.
+- Re-wrapping the whole file buries the change, so only the unit the splice landed in is
+  re-wrapped, at `markdown_wrap.WIDTH`.
 - A replacement that spans a different number of lines from the text it replaced invalidates any
   line index taken before the splice. Unit boundaries are recomputed on the spliced text, which is
   what stops two list items merging into one.
@@ -58,6 +58,9 @@ import textwrap
 from pathlib import Path
 from typing import Final, Literal, NamedTuple, TypedDict
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+from scripts.markdown_wrap import WIDTH
+
 LINK: Final[re.Pattern[str]] = re.compile(r"\[(?P<body>[^\]\[]*)\]\((?:[^()]|\([^()]*\))*\)")
 """A markdown link, whose label survives the projection and whose target does not."""
 
@@ -82,12 +85,6 @@ MARKUP: Final[tuple[str, ...]] = ("**", "`", "[", "](")
 
 SENTENCE_STOPS: Final[str] = ".!?"
 """The punctuation that ends a sentence, and so ends a bolded lead inside the lead's own markers."""
-
-WIDTH_RANGE: Final[tuple[int, int]] = (88, 104)
-"""The wrap widths to try when solving a unit's width. This repo's pages sit between 94 and 100."""
-
-FALLBACK_WIDTH: Final[int] = 99
-"""Used only for a file whose every unit is a single line, so no width can be solved from it."""
 
 FRONTMATTER: Final[re.Pattern[str]] = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
 """A skill file's YAML block. Its indented lines read as list markers, so it is never re-flowed."""
@@ -492,31 +489,6 @@ def rewrap(unit_lines: list[str], width: int) -> list[str]:
     )
 
 
-def solve_width(unit_lines: list[str]) -> int | None:
-    """The wrap width that reproduces `unit_lines` exactly, or None when no width does.
-
-    Solving beats assuming: this repo's pages are wrapped anywhere between 94 and 100 characters,
-    and applying the wrong width re-flows every line of the unit instead of the lines that changed.
-    """
-    if len(unit_lines) < 2 or any(UNWRAPPABLE.match(line) for line in unit_lines[1:]):
-        return None
-    low, high = WIDTH_RANGE
-    for width in range(low, high + 1):
-        if rewrap(unit_lines, width) == unit_lines:
-            return width
-    return None
-
-
-@functools.cache
-def modal_width(path: str) -> int:
-    """The width most of this file's units solve to, for a unit that solves to none."""
-    solved: list[int] = []
-    for block in Path(path).read_text(encoding="utf-8").split("\n\n"):
-        lines = block.split("\n")
-        solved += [width for lo, hi in units(block) if (width := solve_width(lines[lo:hi]))]
-    return max(set(solved), key=solved.count) if solved else FALLBACK_WIDTH
-
-
 def _block_at(text: str, offset: int) -> tuple[int, str]:
     """The start offset and text of the blank-line-separated block containing `offset`."""
     position = 0
@@ -549,23 +521,22 @@ def _trailing_blanks(unit_lines: list[str]) -> tuple[list[str], list[str]]:
     return unit_lines[:end], unit_lines[end:]
 
 
-def _reflow(*, raw: str, spliced: str, offset: int, path: str) -> str:
-    """Re-wrap only the unit the splice landed in, at the width that unit was already wrapped at.
+def _reflow(*, raw: str, spliced: str, offset: int) -> str:
+    """Re-wrap only the unit the splice landed in, at `WIDTH`.
 
-    The unit is solved on `raw` and recomputed on `spliced`, because a replacement spanning a
+    The unit is bounded on `raw` and recomputed on `spliced`, because a replacement spanning a
     different number of lines from the text it replaced moves every line index taken beforehand.
     """
     _, original_block, low, high, _ = _unit_at(raw, offset)
     original_unit, _ = _trailing_blanks(original_block.split("\n")[low:high])
     if len(original_unit) < 2 or any(UNWRAPPABLE.match(line) for line in original_unit):
         return spliced
-    width = solve_width(original_unit) or modal_width(path)
 
     block_start, block, low, high, line = _unit_at(spliced, offset)
     lines = block.split("\n")
     head, tail = lines[low:line], lines[line:high]
     tail, blanks = _trailing_blanks(tail)
-    reflowed = lines[:low] + head + rewrap(tail, width) + blanks + lines[high:]
+    reflowed = lines[:low] + head + rewrap(tail, WIDTH) + blanks + lines[high:]
     return spliced[:block_start] + "\n".join(reflowed) + spliced[block_start + len(block) :]
 
 
@@ -609,7 +580,7 @@ def apply_one(*, raw: str, finding: Finding, merge_base: str | None) -> tuple[st
     spliced = splice(raw=raw, start=start, end=end, replacement=replacement)
     if not markup_intact(before=_block_at(raw, offset)[1], after=_block_at(spliced, offset)[1]):
         return raw, "markup refused"
-    return _reflow(raw=raw, spliced=spliced, offset=offset, path=finding["file"]), "applied"
+    return _reflow(raw=raw, spliced=spliced, offset=offset), "applied"
 
 
 def main() -> None:

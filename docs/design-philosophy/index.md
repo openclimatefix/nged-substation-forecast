@@ -3,9 +3,12 @@
 **The one-minute description:** we are betting that five claims can all hold at once, each stated as
 a falsifiable [engineering hypothesis](engineering-hypotheses.md) with a number and a deadline:
 
-- [H1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-- [H2: a hundred experiments per person in a peak month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)
-- [H3: safe one-click promotion, and one-click rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback)
+- [H1: a service that mostly runs
+  itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
+- [H2: a hundred experiments per person in a peak
+  month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)
+- [H3: safe one-click promotion, and one-click
+  rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback)
 - [H4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money)
 - [H5: scale without redesign](engineering-hypotheses.md#h5-scale-without-redesign)
 
@@ -20,9 +23,9 @@ claim is practised, never as a prerequisite for following the argument.
 These pages therefore sit deliberately *above* the level of software-engineering practice.
 Everything here is about the shape of the system rather than the shape of the code: which language
 we write in, how functions are named, how the dataframe library is used, how the tests are wired —
-none of that is settled here. Those finer-grained rules live in
-[Code Style](../architecture/code-style.md) and [Testing](../architecture/testing.md), and a team
-could disagree with every one of them while still adopting everything in this section.
+none of that is settled here. Those finer-grained rules live in [Code
+Style](../architecture/code-style.md) and [Testing](../architecture/testing.md), and a team could
+disagree with every one of them while still adopting everything in this section.
 
 Flexpectation is a greenfield project, and that is a rare opportunity to research the best practices
 of several industries, test-drive them against real data and a real production service, and report
@@ -47,8 +50,8 @@ Four pages, in reading order:
   service behaves as its inputs degrade, the degradation ladder, and the rules to follow when
   changing production code.
 - **[Common Incident Classes](common-incident-classes.md)** — the recurring failure shapes
-  production forecasting services see in practice, and which mechanism above (if any) targets
-  each one.
+  production forecasting services see in practice, and which mechanism above (if any) targets each
+  one.
 
 The boundary with the [Architecture](../architecture/overview.md) section is deliberate: this
 section holds the transferable argument, while `architecture/` describes what we actually built,

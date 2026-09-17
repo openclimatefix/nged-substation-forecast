@@ -1,23 +1,21 @@
 # Intervention log
 
 An append-only record of every occasion on which a human had to intervene in the running service.
-This is the artefact that the
-[T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-is scored from.
+This is the artefact that the [T1.1 operability
+test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) is scored
+from.
 
-It exists because the
-[T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-is the only test on the
-[engineering hypotheses](../design-philosophy/engineering-hypotheses.md) page that **cannot be
-measured retrospectively**. Every other test can be reconstructed later — from the scenario suite,
-from MLflow timestamps, from the runbooks, or from billing history. "How many times did a human
-have to intervene, and why?" is unrecoverable unless it is written down as it happens.
+It exists because the [T1.1 operability
+test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) is the
+only test on the [engineering hypotheses](../design-philosophy/engineering-hypotheses.md) page that
+**cannot be measured retrospectively**. Every other test can be reconstructed later — from the
+scenario suite, from MLflow timestamps, from the runbooks, or from billing history. "How many times
+did a human have to intervene, and why?" is unrecoverable unless it is written down as it happens.
 
 ## How to add an entry
 
 Append a row to [the log](#the-log) below. One row per intervention, newest last. The columns are
-deliberately few, so that logging an intervention is never the reason an intervention goes
-unlogged:
+deliberately few, so that logging an intervention is never the reason an intervention goes unlogged:
 
 | Column | What goes in it |
 |---|---|
@@ -38,19 +36,20 @@ with `Minutes = 0` and `Cause = self-recovered`. Self-recovery is evidence for t
 than against it, and it is only evidence if somebody wrote it down.
 
 "Runbook?" is not bookkeeping. A gap in [operations.md](operations.md) is itself a finding: the
-[T1.4 runbooks-alone operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-claims that staff who did not develop the code can run this service from the runbooks alone, and
-every `no` is a point against that claim.
+[T1.4 runbooks-alone operability
+test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) claims
+that staff who did not develop the code can run this service from the runbooks alone, and every `no`
+is a point against that claim.
 
 ## Cause taxonomy
 
-The taxonomy is the substance of the test. The
-[T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-predicts that **at least 90% of entries fall into `upstream-contract`** — that essentially the
-only cause that should ever need a human is an upstream provider changing the shape of what they
-publish. Every entry in another category counts against that 90%, which is exactly why the
-categories are recorded separately rather than lumped together. The threshold is deliberately not
-100%, so a single fluke cannot falsify the claim on its own.
+The taxonomy is the substance of the test. The [T1.1 operability
+test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts
+that **at least 90% of entries fall into `upstream-contract`** — that essentially the only cause
+that should ever need a human is an upstream provider changing the shape of what they publish. Every
+entry in another category counts against that 90%, which is exactly why the categories are recorded
+separately rather than lumped together. The threshold is deliberately not 100%, so a single fluke
+cannot falsify the claim on its own.
 
 | Category | Meaning |
 |---|---|
@@ -78,9 +77,10 @@ threshold. The pre-v1.0 entries are still worth having: they are what the cause 
 from, and they are the honest record of what the service actually demanded of us on the way up.
 
 The reverse also holds, and matters more. A *quiet* pre-v1.0 stretch does not score in favour of
-[H1, a service that mostly runs itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-either. Counting the good weeks of an excluded window while discounting the bad weeks would be the
-plainest possible case of the selective reading these hypotheses exist to prevent.
+[H1, a service that mostly runs
+itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) either.
+Counting the good weeks of an excluded window while discounting the bad weeks would be the plainest
+possible case of the selective reading these hypotheses exist to prevent.
 
 ## The log
 
@@ -106,9 +106,9 @@ rather than a formality.
 
 The first `live_forecasts` run on AWS was the 18:00 UTC slot on 15 July 2026, and the last was the
 18:00 UTC slot on 13 August 2026, an hour before the v0.1 stack was retired at roughly 19:00 UTC
-that evening to make way for v0.2. Over that window the schedule called for 117 consecutive
-6-hourly forecast slots, and **every one of them produced a forecast for all 28 time series**. One
-ECMWF run was lost and one human intervention was needed, both described below.
+that evening to make way for v0.2. Over that window the schedule called for 117 consecutive 6-hourly
+forecast slots, and **every one of them produced a forecast for all 28 time series**. One ECMWF run
+was lost and one human intervention was needed, both described below.
 
 The VM was deployed once, on 15 July, and no code was pushed to AWS until it was retired. The one
 operator action in the window was the NWP backfill logged above, so the period is close to
@@ -145,23 +145,22 @@ Three caveats, without which the window would be worth more than it is:
   in the same week — lands on `main` on 21 July, 6 days after the box was deployed and never
   updated. Whatever was running there therefore predates Sentry entirely: the missed-check-in
   monitor never existed on that box, and the alarm that did surface the missed run came from newer
-  code running on a laptop. `live_forecasts_are_healthy`, the check that reads each slot's rows
-  back and counts missed NWP runs, landed later still. The four degraded slots were
-  reconstructable only because `nwp_init_time` travels on every forecast row: the degradation was
-  recoverable from the data, but nothing in the deployment announced it.
-- **A month is short, and this is the easy case.** v0.1 is 28 time series and one ECMWF run
-  per day. The dominant cause predicted by the
-  [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-  — an upstream contract change — did not happen in a window this short; a partial publication is a
+  code running on a laptop. `live_forecasts_are_healthy`, the check that reads each slot's rows back
+  and counts missed NWP runs, landed later still. The four degraded slots were reconstructable only
+  because `nwp_init_time` travels on every forecast row: the degradation was recoverable from the
+  data, but nothing in the deployment announced it.
+- **A month is short, and this is the easy case.** v0.1 is 28 time series and one ECMWF run per day.
+  The dominant cause predicted by the [T1.1 operability
+  test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — an
+  upstream contract change — did not happen in a window this short; a partial publication is a
   milder fault than a changed schema.
 - **It does not score.** The window opens at v1.0, [as above](#the-scoring-window-opens-at-v10).
 
-So what this is, stated plainly: **weak, non-scoring evidence for
-[H1, a service that mostly runs itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
-drawn from a window the scoring rule excludes.** The deployed stack served all 117 scheduled slots
-over 29 days, absorbed one lost NWP run by degrading rather than stopping, and cost a human about a
-minute. That is worth
-recording, and it is not worth more than that.
+So what this is, stated plainly: **weak, non-scoring evidence for [H1, a service that mostly runs
+itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself), drawn
+from a window the scoring rule excludes.** The deployed stack served all 117 scheduled slots over 29
+days, absorbed one lost NWP run by degrading rather than stopping, and cost a human about a minute.
+That is worth recording, and it is not worth more than that.
 
 ### v0.2 on AWS, from 2026-08-14
 
@@ -172,9 +171,9 @@ in [the log](#the-log).
 
 v0.2 forecasts 31 time series, three more than v0.1, under the promoted model `xgboost_cv_0003`.
 From the 00:00 UTC slot on 14 August 2026 to the 06:00 UTC slot on 28 August 2026 the schedule
-called for 58 consecutive 6-hourly slots. **Every one of those slots produced a forecast for all
-31 time series.** No NWP run was missed: every slot in the window forecast from NWP between 12 and
-30 hours old, the healthy band for a once-daily ECMWF run.
+called for 58 consecutive 6-hourly slots. **Every one of those slots produced a forecast for all 31
+time series.** No NWP run was missed: every slot in the window forecast from NWP between 12 and 30
+hours old, the healthy band for a once-daily ECMWF run.
 
 *Verified by* counting distinct `power_fcst_init_time` values with `fold_id = "live"` and
 `experiment_name = "xgboost_cv_0003"` — v0.2's promoted model — in the `power_forecasts` Delta table
@@ -183,12 +182,12 @@ consecutive pair is exactly 6 hours apart, all 31 time series appear in every on
 slot's `nwp_init_time` is more than 30 hours before its `power_fcst_init_time`.
 
 Three changes make the next stretch better evidence than the last. `live_forecasts_are_healthy`
-reads each succeeding slot's rows back and reports missed NWP runs, so a slot forecasting from
-stale inputs is recorded as degraded rather than passing unremarked. A wholly-missing NWP variable
-is now retried for 4 hours instead of failing, which is what would have made the 9 August
-intervention unnecessary. And the deployment carries Sentry, which v0.1's never did, so an
-`ecmwf_ens` run that *does* exhaust its retries reports itself from AWS rather than waiting for
-somebody to run the code on a laptop.
+reads each succeeding slot's rows back and reports missed NWP runs, so a slot forecasting from stale
+inputs is recorded as degraded rather than passing unremarked. A wholly-missing NWP variable is now
+retried for 4 hours instead of failing, which is what would have made the 9 August intervention
+unnecessary. And the deployment carries Sentry, which v0.1's never did, so an `ecmwf_ens` run that
+*does* exhaust its retries reports itself from AWS rather than waiting for somebody to run the code
+on a laptop.
 
 What still would not reach us is the degraded *slot*, where nothing failed. Dagster runs no check
 for an asset that raised, so this is the succeeding-run case: `live_forecasts_are_healthy` returns
@@ -200,8 +199,8 @@ service healthy regardless, so a degraded run looks like a good one from outside
 
 - [Engineering Hypotheses → H1, a service that mostly runs
   itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — the
-  hypothesis this log scores, and the other three tests that sit alongside the
-  [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+  hypothesis this log scores, and the other three tests that sit alongside the [T1.1 operability
+  test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 - [Operating the live service](operations.md) — the runbooks whose coverage the `Runbook?` column
   measures.
 - [Inherent Stability](../design-philosophy/inherent-stability.md) — the design that is meant to

@@ -16,20 +16,19 @@ description: >-
 
 Whenever you create an issue, also set:
 
-- **Labels** and **Type** (org issue type: Task / Bug / Feature / Spike / Epic / …) — pick
-  whatever fits the issue.
-- Add it to the **OCF project** (org project 33, `gh project item-add 33 --owner
-  openclimatefix --url <issue-url>`) and set the project fields **Status = Todo**,
-  **Project = NGED**, **Area = ML**.
-- If it is a sub-issue, attach it to its parent epic **and position it appropriately in the
-  parent's sub-issue order** (execution order, respecting `blocked by` chains) — the
-  `reprioritizeSubIssue` GraphQL mutation with `afterId`/`beforeId`.
-- **Body** — if (and only if) the docs already contain a plan for the issue (e.g. a
-  `docs/roadmap/` section), the body may be *just* a link to that rendered docs section and
-  nothing more; don't duplicate the plan. Otherwise, write a self-contained body.
+- **Labels** and **Type** (org issue type: Task / Bug / Feature / Spike / Epic / …) — pick whatever
+  fits the issue.
+- Add it to the **OCF project** (org project 33, `gh project item-add 33 --owner openclimatefix
+  --url <issue-url>`) and set the project fields **Status = Todo**, **Project = NGED**, **Area =
+  ML**.
+- If it is a sub-issue, attach it to its parent epic **and position it appropriately in the parent's
+  sub-issue order** (execution order, respecting `blocked by` chains) — the `reprioritizeSubIssue`
+  GraphQL mutation with `afterId`/`beforeId`.
+- **Body** — if (and only if) the docs already contain a plan for the issue (e.g. a `docs/roadmap/`
+  section), the body may be *just* a link to that rendered docs section and nothing more; don't
+  duplicate the plan. Otherwise, write a self-contained body.
 - When the body links to a docs page, link to the **rendered site**
-  (`https://openclimatefix.github.io/nged-substation-forecast/...`), never a `github.com`
-  blob path.
+  (`https://openclimatefix.github.io/nged-substation-forecast/...`), never a `github.com` blob path.
 
 `gh issue create` can't set any of these: use `gh issue edit --add-label` for labels, the
 `updateIssueIssueType` GraphQL mutation for Type, and `gh project item-edit` (or the
@@ -61,75 +60,75 @@ see: https://github.blog/changelog/2024-05-23-sunset-notice-projects-classic/.
 **Check `gh --version` and `apt-cache policy gh` (or the equivalent for your package manager) —
 upgrading to a current release from GitHub's own apt/homebrew repository fixes it.** Confirmed on
 this repo: `gh pr edit --body-file` failed on Ubuntu's `universe` package (2.46.0, many releases
-behind) and succeeded cleanly after switching to
-[GitHub's own repository](https://github.com/cli/cli#installation) (2.101.0)
+behind) and succeeded cleanly after switching to [GitHub's own
+repository](https://github.com/cli/cli#installation) (2.101.0)
 ([cli/cli#13069](https://github.com/cli/cli/issues/13069),
 [cli/cli#11983](https://github.com/cli/cli/issues/11983)). The underlying `projectCards` field is
-still emitted by every build pending [cli/cli#11769](https://github.com/cli/cli/issues/11769), so
-a recurrence after upgrading is worth reporting upstream rather than a sign the fix failed.
+still emitted by every build pending [cli/cli#11769](https://github.com/cli/cli/issues/11769), so a
+recurrence after upgrading is worth reporting upstream rather than a sign the fix failed.
 
-**When editing a body through the REST API directly — a stopgap on a `gh` you can't upgrade, or
-for scripting comments — build the JSON payload with `jq --rawfile` and pipe it through `--input`,
-never pass the body as a `-f`/`-F` field value.** `gh api`'s `-f key=value` (`--raw-field`) treats
-the value as a literal string, so `-f body=@file.md` sends the literal text `@file.md` rather than
-the file's contents (only `-F`/`--field` has the `@file`-reads-from-file behaviour, and even that
-still needs correct JSON escaping for a body containing quotes or backticks, which `--input`
-handles for free):
+**When editing a body through the REST API directly — a stopgap on a `gh` you can't upgrade, or for
+scripting comments — build the JSON payload with `jq --rawfile` and pipe it through `--input`, never
+pass the body as a `-f`/`-F` field value.** `gh api`'s `-f key=value` (`--raw-field`) treats the
+value as a literal string, so `-f body=@file.md` sends the literal text `@file.md` rather than the
+file's contents (only `-F`/`--field` has the `@file`-reads-from-file behaviour, and even that still
+needs correct JSON escaping for a body containing quotes or backticks, which `--input` handles for
+free):
 
 ```bash
 jq -n --rawfile body /tmp/pr_body.md '{body: $body}' \
   | gh api repos/OWNER/REPO/pulls/<N> -X PATCH --input - --silent
 ```
 
-The same pattern PATCHes an issue body (`issues/<N>`) or posts a comment
-(`issues/<N>/comments`, which also works for PR comments).
+The same pattern PATCHes an issue body (`issues/<N>`) or posts a comment (`issues/<N>/comments`,
+which also works for PR comments).
 
 ## Open every GitHub body with the attribution line
 
-**Every issue, PR, and comment body Claude writes opens with the attribution line —
-`🤖 Generated with [Claude Code](https://claude.com/claude-code)` — as its first line, before any
-other content.** This repo convention takes the line from wherever a session's own environment
-instructions would otherwise place it (commonly the end of a PR description) and puts it first
-instead, so a reader skimming a long issue thread or a wave-tracking comment sees the automated
-origin before reading a word of the content. It is separate from the commit-message trailer
-(`Co-Authored-By: Claude ... <noreply@anthropic.com>`), which stays on commits only and keeps its
-usual placement at the end of the message. `plan-wave`'s epic-ledger comment already follows this.
+**Every issue, PR, and comment body Claude writes opens with the attribution line — `🤖 Generated
+with [Claude Code](https://claude.com/claude-code)` — as its first line, before any other content.**
+This repo convention takes the line from wherever a session's own environment instructions would
+otherwise place it (commonly the end of a PR description) and puts it first instead, so a reader
+skimming a long issue thread or a wave-tracking comment sees the automated origin before reading a
+word of the content. It is separate from the commit-message trailer (`Co-Authored-By: Claude ...
+<noreply@anthropic.com>`), which stays on commits only and keeps its usual placement at the end of
+the message. `plan-wave`'s epic-ledger comment already follows this.
 
 ## Never hard-wrap a GitHub body or comment
 
-**Write one line per paragraph. No hard wraps, at any width.** This applies to every issue body,
-PR body, issue comment, PR comment and review comment — everything posted to GitHub rather than
+**Write one line per paragraph. No hard wraps, at any width.** This applies to every issue body, PR
+body, issue comment, PR comment and review comment — everything posted to GitHub rather than
 committed to the repo. Blank lines still separate paragraphs, and list items still get their own
 line; it is only wrapping *within* a paragraph that is forbidden.
 
-GitHub renders comment-shaped content with hard line breaks turned on, so a single newline inside
-a paragraph becomes a literal `<br>`. Repo `.md` files are rendered without that setting, which is
-why the same wrapping is correct there and wrong here. GitHub's own API shows the two renderers
+GitHub renders comment-shaped content with hard line breaks turned on, so a single newline inside a
+paragraph becomes a literal `<br>`. Repo `.md` files are rendered without that setting, which is why
+the same wrapping is correct there and wrong here. GitHub's own API shows the two renderers
 disagreeing on identical input:
 
 ```bash
 printf '{"text":"line one\\nline two","mode":"gfm"}' | gh api /markdown --input -
 ```
 
-`mode=gfm` (the issue/PR/comment renderer) returns `<p>line one<br>\nline two</p>`;
-`mode=markdown` (the repo-file renderer) returns `<p>line one\nline two</p>` with no `<br>`. A body
-wrapped at this repo's 100-character prose width therefore reaches a reviewer as a ragged block of
-forced breaks, one per source line.
+`mode=gfm` (the issue/PR/comment renderer) returns `<p>line one<br>\nline two</p>`; `mode=markdown`
+(the repo-file renderer) returns `<p>line one\nline two</p>` with no `<br>`. A body wrapped at this
+repo's 100-character prose width therefore reaches a reviewer as a ragged block of forced breaks,
+one per source line.
 
-**The trap is the draft file, not the typing.** A long body wants to be written to a file and
-passed with `gh pr create --body-file`, and a draft written *inside the repo* gets reflowed to the
-house line length by the markdown linter or by habit — at which point the wrapping is baked in
-before the body is ever posted. Write the draft to the session scratchpad directory instead, where
-no linter touches it, and pass that path to `--body-file`. Never commit a body draft.
+**The trap is the draft file, not the typing.** A long body wants to be written to a file and passed
+with `gh pr create --body-file`, and a draft written *inside the repo* gets reflowed to the house
+line length by the markdown linter or by habit — at which point the wrapping is baked in before the
+body is ever posted. Write the draft to the session scratchpad directory instead, where no linter
+touches it, and pass that path to `--body-file`. Never commit a body draft.
 
 ## Merging pull requests
 
-Never squash-merge. We keep the full commit history in `main`, so use a merge commit
-(`gh pr merge --merge`) or rebase (`gh pr merge --rebase`), not `gh pr merge --squash`. Under the
+Never squash-merge. We keep the full commit history in `main`, so use a merge commit (`gh pr merge
+--merge`) or rebase (`gh pr merge --rebase`), not `gh pr merge --squash`. Under the
 `implement-issue` routine you stop for human review rather than merging at all.
 
-**Wait for the head commit's `ci` check to finish before merging — don't merge in the same breath
-as a push.** `main`'s branch ruleset requires the `ci` GitHub Actions check to pass, and that check
+**Wait for the head commit's `ci` check to finish before merging — don't merge in the same breath as
+a push.** `main`'s branch ruleset requires the `ci` GitHub Actions check to pass, and that check
 takes roughly two minutes to run on a fresh commit. Calling `gh pr merge` immediately after `git
 push` races that run: if `ci` hasn't completed yet, `gh pr merge` fails with `is not mergeable: the
 base branch policy prohibits the merge`, which reads like a permanent block but means only "a
@@ -148,9 +147,9 @@ git log origin/main..HEAD --format='%B' | grep -inE "$KW"
 ```
 
 The word boundaries are load-bearing: without them `openclimatefix` matches on its own trailing
-"fix", so every body carrying a GitHub URL near a `#number` looks like a hit, and a guard that
-fires on every PR stops being read. They cost nothing in coverage — every keyword GitHub honours
-is a standalone word.
+"fix", so every body carrying a GitHub URL near a `#number` looks like a hit, and a guard that fires
+on every PR stops being read. They cost nothing in coverage — every keyword GitHub honours is a
+standalone word.
 
 **`closingIssuesReferences` proves nothing before the merge.** It stays `[]` right up to the point
 the merge lands and only then fills in. A PR body reading "tracked in issue \#593, which this does
@@ -158,9 +157,9 @@ not close" reported `[]` when checked minutes before merging, registered a closi
 and closed 593. Commit-message keywords are invisible to the field for the same reason. Treat an
 empty result as no evidence at all.
 
-**Word order does not save you, and neither does a negation.** GitHub matches the keyword whether
-it falls before or after the reference, and it ignores the "not": both `closes #512` and "#512,
-which this does not close" register the link. Prose *about* a closure counts too — "Merging #514
+**Word order does not save you, and neither does a negation.** GitHub matches the keyword whether it
+falls before or after the reference, and it ignores the "not": both `closes #512` and "#512, which
+this does not close" register the link. Prose *about* a closure counts too — "Merging #514
 closed #512" in a commit message closes 512. When writing about an issue the PR leaves open, keep
 close, fix and resolve out of the sentence entirely. "Tracked separately in #512" and "issue #512
 stays open" are safe; anything pairing the word with the number is not.
@@ -168,11 +167,10 @@ stays open" are safe; anything pairing the word with the number is not.
 **The link is sticky once registered.** GitHub records it when the text containing the keyword is
 first saved and does not drop it when the text is edited away, so a body that now reads "filed
 rather than fixed, see \#512" can still hold a closing link from an early draft. A link you did not
-intend cannot be edited out — close the PR and open it again from the same branch with a clean
-body.
+intend cannot be edited out — close the PR and open it again from the same branch with a clean body.
 
-**Check every issue the PR mentioned once the merge lands.** The pre-merge checks tell you about
-the text, not about what GitHub decided to do with it.
+**Check every issue the PR mentioned once the merge lands.** The pre-merge checks tell you about the
+text, not about what GitHub decided to do with it.
 
 **Don't pass `--delete-branch`.** The repo has `delete_branch_on_merge` turned on, so GitHub deletes
 the head branch on merge by itself. The flag only adds a *local* branch deletion, and that step
@@ -184,13 +182,13 @@ failed to run git: fatal: 'main' is already used by worktree at '/home/jack/dev/
 ```
 
 The merge has already gone through by then. **A non-zero exit from `gh pr merge` does not mean the
-merge failed**, so confirm the outcome rather than retrying the command or reporting a failure:
-`gh pr view <N> --json state,mergeCommit` and the issue's own state say what actually landed.
-Delete the local branch afterwards, from a worktree that is not sitting on it.
+merge failed**, so confirm the outcome rather than retrying the command or reporting a failure: `gh
+pr view <N> --json state,mergeCommit` and the issue's own state say what actually landed. Delete the
+local branch afterwards, from a worktree that is not sitting on it.
 
 When something is closed that should not have been: `gh issue reopen <N>`, then put its project
-Status back explicitly. The board automation moves a closed issue to Done, and reopening lands it
-on In Progress rather than Todo — see the `github-graphql` skill for `gh project item-edit`.
+Status back explicitly. The board automation moves a closed issue to Done, and reopening lands it on
+In Progress rather than Todo — see the `github-graphql` skill for `gh project item-edit`.
 
 ## GraphQL calls
 
@@ -204,8 +202,8 @@ When a PR lands a roadmap item, that PR (or an immediate follow-up) must also:
 
 1. Promote surviving design decisions to their permanent home (`docs/architecture/`,
    `docs/ml_experimentation/`, …).
-2. Delete the item's "Implementation details" section (and any `plans/` file), pasting it (or
-   a summary) into the PR body. When a roadmap page's last 🚧 item ships, delete the page
-   (nav entry, inbound doc links).
-3. Close the GitHub issue; update the status banner on the roadmap page (and the milestone
-   section in `docs/roadmap/index.md` if the arc changed).
+2. Delete the item's "Implementation details" section (and any `plans/` file), pasting it (or a
+   summary) into the PR body. When a roadmap page's last 🚧 item ships, delete the page (nav entry,
+   inbound doc links).
+3. Close the GitHub issue; update the status banner on the roadmap page (and the milestone section
+   in `docs/roadmap/index.md` if the arc changed).

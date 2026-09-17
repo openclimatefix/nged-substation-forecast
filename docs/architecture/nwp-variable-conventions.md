@@ -2,8 +2,8 @@
 
 This page says how to read a value out of the `nwp` Delta table, and what the feature pipeline does
 to it on the way to the model. Every ECMWF ENS variable we store is listed with the convention that
-governs it: some values describe an instant, some describe the 3 or 6 hours before that instant,
-and two are angles that wrap.
+governs it: some values describe an instant, some describe the 3 or 6 hours before that instant, and
+two are angles that wrap.
 
 Everything here is a choice this project made, so a defect described on this page is a reason to
 change our code. Damage the data arrives with is the separate subject of [Known ECMWF ENS
@@ -21,9 +21,9 @@ identical in every run in the archive:
 | 3 h | 3 h → 144 h | 48 |
 | 6 h | 150 h → 360 h | 36 |
 
-The change at **144 h — 6 days** matters most, because the primary user band is 3–10 days
-([XGBoost improvements](../roadmap/xgboost-improvements.md)), so days 6 to 10 of that band sit on
-the coarse half of the grid.
+The change at **144 h — 6 days** matters most, because the primary user band is 3–10 days ([XGBoost
+improvements](../roadmap/xgboost-improvements.md)), so days 6 to 10 of that band sit on the coarse
+half of the grid.
 
 ## The three axes
 
@@ -63,10 +63,10 @@ area-weighted mode rather than averaged, and forward-filled rather than interpol
 It appears to be instantaneous. The three period-ending variables are 100 % null at lead 0, because
 there is no preceding interval for them to average; `categorical_precipitation_type_surface` is
 fully populated there. That is good evidence but not proof, since a period field could in principle
-be published at lead 0 anyway, so confirm against
-[ECMWF's parameter database entry](https://codes.ecmwf.int/grib/param-db/260015) before relying on
-its timing. If it did describe the preceding interval, forward-filling it would attribute one
-interval's precipitation type to the following one.
+be published at lead 0 anyway, so confirm against [ECMWF's parameter database
+entry](https://codes.ecmwf.int/grib/param-db/260015) before relying on its timing. If it did
+describe the preceding interval, forward-filling it would attribute one interval's precipitation
+type to the following one.
 
 ## Every variable, and how to read it
 
@@ -112,15 +112,14 @@ definition is the root of two of the three defects below: it silently classifies
 rate and a wrapped angle as things that may be linearly interpolated between their `valid_time`
 stamps.
 
-Repairing all three is scheduled as the first work in v0.5 — see
-[Before anything
+Repairing all three is scheduled as the first work in v0.5 — see [Before anything
 else](../roadmap/xgboost-improvements.md#before-anything-else-fix-how-the-nwp-variables-are-interpreted).
 Until that lands, the behaviour described below is what the pipeline does.
 
 ### Wind direction is interpolated across the 0°/360° wrap
 
-Interpolating 350° → 10° yields 180°: due south for a northerly wind. Measured on the 2026-08-10
-00Z run, over every consecutive native-step pair:
+Interpolating 350° → 10° yields 180°: due south for a northerly wind. Measured on the 2026-08-10 00Z
+run, over every consecutive native-step pair:
 
 | step width | pairs straddling north (`_10m`) | pairs straddling north (`_100m`) |
 |---|---|---|
@@ -129,10 +128,9 @@ Interpolating 350° → 10° yields 180°: due south for a northerly wind. Measu
 
 Inside a straddling interval the error grows linearly with distance from the first step: at fraction
 $t$ of the way across, the interpolated value is $360t$ degrees from the truth as a circular
-distance. A straddling
-3-hourly interval therefore holds five interpolated rows wrong by 60°, 120°, 180°, 120° and 60°.
-Only the midpoint is a full reversal; the mean error across the interval is **108°** at 3-hourly
-spacing and **98°** at 6-hourly.
+distance. A straddling 3-hourly interval therefore holds five interpolated rows wrong by 60°, 120°,
+180°, 120° and 60°. Only the midpoint is a full reversal; the mean error across the interval is
+**108°** at 3-hourly spacing and **98°** at 6-hourly.
 
 Across the whole horizon that affects **6.57 %** of interpolated `wind_direction_10m` rows and
 **6.32 %** of `wind_direction_100m` rows — 5.80 % and 5.58 % of all half-hourly rows, since the
@@ -214,9 +212,9 @@ re-ingesting. The size of the gap has not been measured.
 information, so this is mostly a storage question. The one behavioural consequence is that speed
 becomes derived after interpolation, which changes its values slightly. Round-tripping speed and
 direction to components and back, with the components rounded to the [13-bit
-significand](../api/delta_store/index.md) the table stores, costs at most
-6.8 × 10⁻³ ° of direction and 2.4 × 10⁻³ m s⁻¹ of speed over a full run — the same order as the
-rounding the table already applies, and far below anything a forecast responds to.
+significand](../api/delta_store/index.md) the table stores, costs at most 6.8 × 10⁻³ ° of direction
+and 2.4 × 10⁻³ m s⁻¹ of speed over a full run — the same order as the rounding the table already
+applies, and far below anything a forecast responds to.
 
 Written through the production path (same significand rounding, sort order, and writer properties),
 the full column set both ways:
@@ -236,5 +234,5 @@ many distinct values after rounding. It is the same mechanism that makes `BYTE_S
 this table.
 
 Whether to accept that 6 % in exchange for making the wrap defect structurally impossible is being
-decided in
-[Store wind as u/v components](../roadmap/xgboost-improvements.md#store-wind-as-uv-components-rather-than-speed-and-direction).
+decided in [Store wind as u/v
+components](../roadmap/xgboost-improvements.md#store-wind-as-uv-components-rather-than-speed-and-direction).

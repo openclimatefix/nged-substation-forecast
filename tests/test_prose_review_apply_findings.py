@@ -40,8 +40,8 @@ def _load_script() -> ModuleType:
 
 apply_findings = _load_script()
 
-WRAP_WIDTH: Final[int] = 95
-"""The width the fixtures below are wrapped at, inside the script's own 88-to-104 search range."""
+WRAP_WIDTH: Final[int] = apply_findings.WIDTH
+"""The width the fixtures below are wrapped at, matching the script's own canonical width."""
 
 MARKUP_COUNTS: Final[tuple[str, ...]] = ("**", "`", "[", "](")
 """The markers whose count a splice must never change, as `check_structure.py` counts them."""

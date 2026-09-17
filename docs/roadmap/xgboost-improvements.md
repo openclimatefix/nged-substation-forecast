@@ -1,10 +1,10 @@
 # XGBoost improvements ("quick wins")
 
 > **Status: 🚧 Planned (v0.5).** Epic:
-> [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145); the Tier-1
-> quick wins are [#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230).
-> The live service is running ([Live service](live-service.md), now on v0.2); forecast-quality
-> work follows once v0.3 and v0.4 land.
+> [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145); the Tier-1 quick
+> wins are [#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230). The live
+> service is running ([Live service](live-service.md), now on v0.2); forecast-quality work follows
+> once v0.3 and v0.4 land.
 
 Quick wins to make XGBoost a strong baseline before the advanced approaches land — explicitly *not*
 deep ML work ("little point in spending ages on the ML model before we have good capacity
@@ -58,13 +58,14 @@ optimistic end of the range.
 **A limit worth knowing before you rely on NaN handling.** XGBoost's NaN routing only covers the
 missingness patterns present in the training data. Two consequences for the wins below: a model
 trained with NWP features does **not** behave like a weather-blind model when NWP vanishes (beating
-the manual heuristic during an outage needs outage-shaped training data, not NaN routing), and the nulls
-the de-accumulated ECMWF variables carry are the one case the guarantee genuinely covers. Full
+the manual heuristic during an outage needs outage-shaped training data, not NaN routing), and the
+nulls the de-accumulated ECMWF variables carry are the one case the guarantee genuinely covers. Full
 argument: [Inherent Stability → Default directions, and their
 limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
 
 **The null-covered case is narrower than it sounds, because most nulls never reach the model as
-nulls at all.** Only *leading and trailing* nulls reach the model as nulls: `_upsample_nwp_to_half_hourly` already interpolates interior ones away (see [the null-filling
+nulls at all.** Only *leading and trailing* nulls reach the model as nulls:
+`_upsample_nwp_to_half_hourly` already interpolates interior ones away (see [the null-filling
 item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)), and the scattered
 per-pixel corruption mostly never becomes a null in the first place, because the ingest renormalises
 each H3 cell over the grid points that arrived.
@@ -234,8 +235,9 @@ before it — so the work ends with an attribution per change rather than one nu
 1. **u/v storage**, with the resample interpolating components. Subsumes defect (a).
 2. **Clear-sky-index resample** for the two radiation variables. Defect (b).
 3. **Shape-preserving interpolation** of the instantaneous variables. Defect (c).
-4. **Raw `u`/`v` as model features**, replacing `wind_direction_*` in `selected_features` — see
-   [the feature-representation experiment](#raw-uv-components-as-features-instead-of-speed-and-direction).
+4. **Raw `u`/`v` as model features**, replacing `wind_direction_*` in `selected_features` — see [the
+   feature-representation
+   experiment](#raw-uv-components-as-features-instead-of-speed-and-direction).
 
 Headline NMAE sliced by horizon and `time_series_type` as everywhere else on this page, with the
 3–10 day band as the headline slice — arms 2 and 3 are concentrated beyond day 6 by construction and
@@ -309,8 +311,8 @@ columns sit beside it in `selected_features`.
 
 Arms worth running: speed + direction (today), `u` + `v`, `u` + `v` + derived speed, and speed +
 `sin`/`cos` of direction. The third is the arm to beat — a booster given both the components and the
-magnitude has to synthesise nothing — and the fourth is the low-effort control that separates "the wrap
-was the problem" from "the Cartesian form was the problem". Expect the win in the wind
+magnitude has to synthesise nothing — and the fourth is the low-effort control that separates "the
+wrap was the problem" from "the Cartesian form was the problem". Expect the win in the wind
 `time_series_type` slice, and pair with the [per-`time_series_type` feature
 lists](#per-time_series_type-feature-lists).
 
@@ -334,9 +336,9 @@ holiday flags at the lag time once the holiday and calendar features land), so a
 the only genuinely new information.
 
 **In principle the booster can then judge how *normal* each lagged power value is — exactly the
-anomaly signal the residual-lag features compute explicitly.** A lagged power value is normal or
-not relative to what the weather at that lagged time would predict. That
-judgement is exactly the anomaly signal that [the residual-lag
+anomaly signal the residual-lag features compute explicitly.** A lagged power value is normal or not
+relative to what the weather at that lagged time would predict. That judgement is exactly the
+anomaly signal that [the residual-lag
 features](#residual-lag-features-from-the-switching-detector-baseline) engineers explicitly with a
 two-stage residual pipeline (the [full
 design](switching-events.md#approach-1-the-two-stage-forecaster) lives on the switching-events
@@ -346,48 +348,48 @@ the low-effort way to start answering it.
 
 **Pros, relative to the two-stage residual pipeline:**
 
-- **Almost no extra work.** A config change: no two-pass pipeline, no per-fold baseline training. (One
-  caveat is shared rather than avoided: lagged weather at past target times rides the same
+- **Almost no extra work.** A config change: no two-pass pipeline, no per-fold baseline training.
+  (One caveat is shared rather than avoided: lagged weather at past target times rides the same
   freshest-NWP-run join as the residual-lag hindcasts — a join with no publication-time cut,
-  leak-free today only as a side effect of daily run cadence — so the availability cut planned
-  in [#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356) hardens this
-  item and the residual-lag features alike.)
+  leak-free today only as a side effect of daily run cadence — so the availability cut planned in
+  [#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356) hardens this item
+  and the residual-lag features alike.)
 - **No fold-hygiene leakage risk.** The two-stage design's subtlest failure mode — a baseline
-  trained on data that overlaps the evaluation fold — cannot occur, because there is no
-  baseline model.
-- **End-to-end optimisation.** The booster extracts whatever notion of "anomaly" actually helps the forecast
-  objective, rather than the notion a residual definition pre-commits to (median residual, a
-  particular normalisation); no stage-1 bias is frozen into a feature.
+  trained on data that overlaps the evaluation fold — cannot occur, because there is no baseline
+  model.
+- **End-to-end optimisation.** The booster extracts whatever notion of "anomaly" actually helps the
+  forecast objective, rather than the notion a residual definition pre-commits to (median residual,
+  a particular normalisation); no stage-1 bias is frozen into a feature.
 
 **Cons — why we expect it to learn a much cruder "how normal is this lag" signal:**
 
-- **Trees are structurally bad at subtraction.** XGBoost splits axis-parallel on single
-  features, and differences or ratios of continuous inputs are notoriously hard for trees to
-  represent. Using "power relative to expectation" here means approximating the whole
-  weather → power baseline *inside interactions with* the lagged power — the hard kind of structure for a gradient-boosted tree to learn — whereas the two-stage residual hands the model that
-  comparison precomputed as a single number.
-- **The per-series data regime is small.** One booster per series sees on the order of
-  10⁴–10⁵ training rows — not the regime in which a tree ensemble reliably discovers a
-  multi-variable implicit baseline within interactions.
-- **The training signal for the implicit baseline is weak.** The two-stage design learns
-  weather → power as a direct regression — every training row's target is the power concurrent
-  with the weather input. Here the same function must be learned only through its indirect
-  effect on predicting *future* power, where the anomaly signal matters strongly on only the
-  ~10% of switching-affected rows.
+- **Trees are structurally bad at subtraction.** XGBoost splits axis-parallel on single features,
+  and differences or ratios of continuous inputs are notoriously hard for trees to represent. Using
+  "power relative to expectation" here means approximating the whole weather → power baseline
+  *inside interactions with* the lagged power — the hard kind of structure for a gradient-boosted
+  tree to learn — whereas the two-stage residual hands the model that comparison precomputed as a
+  single number.
+- **The per-series data regime is small.** One booster per series sees on the order of 10⁴–10⁵
+  training rows — not the regime in which a tree ensemble reliably discovers a multi-variable
+  implicit baseline within interactions.
+- **The training signal for the implicit baseline is weak.** The two-stage design learns weather →
+  power as a direct regression — every training row's target is the power concurrent with the
+  weather input. Here the same function must be learned only through its indirect effect on
+  predicting *future* power, where the anomaly signal matters strongly on only the ~10% of
+  switching-affected rows.
 - **Feature-count explosion — worst for neighbours.** Each power lag brings roughly a dozen aligned
   weather columns. That is tolerable for the self-series, but the conservation fingerprint that the
   residual-lag features' neighbour variant targets would need each *neighbour's* lagged power plus
   each neighbour's lagged weather (a different H3 cell per neighbour), per neighbour — an order of
   magnitude more columns diluting split gain on small per-series datasets. The two-stage design
-  collapses every neighbour to one normalised residual, or the
-  whole neighbourhood to a single sum.
+  collapses every neighbour to one normalised residual, or the whole neighbourhood to a single sum.
 - **No normalisation comes for nothing.** The two-stage baseline's quantile spread expresses each
-  residual in units of that series' usual wobble at that kind of moment; the single-stage model
-  must learn that heteroscedasticity implicitly as well.
-- **No reusable artifact.** The two-stage baseline *is* the v0.6 switching-detector baseline —
-  the same fitted model feeds the changepoint detector, the sensitivity floor, and the residual
-  features. This variant produces nothing inspectable: no residual series to plot, changepoint,
-  or hand to the detector; its notion of normality is buried in split structure.
+  residual in units of that series' usual wobble at that kind of moment; the single-stage model must
+  learn that heteroscedasticity implicitly as well.
+- **No reusable artifact.** The two-stage baseline *is* the v0.6 switching-detector baseline — the
+  same fitted model feeds the changepoint detector, the sensitivity floor, and the residual
+  features. This variant produces nothing inspectable: no residual series to plot, changepoint, or
+  hand to the detector; its notion of normality is buried in split structure.
 
 **Sequencing: run this before the residual-lag features, as their ablation control.** Its measured
 result bounds how much anomaly signal a tabular learner extracts *unaided*, so the residual-lag
@@ -426,15 +428,15 @@ precomputed.
 delta is only meaningful on a variable that is roughly linear in the generation it stands for:
 
 - **PV.** A raw GHI delta is a serviceable start (the PV proxy is nearly linear in GHI), so a PV
-  variant can run using irradiance directly. The
-  [simplified PV power proxy](#linearised-physics-features-for-solar-and-wind) sharpens it —
-  especially across the clear-sky-index-interpolated sunrise/sunset ramps and the cell-temperature
-  derate — so the proxy delta is the better feature once that item lands.
+  variant can run using irradiance directly. The [simplified PV power
+  proxy](#linearised-physics-features-for-solar-and-wind) sharpens it — especially across the
+  clear-sky-index-interpolated sunrise/sunset ramps and the cell-temperature derate — so the proxy
+  delta is the better feature once that item lands.
 - **Wind.** A raw wind-*speed* delta is actively misleading, because the power curve is cubic then
   flat: equal speed deltas at 5 m/s and at 15 m/s mean wildly different power deltas. The wind
-  variant must take its delta on the
-  [farm-level power-curve proxy](#linearised-physics-features-for-solar-and-wind), not on speed,
-  and therefore waits for that proxy.
+  variant must take its delta on the [farm-level power-curve
+  proxy](#linearised-physics-features-for-solar-and-wind), not on speed, and therefore waits for
+  that proxy.
 
 **Where the weather-delta compensation is weaker than the two-stage residual.** It only compensates
 for the *weather-linear* component: nonlinear, asymmetric temperature-driven demand response and all
@@ -460,10 +462,10 @@ tool](https://github.com/openclimatefix/nged-substation-forecast/issues/359).
 **Sequencing.** This is a new arm in the aligned-weather → residual-lag ablation ladder: (a) aligned
 raw lagged weather, (b) these proxy deltas, (c) full two-stage residuals. Arm (b) minus arm (a)
 measures what the precomputed subtraction is worth; if it captures most of arm (c)'s gain on
-non-switching rows, that is a low-effort and important discovery to make before the two-pass baseline
-machinery is built. It is slightly more than the pure config of aligned weather — a derived delta
-column in `_parsed_features.py`, in the mould of the existing derived features — so it sits at the
-bottom of Tier 1. The PV variant can run now on a raw GHI delta; the wind variant waits on the
+non-switching rows, that is a low-effort and important discovery to make before the two-pass
+baseline machinery is built. It is slightly more than the pure config of aligned weather — a derived
+delta column in `_parsed_features.py`, in the mould of the existing derived features — so it sits at
+the bottom of Tier 1. The PV variant can run now on a raw GHI delta; the wind variant waits on the
 [solar/wind physics proxies](#linearised-physics-features-for-solar-and-wind).
 
 ### Log feature importances for every trained model
@@ -471,15 +473,14 @@ bottom of Tier 1. The PV variant can run now on a raw GHI delta; the wind varian
 Every model this project trains during cross-validation — one XGBoost `Booster` per
 `time_series_id`, for every fold — should have its feature importances
 (`Booster.get_score(importance_type="gain")`) logged to the MLflow run already created for that
-fold. The cost is a few lines and a dictionary of floats per booster, with no new training step.
-The diagnostic value shows up the first time a booster's feature ranking looks wrong, when the
-current tooling has nothing to point at. Feature attributions are exactly the diagnostic the
-Energy Systems Catapult [DNO Forecasting
-Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/) names under its "Explainability"
-characteristic, for supporting operator trust and reducing "black box" risk. Logging feature
-importances this way is a lightweight, per-fold habit, distinct from the detailed model cards
-deferred until [after v2 ships](index.md#model-cards-for-promoted-models) for models actually
-promoted to production.
+fold. The cost is a few lines and a dictionary of floats per booster, with no new training step. The
+diagnostic value shows up the first time a booster's feature ranking looks wrong, when the current
+tooling has nothing to point at. Feature attributions are exactly the diagnostic the Energy Systems
+Catapult [DNO Forecasting Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/) names
+under its "Explainability" characteristic, for supporting operator trust and reducing "black box"
+risk. Logging feature importances this way is a lightweight, per-fold habit, distinct from the
+detailed model cards deferred until [after v2 ships](index.md#model-cards-for-promoted-models) for
+models actually promoted to production.
 
 ## Tier 2 — low-effort feature engineering (about a day each)
 
@@ -508,9 +509,9 @@ PV, turbine features for wind, holidays for demand).
 
 Full data cleaning is roadmap v0.4, but training on stuck meters and false zeros actively teaches
 the model wrong targets *today* (quality issues affect roughly 10% or more of some series).
-Low-effort interim: drop training rows whose target sits inside a detected stuck window (rolling std ≈ 0) or an isolated
-exact-zero run. Cleaning only the *training* target is much lower-risk than cleaning delivered data,
-and it protects every subsequent experiment from learning artefacts.
+Low-effort interim: drop training rows whose target sits inside a detected stuck window (rolling std
+≈ 0) or an isolated exact-zero run. Cleaning only the *training* target is much lower-risk than
+cleaning delivered data, and it protects every subsequent experiment from learning artefacts.
 
 ### Effective (smoothed) temperature and degree-day features
 
@@ -558,48 +559,45 @@ has of it is that the half-hourly irradiance columns are already sharp by the ti
 
 **(c) Derived features, computed from the upsampled columns:**
 
-- **Clear-sky index** $k_c = \mathrm{GHI} / \mathrm{GHI}_{\text{cs}}$ — the single most
-  informative derived solar feature. Null it when solar elevation is below ~5–10° (the ratio
-  blows up near the horizon) and clip to roughly $[0, 1.2]$ — cloud enhancement genuinely lifts it a
-  little above 1, so the clip belongs above 1 rather than at it. **The denominator must be the
-  clear-sky *mean over the same half-hour* that the numerator averages**, not the instantaneous
-  clear-sky value at `valid_time` — the same requirement stage (b) carries, and it applies here
-  independently, because this is a feature rather than a resampling step. Plotting the upper tail is a quick check that it was built right: a few tens of percent above 1 is real cloud enhancement,
-  while values near 2 mean the denominator is wrong.
-- **Simplified PV power proxy** (PVWatts-style). Cell temperature from the Ross/NOCT
-  (Nominal Operating Cell Temperature) model, then a linear temperature derate:
+- **Clear-sky index** $k_c = \mathrm{GHI} / \mathrm{GHI}_{\text{cs}}$ — the single most informative
+  derived solar feature. Null it when solar elevation is below ~5–10° (the ratio blows up near the
+  horizon) and clip to roughly $[0, 1.2]$ — cloud enhancement genuinely lifts it a little above 1,
+  so the clip belongs above 1 rather than at it. **The denominator must be the clear-sky *mean over
+  the same half-hour* that the numerator averages**, not the instantaneous clear-sky value at
+  `valid_time` — the same requirement stage (b) carries, and it applies here independently, because
+  this is a feature rather than a resampling step. Plotting the upper tail is a quick check that it
+  was built right: a few tens of percent above 1 is real cloud enhancement, while values near 2 mean
+  the denominator is wrong.
+- **Simplified PV power proxy** (PVWatts-style). Cell temperature from the Ross/NOCT (Nominal
+  Operating Cell Temperature) model, then a linear temperature derate:
 
-    $$
-    T_{\text{cell}} = T_{2\text{m}} + k \, \mathrm{GHI},
-    \qquad k = \tfrac{\mathrm{NOCT} - 20\,°\mathrm{C}}{800\,\mathrm{W\,m^{-2}}} \approx 0.03
-    $$
+    $$ T_{\text{cell}} = T_{2\text{m}} + k \, \mathrm{GHI}, \qquad k = \tfrac{\mathrm{NOCT} -
+    20\,°\mathrm{C}}{800\,\mathrm{W\,m^{-2}}} \approx 0.03 $$
 
-    $$
-    P_{\text{pv}} \propto \mathrm{GHI} \, \bigl(1 + \gamma \, (T_{\text{cell}} - 25\,°\mathrm{C})\bigr),
-    \qquad \gamma \approx -0.004\,/°\mathrm{C}
-    $$
+    $$ P_{\text{pv}} \propto \mathrm{GHI} \, \bigl(1 + \gamma \, (T_{\text{cell}} -
+    25\,°\mathrm{C})\bigr), \qquad \gamma \approx -0.004\,/°\mathrm{C} $$
 
     i.e. one expression, `ghi * (1 - 0.004 * (t2m_celsius + 0.03 * ghi - 25))`, clipped at 0.
-    Deliberately capacity-free (per-series boosters learn the scale) and with no
-    tilt/orientation modelling — embedded PV behind a substation is an unknown mix of
-    orientations, and the booster can bend the proxy per series.
+    Deliberately capacity-free (per-series boosters learn the scale) and with no tilt/orientation
+    modelling — embedded PV behind a substation is an unknown mix of orientations, and the booster
+    can bend the proxy per series.
 
     This expression combines a period-ending GHI with an instantaneous temperature. Once stage (b)
     has landed that is a quarter-hour offset and immaterial to a cell-temperature model; before it,
-    it is a 3-hour offset beyond day 6. We state this so that nobody reintroduces the larger
-    version by deriving the proxy from un-resampled inputs.
+    it is a 3-hour offset beyond day 6. We state this so that nobody reintroduces the larger version
+    by deriving the proxy from un-resampled inputs.
 
-- **Wind power curve**: 100 m wind speed through a generic *farm-level* power curve — either
-  a piecewise form (zero below cut-in ~3 m/s, normalised cubic ramp
-  $(v^3 - v_{ci}^3)/(v_r^3 - v_{ci}^3)$ to rated ~12–14 m/s, flat to cut-out ~25 m/s, zero
-  above) or a logistic sigmoid **masked to zero above cut-out** (an unmasked logistic is
-  actively wrong in storms — precisely when NGED cares). Exact shape matters less than it
-  looks: farm-level curves are smoother than single-turbine ones (aggregation, wakes,
-  hub-height spread), the booster monotonically re-bends the ramp anyway, and raw
-  `wind_speed_100m` stays in the feature list. What the proxy must get right is the
-  saturation at rated and the two dead zones — the parts trees can't build from raw speed.
-  (Large errors in the steep ramp region are dominated by NWP speed error amplified by the
-  physics' own $dP/dv$ — no closed form removes that; training on more ensemble members is what addresses it.)
+- **Wind power curve**: 100 m wind speed through a generic *farm-level* power curve — either a
+  piecewise form (zero below cut-in ~3 m/s, normalised cubic ramp $(v^3 - v_{ci}^3)/(v_r^3 -
+  v_{ci}^3)$ to rated ~12–14 m/s, flat to cut-out ~25 m/s, zero above) or a logistic sigmoid
+  **masked to zero above cut-out** (an unmasked logistic is actively wrong in storms — precisely
+  when NGED cares). Exact shape matters less than it looks: farm-level curves are smoother than
+  single-turbine ones (aggregation, wakes, hub-height spread), the booster monotonically re-bends
+  the ramp anyway, and raw `wind_speed_100m` stays in the feature list. What the proxy must get
+  right is the saturation at rated and the two dead zones — the parts trees can't build from raw
+  speed. (Large errors in the steep ramp region are dominated by NWP speed error amplified by the
+  physics' own $dP/dv$ — no closed form removes that; training on more ensemble members is what
+  addresses it.)
 
 Implement stage (c) as derived-feature names in `_parsed_features.py` — same pattern as the existing
 `windchill` feature. That pattern gives the correct order of operations with no extra work:
@@ -639,19 +637,18 @@ solar/wind physics features exist.
 ### BMRS day-ahead price as a feature
 
 The trial population includes a battery, a gas generator, and a biofuel plant behind one set of
-primaries ([several estimators, one winner](capacity-estimation.md#several-estimators-one-winner))
-— assets whose output responds to market price rather than to weather alone. No market signal
-reaches the model today, though the Energy Systems Catapult [DNO Forecasting
-Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/) names market signals as one of
-the standard forecast covariates in its use-case characteristics. The low-effort version: fetch
-the GB day-ahead wholesale price from the Balancing Mechanism Reporting Service (BMRS, run by
-Elexon), join it by settlement period, and add
-it as a feature for these `time_series_type`s — pairing naturally with the [per-`time_series_type`
-feature lists](#per-time_series_type-feature-lists) above, so the price feature need not pollute the
-demand and PV/wind lists. Adding the BMRS price this way is deliberately the cheap version:
-modelling *how* a distributed energy resource actually responds to price is a
-[differentiable-physics stretch goal well after v2](index.md#after-v21-research-advanced-ml), not
-this item.
+primaries ([several estimators, one winner](capacity-estimation.md#several-estimators-one-winner)) —
+assets whose output responds to market price rather than to weather alone. No market signal reaches
+the model today, though the Energy Systems Catapult [DNO Forecasting
+Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/) names market signals as one of the
+standard forecast covariates in its use-case characteristics. The low-effort version: fetch the GB
+day-ahead wholesale price from the Balancing Mechanism Reporting Service (BMRS, run by Elexon), join
+it by settlement period, and add it as a feature for these `time_series_type`s — pairing naturally
+with the [per-`time_series_type` feature lists](#per-time_series_type-feature-lists) above, so the
+price feature need not pollute the demand and PV/wind lists. Adding the BMRS price this way is
+deliberately the cheap version: modelling *how* a distributed energy resource actually responds to
+price is a [differentiable-physics stretch goal well after
+v2](index.md#after-v21-research-advanced-ml), not this item.
 
 ## Tier 3 — new feature machinery (days)
 
@@ -697,37 +694,36 @@ between a feature-based switching mainline and the staged detector — extra rea
 
 Four scheduling notes specific to this page, and one larger caveat that follows them:
 
-- **Run [aligned lagged weather](#aligned-lagged-weather-the-single-stage-ablation-control)
-  first.** The config-only single-stage variant — aligned lagged-weather features, letting the
-  booster judge each lag's normality without an explicit baseline — is this item's ablation
-  control: its measured result is the bar the residual features must clear for the two-stage
-  machinery to be worth building.
-- **The highest-value variant pairs with the init-time-anchored features.** Valid-time-anchored residual lags obey the
-  same nullification as raw power lags (any lag ≤ lead time is null), so in the 3–10 day band
-  only residuals several days old survive — while the freshest, most informative residual is the
-  residual from just before forecast time. The strongest form is therefore *init-time-anchored*
-  residual features ("normalised residual just before forecast time", "mean residual over the
-  24 h before forecast time") — never null at any horizon, and carrying exactly the anomaly
-  signal that the init-time-anchored features' raw anchors mix in with ordinary weather-driven level variation. The
-  same anchoring extends to the threshold-free *event-age* accumulators from the full design
-  (residual EWMAs at a few half-lives, or a self-resetting CUSUM (cumulative sum) statistic):
-  "how long has this series been abnormal" with no hand-coded normality threshold, because trees
-  learn their own cutpoints from continuous accumulators.
+- **Run [aligned lagged weather](#aligned-lagged-weather-the-single-stage-ablation-control) first.**
+  The config-only single-stage variant — aligned lagged-weather features, letting the booster judge
+  each lag's normality without an explicit baseline — is this item's ablation control: its measured
+  result is the bar the residual features must clear for the two-stage machinery to be worth
+  building.
+- **The highest-value variant pairs with the init-time-anchored features.** Valid-time-anchored
+  residual lags obey the same nullification as raw power lags (any lag ≤ lead time is null), so in
+  the 3–10 day band only residuals several days old survive — while the freshest, most informative
+  residual is the residual from just before forecast time. The strongest form is therefore
+  *init-time-anchored* residual features ("normalised residual just before forecast time", "mean
+  residual over the 24 h before forecast time") — never null at any horizon, and carrying exactly
+  the anomaly signal that the init-time-anchored features' raw anchors mix in with ordinary
+  weather-driven level variation. The same anchoring extends to the threshold-free *event-age*
+  accumulators from the full design (residual EWMAs at a few half-lives, or a self-resetting CUSUM
+  (cumulative sum) statistic): "how long has this series been abnormal" with no hand-coded normality
+  threshold, because trees learn their own cutpoints from continuous accumulators.
 - **Inspect every feature visually before it enters an experiment.** Residuals, event-age
   accumulators, and neighbour pools are easy to build subtly wrong (sign conventions, normalisation,
-  availability cuts) in ways the leaderboard will not surface; plot each of the three
-  against observed power — and the v1 switching-event labels — first. The planned
-  feature-visualisation tool
-  ([#359](https://github.com/openclimatefix/nged-substation-forecast/issues/359)) is the
-  vehicle.
+  availability cuts) in ways the leaderboard will not surface; plot each of the three against
+  observed power — and the v1 switching-event labels — first. The planned feature-visualisation tool
+  ([#359](https://github.com/openclimatefix/nged-substation-forecast/issues/359)) is the vehicle.
 - **A related variant reuses the same machinery to *correct a draft*, not only to supply residual
   lags.** The stage-1 baseline can be evaluated at the target time to make a first-draft forecast
-  that stage 2 then corrects — supplied either as an ordinary feature or as an XGBoost
-  `base_margin` — a design axis orthogonal to the residual lags (the lags concern what stage 2
-  receives; the draft, what it predicts and starts from) and low-effort to add once their per-fold out-of-sample hindcast machinery exists. The
-  [full treatment](switching-events.md#approach-1-the-two-stage-forecaster) — soft-vs-hard
-  corrector, the quantile subtlety, and why the low-variance correction target is a plausible route
-  to a *global* model — is on the switching-events page.
+  that stage 2 then corrects — supplied either as an ordinary feature or as an XGBoost `base_margin`
+  — a design axis orthogonal to the residual lags (the lags concern what stage 2 receives; the
+  draft, what it predicts and starts from) and low-effort to add once their per-fold out-of-sample
+  hindcast machinery exists. The [full
+  treatment](switching-events.md#approach-1-the-two-stage-forecaster) — soft-vs-hard corrector, the
+  quantile subtlety, and why the low-variance correction target is a plausible route to a *global*
+  model — is on the switching-events page.
 
 **It needs more than a config change.** The two-pass pipeline (fit the baseline per cross-validation
 (CV) fold on that fold's training period only; hindcast residuals over history, generating the
@@ -766,7 +762,8 @@ it the precomputed anomaly is legitimate inductive bias rather than information 
 
 **The weather-abnormality feature sits at the end of Tier 3 because its expected win is modest but
 its data-ingestion dependency is new.** The expected win is modest (see below) yet the feature
-carries a new data-ingestion dependency — far more effort per unit skill than the residual-lag features above it.
+carries a new data-ingestion dependency — far more effort per unit skill than the residual-lag
+features above it.
 
 **Is the anomaly the signal, or is the raw value?** For GB demand the first-order response is to
 *actual* (effective) temperature, which the Tier-2 [effective-temperature and degree-day
@@ -866,20 +863,20 @@ route](capacity-estimation.md#honest-caveats-of-the-convex-route)): that leaves 
 time-varying part for a feature to explain, and this is the low-effort XGBoost-era stand-in for the
 differentiable-physics treatment.
 
-- **Sustained-heat demand** — the largest case by *magnitude* for the v1 population, because most
-  of that population is demand. The Tier-2
-  [effective temperature](#effective-smoothed-temperature-and-degree-day-features) smooths over
-  roughly 1–3 days, which is building thermal inertia. A multi-week heat regime is a different
-  regime: acclimatisation, cooling equipment bought partway through a hot summer and then kept, and
-  ground and building-fabric temperatures that a 3-day EWM cannot represent.
+- **Sustained-heat demand** — the largest case by *magnitude* for the v1 population, because most of
+  that population is demand. The Tier-2 [effective
+  temperature](#effective-smoothed-temperature-and-degree-day-features) smooths over roughly 1–3
+  days, which is building thermal inertia. A multi-week heat regime is a different regime:
+  acclimatisation, cooling equipment bought partway through a hot summer and then kept, and ground
+  and building-fabric temperatures that a 3-day EWM cannot represent.
 - **Agricultural irrigation pumping.** Drought raises it, and the trial area sits in the EMids
-  licence area, which includes arable Lincolnshire. Treat that second clause as an assumption
-  rather than a finding: nothing in the metadata carries a land-use or customer-mix field, so it
-  needs confirming against NGED's own customer mix before anyone leans on it. Agricultural pumping is easier to model
-  on an electricity network whose agricultural feeders are segregated and run to a published
-  supply schedule, because a large unmetered load is then partly known in advance. GB offers no
-  such segregation, which is exactly why this stays an inference from weather rather than a
-  measured quantity.
+  licence area, which includes arable Lincolnshire. Treat that second clause as an assumption rather
+  than a finding: nothing in the metadata carries a land-use or customer-mix field, so it needs
+  confirming against NGED's own customer mix before anyone leans on it. Agricultural pumping is
+  easier to model on an electricity network whose agricultural feeders are segregated and run to a
+  published supply schedule, because a large unmetered load is then partly known in advance. GB
+  offers no such segregation, which is exactly why this stays an inference from weather rather than
+  a measured quantity.
 - **Hydro** — out of scope, despite being the mechanism a rainfall total would explain most
   directly. The [32-series trial area](../index.md#scope) has no hydro series, and NGED's [embedded
   hydro capacity](../background/network.md#embedded-generation-on-the-network) is under half a
@@ -982,21 +979,22 @@ So roughly 92% of the null count this item is sized against is estimator artefac
 missing weather, and what remains is rare enough that the experiment would struggle to separate any
 effect from noise. **Treat it as low priority.** Two changes would raise that priority: V2's wider
 download box raises the exposure, since the corruption that currently falls outside the GB box
-starts landing inside it; and [issue #506](https://github.com/openclimatefix/nged-substation-forecast/issues/506),
-which reports the
-contributing-weight fraction, would let us size the problem directly rather than inferring it from
-null counts. The item stays worth doing eventually — an unbounded, silent, unflagged bridge across a
-12-hour gap in a *rate* variable is hard to defend however rarely it fires — but it is no longer
-competing with the Tier 1 items.
+starts landing inside it; and
+[issue #506](https://github.com/openclimatefix/nged-substation-forecast/issues/506), which reports
+the contributing-weight fraction, would let us size the problem directly rather than inferring it
+from null counts. The item stays worth doing eventually — an unbounded, silent, unflagged bridge
+across a 12-hour gap in a *rate* variable is hard to defend however rarely it fires — but it is no
+longer competing with the Tier 1 items.
 
 The experiment is therefore not "should we start interpolating?" but **"the interpolation already
 happening should be deliberate, bounded, and visible"**:
 
-- **Bounded.** `interpolate()` will span an arbitrarily long interior gap. Note that even the smallest case bridges further than it sounds: the fill runs between the steps *either side* of the
+- **Bounded.** `interpolate()` will span an arbitrarily long interior gap. Note that even the
+  smallest case bridges further than it sounds: the fill runs between the steps *either side* of the
   missing step, so losing a single native step is a 6-hour bridge in the 3-hourly part of the
   horizon and a **12-hour** bridge in the 6-hourly part — and the 6-hourly part is the 3–10 day band
-  users act on. Several consecutive missing steps are bridged just as confidently. Cap the span
-  and leave anything longer as null.
+  users act on. Several consecutive missing steps are bridged just as confidently. Cap the span and
+  leave anything longer as null.
 - **Visible.** Carry an `is_imputed` flag per filled variable so the model can condition on it, and
   so a forecast built on a bridged gap is distinguishable after the fact.
 - **Measured.** With the flag in place, compare against today's silent behaviour, and against
@@ -1146,28 +1144,28 @@ want is spread-as-a-feature or the resilience property.
 
 **Advantages.**
 
-- **Resilience, by construction.** This is the strongest practical argument. A statistic is
-  computed over whatever members actually arrived, so a missing ensemble member shifts a quantile
-  slightly instead of removing rows, and a variable that is null for a few members degrades the
-  estimate instead of nulling whole rows. The [2026-08-09
+- **Resilience, by construction.** This is the strongest practical argument. A statistic is computed
+  over whatever members actually arrived, so a missing ensemble member shifts a quantile slightly
+  instead of removing rows, and a variable that is null for a few members degrades the estimate
+  instead of nulling whole rows. The [2026-08-09
   incident](../architecture/ecmwf-ens-known-issues.md#nulls-in-the-de-accumulated-variables-tolerated)
   — one member's radiation missing at two lead times — would not have been an event at all. This
   resilience also makes the
   [incomplete-run](../architecture/ecmwf-ens-known-issues.md#an-incomplete-run-tolerated-and-reported)
   warning much less consequential.
 - **Resource use and scale.** Up to 51× fewer feature rows: the ~321M-row validation prediction, the
-  memory ceiling that shapes input pruning and `init_time` chunking, and the
-  [32-bit row-index ceiling](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index)
-  all get dramatically easier at once, and inference does ~51× less work. That is direct support for
-  [principle 6](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)
+  memory ceiling that shapes input pruning and `init_time` chunking, and the [32-bit row-index
+  ceiling](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index) all get
+  dramatically easier at once, and inference does ~51× less work. That is direct support for
+  [principle
+  6](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)
   at V2 scale, where it is the claim most at risk.
-- **Spread becomes an explicit input.** The model can learn that a wide member spread means a
-  less certain forecast, which is the natural feed for the
-  [band-widening](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal)
-  that is designed but not built.
-- **No ensemble-member identity problem.** A quantile is identity-free, so it is comparable
-  across runs in a way a member index is not — which is what would make a cross-run fill
-  defensible (see
+- **Spread becomes an explicit input.** The model can learn that a wide member spread means a less
+  certain forecast, which is the natural feed for the
+  [band-widening](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal) that
+  is designed but not built.
+- **No ensemble-member identity problem.** A quantile is identity-free, so it is comparable across
+  runs in a way a member index is not — which is what would make a cross-run fill defensible (see
   [the null-filling item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)).
 
 **Disadvantages.**
@@ -1199,12 +1197,12 @@ informative. Calibration and attribution are genuinely different goods here.
   quantile row can describe a physically impossible joint state. A member row cannot. Mitigations
   exist (member-rank-based statistics, or quantiles of a derived physics proxy rather than of each
   raw variable), and testing one is part of the experiment.
-- **A 51× cut in training data.** The mirror image of the resource-use win, and in direct tension with
-  [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) above, whose whole
-  argument is that member rows multiply the training set. The two items are alternatives at the
-  same fork, so decide them together rather than in sequence.
-- **It moves the `AllFeatures` primary key**, and therefore touches cross-validation, metrics,
-  and the leaderboard. [Principle
+- **A 51× cut in training data.** The mirror image of the resource-use win, and in direct tension
+  with [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) above, whose
+  whole argument is that member rows multiply the training set. The two items are alternatives at
+  the same fork, so decide them together rather than in sequence.
+- **It moves the `AllFeatures` primary key**, and therefore touches cross-validation, metrics, and
+  the leaderboard. [Principle
   8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically) means it
   must be scored against the existing board by a controlled comparison, not swapped in.
 
@@ -1226,47 +1224,45 @@ booster learns when to trust each source.** AIFS-ENS member *n* starts from the 
 conditions](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1) as ECMWF ENS
 member *n*, so the two members share one row. Before relying on the pairing, check that
 Dynamical.org keeps ECMWF's member numbering in both datasets. ICON-EU is a single deterministic
-run, so its values
-repeat on every member's row and are absent beyond its 120-hour horizon. Train with whole sources
-randomly blanked, so that a failed feed degrades the forecast rather than breaking it.
+run, so its values repeat on every member's row and are absent beyond its 120-hour horizon. Train
+with whole sources randomly blanked, so that a failed feed degrades the forecast rather than
+breaking it.
 
-**Each step of the experiment has to beat the step before on out-of-sample CRPS per horizon
-slice, with a block-bootstrap confidence interval that excludes zero:**
+**Each step of the experiment has to beat the step before on out-of-sample CRPS per horizon slice,
+with a block-bootstrap confidence interval that excludes zero:**
 
 1. ECMWF ENS alone.
 2. The paired multi-source features, which must also beat two blends of the per-source forecast
    distributions: one weighting each source by lead time, and one weighting each source by its
    inverse error over the last 30 days.
-3. Step 2 plus weather-situation features: pressure gradient, ensemble spread, and the
-   disagreement between sources. Step 2 must already include lead time and time of day, so step 3
-   isolates the weather situation.
+3. Step 2 plus weather-situation features: pressure gradient, ensemble spread, and the disagreement
+   between sources. Step 2 must already include lead time and time of day, so step 3 isolates the
+   weather situation.
 
 **The 30-day blend is a cheap baseline, but part of its reported gain may not carry over to the
-booster.** [Abellan and Johnson (2026)](https://doi.org/10.5194/ems2026-258), a conference
-abstract, apply the blend to the ECMWF and ACCESS models over Australia, for surface temperature,
-dewpoint, and wind. The authors attribute part of their gain to opposing biases in the two models
-cancelling. The booster corrects each source's bias directly, so that part of the gain may not
-carry over.
+booster.** [Abellan and Johnson (2026)](https://doi.org/10.5194/ems2026-258), a conference abstract,
+apply the blend to the ECMWF and ACCESS models over Australia, for surface temperature, dewpoint,
+and wind. The authors attribute part of their gain to opposing biases in the two models cancelling.
+The booster corrects each source's bias directly, so that part of the gain may not carry over.
 
 **Both blends give one distribution per half-hour, so ensemble copula coupling has to rebuild the
 members afterwards.** Ensemble copula coupling reorders samples from each half-hour's blended
 distribution to follow the ranks of template members ([Schefzik, Thorarinsdottir and Gneiting
 (2013)](https://doi.org/10.1214/13-STS443)). The Met Office's IMPROVER system runs this pipeline in
-production: IMPROVER blends ensemble and deterministic sources as exceedance probabilities and
-draws its templates from the raw ensembles ([Evans et al.
-(2026)](https://doi.org/10.5194/ems2026-482)). Here the paired ECMWF ENS and AIFS-ENS members make
-the natural templates. The same step would restore the dependence across half-hours and across
-series that the pooled percentiles lose today
+production: IMPROVER blends ensemble and deterministic sources as exceedance probabilities and draws
+its templates from the raw ensembles ([Evans et al. (2026)](https://doi.org/10.5194/ems2026-482)).
+Here the paired ECMWF ENS and AIFS-ENS members make the natural templates. The same step would
+restore the dependence across half-hours and across series that the pooled percentiles lose today
 ([#730](https://github.com/openclimatefix/nged-substation-forecast/issues/730)).
 
-**Step 3 is unlikely to clear step 2 on the history available by v2.1.** The AIFS-ENS archive
-starts in July 2025 and ICON-EU's in early 2026. One source's forecast errors are shared by every
+**Step 3 is unlikely to clear step 2 on the history available by v2.1.** The AIFS-ENS archive starts
+in July 2025 and ICON-EU's in early 2026. One source's forecast errors are shared by every
 substation under the same weather system, so hundreds of substations during one storm give roughly
 one storm's worth of evidence. A few years of history therefore hold few independent examples of
 each kind of weather.
 
-**A cheaper first signal needs only ECMWF ENS: check whether its calibration varies with the
-weather situation once lead time is accounted for.** For a single ensemble, [Allen et al.
+**A cheaper first signal needs only ECMWF ENS: check whether its calibration varies with the weather
+situation once lead time is accounted for.** For a single ensemble, [Allen et al.
 (2020)](https://doi.org/10.1002/qj.3806) found that making ensemble model output statistics (EMOS)
 regime-dependent improved the calibration of wind-speed forecasts, and [Allen et al.
 (2021)](https://doi.org/10.1002/qj.3983) found a similar gain from adding the state of the North
@@ -1302,31 +1298,38 @@ normalisation is what supplies it.
 
 **Using the physics proxy as that `base_margin` is the same move the two-stage forecaster already
 makes with its stage-1 draft.** It is the same base-margin move the [two-stage
-forecaster](switching-events.md#approach-1-the-two-stage-forecaster)
-makes with its stage-1 draft; there, the correction target's low variance and cross-series
-stationarity are part of what makes a *global* corrector tractable at all — the same property that
-helps here. (Under a log-link generation objective the margin would be `log(proxy)`, which needs a
-floor to handle the PV proxy's exact zeros at night.)
+forecaster](switching-events.md#approach-1-the-two-stage-forecaster) makes with its stage-1 draft;
+there, the correction target's low variance and cross-series stationarity are part of what makes a
+*global* corrector tractable at all — the same property that helps here. (Under a log-link
+generation objective the margin would be `log(proxy)`, which needs a floor to handle the PV proxy's
+exact zeros at night.)
 
 ## Explicitly deferred (not quick, or not skill)
 
-- **[#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) local-time power lags** — a DST edge case affecting a handful of half-hours per year;
-  the issue itself says it may not be worth worrying about yet. Revisit if the metrics slices
-  ever show a DST-transition artefact.
-- **A composable feature-expression grammar (consider designing later, deliberately not now).**
-  The accumulator machinery of the residual-lag features generalises well beyond power residuals: EWMAs of *any*
-  base column at chosen half-lives (an EWMA of temperature *is* the effective-temperature feature), each either lagged in valid time or locked to `power_fcst_init_time` (the init-time-anchored features' anchoring), plus the [weather-abnormality features](#weather-abnormality-climatology-z-score-features) (now a Tier-3 item of their own) — how unusual the forecast weather is against
-  the climatological norm for that calendar time ("is this a heat wave?"). Feature names are
-  already a tiny parsed language (`ParsedFeatures.from_strings()` turns strings into typed
+- **[#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) local-time power
+  lags** — a DST edge case affecting a handful of half-hours per year; the issue itself says it may
+  not be worth worrying about yet. Revisit if the metrics slices ever show a DST-transition
+  artefact.
+- **A composable feature-expression grammar (consider designing later, deliberately not now).** The
+  accumulator machinery of the residual-lag features generalises well beyond power residuals: EWMAs
+  of *any* base column at chosen half-lives (an EWMA of temperature *is* the effective-temperature
+  feature), each either lagged in valid time or locked to `power_fcst_init_time` (the
+  init-time-anchored features' anchoring), plus the [weather-abnormality
+  features](#weather-abnormality-climatology-z-score-features) (now a Tier-3 item of their own) —
+  how unusual the forecast weather is against the climatological norm for that calendar time ("is
+  this a heat wave?"). Feature names are already a tiny parsed language
+  (`ParsedFeatures.from_strings()` turns strings into typed
   `LagFeature`/`RollingFeature`/`WeatherFeature`/... objects), so the natural end state is a
   modestly richer grammar of composable combinators — base column → transform (EWMA,
   anomaly-vs-climatology) → anchoring (valid-time lag vs init-time lock) — still expressed as
-  concise strings, e.g. something like `temperature_2m->ewma(3d)@init_time` (illustrative, not
-  a design). The payoff couples to
+  concise strings, e.g. something like `temperature_2m->ewma(3d)@init_time` (illustrative, not a
+  design). The payoff couples to
   [#359](https://github.com/openclimatefix/nged-substation-forecast/issues/359): any feature a
-  string can express could be tried interactively in the visualisation, then pasted into any
-  model config unchanged. Deferred because grammar design done speculatively becomes an inner
-  platform — grow combinators only as experiments demand them, and revisit once aligned lagged weather, effective temperature, the weather-abnormality features, the init-time-anchored features, and the residual-lag features have shown which transforms actually earn their keep.
+  string can express could be tried interactively in the visualisation, then pasted into any model
+  config unchanged. Deferred because grammar design done speculatively becomes an inner platform —
+  grow combinators only as experiments demand them, and revisit once aligned lagged weather,
+  effective temperature, the weather-abnormality features, the init-time-anchored features, and the
+  residual-lag features have shown which transforms actually earn their keep.
 
 ## How each win is evaluated
 

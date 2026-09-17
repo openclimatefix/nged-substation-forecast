@@ -1,17 +1,16 @@
 # Getting started on your laptop
 
 This is the single walkthrough for going from a fresh clone to a running Dagster instance that
-downloads real data and trains a model — entirely on your laptop, with no AWS account of your own
-to set up. A final section then covers running the live service continuously on the same laptop,
-once the daemon is up. Follow it top to bottom the first time; later pages go deeper on each part
-and are linked as you reach them.
+downloads real data and trains a model — entirely on your laptop, with no AWS account of your own to
+set up. A final section then covers running the live service continuously on the same laptop, once
+the daemon is up. Follow it top to bottom the first time; later pages go deeper on each part and are
+linked as you reach them.
 
 ## Prerequisites
 
-- **Python 3.14+** and [`uv`](https://docs.astral.sh/uv/) — install `uv` following its
-  [official instructions](https://docs.astral.sh/uv/getting-started/installation/). `uv` manages
-  the Python version and the virtual environment for you, so you do not need to install Python
-  separately.
+- **Python 3.14+** and [`uv`](https://docs.astral.sh/uv/) — install `uv` following its [official
+  instructions](https://docs.astral.sh/uv/getting-started/installation/). `uv` manages the Python
+  version and the virtual environment for you, so you do not need to install Python separately.
 - **Credentials for NGED's telemetry bucket** — the URL, access key, and secret for the S3 bucket
   where NGED publishes its telemetry. Ask another team member if you do not have them. Nothing in
   this project works without them, because the raw power data lives there.
@@ -25,8 +24,8 @@ uv sync                    # create the virtualenv and install all workspace pac
 uv run pre-commit install  # install the git hooks (lint, format, markdown, type-check on commit)
 ```
 
-`uv sync` reads the workspace's lockfile and installs every package under `packages/` plus the
-root Dagster application in one step.
+`uv sync` reads the workspace's lockfile and installs every package under `packages/` plus the root
+Dagster application in one step.
 
 ## Step 2 — Create your `.env`
 
@@ -38,8 +37,8 @@ cp .env.example .env
 ```
 
 Every setting has a working default, so you can stop there: with an untouched `.env` all data and
-artifacts live under `<repo>/data` as plain files on disk, and the test suite, a training run,
-and the dashboards all work.
+artifacts live under `<repo>/data` as plain files on disk, and the test suite, a training run, and
+the dashboards all work.
 
 To ingest NGED telemetry you also need the three `NGED_S3_BUCKET_*` values from the prerequisites.
 They authenticate reads of NGED's own bucket, so nothing else needs them. Without them, the
@@ -53,21 +52,20 @@ NGED_S3_BUCKET_SECRET=<secret>
 ```
 
 The [Configuration reference](live_service/setup.md) explains the full menu — the three storage
-roots, the derive-from-root convention, and the credentials you would add to move the data tables
-to S3.
+roots, the derive-from-root convention, and the credentials you would add to move the data tables to
+S3.
 
 `.env` is git-ignored; never commit real credentials.
 
 > **Using a git worktree?** `Settings` reads `.env` from the repository root, so a worktree needs
-> its own. Symlink the main checkout's file rather than copying secrets around:
-> `ln -s ../<main-checkout>/.env .env`.
+> its own. Symlink the main checkout's file rather than copying secrets around: `ln -s
+> ../<main-checkout>/.env .env`.
 
 ## Step 3 — Give Dagster a persistent home
 
-Dagster works without any of this, but by default it forgets its run history and schedule state
-when you stop it. Point it at a persistent directory so that state survives a restart — this also
-matters later, because the live 6-hourly schedule only keeps time while the daemon runs
-continuously.
+Dagster works without any of this, but by default it forgets its run history and schedule state when
+you stop it. Point it at a persistent directory so that state survives a restart — this also matters
+later, because the live 6-hourly schedule only keeps time while the daemon runs continuously.
 
 1. Create the directory and a `dagster.yaml` inside it:
 
@@ -118,9 +116,9 @@ Leave it running and open <http://localhost:3000>. Everything from here is drive
 
 ## Step 5 — Download data and train a model
 
-In the Dagster UI, materialise the data assets in order — this is what pulls the real data onto
-your laptop. The quickest first run is the **`smoke_test`** fold (a ~1-month train / ~1-month
-validation window for a fast end-to-end check), so the concrete values below target it:
+In the Dagster UI, materialise the data assets in order — this is what pulls the real data onto your
+laptop. The quickest first run is the **`smoke_test`** fold (a ~1-month train / ~1-month validation
+window for a fast end-to-end check), so the concrete values below target it:
 
 1. **`power_time_series_and_metadata`** — pulls NGED telemetry from S3 into a local Delta table
    (unpartitioned).
@@ -136,32 +134,32 @@ validation window for a fast end-to-end check), so the concrete values below tar
    raises.
 
 Then register an experiment and train a model. The full recipe — the run config for each job, what
-`smoke_test` versus `full_cv` does, and how the trained model is tracked in MLflow — is
-[Running an ML experiment end-to-end](ml_experimentation/dagster-workflow.md). Register the
-experiment with `run_mode="smoke_test"` to check the whole pipeline is wired up before committing to
-a long `full_cv` training run.
+`smoke_test` versus `full_cv` does, and how the trained model is tracked in MLflow — is [Running an
+ML experiment end-to-end](ml_experimentation/dagster-workflow.md). Register the experiment with
+`run_mode="smoke_test"` to check the whole pipeline is wired up before committing to a long
+`full_cv` training run.
 
 ## Running the live service on your laptop
 
-The entire live service — telemetry ingestion, NWP download, the 6-hourly forecast schedule, and
-the Dagster UI — runs on the laptop you have just set up, with no AWS involved. Running the whole
-stack locally is a deliberate portability requirement rather than a development convenience: no
+The entire live service — telemetry ingestion, NWP download, the 6-hourly forecast schedule, and the
+Dagster UI — runs on the laptop you have just set up, with no AWS involved. Running the whole stack
+locally is a deliberate portability requirement rather than a development convenience: no
 cloud-specific service may be load-bearing for scheduling or orchestration (see [the orchestration
 decision](architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm)).
 
 The 6-hourly schedule fires only while `dg dev` keeps running, so closing the laptop lid stops the
-service. That gap is exactly what the [AWS deployment](live_service/aws.md) exists to close, and
-why a missed slot is backfillable — see [Operating the live service: Backfilling a missed
-slot](live_service/operations.md#backfilling-a-missed-slot). Driving a running stack is identical
-in both environments — promotion, the schedule, inspecting a forecast, backfills — and lives in
+service. That gap is exactly what the [AWS deployment](live_service/aws.md) exists to close, and why
+a missed slot is backfillable — see [Operating the live service: Backfilling a missed
+slot](live_service/operations.md#backfilling-a-missed-slot). Driving a running stack is identical in
+both environments — promotion, the schedule, inspecting a forecast, backfills — and lives in
 [Operating the live service](live_service/operations.md).
 
 ### Optional — rehearse S3 locally with MinIO
 
-To exercise the exact S3 (Simple Storage Service — AWS's object store) read/write code paths
-without touching AWS, point both `DATA_PATH_INTERNAL`
-and `DATA_PATH_DELIVERY` at the same local [MinIO](https://min.io/) (or any S3-compatible) endpoint
-and supply all four `DATA_STORE_*` settings:
+To exercise the exact S3 (Simple Storage Service — AWS's object store) read/write code paths without
+touching AWS, point both `DATA_PATH_INTERNAL` and `DATA_PATH_DELIVERY` at the same local
+[MinIO](https://min.io/) (or any S3-compatible) endpoint and supply all four `DATA_STORE_*`
+settings:
 
 ```dotenv
 DATA_PATH_INTERNAL=s3://my-bucket/data
@@ -172,19 +170,21 @@ DATA_STORE_SECRET_ACCESS_KEY=minioadmin
 DATA_STORE_REGION=us-east-1
 ```
 
-`LOCAL_ARTIFACTS_PATH` is left unset, so models and plots stay under `<repo>/data` on your disk while
-the data tables round-trip through MinIO. Setting `DATA_STORE_ENDPOINT_URL` also allows plain HTTP,
-since dev endpoints rarely have TLS. (This is the same machinery the S3 integration test drives
-against an in-process `moto` server.)
+`LOCAL_ARTIFACTS_PATH` is left unset, so models and plots stay under `<repo>/data` on your disk
+while the data tables round-trip through MinIO. Setting `DATA_STORE_ENDPOINT_URL` also allows plain
+HTTP, since dev endpoints rarely have TLS. (This is the same machinery the S3 integration test
+drives against an in-process `moto` server.)
 
 ## Where to go next
 
 - [Running an ML experiment end-to-end](ml_experimentation/dagster-workflow.md) — the data-to-model
-  recipe in full, plus [Model configuration](ml_experimentation/model-configuration.md) for
-  choosing features and hyperparameters.
+  recipe in full, plus [Model configuration](ml_experimentation/model-configuration.md) for choosing
+  features and hyperparameters.
 - [Configuration reference](live_service/setup.md) — every `.env` setting, the storage-root model,
   and how to point the data tables at real S3.
-- The [dashboard README](https://github.com/openclimatefix/nged-substation-forecast/tree/main/packages/dashboard#readme)
+- The [dashboard
+  README](https://github.com/openclimatefix/nged-substation-forecast/tree/main/packages/dashboard#readme)
   — Marimo apps for inspecting forecasts, and the `.env.s3` toggle for viewing production data.
-- [Viewing results in the MLflow UI](ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)
-  — inspecting your training runs (`uv run mlflow ui --gunicorn-opts "--workers 1"`).
+- [Viewing results in the MLflow
+  UI](ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui) — inspecting your
+  training runs (`uv run mlflow ui --gunicorn-opts "--workers 1"`).

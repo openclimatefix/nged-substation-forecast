@@ -81,8 +81,8 @@ historical data (full detail + plots in the Milestone 1 report, Appendices A & B
   midday solar export "bounces" off zero and looks like extra load. See also the [MVA discussion in
   Net-demand disaggregation](disaggregation.md#apparent-power-mva-metering).
 
-These data oddities are detected and reported back to NGED as warnings (see
-[delivery tables, Table 2](delivery-tables.md#table-2-power_forecast_warnings)).
+These data oddities are detected and reported back to NGED as warnings (see [delivery tables, Table
+2](delivery-tables.md#table-2-power_forecast_warnings)).
 
 ---
 
@@ -95,8 +95,8 @@ As of May 2026, NGED's full network (the v2 target scope) consists of:
 - **52 grid supply points (GSPs)** (400/132 kV & 275/132 kV)
 - **~1,500 generators** (industrial customer generators, not domestic):
     - 558 connect directly to GSP/BSP busbars at 33 kV or 132 kV (modelled by NGED as
-      generation-only "substations"; mostly have telemetry; curtailable via ANM; comprising 329 solar,
-      63 wind, 166 other).
+      generation-only "substations"; mostly have telemetry; curtailable via ANM; comprising 329
+      solar, 63 wind, 166 other).
     - ~1,000 are on the 11 kV network downstream of primaries; some metered, some not.
     - Power flow from metered generators connected to primaries is **already subtracted** from the
       primaries' power flow ("Disaggregated Demand").
@@ -122,8 +122,9 @@ breakdown.
 
 ## Weather data
 
-Issues: [#142](https://github.com/openclimatefix/nged-substation-forecast/issues/142) (CAMS solar radiation),
-[#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143) (reanalysis ingestion — ERA5)
+Issues: [#142](https://github.com/openclimatefix/nged-substation-forecast/issues/142) (CAMS solar
+radiation), [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143)
+(reanalysis ingestion — ERA5)
 
 | Source | Status | Description |
 |---|---|---|
@@ -157,19 +158,19 @@ right to withdraw access to protect Data Store performance.
 
 **Three fallbacks, in order.** [ARCO-ERA5](https://github.com/google-research/arco-era5) is a public
 Google Cloud Zarr carrying ERA5T at about a week's lag — verify freshness via its
-`valid_time_stop_era5t` / `last_updated` metadata.
-[Earthmover Icechunk-ERA5](https://registry.opendata.aws/earthmover-era5/) is on AWS and updates
-daily, but is paid; its free tier lags 3 months. The plain **CDS API** reaches about 5 days behind
-real time but is not analysis-ready. Separately, a precomputed *mean* climatology for the
-[weather-abnormality feature](xgboost-improvements.md#weather-abnormality-climatology-z-score-features)
-is available from WeatherBench2 at `gs://weatherbench2/datasets/era5-hourly-climatology/`.
+`valid_time_stop_era5t` / `last_updated` metadata. [Earthmover
+Icechunk-ERA5](https://registry.opendata.aws/earthmover-era5/) is on AWS and updates daily, but is
+paid; its free tier lags 3 months. The plain **CDS API** reaches about 5 days behind real time but
+is not analysis-ready. Separately, a precomputed *mean* climatology for the [weather-abnormality
+feature](xgboost-improvements.md#weather-abnormality-climatology-z-score-features) is available from
+WeatherBench2 at `gs://weatherbench2/datasets/era5-hourly-climatology/`.
 
 ### CAMS: use the point API, not the gridded product
 
-**Two CAMS products exist, and only the point time-series product is current.** The
-[gridded product](https://ads.atmosphere.copernicus.eu/datasets/cams-gridded-solar-radiation)
-would suit the H3 pipeline — 0.1°, 15-minute, monthly netCDF — but it lags years behind, and
-version 4.6 (rev2) is the only version that reaches 2024:
+**Two CAMS products exist, and only the point time-series product is current.** The [gridded
+product](https://ads.atmosphere.copernicus.eu/datasets/cams-gridded-solar-radiation) would suit the
+H3 pipeline — 0.1°, 15-minute, monthly netCDF — but it lags years behind, and version 4.6 (rev2) is
+the only version that reaches 2024:
 
 | Version | Years available |
 |---|---|
@@ -178,24 +179,25 @@ version 4.6 (rev2) is the only version that reaches 2024:
 | 4.6 (rev2) | 2005–2024 |
 
 **A grid that stops in 2024 is disqualifying for capacity estimation**, because the domestic solar
-fleet the estimate has to track has kept growing since. That table was read from the Atmosphere
-Data Store catalogue API on 2026-09-09, and a
-[user who asked for April 2025 onward in May 2026](https://forum.ecmwf.int/t/cams-gridded-solar-radiation-data-for-the-period-01-04-2025-to-31-03-2026/14983)
+fleet the estimate has to track has kept growing since. That table was read from the Atmosphere Data
+Store catalogue API on 2026-09-09, and a [user who asked for April 2025 onward in May
+2026](https://forum.ecmwf.int/t/cams-gridded-solar-radiation-data-for-the-period-01-04-2025-to-31-03-2026/14983)
 was given no release date and pointed at the point product instead.
 
-**The [point time-series product](https://ads.atmosphere.copernicus.eu/datasets/cams-solar-radiation-timeseries)
-runs to yesterday**, and takes one latitude and longitude per request. That is annoying rather than
-disqualifying: one request covers a location over a whole date range, so the count scales with
-sites rather than with days. The [v1 trial area](../index.md#scope) needs at most 32 requests, 6 of
-them for the solar farms, against a limit of 500 requests per day. Ask for `observed_cloud` rather
-than `clear`: the all-sky response carries the clear-sky columns (`GHIc`, `BHIc`, `DHIc`, `BNIc`)
-alongside the all-sky ones, so one request returns both, and their ratio is the clear-sky index
-that conditions the capacity fit and the published estimates of CAMS's own error.
+**The [point time-series
+product](https://ads.atmosphere.copernicus.eu/datasets/cams-solar-radiation-timeseries) runs to
+yesterday**, and takes one latitude and longitude per request. That is annoying rather than
+disqualifying: one request covers a location over a whole date range, so the count scales with sites
+rather than with days. The [v1 trial area](../index.md#scope) needs at most 32 requests, 6 of them
+for the solar farms, against a limit of 500 requests per day. Ask for `observed_cloud` rather than
+`clear`: the all-sky response carries the clear-sky columns (`GHIc`, `BHIc`, `DHIc`, `BNIc`)
+alongside the all-sky ones, so one request returns both, and their ratio is the clear-sky index that
+conditions the capacity fit and the published estimates of CAMS's own error.
 
 **Great Britain sits inside the Meteosat Second Generation field of view** that bounds the all-sky
 product, with the same low-winter-sun degradation SARAH-3 documents. Meteosat Third Generation is
-not yet in the CAMS processing chain. Depending on a service still built on the older satellite is
-a supply risk.
+not yet in the CAMS processing chain. Depending on a service still built on the older satellite is a
+supply risk.
 
 **Three traps in the point API each fail silently.**
 
