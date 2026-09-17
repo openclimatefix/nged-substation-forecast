@@ -123,7 +123,8 @@ def _horizon_slice_expr() -> pl.Expr:
 
 
 _BAND_LOWER_QUANTILES: Final[tuple[float, ...]] = tuple(q for q in DELIVERY_QUANTILES if q < 0.5)
-"""Lower quantile of each symmetric prediction-interval band scored by PICP/interval width.
+"""Lower quantile of each symmetric prediction-interval band scored by prediction-interval
+coverage probability (PICP) and by interval width.
 
 Each lower quantile ``q`` pairs with ``1 − q`` to form a band (e.g. 0.1 → the p10–p90 band),
 matching ``contracts.ml_schemas.BAND_METRIC_PARAMS``.
@@ -161,11 +162,12 @@ def _quantile_column(quantile: float) -> str:
 
 
 def _fair_crps_expr() -> pl.Expr:
-    """Per-timestamp fair CRPS over the ensemble members of one forecast-run group.
+    """Per-timestamp fair continuous ranked probability score over one forecast run's members.
 
-    Evaluated inside the per-run collapse ``group_by``, where each group holds the ``m``
-    members forecasting one ``(time_series_id, power_fcst_init_time, valid_time)``. The fair
-    (finite-ensemble-unbiased, Ferro 2014) form is::
+    The continuous ranked probability score (CRPS) is evaluated inside the per-run collapse
+    ``group_by``, where each group holds the ``m`` members forecasting one ``(time_series_id,
+    power_fcst_init_time, valid_time)``. The fair (finite-ensemble-unbiased, Ferro 2014) form
+    is::
 
         CRPS = mean_i |x_i − y|  −  Σ_{i<j} |x_i − x_j| / (m(m−1))
 
