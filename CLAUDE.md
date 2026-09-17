@@ -28,9 +28,8 @@ uv run marimo edit packages/notebooks/some_notebook.py
 ```
 
 Markdown (README.md files, docs/*.md, and Python docstrings) is linted automatically by the
-pre-commit hook, but when developing code or docs it's a good idea to run the markdown lint
-command above yourself before committing, for faster feedback than waiting on the commit-time
-hook.
+pre-commit hook, but when developing code or docs it's a good idea to run the markdown lint command
+above yourself before committing, for faster feedback than waiting on the commit-time hook.
 
 **Testing conventions** — where test dependencies and fixtures live, how discovery works, mocking
 with `monkeypatch`, network-gated tests, the moto S3 reset-per-test rule, and the Patito assertion
@@ -38,19 +37,19 @@ house style — are documented on the **[Testing](docs/architecture/testing.md)*
 
 **Never create a `uv venv` or run `uv sync` with a target under `/tmp`.** `/tmp` on this machine is
 tmpfs, a different filesystem from `~/.cache/uv`, so uv can't hardlink packages from its cache
-across that boundary and silently falls back to a full byte-for-byte copy per package — costing
-real RAM instead of the near-zero marginal cost a same-filesystem venv gets. This has been seen to
+across that boundary and silently falls back to a full byte-for-byte copy per package — costing real
+RAM instead of the near-zero marginal cost a same-filesystem venv gets. This has been seen to
 exhaust the tmpfs quota mid-install and abandon the venv half-built. The session scratchpad
-directory is under `/tmp` too, so it has the same problem — put throwaway venvs (a
-mutation-testing worktree, a version-bisection scratch build, a one-off repro) on the home
-partition instead, e.g. a worktree under `.claude/worktrees/`.
+directory is under `/tmp` too, so it has the same problem — put throwaway venvs (a mutation-testing
+worktree, a version-bisection scratch build, a one-off repro) on the home partition instead, e.g. a
+worktree under `.claude/worktrees/`.
 
 ## Skills
 
 Detail that only matters while you are touching one specific thing lives in
 `.claude/skills/<name>/SKILL.md` and is loaded on demand. **Load the relevant skill *before* you
-start** — most of what they hold are traps that fail silently, so by the time you notice you
-needed one, the mistake is already written.
+start** — most of what they hold are traps that fail silently, so by the time you notice you needed
+one, the mistake is already written.
 
 | Skill | Load it before… |
 |---|---|
@@ -71,24 +70,24 @@ needed one, the mistake is already written.
 
 ## Docs
 
-`docs/` contains a lot of useful information beyond API reference: forward-looking plans and
-their ordering (`docs/roadmap/`), the portable design principles, engineering hypotheses and
+`docs/` contains a lot of useful information beyond API reference: forward-looking plans and their
+ordering (`docs/roadmap/`), the portable design principles, engineering hypotheses and
 inherent-stability argument (`docs/design-philosophy/`), durable explainers of solution methods
 (`docs/techniques/`), background/requirements context (`docs/background/`), design rationale for
-what's already built (`docs/architecture/`), and step-by-step operational how-to for what's already built
-(`docs/ml_experimentation/`, `docs/live_service/` — design and how-to are deliberately separate
-pages, cross-linked via "See also"). When planning new features, check `docs/` for relevant prior
-discussion before proposing an approach.
+what's already built (`docs/architecture/`), and step-by-step operational how-to for what's already
+built (`docs/ml_experimentation/`, `docs/live_service/` — design and how-to are deliberately
+separate pages, cross-linked via "See also"). When planning new features, check `docs/` for relevant
+prior discussion before proposing an approach.
 
-The docs are published at <https://openclimatefix.github.io/nged-substation-forecast>. When
-linking to a docs page from anywhere outside `docs/` itself (GitHub issues, PR bodies, code
-docstrings), link to that rendered site (e.g.
+The docs are published at <https://openclimatefix.github.io/nged-substation-forecast>. When linking
+to a docs page from anywhere outside `docs/` itself (GitHub issues, PR bodies, code docstrings),
+link to that rendered site (e.g.
 `https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#production-monitoring`),
 never to a `github.com/.../blob/main/docs/...` path.
 
 **Chart images — optimise an SVG before committing it.** A Vega/Altair chart exported straight to
-SVG carries one path point per reading, at more decimal places than the viewport can express, so
-the file is far larger than it needs to be. Run the export through
+SVG carries one path point per reading, at more decimal places than the viewport can express, so the
+file is far larger than it needs to be. Run the export through
 
 ```bash
 npx svgo@4 --multipass --precision=1
@@ -103,12 +102,12 @@ by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised expor
 These rules apply to everything we write in prose: `docs/` pages, READMEs, `SKILL.md` files,
 docstrings, code comments, GitHub issue and PR bodies, and anything we write for an outside reader.
 
-**The prose rules in this section govern words and sentences; getting a whole document's order
-right needs a planning step of its own.** A badly ordered document reads fine sentence by sentence,
-so the rules below won't catch it and neither will a reviewer holding the whole document in
-context. That reviewer already knows what a later section says while reading an earlier one —
-exactly the knowledge a first-time reader doesn't have. Load `long-form-prose` before drafting new
-prose longer than a few paragraphs.
+**The prose rules in this section govern words and sentences; getting a whole document's order right
+needs a planning step of its own.** A badly ordered document reads fine sentence by sentence, so the
+rules below won't catch it and neither will a reviewer holding the whole document in context. That
+reviewer already knows what a later section says while reading an earlier one — exactly the
+knowledge a first-time reader doesn't have. Load `long-form-prose` before drafting new prose longer
+than a few paragraphs.
 
 **When reviewing prose against these rules, load `prose-review` before starting.** A reviewer asked
 to check everything at once finds the loudest fault in each paragraph and moves on, so the quieter
@@ -126,8 +125,8 @@ like. Concision comes next, and comes mostly from cutting whole sentences or par
 from clipping words out of a sentence that needs them. Most of the rules below are that order of
 priorities applied to one recurring case.
 
-**Lead each paragraph with a bolded sentence that states its conclusion.** The reader should get
-the argument from the bolded leads alone, then read on only where they want the reasoning. That
+**Lead each paragraph with a bolded sentence that states its conclusion.** The reader should get the
+argument from the bolded leads alone, then read on only where they want the reasoning. That
 skim-reading pattern is why we prefer sub-headings and short paragraphs over bullet lists. A list
 flattens the argument into items of equal weight; a bolded lead says which claim matters, and the
 sentences under it say why.
@@ -172,29 +171,28 @@ then explain it.
 
 **State the point directly; don't write a sentence whose only job is announcing that a point is
 coming.** "It is therefore worth saying precisely which problems that creates" spends a whole
-sentence promising content instead of giving it. "This overlap creates several problems:" gives
-the same information in half the words and leads straight into the list that follows — the
-announcing sentence and the content it was announcing collapse into one. The usual offenders open
-with "it is worth noting/saying/pointing out that," "it is important to note that," "let us
-consider," "we now turn to," "there are several reasons why," or "this raises the question of."
-Replace each by naming the noun the throat-clearing was circling and stating the claim in its
-place.
+sentence promising content instead of giving it. "This overlap creates several problems:" gives the
+same information in half the words and leads straight into the list that follows — the announcing
+sentence and the content it was announcing collapse into one. The usual offenders open with "it is
+worth noting/saying/pointing out that," "it is important to note that," "let us consider," "we now
+turn to," "there are several reasons why," or "this raises the question of." Replace each by naming
+the noun the throat-clearing was circling and stating the claim in its place.
 
 **Name the thing; don't write "it".** Wherever a pronoun or a demonstrative makes the reader look
 backwards to work out what it refers to, repeat the noun instead. "It", "this", "that", "these",
 "those", "they", "such", "one", "ones", "the former" and "the latter" are the usual offenders. A
 paragraph that *opens* with a pronoun is the worst case, because a skim-reader landing there has
-nothing to look back at. **"One" and "such a" are the two that slip past a careless sweep**,
-because both read smoothly: write "an energy-forecasting lifecycle rather than a generic
-lifecycle", never "rather than a generic one"; write "the only paper of the three", never "the only
-one of the three"; write "a measure of effectiveness", never "such a metric" where a metric was
-named a clause earlier. Repeating the noun is always available and always correct. "One" is fine as
-a determiner in front of the noun it counts — "the one review we found" both scopes a claim and
-names its noun — and wrong only when it stands in place of the noun. Prefer "the NWP download" over
-"it", "the threshold-weighted score" over "this". A little repetition beats an ambiguous sentence
-every time: never make the reader refer backwards to decode a sentence, and never buy elegance with
-a referent the reader has to hunt for. The same rule covers version numbers: write "Flexpectation
-v1" and "Flexpectation v2", never a bare "v1" or "v2", which could be a version of anything.
+nothing to look back at. **"One" and "such a" are the two that slip past a careless sweep**, because
+both read smoothly: write "an energy-forecasting lifecycle rather than a generic lifecycle", never
+"rather than a generic one"; write "the only paper of the three", never "the only one of the three";
+write "a measure of effectiveness", never "such a metric" where a metric was named a clause earlier.
+Repeating the noun is always available and always correct. "One" is fine as a determiner in front of
+the noun it counts — "the one review we found" both scopes a claim and names its noun — and wrong
+only when it stands in place of the noun. Prefer "the NWP download" over "it", "the
+threshold-weighted score" over "this". A little repetition beats an ambiguous sentence every time:
+never make the reader refer backwards to decode a sentence, and never buy elegance with a referent
+the reader has to hunt for. The same rule covers version numbers: write "Flexpectation v1" and
+"Flexpectation v2", never a bare "v1" or "v2", which could be a version of anything.
 
 **"Thing" is never the right noun.** Every use of "thing" or "things" has a specific noun waiting
 behind it, and the specific noun carries information the placeholder throws away: "the two
@@ -202,20 +200,20 @@ contaminants that must be filtered out", not "the two things"; "Two caveats temp
 not "Two things temper"; "the closest work already published", not "the closest thing already
 published". A bolded lead opening "Two things follow" wastes the one sentence a skim-reader is
 guaranteed to read. **"Something" and "anything" throw away the same information.** They are harder
-to spot, because they read like ordinary English: "a decision to agree with NGED", not "something
-to agree with NGED"; "any occasion a human had to intervene in the running service", not "had to do
-something to it"; "when the ingest fails", not "when something breaks". Where the sentence
-genuinely means an unknown of unknown kind — a placeholder in a rule about future cases — say what
-kind of unknown: "an input we have not anticipated", not "something unexpected".
+to spot, because they read like ordinary English: "a decision to agree with NGED", not "something to
+agree with NGED"; "any occasion a human had to intervene in the running service", not "had to do
+something to it"; "when the ingest fails", not "when something breaks". Where the sentence genuinely
+means an unknown of unknown kind — a placeholder in a rule about future cases — say what kind of
+unknown: "an input we have not anticipated", not "something unexpected".
 
 **"Metadata" hides the fields that carry the information; list them.** The fault is the same as
 "thing": a reader told that a model was given "the site's metadata" learns nothing, because the
 fields are the information. Write "the panel tilt, the panel azimuth, and the ratio of
 direct-current to alternating-current rating", not "the site's metadata"; write "six columns
 describing each low-voltage feeder — among them how many housing units it serves", not "metadata
-covariates". Where the fields are not worth listing in full, name the fields that matter and say
-how many there are. The same goes for every other umbrella noun that stands in for a list the
-reader wants: "parameters", "attributes", "characteristics", "data quality issues".
+covariates". Where the fields are not worth listing in full, name the fields that matter and say how
+many there are. The same goes for every other umbrella noun that stands in for a list the reader
+wants: "parameters", "attributes", "characteristics", "data quality issues".
 
 **A noun that carries a count has to say what was counted.** A sentence chaining counts — "screened
 256 records to 31 sources and mapped 13 general-purpose platforms" — hands the reader three units
@@ -231,30 +229,30 @@ above: there an umbrella noun hides a list of fields, here it hides what is bein
 **Say which kind of network you mean, every time.** This project forecasts an electricity network
 using neural networks, so a bare "network" makes the reader stop and work out which one is meant.
 Qualify it on both sides: "electricity network", "distribution network", "network operator" for the
-wires, and "neural network", "graph neural network", "long short-term memory neural network" for
-the model. Where a sentence would otherwise pile up the qualifier, name the specific noun instead —
-"a model trained on the feeders' own history" beats "a model given a network's whole history". Any
+wires, and "neural network", "graph neural network", "long short-term memory neural network" for the
+model. Where a sentence would otherwise pile up the qualifier, name the specific noun instead — "a
+model trained on the feeders' own history" beats "a model given a network's whole history". Any
 other word this project uses for two different meanings gets the same treatment.
 
 **Use the internationally recognised engineering term, not a national policy coinage.** Where a UK
-body has invented a name for a quantity engineering already names, use the engineering name.
-Write "DC capacity" and "AC capacity", not the Department for Energy Security and Net Zero's
-"total installed capacity" and "declared net capacity". Gloss the local label once, at the point a
-reader has to recognise it in a dataset's column headings, and then drop it. The reader is an
-engineer who may not be British, and a term whose meaning is confined to one country's policy
-documents costs them a lookup for nothing. The same goes in the other direction: keep a term that
-is standard in the field even where a UK body has renamed it.
+body has invented a name for a quantity engineering already names, use the engineering name. Write
+"DC capacity" and "AC capacity", not the Department for Energy Security and Net Zero's "total
+installed capacity" and "declared net capacity". Gloss the local label once, at the point a reader
+has to recognise it in a dataset's column headings, and then drop it. The reader is an engineer who
+may not be British, and a term whose meaning is confined to one country's policy documents costs
+them a lookup for nothing. The same goes in the other direction: keep a term that is standard in the
+field even where a UK body has renamed it.
 
-**Describe performance in performance terms, not in money metaphors.** A forecast does not "pay",
-an input does not "buy" accuracy, and a modelling choice does not "cost" anything unless real money
+**Describe performance in performance terms, not in money metaphors.** A forecast does not "pay", an
+input does not "buy" accuracy, and a modelling choice does not "cost" anything unless real money
 changes hands. Write what actually moved: "the inputs that improve skill at short range", "adding
 the physics model made the forecast interpretable without making it less accurate", "rejected the
 gradient-boosted tree on the effort of tuning it". Keep "cost" and "price" for money: what NGED
 spends procuring flexibility is a cost. Calling a lost percentage point of skill a cost as well
 makes the page ambiguous exactly where it has to be exact.
 
-**Put the words in the order that cannot be misread.** "73 wind farms in GB" says what it means;
-"73 GB wind farms" makes the reader parse a noun-pile and can be read as a unit of measure. Where a
+**Put the words in the order that cannot be misread.** "73 wind farms in GB" says what it means; "73
+GB wind farms" makes the reader parse a noun-pile and can be read as a unit of measure. Where a
 qualifier can attach to more than one noun, move it or add the word that pins it down.
 
 **Use numerals when the number carries a unit, is 10 or more, or sits beside another numeral in the
@@ -272,16 +270,16 @@ items.** So "solar, wind, and dispatchable generators", never "solar, wind and d
 generators". The serial comma is the one deliberate departure from *The Economist*'s house style
 above. The serial comma also removes a real ambiguity: without the comma, the last two items can
 read as a pair belonging to the item before them. In a list of assets or of data sources, that
-reading changes the meaning. A list of two items takes no comma, and an author string in a
-reference list follows the citation convention rather than this rule.
+reading changes the meaning. A list of two items takes no comma, and an author string in a reference
+list follows the citation convention rather than this rule.
 
-**Be concise by cutting whole sentences, not words.** Prose should be as short as it can be
-without losing readability, but the compressible material is rarely inside a sentence. It is whole
-sentences and paragraphs that carry no information: restating the heading, summarising what the
-reader has just read, hedging ("it is worth noting that"), listing what we are *not* doing, or a
-closing paragraph that repeats the opening. Delete those outright, and leave the surviving
-sentences intact — buying brevity by clipping words out of a sentence that needs them is the
-mistake the next rule forbids.
+**Be concise by cutting whole sentences, not words.** Prose should be as short as it can be without
+losing readability, but the compressible material is rarely inside a sentence. It is whole sentences
+and paragraphs that carry no information: restating the heading, summarising what the reader has
+just read, hedging ("it is worth noting that"), listing what we are *not* doing, or a closing
+paragraph that repeats the opening. Delete those outright, and leave the surviving sentences intact
+— buying brevity by clipping words out of a sentence that needs them is the mistake the next rule
+forbids.
 
 **Delete a clause the sentence does not need.** This is the one case where cutting inside a sentence
 is right. The usual offenders are a contrast nobody asked for, a restatement of the first half in
@@ -298,24 +296,24 @@ about.
 **Prefer short sentences. Where a sentence carries two claims, split it into two sentences.** A
 joined sentence makes the reader hold the first claim in mind while parsing the second, and the
 second claim usually carries the conclusion. The joins worth checking are "and" and "but", a
-semicolon, an em dash, a "so", a "which", and a trailing participle. None of those joins is wrong
-by itself. The test is whether splitting makes the passage easier to read, never whether a joining
-word is present. Two limits keep the rule from doing harm. A split must leave full sentences rather
-than a fragment, which is the rule below. And a conjunction joining two verbs that share one
-subject joins no second claim: "the forecast reuses yesterday's NWP run and widens the uncertainty
-bands" is one sentence and stays one.
+semicolon, an em dash, a "so", a "which", and a trailing participle. None of those joins is wrong by
+itself. The test is whether splitting makes the passage easier to read, never whether a joining word
+is present. Two limits keep the rule from doing harm. A split must leave full sentences rather than
+a fragment, which is the rule below. And a conjunction joining two verbs that share one subject
+joins no second claim: "the forecast reuses yesterday's NWP run and widens the uncertainty bands" is
+one sentence and stays one.
 
-**Write full sentences; don't drop the subject.** Don't clip words for terseness
-if it leaves a sentence without a clear subject/verb. Prefer "We split storage across two
-buckets so that..." over "Two buckets, not one — split so that...". The full form is more
-readable and no less concise in practice.
+**Write full sentences; don't drop the subject.** Don't clip words for terseness if it leaves a
+sentence without a clear subject/verb. Prefer "We split storage across two buckets so that..." over
+"Two buckets, not one — split so that...". The full form is more readable and no less concise in
+practice.
 
 **Write about the present, not the past.** The docs describe how the code works *now*. Don't write
-about how it used to work, what a change replaced, or which issue changed it — that history lives
-in git, in the PR and in the issue tracker, and repeating it here turns every page into a running
-changelog and makes the docs unreadable. When a change invalidates a passage, rewrite the passage
-to describe the new behaviour rather than appending a note about what changed. This is the
-"comments and docs must reflect current state only" rule in
+about how it used to work, what a change replaced, or which issue changed it — that history lives in
+git, in the PR and in the issue tracker, and repeating it here turns every page into a running
+changelog and makes the docs unreadable. When a change invalidates a passage, rewrite the passage to
+describe the new behaviour rather than appending a note about what changed. This is the "comments
+and docs must reflect current state only" rule in
 [`docs/architecture/code-style.md`](docs/architecture/code-style.md), applied to prose.
 
 **Every citation is a hyperlink to the work cited.** Writing "Sculley et al. (2015)" as plain text
@@ -323,16 +321,16 @@ makes the reader go and find the paper. The link costs only a few characters, an
 identifier is a stable address. Wrap the author-and-year label itself — `[Sculley et al.
 (2015)](https://doi.org/...)` — and prefer a DOI to a publisher's landing page. This holds
 everywhere we write, not only in the literature review: a GitHub issue or a pull-request body
-quoting a paper links it too, because the reader there has even less context than a docs reader.
-The exception is repetition. Once a work is linked, later mentions of the same work in the same
-passage drop both the year and the link and name the authors alone — "Sculley et al. report" — so a
+quoting a paper links it too, because the reader there has even less context than a docs reader. The
+exception is repetition. Once a work is linked, later mentions of the same work in the same passage
+drop both the year and the link and name the authors alone — "Sculley et al. report" — so a
 paragraph does not carry the same link four times. `check_citations.py` in the `literature-review`
 skill enforces the linking half of this rule on the review, and nothing enforces it anywhere else.
 
 **Say what the source found, not what is always true.** When prose rests on a paper, a measurement
 or a trial, state the finding with its scope attached: "in the studies we read, a gradient-boosted
-model beat a same-time-yesterday rule by 10 to 20%", not "sophisticated models beat naive ones".
-A law-like sentence claims far more than the evidence supports, and the first reader who knows a
+model beat a same-time-yesterday rule by 10 to 20%", not "sophisticated models beat naive ones". A
+law-like sentence claims far more than the evidence supports, and the first reader who knows a
 counter-example stops trusting the rest of the page. The same applies to claims that something does
 *not* exist: an absence claim is only ever as good as the search behind it. Say what was searched
 and let the reader judge, rather than asserting that nobody has tried the approach.
@@ -350,8 +348,8 @@ judgement instead, as in "the published method that fits NGED's telemetry most c
 **Don't commit the project to work it has not agreed to.** A page explaining what the literature
 found, what a technique does, or how a subsystem works is not a project plan. A sentence like
 "Flexpectation will therefore label the telemetry by hand" turns a description into a promise a
-funder can hold us to. Describe what is known and what the options are, and leave what we will do
-to the roadmap, the issue tracker, and the documents that own those commitments.
+funder can hold us to. Describe what is known and what the options are, and leave what we will do to
+the roadmap, the issue tracker, and the documents that own those commitments.
 
 **Don't introduce a name, a number, or an acronym before the reader has a use for it.** A fact that
 exists only to justify a claim belongs after the claim, not before it — a reader who meets the
@@ -363,70 +361,69 @@ conclusion: state the claim, then supply the detail that backs it, never the rev
 
 **Don't name individuals.** Write the rule, not who asked for it: "get a contract change agreed
 before making it", never "ask so-and-so before changing a contract". One person maintains this repo
-today, but the docs and skills outlive that, and a name that reads as "the person responsible" to
-us reads as an unknown third party to whoever picks the work up next. Where the sentence needs an
-actor, name the role — the reviewer, the maintainer, whoever runs the pipeline. Real GitHub
-handles used as data are fine (the `JackKelly` assignee, a commit's `Co-Authored-By`); it is prose
-about a named person that this forbids.
+today, but the docs and skills outlive that, and a name that reads as "the person responsible" to us
+reads as an unknown third party to whoever picks the work up next. Where the sentence needs an
+actor, name the role — the reviewer, the maintainer, whoever runs the pipeline. Real GitHub handles
+used as data are fine (the `JackKelly` assignee, a commit's `Co-Authored-By`); it is prose about a
+named person that this forbids.
 
 ## How planning works
 
 Full description and a "which place do I use?" table: `docs/documentation-guide.md`. In brief:
 
 - **GitHub** (issues + the OCF Project board) is the *complete, ordered* task list — task-level
-  priority lives only there. When current priorities matter, query it with `gh` (epics map 1:1
-  to roadmap milestones; dependencies are `blocked by` issue links).
-- **`docs/roadmap/`** holds design, dependencies, and the milestone arc. Step-by-step mechanics
-  sit inside each page under an "Implementation details (deleted when this ships)" section.
+  priority lives only there. When current priorities matter, query it with `gh` (epics map 1:1 to
+  roadmap milestones; dependencies are `blocked by` issue links).
+- **`docs/roadmap/`** holds design, dependencies, and the milestone arc. Step-by-step mechanics sit
+  inside each page under an "Implementation details (deleted when this ships)" section.
 - **`docs/design-philosophy/engineering-hypotheses.md`** holds the falsifiable claims the
-  engineering is meant to deliver. Cite them by label (`H1`, `T1.2`); labels are append-only —
-  never renumber.
+  engineering is meant to deliver. Cite them by label (`H1`, `T1.2`); labels are append-only — never
+  renumber.
 - **`plans/`** holds at most one file: the in-flight branch's implementation plan, written by the
   `plan-issue` skill before any code is touched and deleted on merge. One worktree per branch is
   what keeps it to one file, so parallel sessions never collide. Usually empty on `main`, and empty
   on a branch whose issue was simple enough to need no plan.
 
-**Creating an issue or a PR has a checklist** — labels, org issue Type, OCF project membership
-and its fields, sub-issue ordering, the `JackKelly` assignee — and none of it can be set by `gh
-issue create` / `gh pr create`. It lives in the `github-issue-pr-workflow` skill, along with the
+**Creating an issue or a PR has a checklist** — labels, org issue Type, OCF project membership and
+its fields, sub-issue ordering, the `JackKelly` assignee — and none of it can be set by `gh issue
+create` / `gh pr create`. It lives in the `github-issue-pr-workflow` skill, along with the
 never-squash-merge rule and ship-time triage. Load it before you run either command.
 
 ## How work gets done
 
-Three skills, in order. The last two are deliberately separate so that a design is approved
-before any code moves:
+Three skills, in order. The last two are deliberately separate so that a design is approved before
+any code moves:
 
-1. **`plan-wave`** (`/plan-wave <EPIC>`) chooses the next one-to-five issues under an epic that
-   can run concurrently without editing the same files, and dispatches each as a chip to be
-   launched as its own Claude Code session. It plans one wave and stops, because the epic gains
-   issues while a wave is in flight. Skip it when the issue to work on has already been named.
-2. **`plan-issue`** (`/plan-issue <N>`) reads the issue, decides whether it is worth implementing
-   at all, and sizes how much process it needs. It creates the worktree and branch, writes
-   `plans/<branch-name>.md`, opens the PR as a draft with labels and the `JackKelly` assignee,
-   links to both the plan and the draft PR as soon as they are pushed, has up to two fresh
-   sub-agents adversarially review that plan in turn — the first hunting for a simpler approach,
-   the second checking correctness and testability — and stops for human review. It writes no
-   code.
-3. **`implement-issue`** picks up an approved plan in the worktree and draft PR `plan-issue`
-   already created: implement, the green-before-push verification set, push and mark the PR ready
-   for review, then up to two *further independent* adversarial reviews of the diff — the first
-   for correctness and for cutting the code, tests and prose down to what the change needs, the
-   second mutation-testing the change — committing, triaging and pushing after each, stop for
-   human review. **Never merge.** A simple issue arrives here with no plan and no draft PR, so
-   `implement-issue` makes the worktree and opens the PR itself.
+1. **`plan-wave`** (`/plan-wave <EPIC>`) chooses the next one-to-five issues under an epic that can
+   run concurrently without editing the same files, and dispatches each as a chip to be launched as
+   its own Claude Code session. It plans one wave and stops, because the epic gains issues while a
+   wave is in flight. Skip it when the issue to work on has already been named.
+2. **`plan-issue`** (`/plan-issue <N>`) reads the issue, decides whether it is worth implementing at
+   all, and sizes how much process it needs. It creates the worktree and branch, writes
+   `plans/<branch-name>.md`, opens the PR as a draft with labels and the `JackKelly` assignee, links
+   to both the plan and the draft PR as soon as they are pushed, has up to two fresh sub-agents
+   adversarially review that plan in turn — the first hunting for a simpler approach, the second
+   checking correctness and testability — and stops for human review. It writes no code.
+3. **`implement-issue`** picks up an approved plan in the worktree and draft PR `plan-issue` already
+   created: implement, the green-before-push verification set, push and mark the PR ready for
+   review, then up to two *further independent* adversarial reviews of the diff — the first for
+   correctness and for cutting the code, tests and prose down to what the change needs, the second
+   mutation-testing the change — committing, triaging and pushing after each, stop for human review.
+   **Never merge.** A simple issue arrives here with no plan and no draft PR, so `implement-issue`
+   makes the worktree and opens the PR itself.
 
 **How much process an issue gets is sized to the issue**, in step 3 of `plan-issue`:
 
 - **Simple** — a mechanical change with one obvious way to do it, touching no contract, no
-  production degradation path, no asset graph, and nothing stored, where the verification set is
-  the whole of the risk. It gets **no plan and no agentic review**: implement it, open the PR
-  saying that no sub-agent reviewed it, and stop for human review.
-- **Complex** — anything that changes what gets stored, touches the production serving path,
-  touches a degradation rule, admits more than one defensible design, or spans code whose callers
-  you could not name without searching. It gets the plan and **all four** reviews.
-- **Medium** — everything else. It gets a plan, and Claude chooses between zero and two of the
-  plan reviews and between zero and two of the diff reviews, running the earlier of each pair
-  first and erring towards running one more when the call is close.
+  production degradation path, no asset graph, and nothing stored, where the verification set is the
+  whole of the risk. It gets **no plan and no agentic review**: implement it, open the PR saying
+  that no sub-agent reviewed it, and stop for human review.
+- **Complex** — anything that changes what gets stored, touches the production serving path, touches
+  a degradation rule, admits more than one defensible design, or spans code whose callers you could
+  not name without searching. It gets the plan and **all four** reviews.
+- **Medium** — everything else. It gets a plan, and Claude chooses between zero and two of the plan
+  reviews and between zero and two of the diff reviews, running the earlier of each pair first and
+  erring towards running one more when the call is close.
 
 **State a size as an answer to each of the five triggers in the Complex bullet above, never as the
 one trigger that fired.** A size naming only the trigger you noticed hides the triggers you did not
@@ -441,12 +438,12 @@ fault. Widening a field to `| None` or relaxing a range to make a failing `valid
 the defect in the one place the rest of the system trusts. Reasoning and the rest of the rule:
 [`packages/contracts/README.md`](packages/contracts/README.md).
 
-**Never publish a metered generator's time series with the generator's name or ID.** A single
-site's output can be commercially sensitive, so NGED has asked that generator data leaves the
-project only anonymised. The rule covers everything outside the private data store: charts and
-examples in `docs/`, leaderboard rows, dashboards, reports, papers, and issue or PR bodies.
-Substations are not covered by this rule, and a generator's name may still appear in a lookup table
-that carries no time series.
+**Never publish a metered generator's time series with the generator's name or ID.** A single site's
+output can be commercially sensitive, so NGED has asked that generator data leaves the project only
+anonymised. The rule covers everything outside the private data store: charts and examples in
+`docs/`, leaderboard rows, dashboards, reports, papers, and issue or PR bodies. Substations are not
+covered by this rule, and a generator's name may still appear in a lookup table that carries no time
+series.
 
 **Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an adversarial
 pass by the time a human is asked to review the diff, so that human review is the last line of
@@ -455,9 +452,9 @@ anchored by the implementer's rationale; the triage step exists because reviewer
 wrong and must not be applied uncritically. Simplicity gets its own reviewer, and gets it first,
 because a plan that is more complicated than the issue requires is the failure mode that survives a
 correctness review intact. Mutation testing gets the last reviewer because a green suite proves
-nothing on its own: whether a test would catch the bug it exists for is only settled by writing
-that bug and watching. The sizing exists because that machinery costs wall-clock time and a round
-of triage: on a change whose correctness is visible in the diff it finds nothing the diff did not
+nothing on its own: whether a test would catch the bug it exists for is only settled by writing that
+bug and watching. The sizing exists because that machinery costs wall-clock time and a round of
+triage: on a change whose correctness is visible in the diff it finds nothing the diff did not
 already show, and the process then delays the change instead of protecting it.
 
 ## Architecture
@@ -466,9 +463,9 @@ This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is t
 application; all reusable logic lives in `packages/`.
 
 **A short list of design principles** governs architectural decisions:
-[`docs/design-philosophy/design-principles.md`](docs/design-philosophy/design-principles.md).
-Read them before proposing a structural change. If a change violates one, that is not a veto, but
-say which principle is being traded away and what is bought in return.
+[`docs/design-philosophy/design-principles.md`](docs/design-philosophy/design-principles.md). Read
+them before proposing a structural change. If a change violates one, that is not a veto, but say
+which principle is being traded away and what is bought in return.
 
 ### Inherent stability (production code)
 
@@ -478,8 +475,8 @@ bands, and record the degradation on the row.** Raising is reserved for states t
 that come up constantly when editing `defs/`:
 
 - **Liberal about missing inputs, strict about malformed ones.** Absent data routes into the
-  always-output path; malformed data is rejected at the Patito boundary. Detectably-*wrong* input
-  (a stuck meter) is treated as missing, not as data.
+  always-output path; malformed data is rejected at the Patito boundary. Detectably-*wrong* input (a
+  stuck meter) is treated as missing, not as data.
 - **Asset checks warn, they do not block** — `AssetCheckSeverity.WARN` with `blocking=False`. There
   is deliberately no `ERROR`-severity check anywhere in the repo. A warning function must never be
   able to raise, or fail-open silently becomes fail-closed.
@@ -491,13 +488,13 @@ that come up constantly when editing `defs/`:
   training loop.** Keep the serving path close to "load a model, call `predict`".
 - **Make the telemetry name the fault.** Whatever reaches Sentry — a swallowed exception, a
   degradation warning — carries the tag an alert rule routes on, and names the series, the run or
-  the asset at fault rather than only the type of error. The operator reads the alert, not the
-  logs.
+  the asset at fault rather than only the type of error. The operator reads the alert, not the logs.
 
 Full rationale, the degradation ladder and the numbered rules:
 [`docs/design-philosophy/inherent-stability.md`](docs/design-philosophy/inherent-stability.md). The
 falsifiable claims it is meant to deliver — cite them as `H1`/`T1.2` and never renumber them — are
-in [`docs/design-philosophy/engineering-hypotheses.md`](docs/design-philosophy/engineering-hypotheses.md).
+in
+[`docs/design-philosophy/engineering-hypotheses.md`](docs/design-philosophy/engineering-hypotheses.md).
 
 ### Packages
 
@@ -519,9 +516,12 @@ in [`docs/design-philosophy/engineering-hypotheses.md`](docs/design-philosophy/e
 
 Three main assets:
 
-- `power_time_series_and_metadata` — pulls NGED telemetry from S3, appends to Delta Lake, upserts metadata parquet
-- `h3_grid_weights` — computes fractional H3 cell overlap with the GB boundary for spatial NWP aggregation
-- `ecmwf_ens` — daily-partitioned asset that downloads ECMWF ENS NWP and writes it to Delta Lake via `delta_store.nwp.write_nwp`, which replaces that `(nwp_model_id, init_time)` partition
+- `power_time_series_and_metadata` — pulls NGED telemetry from S3, appends to Delta Lake, upserts
+  metadata parquet
+- `h3_grid_weights` — computes fractional H3 cell overlap with the GB boundary for spatial NWP
+  aggregation
+- `ecmwf_ens` — daily-partitioned asset that downloads ECMWF ENS NWP and writes it to Delta Lake via
+  `delta_store.nwp.write_nwp`, which replaces that `(nwp_model_id, init_time)` partition
 
 ### Data Contracts (`packages/contracts/`)
 
@@ -529,13 +529,20 @@ All tabular data flowing through the system is validated with **Patito** models.
 
 - `PowerTimeSeries` — half-hourly power observations (MW/MVA) per `time_series_id`
 - `TimeSeriesMetadata` — substation metadata including lat/lon, H3 index, substation type
-- `Nwp` — NWP weather data in physical-unit `Float32`, on disk and in memory alike (rounded to a 13-bit significand at write time by `delta_store.nwp`)
-- `AllFeatures` — the final joined dataset handed to ML models; primary key is `(time_series_id, power_fcst_init_time, valid_time[, ensemble_member])`
+- `Nwp` — NWP weather data in physical-unit `Float32`, on disk and in memory alike (rounded to a
+  13-bit significand at write time by `delta_store.nwp`)
+- `AllFeatures` — the final joined dataset handed to ML models; primary key is `(time_series_id,
+  power_fcst_init_time, valid_time[, ensemble_member])`
 - `PowerForecast` — model output schema
 
 ### Feature Engineering (`packages/ml_core/src/ml_core/features/`)
 
-`_engineer_features()` (in `tabular_feature_engineer.py`) is the central tabular pipeline function: given a `set[str]` of requested feature names, it joins power observations with NWP and metadata, then applies features. Feature names are parsed by `ParsedFeatures.from_strings()` (in `_parsed_features.py`) into typed `LagFeature`, `RollingFeature`, `StaticFeature`, `TimeFeature`, or `WeatherFeature` objects. Callers reach this via `FeatureEngineer.engineer()` — see the ML Model Interface section below.
+`_engineer_features()` (in `tabular_feature_engineer.py`) is the central tabular pipeline function:
+given a `set[str]` of requested feature names, it joins power observations with NWP and metadata,
+then applies features. Feature names are parsed by `ParsedFeatures.from_strings()` (in
+`_parsed_features.py`) into typed `LagFeature`, `RollingFeature`, `StaticFeature`, `TimeFeature`, or
+`WeatherFeature` objects. Callers reach this via `FeatureEngineer.engineer()` — see the ML Model
+Interface section below.
 
 **Critical design invariant — no lookahead bias:** `power_fcst_init_time` (when we make the
 forecast) is distinct from `nwp_init_time` (when the NWP model ran). Power lag features are
@@ -545,8 +552,10 @@ for past target times.
 
 Two operating modes:
 
-- **Bulk training and multi-run backtesting** (recommended for most callers): `power_fcst_init_time` is `None`; it is derived per-row as `nwp_init_time + nwp_publication_delay_hours`.
-- **Single-run inference or backfilling**: `power_fcst_init_time` is provided; NWP is joined on `(time_series_id, valid_time, nwp_init_time)` for the one matching NWP run.
+- **Bulk training and multi-run backtesting** (recommended for most callers): `power_fcst_init_time`
+  is `None`; it is derived per-row as `nwp_init_time + nwp_publication_delay_hours`.
+- **Single-run inference or backfilling**: `power_fcst_init_time` is provided; NWP is joined on
+  `(time_series_id, valid_time, nwp_init_time)` for the one matching NWP run.
 
 ### ML Model Interface (`packages/ml_core/src/ml_core/base_forecaster.py`)
 
@@ -566,8 +575,8 @@ identity into `power_fcst_model_name`.
 
 Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer]` — a strategy
 object (composition, not inheritance) that owns the full data-preparation pipeline from raw inputs
-to an `AllFeatures` frame, including the NWP spatial join. The default `TabularFeatureEngineer`
-maps each gridded NWP H3 cell to the nearest time series then runs the tabular `_engineer_features`
+to an `AllFeatures` frame, including the NWP spatial join. The default `TabularFeatureEngineer` maps
+each gridded NWP H3 cell to the nearest time series then runs the tabular `_engineer_features`
 pipeline. A future model needing a different view of the data (e.g. a CNN wanting a spatial NWP
 crop) overrides `feature_engineer` with a different `FeatureEngineer` subclass — it does not change
 `_engineer_features` or `BaseForecaster`. Both classes live in

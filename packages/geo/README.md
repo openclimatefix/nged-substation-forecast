@@ -1,11 +1,12 @@
 # Geo Package
 
-Generic geospatial logic and data for the NGED substation forecast project: H3 spatial indexing
-and the Great Britain boundary the NWP grid is clipped to.
+Generic geospatial logic and data for the NGED substation forecast project: H3 spatial indexing and
+the Great Britain boundary the NWP grid is clipped to.
 
 ## Map of Great Britain using H3 resolution 5 hexagons
 
-![Map of Great Britain using H3 resolution 5 hexagons](assets/map-of-Great-Britain-H3-resolution-5.png)
+![Map of Great Britain using H3 resolution 5
+hexagons](assets/map-of-Great-Britain-H3-resolution-5.png)
 
 ## Purpose
 
@@ -16,19 +17,19 @@ depending on heavy or unrelated packages.
 
 `compute_h3_grid_weights_for_boundary` accepts any boundary polygon, not only the Great Britain
 shape this package ships. Keeping it general costs nothing here and means a new region plugs into
-the same H3 gridding rather than forking it, which is
-[design principle 5](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#5-everything-around-the-model-is-general-purpose)
+the same H3 gridding rather than forking it, which is [design principle
+5](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#5-everything-around-the-model-is-general-purpose)
 applied to this package.
 
 Two neighbouring jobs are deliberately *not* here. The per-substation H3 index (`h3_res_5` on
 `TimeSeriesMetadata`) is computed by `nged_data` straight from each substation's coordinates, and
-the spatial aggregation that consumes the grid weights computed here happens in `dynamical_data`
-at ECMWF ingest.
+the spatial aggregation that consumes the grid weights computed here happens in `dynamical_data` at
+ECMWF ingest.
 
 ## Contents
 
-- `h3` — `compute_h3_grid_weights_for_boundary()` and `compute_h3_grid_weights()`, which map the
-  H3 grid onto the regular lat/lon NWP grid. The sampling and snapping method is documented on the
+- `h3` — `compute_h3_grid_weights_for_boundary()` and `compute_h3_grid_weights()`, which map the H3
+  grid onto the regular lat/lon NWP grid. The sampling and snapping method is documented on the
   functions themselves.
 - `great_britain.load` — `load_gb_boundary()`, which loads the Great Britain boundary polygon that
   the NWP grid is clipped to, from the packaged GeoJSON file.

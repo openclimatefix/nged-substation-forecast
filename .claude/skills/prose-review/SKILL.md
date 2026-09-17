@@ -57,27 +57,27 @@ that reviewer already knows what a later section says while reading an earlier o
 
 **Many pages have no bolded leads to extract — summarise each paragraph instead.** The bolded-lead
 rule is recent, so a page written before the rule can lack bolded leads entirely. Even a page that
-has some can have paragraphs without one. Where a paragraph has no bolded lead, write a
-one-sentence summary of its conclusion — not its topic — standing in for the lead it should have
-had, then build the same flat list from those summaries and read it the same way. Unlike the
-mechanical extraction above, summarising is a judgement call: do it paragraph by paragraph, blind
-to the document's overall argument as far as that's practical, so a summary reports what the
-paragraph actually concludes rather than what the summariser already expects the page to say.
+has some can have paragraphs without one. Where a paragraph has no bolded lead, write a one-sentence
+summary of its conclusion — not its topic — standing in for the lead it should have had, then build
+the same flat list from those summaries and read it the same way. Unlike the mechanical extraction
+above, summarising is a judgement call: do it paragraph by paragraph, blind to the document's
+overall argument as far as that's practical, so a summary reports what the paragraph actually
+concludes rather than what the summariser already expects the page to say.
 
 **Check whether a missing bolded lead is a convention before proposing to add one.** A paragraph
-with no bolded lead usually wants one, but not always: a page can deliberately give a whole class
-of paragraph no lead — the short paragraph that states a problem ahead of the sections answering
-it, the sentence that exists only to introduce the table under it. Three separate reviewers in one
-run each proposed adding a lead to a paragraph of one such class, because each saw a single
-instance and none checked the rest of the page. Before recording the finding, count how many
-paragraphs of the same kind the document holds and how many of those carry a lead. Where none
-does, the absence is a convention and the finding is wrong.
+with no bolded lead usually wants one, but not always: a page can deliberately give a whole class of
+paragraph no lead — the short paragraph that states a problem ahead of the sections answering it,
+the sentence that exists only to introduce the table under it. Three separate reviewers in one run
+each proposed adding a lead to a paragraph of one such class, because each saw a single instance and
+none checked the rest of the page. Before recording the finding, count how many paragraphs of the
+same kind the document holds and how many of those carry a lead. Where none does, the absence is a
+convention and the finding is wrong.
 
 ## Pass B: paragraphs carrying more than one claim
 
 **A paragraph that makes two distinct claims can carry a bolded lead for only one of them, which
-makes an oversized paragraph a structural defect rather than a stylistic one.** Nothing else in
-this repo looks for it. Until this pass existed, a 479-word paragraph, a 525-word paragraph and a
+makes an oversized paragraph a structural defect rather than a stylistic one.** Nothing else in this
+repo looks for it. Until this pass existed, a 479-word paragraph, a 525-word paragraph and a
 352-word paragraph all survived every review round the literature review had been given.
 
 Roughly 150 words or 10 wrapped lines is the prompt to look, not the test. The test is whether the
@@ -85,30 +85,29 @@ paragraph reaches more than one conclusion. A 180-word paragraph running one con
 one conclusion stays whole; splitting it would cut a sentence away from the evidence it needs.
 
 For every split, give the exact sentence to split at and write the bolded lead for the new
-paragraph. A split that leaves the second half without a lead has moved the defect rather than
-fixed it.
+paragraph. A split that leaves the second half without a lead has moved the defect rather than fixed
+it.
 
 **The mirror-image finding is a run of bullets that should be prose.** CLAUDE.md prefers
 sub-headings and short paragraphs over bullet lists, because a list flattens an argument into items
 of equal weight. A bulleted item carrying several sentences and a citation is a paragraph wearing a
 hyphen; a genuinely parallel set of short design notes is a list. Both directions are findings.
 
-**Prose that should be bullets is the harder direction to spot, and the rule that decides it is
-the complexity of the concept, not the length of the passage.** CLAUDE.md's bullets rule allows a
-list wherever the items really are of equal weight and each one is simple — the options a setting
-takes, what a table holds, a run of short design notes — and forbids one wherever the passage
-introduces a complex new concept, because the connective tissue between the sentences is what
-makes a new concept followable. So the finding is not "this paragraph is long". The finding is
-that a reader meeting this material for the first time would lose nothing if the sentences stopped
-joining up. Where a paragraph is building an argument towards a conclusion, leave it as prose
-however long it runs.
+**Prose that should be bullets is the harder direction to spot, and the rule that decides it is the
+complexity of the concept, not the length of the passage.** CLAUDE.md's bullets rule allows a list
+wherever the items really are of equal weight and each one is simple — the options a setting takes,
+what a table holds, a run of short design notes — and forbids one wherever the passage introduces a
+complex new concept, because the connective tissue between the sentences is what makes a new concept
+followable. So the finding is not "this paragraph is long". The finding is that a reader meeting
+this material for the first time would lose nothing if the sentences stopped joining up. Where a
+paragraph is building an argument towards a conclusion, leave it as prose however long it runs.
 
 ## Pass C: does every count close?
 
 **An enumeration that promises N items and delivers a different N is invisible to every other pass
 and mechanically detectable by this one.** It reads perfectly well sentence by sentence, so the
-word-level sweep passes over it. A reviewer holding the whole document already knows what the
-author meant, too.
+word-level sweep passes over it. A reviewer holding the whole document already knows what the author
+meant, too.
 
 For every "the four in use", "three further", "six spokes", "the five are not", "nine challenges":
 
@@ -139,23 +138,23 @@ Two tests per heading, per CLAUDE.md's heading rule:
 A heading failing either test is rewritten as a plain descriptor of its subject, and the conclusion
 moves into the section's bolded lead. A heading passing both tests is left alone, however long it
 is. Often only one phrase is failing, and replacing that phrase keeps the conclusion: "the field"
-became "MLOps research" because a bare "the field" is the referent fault Rule 1 already forbids.
-The rewritten phrase lands in the one sentence a skim-reader is guaranteed to read.
+became "MLOps research" because a bare "the field" is the referent fault Rule 1 already forbids. The
+rewritten phrase lands in the one sentence a skim-reader is guaranteed to read.
 
 **The two tests apply to a navigation entry with more force than to a heading.** A published site's
 navigation is where a reader arrives, so a section or page name that only makes sense once the page
 is open sends every reader down the wrong branch. Read the navigation on its own, the way Pass A
 reads the bolded leads: `mkdocs.yml`'s `nav` block is the whole list, and any name a first-time
 reader cannot place is a finding. Keep the capitalisation consistent across the list too — a
-navigation list mixing title case with sentence case reads as two lists stapled together — and
-where two entries in different sections name the same subject, that duplication is a Pass F
-finding, not a naming one.
+navigation list mixing title case with sentence case reads as two lists stapled together — and where
+two entries in different sections name the same subject, that duplication is a Pass F finding, not a
+naming one.
 
 **Renaming a heading changes its anchor slug, so grep for inbound links to the old slug first** —
-across `docs/`, the skills, and any absolute link to the published site — and update every one in the
-same commit. That cost is real: of three headings renamed in this repo, two carried three and two
-inbound links respectively. The link text is usually a fragment of the sentence around it rather than
-the heading itself, so only the anchor needs changing.
+across `docs/`, the skills, and any absolute link to the published site — and update every one in
+the same commit. That cost is real: of three headings renamed in this repo, two carried three and
+two inbound links respectively. The link text is usually a fragment of the sentence around it rather
+than the heading itself, so only the anchor needs changing.
 
 ## Pass E: the first-stumble reader
 
@@ -163,13 +162,13 @@ the heading itself, so only the anchor needs changing.
 conversation.** Paste the document into the prompt, or point the sub-agent at a single scratchpad
 file, and instruct it to read nothing else. Left unconstrained, a sub-agent in this repo auto-loads
 `CLAUDE.md` and can read any file in it, which defeats the isolation. Give it a stated knowledge
-boundary too: a persona matched to the document's actual audience, such as "an NGED engineer who
-has never trained a machine-learning model" or "a funder reading this for the first time." Ask it
-to read from the top and stop at the first sentence it cannot follow, and to name the earlier
-sentence that would have had to exist for that sentence to work. Forbid it from rewriting anything
-— its job is to report where a reader stalls, not to fix the prose. Run it with two or three
-personas that cover the page's real readers. A stop point one persona reports and another doesn't
-is a gap specific to that persona's background, not a fault in the document as a whole.
+boundary too: a persona matched to the document's actual audience, such as "an NGED engineer who has
+never trained a machine-learning model" or "a funder reading this for the first time." Ask it to
+read from the top and stop at the first sentence it cannot follow, and to name the earlier sentence
+that would have had to exist for that sentence to work. Forbid it from rewriting anything — its job
+is to report where a reader stalls, not to fix the prose. Run it with two or three personas that
+cover the page's real readers. A stop point one persona reports and another doesn't is a gap
+specific to that persona's background, not a fault in the document as a whole.
 
 The output is a list of stop points: an ordering-bug report, not a style critique.
 
@@ -188,9 +187,9 @@ scheduled for deletion has to be promoted to a permanent page before that page g
 **A cross-reference must carry a few words saying what is on the other end.** A bare `H2`, a bare
 "see the design principles", or a link whose visible text is only a label leaves the reader unable
 to tell whether they need to follow it, so they either break off and read the other page or skip a
-claim they should have checked. Write "the model must beat the manual heuristic at day-ahead
-(H2)" with the link on the words, not "see H2". A label is an address, not a description, and a
-link whose text is only the address is as opaque as no link at all.
+claim they should have checked. Write "the model must beat the manual heuristic at day-ahead (H2)"
+with the link on the words, not "see H2". A label is an address, not a description, and a link whose
+text is only the address is as opaque as no link at all.
 
 **Find the candidates with `scripts/find_duplication.py`, then find the real duplication by
 reading.** The script counts the 8-word runs each pair of pages shares, which is a cheap way to
@@ -212,10 +211,10 @@ arrives at first and what that page owes them, rather than merging by default: a
 genuinely routes a reader earns its length, and one that restates the page it links to does not.
 
 **Before deleting any passage, grep for inbound links to it, anchors included.** A heading that
-disappears takes its anchor slug with it, and `mkdocs build --strict` checks relative links only,
-so a link from outside the repo breaks silently. **And never cut a passage that limits a claim in
-the project's own favour** — material that makes the project look more modest is almost always
-there on purpose.
+disappears takes its anchor slug with it, and `mkdocs build --strict` checks relative links only, so
+a link from outside the repo breaks silently. **And never cut a passage that limits a claim in the
+project's own favour** — material that makes the project look more modest is almost always there on
+purpose.
 
 ## Fix at the level the pass found the problem
 
@@ -233,13 +232,13 @@ there on purpose.
 
 **A reviewer asked to check every rule at once finds the loudest fault in each paragraph and moves
 on, so the quieter faults survive.** The evidence is direct rather than theoretical. A combined
-sweep of one section of the literature review reported **zero** findings. A one-rule-at-a-time
-sweep of the same text, by the same model, found **30** — 26 pronouns, 2 unscoped superlatives, 2
-umbrella nouns, and a money metaphor. Extended across the whole review, 6 sub-agents working one
-rule per pass returned 469 findings on a file that had already passed several reviews.
+sweep of one section of the literature review reported **zero** findings. A one-rule-at-a-time sweep
+of the same text, by the same model, found **30** — 26 pronouns, 2 unscoped superlatives, 2 umbrella
+nouns, and a money metaphor. Extended across the whole review, 6 sub-agents working one rule per
+pass returned 469 findings on a file that had already passed several reviews.
 
-**Say "one pass per rule" explicitly in the brief.** A brief that lists all eleven rules together gets a
-sweep that honours none of them, because listing the rules is not the same instruction as
+**Say "one pass per rule" explicitly in the brief.** A brief that lists all eleven rules together
+gets a sweep that honours none of them, because listing the rules is not the same instruction as
 sequencing them.
 
 **Require reasoning on the passes that return nothing.** A silent pass and a skipped pass look
@@ -257,49 +256,49 @@ expensive passes get the freshest attention:
 3. Pronouns and demonstratives, including "one", "ones", and "such a"
 4. Unenumerated singletons and superlatives
 5. Umbrella nouns — "thing", "something", "anything", "metadata"
-6. Counting nouns that never say what was counted — "records", "sources", "items",
-   "entries", "studies", "results"
+6. Counting nouns that never say what was counted — "records", "sources", "items", "entries",
+   "studies", "results"
 7. Money metaphors for performance
 8. Ambiguous "network"
 9. Numerals
 10. Serial commas
 11. Acronyms expanded on first use
 12. Sentences readable two ways, and noun-piles
-13. Sentences that announce content instead of stating it — "it is worth noting/saying,"
-    "it is important to note," "let us consider," "there are several reasons why"
+13. Sentences that announce content instead of stating it — "it is worth noting/saying," "it is
+    important to note," "let us consider," "there are several reasons why"
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
 
-**The deletion pass goes first because a clause that is about to be deleted is not worth
-splitting, naming a noun in, or expanding an acronym in.** Every later pass costs less on text the
-deletion pass has already thinned, and a sentence that loses a dead clause often stops being a
-two-claim sentence at all, so the split pass has less to do. The deletion finding is a whole
-clause the sentence can lose: the contrast that restates what the definition already settled, the
-half-sentence saying what a passage is *not* about, the aside that repeats the subject. Delete it,
-re-read the sentence, and keep the deletion unless the reader lost something. Where the reviewer
-cannot tell whether the clause carries anything, it stays — this pass is for the clauses whose
-deletion is obviously safe, not for close calls.
+**The deletion pass goes first because a clause that is about to be deleted is not worth splitting,
+naming a noun in, or expanding an acronym in.** Every later pass costs less on text the deletion
+pass has already thinned, and a sentence that loses a dead clause often stops being a two-claim
+sentence at all, so the split pass has less to do. The deletion finding is a whole clause the
+sentence can lose: the contrast that restates what the definition already settled, the half-sentence
+saying what a passage is *not* about, the aside that repeats the subject. Delete it, re-read the
+sentence, and keep the deletion unless the reader lost something. Where the reviewer cannot tell
+whether the clause carries anything, it stays — this pass is for the clauses whose deletion is
+obviously safe, not for close calls.
 
 **The split pass goes second because splitting a sentence manufactures work for the passes behind
 it.** A split leaves the second claim needing a subject, and the obvious subject is a pronoun
 standing for whatever the first half named: "it plays on substation load the role the combined
 reference plays on irradiance, and it is the bar that decides whether the project is worth its
-money" splits into a second sentence opening "It is also the bar", whose referent is now three
-nouns back. Seven of 94 splits in one pass did this. Running the pronoun pass next turns every one
-of those stranded pronouns into an ordinary pronoun finding, and the numeral pass later catches a
-split that leaves a sentence opening with a numeral. Sweep in the old order and each of those
-faults has to be hunted afterwards by hand, on text that no pass is looking at any more.
+money" splits into a second sentence opening "It is also the bar", whose referent is now three nouns
+back. Seven of 94 splits in one pass did this. Running the pronoun pass next turns every one of
+those stranded pronouns into an ordinary pronoun finding, and the numeral pass later catches a split
+that leaves a sentence opening with a numeral. Sweep in the old order and each of those faults has
+to be hunted afterwards by hand, on text that no pass is looking at any more.
 
-**Where naming the stranded noun reads as pure repetition, the split was the wrong call.** Two
-verbs sharing one subject carry one claim between them, so the sentence was never a finding and
-the pronoun pass is telling you so. Rejoin it rather than inventing a subject for the second half.
+**Where naming the stranded noun reads as pure repetition, the split was the wrong call.** Two verbs
+sharing one subject carry one claim between them, so the sentence was never a finding and the
+pronoun pass is telling you so. Rejoin it rather than inventing a subject for the second half.
 
 **The reorder costs the split pass its cheapest way in.** Naming a noun, naming what a count
-counted, and expanding an acronym all make sentences longer, so a sweep that ran those passes
-first would hand the split pass a longer and more conspicuous corpus. Going first means the length
-grep below sees every sentence at its shortest. Set the threshold lower than the 160 characters
-that worked when splitting ran last, and treat the grep as a way in rather than as the pass: the
-finding is two claims, not a character count.
+counted, and expanding an acronym all make sentences longer, so a sweep that ran those passes first
+would hand the split pass a longer and more conspicuous corpus. Going first means the length grep
+below sees every sentence at its shortest. Set the threshold lower than the 160 characters that
+worked when splitting ran last, and treat the grep as a way in rather than as the pass: the finding
+is two claims, not a character count.
 
 **Rule 1 has a cheap way in: find the long sentences.** `grep -oE '[^.]{130,}\.'` over a
 whitespace-normalised copy returns the sentences worth reading, and the finding is real where the
@@ -309,16 +308,17 @@ sweep briefed on conjunctions alone will miss. A conjunction joining two verbs t
 subject is not a finding, and neither is a split that would leave a fragment.
 
 **Rule 5 has a cheap way in too: find the sentences carrying two or more numerals.** A count chain
-is where the fault lives, and a methods sentence reporting a screening funnel is where a count
-chain lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds
-them, and most will be fine. The ones that are not hand the reader a different unit at each number
-and define none of them.
+is where the fault lives, and a methods sentence reporting a screening funnel is where a count chain
+lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and
+most will be fine. The ones that are not hand the reader a different unit at each number and define
+none of them.
 
-**Rule 13 has a cheap way in too: grep for the throat-clearing openers themselves.**
-`grep -inE "it (is|would be) (worth|important|useful|interesting) (noting|saying|pointing out|mentioning)|let us (consider|turn to)|we now turn to|there are (several|many) reasons why|this raises the question of"`
+**Rule 13 has a cheap way in too: grep for the throat-clearing openers themselves.** `grep -inE "it
+(is|would be) (worth|important|useful|interesting) (noting|saying|pointing out|mentioning)|let us
+(consider|turn to)|we now turn to|there are (several|many) reasons why|this raises the question of"`
 over a whitespace-normalised copy finds most instances directly, because the phrase itself is the
-fault rather than a symptom of it. The finding is real wherever the sentence could instead state
-its content and skip the announcement — which is nearly always; the rare exception is a genuine
+fault rather than a symptom of it. The finding is real wherever the sentence could instead state its
+content and skip the announcement — which is nearly always; the rare exception is a genuine
 transition sentence that a reader needs to see coming (a change of topic mid-page), which stays.
 
 ## What is deliberately not a finding
@@ -327,12 +327,12 @@ transition sentence that a reader needs to see coming (a change of topic mid-pag
 afterwards.** In the review sweep, roughly 250 of 469 findings were a single pattern that should
 never have been reported.
 
-- **An author possessive whose owner is already the subject of its own clause.** "Kaas et al.
-  report the median across their 200 feeders" is correct as written. The rule's test is whether a
-  pronoun makes the reader look backwards to work out the referent, and a possessive with no
-  competing candidate does not. Repeating the name there — "Kaas et al.'s 200 feeders" — costs
-  readability and buys no precision. Left unstated in the brief, this pattern produces proposals as
-  bad as "Enedis has forecast all 2,300 of Enedis's substations".
+- **An author possessive whose owner is already the subject of its own clause.** "Kaas et al. report
+  the median across their 200 feeders" is correct as written. The rule's test is whether a pronoun
+  makes the reader look backwards to work out the referent, and a possessive with no competing
+  candidate does not. Repeating the name there — "Kaas et al.'s 200 feeders" — costs readability and
+  buys no precision. Left unstated in the brief, this pattern produces proposals as bad as "Enedis
+  has forecast all 2,300 of Enedis's substations".
 - **"One" as a determiner in front of the noun it counts.** "the one review we found" both scopes a
   claim and names its noun.
 - **A demonstrative that already names its noun**, such as "those principles". The fault is a *bare*
@@ -343,8 +343,8 @@ never have been reported.
   the serial-comma rule.
 - **Code blocks and the code inside them**, including comments.
 - **Headings**, which Pass D owns. The sentence sweep leaves them alone. A heading rename changes
-  the anchor slug and breaks inbound links from elsewhere in the docs, including absolute links
-  from other pages, so it is worth doing deliberately rather than as a by-product.
+  the anchor slug and breaks inbound links from elsewhere in the docs, including absolute links from
+  other pages, so it is worth doing deliberately rather than as a by-product.
 
 Findings worth keeping are the mirror image: "one"/"ones"/"theirs"/"ours" standing in place of a
 noun, a pronoun or demonstrative *opening* a sentence, a referent with two or more plausible
@@ -356,13 +356,13 @@ candidates, and a bare "that" or "this" standing for a whole clause.
 verbatim quote, and concrete replacement wording for every finding.** A finding without replacement
 wording cannot be triaged and is worth nothing.
 
-- **Chunk by section boundary, not by equal line count**, so no agent owns half an argument.
-  Roughly 5,000 to 7,000 words per agent worked well; the reference list needs no sweep.
+- **Chunk by section boundary, not by equal line count**, so no agent owns half an argument. Roughly
+  5,000 to 7,000 words per agent worked well; the reference list needs no sweep.
 - **A per-section pass finds the defects inside a section; only a whole-document pass finds a
   paragraph sitting in the wrong section.** What a split cannot see is the join. An agent holding
-  one section cannot notice that its section repeats a paragraph from an earlier one, or that a
-  fact it asks for arrives two sections later. Run Pass A over the complete document as well, and
-  treat that whole-document pass as the only one entitled to move a paragraph between sections.
+  one section cannot notice that its section repeats a paragraph from an earlier one, or that a fact
+  it asks for arrives two sections later. Run Pass A over the complete document as well, and treat
+  that whole-document pass as the only one entitled to move a paragraph between sections.
 - **Warn about hard wrapping.** In a wrapped file a sentence spans several lines, so a plain grep
   for a phrase misses most matches. An agent that greps will report a present passage as absent.
   Tell the agent to normalise first: `tr '\n' ' ' < FILE | tr -s ' ' | grep -o 'phrase'`.
@@ -370,9 +370,9 @@ wording cannot be triaged and is worth nothing.
   means an edit to one word reflows the whole paragraph, so `git diff` presents untouched sentences
   as added lines. Tell the agent to check any finding against the merge-base version before
   reporting it, or the sweep returns pre-existing prose as new findings.
-- **Report only. Edit no file, run no `git` command that writes, spawn no sub-agents, use no
-  browser tools.** Concurrent agents editing one file collide, and a finding that lands before
-  triage cannot be rejected.
+- **Report only. Edit no file, run no `git` command that writes, spawn no sub-agents, use no browser
+  tools.** Concurrent agents editing one file collide, and a finding that lands before triage cannot
+  be rejected.
 - **Ask for absolute line numbers in the file**, not offsets into an extracted chunk.
 - **Ask for the findings as JSON** — a list of objects carrying `file`, `quote` and `replacement` —
   so `scripts/apply_findings.py` can apply the whole batch without anything being retyped. Tell the
@@ -384,16 +384,16 @@ wording cannot be triaged and is worth nothing.
 **Where the sweep covers pages a branch only partly wrote, gate each finding on the merge-base.**
 Tell the agent to skip prose that predates the branch, then check it mechanically too, because the
 instruction leaks. A finding that is already on `main` belongs to whatever issue owns the unswept
-rest of the docs, not to the branch in hand. `scripts/apply_findings.py --merge-base <ref>` runs
-the check: it normalises the whitespace, projects the markup away, and tests the quoted sentence
-against `git show <ref>:<path>` before applying anything.
+rest of the docs, not to the branch in hand. `scripts/apply_findings.py --merge-base <ref>` runs the
+check: it normalises the whitespace, projects the markup away, and tests the quoted sentence against
+`git show <ref>:<path>` before applying anything.
 
-**The leak is small, and an earlier estimate of it here was wrong.** Of 171 findings gated this
-way, the gate caught one. The figure this skill carried before — about one in nine — came from
-sampling sentence fragments picked by hand rather than the quotes the agents actually filed, and
-overstated the leak by more than an order of magnitude. Measure a yield on the findings that were
-really filed, or quote no yield at all. The gate stays worth running at one in 171, because it
-costs one flag and the finding it catches is prose the branch has no business touching.
+**The leak is small, and an earlier estimate of it here was wrong.** Of 171 findings gated this way,
+the gate caught one. The figure this skill carried before — about one in nine — came from sampling
+sentence fragments picked by hand rather than the quotes the agents actually filed, and overstated
+the leak by more than an order of magnitude. Measure a yield on the findings that were really filed,
+or quote no yield at all. The gate stays worth running at one in 171, because it costs one flag and
+the finding it catches is prose the branch has no business touching.
 
 ## Which model to give the review to
 
@@ -411,8 +411,8 @@ never Haiku 4.5.** All three were given a byte-identical brief over an identical
 
 **Opus returned fewer findings than Sonnet, and better findings.** Opus applied the
 author-possessive carve-out above without being told, and listed every candidate it had rejected
-with a line number. Listing the rejections makes the restraint auditable rather than assumed.
-Sonnet reported that whole category as findings.
+with a line number. Listing the rejections makes the restraint auditable rather than assumed. Sonnet
+reported that whole category as findings.
 
 **The gap that matters most is the singleton-and-superlative rule.** Sonnet reported no findings
 there, with confident reasoning. Opus found eight, one of which contradicted another passage of the
@@ -437,8 +437,8 @@ before acting on it.** Reviewers in these runs variously reported a cross-refere
 wrong way when the document already pointed the right way, proposed renaming a metric to a word
 other than the one the cited paper uses for it, three times proposed a bolded lead the page
 deliberately omits, and proposed a replacement sentence repeating a factual error a different agent
-had disproved in the same run. An agent reading a 3,000-line document reports what it remembers,
-and what it remembers is sometimes not what the line says.
+had disproved in the same run. An agent reading a 3,000-line document reports what it remembers, and
+what it remembers is sometimes not what the line says.
 
 - **Triage the whole set together, not agent by agent.** Agents contradict each other, and the
   contradiction is the signal.
@@ -458,9 +458,9 @@ and what it remembers is sometimes not what the line says.
 - **A claim checked by running something survives the next review; a claim checked by reading often
   does not.** Four failure modes written up from one reviewer's findings went in unrun, and a later
   review found three of the four wrong in part — each a plausible mechanism sitting next to a
-  correct outcome, which is the shape most likely to send a reader hunting in the wrong place.
-  Every claim in the same batch that had been settled by executing the library held exactly. Where
-  prose states what a library does, run it before writing the sentence.
+  correct outcome, which is the shape most likely to send a reader hunting in the wrong place. Every
+  claim in the same batch that had been settled by executing the library held exactly. Where prose
+  states what a library does, run it before writing the sentence.
 
 ## Applying and checking the edits
 
@@ -475,29 +475,29 @@ uv run python .claude/skills/prose-review/scripts/apply_findings.py findings.jso
 
 The paragraphs below say what the script is defending against. Read them before hand-editing
 anything the script refused, because what the refusal was for decides how the edit has to be made
-instead. Every defect named below was written by an earlier apply script and then passed
-`pymarkdown scan`, `mkdocs build --strict` and `check_information_loss.py` unnoticed.
+instead. Every defect named below was written by an earlier apply script and then passed `pymarkdown
+scan`, `mkdocs build --strict` and `check_information_loss.py` unnoticed.
 
 **A sub-agent quotes the sentence with the markdown stripped, so a wrap-tolerant substitution still
 misses it.** `[Gijon et al. (2025)](https://doi.org/…) write` comes back as `Gijon et al. (2025)
 write`, and 57 of 98 findings failed to match on that alone. The script matches against a
 markup-stripped projection of the file that keeps an offset map back to the raw text, then splices
-the replacement in run by run, copying raw characters wherever the wording is unchanged so the
-links and bold markers the agent dropped survive. The replacement is written without markup too,
-so splicing it in whole would delete every link in the sentence.
+the replacement in run by run, copying raw characters wherever the wording is unchanged so the links
+and bold markers the agent dropped survive. The replacement is written without markup too, so
+splicing it in whole would delete every link in the sentence.
 
 **The offset map records where each character's markup ends, not only where the character sits.** A
 map of bare character positions resumes the raw text before a closing backtick, so a serial comma
 inserted after `n_h3_cells` is written as `` `n_h3_cells,` `` — the comma inside the code span. The
 backtick count is unchanged, so every markup check below is satisfied and only `check_structure.py`
 catches it. Each projected character therefore carries the opening backtick, `[` or `**` before it
-and the closing backtick, `](url)` or `**` after it, and a splice writes between those bounds
-rather than across them.
+and the closing backtick, `](url)` or `**` after it, and a splice writes between those bounds rather
+than across them.
 
-**A quote that stops short of a trailing clause matches nothing at all.** A sub-agent routinely
-ends its quote before a parenthetical the file actually carries, while every change it proposes
-sits in the head of the sentence. Trimming the words the quote and the replacement share at the end
-makes the truncated quote match, which the script does before searching.
+**A quote that stops short of a trailing clause matches nothing at all.** A sub-agent routinely ends
+its quote before a parenthetical the file actually carries, while every change it proposes sits in
+the head of the sentence. Trimming the words the quote and the replacement share at the end makes
+the truncated quote match, which the script does before searching.
 
 **A bolded lead is the one span whose full stop belongs inside its markers, and the splice puts it
 there.** Splitting is the pass that reaches this boundary, because the join it breaks is often the
@@ -507,16 +507,16 @@ spot` becomes `**the same information.** They are harder to spot`, with the stop
 span takes its punctuation outside: a serial comma after a code span, a link or a mid-sentence bold
 is written after the closing marker. Counts over the 78 markdown files under `docs/`, in the
 repository root and in `.claude/skills/` are what set that rule. A lead opening a paragraph carries
-the stop inside its `**` 451 times against 6 that do not, a lead on a list item 404 times against
-1, and a lead in a blockquote 38 times against 1. A bold span in the middle of a sentence goes the
+the stop inside its `**` 451 times against 6 that do not, a lead on a list item 404 times against 1,
+and a lead in a blockquote 38 times against 1. A bold span in the middle of a sentence goes the
 other way, with 144 commas and 70 full stops after its closing `**` against no comma and 2 full
 stops inside one. Single-asterisk emphasis was never counted, so a stop after one is left where the
-replacement put it. The script still counts `**`, backticks and links in the paragraph either side of the splice,
-and refuses any edit that changes a count.
+replacement put it. The script still counts `**`, backticks and links in the paragraph either side
+of the splice, and refuses any edit that changes a count.
 
 **An insertion anchored on a sentence can land inside a bolded lead**, between the lead's opening
-`**` and its closing `**`, leaving both markers unbalanced. The rendered page then turns bold on
-and leaves it on for the rest of the section. The same marker count catches this case, and the
+`**` and its closing `**`, leaving both markers unbalanced. The rendered page then turns bold on and
+leaves it on for the rest of the section. The same marker count catches this case, and the
 per-paragraph check below catches one that reaches the file by another route.
 
 **A quote can match inside a fenced code block, where the words are a command rather than prose.**
@@ -525,9 +525,9 @@ packages` inside a fenced block, and a serial-comma finding quoting those words 
 command. Nothing downstream notices: the page still lints, still builds, and `check_structure.py`
 sees no marker move. The script reports such a finding as `code block` and writes nothing, the way
 it already refuses one landing in a skill file's YAML frontmatter. Reword the finding to quote the
-prose it meant, or leave the block alone. A fence indented under a list item counts, because that
-is where most of this repo's fenced blocks sit — every one on the code-style page, and two of the
-six on the getting-started page.
+prose it meant, or leave the block alone. A fence indented under a list item counts, because that is
+where most of this repo's fenced blocks sit — every one on the code-style page, and two of the six
+on the getting-started page.
 
 **A replacement spanning a different number of lines from the text it replaced invalidates every
 line index taken before the splice.** A three-line span rewritten as one line moves every following
@@ -537,10 +537,10 @@ the closing `---` of a skill file's YAML frontmatter into the description above 
 unit boundaries on the spliced text, never on the text as it was before, and leave the YAML
 frontmatter out of the re-wrap altogether — its indented lines read as list markers.
 
-**Reflow only the unit the change landed in, and solve that unit's width rather than assuming
-one.** Re-wrapping a whole file buries the edit: one 8-edit batch produced a 412-line diff before
-the reflow was narrowed. A unit is finer than a paragraph, because a bullet list written without
-blank lines between its items is a single paragraph, and re-wrapping the whole of one reflows every
+**Reflow only the unit the change landed in, and solve that unit's width rather than assuming one.**
+Re-wrapping a whole file buries the edit: one 8-edit batch produced a 412-line diff before the
+reflow was narrowed. A unit is finer than a paragraph, because a bullet list written without blank
+lines between its items is a single paragraph, and re-wrapping the whole of one reflows every
 sibling bullet. The width is not uniform across this repo either — the pages this skill has swept
 are wrapped anywhere between 94 and 100 characters — so the script solves each unit's width by
 finding the width that reproduces the unit exactly, and falls back to the width most of the file's
@@ -562,10 +562,10 @@ uv run mkdocs build --strict
 
 `check_structure.py` compares each changed file against a git ref and fails when a link, a bold or
 code span, a list item, a heading, a table row or a blank line has been *lost*, when a paragraph
-gains an unpaired `**` or backtick, when the trailing newline goes, or when a YAML frontmatter
-block stops closing. A count that *rises* is reported and not gated, because naming the noun a
-pronoun stood for legitimately adds a code span — writing `file` or `prose-review` where the
-sentence said "it" — while no sweep can legitimately lose one.
+gains an unpaired `**` or backtick, when the trailing newline goes, or when a YAML frontmatter block
+stops closing. A count that *rises* is reported and not gated, because naming the noun a pronoun
+stood for legitimately adds a code span — writing `file` or `prose-review` where the sentence said
+"it" — while no sweep can legitimately lose one.
 
 **Renaming a heading breaks every absolute link to its old anchor, and `scripts/check_docs_links.py`
 is what tells you.** `mkdocs build --strict` validates relative links only, so a link from a
@@ -578,8 +578,8 @@ generates a single separator, not two: `## H2 — a hundred experiments` becomes
 **Neither command catches content dropped at render time either.** Python-Markdown treats any line
 starting with `#` as a heading even without the space CommonMark requires, and it silently discards
 a table row's extra cells when the row carries more cells than the header. A whole paragraph of
-sourced prose sat invisible on the published site for exactly that reason. Both are greppable in
-the built output:
+sourced prose sat invisible on the published site for exactly that reason. Both are greppable in the
+built output:
 
 ```bash
 python3 -c "import re;[print(i+1,l[:60]) for i,l in enumerate(open('FILE')) if l.startswith('#') and not re.match(r'#{1,6} ',l)]"
@@ -598,18 +598,18 @@ Three checks, cheapest first. The first two are mechanical and take seconds:
 uv run python .claude/skills/prose-review/scripts/check_information_loss.py <old-ref> <path>
 ```
 
-1. **Diff the inventory of things that cannot survive being dropped** — every number, every link
-   and citation, every direct quotation, every bolded term. Losing one is always a defect, never a
+1. **Diff the inventory of things that cannot survive being dropped** — every number, every link and
+   citation, every direct quotation, every bolded term. Losing one is always a defect, never a
    rewording. The script above extracts and diffs all four between a git ref and the working tree.
 2. **Shingle the old text against the new.** Every 9-word run of the original appearing nowhere in
    the rewrite is either a deliberate rewording or a deletion. Only a human can tell which, but the
    list is short enough to read, and the script prints it.
-3. **Ask a fresh sub-agent what went missing.** Give it the before and after as two scratchpad
-   files and one question: what does the old text state that the new text does not? Tell it to
-   report **hedges, caveats, scope limits and attributions first** — those are the losses that
-   matter and the ones a rewrite drops most easily. A restructure that quietly makes the document
-   more confident than its evidence supports is the failure mode this check exists for, and it is
-   the same fault as the triage rule above about self-serving cuts.
+3. **Ask a fresh sub-agent what went missing.** Give it the before and after as two scratchpad files
+   and one question: what does the old text state that the new text does not? Tell it to report
+   **hedges, caveats, scope limits and attributions first** — those are the losses that matter and
+   the ones a rewrite drops most easily. A restructure that quietly makes the document more
+   confident than its evidence supports is the failure mode this check exists for, and it is the
+   same fault as the triage rule above about self-serving cuts.
 
 ## Re-run after a restructure
 
@@ -630,28 +630,28 @@ target is the opposite of the default instinct on a prose task, and it is not ne
 attempts to shorten this repo's code prose drew the same objection. The first cut `src/` by 29% and
 was closed unmerged; the second targeted duplication rather than word count, cut 6%, and still drew
 review comments asking for `main`'s fuller wording back. Losing information from a docstring is
-worse than a little duplication with `docs/`. **Say this at the top
-of every sub-agent brief**, because a reviewer asked to improve prose will otherwise recommend
-tightening, and every one of those findings has to be thrown away. The rules themselves — the
-duplication bar, worked examples, load-bearing links, Dagster docstrings, the README collision —
-are on [the code-style page](https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/)
-and are not repeated here.
+worse than a little duplication with `docs/`. **Say this at the top of every sub-agent brief**,
+because a reviewer asked to improve prose will otherwise recommend tightening, and every one of
+those findings has to be thrown away. The rules themselves — the duplication bar, worked examples,
+load-bearing links, Dagster docstrings, the README collision — are on [the code-style
+page](https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/) and are
+not repeated here.
 
-**Never delete prose in the same edit that adds a link.** Add the link beside the prose. Where
-prose genuinely has to go, that is a separate deletion, justified on its own and visible as such in
-the diff. The audit that produced this rule found 10 passages whose reasoning had been *replaced*
-by a link mid-pull-request, six of which still had that reasoning on `main`.
+**Never delete prose in the same edit that adds a link.** Add the link beside the prose. Where prose
+genuinely has to go, that is a separate deletion, justified on its own and visible as such in the
+diff. The audit that produced this rule found 10 passages whose reasoning had been *replaced* by a
+link mid-pull-request, six of which still had that reasoning on `main`.
 
 **One search shape finds one shape of fault.** A grep for `why X: <link>` found 10 load-bearing
 links; a later pass reading the passages found four more that stated a claim and left its
 justification to the link, which no template would have matched. Budget a second sweep that reads
 rather than greps.
 
-**Check which packages render their README beside their module docstrings.** `docs/api/<pkg>/`
-pages `{% include %}` the README and then emit `::: module` directives, so a reader meets both at
-once and a README that restates a module docstring is the one deletion the duplication rule
-sanctions. Only the packages with a page under `docs/api/` are affected; the others are not, and
-their READMEs should usually grow rather than shrink.
+**Check which packages render their README beside their module docstrings.** `docs/api/<pkg>/` pages
+`{% include %}` the README and then emit `::: module` directives, so a reader meets both at once and
+a README that restates a module docstring is the one deletion the duplication rule sanctions. Only
+the packages with a page under `docs/api/` are affected; the others are not, and their READMEs
+should usually grow rather than shrink.
 
 **mkdocstrings renders no private member, so prose in an underscore-prefixed function never reaches
 the published page.** A `docs/api/<pkg>/` page carries only what its `::: module` directives emit,
@@ -670,10 +670,10 @@ for a markdown file, the whole file. Report the before and the after on that def
 **Verify which worktree you are in before reading a single file, and give sub-agents the absolute
 path.** This repo keeps a worktree per branch under `.claude/worktrees/`, and a session's primary
 directory is often a bridge worktree on `main` rather than the branch under review. The failure is
-silent and *inverts* your conclusion: `main` legitimately contains the text the branch removed,
-so a correct finding reads as false. Triaging one audit against the wrong worktree nearly rejected
-10 valid findings. Run `git rev-parse --abbrev-ref HEAD` first, and tell every sub-agent not to
-`cd` to the repository root.
+silent and *inverts* your conclusion: `main` legitimately contains the text the branch removed, so a
+correct finding reads as false. Triaging one audit against the wrong worktree nearly rejected 10
+valid findings. Run `git rev-parse --abbrev-ref HEAD` first, and tell every sub-agent not to `cd` to
+the repository root.
 
 **Fix obviously-wrong prose you meet outside the nominal scope.** A prose sweep is the one time
 anybody reads these files closely, so filing a defect for later wastes the pass that found it. When
@@ -689,19 +689,19 @@ Four checks, none of which a `docs/` sweep needs:
   each file before and after, blank every string constant, and compare `ast.dump()`. Anything that
   survives is a behavioural change, and belongs in the pull-request body as a list a reviewer can
   reject as a unit — or in its own pull request.
-- **`pydoclint`**, for a docstring whose `Args:` or `Returns:` section disagrees with the
-  signature. Ruff's `D417` sees only an `Args:` section that is present and incomplete, so it is
-  silent on the two failures a rename actually produces. `pydoclint` runs as a pre-commit hook and
-  as a CI step, so a sweep only has to read its output.
-- **A grep for reStructuredText cross-reference roles**, which reach the API pages as literal
-  markup because nothing interprets them. A `pygrep` pre-commit hook rejects them now, so a sweep
-  inherits the guard rather than running the grep itself. The lesson generalises past the one hook:
-  **a sweep that changes how a docstring renders has to read the rendered page.** The same
-  blindness hides an empty section heading, a nested list that flattens, and prose in a private
-  function that mkdocstrings never renders at all.
+- **`pydoclint`**, for a docstring whose `Args:` or `Returns:` section disagrees with the signature.
+  Ruff's `D417` sees only an `Args:` section that is present and incomplete, so it is silent on the
+  two failures a rename actually produces. `pydoclint` runs as a pre-commit hook and as a CI step,
+  so a sweep only has to read its output.
+- **A grep for reStructuredText cross-reference roles**, which reach the API pages as literal markup
+  because nothing interprets them. A `pygrep` pre-commit hook rejects them now, so a sweep inherits
+  the guard rather than running the grep itself. The lesson generalises past the one hook: **a sweep
+  that changes how a docstring renders has to read the rendered page.** The same blindness hides an
+  empty section heading, a nested list that flattens, and prose in a private function that
+  mkdocstrings never renders at all.
 - **Link resolution against the *built* site**, not a guessed slug: `uv run mkdocs build` and then
-  check each URL's page and `#anchor` against the generated HTML. `scripts/check_docs_links.py`
-  does this repo-wide and is also a hook.
+  check each URL's page and `#anchor` against the generated HTML. `scripts/check_docs_links.py` does
+  this repo-wide and is also a hook.
 
 Then the ordinary green-before-push set — `ruff check`, `ruff format`, `ty check`, `pytest`,
 `pymarkdown scan`, `mkdocs build --strict`.
@@ -716,9 +716,9 @@ moves anchors, a measurement that supersedes a number quoted in three places. Tr
 **Use sub-agents to author the findings and a different, fresh sub-agent to review the diff.** An
 authoring agent cannot adversarially review its own work. Two reviews caught a wrong claim the
 authoring pass had introduced *and* an overclaim written during triage; one of them ran a mutation
-to check a comment's assertion about which test catches a bug, and found the comment named the
-wrong test. Verify every finding against the code before applying it — a wrong "fix" to a docstring
-costs more than a missed fix, because the next reader trusts the docstring.
+to check a comment's assertion about which test catches a bug, and found the comment named the wrong
+test. Verify every finding against the code before applying it — a wrong "fix" to a docstring costs
+more than a missed fix, because the next reader trusts the docstring.
 
 **A review told to read the diff finds faults in the diff; a review told to ignore the diff finds
 the rest.** Give one reviewer the packages and no diff at all, briefed as a first-time reader
@@ -729,23 +729,23 @@ fix-obviously-wrong-prose rule, and say in the pull-request body why the change 
 stated scope.
 
 **Review the commits written during triage, because nobody else has.** Everything applied after the
-first review is new prose that went in without a reviewer, written against a list and in a hurry.
-An audit of two such commits found two regressions in them: a claim that both input kinds are
-filtered before download when only the file listing is, and a module summary that had lost the one
-word naming what it summarised. Point a fresh sub-agent at the fix commits alone.
+first review is new prose that went in without a reviewer, written against a list and in a hurry. An
+audit of two such commits found two regressions in them: a claim that both input kinds are filtered
+before download when only the file listing is, and a module summary that had lost the one word
+naming what it summarised. Point a fresh sub-agent at the fix commits alone.
 
 ## See also
 
 `long-form-prose` runs the planning discipline before any prose exists, for drafting rather than
 reviewing. For a rewrite that adds whole new sections to an existing page, run this skill on the
 existing text first, then switch to `long-form-prose` to outline the new sections against the
-result. Outlining new material against a page whose own structure hasn't been checked risks
-building the new sections on prerequisites the existing page never actually establishes.
+result. Outlining new material against a page whose own structure hasn't been checked risks building
+the new sections on prerequisites the existing page never actually establishes.
 
 `code-style` holds the rules a code prose sweep is measured against, and is where a new rule
 belongs; this skill holds only the procedure for applying them.
 
 `literature-review` owns the accuracy round, which is a separate pass from this one. Reach for its
 `rsub` helper only for a single hand-edit; a batch of findings goes through
-`scripts/apply_findings.py` here, which `rsub` predates and which handles the markup, the wrap
-width and the merge-base gate that a bare substitution does not.
+`scripts/apply_findings.py` here, which `rsub` predates and which handles the markup, the wrap width
+and the merge-base gate that a bare substitution does not.

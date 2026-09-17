@@ -6,8 +6,8 @@ How to set hyperparameters and choose features for a forecasting experiment.
 
 ## Config files
 
-Each model family has a base YAML in `conf/model/`. The only one today is
-`conf/model/xgboost.yaml`. The file has two required top-level keys:
+Each model family has a base YAML in `conf/model/`. The only one today is `conf/model/xgboost.yaml`.
+The file has two required top-level keys:
 
 ```yaml
 # Identifies the BaseForecaster subclass to instantiate.
@@ -38,10 +38,10 @@ cannot drift apart.
 `selected_features` is a set of strings, written in the YAML as a list. Registration only checks
 that it is a list of strings coercible to that set — a typo'd top-level key (e.g.
 `selected_featuers`) is rejected there, by pydantic's `extra="forbid"` on `BaseForecasterConfig`.
-The individual strings inside the list are not parsed until training runs. The feature
-engineering pipeline (`ml_core.features._parsed_features.ParsedFeatures.from_strings`) parses
-each one into a typed descriptor and raises `ValueError` on any unrecognised or forbidden name,
-so a typo'd feature name (e.g. `tempurature_2m`) surfaces only then, not at registration.
+The individual strings inside the list are not parsed until training runs. The feature engineering
+pipeline (`ml_core.features._parsed_features.ParsedFeatures.from_strings`) parses each one into a
+typed descriptor and raises `ValueError` on any unrecognised or forbidden name, so a typo'd feature
+name (e.g. `tempurature_2m`) surfaces only then, not at registration.
 
 ### Power lags
 
@@ -50,7 +50,8 @@ so a typo'd feature name (e.g. `tempurature_2m`) surfaces only then, not at regi
 | `power_lag_{N}h` | `power_lag_24h` | Observed power at `valid_time − N hours`. N must be a positive integer ≤ 17,520 (2 years). |
 
 Power lags shorter than or equal to the forecast lead time are automatically nullified at
-engineering time to prevent lookahead bias — see [Lookahead-bias guardrails](#lookahead-bias-guardrails) below.
+engineering time to prevent lookahead bias — see [Lookahead-bias
+guardrails](#lookahead-bias-guardrails) below.
 
 ### Raw weather variables
 
@@ -109,8 +110,8 @@ Derived from weather variables via a fixed formula; no time-shifting.
 
 ### Pass-through base columns
 
-These columns from the `AllFeatures` frame can be passed directly to the model as-is (e.g. to
-let the model learn horizon-dependent biases).
+These columns from the `AllFeatures` frame can be passed directly to the model as-is (e.g. to let
+the model learn horizon-dependent biases).
 
 | Feature name | Description |
 |---|---|
@@ -127,19 +128,19 @@ let the model learn horizon-dependent biases).
 
 Two feature names are **forbidden** and raise `ValueError` at parse time:
 
-- **`power`** — requesting the raw target variable as an input would let the model learn a
-  trivial identity function, useless at inference time.
+- **`power`** — requesting the raw target variable as an input would let the model learn a trivial
+  identity function, useless at inference time.
 - **`valid_time`** — an index column; use time features (e.g. `local_time_of_day_sin`) instead.
 
 **Power lags** are automatically nullified by the feature engineering pipeline when the lag is
-shorter than or equal to the forecast lead time. For example, `power_lag_1h` would leak
-observed power into a 1-hour-ahead forecast, so its value is set to `null` for those rows. The
-model sees a null and treats it as a missing value (XGBoost handles nulls natively). This
-nullification happens per-row in `_nullify_leaky_lags()`, not at config time — the feature name
-is still valid; the pipeline just makes it safe.
+shorter than or equal to the forecast lead time. For example, `power_lag_1h` would leak observed
+power into a 1-hour-ahead forecast, so its value is set to `null` for those rows. The model sees a
+null and treats it as a missing value (XGBoost handles nulls natively). This nullification happens
+per-row in `_nullify_leaky_lags()`, not at config time — the feature name is still valid; the
+pipeline just makes it safe.
 
-Weather lags and rolling means are **never** nullified: NWP forecasts cover future `valid_time`s,
-so a weather feature is always available at inference time regardless of lead time.
+Weather lags and rolling means are **never** nullified: NWP forecasts cover future `valid_time`s, so
+a weather feature is always available at inference time regardless of lead time.
 
 ---
 
@@ -184,16 +185,16 @@ constructed.
 `n_estimtors` instead of `n_estimators` and registration fails, before a single fold is scheduled,
 with a `ValidationError` naming the key. This matters more than a typo usually would, because the
 searches that drive most registrations are unattended. The LLM auto-research agent registers,
-materialises, and reads the leaderboard with nobody in the loop, and the variant grid sweeps
-several dimensions at once. A key that was quietly dropped would give you a grid of *identical*
-runs, each scoring plausibly, each landing on the leaderboard, and nothing to distinguish that
-grid from a genuine null result. That is [principle
+materialises, and reads the leaderboard with nobody in the loop, and the variant grid sweeps several
+dimensions at once. A key that was quietly dropped would give you a grid of *identical* runs, each
+scoring plausibly, each landing on the leaderboard, and nothing to distinguish that grid from a
+genuine null result. That is [principle
 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically).
 
 Two further keys are refused for their own reasons. `_target_` names the forecaster class, and the
-config class follows from it: to use a different one, point `base_model_config` at a different
-YAML. `experiment_name` comes from the job's own `experiment_name` parameter, which would overwrite
-an override of it.
+config class follows from it: to use a different one, point `base_model_config` at a different YAML.
+`experiment_name` comes from the job's own `experiment_name` parameter, which would overwrite an
+override of it.
 
 **Example — reduce tree depth and add a feature:**
 
@@ -210,12 +211,11 @@ an override of it.
 }
 ```
 
-Every override is a **whole-value replacement**, not a merge. `selected_features` is the case
-you will meet first: to add one feature to the baseline set you must list all the features you
-want, not just the new one. The same holds when a `model_params` value is itself a mapping —
-an override replaces the whole mapping, dropping the base's other keys, so restate every key
-you want to keep.
+Every override is a **whole-value replacement**, not a merge. `selected_features` is the case you
+will meet first: to add one feature to the baseline set you must list all the features you want, not
+just the new one. The same holds when a `model_params` value is itself a mapping — an override
+replaces the whole mapping, dropping the base's other keys, so restate every key you want to keep.
 
 The resolved config (the YAML defaults with your overrides applied) is frozen as a JSON tag on the
-MLflow experiment at registration time. That frozen record is what `trained_cv_model` reads back
-at train time — so changing the YAML after registering an experiment has no effect on it.
+MLflow experiment at registration time. That frozen record is what `trained_cv_model` reads back at
+train time — so changing the YAML after registering an experiment has no effect on it.

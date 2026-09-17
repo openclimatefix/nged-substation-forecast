@@ -410,9 +410,15 @@ markers = [
 ]
 
 [tool.pymarkdown]
-# Line length: prose isn't hard-wrapped in this repo's docs, and ruff's default lint
-# selection doesn't enforce E501 either, so there's no existing precedent to match.
-plugins.md013.enabled = false
+# Line length: prose in docs/, the READMEs and the skill files is hard-wrapped at 100 characters.
+# `strict` and `stern` default to off, so a line is only flagged when it could actually have been
+# wrapped — an unbreakable token such as a long URL passes. Headings are exempt because an ATX
+# heading is one line by construction and was never part of the wrapped-prose convention.
+plugins.md013.enabled = true
+plugins.md013.line_length = 100
+plugins.md013.tables = false
+plugins.md013.code_blocks = false
+plugins.md013.headings = false
 # Duplicate heading: only flag duplicates under the same parent heading, not across
 # the whole file (e.g. "Usage" appearing under two different top-level sections).
 plugins.md024.siblings_only = true
@@ -435,6 +441,15 @@ plugins.pml101.indent = 4
 # Without this, pymarkdown misreads the frontmatter as document content (e.g. "---" as a setext
 # heading underline), producing spurious heading-style/blank-line errors.
 extensions.front-matter.enabled = true
+# Tables: MD013's `tables = false` above only exempts a pipe table's rows from the line-length
+# check if pymarkdown recognises them as table tokens in the first place, which needs this
+# extension. Without it, a table row is scanned as an ordinary paragraph line and MD013 flags
+# every row wider than 100 characters, even though a wrapped table row would not render as a table.
+extensions.markdown-tables.enabled = true
+# Table column style: this extension turns MD060 on too, which wants every pipe table in the repo
+# reformatted to its "compact" delimiter style — hundreds of pre-existing rows, out of #690's
+# scope of line length alone.
+plugins.md060.enabled = false
 # Link fragments: pymarkdownlnt 0.9.40 (the first release to implement this rule) doesn't
 # reproduce Python-Markdown's slug algorithm for a heading containing an em dash, so it flags
 # every anchor link to a heading like "### 10 — Every write is atomic..." as broken even though

@@ -1,11 +1,11 @@
 # Evaluating disaggregation: a multi-pronged protocol
 
 > **Status: 🔬 v2 research.** This applies to the full disaggregation problem (v2) — the plan and
-> architecture live on the canonical
-> [Net-demand disaggregation](../roadmap/disaggregation.md) roadmap page. The v0.7 capacity
-> estimation for metered generators is evaluated separately, with its own
-> [head-to-head protocol](../roadmap/capacity-estimation.md#the-head-to-head-protocol) against the
-> metered ground truth. See the [roadmap index](../roadmap/index.md) for status conventions.
+> architecture live on the canonical [Net-demand disaggregation](../roadmap/disaggregation.md)
+> roadmap page. The v0.7 capacity estimation for metered generators is evaluated separately, with
+> its own [head-to-head protocol](../roadmap/capacity-estimation.md#the-head-to-head-protocol)
+> against the metered ground truth. See the [roadmap index](../roadmap/index.md) for status
+> conventions.
 
 Substation disaggregation has **no single clean ground truth**: by definition, you are estimating
 quantities that are unmetered. Chasing a single objective metric is therefore a trap. The rigorous
@@ -26,10 +26,10 @@ battery energy storage system (BESS), etc.), sum them into a synthetic "substati
 score against the held-out components. This gives an exact ground truth because you constructed the
 aggregate.
 
-**Caveat**: a synthetic clean sum lacks [switching events](../roadmap/switching-events.md), MVA bounce, false
-zeros, unmetered load, and correctly-scaled correlated co-movement. It systematically flatters
-performance — it measures the model on an easier problem than reality. Always report as "performance
-under idealised aggregation," never as real-world skill.
+**Caveat**: a synthetic clean sum lacks [switching events](../roadmap/switching-events.md), MVA
+bounce, false zeros, unmetered load, and correctly-scaled correlated co-movement. It systematically
+flatters performance — it measures the model on an easier problem than reality. Always report as
+"performance under idealised aggregation," never as real-world skill.
 
 ---
 
@@ -39,8 +39,8 @@ Where a generator is metered behind a primary, pretend it is unmetered, disaggre
 real net flow, compare to the metered value. Real (not synthetic) ground truth on real substation
 data, for the subset where metering happens to exist.
 
-**Caveat**: biased to the sites where metering happens to exist, which may not be representative
-of the unmetered fleet.
+**Caveat**: biased to the sites where metering happens to exist, which may not be representative of
+the unmetered fleet.
 
 **Concrete example in the NGED dataset**: Stickney primary's midday peaks correlate with the
 separately-metered solar farm nearby — a ready-made held-out label test.
@@ -66,18 +66,17 @@ absent from the papers it read.
 ## Spoke 4: Cross-source corroboration (label-free, indirect)
 
 Where an independent dataset should predict your disaggregated quantity, agreement is evidence. The
-main example: estimated unmetered-PV capacity per primary vs. registered PV in the Embedded
-Capacity Register (ECR) / Microgeneration Certification Scheme (MCS) for that substation's
-geographic catchment (recoverable via the Meter Point Administration Number (MPAN)→substation
-mapping).
+main example: estimated unmetered-PV capacity per primary vs. registered PV in the Embedded Capacity
+Register (ECR) / Microgeneration Certification Scheme (MCS) for that substation's geographic
+catchment (recoverable via the Meter Point Administration Number (MPAN)→substation mapping).
 
 **Caveat**: the gap between the estimate and the register is partly the unregistered fleet you are
 trying to find, so exact agreement is not expected. Gross disagreement in the wrong direction
 (estimate < registered) is a detectable error. Weak but real-world triangulation.
 
 **Caveat**: this spoke stops being evidence for any fit that used the register. The capacity work
-plans to feed registered capacity in as a
-[convex prior](../roadmap/capacity-estimation.md#loss-and-penalties), and once a register is in the
+plans to feed registered capacity in as a [convex
+prior](../roadmap/capacity-estimation.md#loss-and-penalties), and once a register is in the
 objective, agreement with that register is partly the optimiser doing what it was told.
 
 **The fix is an ablation, not a ban.** Fit once *without* the register prior and score that fit
@@ -86,12 +85,12 @@ available, while the validation number comes from a fit that never saw the regis
 and keep the no-prior fit as a standing leaderboard column rather than a one-off, or it rots.
 
 **Score the ablation on pattern, not on level.** What the disaggregation recovers is registered
-*plus* unregistered capacity, so the estimate should exceed the register and an estimate below it
-is a detectable failure. The informative signals are the rank correlation across substations —
-does the estimate order catchments the way the register does? — and level agreement restricted to
-the subset where the register is near-complete, such as large registered ground-mount, where
-little unregistered capacity can hide. Spoke 1 and Spoke 7 read no register at all and stay
-independent either way.
+*plus* unregistered capacity, so the estimate should exceed the register and an estimate below it is
+a detectable failure. The informative signals are the rank correlation across substations — does the
+estimate order catchments the way the register does? — and level agreement restricted to the subset
+where the register is near-complete, such as large registered ground-mount, where little
+unregistered capacity can hide. Spoke 1 and Spoke 7 read no register at all and stay independent
+either way.
 
 ---
 
@@ -102,10 +101,10 @@ held-out test set? This evaluation has clean ground truth (you are forecasting t
 observed meter readings).
 
 **Caveat**: this measures the *instrumental value* of disaggregation for forecasting, not
-disaggregation fidelity. A disaggregation that is wrong-but-harmless-to-the-forecast scores well;
-a correct-but-forecasting-irrelevant disaggregation scores "useless." Report this as a distinct
-quantity from disaggregation accuracy. Spoke 5 is arguably the most decision-relevant evaluation
-for NGED, because their goal is better forecasts for flexibility procurement.
+disaggregation fidelity. A disaggregation that is wrong-but-harmless-to-the-forecast scores well; a
+correct-but-forecasting-irrelevant disaggregation scores "useless." Report this as a distinct
+quantity from disaggregation accuracy. Spoke 5 is arguably the most decision-relevant evaluation for
+NGED, because their goal is better forecasts for flexibility procurement.
 
 ---
 
@@ -119,17 +118,17 @@ metered, used purely as validation. One such site anchors the whole evaluation.
 ## Spoke 7: Manual capacity survey from aerial imagery (direct, small-sample)
 
 Count rooftop PV by hand from aerial or high-resolution satellite imagery across a few primary
-substations' catchments, and compare the total against the estimated unmetered capacity. This is
-the only spoke that measures installed capacity directly, and the only one that is independent of
-both the meters and the registers — which is what makes it the check to reach for when the
-registers have been used as priors. Rooftop-PV detection from imagery is a well-developed computer
-vision task, so a hand-counted pilot can be scaled later if it proves worth it.
+substations' catchments, and compare the total against the estimated unmetered capacity. This is the
+only spoke that measures installed capacity directly, and the only one that is independent of both
+the meters and the registers — which is what makes it the check to reach for when the registers have
+been used as priors. Rooftop-PV detection from imagery is a well-developed computer vision task, so
+a hand-counted pilot can be scaled later if it proves worth it.
 
 **Caveat**: imagery gives panel area, not kilowatts, so the comparison carries an assumed
 watts-per-square-metre and misses panels hidden by shading, flat-roof mounting angles, or tree
 cover. The imagery's capture date rarely matches the estimate's period. Counting is expensive per
-catchment, so the sample is small and chosen rather than random, which makes it a check on
-magnitude rather than a statistic.
+catchment, so the sample is small and chosen rather than random, which makes it a check on magnitude
+rather than a statistic.
 
 ---
 
@@ -137,23 +136,23 @@ magnitude rather than a statistic.
 
 Fit the per-site generation modules ([differentiable physics](differentiable-physics.md)) and the
 shared demand-profile basis ([the `BasisLoadNode`](../roadmap/disaggregation.md#node-definitions))
-on real telemetry, freeze their parameters, run them forward on real weather, and sum the sites
-into a simulated substation. Every quantity the disaggregator must recover — each site's
-generation, the residual demand, and each fitted capacity — is written down by construction, and a
-whole fleet of simulated substations costs no metering. Unlike Spoke 1, the simulated sum covers
-the unmetered fleet and the demand as well as the metered sites.
+on real telemetry, freeze their parameters, run them forward on real weather, and sum the sites into
+a simulated substation. Every quantity the disaggregator must recover — each site's generation, the
+residual demand, and each fitted capacity — is written down by construction, and a whole fleet of
+simulated substations costs no metering. Unlike Spoke 1, the simulated sum covers the unmetered
+fleet and the demand as well as the metered sites.
 
 **Caveat**: this spoke is circular in a way the other seven spokes are not. An estimator scored on
-data generated by its own model family measures whether the parameters are identifiable, not
-whether that model family matches reality, so a disaggregator drawn from the same family recovers
-the components it was built to produce. The simulated telemetry is also missing the artefacts
-listed under Spoke 1, plus meter noise; a simulator can reproduce the MVA magnitude, but not the
+data generated by its own model family measures whether the parameters are identifiable, not whether
+that model family matches reality, so a disaggregator drawn from the same family recovers the
+components it was built to produce. The simulated telemetry is also missing the artefacts listed
+under Spoke 1, plus meter noise; a simulator can reproduce the MVA magnitude, but not the
 reactive-power floor that lifts it at the bounce. Where an edit can be applied to real telemetry
 instead — injection adds to a real series rather than replacing it — prefer the edit to real
 telemetry, and reserve the simulated substation for the labels no edit to real data can produce,
 such as removing the unmetered fleet entirely. The same construction serves the switching and
-capacity problems too; that
-[wider v2 idea](../roadmap/index.md#after-v21-research-advanced-ml) is on the roadmap.
+capacity problems too; that [wider v2 idea](../roadmap/index.md#after-v21-research-advanced-ml) is
+on the roadmap.
 
 ---
 
@@ -163,5 +162,5 @@ A good method scores well across all eight spokes despite their differing biases
 scores well on synthetic aggregation (Spoke 1) but fails physical-consistency checks (Spoke 3) on
 real data has overfit to the easy case. The leaderboard columns for disaggregation are not "the
 metric" — they are these spokes. Because labels are weak, the protocol must be more carefully
-reasoned and transparently caveated than a standard forecasting evaluation: "no clean ground
-truth" must not slide into "any evaluation will do."
+reasoned and transparently caveated than a standard forecasting evaluation: "no clean ground truth"
+must not slide into "any evaluation will do."

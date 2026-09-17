@@ -11,8 +11,8 @@ import sys
 from pathlib import Path
 from typing import Final
 
-WIDTH: Final[int] = 100
-"""Column at which prose is wrapped, matching the repo's markdown line length."""
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+from scripts.markdown_wrap import WIDTH
 
 SKIP_PREFIXES: Final[tuple[str, ...]] = ("#", "|", "```", "- ", "* ", ">", "    ")
 """Block openings whose line breaks carry meaning, so they must never be rewrapped."""

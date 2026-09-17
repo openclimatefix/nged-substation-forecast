@@ -1,19 +1,18 @@
 # Configuration reference
 
 What the live service's storage and credential settings mean: **where the bytes live** (a local
-disk, or S3 — Simple Storage Service, AWS's object store) and **what credentials reach them**.
-This page is the reference; the step-by-step journeys that *use* these settings live elsewhere
-and deliberately aren't repeated here:
+disk, or S3 — Simple Storage Service, AWS's object store) and **what credentials reach them**. This
+page is the reference; the step-by-step journeys that *use* these settings live elsewhere and
+deliberately aren't repeated here:
 
-- [Getting started on your laptop](../getting-started.md) owns first-time repo setup and the
-  laptop bring-up — installing `uv`, `uv sync`, pre-commit hooks, creating `.env`, a persistent
+- [Getting started on your laptop](../getting-started.md) owns first-time repo setup and the laptop
+  bring-up — installing `uv`, `uv sync`, pre-commit hooks, creating `.env`, a persistent
   `DAGSTER_HOME`, `dg dev`, materialising the first data and model, and the optional MinIO
   rehearsal.
-- [Setting up the live service on AWS](aws.md) owns every AWS console step — buckets, IAM
-  (Identity and Access Management — AWS's permissions system), the container image, and the
-  control-plane box.
-- [Operating the live service](operations.md) owns how to *drive* the assets once an
-  environment is up (picking a champion, the 6-hourly schedule, backfilling).
+- [Setting up the live service on AWS](aws.md) owns every AWS console step — buckets, IAM (Identity
+  and Access Management — AWS's permissions system), the container image, and the control-plane box.
+- [Operating the live service](operations.md) owns how to *drive* the assets once an environment is
+  up (picking a champion, the 6-hourly schedule, backfilling).
 
 ## The configuration model
 
@@ -35,9 +34,9 @@ The single most important idea is that there are **three** roots, not one:
 > **On AWS, the two data-table roots point at two separate buckets** — `DATA_PATH_DELIVERY`
 > hard-codes the five NGED-facing delivery tables (see the "derive from root" convention just
 > below), so shipping a new delivery table can't silently leave it in the internal bucket. See
-> [Setting up the live service on AWS: Step 1](aws.md#step-1-create-the-s3-buckets) for the
-> concrete setup, and
-> [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it) for why.
+> [Setting up the live service on AWS: Step 1](aws.md#step-1-create-the-s3-buckets) for the concrete
+> setup, and [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it) for
+> why.
 
 They are split for an **architectural** reason, not merely because XGBoost and Altair happen to
 write to local files (a library that can't write to S3 can always be bridged — write to a tempdir,
@@ -47,14 +46,13 @@ container image, not to shared storage:
 
 - **Promoted production model** — distributed via the **container image**, not shared storage: the
   live deployment bakes the champion into the image at build time and loads it with a plain disk
-  `load()` (see
-  [Production Deployment — Design](../architecture/production-deployment.md),
+  `load()` (see [Production Deployment — Design](../architecture/production-deployment.md),
   [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)). This local
   directory is the build-time staging area that gets copied into the image. On the deployed task,
   the model is read from the image's own filesystem.
-- **Plot HTML** — a **local-dev convenience** only (materialise, open in a browser); see
-  [Operating the live service: Inspecting a live forecast](operations.md#inspecting-a-live-forecast)
-  for why it is not the way to view forecasts in a deployed service.
+- **Plot HTML** — a **local-dev convenience** only (materialise, open in a browser); see [Operating
+  the live service: Inspecting a live forecast](operations.md#inspecting-a-live-forecast) for why it
+  is not the way to view forecasts in a deployed service.
 
 So the deployed AWS runtime reads its model from the image, reads data from S3, and writes forecasts
 to S3. It never uses `LOCAL_ARTIFACTS_PATH` as shared storage at all. All three roots default to
@@ -76,31 +74,31 @@ alone and both delivery tables move together. Setting an individual table (e.g.
 `NWP_DATA_PATH=s3://other-bucket/NWP`) overrides just that one — useful for keeping one big table on
 a separate bucket, and nothing else needs to change.
 
-The delivery-side derivation deliberately **fails closed**: a new delivery table added to the
-schema but not wired into `Settings._derive_unset_paths` stays on `DATA_PATH_INTERNAL` (invisible
-to NGED, a functional bug caught by `test_settings.py`'s guard test), rather than a forgotten
-override on a new internal table accidentally exposing it in the delivery bucket. The other three
-delivery tables (`power_forecast_warnings`, `asset_health_history`, `substation_switching`) don't
-have `Settings` fields yet — none are implemented in code. When they land, they need to be wired
-into `Settings._derive_unset_paths` to derive from `DATA_PATH_DELIVERY` alongside the two above
-(the per-field env var override — e.g. `POWER_FORECASTS_DATA_PATH` — still works as an escape
-valve for a one-off case, but the delivery/internal split is driven by root derivation, not
-per-table overrides).
+The delivery-side derivation deliberately **fails closed**: a new delivery table added to the schema
+but not wired into `Settings._derive_unset_paths` stays on `DATA_PATH_INTERNAL` (invisible to NGED,
+a functional bug caught by `test_settings.py`'s guard test), rather than a forgotten override on a
+new internal table accidentally exposing it in the delivery bucket. The other three delivery tables
+(`power_forecast_warnings`, `asset_health_history`, `substation_switching`) don't have `Settings`
+fields yet — none are implemented in code. When they land, they need to be wired into
+`Settings._derive_unset_paths` to derive from `DATA_PATH_DELIVERY` alongside the two above (the
+per-field env var override — e.g. `POWER_FORECASTS_DATA_PATH` — still works as an escape valve for a
+one-off case, but the delivery/internal split is driven by root derivation, not per-table
+overrides).
 
 > **Design choice: NGED sees every CV/backtest fold, not just live production forecasts.** The
 > `power_forecasts` table holds every CV/backtest experiment alongside live production forecasts,
-> distinguished by `fold_id` (`"live"` for production — see
-> [Operating the live service](operations.md)). Pointing the whole table at the
-> delivery bucket is deliberate, not an accidental side effect of the bucket split: it lets NGED
-> see how each of OCF's model versions actually behaves, not just whichever one is currently
-> promoted. NGED filters on `fold_id="live"` when it only wants the current production forecast.
+> distinguished by `fold_id` (`"live"` for production — see [Operating the live
+> service](operations.md)). Pointing the whole table at the delivery bucket is deliberate, not an
+> accidental side effect of the bucket split: it lets NGED see how each of OCF's model versions
+> actually behaves, not just whichever one is currently promoted. NGED filters on `fold_id="live"`
+> when it only wants the current production forecast.
 
 ### The `.env` file and NGED source credentials
 
 Create a `.env` file in the repo root by copying the committed template — `cp .env.example .env` —
-and filling in the values. The three **NGED source-bucket** credentials authenticate reads of
-NGED's telemetry bucket, which is a *different* account and bucket from our own managed data
-tables, so only telemetry ingest needs them:
+and filling in the values. The three **NGED source-bucket** credentials authenticate reads of NGED's
+telemetry bucket, which is a *different* account and bucket from our own managed data tables, so
+only telemetry ingest needs them:
 
 ```dotenv
 NGED_S3_BUCKET_URL=<nged source bucket url>
@@ -111,9 +109,9 @@ NGED_S3_BUCKET_SECRET=<secret>
 `.env` is git-ignored — never commit real credentials.
 
 Leave them unset and `Settings` still builds: the ingest asset raises an error naming the unset
-variables when it runs, while every other asset, the test suite, training, and the dashboards
-carry on. That keeps a laptop, a CI runner and a training job free of third-party credentials they
-never use
+variables when it runs, while every other asset, the test suite, training, and the dashboards carry
+on. That keeps a laptop, a CI runner and a training job free of third-party credentials they never
+use
 ([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)),
 and it confines a mis-wired secret to the one schedule that needs it — [Step 8 of the AWS
 runbook](aws.md#step-8-store-secrets-in-parameter-store) explains why a deployment should *not*
@@ -126,18 +124,18 @@ has its own page: [Setting up Sentry telemetry](sentry.md).
 
 ### Credentials for our own S3 data (`DATA_STORE_*`)
 
-The four `DATA_STORE_*` fields (`ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION`, `ENDPOINT_URL`)
-map onto the shared `aws_*` object_store option keys that delta-rs, Polars, and obstore all
-understand, so this one dict feeds every read and write — to both buckets alike, since bucket
-choice is entirely a matter of which URI each path setting resolves to. Which of them to set
-depends on where the code runs:
+The four `DATA_STORE_*` fields (`ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION`, `ENDPOINT_URL`) map
+onto the shared `aws_*` object_store option keys that delta-rs, Polars, and obstore all understand,
+so this one dict feeds every read and write — to both buckets alike, since bucket choice is entirely
+a matter of which URI each path setting resolves to. Which of them to set depends on where the code
+runs:
 
-- **Compute on AWS (an EC2 — Elastic Compute Cloud — virtual machine, or a Fargate container
-  task)** — set **none of them**: `object_store`
-  auto-discovers the attached IAM role's temporary credentials and region at runtime.
-- **A laptop reaching real S3** — set key + secret + region from an IAM user (see
-  [Setting up the live service on AWS: Step 2](aws.md#step-2-grant-data-access-with-iam) for
-  which user), but **not** `ENDPOINT_URL`.
+- **Compute on AWS (an EC2 — Elastic Compute Cloud — virtual machine, or a Fargate container task)**
+  — set **none of them**: `object_store` auto-discovers the attached IAM role's temporary
+  credentials and region at runtime.
+- **A laptop reaching real S3** — set key + secret + region from an IAM user (see [Setting up the
+  live service on AWS: Step 2](aws.md#step-2-grant-data-access-with-iam) for which user), but
+  **not** `ENDPOINT_URL`.
 - **A local MinIO rehearsal** — set all four; `ENDPOINT_URL` is only for non-AWS/S3-compatible
   endpoints (and it deliberately allows plain HTTP, which dev endpoints rarely encrypt). See
   [Getting started on your laptop](../getting-started.md#optional-rehearse-s3-locally-with-minio).
@@ -152,11 +150,10 @@ depends on where the code runs:
 | Laptop → real S3 (dashboard only) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | key + secret + region, read-only IAM user (no endpoint) |
 | Compute on AWS (IAM role) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | none (auto-discovered) |
 
-*How* the values are set differs by compute, but `Settings` reads them identically — an
-environment variable and a `.env` line are interchangeable, and an environment variable wins if
-both are set. A Fargate task has no repo checkout and no `.env` file, so its values are plain
-environment variables on the container in the ECS (Elastic Container Service) task definition
-(bucket URIs are safe in clear
-text; the NGED source credentials are injected from Parameter Store instead — see
-[Setting up the live service on AWS: Steps 8–9](aws.md#step-8-store-secrets-in-parameter-store)).
-On an EC2 box or a laptop, use a `.env` file.
+*How* the values are set differs by compute, but `Settings` reads them identically — an environment
+variable and a `.env` line are interchangeable, and an environment variable wins if both are set. A
+Fargate task has no repo checkout and no `.env` file, so its values are plain environment variables
+on the container in the ECS (Elastic Container Service) task definition (bucket URIs are safe in
+clear text; the NGED source credentials are injected from Parameter Store instead — see [Setting up
+the live service on AWS: Steps 8–9](aws.md#step-8-store-secrets-in-parameter-store)). On an EC2 box
+or a laptop, use a `.env` file.

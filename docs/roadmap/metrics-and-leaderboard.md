@@ -2,21 +2,21 @@
 
 How OCF measures the skill of its forecasts and compares forecasting approaches.
 
-> **Status legend** — ✅ Implemented · 🚧 Planned · 🔬 Research. The `Metrics` schema, the
-> `metrics` Dagster asset, the deterministic metrics (MAE, NMAE, RMSE, MBE), and the
-> probabilistic metrics (CRPS, spread-skill ratio, pinball loss, PICP, interval width — see the
-> [evaluation-metrics reference](../techniques/evaluation-metrics.md)) are ✅ implemented. The
-> interactive leaderboard visualisation is 🚧 planned.
-> The implemented [cross-validation protocol](../ml_experimentation/cross-validation-folds.md) has
-> moved out of the roadmap. See the [roadmap index](index.md) for status conventions.
-> The 🚧 items are tracked under the v0.3 epic
-> [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6):
-> baseline forecasters [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) ·
-> probabilistic evaluation [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225) ·
-> tail & exceedance metrics [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254) ·
+> **Status legend** — ✅ Implemented · 🚧 Planned · 🔬 Research. The `Metrics` schema, the `metrics`
+> Dagster asset, the deterministic metrics (MAE, NMAE, RMSE, MBE), and the probabilistic metrics
+> (CRPS, spread-skill ratio, pinball loss, PICP, interval width — see the [evaluation-metrics
+> reference](../techniques/evaluation-metrics.md)) are ✅ implemented. The interactive leaderboard
+> visualisation is 🚧 planned. The implemented [cross-validation
+> protocol](../ml_experimentation/cross-validation-folds.md) has moved out of the roadmap. See the
+> [roadmap index](index.md) for status conventions. The 🚧 items are tracked under the v0.3 epic
+> [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6): baseline forecasters
+> [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) · probabilistic
+> evaluation [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225) · tail &
+> exceedance metrics [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254) ·
 > tricky-days filter [#255](https://github.com/openclimatefix/nged-substation-forecast/issues/255) ·
 > fold hygiene [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226) ·
-> calibrated manual heuristic [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715).
+> calibrated manual heuristic
+> [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715).
 
 ---
 
@@ -42,14 +42,15 @@ glance, inspired by the [WeirdML leaderboard](https://htihle.github.io/weirdml.h
 baseline is run from its authors' own repository at its authors' recommended defaults, with no
 domain-specific tuning, because a team that runs every entry on its own leaderboard risks reporting
 its own implementation quality as a methodological result — the rule TS-Arena applies, set out with
-its evidence under
-[Leaderboards of machine learning results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results).
-The leaderboard is published with the material needed to check it — the evaluation protocol, the
-metric definitions, the code that computes them, and the telemetry where NGED's data policy allows —
-so someone outside the project can reproduce a row rather than take it on trust. And negative
-results get a row, because a leaderboard carrying only the approaches that worked hides how much of
-the search space was tried; both commitments are argued under
-[Publishing results that others can compare against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
+its evidence under [Leaderboards of machine learning
+results](../background/energy-forecasting-review.md#leaderboards-of-machine-learning-results). The
+leaderboard is published with the material needed to check it — the evaluation protocol, the metric
+definitions, the code that computes them, and the telemetry where NGED's data policy allows — so
+someone outside the project can reproduce a row rather than take it on trust. And negative results
+get a row, because a leaderboard carrying only the approaches that worked hides how much of the
+search space was tried; both commitments are argued under [Publishing results that others can
+compare
+against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against).
 A metered generator's time series and results are never published with the generator's name or ID.
 
 ---
@@ -79,38 +80,39 @@ time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13
 operator reads the plotted analogues by eye. If a single number is needed, the operator picks the
 percentile that matches the company's risk appetite. We score the conservative 95th percentile.
 
-**Reproducing the manual heuristic matters because the manual heuristic is *the bar we have to
-clear to justify the project*.** "XGBoost beats persistence" is the least we must do; "XGBoost
-beats the manual heuristic" is the deliverable. `manual_heuristic` is the first baseline we
-implement, and the one we would keep if we could implement only one.
+**Reproducing the manual heuristic matters because the manual heuristic is *the bar we have to clear
+to justify the project*.** "XGBoost beats persistence" is the least we must do; "XGBoost beats the
+manual heuristic" is the deliverable. `manual_heuristic` is the first baseline we implement, and the
+one we would keep if we could implement only one.
 
-`manual_heuristic` fits our existing machinery, because every one of its 13 members is just a **power
-lag**:
+`manual_heuristic` fits our existing machinery, because every one of its 13 members is just a
+**power lag**:
 
 - Weekly group (last 6 weeks, same weekday & time): `power_lag_168h, 336h, 504h, 672h, 840h, 1008h`
-- Annual group (49–55 weeks ago, same weekday & time): `power_lag_8232h, 8400h, 8568h, 8736h,
-  8904h, 9072h, 9240h`
+- Annual group (49–55 weeks ago, same weekday & time): `power_lag_8232h, 8400h, 8568h, 8736h, 8904h,
+  9072h, 9240h`
 
 So it rides the same audited, no-lookahead pipeline as `PersistenceForecaster` (below) with zero new
 time-series logic. `_nullify_leaky_lags` already sheds the shortest members as lead time grows (past
 7 days the 168 h member nullifies, past 14 days the 336 h, and so on). That shedding leaves the
 annual members to carry the full 14-day horizon. Because the shortest member is a week old, the
-manual heuristic has *no* short-horizon skill from recent power. That gap is faithful to the analogue
-method, and a reason to keep the pure `PersistenceForecaster` as a contrast rather than to sneak a
-recent-power member in.
+manual heuristic has *no* short-horizon skill from recent power. That gap is faithful to the
+analogue method, and a reason to keep the pure `PersistenceForecaster` as a contrast rather than to
+sneak a recent-power member in.
 
 **`manual_heuristic` is also our first _probabilistic_ baseline — and this is the faithful
-representation, not a bonus.** The plotted spread *is* the manual heuristic's output — an operator reads it
-by eye. We emit the 13 analogues as 13 `ensemble_member` rows and let the [probabilistic
+representation, not a bonus.** The plotted spread *is* the manual heuristic's output — an operator
+reads it by eye. We emit the 13 analogues as 13 `ensemble_member` rows and let the [probabilistic
 metrics](#phase-b-probabilistic-metrics-from-the-existing-ensemble) score them with no extra
 implementation work — scoring the spread is the closest automatable proxy for the plot a human
 actually reads. Two consequences follow.
 
 **`ensemble_member` is overloaded here.** For NWP models that column indexes an NWP ensemble member;
-for `manual_heuristic` it indexes a *historical analogue*. Same column, different meaning. We document
-this on the `PowerForecast` / `AllFeatures` schema so nobody assumes `ensemble_member ⇒ NWP`. The
-manual heuristic *synthesises* its ensemble inside `predict()` (by unpivoting its analogue-lag columns into
-member rows) rather than consuming an NWP ensemble; it runs with `weather_source: "none"`.
+for `manual_heuristic` it indexes a *historical analogue*. Same column, different meaning. We
+document this on the `PowerForecast` / `AllFeatures` schema so nobody assumes `ensemble_member ⇒
+NWP`. The manual heuristic *synthesises* its ensemble inside `predict()` (by unpivoting its
+analogue-lag columns into member rows) rather than consuming an NWP ensemble; it runs with
+`weather_source: "none"`.
 
 **Deterministic collapse is a property of the metrics layer, not the manual heuristic.** The manual
 heuristic emits its 13 members and nothing else; the [metric-matched collapse
@@ -126,11 +128,11 @@ are faithful, not an approximation.
 ### A faithful replica and a "simple upgrades" variant
 
 **Most of the benefit may come from a few simple upgrades to the analogue method, not from heavy ML
-— the message the pair of baselines is built to test.** We implement two closely-related
-baselines built on the manual heuristic:
+— the message the pair of baselines is built to test.** We implement two closely-related baselines
+built on the manual heuristic:
 
-- `manual_heuristic` — the faithful replica above, treating bank holidays as ordinary days. Pure
-  lag features.
+- `manual_heuristic` — the faithful replica above, treating bank holidays as ordinary days. Pure lag
+  features.
 - `manual_heuristic_holiday_aligned` — the same skeleton, but analogue *selection* becomes
   calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type (a
   bank-holiday Monday behaves like a Sunday). Moveable feasts align holiday-to-holiday
@@ -154,8 +156,8 @@ weather ensembles: fit a predictive distribution whose mean is an affine functio
 forecasts — one coefficient each, collapsing to a single coefficient on the ensemble mean where the
 members are exchangeable, as the manual heuristic's equally-weighted analogues are. Its variance is
 an affine function of the ensemble variance, with the coefficients chosen by minimising CRPS over a
-training window. Nothing in EMOS requires the ensemble to come from a weather model, so
-the analogues `manual_heuristic` already synthesises are a valid input.
+training window. Nothing in EMOS requires the ensemble to come from a weather model, so the
+analogues `manual_heuristic` already synthesises are a valid input.
 
 **The faithful replica stays the headline bar, because the correction is our work rather than the
 manual heuristic's.** The manual heuristic forecast itself does not adjust for holidays, switching
@@ -169,9 +171,10 @@ rather than from heavy ML.
 analogues are perfectly calibrated.** Empirical quantiles from a finite ensemble sit inside the true
 quantiles, and at 13 members the effect is large. For uniform draws the empirical p95 of 13
 equiprobable members is exceeded about 11.4% of the time, by the same arithmetic behind [PICP's
-calibrated reference table](../techniques/evaluation-metrics.md#picp-prediction-interval-coverage-probability).
-The floor tightens as members shed: `_nullify_leaky_lags` drops the 168-hour analogue past 7 days of
-lead and the 336-hour analogue past 14, giving 11.9% at 12 members and 12.5% at 11.
+calibrated reference
+table](../techniques/evaluation-metrics.md#picp-prediction-interval-coverage-probability). The floor
+tightens as members shed: `_nullify_leaky_lags` drops the 168-hour analogue past 7 days of lead and
+the 336-hour analogue past 14, giving 11.9% at 12 members and 12.5% at 11.
 
 **No choice of analogues removes that penalty.** An operator reading the percentile as "the level
 demand should stay under, 19 times out of 20" would, if the analogues were calibrated, be reading a
@@ -195,8 +198,8 @@ correct. The calibrated variant therefore stays naive in the sense that matters 
 knowing nothing the substation's own history does not contain.
 
 **The two halves of the fit show up in different metrics.** The mean correction improves NMAE
-wherever the analogues carry a stale level, and the variance correction moves CRPS and the exceedance
-rate.
+wherever the analogues carry a stale level, and the variance correction moves CRPS and the
+exceedance rate.
 
 **An analogue ensemble may be miscalibrated in the opposite direction to a weather ensemble, so
 measure before building.** The manual heuristic's members are observed powers rather than perturbed
@@ -204,8 +207,8 @@ model runs. The analogue spread does not narrow at short lead the way an NWP ens
 because the freshest analogue is already a week old. Week-to-week variation at the same weekday and
 time of day could easily exceed the real forecast uncertainty, leaving the manual heuristic
 over-dispersed where a weather ensemble is under-dispersed. The 95th percentile would then be
-crossed less often than the finite-ensemble arithmetic above implies. The correction would
-narrow the band rather than widen it.
+crossed less often than the finite-ensemble arithmetic above implies. The correction would narrow
+the band rather than widen it.
 
 **Two cheap diagnostics point to the direction once `manual_heuristic` ships.** The first diagnostic
 is the rank histogram of the observation among the analogues per horizon slice, the same instrument
@@ -233,13 +236,13 @@ exactly as [Phase C](#phase-c-low-effort-calibration-after-b-proves-the-diagnosi
 weather ensemble. The fit also runs per horizon slice, because the surviving analogue mix changes as
 members shed with lead time. Fitting on the training window alone is the line between a baseline and
 a model that has seen the data it is scored on. A handful of coefficients crosses that line as
-easily as a large model does. The calibration itself belongs in the shared wrapper forecaster Phase C
-specifies, rather than inside the manual heuristic.
+easily as a large model does. The calibration itself belongs in the shared wrapper forecaster Phase
+C specifies, rather than inside the manual heuristic.
 
 ### Persistence and climatology — diagnostic bookends
 
-The manual heuristic is really a *hybrid* — its weekly group is persistence-like recency, its annual group
-is climatology-like seasonality — so the two pure forms are still worth having: they isolate
+The manual heuristic is really a *hybrid* — its weekly group is persistence-like recency, its annual
+group is climatology-like seasonality — so the two pure forms are still worth having: they isolate
 short-horizon from long-horizon naive skill. Persistence is famously hard to beat at 0 to 6 hours.
 
 **The climatology row measures where the weather ensemble stops adding skill over a plain seasonal
@@ -275,9 +278,9 @@ or over climatology alone, flatters a forecast that a combined reference would j
 headline bar, not for building a fourth baseline.** The manual heuristic already blends recency with
 seasonality — the last 6 weeks of same-weekday, same-time-of-day analogues alongside the
 49-to-55-weeks-back group — so it plays on substation load the role the combined reference plays on
-irradiance. The manual heuristic is also the bar the project must clear.
-Persistence and climatology stay as diagnostic bookends, read as the loose end of the range rather
-than as the benchmark a win should be claimed against.
+irradiance. The manual heuristic is also the bar the project must clear. Persistence and climatology
+stay as diagnostic bookends, read as the loose end of the range rather than as the benchmark a win
+should be claimed against.
 
 **Carrying a loose bookend and a tight bookend is what the published guidance recommends** — see
 [Leaderboards of machine learning
@@ -289,10 +292,10 @@ yardstick here; `manual_heuristic` is the point on it.
 ### Implementation details — baselines (deleted when they ship)
 
 Five PRs, in order. PRs 1–2 are shared-framework groundwork (no baseline yet); PRs 3–5 add one
-baseline each. The `manual_heuristic_holiday_aligned` variant (described under [A faithful replica and
-a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a later sixth
-PR, out of scope for this arc but given its own tracked issue so it is not lost when #147 closes.
-`manual_heuristic_calibrated` (described under [Calibrating the manual
+baseline each. The `manual_heuristic_holiday_aligned` variant (described under [A faithful replica
+and a "simple upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is a later
+sixth PR, out of scope for this arc but given its own tracked issue so it is not lost when #147
+closes. `manual_heuristic_calibrated` (described under [Calibrating the manual
 heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile), and tracked in
 [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) is a seventh PR, on
 the same footing: out of scope here, tracked separately, and buildable as soon as `manual_heuristic`
@@ -325,11 +328,11 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
   exactly `.median()`), and keep `q_p95`.
 - Score `mae`/`nmae` on the median error; `rmse`/`mbe` on the mean error; the spread-skill
   denominator stays the mean-error RMSE (its Fortin "1.0 = calibrated" target is defined against the
-  mean). Add extra labelled rows: `mae`/`mbe` at `metric_param="p95"` (the conservative operating point) and
-  `mbe` at `metric_param="p50"` (bias of the delivered median). `METRIC_PARAMS` already contains
-  `"p95"` and `"p50"` (both are in `DELIVERY_QUANTILES`), so **no `Metrics` schema change** — and
-  the primary key includes `metric_param`, so the new rows do not collide with the `metric_param="all"`
-  headline rows.
+  mean). Add extra labelled rows: `mae`/`mbe` at `metric_param="p95"` (the conservative operating
+  point) and `mbe` at `metric_param="p50"` (bias of the delivered median). `METRIC_PARAMS` already
+  contains `"p95"` and `"p50"` (both are in `DELIVERY_QUANTILES`), so **no `Metrics` schema change**
+  — and the primary key includes `metric_param`, so the new rows do not collide with the
+  `metric_param="all"` headline rows.
 - Extend the MLflow allowlist `_MLFLOW_LOGGED_PARAMETRIC` with `("mbe", "p95")` and `("mbe", "p50")`
   so the operating-point bias and the median's bias appear on the leaderboard (aggregate keys come
   out distinct, e.g. `mbe_p95__all` vs `mbe__all`).
@@ -337,9 +340,9 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
   mean" (`METRIC_NAMES` in `contracts/ml_schemas.py`), the `Metrics.metric_param` field description
   (no longer pinball-only), and the `_MLFLOW_LOGGED_PARAMETRIC` key-count claims. The promoted
   [evaluation-metrics reference](../techniques/evaluation-metrics.md) section must state explicitly
-  that MAE/NMAE and RMSE/MBE score *different point forecasts* and why (otherwise the first person to
-  recompute RMSE from the stored median members files a bug), and note the identity
-  `mae ≡ 2 × pinball_loss@p50` as a deliberate internal consistency check.
+  that MAE/NMAE and RMSE/MBE score *different point forecasts* and why (otherwise the first person
+  to recompute RMSE from the stored median members files a bug), and note the identity `mae ≡ 2 ×
+  pinball_loss@p50` as a deliberate internal consistency check.
 - Tests: member sets where mean ≠ median ≠ p95, with hand-computed expected values per metric; the
   single-member ensemble (all collapses coincide; CRPS still reduces to MAE); the pinball-p50
   identity. Recompute existing expected values — never relax a test to absorb the shift.
@@ -356,8 +359,8 @@ the shared rails, none baseline-specific.
   `climatology`: quantile-derived members). This is model-family identity, like `MODEL_NAME`, so a
   `ClassVar` is correct. The class is resolved from the experiment's `forecaster_target` MLflow tag
   *before* inputs are loaded, so the flag is available in time. Document alongside it that
-  `weather_source: "none"` does **not** mean "no NWP input": in bulk mode the control-member NWP scan
-  defines the shared `(init_time, valid_time)` forecast-run grid, which is what keeps every
+  `weather_source: "none"` does **not** mean "no NWP input": in bulk mode the control-member NWP
+  scan defines the shared `(init_time, valid_time)` forecast-run grid, which is what keeps every
   leaderboard row — baseline or ML — scored on the identical grid.
 - **Document the `ensemble_member` overload** on `PowerForecast` and `AllFeatures`: an NWP-member
   index for NWP-consuming models, a historical-analogue index for `manual_heuristic`, a
@@ -365,11 +368,11 @@ the shared rails, none baseline-specific.
 - Tests: a dummy `uses_nwp_ensemble = False` forecaster exercising the member-0 path; the leak test
   unchanged.
 - **After PRs 1 + 2 land back-to-back, run one `trained_cv_model++` backfill over every existing
-  experiment partition** — retrain, re-predict, and re-score everything under the new collapse.
-  The backfill is deliberately the exact "re-run everything after a pipeline fix"
-  drill, and it doubles as the empirical verification of the backfill mechanics before the recipe is
-  written into `docs/ml_experimentation/dagster-workflow.md`. Treat both PRs as a single leaderboard
-  epoch event, since each shifts existing numbers.
+  experiment partition** — retrain, re-predict, and re-score everything under the new collapse. The
+  backfill is deliberately the exact "re-run everything after a pipeline fix" drill, and it doubles
+  as the empirical verification of the backfill mechanics before the recipe is written into
+  `docs/ml_experimentation/dagster-workflow.md`. Treat both PRs as a single leaderboard epoch event,
+  since each shifts existing numbers.
 
 **PR 3 — package skeleton + `PersistenceForecaster` (seasonal-naive; the lowest-effort end-to-end
 probe).** Ships the package and proves the PR-2 framework on the simplest model.
@@ -396,10 +399,10 @@ probe).** Ships the package and proves the PR-2 framework on the simplest model.
 - Register (`smoke_test` → `full_cv`), materialise the chain, sanity-check: NMAE worse than XGBoost
   overall but plausibly competitive intraday; single-member CRPS = MAE; spread-skill 0; PICP /
   interval width degenerate (expected and ignorable for a deterministic baseline).
-- **Coverage caveat:** persistence's longest lag is 336 h, so leads in `[336 h, ~360 h]` drop out and
-  its `all` / `extended_range` aggregates cover a shorter lead population than other models'. Fair
-  CRPS is size-comparable so nothing is *wrong*, but state the caveat where the sanity numbers are
-  read, backed by the per-series coverage counts in asset metadata.
+- **Coverage caveat:** persistence's longest lag is 336 h, so leads in `[336 h, ~360 h]` drop out
+  and its `all` / `extended_range` aggregates cover a shorter lead population than other models'.
+  Fair CRPS is size-comparable so nothing is *wrong*, but state the caveat where the sanity numbers
+  are read, backed by the per-series coverage counts in asset metadata.
 
 **PR 4 — `ManualHeuristicForecaster` (`manual_heuristic`; the deliverable).** The faithful replica,
 landing on a now-proven rail.
@@ -407,13 +410,14 @@ landing on a now-proven rail.
 - `MODEL_NAME = "manual_heuristic"`, `MODEL_VERSION = 1`, `uses_nwp_ensemble = False`,
   `weather_source: "none"`. Config `n_weekly_analogues = 6` and `annual_week_span = (49, 55)` drive
   the 13 analogue lags (weekly `168h × {1..6}`; annual `168h × {49..55}` = 8232…9240 h — all within
-  the feature parser's 17 520 h cap), with `selected_features` derived from them so a variant needs only one override.
+  the feature parser's 17 520 h cap), with `selected_features` derived from them so a variant needs
+  only one override.
 - `predict()` unpivots the 13 analogue-lag columns into `ensemble_member` rows (member index =
   analogue index; Int8 holds 0–12). Members nulled by `_nullify_leaky_lags` (as lead time grows, the
   short weekly members shed first) or by insufficient history are dropped; rows where *all* members
-  are null are dropped with the count logged and per-series surviving-member counts recorded in asset
-  metadata. No point forecast is emitted — PR 1's metrics layer produces the median headline and the
-  p95 / p50 labelled rows.
+  are null are dropped with the count logged and per-series surviving-member counts recorded in
+  asset metadata. No point forecast is emitted — PR 1's metrics layer produces the median headline
+  and the p95 / p50 labelled rows.
 - The 55-week annual lags need a non-zero `power_lookback` on `load_engineering_inputs`, which the
   function already takes.
 - **Data check before interpreting results:** `val_start − 55 weeks` ≈ mid-2024. Confirm which
@@ -439,21 +443,21 @@ only skill floor the NWP ensemble must clear at long horizons.
   `(time_series_id, valid_time)` first** — bulk-mode `AllFeatures` repeats each target row once per
   covering `(nwp_init_time, ensemble_member)` (~15× at a 15-day horizon), so without the dedupe the
   per-cell samples would be weighted by NWP-run coverage rather than by calendar. Then, per
-  `(time_series_id, month, half-hour-of-day, is_weekend)` cell, store the empirical quantiles of that
-  cell's power samples. Cell keys derive from **local** (Europe/London) time computed inside the
-  forecaster from `valid_time`, aligning with the demand rhythm (and matching the `local_*` time
+  `(time_series_id, month, half-hour-of-day, is_weekend)` cell, store the empirical quantiles of
+  that cell's power samples. Cell keys derive from **local** (Europe/London) time computed inside
+  the forecaster from `valid_time`, aligning with the demand rhythm (and matching the `local_*` time
   features). `save()` writes the lookup as one parquet + `meta.json`.
 - **Member emission — equiprobable levels, not the delivery levels.** Emit members at *equiprobable*
-  quantile levels `(i − 0.5)/m`, **not** at the tail-heavy `DELIVERY_QUANTILES` levels. Fair CRPS and the
-  per-run empirical delivery quantiles the metrics layer derives from members treat members as an
-  equiprobable sample. Feeding 13 members at the delivery levels in with equal weight would put 7.7
-  % of the mass at `q(0.01)` and `q(0.02)`, i.e. an ensemble materially wider-tailed than the
-  climatology it represents, corrupting CRPS, PICP, and the derived delivery quantiles. The delivery
-  quantiles are still produced — by `compute_metrics`' per-run quantile aggregation, same as every
-  other model. Keep `m = 13`: over the ~14-month training window a weekend cell holds only ~9–17
-  samples (weekday ~21–43), so quantile levels below ~0.06 are already min-sample extrapolation and
-  51 members would be false precision plus ~4× more `power_forecasts` rows; only raise it with
-  empirical justification.
+  quantile levels `(i − 0.5)/m`, **not** at the tail-heavy `DELIVERY_QUANTILES` levels. Fair CRPS
+  and the per-run empirical delivery quantiles the metrics layer derives from members treat members
+  as an equiprobable sample. Feeding 13 members at the delivery levels in with equal weight would
+  put 7.7 % of the mass at `q(0.01)` and `q(0.02)`, i.e. an ensemble materially wider-tailed than
+  the climatology it represents, corrupting CRPS, PICP, and the derived delivery quantiles. The
+  delivery quantiles are still produced — by `compute_metrics`' per-run quantile aggregation, same
+  as every other model. Keep `m = 13`: over the ~14-month training window a weekend cell holds only
+  ~9–17 samples (weekday ~21–43), so quantile levels below ~0.06 are already min-sample
+  extrapolation and 51 members would be false precision plus ~4× more `power_forecasts` rows; only
+  raise it with empirical justification.
 - `predict()`: join the lookup onto the prediction rows by the cell keys (rows in an unseen cell
   dropped with the count logged), then unpivot the quantile columns into `ensemble_member` rows.
 - **Why a distribution, not a mean:** a deterministic climatology forecast collapses CRPS to MAE, so
@@ -473,8 +477,8 @@ only skill floor the NWP ensemble must clear at long horizons.
   quantiles); `save`/`load` round-trip; an integration smoke fold; CRPS flows over the members.
 - Ship-time triage: unblocks
   [#354](https://github.com/openclimatefix/nged-substation-forecast/issues/354) (the dashboard
-  climatology reference band). As the last 🚧 baseline item, delete the whole "Implementation
-  details — baselines" section (summary → PR body), close #147, and update the status banner plus the
+  climatology reference band). As the last 🚧 baseline item, delete the whole "Implementation details
+  — baselines" section (summary → PR body), close #147, and update the status banner plus the
   milestone section in [`docs/roadmap/index.md`](index.md) if the arc changed.
 
 **The recipe.** No open questions remain. Full write-up in [the manual heuristic
@@ -485,9 +489,9 @@ forecast](../background/manual-heuristic-forecast.md); the implementation spec:
 - **Deterministic value:** the operator picks the percentile that matches the company's risk
   appetite; we score the conservative **95th percentile** of all 13 analogue values, reported
   alongside the metric-matched **median** headline (PR 1).
-- **No further processing:** no weighting, no holiday handling, no anomaly rejection, no
-  load-growth scaling. (So the holiday-aligned variant measures how much calendar awareness adds,
-  rather than reimplementing a step the analogue method already takes.)
+- **No further processing:** no weighting, no holiday handling, no anomaly rejection, no load-growth
+  scaling. (So the holiday-aligned variant measures how much calendar awareness adds, rather than
+  reimplementing a step the analogue method already takes.)
 
 **Cross-cutting.** (1) **Issue hygiene:** create one tracked sub-issue per PR under epic
 [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) / #147 following the
@@ -542,7 +546,7 @@ set leaks a little information about it back to the experimenter. The margin-plu
 how much a single query can leak.
 
 **The persistence and climatology baselines are rerun, unchanged, on every leaderboard epoch's
-evaluation window, so growth in the data is never mistaken for improvement in the method.**  The
+evaluation window, so growth in the data is never mistaken for improvement in the method.** The
 precedent is CAMEO, a structure-prediction benchmark that keeps its baseline pipelines frozen while
 the protein-structure databases behind them keep updating ([Robin et al.
 (2021)](https://doi.org/10.1002/prot.26213)).
@@ -634,13 +638,13 @@ runs.
 | [Exceedance rate of upper quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles) | Quantile | 🚧 | "When we said p95, was it exceeded ~5% of the time?" — one-sided calibration check for the delivered tail quantiles. |
 | [Brier score for threshold exceedance](../techniques/evaluation-metrics.md#brier-score-for-threshold-exceedance) | Ensemble | 🚧 | Grades the ensemble's "chance load exceeds the threshold" probability — the score for the yes/no warning NGED acts on. |
 
-> The `Metrics` schema (`contracts.ml_schemas.Metrics`) stores results as
-> `(time_series_id, power_fcst_model_name, fold_id, horizon_slice, metric_name, metric_param,
-> metric_value)`. `metric_param` carries, e.g., the quantile for Pinball Loss (`p10`) or the band
-> for PICP (`p10_p90`). The `metrics` Dagster asset computes every ✅ metric above and writes
-> per-series rows to `forecast_metrics` Delta (partitioned by `experiment_name, fold_id`), with
-> per-fold and mean-across-folds aggregates logged to MLflow — see
-> [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-9-materialise-metrics).
+> The `Metrics` schema (`contracts.ml_schemas.Metrics`) stores results as `(time_series_id,
+> power_fcst_model_name, fold_id, horizon_slice, metric_name, metric_param, metric_value)`.
+> `metric_param` carries, e.g., the quantile for Pinball Loss (`p10`) or the band for PICP
+> (`p10_p90`). The `metrics` Dagster asset computes every ✅ metric above and writes per-series rows
+> to `forecast_metrics` Delta (partitioned by `experiment_name, fold_id`), with per-fold and
+> mean-across-folds aggregates logged to MLflow — see [Running an ML experiment
+> end-to-end](../ml_experimentation/dagster-workflow.md#step-9-materialise-metrics).
 
 **Every metric above is also broken out by named population-filter slices**, which appear as extra
 leaderboard columns. Most are legitimate ranking columns, because the filter is fixed by information
@@ -678,9 +682,9 @@ analogues for `manual_heuristic`; a quantile sample for `climatology`). The metr
 collapse each ensemble to one number. `compute_metrics` today collapses every ensemble to its
 **mean** (`packages/ml_core/src/ml_core/metrics.py`), and the risk we were guarding against was that
 different models would be scored on *different* collapses — e.g. the ML models on their mean and
-`manual_heuristic` on the median that an operator effectively reads off its analogue spread. Mean and median
-diverge for skewed or underdispersed ensembles, so scoring some models on one and some on the other
-is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
+`manual_heuristic` on the median that an operator effectively reads off its analogue spread. Mean
+and median diverge for skewed or underdispersed ensembles, so scoring some models on one and some on
+the other is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
 
 #### Mean versus median — the trade-off
 
@@ -698,9 +702,9 @@ practice.
 The **median** is the point forecast that minimises **absolute error** — so MAE and NMAE are
 *consistent* with the median. It is robust to the skew that is real in this problem (holiday weeks,
 solar clipping) and to the ensemble underdispersion the [probabilistic
-section](#delivering-the-probabilistic-metrics) documents, it is the faithful reading of the manual heuristic's
-equally-weighted analogue spread, and it is coherent with the quantile columns already on the
-leaderboard: median MAE is exactly `2 × pinball_loss@p50`, so a median headline makes the
+section](#delivering-the-probabilistic-metrics) documents, it is the faithful reading of the manual
+heuristic's equally-weighted analogue spread, and it is coherent with the quantile columns already
+on the leaderboard: median MAE is exactly `2 × pinball_loss@p50`, so a median headline makes the
 deterministic and probabilistic columns tell one story.
 
 The key realisation is that **MAE and RMSE elicit *different* functionals, so no single collapse is
@@ -722,16 +726,16 @@ every model**:
   (RMSE of the ensemble mean = `√((m+1)/m) ×` RMS spread, so "1.0 = calibrated") is *defined*
   against the mean; switching its internal collapse would silently break that reading.
 
-Everything else is an **extra, labelled** row, never a headline: the manual heuristic's conservative **P95** operating point
-(`mae`/`mbe` at `metric_param="p95"` — conservative by design, so a large positive MBE that belongs
-*beside* the central number), and the **median's own bias** (`mbe` at `metric_param="p50"`, so the
-delivered central forecast has an honest bias number distinct from the mean's energy-balance bias).
-No model is structurally disadvantaged on any column — which a single uniform statistic cannot
-achieve — and the trap is closed because the collapse is uniform across models. Because the collapse
-lives entirely *downstream* of the stored forecasts, switching it re-scores the whole leaderboard
-from a single `metrics` re-materialisation with no retraining or re-prediction. Doing it now, before
-the leaderboard adjudicates anything, is the easiest moment to shift every existing deterministic
-number.
+Everything else is an **extra, labelled** row, never a headline: the manual heuristic's conservative
+**P95** operating point (`mae`/`mbe` at `metric_param="p95"` — conservative by design, so a large
+positive MBE that belongs *beside* the central number), and the **median's own bias** (`mbe` at
+`metric_param="p50"`, so the delivered central forecast has an honest bias number distinct from the
+mean's energy-balance bias). No model is structurally disadvantaged on any column — which a single
+uniform statistic cannot achieve — and the trap is closed because the collapse is uniform across
+models. Because the collapse lives entirely *downstream* of the stored forecasts, switching it
+re-scores the whole leaderboard from a single `metrics` re-materialisation with no retraining or
+re-prediction. Doing it now, before the leaderboard adjudicates anything, is the easiest moment to
+shift every existing deterministic number.
 
 ### Effective-capacity normalisation, and the v0.7 upgrade to time-varying 🚧
 
@@ -748,9 +752,9 @@ time (panel degradation, inverter trips, seasonal derating). At that point the a
 metrics join both change, and nothing else:
 
 - the `effective_capacity` asset body emits one row per `(time_series_id, time)`; and
-- `compute_metrics` changes its capacity join from `time_series_id`-only to a **temporal as-of join**
-  on `(time_series_id, valid_time)` — matching each forecast's `valid_time` to the capacity in effect
-  at that time.
+- `compute_metrics` changes its capacity join from `time_series_id`-only to a **temporal as-of
+  join** on `(time_series_id, valid_time)` — matching each forecast's `valid_time` to the capacity
+  in effect at that time.
 
 The `Metrics` schema and the rest of the metrics pipeline are untouched. Note the table is
 **backward-looking only** (it holds no future `valid_time`s): fine for historical CV folds (whose
@@ -798,15 +802,13 @@ comparability across ensemble sizes.
 
 - **[Exceedance rate of the upper delivery
   quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles)**
-  (p80–p99) — "when we said p95, was it exceeded ~5% of the time?"; the plain-language
-  *calibration* check for the tail quantiles NGED reads, one-sided where PICP's bands are
-  symmetric.
+  (p80–p99) — "when we said p95, was it exceeded ~5% of the time?"; the plain-language *calibration*
+  check for the tail quantiles NGED reads, one-sided where PICP's bands are symmetric.
 
 - **[Brier score for threshold
-  exceedance](../techniques/evaluation-metrics.md#brier-score-for-threshold-exceedance)** —
-  grades the ensemble's "chance that load exceeds the threshold" the way one would grade a
-  "70% chance of rain" forecast; the most *decision-legible* number, scoring exactly the
-  warning NGED acts on.
+  exceedance](../techniques/evaluation-metrics.md#brier-score-for-threshold-exceedance)** — grades
+  the ensemble's "chance that load exceeds the threshold" the way one would grade a "70% chance of
+  rain" forecast; the most *decision-legible* number, scoring exactly the warning NGED acts on.
 
 All three fit the existing `Metrics` shape — `metric_param` carries the threshold or quantile label
 — but they need a contract change to get there: `METRIC_NAMES` has no `twcrps` or `brier` entry, and
@@ -814,8 +816,8 @@ All three fit the existing `Metrics` shape — `metric_param` carries the thresh
 
 **Thresholds: static, per-series, quantile-derived.** Each series gets one static threshold — the
 P99 of its full observation history, in the series type's constraint-side direction (high load for
-demand; reverse power flow for generation) — a percentile-of-history convention of the kind
-commonly used in capacity setting, and the same rung the [cost-savings
+demand; reverse power flow for generation) — a percentile-of-history convention of the kind commonly
+used in capacity setting, and the same rung the [cost-savings
 metrics](cost-savings-metrics.md#choosing-the-limit) use, so the leaderboard carries one threshold
 concept rather than several. Physical firm/flex ratings, where NGED supplies them, feed ad-hoc case
 studies and dashboard overlays instead. The full rationale — why a full-history quantile threshold
@@ -837,28 +839,26 @@ before/after instruments for Phases C and D.
 
 #### Implementation details — tail & exceedance metrics (deleted when this ships)
 
-- **Thresholds:** compute a per-series `historical_p99` scalar from the full observation
-  history alongside (or within) the `effective_capacity` asset — same full-history stability
-  rationale, same join shape (`time_series_id`-only). Constraint-side direction resolved per
-  `time_series_type`; confirm the mapping with NGED for ambiguous types (BESS charges *and*
-  discharges).
-- **twCRPS:** transform members and observation with `pl.max_horizontal(col, threshold)` and
-  reuse the existing fair-CRPS expression (sorted-member identity, Float64 accumulation)
-  verbatim.
-- **Exceedance rates:** compare `y` against the already-computed empirical quantile columns
-  for p80, p90, p95, p98, p99 — one boolean mean per level.
-- **Brier score:** exceedance probability = member fraction above the threshold; outcome
-  indicator from `y`; squared difference, averaged.
+- **Thresholds:** compute a per-series `historical_p99` scalar from the full observation history
+  alongside (or within) the `effective_capacity` asset — same full-history stability rationale, same
+  join shape (`time_series_id`-only). Constraint-side direction resolved per `time_series_type`;
+  confirm the mapping with NGED for ambiguous types (BESS charges *and* discharges).
+- **twCRPS:** transform members and observation with `pl.max_horizontal(col, threshold)` and reuse
+  the existing fair-CRPS expression (sorted-member identity, Float64 accumulation) verbatim.
+- **Exceedance rates:** compare `y` against the already-computed empirical quantile columns for p80,
+  p90, p95, p98, p99 — one boolean mean per level.
+- **Brier score:** exceedance probability = member fraction above the threshold; outcome indicator
+  from `y`; squared difference, averaged.
 - **MLflow allowlist:** extend `_MLFLOW_LOGGED_PARAMETRIC` with a small headline subset (e.g.
   `twcrps@historical_p99`, exceedance rate at p95, `brier@historical_p99`); decide the exact set at
   implementation time and keep it small — everything is in Delta regardless.
-- **Peak-events diagnostic slice:** one more named population filter on the shared mechanism
-  (with the Tricky-days filter), flagged in the leaderboard UI as diagnostic-only.
-- **Verification:** hand-computed toy-ensemble values for all three metrics; cross-check
-  twCRPS against the `scoringrules` reference implementation; Monte-Carlo the finite-ensemble
-  one-sided exceedance references (mirroring the PICP reference-table verification); on a
-  smoke fold, confirm `manual_heuristic`'s P95 operating point scores well on the p95 exceedance
-  rate while its conservatism reduces its sharpness on Brier/twCRPS.
+- **Peak-events diagnostic slice:** one more named population filter on the shared mechanism (with
+  the Tricky-days filter), flagged in the leaderboard UI as diagnostic-only.
+- **Verification:** hand-computed toy-ensemble values for all three metrics; cross-check twCRPS
+  against the `scoringrules` reference implementation; Monte-Carlo the finite-ensemble one-sided
+  exceedance references (mirroring the PICP reference-table verification); on a smoke fold, confirm
+  `manual_heuristic`'s P95 operating point scores well on the p95 exceedance rate while its
+  conservatism reduces its sharpness on Brier/twCRPS.
 
 ### Tricky days — a calendar-deterministic metric filter 🚧
 
@@ -878,8 +878,8 @@ on tricky days" — is that Christmas, or a switching event?).
 Mechanically it is another population filter (the same mechanism the peak-events diagnostic slice
 uses): a boolean flag per timestep, derived from `valid_time` alone. Unlike that observed-peak
 slice, this filter *is* a legitimate ranking column: the flag depends only on the calendar, which
-every forecaster knew in advance, so it does not fall into the
-[forecaster's-dilemma trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
+every forecaster knew in advance, so it does not fall into the [forecaster's-dilemma
+trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
 Because it is purely calendar-driven it **shares its calendar module with
 `manual_heuristic_holiday_aligned`** — the same GB bank-holiday calendar (the pure-Python `holidays`
 package) plus the two DST dates feed both the holiday-aligned baseline and this metric filter. The
@@ -910,9 +910,9 @@ leaderboard.
 - A small calendar module (shared with baseline 2, `manual_heuristic_holiday_aligned`) answers, for
   any `valid_time`, whether it falls inside a tricky-days window. Back it with the `holidays` GB
   calendar plus the two annual DST dates; expose the per-event window widths as config.
-- Represent the tricky-days slice the same way the peak-events diagnostic slice is represented —
-  one more named population filter, resolved by the same mechanism, **not** a new schema axis —
-  so the leaderboard gains a **Tricky days** column with no `Metrics` schema change.
+- Represent the tricky-days slice the same way the peak-events diagnostic slice is represented — one
+  more named population filter, resolved by the same mechanism, **not** a new schema axis — so the
+  leaderboard gains a **Tricky days** column with no `Metrics` schema change.
 - Verification: unit-test the flag on known dates (a Christmas week, an Easter, both DST
   switchovers, and a plain week that must be *excluded*); on a smoke-test fold, confirm
   `manual_heuristic` scores worse on the tricky-days slice than overall.
@@ -925,9 +925,9 @@ leaderboard.
 > v0.5 champion would be picked on clean-data skill alone.
 
 The [inherent-stability principle](../design-philosophy/inherent-stability.md) claims that the
-service keeps beating the manual heuristic as its inputs degrade. That claim is only worth
-anything if it is *scored*, so degradation becomes a dimension of the leaderboard rather than an
-aspiration in a design document.
+service keeps beating the manual heuristic as its inputs degrade. That claim is only worth anything
+if it is *scored*, so degradation becomes a dimension of the leaderboard rather than an aspiration
+in a design document.
 
 **A canonical failure-scenario suite.** A named, versioned set of degradation transforms over an
 `AllFeatures` frame — NWP {fresh, *n* runs missed, absent} × telemetry {present, partial, absent} ×
@@ -945,11 +945,12 @@ on the `power_forecasts` rows the metrics are computed from) rather than a new e
 degradation behaviour is a first-class property of every experiment instead of a separate study
 somebody has to remember to run.
 
-**The acceptance criterion is `manual_heuristic`, not a fixed error threshold.** The manual heuristic
-consumes no NWP and is indifferent to recent telemetry staleness, so it barely degrades — which
-makes it the honest bar to clear, and a far better failure criterion than any arbitrary staleness
-threshold. Concretely: at rungs 0–2 of the degradation ladder, every time series should still emit a
-forecast, and that forecast should still beat `manual_heuristic`. That is [T1.2, graceful
+**The acceptance criterion is `manual_heuristic`, not a fixed error threshold.** The manual
+heuristic consumes no NWP and is indifferent to recent telemetry staleness, so it barely degrades —
+which makes it the honest bar to clear, and a far better failure criterion than any arbitrary
+staleness threshold. Concretely: at rungs 0–2 of the degradation ladder, every time series should
+still emit a forecast, and that forecast should still beat `manual_heuristic`. That is [T1.2,
+graceful
 degradation](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself);
 the interval-calibration counterpart, PICP within tolerance in every regime, is [T1.3, faithful
 uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
@@ -996,22 +997,19 @@ Two rungs, in increasing order of "cheating":
 Three conditions on reading the result.
 
 - **The ceiling must be trained on the better weather, not merely scored on it.** Feeding reanalysis
-to an
-  ENS-trained model measures a train/serve mismatch instead of a ceiling.
+  to an ENS-trained model measures a train/serve mismatch instead of a ceiling.
 
 - **The ceiling bounds forecast error, not resolution.** ERA5 is a 31 km field, while ICON-EU is
-~6.5 km and
-  post-2023 ENS is 9 km, so a finer *forecast* can carry site-relevant structure that a coarse
-  *analysis* averages away. A low ERA5 ceiling therefore deprioritises a second NWP source without
-  ruling one out; it is the observations rung that closes this gap, since station and satellite data
-  are at-site rather than grid-cell means.
+  ~6.5 km and post-2023 ENS is 9 km, so a finer *forecast* can carry site-relevant structure that a
+  coarse *analysis* averages away. A low ERA5 ceiling therefore deprioritises a second NWP source
+  without ruling one out; it is the observations rung that closes this gap, since station and
+  satellite data are at-site rather than grid-cell means.
 
 - **It is a ceiling for the current model family and feature set.** A model that cannot exploit
   perfect weather shows a low ceiling for reasons that have nothing to do with weather availability.
   That does not weaken the decision the ceiling gates — a model that cannot use perfect weather will
-  not be
-  rescued by a better forecast of it — but it does mean the ceiling is re-measured after any large
-  modelling change rather than treated as a standing fact.
+  not be rescued by a better forecast of it — but it does mean the ceiling is re-measured after any
+  large modelling change rather than treated as a standing fact.
 
 ---
 
@@ -1030,8 +1028,8 @@ lead time:
 **Coverage is broken down by season, by how heavily loaded the substation was, and by the lead-time
 slices above, not reported as one annual figure** — see [Publishing results that others can compare
 against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
-for why an averaged 90% can hide 70% coverage at the winter peaks, the periods when most
-flexibility is procured.
+for why an averaged 90% can hide 70% coverage at the winter peaks, the periods when most flexibility
+is procured.
 
 ### Measuring performance during switching events 🚧
 
@@ -1057,8 +1055,8 @@ Flexibility procurement is a tails problem (P90+ peaks), so this overconfidence 
 directly.
 
 **Phases A and B already built the measurement machinery, and the remaining phases act on what those
-numbers show.** Phases A and B (both shipped) deliver every metric in the
-[evaluation-metrics reference](../techniques/evaluation-metrics.md), per horizon slice. The planned [tail & exceedance
+numbers show.** Phases A and B (both shipped) deliver every metric in the [evaluation-metrics
+reference](../techniques/evaluation-metrics.md), per horizon slice. The planned [tail & exceedance
 metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks) will sharpen the picture
 further: an underdispersed ensemble pushes its exceedance probabilities to 0 or 1 too early, so the
 Brier score and the quantile exceedance rates are the clearest before/after instruments for Phases C
@@ -1121,24 +1119,22 @@ then recombine the 51 members with the **linear-pool mixture** into one set of d
 
 1. **Percentile representations in `PowerForecast`**
    ([#262](https://github.com/openclimatefix/nged-substation-forecast/issues/262)) — extend the
-   contract (and the Delta write/read paths) with the Rep 2 and Rep 3 percentile columns,
-   alongside the existing deterministic-ensemble representation.
+   contract (and the Delta write/read paths) with the Rep 2 and Rep 3 percentile columns, alongside
+   the existing deterministic-ensemble representation.
 2. **Quantile XGBoost model family**
-   ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) —
-   `objective: reg:quantileerror` with several
-   `quantile_alpha`s, as a separate experiment/model family emitting Rep 3. Sort each member's
-   quantiles at predict time (monotonic rearrangement fixes quantile crossing). The lead-time
-   feature and training on multiple members
-   ([xgboost-improvements](xgboost-improvements.md) — the lead-time feature and ensemble-member training) are the double-counting
-   mitigations discussed in the explainer — land them first or measure without them
-   consciously.
+   ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) — `objective:
+   reg:quantileerror` with several `quantile_alpha`s, as a separate experiment/model family emitting
+   Rep 3. Sort each member's quantiles at predict time (monotonic rearrangement fixes quantile
+   crossing). The lead-time feature and training on multiple members
+   ([xgboost-improvements](xgboost-improvements.md) — the lead-time feature and ensemble-member
+   training) are the double-counting mitigations discussed in the explainer — land them first or
+   measure without them consciously.
 3. **Linear-pool combining step**
    ([#264](https://github.com/openclimatefix/nged-substation-forecast/issues/264)) — pool the
-   per-member quantiles into delivered Rep 2
-   percentiles (the pseudo-sample recipe in the explainer), with a per-horizon affine
-   recalibration hook (fit on train) applied only if the pooled spread-skill/PICP numbers
-   demand it. Scored with pinball/PICP/CRPS head-to-head against the Phase-C inflated
-   deterministic champion.
+   per-member quantiles into delivered Rep 2 percentiles (the pseudo-sample recipe in the
+   explainer), with a per-horizon affine recalibration hook (fit on train) applied only if the
+   pooled spread-skill/PICP numbers demand it. Scored with pinball/PICP/CRPS head-to-head against
+   the Phase-C inflated deterministic champion.
 
 ---
 
@@ -1173,6 +1169,5 @@ against](../background/energy-forecasting-review.md#publishing-results-that-othe
 — pooling them with weather-driven generators would hide how well either group is forecast.
 
 > Every leaderboard row also carries two **cost savings (£)** figures — one for flexibility
-> procurement, one for curtailment — designed in
-> [Estimating the money a better forecast saves](cost-savings-metrics.md). They are deliberately
-> rough proxies, not a cost analysis.
+> procurement, one for curtailment — designed in [Estimating the money a better forecast
+> saves](cost-savings-metrics.md). They are deliberately rough proxies, not a cost analysis.

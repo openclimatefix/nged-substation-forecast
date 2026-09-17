@@ -1,12 +1,10 @@
 # Documentation Guide
 
-How this repository's documentation and planning content is organised — where to look for
-existing content, and where to put new content.
+How this repository's documentation and planning content is organised — where to look for existing
+content, and where to put new content.
 
-> **Status legend** (used throughout the design docs below):
-> ✅ **Implemented** — exists in code today ·
-> 🚧 **Planned** — designed, not yet built ·
-> 🔬 **Research** — exploratory / v2.
+> **Status legend** (used throughout the design docs below): ✅ **Implemented** — exists in code
+> today · 🚧 **Planned** — designed, not yet built · 🔬 **Research** — exploratory / v2.
 
 ## How planning works
 
@@ -20,41 +18,40 @@ Planning content lives in five places with deliberately non-overlapping jobs:
 | **`docs/`[techniques](techniques/index.md), [background](background/index.md), [architecture](architecture/overview.md), [ml_experimentation](ml_experimentation/index.md), [live_service](live_service/index.md)** | What is already built — design (`architecture/`) and operational how-to (`ml_experimentation/`, `live_service/`) alike. These pages are where content moves to from `docs/roadmap/` after implementation. |
 | **`plans/`** (repo root, not published) | At most **one** file per branch: the implementation plan for the work in flight on that branch, written before any code is touched and deleted when it merges. One worktree per branch is what keeps it to one file. Usually empty on `main`. |
 
-**Relationship between `docs/roadmap/` and GitHub**: Every substantial 🚧 plan in the
-`docs/roadmap/` folder has a GitHub issue, and every dependency stated in `docs/roadmap/` exists as
-a `blocked by` link on GitHub — but GitHub freely contains small issues with no counterpart here in
-the docs. (🔬 research ideas are exempt from GitHub until they are promoted to a milestone.) The
-litmus test for needing a design doc in `docs/roadmap/`: *does it take more than a few sentences to explain?*
+**Relationship between `docs/roadmap/` and GitHub**: Every substantial 🚧 plan in the `docs/roadmap/`
+folder has a GitHub issue, and every dependency stated in `docs/roadmap/` exists as a `blocked by`
+link on GitHub — but GitHub freely contains small issues with no counterpart here in the docs. (🔬
+research ideas are exempt from GitHub until they are promoted to a milestone.) The litmus test for
+needing a design doc in `docs/roadmap/`: *does it take more than a few sentences to explain?*
 
-When a piece of work ships, its design content **moves out** of `roadmap/` to its permanent home
-— and the roadmap page shrinks; when a page's last 🚧 item ships, the page is deleted. That
-permanent home splits along a **why vs. how** line: `architecture/` holds system design — the
-decisions and rationale, written once and rarely re-read step-by-step — while
-[`ml_experimentation/`](ml_experimentation/index.md) and
-[`live_service/`](live_service/index.md) hold operational how-to — step-by-step recipes for
-running what's already built, one per area (ML backtesting vs. the live production service).
-Each `architecture/` design page names its how-to counterpart (and vice versa) in a "See also"
-section — e.g. [ML Orchestration Design](architecture/ml-orchestration.md) ↔
-[ML Experimentation](ml_experimentation/index.md), and
-[Production Deployment — Design](architecture/production-deployment.md) ↔
-[Setting up the live service on AWS](live_service/aws.md). A page mixing the two — design
-rationale followed by a runbook with literal commands — is a sign it should split along this line.
-The `docs/roadmap/` folder therefore contains **only design for work that is not yet implemented**,
-and is never a mirror of the code. Because roadmap pages are deletable, **code must never link into
-`roadmap/`** — instead, code docstrings link to the durable sections (`design-philosophy/`,
-`techniques/`, `architecture/`, `background/`, `ml_experimentation/`, `live_service/`) instead. The *methods*
-behind these plans — differentiable physics, learned encoders, the disaggregation-evaluation
-protocol — live in [Techniques](techniques/index.md) for exactly this reason: they survive the
-roadmap items that apply them.
+When a piece of work ships, its design content **moves out** of `roadmap/` to its permanent home —
+and the roadmap page shrinks; when a page's last 🚧 item ships, the page is deleted. That permanent
+home splits along a **why vs. how** line: `architecture/` holds system design — the decisions and
+rationale, written once and rarely re-read step-by-step — while
+[`ml_experimentation/`](ml_experimentation/index.md) and [`live_service/`](live_service/index.md)
+hold operational how-to — step-by-step recipes for running what's already built, one per area (ML
+backtesting vs. the live production service). Each `architecture/` design page names its how-to
+counterpart (and vice versa) in a "See also" section — e.g. [ML Orchestration
+Design](architecture/ml-orchestration.md) ↔ [ML Experimentation](ml_experimentation/index.md), and
+[Production Deployment — Design](architecture/production-deployment.md) ↔ [Setting up the live
+service on AWS](live_service/aws.md). A page mixing the two — design rationale followed by a runbook
+with literal commands — is a sign it should split along this line. The `docs/roadmap/` folder
+therefore contains **only design for work that is not yet implemented**, and is never a mirror of
+the code. Because roadmap pages are deletable, **code must never link into `roadmap/`** — instead,
+code docstrings link to the durable sections (`design-philosophy/`, `techniques/`, `architecture/`,
+`background/`, `ml_experimentation/`, `live_service/`) instead. The *methods* behind these plans —
+differentiable physics, learned encoders, the disaggregation-evaluation protocol — live in
+[Techniques](techniques/index.md) for exactly this reason: they survive the roadmap items that apply
+them.
 
 ## Docstrings, READMEs and `docs/` hold three different jobs
 
 The section above covers the pages under `docs/`. Docstrings and package READMEs are documentation
 too — mkdocstrings renders every module listed in `docs/api/<package>/index.md` onto the published
-site — so the same question of which home an argument belongs in applies to them, and it is
-settled by asking what the reader already has in their hand when they arrive. Deciding a home is
-not a licence to delete the other copies: the bar for cutting prose out of code is
-[excessive duplication](architecture/code-style.md#comments-docstrings-and-links), not duplication.
+site — so the same question of which home an argument belongs in applies to them, and it is settled
+by asking what the reader already has in their hand when they arrive. Deciding a home is not a
+licence to delete the other copies: the bar for cutting prose out of code is [excessive
+duplication](architecture/code-style.md#comments-docstrings-and-links), not duplication.
 
 **A docstring holds everything that dies when the symbol dies**: units, preconditions, invariants,
 failure modes, and the argument for this particular implementation. The test is whether the prose

@@ -39,8 +39,8 @@ outline and expensive in 4,000 words of drafted prose. That is why the plan has 
   follow that conclusion.
 
 Order the sections so each section's prerequisites are all satisfied by sections that came before
-it. Leave supporting detail out of the outline entirely. An outline that already contains the
-detail has stopped being a planning tool.
+it. Leave supporting detail out of the outline entirely. An outline that already contains the detail
+has stopped being a planning tool.
 
 ## Review the outline before it becomes prose
 
@@ -58,16 +58,24 @@ detail has stopped being a planning tool.
   smuggle in early.
 - **Decide prose or bullets per passage, on how complex the concept is rather than how long the
   passage runs.** A parallel set of simple, independent facts — the options a setting takes, what a
-  table holds, a run of short design notes — is a list, and drafting it as prose only makes a
-  reader work harder for the same content. A passage introducing a complex new concept is prose,
-  because the connective tissue between the sentences is what makes a new concept followable. The
-  outline is where this is easiest to see: an entry whose content is a set of peers is a list, and
-  an entry whose content is an argument reaching a conclusion is not.
-- **Apply the CLAUDE.md prose-style rules one at a time, using `prose-review`'s one-rule-per-pass sweep, as separate passes over the drafted text** rather than trying to satisfy every rule while drafting. A single named-rule pass does better work than a general "make this good" pass, and much better work than trying to draft rule-conforming prose from a blank page.
+  table holds, a run of short design notes — is a list, and drafting it as prose only makes a reader
+  work harder for the same content. A passage introducing a complex new concept is prose, because
+  the connective tissue between the sentences is what makes a new concept followable. The outline is
+  where this is easiest to see: an entry whose content is a set of peers is a list, and an entry
+  whose content is an argument reaching a conclusion is not.
+- **Apply the CLAUDE.md prose-style rules one at a time, using `prose-review`'s one-rule-per-pass
+  sweep, as separate passes over the drafted text** rather than trying to satisfy every rule while
+  drafting. A single named-rule pass does better work than a general "make this good" pass, and much
+  better work than trying to draft rule-conforming prose from a blank page.
 
 ## Check the draft against a reader, not a reviewer
 
-**Run `prose-review`'s first-stumble reader against the draft.** A fresh sub-agent, isolated from this repository and this conversation, reads from the top with a persona matched to the draft's real audience — such as "a distribution-network planner who has never trained a machine-learning model" — and stops at the first sentence it cannot follow. The isolation requirement, the multi-persona rule and the instruction not to rewrite anything are the same whether the text is a fresh draft or an existing page. `prose-review` documents all three.
+**Run `prose-review`'s first-stumble reader against the draft.** A fresh sub-agent, isolated from
+this repository and this conversation, reads from the top with a persona matched to the draft's real
+audience — such as "a distribution-network planner who has never trained a machine-learning model" —
+and stops at the first sentence it cannot follow. The isolation requirement, the multi-persona rule
+and the instruction not to rewrite anything are the same whether the text is a fresh draft or an
+existing page. `prose-review` documents all three.
 
 **Fix every stop point at the outline level, then re-extract the conclusion list and check it
 again.** Move the missing prerequisite earlier, or move the stalling section later, rather than
@@ -78,8 +86,7 @@ outline's order wrong for the next reader who trips somewhere else.
 
 `prose-review` runs the same flat-list and first-stumble-reader checks over prose that already
 exists, for when there's a draft to fix rather than one to write, and owns the one-rule-per-pass
-sweep this skill hands off to once a draft exists. For a rewrite that adds whole new sections to
-an existing page, run `prose-review` on the existing text first, then outline the new sections
-here against the result. Outlining new material against a page whose own structure hasn't been
-checked risks building the new sections on prerequisites the existing page never actually
-establishes.
+sweep this skill hands off to once a draft exists. For a rewrite that adds whole new sections to an
+existing page, run `prose-review` on the existing text first, then outline the new sections here
+against the result. Outlining new material against a page whose own structure hasn't been checked
+risks building the new sections on prerequisites the existing page never actually establishes.

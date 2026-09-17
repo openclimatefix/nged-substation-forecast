@@ -18,10 +18,10 @@ normally works with. Get a node ID with:
 gh issue view <number> --json id --jq .id   # works for PRs too via `gh pr view`
 ```
 
-All commands assume `openclimatefix/nged-substation-forecast`; swap the owner/name for another
-repo. Every mutation's input fields below were confirmed against GitHub's live schema by
-introspection. If a call starts failing, re-check the same way — GitHub occasionally adds or
-renames fields: `{ __type(name: "<MutationName>Input") { inputFields { name } } }`.
+All commands assume `openclimatefix/nged-substation-forecast`; swap the owner/name for another repo.
+Every mutation's input fields below were confirmed against GitHub's live schema by introspection. If
+a call starts failing, re-check the same way — GitHub occasionally adds or renames fields: `{
+__type(name: "<MutationName>Input") { inputFields { name } } }`.
 
 ## Attach a sub-issue to its parent
 
@@ -78,8 +78,8 @@ gh api graphql -f query='
 ## Set a GitHub Projects (v2) field
 
 Prefer `gh project item-edit` over raw GraphQL — it wraps `updateProjectV2ItemFieldValue` for you
-and only drop to the raw mutation if it doesn't cover the field type you need (e.g. iteration
-fields it can't set). Gather the IDs it needs:
+and only drop to the raw mutation if it doesn't cover the field type you need (e.g. iteration fields
+it can't set). Gather the IDs it needs:
 
 ```bash
 gh project view 33 --owner openclimatefix --format json --jq .id          # project node ID
@@ -88,8 +88,7 @@ gh project item-add 33 --owner openclimatefix --url <issue-url> \
   --format json --jq .id                                                  # item node ID
 ```
 
-Then, for a single-select field (Status, Project, Area are all single-select in this repo's
-board):
+Then, for a single-select field (Status, Project, Area are all single-select in this repo's board):
 
 ```bash
 gh project item-edit --id <item node id> --project-id <project node id> \
