@@ -29,9 +29,11 @@ def _():
 
     Pick a time series and a forecast run; the plot shows every forecast ensemble member
     (thin grey lines) against the observed power (thick blue line), from 24 hours before
-    the forecast init time to 14 days after it. A second panel below shows the NWP ensemble
-    that fed the forecast — pick the weather variable to plot — on the same time axis, at
-    the H3 cell containing the series.
+    the forecast init time to 14 days after it. The lagged-power lines overlay observed power
+    shifted forward by 7 and by 14 days, which is the raw material of the models' power-lag
+    features. A second panel below shows the NWP ensemble that fed the forecast — pick the
+    weather variable to plot — on the same time axis, at the H3 cell containing the series,
+    with a stitched proxy-analysis line standing in for the weather that actually happened.
     """)
     return
 
@@ -94,7 +96,8 @@ def _(settings):
 def _(reload, settings):
     # Load-bearing, not dead code: every Delta read in the notebook descends from this cell, so
     # referencing `reload` here is what makes the button re-read them all. The metadata cell above
-    # is left out on purpose — re-running it would reset the time-series dropdown to its default.
+    # is left out on purpose, because re-running that cell would reset the time-series dropdown to
+    # its default.
     reload
     # Delta partition metadata (no data scan) lists the available (experiment_name, fold_id)
     # pairs. If the table is missing entirely (e.g. a fresh local checkout), stop here — the
@@ -244,9 +247,9 @@ def _(
     show_lag_7d,
     weekend_shading,
 ):
-    # The run selectors (which forecast to look at) stack vertically as one visual unit;
-    # the display toggles (how to draw it) sit beside them. The NWP controls live with the
-    # NWP panel itself (see the NWP chart cell), not here.
+    # The run selectors (which forecast to look at) stack vertically as one visual unit; the
+    # display toggles (how to draw that forecast) sit beside the run selectors. The NWP controls
+    # live with the NWP panel itself (see the NWP chart cell), not here.
     _run_selectors = [series_picker, fold_picker]
     if len(experiment_names) > 1:
         _run_selectors.append(experiment_picker)
@@ -285,13 +288,14 @@ def _(experiment_picker, fold_picker, run_picker, series_picker, settings):
             pl.col("valid_time") <= init_time + PLOT_HORIZON,
         )
         # nwp_init_time identifies the NWP run for the panel below the power chart; the power
-        # chart cell drops it again so it isn't serialised into the 34k-row chart data.
+        # chart cell drops the column again so it is not serialised into the 34k-row chart data.
         .select("valid_time", "power_fcst", "ensemble_member", "nwp_init_time")
         .collect()
     )
-    # History extends max(LAG_OPTIONS) past the plotted window so the lagged-power lines are
-    # loaded whatever the lag picker says — toggling lags then re-runs only the chart cell,
-    # never this Delta query. The extra rows are trivial (one series, 14 more days).
+    # History starts max(LAG_OPTIONS.values()) — 14 days — before the plotted window, so the
+    # lagged-power lines are loaded whatever the lag picker says, and toggling a lag re-runs only
+    # the chart cell, never this Delta query. The extra rows are trivial: one series and 14 more
+    # days.
     actuals = (
         pl.scan_delta(settings.power_time_series_data_path, storage_options=_storage)
         .filter(
@@ -379,10 +383,11 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
     # experiment ever grows the ensemble with lagged NWP runs.
     nwp_init_time = _nwp_init_times.max()
 
-    # All 51 members × ~85 steps × all variables is only ~4k rows, so load every variable for
-    # the run once — switching the NWP-variable dropdown then re-runs only the chart cell,
-    # never this Delta query. init_time is a partition column, so the filter prunes to one
-    # partition; h3_index selects the (resolution 5) cell containing this series.
+    # One run at one H3 cell is 51 members × 85 forecast steps ≈ 4k rows, because `Nwp` carries
+    # one *column* per weather variable rather than one row, so load every variable for the run
+    # at once — switching the NWP-variable dropdown then re-runs only the chart cell, never this
+    # Delta query. init_time is a partition column, so the filter prunes to one partition;
+    # h3_index selects the (resolution 5) cell containing this series.
     _series_h3 = metadata_df.filter(pl.col("time_series_id") == series_picker.value)[
         "h3_res_5"
     ].item()
@@ -399,15 +404,15 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
             .drop("nwp_model_id", "init_time", "h3_index")
             .collect()
         )
-        # The proxy-analysis line stitches the first NWP_ANALYSIS_LEAD of every run overlapping
-        # the plotted window (control member only). select_analysis_proxy applies the member
-        # filter, the max_lead stitch, and the freshest-run-per-valid_time reduction; the cheap
-        # partition/row-group filters (init_time range, h3_index) stay on the scan above it so
-        # Delta partition pruning survives. Loading it here, unconditionally, keeps the "NWP proxy
-        # analysis" checkbox instant: toggling it re-runs only the chart cell, never this Delta
-        # query (~0.2 s across the ~17 pruned init_time partitions). Runs older than
-        # window_start − NWP_ANALYSIS_LEAD cannot reach the window, so the init_time filter starts
-        # there.
+        # The proxy-analysis line stitches the first NWP_ANALYSIS_LEAD of every run overlapping the
+        # plotted window (control member only). select_analysis_proxy applies the member filter, the
+        # max_lead stitch, and the freshest-run-per-valid_time reduction; the cheap
+        # partition/row-group filters (init_time range, h3_index) stay on the scan handed to that
+        # call, so Delta partition pruning survives. Loading the line here, unconditionally, keeps
+        # the "NWP proxy analysis" checkbox instant: ticking the box re-runs only the chart cell,
+        # never this Delta query (~0.2 s across the ~17 pruned init_time partitions). A run older
+        # than window_start − NWP_ANALYSIS_LEAD cannot reach the window, so the init_time filter
+        # starts there.
         nwp_analysis = (
             select_analysis_proxy(
                 pl.scan_delta(

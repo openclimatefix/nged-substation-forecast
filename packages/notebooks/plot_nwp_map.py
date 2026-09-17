@@ -18,6 +18,8 @@ with app.setup:
 
 @app.cell
 def _():
+    # Lazy: nothing is read until a cell below collects. nwp_model_id is dropped because the
+    # table holds one NWP model today, so the column carries no information here.
     df = Nwp.scan_delta().drop("nwp_model_id")
     return (df,)
 
@@ -30,6 +32,9 @@ def _(df):
 
 @app.cell
 def _(df):
+    # One run at one H3 cell, as a line per ensemble member. 599148110664433663 is a resolution-5
+    # cell in Shetland, at roughly 60.6 N, 0.7 W. init_time is a Delta partition column, so the
+    # scan prunes to a single daily partition; h3_index sorts last, so it prunes little further.
     NWP_INIT_TIME = datetime(2026, 5, 15, tzinfo=UTC)
     NWP_VAR_TO_PLOT = "temperature_2m"
 
@@ -70,6 +75,8 @@ def _(NWP_INIT_TIME):
 
 @app.cell
 def _(ENS_MEMBER_TO_PLOT, NWP_INIT_TIME, VALID_TIME_TO_PLOT, df):
+    # One value per H3 cell: one run, one member, one valid time, every cell in the grid. That is
+    # what the hexagon map below shades.
     filtered_df = cast(
         pl.DataFrame,
         df.filter(
@@ -88,6 +95,8 @@ def _(NWP_VAR_TO_PLOT, filtered_df):
     from lonboard.colormap import apply_continuous_cmap
     from palettable.matplotlib import Viridis_20  # ty: ignore[unresolved-import]
 
+    # apply_continuous_cmap wants values in 0-1, so rescale the chosen variable across the cells
+    # drawn. Despite its name, max_bound holds the *range* rather than the maximum.
     values = filtered_df[NWP_VAR_TO_PLOT]
     min_bound = values.min()
     max_bound = values.max() - min_bound

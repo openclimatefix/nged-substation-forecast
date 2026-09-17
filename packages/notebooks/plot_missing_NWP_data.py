@@ -41,13 +41,20 @@ def _():
 
 @app.function
 def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
-    """Chart where `nwp_vars` is missing, one row per ensemble member.
+    """Chart where `nwp_vars` is missing, with one row per ensemble member.
+
+    A missing weather value reaches the archive as either a Polars null or a float NaN, so both
+    are flagged, and both draw the same red tick.
 
     Args:
         df: Lazy scan of the NWP Delta table.
         target_init_time: The single NWP run to plot.
         target_h3_index: The single H3 cell to plot.
         nwp_vars: The NWP variable name (or list of names) to plot.
+
+    Returns:
+        A layered Altair chart: one pale grey line per ensemble member across the run's valid
+        times, with a red tick wherever a plotted variable has no value there.
     """
     # 1. Filter down to the specific init_time and h3_index
     filtered = df.filter(
@@ -62,11 +69,11 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
         value_name="value",
     )
 
-    # 3. Create a boolean flag for missing data and a combined label for the Y-axis. Altair
+    # 3. Flag the missing values, and label each y-axis row with its ensemble member. Altair
     # only accepts materialised data, so collect once the filter has cut the scan down to a
     # single NWP run and a single H3 cell.
     plot_df = melted.with_columns(
-        # Check for both database Nulls and float NaNs
+        # Check for both Polars nulls and float NaNs
         is_missing=pl.col("value").is_null() | pl.col("value").is_nan(),
         # Create a string like "temperature_2m (Member 0)":
         # row_label=(
@@ -75,12 +82,12 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
         row_label=pl.col("ensemble_member"),
     ).collect()
 
-    # 5. Build the Altair Chart
+    # 4. Build the Altair Chart
     base = alt.Chart(plot_df).encode(
         y=alt.Y("row_label:N", title="Ensemble Member", sort="ascending")
     )
 
-    # Layer 1: A light gray background line showing the full time series extent
+    # Layer 1: A light grey background line showing the full time series extent
     background_line = base.mark_line(color=GRID, strokeWidth=1)
     background_lines = background_line.encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("valid_time:T", title="Valid Time"),
@@ -116,6 +123,8 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
 
 @app.cell
 def _(df, nwp_vars):
+    # 599148110664433663 is an H3 resolution-5 cell in Shetland, at roughly 60.6 N, 0.7 W — the
+    # far north of the boundary `h3_grid_weights` covers, and so a cell worth checking for gaps.
     chart = plot_null_distribution(
         df,
         target_init_time=datetime(2026, 5, 1, tzinfo=UTC),

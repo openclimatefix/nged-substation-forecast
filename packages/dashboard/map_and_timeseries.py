@@ -113,7 +113,9 @@ def _(settings):
         settings.power_time_series_data_path,
         storage_options=typeddict_to_dict(settings.storage_options),
     ).filter(
-        # Filter to only show recent data. Altair crashes if you try to show too much data.
+        # Filter to recent observations only. This app inlines a selected series' rows in the
+        # chart spec and never lifts Altair's default guard, so a query reaching further back
+        # would fail with Altair's 5,000-row MaxRowsError.
         pl.col("time") > pl.lit(datetime(2026, 5, 1, tzinfo=UTC)).cast(UTC_DATETIME_DTYPE)
     )
     return (delta_df,)
@@ -125,7 +127,8 @@ def _(delta_df, df, layer_widget, map):
         right_pane = mo.md(
             """
             ### Select a Substation
-            *Click a dot on the map to view the demand profile.*
+            *Click a dot on the map to view its power time series. Generation sites and
+            storage sites are on the map too, so the line is not always demand.*
             """
         )
     else:
