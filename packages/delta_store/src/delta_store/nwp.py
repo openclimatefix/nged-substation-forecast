@@ -51,6 +51,15 @@ of decoding it. That pruning holds for **any** member, not only the control memb
 is not enough, because row groups that straddle member boundaries advertise the whole span between
 their extremes.
 
+Measured on the stored table, a single-member read decodes 1.96% of a partition — one row group in
+51 — for every member: every partition the census sampled held 51 row groups, each spanning a
+single member, and the 51 together covered members 0 to 50. Reading 29 daily partitions, 9 H3
+cells, and the control member alone runs in 30 ms and 400 MB of peak resident memory, against
+170 ms and 2,200 MB for the same read of a table sorted ``valid_time``-first, and the member-early
+sort holds 3.7% more stored bytes. The method and the full figures live beside the storage
+measurements in
+<https://openclimatefix.github.io/nged-substation-forecast/api/dynamical_data/>.
+
 Two conditions have to hold for the predicate to reach the Parquet scan at all. It must survive
 ``Nwp.scan_delta``'s cast, which requires that cast to be a no-op (see the ``Nwp.ensemble_member``
 field). And the row groups have to stay member-aligned, which is what
@@ -59,7 +68,7 @@ field). And the row groups have to stay member-aligned, which is what
 NWP_TARGET_FILE_SIZE_BYTES: Final[int] = 2_000_000_000
 """Target size for each Parquet file delta-rs writes, sized to keep one partition in one file.
 
-A daily ECMWF ENS partition is ~145 MB, so the target leaves more than a tenfold headroom.
+A daily ECMWF ENS partition is ~158 MB, so the target leaves more than a tenfold headroom.
 
 **The file-size target is an optimisation, not a correctness requirement.** A partition that
 outgrows the target still writes correctly and still prunes well, because the single Arrow chunk
