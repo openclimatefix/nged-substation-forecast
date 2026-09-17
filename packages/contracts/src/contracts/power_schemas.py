@@ -112,11 +112,11 @@ class PowerTimeSeries(pt.Model):
         stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
         an ingestion boundary should degrade the batch rather than abort it entirely.
 
-        This exists alongside ``validate``, which stays strict. ``validate`` raises on two of the
-        three conditions above — a ``time`` outside the plausible range, and a ``time`` that is not
-        on the top or bottom of the hour; a null ``time`` is rejected earlier still, by the
-        non-nullable field. ``validate`` is also used as a hard assertion in tests and R&D code,
-        where a raise-on-violation contract must not silently change.
+        Dropping rows exists alongside ``validate``, which stays strict. ``validate`` raises on
+        two of the three conditions above — a ``time`` outside the plausible range, and a ``time``
+        that is not on the top or bottom of the hour; a null ``time`` is rejected earlier still,
+        by the non-nullable field. ``validate`` is also used as a hard assertion in tests and R&D
+        code, where a raise-on-violation contract must not silently change.
 
         Call this method BEFORE ``validate``, and only at a boundary that receives data from
         outside our system (e.g. NGED's raw JSON feed). The uniqueness and sortedness checks in
@@ -176,8 +176,8 @@ Notes:
 - Disaggregated Demand: In the trial area, exclusively associated with "Primary" substations. All
   "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
   Indicates that NGED have already removed metered generation connected to that primary.
-- PV: Photovoltaic (solar). - Raw Flow: Used for bulk supply point (BSP) and grid supply point (GSP)
-  substations.
+- PV: Photovoltaic (solar).
+- Raw Flow: Used for bulk supply point (BSP) and grid supply point (GSP) substations.
 """
 
 
@@ -307,7 +307,8 @@ the reserved sentinel for a production forecast that belongs to no CV fold.
 class PowerForecast(pt.Model):
     """Forecast data schema for an ensemble of deterministic forecasts.
 
-    One row per ensemble member per target time.
+    One row per time series, per forecast run, per target time, per ensemble member —
+    the four columns of ``PRIMARY_KEY``.
 
     Internal vs delivered schema (Milestone 1 report Table 1, p.28): the columns
     ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id`` are INTERNAL-ONLY — they
@@ -367,8 +368,7 @@ class PowerForecast(pt.Model):
     # String (not Categorical): experiment_name/fold_id are the Delta partition columns, and
     # delta-rs stores dictionary-encoded columns as String anyway. String keeps those two columns
     # cast-free and lets predicate pushdown work. See the "Delta Lake dictionary-encoded columns"
-    # section of the
-    # `polars-patito-gotchas` skill.
+    # section of the `polars-patito-gotchas` skill.
     experiment_name: str = pt.Field(
         dtype=pl.String,
         description=(
@@ -461,9 +461,8 @@ class PowerForecast(pt.Model):
         )
 
         # `n_unique`, not `is_duplicated().any()`: the two expressions are equivalent here (every
-        # primary-key
-        # column is non-nullable) but `is_duplicated` materialises a per-row mask, costing ~5x the
-        # peak memory on a predict-sized frame.
+        # primary-key column is non-nullable) but `is_duplicated` materialises a per-row mask,
+        # costing ~5x the peak memory on a predict-sized frame.
         pk_cols = list(cls.PRIMARY_KEY)
         if validated_df.select(pk_cols).n_unique() != validated_df.height:
             raise ValueError(

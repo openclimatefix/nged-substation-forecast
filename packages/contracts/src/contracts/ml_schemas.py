@@ -281,9 +281,8 @@ class Metrics(pt.Model):
 
     # String (not Categorical): fold_id/experiment_name are Delta partition columns, and delta-rs
     # stores dictionary-encoded columns as String anyway. String keeps those two columns cast-free
-    # and lets predicate pushdown work. See the "Delta Lake dictionary-encoded columns" section of
-    # the
-    # `polars-patito-gotchas` skill.
+    # and lets predicate pushdown work. See the "Delta Lake dictionary-encoded columns" section
+    # of the `polars-patito-gotchas` skill.
     power_fcst_model_name: str = pt.Field(
         dtype=pl.String,
         description="Identifier for the ML-based power forecasting model family.",
@@ -450,8 +449,8 @@ class Metrics(pt.Model):
             return validated_df
 
         # `n_unique`, not `is_duplicated().any()`: the two expressions are equivalent here (every
-        # primary-key
-        # column is non-nullable once present) but `is_duplicated` materialises a per-row mask,
+        # primary-key column is non-nullable once present) but `is_duplicated` materialises a
+        # per-row mask,
         # costing ~5x the peak memory on a predict-sized frame.
         if validated_df.select(pk_cols).n_unique() != validated_df.height:
             raise ValueError(

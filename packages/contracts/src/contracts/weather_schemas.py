@@ -230,8 +230,8 @@ class Nwp(pt.Model):
         description=(
             "Wind speed at 100 m. Unit: metres per second. The stored value is a vector mean,"
             " with the same caveat as `wind_speed_10m`: a turbine power curve responds to the"
-            " scalar speed at each grid point, not to the cell's vector mean. 100 m is the height"
-            " that matters most for wind generation, being near a modern turbine's hub. See"
+            " scalar speed at each grid point, not to the cell's vector mean. A height of 100 m"
+            " matters most for wind generation, being near a modern turbine's hub. See"
             " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>"
         ),
         ge=0,

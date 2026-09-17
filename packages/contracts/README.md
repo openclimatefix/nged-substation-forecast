@@ -20,9 +20,9 @@ local path or an `s3://` URI, and `pathlib` mangles a URI.
 This package is designed to be lightweight. It defines the *shape* of the data using Patito and
 Polars, plus the settings and object-store path helpers those shapes are read and written through
 (`deltalake` and `obstore`), but it contains **no** ML-specific logic and no ML dependency such as
-MLflow, XGBoost or Dagster. That light dependency footprint is what lets any component in the system
-(e.g., a data ingestion script or a dashboard) import these schemas without bringing in the entire
-ML stack.
+MLflow, XGBoost, or Dagster. That light dependency footprint is what lets any component in the
+system (e.g., a data ingestion script or a dashboard) import these schemas without bringing in the
+entire ML stack.
 
 ## Key data contracts
 
@@ -82,8 +82,8 @@ behavioural cases:
   lives in each model's `validate` override via `check_datetime_bounds`, because Patito silently
   ignores `ge`/`le` on a datetime field — it derives its bounds checks from the JSON schema's
   `minimum`/`maximum`, which JSON Schema defines for numbers only. Columns on our own *output*
-  schemas (`PowerForecast`, `EffectiveCapacity`, `AllFeatures`, `Metrics`) have not opted in:
-  they are computed from already-bounded inputs rather than received from outside.
+  schemas (`PowerForecast`, `EffectiveCapacity`, `AllFeatures`, `Metrics`) have not opted in: they
+  are computed from already-bounded inputs rather than received from outside.
 - **Degrade, don't abort, at an ingestion boundary**: `validate()` stays strict everywhere — it is
   also used as a hard assertion in tests and R&D code, where a raise-on-violation contract must not
   silently change. But a single malformed row from an external feed should not abort ingestion of

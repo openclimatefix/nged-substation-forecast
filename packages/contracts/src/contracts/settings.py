@@ -54,12 +54,12 @@ and the caveat for wheels installed outside a workspace checkout.
 
 
 class Settings(BaseSettings):
-    """Every data path, object-store credential and Sentry setting the pipeline reads.
+    """Every data path, object-store credential, and Sentry setting the pipeline reads.
 
     Each field takes its value from an environment variable of the same name, from the workspace
     ``.env``, or from the default declared here, in that order of precedence. The managed
     data-table paths default to ``""``, a sentinel meaning "derive me": a path left unset is
-    filled in from ``data_path_internal``, ``data_path_delivery`` or ``local_artifacts_path``
+    filled in from ``data_path_internal``, ``data_path_delivery``, or ``local_artifacts_path``
     after validation, so a caller always reads a concrete path, while a path set explicitly keeps
     the value it was given. Build one through ``get_settings()`` rather than by calling
     ``Settings()`` directly.
