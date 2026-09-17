@@ -1,16 +1,18 @@
 # Organise scripts/ into subdirectories by job (#763)
 
 **Problem:** `scripts/` holds eleven files (ten `.py`/`.sh` scripts plus `markdown_wrap.py`) in one
-flat directory, mixing three unrelated jobs — automated CI/pre-commit checks, manual docs-reflow
-helpers, AWS deployment, and forecasting/data maintenance — with nothing marking which is which.
+flat directory, mixing three unrelated jobs — CI/lint tooling (both the automated pre-commit/CI
+gates and the manual docs-reflow helpers that fix what they flag), AWS deployment, and
+forecasting/data maintenance — with nothing marking which is which.
 
-**Solution:** move the eleven files into four subdirectories by role — `scripts/lint/` (automated
-pre-commit/CI gates), `scripts/docs/` (manual markdown-reflow helpers), `scripts/deploy/` (AWS
-image build/push), `scripts/forecasting/` (baseline export/training/maintenance) — and update every
+**Solution:** move the eleven files into three subdirectories by role — `scripts/lint/` (every
+markdown/docstring/notebook quality tool, automated and manual alike), `scripts/deploy/` (AWS image
+build/push), `scripts/forecasting/` (baseline export/training/maintenance) — and update every
 reference: `.github/workflows/ci.yml`, `.pre-commit-config.yaml`, `Dockerfile`, `pyproject.toml`,
-two `docs/` pages, four `SKILL.md` files, two skill scripts that import `markdown_wrap`, and two
-`tests/` files that locate a script by path. No logic changes; every moved file is untouched except
-for import paths and self-referential usage docstrings.
+two `docs/` pages, four `SKILL.md` files, two skill scripts that import `markdown_wrap`, four
+`packages/` files, two `tests/` files that locate a script by path, and the deploy scripts'
+cross-references to each other. No logic changes; every moved file is untouched except for import
+paths and self-referential usage comments/docstrings.
 
 ## Verdict, size and departures
 
@@ -18,11 +20,14 @@ for import paths and self-referential usage docstrings.
 mixing automated gates, deployment, and forecasting tooling) is accurate — confirmed by reading
 every file in `scripts/` and grepping every reference to it across the repo.
 
-**Departure from the issue body:** the issue's own text guesses three categories (CI/lint tooling,
-AWS deployment, forecasting/data) and explicitly asks the plan to check whether the docs-reflow
+**No departure from the issue body.** The issue's own text guesses three categories (CI/lint
+tooling, AWS deployment, forecasting/data) and asks the plan to check whether the docs-reflow
 helpers (`markdown_wrap.py`, `reflow_docs.py`, `reflow_python_prose.py`, added by #690/#764) belong
-with the lint tooling or in a category of their own. This plan puts them in their own category,
-`scripts/docs/`, separate from `scripts/lint/` — see "What changes" below for why.
+with the lint tooling or in a category of their own. An earlier draft of this plan gave them their
+own `scripts/docs/` category; a simplicity review (recorded under "Plan review" below) found that
+split not earning a fourth top-level directory for three files a side, and that `scripts/docs/`
+reads as documentation rather than doc-tooling next to the top-level `docs/`. This plan now follows
+the issue's own three-category guess.
 
 **Size: Medium.**
 
@@ -33,21 +38,47 @@ with the lint tooling or in a category of their own. This plan puts them in thei
   `checks.py` path, and `rewrite_nwp_row_groups.py` is a one-off maintenance script with no
   `@asset` decorator and no schedule.
 - **Degradation rule:** unaffected. No change to `inherent-stability.md` behaviour.
-- **More than one defensible design:** yes — the category boundaries and names (three vs. four
-  categories, where the docs-reflow helpers sit) are a genuine judgement call, which is exactly why
-  the issue asked for a plan rather than specifying the split itself.
+- **More than one defensible design:** yes — the category boundaries and names are a genuine
+  judgement call, which is exactly why the issue asked for a plan rather than specifying the split
+  itself.
 - **Callers you could not name without searching:** no — every reference is enumerated below via an
   exhaustive grep of the whole repo (workflows, pre-commit config, `Dockerfile`, `pyproject.toml`,
-  `docs/`, `.claude/skills/`, `tests/`), not a sample.
+  `docs/`, `.claude/skills/`, `packages/`, `tests/`, and the scripts themselves), not a sample.
 
 One trigger fires (design choice), so this is Medium, not Complex. Given the low mechanical risk —
 every file move is a `git mv` plus a string substitution, and the verification set below can check
-every reference exhaustively — I am running **one plan review** (simplicity, step 5) to sanity-check
-the four-category split against a simpler alternative, and recommending **one diff review**
-(correctness-and-cut-it-down, in `implement-issue`) to catch any reference this plan's grep missed.
-No correctness plan review (there is no ambiguity about current behaviour to get wrong — every
-script's current behaviour is unchanged) and no mutation-testing diff review (there is no new
-behaviour to mutate; the change is structural).
+every reference exhaustively — this plan already had **one plan review** (simplicity, recorded
+below), and I am recommending **one diff review** (correctness-and-cut-it-down, in
+`implement-issue`) to catch any reference even this revised grep missed. No correctness plan review
+(there is no ambiguity about current behaviour to get wrong — every script's current behaviour is
+unchanged) and no mutation-testing diff review (there is no new behaviour to mutate; the change is
+structural).
+
+## Plan review
+
+**Simplicity review (sub-agent, no visibility into the reasoning above):** found the original
+four-category split (separating `scripts/lint/` from a `scripts/docs/`) not earning its complexity,
+and `scripts/docs/` a confusable name next to top-level `docs/`. Recommended collapsing to the
+issue's own three-category guess. **Accepted** — this plan now uses three categories; see "What
+changes" below.
+
+It also re-ran the reference grep independently and found two gaps this plan's first draft missed:
+
+- **Four `packages/` files** carry a stale-path reference in a comment or docstring, missed because
+  the first grep pass never searched `packages/`: `packages/ml_core/tests/test_production_helpers.py:257`,
+  `packages/ml_core/src/ml_core/production_helpers.py:219`,
+  `packages/dashboard/tests/test_view_forecasts.py:9`, `packages/notebooks/view_baseline_export.py:1`.
+  **Accepted** — confirmed by re-running the grep myself; added to "References updated" below.
+- **The two deploy scripts reference each other** by old path in their own header comments
+  (`build_and_verify_image.sh:10,137`, `push_and_deploy_image.sh:6,11,63`), which the first draft's
+  "self-referential usage docstrings" list didn't cover since it only considered a script
+  referencing *itself*, not its sibling. **Accepted** — confirmed by re-reading both files; added
+  below.
+
+One review suggestion was **not** adopted: dropping the subdirectory move entirely in favour of a
+`scripts/README.md` categorising the flat directory. The reviewer itself concluded this contradicts
+the issue's explicit ask for subdirectories and isn't worth proposing — recorded here for
+completeness, not because it was a close call.
 
 ## What changes, file by file
 
@@ -59,7 +90,6 @@ scripts/
     check_docs_links.py
     check_marimo_notebooks.py
     lint_docstring_markdown.py
-  docs/
     markdown_wrap.py
     reflow_docs.py
     reflow_python_prose.py
@@ -72,17 +102,16 @@ scripts/
     rewrite_nwp_row_groups.py
 ```
 
-**Why `scripts/docs/` is separate from `scripts/lint/`, not merged into it or split further:**
-`check_docs_links.py`, `check_marimo_notebooks.py` and `lint_docstring_markdown.py` share a role —
-each is wired into `.pre-commit-config.yaml` (and `check_docs_links.py` into
-`.github/workflows/ci.yml` too) as an automated gate that fails a commit or a CI run.
-`markdown_wrap.py`, `reflow_docs.py` and `reflow_python_prose.py` share a different role — none is
-invoked automatically anywhere; a person runs one by hand (or a skill script imports
-`markdown_wrap.py` directly) after a lint failure, to fix the prose the gate flagged. Grouping by
-that automated-versus-manual distinction is more useful to a reader than grouping by topic
-(markdown), because `check_marimo_notebooks.py` is not about markdown at all (it checks marimo cell
-`refs`/`defs`), so a topic-based `scripts/markdown/` directory would either misplace it or leave it
-alone in `scripts/lint/` by itself.
+**Why all six lint/docs-quality files share one `scripts/lint/`:** `check_docs_links.py`,
+`check_marimo_notebooks.py` and `lint_docstring_markdown.py` are automated gates, wired into
+`.pre-commit-config.yaml` (and `check_docs_links.py` into `.github/workflows/ci.yml` too).
+`markdown_wrap.py`, `reflow_docs.py` and `reflow_python_prose.py` are manual helpers a person runs
+by hand (or a skill script imports directly) after a gate flags something to fix. That
+automated-versus-manual distinction is real, but a reader who wants to know which scripts run
+themselves already has `.pre-commit-config.yaml` as the authoritative source for that — one grep
+away — so splitting the directory on the same distinction buys little for the cost of a fourth
+top-level category holding three files a side. One `scripts/lint/` for every markdown/docstring/
+notebook quality tool, automated or manual, is the simpler answer and is what this plan uses.
 
 ### Files moved (`git mv`, no content change beyond the reference updates below)
 
@@ -91,9 +120,9 @@ alone in `scripts/lint/` by itself.
 | `scripts/check_docs_links.py` | `scripts/lint/check_docs_links.py` |
 | `scripts/check_marimo_notebooks.py` | `scripts/lint/check_marimo_notebooks.py` |
 | `scripts/lint_docstring_markdown.py` | `scripts/lint/lint_docstring_markdown.py` |
-| `scripts/markdown_wrap.py` | `scripts/docs/markdown_wrap.py` |
-| `scripts/reflow_docs.py` | `scripts/docs/reflow_docs.py` |
-| `scripts/reflow_python_prose.py` | `scripts/docs/reflow_python_prose.py` |
+| `scripts/markdown_wrap.py` | `scripts/lint/markdown_wrap.py` |
+| `scripts/reflow_docs.py` | `scripts/lint/reflow_docs.py` |
+| `scripts/reflow_python_prose.py` | `scripts/lint/reflow_python_prose.py` |
 | `scripts/build_and_verify_image.sh` | `scripts/deploy/build_and_verify_image.sh` |
 | `scripts/push_and_deploy_image.sh` | `scripts/deploy/push_and_deploy_image.sh` |
 | `scripts/export_baseline_forecasts.py` | `scripts/forecasting/export_baseline_forecasts.py` |
@@ -103,7 +132,7 @@ alone in `scripts/lint/` by itself.
 **Unaffected by the move, checked explicitly:** `reflow_docs.py` and `reflow_python_prose.py` import
 `markdown_wrap` with a bare `import markdown_wrap` / `from markdown_wrap import ...` — this works
 because Python adds a running script's own directory to `sys.path[0]`, and all three stay siblings
-in `scripts/docs/` after the move, so this import needs no change.
+in `scripts/lint/` after the move, so this import needs no change.
 `lint_docstring_markdown.py`'s `PYMARKDOWN_CONFIG = ".pymarkdown-docstrings.json"` is resolved
 relative to the *current working directory* (pre-commit and CI both run from the repo root), not
 relative to the script, so this also needs no change.
@@ -134,17 +163,29 @@ relative to the script, so this also needs no change.
   `check_structure.py`, `check_render_loss.py`, `check_information_loss.py`) are a *different*,
   unaffected `scripts/` directory (the skill's own) and are not touched.
 - **`.claude/skills/prose-review/scripts/apply_findings.py`** — `from scripts.markdown_wrap import
-  WIDTH` → `from scripts.docs.markdown_wrap import WIDTH` (the `sys.path.insert` line already
+  WIDTH` → `from scripts.lint.markdown_wrap import WIDTH` (the `sys.path.insert` line already
   inserts the repo root and treats `scripts/` as an implicit namespace package, so nesting one more
   level works the same way).
 - **`.claude/skills/literature-review/scripts/reflow_paragraphs.py`** — same import-path update as
   above.
-- **Self-referential usage docstrings** — each moved script's own `Usage::`/module-docstring example
-  invocation updates to its new path: `scripts/docs/reflow_docs.py`,
-  `scripts/docs/reflow_python_prose.py`, `scripts/forecasting/export_baseline_forecasts.py`,
-  `scripts/forecasting/run_baseline_experiment.py` (two occurrences — its own usage line and the
-  "Now run:" pointer to `export_baseline_forecasts.py`), `scripts/forecasting/
-  rewrite_nwp_row_groups.py` (two occurrences).
+- **`packages/ml_core/tests/test_production_helpers.py:257`** — `` ``scripts/build_and_verify_image.sh`` ``
+  → `` ``scripts/deploy/build_and_verify_image.sh`` `` in its docstring.
+- **`packages/ml_core/src/ml_core/production_helpers.py:219`** — the comment naming
+  `scripts/build_and_verify_image.sh` → `scripts/deploy/build_and_verify_image.sh`.
+- **`packages/dashboard/tests/test_view_forecasts.py:9`** — `scripts/check_marimo_notebooks.py` →
+  `scripts/lint/check_marimo_notebooks.py` in its module docstring.
+- **`packages/notebooks/view_baseline_export.py:1`** — `` ``scripts/export_baseline_forecasts.py`` ``
+  → `` ``scripts/forecasting/export_baseline_forecasts.py`` `` in its module docstring.
+- **Self-referential and cross-referential usage comments/docstrings** — each moved script's own
+  `Usage::`/module-docstring example invocation updates to its new path:
+  `scripts/lint/reflow_docs.py`, `scripts/lint/reflow_python_prose.py`,
+  `scripts/forecasting/export_baseline_forecasts.py`, `scripts/forecasting/run_baseline_experiment.py`
+  (two occurrences — its own usage line and the "Now run:" pointer to `export_baseline_forecasts.py`),
+  `scripts/forecasting/rewrite_nwp_row_groups.py` (two occurrences). The two deploy scripts also
+  reference *each other*, not just themselves: `scripts/deploy/build_and_verify_image.sh` (its own
+  usage line at the old `:10`, plus the "Push + deploy it with scripts/push_and_deploy_image.sh"
+  pointer at the old `:137`) and `scripts/deploy/push_and_deploy_image.sh` (its own usage lines at
+  the old `:6,11`, plus the "run scripts/build_and_verify_image.sh" pointer at the old `:63`).
 - **`tests/test_check_docs_links.py:26`** — `SCRIPT_PATH` → `REPO_ROOT / "scripts" / "lint" /
   "check_docs_links.py"`.
 - **`tests/test_marimo_notebooks.py:23`** — `CHECKER_PATH` → `REPO_ROOT / "scripts" / "lint" /
@@ -179,9 +220,9 @@ that wasn't already covered.
 ## Docs to update
 
 Covered above under "References updated": `docs/live_service/aws.md`,
-`docs/architecture/testing.md`, and four `SKILL.md` files. No roadmap page or "Implementation
-details" section references this issue — it isn't a roadmap item, so there's no ship-time triage
-beyond deleting this plan file into the PR body per the standard rule.
+`docs/architecture/testing.md`, four `SKILL.md` files, and four `packages/` docstrings/comments. No
+roadmap page or "Implementation details" section references this issue — it isn't a roadmap item, so
+there's no ship-time triage beyond deleting this plan file into the PR body per the standard rule.
 
 ## Verification commands
 
@@ -194,23 +235,13 @@ beyond deleting this plan file into the PR body per the standard rule.
   `lint-docstring-markdown`, `check-docs-links`, and the pymarkdown/ruff hooks) against the new
   paths, which is the most direct proof the `.pre-commit-config.yaml` path updates are correct
 - `uv run mkdocs build --strict` — the two touched `docs/` pages still build clean
-- `grep -rn "scripts/check_docs_links\.py\|scripts/check_marimo_notebooks\.py\|scripts/lint_docstring_markdown\.py\|scripts/markdown_wrap\.py\|scripts/reflow_docs\.py\|scripts/reflow_python_prose\.py\|scripts/build_and_verify_image\.sh\|scripts/push_and_deploy_image\.sh\|scripts/export_baseline_forecasts\.py\|scripts/run_baseline_experiment\.py\|scripts/rewrite_nwp_row_groups\.py" --include='*' .` after the move, restricted to matches with no `/lint/`, `/docs/`, `/deploy/` or `/forecasting/` segment — should return nothing outside `.claude/skills/prose-review/scripts/` (a different, unaffected directory) and this plan file itself
+- `grep -rn "scripts/check_docs_links\.py\|scripts/check_marimo_notebooks\.py\|scripts/lint_docstring_markdown\.py\|scripts/markdown_wrap\.py\|scripts/reflow_docs\.py\|scripts/reflow_python_prose\.py\|scripts/build_and_verify_image\.sh\|scripts/push_and_deploy_image\.sh\|scripts/export_baseline_forecasts\.py\|scripts/run_baseline_experiment\.py\|scripts/rewrite_nwp_row_groups\.py" --include='*' .` after the move, restricted to matches with no `/lint/`, `/deploy/` or `/forecasting/` segment — should return nothing outside `.claude/skills/prose-review/scripts/` (a different, unaffected directory) and this plan file itself
 
 ## Risks and open questions
 
-- **Is `scripts/docs/` too easily confused with the top-level `docs/` directory?** A reader
-  skimming `scripts/` sees `docs/` as a subdirectory name and might expect it to hold documentation
-  rather than docs-*tooling*. Alternatives considered: `scripts/reflow/` (accurate, but undersells
-  that `markdown_wrap.py` is a shared library, not a reflow script itself) and `scripts/prose/`
-  (reads oddly next to `check_docs_links.py`'s absence from the same folder). Recommendation: keep
-  `scripts/docs/` — it directly answers the issue's own question ("does the docs-reflow tooling
-  belong with lint tooling or its own category") in a name that says what the files are *for*, and
-  the confusion risk is low given `scripts/docs/markdown_wrap.py` is never referenced without its
-  `scripts/` prefix. Flagging this as the one naming choice most worth a second opinion in the
-  simplicity review.
-- **Should `scripts/lint/` and `scripts/docs/` simply be one `scripts/markdown/` (or
-  `scripts/quality/`) directory instead of two?** Considered and rejected above (`check_marimo_notebooks.py`
-  isn't about markdown, and automated-vs-manual is a more load-bearing distinction for a reader
-  deciding whether a script runs itself or needs to be run by hand) — but this is exactly the kind
-  of call the simplicity review should attack directly, since a 3-category split (matching the
-  issue's own initial guess) is a real alternative.
+- **Does one `scripts/lint/` for both automated gates and manual reflow helpers lose useful
+  signal?** A reader can no longer tell "is this invoked automatically" from directory placement
+  alone. Accepted trade: `.pre-commit-config.yaml` is one grep away and is the authoritative answer
+  to that question regardless of directory structure, so the directory name doesn't need to carry
+  it too. Flagging this once more for the human reviewer in case the automated/manual distinction is
+  valued more than this plan assumes.
